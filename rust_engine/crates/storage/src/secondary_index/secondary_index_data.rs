@@ -17,11 +17,13 @@
 //! floating point bit-ordered, VARCHAR hashed), so the layout matches
 //! [`crate::secondary_segment`]'s fixed-width key array.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
+use roaring::RoaringBitmap;
+
 use crate::format::FormatError;
-use crate::secondary_lowcard::{write_lowcard_segment, LowCardReader};
+use crate::secondary_lowcard::{write_lowcard_segment, LowCardKey, LowCardReader};
 use crate::secondary_segment::{write_secondary_segment, Key, SecondarySegmentReader};
 
 /// Order-preserving map of a signed integer into `u64`: `i64::MIN` -> 0.
@@ -111,9 +113,14 @@ impl HighCardinalityReader {
 }
 
 /// C++ `SecondaryIndexDataLowCardinalityT`.
+///
+/// One `roaring::RoaringBitmap` per unique key is the reference's
+/// `std::vector<Bitmap> offset_bitmaps_` (`secondary_index_data_impl.cpp:288`),
+/// so `GetOffsetsForKey` is a bitmap lookup and the saved image is the same
+/// portable bitmap the chunk stores.
 #[derive(Debug, Default)]
 pub struct LowCardinalityIndex {
-    bitmaps: BTreeMap<u64, BTreeSet<u32>>,
+    bitmaps: BTreeMap<u64, RoaringBitmap>,
 }
 
 impl LowCardinalityIndex {
@@ -142,8 +149,9 @@ impl LowCardinalityIndex {
         }
     }
 
-    /// `GetOffsetsForKeyPtr`: the bitmap's offsets for `key`.
-    pub fn offsets_for_key(&self, key: u64) -> Option<&BTreeSet<u32>> {
+    /// `GetOffsetsForKey` / `GetOffsetsForKeyPtr`: the bitmap of offsets stored
+    /// for `key`.
+    pub fn offsets_for_key(&self, key: u64) -> Option<&RoaringBitmap> {
         self.bitmaps.get(&key)
     }
 
@@ -152,7 +160,7 @@ impl LowCardinalityIndex {
         let entries: Vec<(u64, Vec<u32>)> = self
             .bitmaps
             .iter()
-            .map(|(key, offsets)| (*key, offsets.iter().copied().collect()))
+            .map(|(key, offsets)| (*key, offsets.iter().collect()))
             .collect();
         write_lowcard_segment(path, &entries)
     }
@@ -174,7 +182,7 @@ impl LowCardinalityReader {
     }
 
     pub fn offsets_for_key(&self, key: u64) -> Vec<u32> {
-        self.reader.lookup(key)
+        self.reader.lookup(LowCardKey::Fixed(Key::U64(key)))
     }
 }
 
@@ -190,8 +198,8 @@ mod tests {
             .collect()
     }
 
-    fn offsets(bitmap: &BTreeSet<u32>) -> Vec<u32> {
-        bitmap.iter().copied().collect()
+    fn offsets(bitmap: &RoaringBitmap) -> Vec<u32> {
+        bitmap.iter().collect()
     }
 
     /// C++: `LowCardinalitySecondaryIndexTest.TestIntegerLowCardinality`.
@@ -265,7 +273,7 @@ mod tests {
         index.insert_data(data);
         assert_eq!(index.unique_key_count(), 1);
         let bitmap = index.offsets_for_key(ordered_i64(0)).expect("bitmap");
-        assert_eq!(bitmap.len(), ROWS as usize);
+        assert_eq!(bitmap.len() as usize, ROWS as usize);
     }
 
     /// C++: `LowCardinalitySecondaryIndexTest.TestComparisonWithHighCardinality`.
@@ -285,7 +293,7 @@ mod tests {
         assert!(low.unique_keys().is_some());
         for i in 0..UNIQUE {
             let bitmap = low.offsets_for_key(ordered_i64(i64::from(i))).unwrap();
-            assert_eq!(bitmap.len(), (ROWS / UNIQUE) as usize);
+            assert_eq!(bitmap.len() as usize, (ROWS / UNIQUE) as usize);
         }
     }
 

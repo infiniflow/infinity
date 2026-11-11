@@ -25,6 +25,8 @@ use common::{Error, Result};
 use expression::{Expr, Value};
 use parser::CmpOp;
 
+use roaring::RoaringBitmap;
+
 use crate::regex_rewrite::{RegexIndexCatalog, RegexIndexRewrite};
 use crate::LogicalPlan;
 
@@ -88,8 +90,17 @@ pub struct IndexCatalog {
     /// Keyed by column name (C++ looks the column id up by name so that a
     /// `DROP COLUMN` shift cannot mis-bind an index).
     pub secondary: HashMap<String, SecondaryIndexInfo>,
-    /// `ExtractFunctionInfo()` spelling → indexed column name.
-    pub functional: HashMap<String, String>,
+    /// `ExtractFunctionInfo()` spelling → the index it names.
+    pub functional: HashMap<String, FunctionalIndexInfo>,
+}
+
+/// A functional index: the base column it reads, and the kind of value it
+/// stores. The kind is the function's return type (`FUNC_RETURN`), not the base
+/// column's - `sqrt(c1)` keys on doubles while `c1` is an integer.
+#[derive(Debug, Clone)]
+pub struct FunctionalIndexInfo {
+    pub column: String,
+    pub kind: ColumnKind,
 }
 
 impl IndexCatalog {
@@ -116,8 +127,14 @@ impl IndexCatalog {
         self
     }
 
-    pub fn with_functional(mut self, key: &str, column: &str) -> Self {
-        self.functional.insert(key.to_string(), column.to_string());
+    pub fn with_functional(mut self, key: &str, column: &str, kind: ColumnKind) -> Self {
+        self.functional.insert(
+            key.to_string(),
+            FunctionalIndexInfo {
+                column: column.to_string(),
+                kind,
+            },
+        );
         self
     }
 
@@ -303,6 +320,12 @@ impl FilterExpressionPushDownHelper {
         catalog: &IndexCatalog,
     ) -> Result<UnwindCast> {
         let mut value = right;
+        // `simplify_compare_type_and_value` steps `>`/`<` by the literal's own
+        // type (integers move by one, floats by an ulp). A functional index
+        // keys on its return type, so the functional arm below redoes the
+        // stepping from `raw_value`/`raw_compare`.
+        let raw_value = value.clone();
+        let raw_compare = compare_type;
         let mut compare_type = compare_type;
         Self::simplify_compare_type_and_value(&mut value, &mut compare_type);
         if matches!(
@@ -416,6 +439,29 @@ impl FilterExpressionPushDownHelper {
                 let column_id = find_column(expr).ok_or_else(|| {
                     Error::Invalid("functional index expression has no column argument".into())
                 })?;
+                let mut value = value;
+                let mut compare_type = compare_type;
+                // `sqrt(c1)` stores doubles, so `> 1` has to step to the double
+                // just above `1.0`; stepping by the integer literal selected
+                // `>= 2` and dropped every result in `(1.0, 2.0)`.
+                if matches!(
+                    raw_compare,
+                    FilterCompareType::Greater | FilterCompareType::Less
+                ) {
+                    if let Some(info) = function_key(expr).and_then(|k| catalog.functional.get(&k))
+                    {
+                        if matches!(info.kind, ColumnKind::Double | ColumnKind::Float) {
+                            let mut stepped = match raw_value.clone() {
+                                Value::Int(i) => Value::Float(i as f64),
+                                other => other,
+                            };
+                            let mut next = raw_compare;
+                            Self::simplify_compare_type_and_value(&mut stepped, &mut next);
+                            value = stepped;
+                            compare_type = next;
+                        }
+                    }
+                }
                 Ok(UnwindCast {
                     column_id,
                     value,
@@ -429,6 +475,76 @@ impl FilterExpressionPushDownHelper {
         }
     }
 
+    /// A JSON number as `f64`, whether the literal arrived as an integer or a
+    /// float: `json_extract_double(...) = 1` compares against `1.0`, and the
+    /// reference reads the operand as `DoubleT` regardless of how it was
+    /// written (`filter_expression_push_down_helper_impl.cpp:627-630`).
+    pub fn json_number(value: &Value) -> Option<f64> {
+        match value {
+            Value::Int(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    /// `json_contains`' token as the term the flattener wrote.
+    ///
+    /// The reference parses the token text as a JSON literal and takes the tag
+    /// from the parse (`filter_expression_push_down_helper_impl.cpp:541-600`):
+    /// `'"Alice"'` is the string `Alice` (`:s:`), `50` an integer (`:i:`) and
+    /// `2.5` a double (`:d:`). A token that parses as none of those stays a
+    /// string, which is also the reference's `default` arm.
+    fn json_token(text: &str) -> Option<(&'static str, String)> {
+        let text = text.trim();
+        if let Some(inner) = text.strip_prefix('"').and_then(|t| t.strip_suffix('"')) {
+            return Some((":s:", inner.replace("\\\"", "\"").replace("\\\\", "\\")));
+        }
+        match text {
+            "true" => return Some((":b:", "1".to_string())),
+            "false" => return Some((":b:", "0".to_string())),
+            _ => {}
+        }
+        if let Ok(value) = text.parse::<i64>() {
+            return Some((":i:", Self::encode_json_integer(value)));
+        }
+        // A non-finite literal has no JSON counterpart, so it is left unparsed
+        // and the predicate stays on the row filter rather than probing a term
+        // the flattener can never have written.
+        if let Ok(value) = text.parse::<f64>() {
+            if value.is_finite() {
+                return Some((":d:", Self::encode_json_double(value)));
+            }
+        }
+        None
+    }
+
+    /// The other numeric tag a `json_contains` probe has to look for.
+    ///
+    /// The flattener stores an array element under the tag its own spelling
+    /// produced (`50` → `:i:`, `50.0` → `:d:`) and additionally under the other
+    /// one, so the probe covers both. A value with no exact counterpart - a
+    /// fractional double, a non-finite one - has no alias, which leaves the
+    /// predicate to the row filter instead of excluding matching rows.
+    pub fn json_contains_alias(path: &str, value: &Value) -> Option<String> {
+        match value {
+            Value::Int(integer) => Some(format!(
+                "{path}:d:{}",
+                Self::encode_json_double(*integer as f64)
+            )),
+            Value::Float(double)
+                if double.is_finite()
+                    && double.fract() == 0.0
+                    && double.abs() <= 9_007_199_254_740_992.0 =>
+            {
+                Some(format!(
+                    "{path}:i:{}",
+                    Self::encode_json_integer(*double as i64)
+                ))
+            }
+            _ => None,
+        }
+    }
+
     /// C++ `BuildJsonTerm`.
     pub fn build_json_term(
         func_name: &str,
@@ -437,8 +553,14 @@ impl FilterExpressionPushDownHelper {
         compare_type: &mut FilterCompareType,
     ) -> String {
         if func_name == "json_contains" {
-            let term_value = value.to_slt_string();
-            return path.to_string() + ":s:" + &term_value;
+            // C++ parses the token as a JSON literal and takes the tag from the
+            // parse (`filter_expression_push_down_helper_impl.cpp:541-600`), so
+            // `json_contains(meta, '$.data.inner', 50)` probes the `:i:` term
+            // the flattener wrote and `'"Alice"'` probes `:s:Alice`. Always
+            // emitting `:s:` with the raw token matched neither.
+            let token = value.to_slt_string();
+            let (tag, encoded) = Self::json_token(&token).unwrap_or((":s:", token));
+            return path.to_string() + tag + &encoded;
         }
         let type_tag = match func_name {
             "json_extract_int" | "json_extract_isnull" => ":i:",
@@ -454,10 +576,9 @@ impl FilterExpressionPushDownHelper {
                     Value::Int(i) => format!("{path}{type_tag}{}", Self::encode_json_integer(*i)),
                     _ => String::new(),
                 },
-                "json_extract_double" => match value {
-                    Value::Float(f) => format!("{path}{type_tag}{}", Self::encode_json_double(*f)),
-                    _ => String::new(),
-                },
+                "json_extract_double" => Self::json_number(value)
+                    .map(|f| format!("{path}{type_tag}{}", Self::encode_json_double(f)))
+                    .unwrap_or_default(),
                 "json_extract_string" => format!("{path}{type_tag}{}", value.to_slt_string()),
                 "json_extract_bool" => match value {
                     Value::Bool(b) => format!("{path}{type_tag}{}", u8::from(*b)),
@@ -480,12 +601,11 @@ impl FilterExpressionPushDownHelper {
                         }
                         _ => String::new(),
                     },
-                    "json_extract_double" => match value {
-                        Value::Float(f) => {
-                            format!("{path}{type_tag}{}", Self::encode_json_double(next_up(*f)))
-                        }
-                        _ => String::new(),
-                    },
+                    "json_extract_double" => Self::json_number(value)
+                        .map(|f| {
+                            format!("{path}{type_tag}{}", Self::encode_json_double(next_up(f)))
+                        })
+                        .unwrap_or_default(),
                     "json_extract_string" => {
                         format!("{path}{type_tag}{}\u{1}", value.to_slt_string())
                     }
@@ -497,10 +617,9 @@ impl FilterExpressionPushDownHelper {
                     Value::Int(i) => format!("{path}{type_tag}{}", Self::encode_json_integer(*i)),
                     _ => String::new(),
                 },
-                "json_extract_double" => match value {
-                    Value::Float(f) => format!("{path}{type_tag}{}", Self::encode_json_double(*f)),
-                    _ => String::new(),
-                },
+                "json_extract_double" => Self::json_number(value)
+                    .map(|f| format!("{path}{type_tag}{}", Self::encode_json_double(f)))
+                    .unwrap_or_default(),
                 "json_extract_string" => format!("{path}{type_tag}{}", value.to_slt_string()),
                 _ => String::new(),
             },
@@ -517,15 +636,11 @@ impl FilterExpressionPushDownHelper {
                         }
                         _ => String::new(),
                     },
-                    "json_extract_double" => match value {
-                        Value::Float(f) => {
-                            format!(
-                                "{path}{type_tag}{}",
-                                Self::encode_json_double(next_down(*f))
-                            )
-                        }
-                        _ => String::new(),
-                    },
+                    "json_extract_double" => Self::json_number(value)
+                        .map(|f| {
+                            format!("{path}{type_tag}{}", Self::encode_json_double(next_down(f)))
+                        })
+                        .unwrap_or_default(),
                     "json_extract_string" => format!("{path}{type_tag}{}", value.to_slt_string()),
                     _ => String::new(),
                 }
@@ -535,10 +650,9 @@ impl FilterExpressionPushDownHelper {
                     Value::Int(i) => format!("{path}{type_tag}{}", Self::encode_json_integer(*i)),
                     _ => String::new(),
                 },
-                "json_extract_double" => match value {
-                    Value::Float(f) => format!("{path}{type_tag}{}", Self::encode_json_double(*f)),
-                    _ => String::new(),
-                },
+                "json_extract_double" => Self::json_number(value)
+                    .map(|f| format!("{path}{type_tag}{}", Self::encode_json_double(f)))
+                    .unwrap_or_default(),
                 "json_extract_string" => format!("{path}{type_tag}{}", value.to_slt_string()),
                 _ => String::new(),
             },
@@ -847,13 +961,8 @@ impl ExpressionInfoTree<IndexScanInfo> {
                     || (name == "-" && args.len() == 1))
                 {
                     if let Some(key) = function_key(expr) {
-                        if catalog.functional.contains_key(&key) {
-                            let kind = catalog
-                                .column_names
-                                .first()
-                                .and_then(|_| find_column(expr))
-                                .and_then(|i| catalog.kind(i));
-                            tree.info = if kind == Some(ColumnKind::Varchar) {
+                        if let Some(info) = catalog.functional.get(&key) {
+                            tree.info = if info.kind == ColumnKind::Varchar {
                                 IndexScanInfo::VarcharSecondaryIndexFunctionExpr
                             } else {
                                 IndexScanInfo::SecondaryIndexFunctionExpr
@@ -963,7 +1072,7 @@ fn classify_compare(left: IndexScanInfo, right: IndexScanInfo, is_eq: bool) -> I
 pub struct Bitmask {
     count: u32,
     all_true: bool,
-    values: BTreeSet<u32>,
+    values: RoaringBitmap,
 }
 
 impl Bitmask {
@@ -972,7 +1081,7 @@ impl Bitmask {
         Self {
             count,
             all_true: true,
-            values: BTreeSet::new(),
+            values: RoaringBitmap::new(),
         }
     }
 
@@ -980,7 +1089,7 @@ impl Bitmask {
         Self {
             count,
             all_true: false,
-            values: BTreeSet::new(),
+            values: RoaringBitmap::new(),
         }
     }
 
@@ -1000,7 +1109,7 @@ impl Bitmask {
     }
 
     pub fn is_true(&self, row: u32) -> bool {
-        row < self.count && (self.all_true || self.values.contains(&row))
+        row < self.count && (self.all_true || self.values.contains(row))
     }
 
     pub fn count_true(&self) -> u32 {
@@ -1027,7 +1136,7 @@ impl Bitmask {
         if other.all_true {
             return;
         }
-        self.values = self.values.intersection(&other.values).copied().collect();
+        self.values &= &other.values;
     }
 
     pub fn merge_or(&mut self, other: &Bitmask) {
@@ -1039,7 +1148,7 @@ impl Bitmask {
         if self.all_true {
             return;
         }
-        self.values.extend(other.values.iter().copied());
+        self.values |= &other.values;
         if self.values.len() as u32 == self.count {
             self.all_true = true;
             self.values.clear();
@@ -1927,14 +2036,31 @@ fn secondary_from_compare(
     if unwound.compare_type == FilterCompareType::Invalid {
         return Ok(IndexFilterEvaluator::AllTrue);
     }
-    let info = catalog
-        .secondary_for(unwound.column_id)
-        .ok_or_else(|| Error::Invalid("no secondary index for the pushed-down column".into()))?;
+    // A functional index is registered under its expression and its base column
+    // carries no ordinary secondary index, so the key kind comes from the
+    // functional entry; the key domain is the function's return type, which is
+    // also what the bounds below have to be expressed in.
+    let (kind, json) = match &unwound.functional {
+        Some(expr) => {
+            let info = function_key(expr)
+                .and_then(|key| catalog.functional.get(&key))
+                .ok_or_else(|| {
+                    Error::Invalid("no functional index for the pushed-down expression".into())
+                })?;
+            (info.kind, false)
+        }
+        None => {
+            let info = catalog.secondary_for(unwound.column_id).ok_or_else(|| {
+                Error::Invalid("no secondary index for the pushed-down column".into())
+            })?;
+            (info.kind, info.json)
+        }
+    };
     let evaluator = IndexFilterEvaluatorSecondary::make(
         left.clone(),
         unwound.column_id,
-        info.kind,
-        info.json,
+        kind,
+        json,
         unwound.compare_type,
         unwound.value,
     )?;
@@ -1973,17 +2099,26 @@ fn json_compare_evaluator(
     let raw = FilterExpressionPushDownHelper::calc_value_result(value_expr)?;
     let mut compare = filter_compare_of(op)
         .ok_or_else(|| Error::Invalid("cannot push '<>' into a JSON index".into()))?;
+    // `build_json_term` rewrites `>` into `>=` of the neighbouring value, so the
+    // comparison the statement wrote is kept for the integer fallback below.
+    let original_compare = compare;
     let term =
         FilterExpressionPushDownHelper::build_json_term(&func_name, &path, &raw, &mut compare);
     if compare == FilterCompareType::AlwaysFalse {
         return Ok(IndexFilterEvaluator::AllFalse);
+    }
+    if term.is_empty() {
+        // The operand is not a value this path can hold (`json_extract_int` of a
+        // string, say). Answering from an empty term would select nothing at
+        // all, so let the residual predicate decide instead.
+        return Ok(IndexFilterEvaluator::AllTrue);
     }
     let column = find_column(json_expr)
         .ok_or_else(|| Error::Invalid("JSON index expression has no column".into()))?;
     let info = catalog.secondary_for(column).ok_or_else(|| {
         Error::Invalid("no JSON secondary index for the pushed-down column".into())
     })?;
-    let evaluator = IndexFilterEvaluatorSecondary::make(
+    let mut evaluator = IndexFilterEvaluatorSecondary::make(
         tree.expr.clone(),
         column,
         info.kind,
@@ -1991,7 +2126,70 @@ fn json_compare_evaluator(
         compare,
         Value::Str(term),
     )?;
+    // C++ `filter_expression_push_down_indexscanfilter_impl.cpp:771-820`: a JSON
+    // number written as an integer (`{"score": 1}`) is read back as `1.0`, so
+    // the flattener wrote a `:i:` term and the `:d:` range alone misses it.
+    if func_name == "json_extract_double" {
+        if let Some(value) = FilterExpressionPushDownHelper::json_number(&raw) {
+            if let Some(range) = json_int_term_range(&path, value, original_compare) {
+                evaluator.add_range(range);
+            }
+        }
+    }
     Ok(IndexFilterEvaluator::Secondary(evaluator))
+}
+
+/// The `:i:` range a `json_extract_double` predicate has to probe as well.
+///
+/// A JSON number keeps the type it was written with: `{"score": 1}` flattens to
+/// `$.score:i:…` while `json_extract_double` reads it back as `1.0`. The
+/// reference therefore adds a second range over the integer terms
+/// (`filter_expression_push_down_indexscanfilter_impl.cpp:771-820`); the
+/// evaluator unions both when it runs.
+fn json_int_term_range(
+    path: &str,
+    value: f64,
+    compare: FilterCompareType,
+) -> Option<(Value, Value)> {
+    let prefix = format!("{path}:i:");
+    let key = |v: i64| {
+        Value::Str(format!(
+            "{prefix}{}",
+            FilterExpressionPushDownHelper::encode_json_integer(v)
+        ))
+    };
+    let integral = value.fract() == 0.0;
+    let range = match compare {
+        FilterCompareType::Equal => {
+            let term = key(value as i64);
+            (term.clone(), term)
+        }
+        // `>` of an integral bound starts at the next integer; against a
+        // fractional one the integer terms at the bound still qualify.
+        FilterCompareType::Greater => (
+            key(if integral {
+                value as i64 + 1
+            } else {
+                value.ceil() as i64
+            }),
+            Value::Str(format!("{prefix}~")),
+        ),
+        FilterCompareType::GreaterEqual => {
+            (key(value.ceil() as i64), Value::Str(format!("{prefix}~")))
+        }
+        FilterCompareType::Less => {
+            let end = key(if integral {
+                value as i64 - 1
+            } else {
+                value.floor() as i64
+            });
+            (Value::Str(prefix.clone()), end)
+        }
+        FilterCompareType::LessEqual => (Value::Str(prefix.clone()), key(value.floor() as i64)),
+        // `AlwaysFalse` is answered by the caller; `<>` never reaches push-down.
+        _ => return None,
+    };
+    Some(range)
 }
 
 fn json_function_evaluator(expr: &Expr, catalog: &IndexCatalog) -> Result<IndexFilterEvaluator> {
@@ -2033,7 +2231,12 @@ fn json_function_evaluator(expr: &Expr, catalog: &IndexCatalog) -> Result<IndexF
     };
     let term =
         FilterExpressionPushDownHelper::build_json_term(&func_name, &path, &value, &mut compare);
-    let evaluator = IndexFilterEvaluatorSecondary::make(
+    if term.is_empty() {
+        // Nothing the index could key on (an operand of another type, a
+        // non-finite number): the row filter answers it.
+        return Ok(IndexFilterEvaluator::AllTrue);
+    }
+    let mut evaluator = IndexFilterEvaluatorSecondary::make(
         expr.clone(),
         column,
         info.kind,
@@ -2041,6 +2244,13 @@ fn json_function_evaluator(expr: &Expr, catalog: &IndexCatalog) -> Result<IndexF
         compare,
         Value::Str(term),
     )?;
+    // `json_contains` matches `50` and `50.0` alike, and the flattener writes a
+    // numeric element under both tags, so the probe covers the other one too.
+    if func_name == "json_contains" {
+        if let Some(alias) = FilterExpressionPushDownHelper::json_contains_alias(&path, &value) {
+            evaluator.add_range((Value::Str(alias.clone()), Value::Str(alias)));
+        }
+    }
     Ok(IndexFilterEvaluator::Secondary(evaluator))
 }
 

@@ -102,6 +102,45 @@ pub(crate) fn quantize_elem(x: f64, e: ElemType) -> f32 {
     }
 }
 
+/// `sum(quantize(a_i, qa) * quantize(b_i, qb))` accumulated in `f32` - the inner
+/// product `tensor_maxsim` takes between a query vector and a stored one.
+///
+/// For every element type except `Float16`/`BFloat16`, [`quantize_elem`] is just
+/// `x as f32` (the storage layer already rounded the value to the declared
+/// type), so the loop reduces to a width-4 `f64 -> f32` conversion and a
+/// multiply-add. Those two types round through bit-manipulating helpers and stay
+/// on the scalar path, so their rounding cannot drift.
+///
+/// Below one vector the scalar loop runs instead, which keeps small tensors (the
+/// shape most callers and tests use) bit-identical to the previous code.
+pub(crate) fn dot_quantized(a: &[f64], b: &[f64], qa: ElemType, qb: ElemType) -> f32 {
+    use std::simd::{f32x4, f64x4, num::SimdFloat};
+
+    let n = a.len().min(b.len());
+    let direct = |e: ElemType| !matches!(e, ElemType::Float16 | ElemType::BFloat16);
+    if n >= 8 && direct(qa) && direct(qb) {
+        let mut acc = f32x4::splat(0.0);
+        let mut i = 0usize;
+        while i + 4 <= n {
+            let va = f64x4::from_slice(&a[i..i + 4]).cast::<f32>();
+            let vb = f64x4::from_slice(&b[i..i + 4]).cast::<f32>();
+            acc += va * vb;
+            i += 4;
+        }
+        let mut sum = acc.reduce_sum();
+        while i < n {
+            sum += (a[i] as f32) * (b[i] as f32);
+            i += 1;
+        }
+        return sum;
+    }
+    let mut acc = 0f32;
+    for i in 0..n {
+        acc += quantize_elem(a[i], qa) * quantize_elem(b[i], qb);
+    }
+    acc
+}
+
 /// Round-to-nearest-even conversion of an `f32` to the nearest `f16` value,
 /// returned as `f32`.
 pub(crate) fn round_f16(x: f32) -> f32 {
@@ -879,4 +918,112 @@ pub(crate) fn sparse_dot(q: &[(usize, f64)], v: &[(usize, f64)]) -> f64 {
         }
     }
     sum
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The loop `dot_quantized` replaced, kept here as the reference.
+    fn scalar(a: &[f64], b: &[f64], qa: ElemType, qb: ElemType) -> f32 {
+        let n = a.len().min(b.len());
+        let mut acc = 0f32;
+        for i in 0..n {
+            acc += quantize_elem(a[i], qa) * quantize_elem(b[i], qb);
+        }
+        acc
+    }
+
+    fn values(n: usize, seed: u64) -> Vec<f64> {
+        (0..n)
+            .map(|i| {
+                let x = (i as u64)
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(seed);
+                ((x >> 33) as f64 / (1u64 << 30) as f64) - 2.0
+            })
+            .collect()
+    }
+
+    #[test]
+    fn short_vectors_match_the_scalar_form_exactly() {
+        for n in 0..8usize {
+            let a = values(n, 1);
+            let b = values(n, 2);
+            for (qa, qb) in [
+                (ElemType::Float32, ElemType::Float32),
+                (ElemType::Int8, ElemType::Float32),
+                (ElemType::Float16, ElemType::Float64),
+            ] {
+                assert_eq!(
+                    dot_quantized(&a, &b, qa, qb).to_bits(),
+                    scalar(&a, &b, qa, qb).to_bits(),
+                    "n={n} {qa:?}/{qb:?}"
+                );
+            }
+        }
+    }
+
+    /// Half precision rounds through a bit-manipulating helper, so it never
+    /// takes the vector path - the result must be identical at every length.
+    #[test]
+    fn half_precision_keeps_the_scalar_rounding_at_every_length() {
+        for n in [8usize, 13, 128] {
+            let a = values(n, 3);
+            let b = values(n, 4);
+            for (qa, qb) in [
+                (ElemType::Float16, ElemType::Float32),
+                (ElemType::BFloat16, ElemType::BFloat16),
+                (ElemType::Float32, ElemType::Float16),
+            ] {
+                assert_eq!(
+                    dot_quantized(&a, &b, qa, qb).to_bits(),
+                    scalar(&a, &b, qa, qb).to_bits(),
+                    "n={n} {qa:?}/{qb:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn wide_vectors_match_within_float_error() {
+        for n in [8usize, 9, 127, 128, 129] {
+            let a = values(n, 5);
+            let b = values(n, 6);
+            let want = scalar(&a, &b, ElemType::Float32, ElemType::Float32);
+            let got = dot_quantized(&a, &b, ElemType::Float32, ElemType::Float32);
+            let tolerance = want.abs().max(1.0) * 1e-6;
+            assert!((got - want).abs() <= tolerance, "n={n}: {got} vs {want}");
+        }
+    }
+
+    /// Timing harness for the `MATCH TENSOR` inner product.
+    ///
+    /// ```text
+    /// cargo test --release -p executor --lib dot_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn dot_throughput() {
+        let dim = 128usize;
+        let a = values(dim, 7);
+        let b = values(dim, 8);
+        let rounds = 200_000;
+        let t0 = std::time::Instant::now();
+        let mut acc = 0f32;
+        for _ in 0..rounds {
+            acc += dot_quantized(&a, &b, ElemType::Float32, ElemType::Float32);
+        }
+        let simd = t0.elapsed() / rounds;
+        let t0 = std::time::Instant::now();
+        let mut scalar_acc = 0f32;
+        for _ in 0..rounds {
+            scalar_acc += scalar(&a, &b, ElemType::Float32, ElemType::Float32);
+        }
+        let old = t0.elapsed() / rounds;
+        eprintln!(
+            "dot dim={dim}: scalar={old:?} simd={simd:?} ({:.2}x) acc={acc} {scalar_acc}",
+            old.as_secs_f64() / simd.as_secs_f64()
+        );
+    }
 }

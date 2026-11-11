@@ -306,9 +306,10 @@ impl PlaidQuantizer {
                 "PlaidQuantizer::GetIPDistanceTableTo: buffer too short".into(),
             ));
         }
-        for d in 0..dim {
-            for b in 0..n_buckets {
-                output[d * n_buckets + b] = query[d] * self.bucket_weights[b];
+        for (d, row) in output.chunks_exact_mut(n_buckets).take(dim).enumerate() {
+            let q = query[d];
+            for (slot, weight) in row.iter_mut().zip(&self.bucket_weights) {
+                *slot = q * *weight;
             }
         }
         Ok(())
@@ -318,24 +319,45 @@ impl PlaidQuantizer {
     pub fn build_position_lut(&self, ip_table: &[f32], lut_out: &mut [f32]) -> Result<()> {
         let keys_per_byte = (8 / self.nbits) as usize;
         let n_buckets = self.n_buckets as usize;
+        let dim = self.embedding_dim as usize;
         let packed_dim = self.packed_dim as usize;
-        if ip_table.len() < self.embedding_dim as usize * n_buckets
-            || lut_out.len() < packed_dim * 256
-        {
+        if ip_table.len() < dim * n_buckets || lut_out.len() < packed_dim * 256 {
             return Err(Error::Invalid(
                 "PlaidQuantizer::BuildPositionLUT: buffer too short".into(),
             ));
         }
-        for j in 0..packed_dim {
-            for v in 0..256 {
-                let reversed = self.byte_reversed_bits_map[v] as usize;
+        // Decoding a byte into its bucket indices does not depend on the
+        // position, so it happens once instead of `packed_dim` times. The
+        // accumulation order is unchanged (one running total, ascending `k`),
+        // so the table is bit-for-bit what the per-position loop produced.
+        // A fixed stack buffer: `keys_per_byte` is 1, 2, 4 or 8, so 2048 bytes
+        // cover the widest case and the build stays allocation-free. Laid out as
+        // `decoded[k * 256 + v]` so the inner loop indexes it without building a
+        // sub-slice per byte value.
+        let mut scratch = [0u8; 256 * 8];
+        for v in 0..256 {
+            let base = self.byte_reversed_bits_map[v] as usize * keys_per_byte;
+            for k in 0..keys_per_byte {
+                scratch[k * 256 + v] = self.bucket_weight_indices_lookup[base + k];
+            }
+        }
+        let (lut_rows, _) = lut_out.as_chunks_mut::<256>();
+        for (j, row) in lut_rows.iter_mut().take(packed_dim).enumerate() {
+            let first = j * keys_per_byte;
+            // When `dim * nbits` is not a multiple of 8 the last byte carries
+            // padding bits that address no embedding dimension. Only the keys
+            // that still do contribute; the padded slots are skipped, which is
+            // also what keeps the row read inside `ip_table` - clamping the end
+            // of the slice to `dim * n_buckets` rather than to the packed
+            // width.
+            let valid = keys_per_byte.min(dim - first);
+            let buckets = &ip_table[first * n_buckets..(first + valid) * n_buckets];
+            for (v, slot) in row.iter_mut().enumerate() {
                 let mut contrib = 0.0f32;
-                for k in 0..keys_per_byte {
-                    let bucket =
-                        self.bucket_weight_indices_lookup[reversed * keys_per_byte + k] as usize;
-                    contrib += ip_table[(j * keys_per_byte + k) * n_buckets + bucket];
+                for k in 0..valid {
+                    contrib += buckets[k * n_buckets + scratch[k * 256 + v] as usize];
                 }
-                lut_out[j * 256 + v] = contrib;
+                *slot = contrib;
             }
         }
         Ok(())
@@ -350,17 +372,19 @@ impl PlaidQuantizer {
     ) -> f32 {
         let packed_dim = self.packed_dim as usize;
         let packed = &packed_residuals[embedding_id * packed_dim..(embedding_id + 1) * packed_dim];
+        assert!(
+            position_lut.len() >= packed_dim * 256,
+            "position LUT is shorter than the packed dimension"
+        );
+        // One 256-float row per packed byte: indexing a row with a byte lets the
+        // compiler prove the bound, where the flat `j * 256 + byte` form needed a
+        // check per lookup against a slice that grew with `j`. The accumulation
+        // order is the same single running total, so the score is bit-for-bit
+        // what the four-way unroll produced.
         let mut result = 0.0f32;
-        let mut j = 0usize;
-        while j + 4 <= packed_dim {
-            for k in 0..4 {
-                result += position_lut[(j + k) * 256 + packed[j + k] as usize];
-            }
-            j += 4;
-        }
-        while j < packed_dim {
-            result += position_lut[j * 256 + packed[j] as usize];
-            j += 1;
+        let (lut_rows, _) = position_lut.as_chunks::<256>();
+        for (row, &byte) in lut_rows.iter().zip(packed) {
+            result += row[byte as usize];
         }
         result
     }
@@ -589,6 +613,148 @@ mod tests {
         q.train(&residuals, n).unwrap();
         let packed = q.quantize(&residuals, n).unwrap();
         assert_eq!(packed.len(), n * ((dim * nbits).div_ceil(8) as usize));
+    }
+
+    /// Timing harness for the two halves of a PLAID exact score: building the
+    /// position LUT (once per query token) and walking embeddings through it
+    /// (once per candidate token, the hottest loop of a search).
+    ///
+    /// ```text
+    /// cargo test --release -p index --lib position_lut_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn position_lut_throughput() {
+        let (nbits, dim) = (4u32, 128u32);
+        let mut q = PlaidQuantizer::new(nbits, dim).unwrap();
+        let n = 4096usize;
+        let residuals: Vec<f32> = (0..n * dim as usize)
+            .map(|i| ((i % 37) as f32) * 0.01)
+            .collect();
+        q.train(&residuals, n).unwrap();
+        let packed = q.quantize(&residuals, n).unwrap();
+        let query: Vec<f32> = (0..dim).map(|i| i as f32 * 0.5).collect();
+        let table = q.ip_distance_table(&query).unwrap();
+        let mut lut = vec![0f32; q.packed_dim() as usize * 256];
+
+        let rounds = 20;
+        let t0 = std::time::Instant::now();
+        for _ in 0..rounds {
+            q.build_position_lut(&table, &mut lut).unwrap();
+        }
+        let build = t0.elapsed() / rounds;
+
+        let mut acc = 0f32;
+        let t0 = std::time::Instant::now();
+        for _ in 0..rounds {
+            for id in 0..n {
+                acc += q.single_ip_distance_from_lut(id, &lut, &packed);
+            }
+        }
+        let score = t0.elapsed() / rounds;
+        eprintln!(
+            "build_position_lut={build:?} score_n={n}={score:?} per_embedding={:?} acc={acc}",
+            score / n as u32
+        );
+    }
+
+    /// The two speed-ups (one decode per byte value in the build, row-wise LUT
+    /// indexing in the walk) may only remove work, never change the arithmetic:
+    /// the reference loops are written out here and compared bit for bit.
+    ///
+    /// Note the LUT itself is *not* bit-identical to `single_ip_distance`: it
+    /// sums a byte's keys into `contrib` before adding that to the total, which
+    /// is the reference's own grouping (and therefore what the C++ produces).
+    #[test]
+    fn the_optimised_lut_matches_the_reference_arithmetic() {
+        for nbits in [2u32, 4u32] {
+            let dim = 16u32;
+            let n = 32usize;
+            let mut q = PlaidQuantizer::new(nbits, dim).unwrap();
+            let residuals: Vec<f32> = (0..n * dim as usize)
+                .map(|i| (((i * 7919) % 101) as f32 - 50.0) * 0.037)
+                .collect();
+            q.train(&residuals, n).unwrap();
+            let packed = q.quantize(&residuals, n).unwrap();
+            let query: Vec<f32> = (0..dim).map(|i| (i as f32 + 0.25) * 0.5).collect();
+            let table = q.ip_distance_table(&query).unwrap();
+
+            let keys_per_byte = (8 / nbits) as usize;
+            let n_buckets = q.n_buckets as usize;
+            let packed_dim = q.packed_dim as usize;
+            let mut expected = vec![0f32; packed_dim * 256];
+            for j in 0..packed_dim {
+                // The reference stops at the last embedding dimension too: an
+                // unaligned width leaves padding keys in the final byte.
+                let first = j * keys_per_byte;
+                let valid = keys_per_byte.min(dim as usize - first);
+                for v in 0..256 {
+                    let reversed = q.byte_reversed_bits_map[v] as usize;
+                    let mut contrib = 0.0f32;
+                    for k in 0..valid {
+                        let bucket =
+                            q.bucket_weight_indices_lookup[reversed * keys_per_byte + k] as usize;
+                        contrib += table[(first + k) * n_buckets + bucket];
+                    }
+                    expected[j * 256 + v] = contrib;
+                }
+            }
+            let mut lut = vec![0f32; packed_dim * 256];
+            q.build_position_lut(&table, &mut lut).unwrap();
+            for (got, want) in lut.iter().zip(&expected) {
+                assert_eq!(got.to_bits(), want.to_bits(), "nbits={nbits} LUT");
+            }
+
+            for id in 0..n {
+                let row = &packed[id * packed_dim..(id + 1) * packed_dim];
+                let mut reference = 0.0f32;
+                for (j, &byte) in row.iter().enumerate() {
+                    reference += lut[j * 256 + byte as usize];
+                }
+                let fast = q.single_ip_distance_from_lut(id, &lut, &packed);
+                assert_eq!(
+                    reference.to_bits(),
+                    fast.to_bits(),
+                    "nbits={nbits} id={id}: {reference} vs {fast}"
+                );
+            }
+        }
+    }
+
+    /// A dimension that does not fill its last packed byte leaves padding keys
+    /// behind. The LUT build has to stop at the last real dimension instead of
+    /// reading past `ip_table`, and the resulting score must still agree with
+    /// the direct (byte-unpacking) path, which already stops at `dim`.
+    #[test]
+    fn unaligned_dimensions_stay_inside_the_table() {
+        for nbits in [2u32, 4u32] {
+            for dim in [3u32, 5, 7, 9, 13] {
+                let n = 16usize;
+                let mut q = PlaidQuantizer::new(nbits, dim).unwrap();
+                let residuals: Vec<f32> = (0..n * dim as usize)
+                    .map(|i| (((i * 37) % 23) as f32 - 11.0) * 0.125)
+                    .collect();
+                q.train(&residuals, n).unwrap();
+                let packed = q.quantize(&residuals, n).unwrap();
+                assert_eq!(
+                    packed.len(),
+                    n * q.packed_dim() as usize,
+                    "nbits={nbits} dim={dim}"
+                );
+                let query: Vec<f32> = (0..dim).map(|i| (i as f32 + 0.5) * 0.25).collect();
+                let table = q.ip_distance_table(&query).unwrap();
+                let mut lut = vec![0f32; q.packed_dim() as usize * 256];
+                q.build_position_lut(&table, &mut lut).unwrap();
+                for id in 0..n {
+                    let direct = q.single_ip_distance(id, &table, &packed);
+                    let fast = q.single_ip_distance_from_lut(id, &lut, &packed);
+                    assert!(
+                        (direct - fast).abs() < 1e-4,
+                        "nbits={nbits} dim={dim} id={id}: {direct} vs {fast}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

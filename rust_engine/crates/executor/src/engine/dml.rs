@@ -99,6 +99,7 @@ impl Engine {
             }
         }
         let mut readers = Vec::new();
+        let mut meta: Vec<(u64, usize)> = Vec::new();
         for (segment, entries) in by_segment {
             let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
             for entry in entries {
@@ -121,20 +122,20 @@ impl Engine {
                     storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
                 {
                     // The chunk's offsets are already segment-relative, so the
-                    // base is the segment alone.
+                    // base is the segment alone; its `ChunkIndexMetaInfo` covers
+                    // the rows the block held.
+                    meta.push((segment << 32, entries.len()));
                     readers.push((segment << 32, Arc::new(reader)));
                 }
             }
         }
         let tkey = self.table_key(table);
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(tkey)
-            .or_default()
-            .secondary
-            .disk
-            .insert(column.to_string(), readers);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.secondary.disk.insert(column.to_string(), readers);
+        // A rebuild replaces the whole chunk set, so its meta replaces the list
+        // a previous dump appended to.
+        entry.secondary.chunk_meta.insert(column.to_string(), meta);
     }
 
     /// Appends a committed batch to the decoded-row cache, if the table has one.
@@ -746,8 +747,12 @@ impl Engine {
                 // thread (the reference's `MemIndexAppender` is a single
                 // thread, which is the one structural deviation here).
                 let schema = engine.table_schema(&index_table).unwrap_or_default();
-                for (seq, texts) in &index_rows {
-                    engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
+                for (k, (seq, _)) in index_rows.iter().enumerate() {
+                    // `index_rows` is `bottom_rows` rendered, so the literals are
+                    // the same rows: the secondary hook needs them to tell a NULL
+                    // from an empty cell.
+                    let values = bottom_rows.get(k).map(Vec::as_slice).unwrap_or(&[]);
+                    engine.update_indexes_on_insert(&index_table, *seq, values, &schema)?;
                 }
                 // One batch: the full-text terms of the whole append are
                 // tokenised without the column lock and inserted under it once.
@@ -1109,8 +1114,34 @@ impl Engine {
         values: &[Literal],
         schema: &[String],
     ) -> Result<()> {
-        let texts: Vec<String> = values.iter().map(|v| v.to_slt_string()).collect();
-        self.update_indexes_on_insert_text(table, seq, &texts, schema)
+        // The evaluated row is only built when a functional index needs it: a
+        // plain index reads its cell's text and pays nothing.
+        let mut row_values: Option<Vec<Value>> = None;
+        for target in self.secondary_targets(table, schema) {
+            let Some(value) = values.get(target.pos) else {
+                continue;
+            };
+            // `SecondaryIndexInMemT::InsertInner` skips a row whose null bit is
+            // set: a NULL is not a key.
+            if matches!(value, Literal::Null) {
+                continue;
+            }
+            let keys = match &target.func {
+                None => text_to_tail_keys(&target.declared, &value.to_slt_string()),
+                Some(func) => {
+                    let row = row_values
+                        .get_or_insert_with(|| values.iter().map(Value::from_literal).collect());
+                    match functional_value(func, target.pos, row) {
+                        Some(value) => value_to_key(&target.declared, &value),
+                        None => Vec::new(),
+                    }
+                }
+            };
+            for key in keys {
+                target.index.insert(&key, seq as u64);
+            }
+        }
+        Ok(())
     }
 
     /// Feeds a whole batch of rows into every secondary index of `table`.
@@ -1119,6 +1150,12 @@ impl Engine {
     /// string) and took the registry lock for every row, and looked the indexed
     /// column up in the schema once per index per row. A bulk statement paid
     /// that per row; this pays it once for the batch.
+    ///
+    /// Each key is the column's **order-preserving encoding**
+    /// (`Key::ordered_bytes`) - the same domain a sealed chunk uses - so the
+    /// memory tail is ordered like the column (a range scan slices it instead
+    /// of decoding every key) and a dump can write its keys out directly. The
+    /// tails are cloned out under the table lock and appended to outside it.
     pub(crate) fn update_secondary_indexes_batch(
         &self,
         table: &str,
@@ -1129,57 +1166,94 @@ impl Engine {
         if rows.is_empty() {
             return;
         }
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        if entry.secondary.indexes.is_empty() {
+        let targets = self.secondary_targets(table, schema);
+        if targets.is_empty() {
             return;
         }
-        // `(position of the indexed column in the row, index)`, resolved once.
-        let mut targets: Vec<(usize, &mut SecondaryIndex)> = Vec::new();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(pos) = schema.iter().position(|c| c == col) {
-                targets.push((pos, idx));
-            }
-        }
-        // Only the indexed cells are rendered: the key is the cell's stored
-        // text, and a wide table has no reason to format the rest. A varchar
-        // cell *is* its stored text, so it goes in without a copy; everything
-        // else is formatted into one buffer reused across the batch.
-        let mut key = String::new();
         for (k, values) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
-            for (pos, idx) in targets.iter_mut() {
-                let Some(value) = values.get(*pos) else {
+            for target in &targets {
+                let Some(value) = values.get(target.pos) else {
                     continue;
                 };
-                match value {
-                    Value::Str(text) => idx.insert(text.as_bytes(), seq),
-                    other => {
-                        key.clear();
-                        key.push_str(&other.to_slt_string());
-                        idx.insert(key.as_bytes(), seq);
-                    }
+                // A JSON document contributes one key per flattened term, a
+                // functional index one per evaluated row and every other column
+                // exactly one.
+                let keys = match &target.func {
+                    None => value_to_tail_keys(&target.declared, value),
+                    Some(func) => match functional_value(func, target.pos, values) {
+                        Some(value) => value_to_key(&target.declared, &value),
+                        None => Vec::new(),
+                    },
+                };
+                for key in keys {
+                    target.index.insert(&key, seq);
                 }
             }
         }
     }
 
+    /// `(position in the row, declared type, memory tail)` of each indexed
+    /// column, resolved once per statement and held outside the table lock.
+    ///
+    /// The tail is an `Arc` (the registry only borrows it while building this
+    /// list), so the rows go into it without excluding any other table - the
+    /// reference writes into each `SecondaryIndexInMemT` the same way.
+    fn secondary_targets(&self, table: &str, schema: &[String]) -> Vec<SecondaryTarget> {
+        let tkey = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&tkey) else {
+            return Vec::new();
+        };
+        entry
+            .secondary
+            .indexes
+            .iter()
+            .filter_map(|(col, index)| {
+                let declared = entry.secondary.declared_types.get(col)?;
+                // A functional index reads `base` and applies `func`; its
+                // declared type is the function's return type
+                // (`IndexSecondaryFunctional::func_return_type_`).
+                let (pos, func) = match entry.secondary.functional.get(col) {
+                    Some(functional) => (
+                        schema.iter().position(|c| c == &functional.base)?,
+                        Some(functional.func.clone()),
+                    ),
+                    None => (schema.iter().position(|c| c == col)?, None),
+                };
+                Some(SecondaryTarget {
+                    pos,
+                    declared: declared.clone(),
+                    index: Arc::clone(index),
+                    func,
+                })
+            })
+            .collect()
+    }
+
+    /// The `Value` form of [`Self::update_indexes_on_insert`]: a callback path
+    /// that only has the rendered cells cannot tell a NULL from an empty string,
+    /// so every caller hands the row over as values.
     pub(crate) fn update_indexes_on_insert_text(
         &self,
         table: &str,
         seq: usize,
-        values: &[String],
+        values: &[Value],
         schema: &[String],
     ) -> Result<()> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(ci) = schema.iter().position(|c| c == col) {
-                if let Some(v) = values.get(ci) {
-                    idx.insert(v.as_bytes(), seq as u64);
-                }
+        for target in self.secondary_targets(table, schema) {
+            let Some(value) = values.get(target.pos) else {
+                continue;
+            };
+            let keys = match &target.func {
+                None => value_to_tail_keys(&target.declared, value),
+                Some(func) => match functional_value(func, target.pos, values) {
+                    Some(value) => value_to_key(&target.declared, &value),
+                    None => Vec::new(),
+                },
+            };
+            for key in keys {
+                target.index.insert(&key, seq as u64);
             }
         }
         Ok(())
@@ -1388,6 +1462,12 @@ impl Engine {
             }
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The row is seen whether or not it carries a tensor. A NULL cell
+            // adds no PLAID document, but the coverage counter has to advance
+            // anyway: `is_complete(reserved)` compares it with the table's live
+            // rows, and a row it never counts keeps every later search
+            // rebuilding the index from scratch.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             if let Some(doc) = parse_multivector_doc(text, dims) {
                 index.insert(seq as u64, doc);
@@ -1423,6 +1503,11 @@ impl Engine {
             };
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The index has seen this row whether or not it carries postings:
+            // the coverage check counts rows, not documents (a NULL sparse cell
+            // writes no term). A rewritten row counts twice, which only makes
+            // the index look more complete than it is - it was just updated.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             // A NULL cell stores the literal `null`; it has no postings.
             if text.trim().eq_ignore_ascii_case("null") {

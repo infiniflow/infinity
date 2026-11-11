@@ -3709,6 +3709,634 @@ mod tests {
         assert_eq!(loaded.total_embedding_num(), 1200);
     }
 
+    /// Concurrent searches while rows are appended and the tail is dumped: the
+    /// readers never deadlock, every answer is a subset of the table, and the
+    /// final answer covers every row.
+    #[test]
+    fn plaid_index_answers_concurrent_searches() {
+        use std::sync::{Arc, Mutex};
+
+        let dir = tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let tensor_rows = |lo: usize, hi: usize| -> String {
+            let mut values = Vec::new();
+            for i in lo..hi {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    tokens.push(format!("[{x},0.5,0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            values.join(",")
+        };
+        engine
+            .execute(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
+            .unwrap();
+        engine
+            .execute("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let query = "SELECT id FROM pcc SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=400');";
+        let writer = {
+            let engine = Arc::clone(&engine);
+            std::thread::spawn(move || {
+                for step in 0..4 {
+                    let lo = 200 + step * 50;
+                    engine
+                        .execute(&format!(
+                            "INSERT INTO pcc VALUES {};",
+                            tensor_rows(lo, lo + 50)
+                        ))
+                        .unwrap();
+                }
+                engine.flush().unwrap();
+            })
+        };
+        let observed: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut readers = Vec::new();
+        for _ in 0..2 {
+            let engine = Arc::clone(&engine);
+            let observed = Arc::clone(&observed);
+            readers.push(std::thread::spawn(move || {
+                for _ in 0..15 {
+                    let seen: Vec<i64> = rows(&engine, query)
+                        .into_iter()
+                        .map(|row| row[0].parse().expect("id column"))
+                        .collect();
+                    observed.lock().unwrap().extend(seen);
+                }
+            }));
+        }
+        writer.join().unwrap();
+        for reader in readers {
+            reader.join().unwrap();
+        }
+
+        // No ghost rows: every id a concurrent reader saw exists.
+        for id in observed.lock().unwrap().iter() {
+            assert!((0..400).contains(id), "reader saw the ghost id {id}");
+        }
+        // And the final answer covers the whole table.
+        let final_ids: std::collections::BTreeSet<i64> = rows(&engine, query)
+            .into_iter()
+            .map(|row| row[0].parse().expect("id column"))
+            .collect();
+        let expected: std::collections::BTreeSet<i64> = (0..400).collect();
+        assert_eq!(final_ids, expected);
+    }
+
+    /// The whole PLAID lifecycle in one run: build, search the corpus, append,
+    /// flush, reopen (mmap load), optimize (chunk merge), a `filter=`, a delete
+    /// and an update. Every step must return exactly the rows the table holds, so
+    /// the index stays coherent across the operations a production table sees.
+    fn plaid_lifecycle(colbertsar: bool) {
+        let dir = tempdir().unwrap();
+        let table = if colbertsar { "pcb" } else { "pld" };
+        let index = if colbertsar { "pcbi" } else { "pldi" };
+        let ddl = if colbertsar {
+            // `nbits` is unused without residuals and is accepted only here.
+            format!(
+                "CREATE INDEX {index} ON {table} (t) USING PLAID \
+                 WITH (centroids = 8, nbits = 8, colbertsar_mode = true);"
+            )
+        } else {
+            format!("CREATE INDEX {index} ON {table} (t) USING PLAID WITH (n_centroids = 8);")
+        };
+        let query = |topn: usize, filter: Option<&str>| {
+            let mut params = format!("topn={topn}");
+            if let Some(filter) = filter {
+                params.push_str(&format!(";filter={filter}"));
+            }
+            format!(
+                "SELECT id FROM {table} SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', '{params}');"
+            )
+        };
+        let ids = |engine: &Engine, sql: &str| -> std::collections::BTreeSet<i64> {
+            rows(engine, sql)
+                .into_iter()
+                .map(|row| row[0].parse().expect("id column"))
+                .collect()
+        };
+        let tensor_rows = |lo: usize, hi: usize| -> String {
+            let mut values = Vec::new();
+            for i in lo..hi {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    let y = ((i + j) % 5) as f32 - 1.0;
+                    tokens.push(format!("[{x},{y},0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            values.join(",")
+        };
+
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute(&format!(
+                "CREATE TABLE {table} (id INT, t TENSOR(FLOAT,4));"
+            ))
+            .unwrap();
+        engine
+            .execute(&format!(
+                "INSERT INTO {table} VALUES {};",
+                tensor_rows(0, 200)
+            ))
+            .unwrap();
+        engine.execute(&ddl).unwrap();
+
+        // 1. The index answers for the whole corpus.
+        let mut expected: std::collections::BTreeSet<i64> = (0..200).collect();
+        assert_eq!(ids(&engine, &query(200, None)), expected);
+
+        // 2. Rows appended after the build are indexed too (incremental add).
+        engine
+            .execute(&format!(
+                "INSERT INTO {table} VALUES {};",
+                tensor_rows(200, 260)
+            ))
+            .unwrap();
+        expected.extend(200..260);
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 3. A flush + reopen loads the flushed chunk (mmap) instead of rebuilding.
+        engine.flush().unwrap();
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+        {
+            let index = engine.multivector_index_for(table, "t", 4).unwrap();
+            let guard = index.read().unwrap();
+            let plaid = guard.plaid.as_ref().expect("PLAID not restored");
+            assert_eq!(plaid.doc_num() as usize, 260);
+            assert_eq!(plaid.is_colbertsar_mode(), colbertsar);
+            if colbertsar {
+                // Residual-free: nothing to map, and nothing on the heap either.
+                assert!(plaid.packed_residuals().is_empty());
+            } else {
+                assert!(
+                    plaid.is_packed_mapped(),
+                    "the PLAID chunk was copied onto the heap instead of mapped"
+                );
+                assert!(!plaid.packed_residuals().is_empty());
+            }
+        }
+
+        // 4. The optimize pass merges the chunks; the answers stay the same.
+        engine.optimize_index_chunks().unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 5. A `filter=` is answered from the index bitmask.
+        let filtered: std::collections::BTreeSet<i64> = (0..100).collect();
+        assert_eq!(ids(&engine, &query(260, Some("id < 100"))), filtered);
+
+        // 6. A tombstoned row is no longer returned.
+        engine
+            .execute(&format!("DELETE FROM {table} WHERE id = 5;"))
+            .unwrap();
+        expected.remove(&5);
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 7. An update rewrites the tensor and the row stays searchable.
+        engine
+            .execute(&format!(
+                "UPDATE {table} SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 6;"
+            ))
+            .unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 8. A clean shutdown and restart keeps the same answers.
+        engine.flush().unwrap();
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+    }
+
+    /// PLAID mode, end to end.
+    #[test]
+    fn plaid_index_lifecycle_is_coherent() {
+        plaid_lifecycle(false);
+    }
+
+    /// ColBERTSaR mode, end to end: residual-free chunks and the same lifecycle
+    /// guarantees.
+    #[test]
+    fn colbertsar_index_lifecycle_is_coherent() {
+        plaid_lifecycle(true);
+    }
+
+    /// `filter=` on `SEARCH MATCH TENSOR` narrows the candidates through the
+    /// index's bitmask (`CalculateFilterBitmask`) instead of falling back to a
+    /// row scan: with the whole corpus requested, the filtered answer is exactly
+    /// the unfiltered one restricted to the filter's rows.
+    #[test]
+    fn match_tensor_filter_narrows_through_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO pf VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let all = rows(
+            &e,
+            "SELECT id FROM pf SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300');",
+        );
+        let filtered = rows(
+            &e,
+            "SELECT id FROM pf SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300;filter=id < 150');",
+        );
+        let all_ids: std::collections::HashSet<String> =
+            all.into_iter().map(|row| row[0].clone()).collect();
+        let expected: std::collections::HashSet<String> = all_ids
+            .iter()
+            .filter(|id| id.parse::<i64>().unwrap() < 150)
+            .cloned()
+            .collect();
+        let got: std::collections::HashSet<String> =
+            filtered.into_iter().map(|row| row[0].clone()).collect();
+        assert_eq!(got, expected);
+        assert!(
+            got.len() >= 100,
+            "the filter dropped too many rows: {}",
+            got.len()
+        );
+    }
+
+    /// A `flush` writes the PLAID index out as C++ chunks; the first search
+    /// after a reopen must load them instead of retraining over the whole table
+    /// (that cost is what made a restart pay O(rows) before answering).
+    #[test]
+    fn plaid_index_loads_its_flushed_chunks_after_reopen() {
+        let dir = tempdir().unwrap();
+        let q = "SELECT id FROM pr SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let mut values = Vec::new();
+            for i in 0..300 {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    tokens.push(format!("[{x},0.5,0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            e.execute(&format!("INSERT INTO pr VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
+                .unwrap();
+            assert_eq!(rows(&e, q).len(), 3);
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        // A filter can exclude every PLAID candidate; the sealed readers loaded
+        // beside PLAID are what keeps such a search answered.
+        let filtered = "SELECT id FROM pr SEARCH MATCH TENSOR \
+                        (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3;filter=id < 5');";
+        let filtered_hits = rows(&e, filtered);
+        assert!(
+            !filtered_hits.is_empty(),
+            "a filtered search lost its fallback"
+        );
+        assert!(
+            filtered_hits
+                .iter()
+                .all(|row| row[0].parse::<i64>().unwrap_or(99) < 5),
+            "the filter was not applied: {filtered_hits:?}"
+        );
+        let index = e.multivector_index_for("pr", "t", 4).unwrap();
+        let guard = index.read().unwrap();
+        assert!(
+            guard.plaid.is_some(),
+            "PLAID was not restored from its flushed chunks"
+        );
+        assert_eq!(guard.plaid_seqs.len(), 300, "the row ids were not restored");
+        assert!(
+            guard.plaid.as_ref().is_some_and(|p| p.is_packed_mapped()),
+            "the loaded PLAID chunk was copied onto the heap instead of mapped"
+        );
+        // The sealed readers are loaded beside PLAID on purpose: they are the
+        // fallback a filtered search needs when PLAID returns no admissible
+        // candidate. Their presence also proves the chunk path ran - a rebuild
+        // would have written new ones from the rows.
+        assert_eq!(
+            guard.sealed.len(),
+            1,
+            "the flushed chunk was not mapped for the sealed fallback"
+        );
+        assert!(
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the restored row ids do not line up with the chunk's documents"
+        );
+        assert!(!guard.plaid_dropped, "PLAID was left dropped");
+    }
+
+    /// A NULL tensor adds no PLAID document, but the row still has to count as
+    /// *seen*: `is_complete(reserved)` compares the counter with the table's
+    /// live rows, so a row it never advances on would make every search rebuild
+    /// the whole index, PLAID training included.
+    #[test]
+    fn a_null_tensor_row_keeps_the_multivector_index_complete() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[1.0,0.5,0.25,0.125]])"))
+            .collect();
+        e.execute(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let first = e.multivector_index_for("mn", "m", 4).unwrap();
+        e.execute("INSERT INTO mn VALUES (300, NULL);").unwrap();
+        let after = e.multivector_index_for("mn", "m", 4).unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt although the NULL row was counted as seen"
+        );
+    }
+
+    /// The four `plaid_*` keys reach `plaid_search_options`; the statement's
+    /// option validator runs first and used to reject them as unknown.
+    #[test]
+    fn plaid_search_options_are_accepted_by_the_validator() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+            .collect();
+        e.execute(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let query = "SELECT id FROM pv SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', \
+                      'topn=3;plaid_n_ivf_probe=32;plaid_centroid_score_threshold=-0.5;\
+                      plaid_n_doc_to_score=300;plaid_n_full_scores=30');";
+        assert_eq!(rows(&e, query).len(), 3);
+    }
+
+    /// A chunk written after a delete covers only the live rows. The restored
+    /// row list has to be that same live population, or the document count
+    /// never matches `doc_num()` and every reopen retrains the index.
+    #[test]
+    fn a_chunk_written_after_a_delete_reopens_without_retraining() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute(&format!("INSERT INTO md VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+                .unwrap();
+            e.flush().unwrap();
+            e.execute("DELETE FROM md WHERE id = 0;").unwrap();
+            // A delete drops the in-memory PLAID index, and the next search
+            // rebuilds it; the following flush then rewrites the chunk from the
+            // live rows (`plaid_chunk` -> `column_docs`), which is the chunk
+            // this test reopens.
+            e.execute(
+                "SELECT id FROM md SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+            )
+            .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let hits = rows(
+            &e,
+            "SELECT id FROM md SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+        );
+        assert!(
+            !hits.iter().any(|row| row[0] == "0"),
+            "the deleted row was scored after the reopen"
+        );
+        let index = e.multivector_index_for("md", "t", 4).unwrap();
+        let guard = index.read().unwrap();
+        assert!(guard.plaid.is_some(), "PLAID was not restored");
+        // The restored id lists have to line up with the chunks that carry
+        // them; a tombstoned row in the list would shift every later id.
+        assert!(
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the sealed fallback was loaded with a stale row list"
+        );
+        assert_eq!(
+            guard.plaid_seqs.len(),
+            guard
+                .plaid
+                .as_ref()
+                .map(|p| p.doc_num() as usize)
+                .unwrap_or(0),
+            "the restored document ids do not cover the loaded index"
+        );
+    }
+
+    /// `IndexOptions`' PLAID knobs: the reference's defaults
+    /// (`default_values.cppm:154-157`) and the per-query overrides
+    /// (`logical_match_tensor_scan_impl.cpp:116-152`), where a value the
+    /// reference would reject keeps the default.
+    #[test]
+    fn plaid_search_options_follow_the_reference_defaults_and_overrides() {
+        let defaults = crate::engine::state::plaid_search_options(|_| None, 5);
+        assert_eq!(defaults.n_ivf_probe, 8);
+        assert!((defaults.centroid_score_threshold + 0.1).abs() < 1e-6);
+        assert_eq!(defaults.n_doc_to_score, 500);
+        assert_eq!(defaults.n_full_scores, 50);
+
+        let custom = crate::engine::state::plaid_search_options(
+            |k| match k {
+                "plaid_n_ivf_probe" => Some("32".to_string()),
+                "plaid_n_doc_to_score" => Some("40".to_string()),
+                "plaid_n_full_scores" => Some("20".to_string()),
+                _ => None,
+            },
+            5,
+        );
+        assert_eq!(custom.n_ivf_probe, 32);
+        assert_eq!(custom.n_doc_to_score, 40);
+        assert_eq!(custom.n_full_scores, 20);
+
+        // `n_doc_to_score < topn` and `n_full_scores > n_doc_to_score` are the
+        // reference's rejections, so the defaults survive.
+        let rejected = crate::engine::state::plaid_search_options(
+            |k| match k {
+                "plaid_n_doc_to_score" => Some("2".to_string()),
+                "plaid_n_full_scores" => Some("600".to_string()),
+                _ => None,
+            },
+            5,
+        );
+        assert_eq!(rejected.n_doc_to_score, 500);
+        assert_eq!(rejected.n_full_scores, 50);
+    }
+
+    /// A row whose tensor is NULL must not make the multi-vector index look
+    /// incomplete: `doc_count` counts parsed documents, so comparing it with the
+    /// table's live rows rebuilt the whole index (PLAID training included) on
+    /// every search. Rewriting a row must leave PLAID covering every document
+    /// instead of dropping it for good.
+    #[test]
+    fn plaid_index_rebuilds_only_when_the_rows_change() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..320 {
+            if i % 10 == 0 {
+                values.push(format!("({i}, NULL)"));
+                continue;
+            }
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO pm VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let q = "SELECT id FROM pm SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(rows(&e, q).len(), 3);
+        let first = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert!(
+            first.read().unwrap().plaid.is_some(),
+            "PLAID was not built over 320 rows"
+        );
+        // A second search must reuse the index; a NULL row used to make it look
+        // incomplete and rebuild it every time.
+        assert_eq!(rows(&e, q).len(), 3);
+        let second = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "the second search rebuilt the whole multi-vector index"
+        );
+
+        // An update appends a new row id (the old one is tombstoned), so PLAID
+        // either grows by one or is rebuilt - it must cover every document
+        // afterwards either way.
+        e.execute("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
+            .unwrap();
+        assert!(!rows(&e, q).is_empty());
+        let after = e.multivector_index_for("pm", "t", 4).unwrap();
+        {
+            let guard = after.read().unwrap();
+            let covered = guard.plaid.as_ref().map(|p| p.doc_num() as usize);
+            assert_eq!(
+                covered,
+                Some(guard.doc_count()),
+                "PLAID does not cover every document after the update"
+            );
+            assert!(!guard.plaid_dropped, "PLAID was left dropped");
+        }
+    }
+
+    /// `USING PLAID … WITH (colbertsar_mode = true)` is the reference's
+    /// ColBERTSaR path (`d3ee9f6`, #3379): query-aware centroids
+    /// (`PlaidIndex::TrainQueryAwareCentroids`) and **no residual storage**, so
+    /// the chunk holds no quantizer and no packed residual. The mode travels in
+    /// the chunk, so a reload restores it.
+    #[test]
+    fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                let y = ((i + j) % 5) as f32 - 1.0;
+                let z = ((i * j) % 11) as f32 * 0.25;
+                tokens.push(format!("[{x},{y},{z},{}]", (i % 3) as f32));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO cs VALUES {};", values.join(",")))
+            .unwrap();
+
+        // `nbits` is unused without residuals, so `IndexPLAID::Make` skips its
+        // check in this mode; `centroids` is the SQL spelling of
+        // `n_centroids` and has to reach the index.
+        e.execute(
+            "CREATE INDEX csi ON cs (t) USING PLAID \
+             WITH (centroids = 8, nbits = 8, colbertsar_mode = true);",
+        )
+        .unwrap();
+        let options = e.plaid_options("default_db.cs", "csi");
+        assert!(options.colbertsar, "colbertsar_mode was not picked up");
+        assert_eq!(options.n_centroids, 8, "`centroids` was ignored");
+
+        let query = "SELECT id FROM cs SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(rows(&e, query).len(), 3);
+
+        e.flush().unwrap();
+        let chunks = e.read_plaid_index_chunks("cs", "csi").unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert!(chunks[0].is_colbertsar_mode(), "chunk lost the mode");
+        assert!(
+            chunks[0].packed_residuals().is_empty(),
+            "ColBERTSaR must store no residual"
+        );
+        assert_eq!(chunks[0].doc_num(), 300);
+        // Reload round-trips the mode and stays residual-free.
+        let loaded = e.read_plaid_index("cs", "csi").unwrap();
+        assert!(loaded.is_colbertsar_mode());
+        assert!(loaded.packed_residuals().is_empty());
+
+        // A flag value outside `true/false/1/0` is rejected, as in `IndexPLAID::Make`.
+        assert!(e
+            .execute("CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);")
+            .is_err());
+        // Without the mode `nbits` is validated as before.
+        assert!(e
+            .execute("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
+            .is_err());
+    }
+
     /// `USING SMVE`: the tensor scan builds `SMVEIndexInMem` (projection +
     /// BMP) and re-ranks its candidates with exact MaxSim.
     #[test]
@@ -4059,6 +4687,851 @@ mod tests {
         );
         e.execute("DELETE FROM b WHERE id = 1;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+    }
+
+    /// A `json` column is always a low-cardinality chunk (`index_secondary.cppm:56`
+    /// forces it there) keyed by the flattener's `path:type:value` terms, so the
+    /// planner's `json_*` filters read a term chunk rather than a hashed key.
+    #[test]
+    fn json_secondary_index_seals_term_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE j (id INT, meta JSON);").unwrap();
+        e.execute(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+            .unwrap();
+        e.execute("CREATE INDEX idx_meta ON j (meta);").unwrap();
+        let by_a = "SELECT id FROM j WHERE json_extract_int(meta, '$.a') = 1;";
+        let has_b = "SELECT id FROM j WHERE json_exists_path(meta, '$.b');";
+        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+
+        // The dump turns the tail into one low-cardinality chunk per segment: the
+        // document's scalar, path and array terms, not a single hashed document.
+        e.dump_index_transaction("j", "idx_meta").unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let segments = tables
+                .values()
+                .find_map(|t| t.secondary.low.get("meta"))
+                .unwrap();
+            assert_eq!(segments.len(), 1);
+            assert!(segments[0].1.len() > 1);
+            assert_eq!(
+                segments[0].1.kind(),
+                storage::secondary_segment::KeyKind::Bytes
+            );
+        }
+        // Both filters still answer from the chunk plus the (now empty) tail.
+        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+
+        // A new row lands in the tail and is visible through the same filters.
+        e.execute(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
+            .unwrap();
+        assert_eq!(
+            rows(&e, by_a),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, has_b),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+    }
+
+    /// A `json` document nesting past the flattener's depth bound cannot be
+    /// expanded into terms, but it is valid JSON that may still match a
+    /// predicate. The index therefore keeps it as a candidate instead of
+    /// reporting "no terms" and dropping the row before the residual filter
+    /// above the index scan runs.
+    ///
+    /// The marker is an ordinary term-chunk key, so the row survives the dump
+    /// into a chunk and a cold restart alike.
+    #[test]
+    fn over_depth_json_rows_stay_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE jd (id INT, meta JSON);").unwrap();
+        // Row 2 nests past `MAX_JSON_DEPTH` (512) and is still valid JSON whose
+        // `$.a` is 1 - exactly the row a term-range read would lose.
+        let deep = format!("{{\"a\":1,\"d\":{}1{}}}", "[".repeat(513), "]".repeat(513));
+        e.execute(&format!(
+            "INSERT INTO jd VALUES (1, '{{\"a\":1}}'), (2, '{deep}');"
+        ))
+        .unwrap();
+        e.execute("CREATE INDEX idx_jd ON jd (meta);").unwrap();
+        let q = "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 1;";
+        let both = vec![vec!["1".to_string()], vec!["2".to_string()]];
+        assert_eq!(rows(&e, q), both);
+
+        // The dump rewrites the tail's terms into a low-cardinality chunk. The
+        // marker is a key like any other, so the row is still found.
+        e.dump_index_transaction("jd", "idx_jd").unwrap();
+        assert_eq!(rows(&e, q), both);
+
+        // Widening the candidate set must not become a false positive: the
+        // residual filter above the index scan still answers the predicate.
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 999;"
+        )
+        .is_empty());
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_exists_path(meta, '$.zzz');"
+        )
+        .is_empty());
+
+        // The chunk also carries the marker on disk, which is what a cold
+        // restart - or a rebuild from the rows - reads back.
+        {
+            let tables = e.tables.lock().unwrap();
+            let low = tables
+                .values()
+                .find_map(|t| t.secondary.low.get("meta"))
+                .expect("a json column uses term chunks");
+            assert!(
+                low.iter().any(|(_, reader)| reader
+                    .range(
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                    )
+                    .len()
+                    == 1),
+                "the over-depth row's candidate term must be written to the chunk"
+            );
+        }
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q), both);
+    }
+
+    /// `WITH (cardinality = low)` moves any column onto the bitmap layout, not
+    /// just BOOL and JSON (`NewSecondaryIndexInMem` honours the option for every
+    /// type).
+    #[test]
+    fn low_cardinality_option_uses_bitmap_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE lc (id INT, v INT);").unwrap();
+        e.execute("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+            .unwrap();
+        e.execute("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
+            .unwrap();
+        let q = "SELECT id FROM lc WHERE v = 10;";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        e.dump_index_transaction("lc", "lcv").unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let low = tables
+                .values()
+                .find_map(|t| t.secondary.low.get("v"))
+                .expect("an explicit low-cardinality column uses bitmap chunks");
+            assert_eq!(low.len(), 1);
+            let high = tables.values().find_map(|t| t.secondary.disk.get("v"));
+            assert!(high.is_none(), "no PGM chunk for a low-cardinality column");
+        }
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+    }
+
+    /// Concurrent inserts, dumps and index reads on one secondary index must
+    /// agree with the rows: no ghost row, and no row missing from the final
+    /// index.
+    ///
+    /// Three races are exercised at once:
+    /// * `SecondaryIndex::fold` republishing the tail while a reader is between
+    ///   its two views (fixed by taking `pending` before the snapshot);
+    /// * a dump emptying the tail before its chunk is registered (fixed by the
+    ///   frozen `sealing` tails the readers merge);
+    /// * many writers appending to one tail concurrently.
+    #[test]
+    fn secondary_index_is_correct_under_concurrent_writes_and_dumps() {
+        use std::collections::HashSet;
+        use std::sync::{Arc, Mutex};
+
+        const WRITERS: usize = 4;
+        const ROWS_PER_WRITER: usize = 1500;
+        const READERS: usize = 2;
+        const READS: usize = 400;
+
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE c (id INT, v INT);").unwrap();
+        e.execute("CREATE INDEX cv ON c (v);").unwrap();
+
+        // Every row gets its own value, so the tail folds its pending map
+        // several times while the readers probe it.
+        let mut writers = Vec::new();
+        for w in 0..WRITERS {
+            let e = Arc::clone(&e);
+            writers.push(std::thread::spawn(move || {
+                let rows: Vec<Vec<Literal>> = (0..ROWS_PER_WRITER)
+                    .map(|i| {
+                        let id = (w * ROWS_PER_WRITER + i) as i64;
+                        vec![Literal::Int(id), Literal::Int(id)]
+                    })
+                    .collect();
+                e.insert_literals("default_db.c", None, rows).unwrap();
+            }));
+        }
+        // A dump loop interleaves with the writers: each dump freezes a tail and
+        // registers a chunk, which is exactly the window a reader can land in.
+        let dumper = {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                for _ in 0..40 {
+                    std::thread::sleep(std::time::Duration::from_millis(3));
+                    let _ = e.dump_index_transaction("c", "cv");
+                }
+            })
+        };
+        // Readers record every row id the index ever returns, per value.
+        let observed: Arc<Mutex<Vec<(i64, u64)>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut readers = Vec::new();
+        for r in 0..READERS {
+            let e = Arc::clone(&e);
+            let observed = Arc::clone(&observed);
+            readers.push(std::thread::spawn(move || {
+                let mut at = r * 7;
+                for _ in 0..READS {
+                    at = (at * 31 + 17) % (WRITERS * ROWS_PER_WRITER);
+                    let value = Literal::Int(at as i64);
+                    if let Some(ids) = e.index_lookup("c", "v", &value) {
+                        let mut seen = observed.lock().unwrap();
+                        seen.extend(ids.into_iter().map(|id| (at as i64, id)));
+                    }
+                }
+            }));
+        }
+        for w in writers {
+            w.join().unwrap();
+        }
+        for r in readers {
+            r.join().unwrap();
+        }
+        dumper.join().unwrap();
+        // Everything written is sealed or in the tail.
+        e.dump_index_transaction("c", "cv").unwrap();
+
+        // The rows themselves, as `seq -> value`.
+        let rows: Vec<(u64, i64)> = e
+            .fetch_rows_with_ids("c")
+            .unwrap()
+            .into_iter()
+            .map(|(seq, row)| {
+                let value = match row.get(1) {
+                    Some(Value::Int(v)) => *v,
+                    _ => 0,
+                };
+                (seq as u64, value)
+            })
+            .collect();
+        assert_eq!(rows.len(), WRITERS * ROWS_PER_WRITER);
+
+        // The index must return exactly the row ids of each value.
+        for (seq, value) in &rows {
+            let indexed: HashSet<u64> = e
+                .index_lookup("c", "v", &Literal::Int(*value))
+                .unwrap()
+                .into_iter()
+                .collect();
+            assert!(
+                indexed.contains(seq),
+                "row {seq} (v = {value}) is missing from the index"
+            );
+        }
+        // No ghost: every id a concurrent reader saw belongs to the final rows.
+        let final_ids: HashSet<u64> = rows.iter().map(|(seq, _)| *seq).collect();
+        for (value, id) in observed.lock().unwrap().iter() {
+            assert!(
+                final_ids.contains(id),
+                "index returned the ghost row {id} for v = {value}"
+            );
+        }
+    }
+
+    /// `CREATE INDEX` reads the table without excluding writers (the reference
+    /// leans on its transaction conflict detection, which this port does not
+    /// have yet). A row committed after the scan had read the table is in
+    /// neither the chunks the build wrote nor the tail it installs - the write
+    /// hook could not put it there while the index was still being built - so
+    /// the build appends it to the tail afterwards (`secondary_catch_up`).
+    /// Without that step the index silently loses every row in the window.
+    #[test]
+    fn create_index_covers_rows_committed_while_it_builds() {
+        use std::sync::Arc;
+
+        const BEFORE: usize = 200;
+        const DURING: usize = 200;
+
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute("CREATE TABLE cd (id INT, v INT);").unwrap();
+        for i in 0..BEFORE {
+            e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                .unwrap();
+        }
+        // One writer keeps appending while the build scans; the values are
+        // unique so every expected row is individually checkable.
+        let writer = {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                for i in BEFORE..(BEFORE + DURING) {
+                    e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                        .unwrap();
+                }
+            })
+        };
+        e.execute("CREATE INDEX cdv ON cd (v);").unwrap();
+        writer.join().unwrap();
+
+        // A range predicate is answered by the index (chunk keys plus the
+        // tail), so a row the build dropped would be missing from the result.
+        let found = rows(&e, "SELECT v FROM cd WHERE v >= 0;");
+        let values: std::collections::HashSet<String> =
+            found.iter().map(|row| row[0].clone()).collect();
+        for i in 0..(BEFORE + DURING) {
+            assert!(
+                values.contains(&i.to_string()),
+                "v = {i} is missing from the index after a concurrent insert"
+            );
+        }
+        assert_eq!(found.len(), BEFORE + DURING, "duplicate index entries");
+    }
+
+    /// Timing harness for the `MATCH TENSOR` scoring loop: the current
+    /// implementation against the per-`(query, doc)` `Vec` allocation plus
+    /// scalar dot it replaced.
+    ///
+    /// ```text
+    /// cargo test --release -p executor --lib tensor_maxsim_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn tensor_maxsim_throughput() {
+        let (nq, nd, dim) = (32usize, 32usize, 128usize);
+        let q: Vec<Vec<f64>> = (0..nq)
+            .map(|i| {
+                (0..dim)
+                    .map(|j| ((i * 3 + j) % 17) as f64 * 0.5 - 4.0)
+                    .collect()
+            })
+            .collect();
+        let d: Vec<Vec<f64>> = (0..nd)
+            .map(|i| (0..dim).map(|j| ((i * 7 + j) % 13) as f64 - 6.0).collect())
+            .collect();
+
+        let rounds = 500;
+        let t0 = std::time::Instant::now();
+        let mut acc = 0f64;
+        for _ in 0..rounds {
+            acc += tensor_maxsim(&q, &d, ElemType::Float32, ElemType::Float32);
+        }
+        let now = t0.elapsed() / rounds;
+
+        // The loop this replaced: a `Vec<&[f64]>` per pair and a sequential dot.
+        let t0 = std::time::Instant::now();
+        let mut old_acc = 0f64;
+        for _ in 0..rounds {
+            let mut sum = 0f32;
+            for qv in &q {
+                let mut best = f32::NEG_INFINITY;
+                for dv in &d {
+                    let pieces: Vec<&[f64]> = if qv.is_empty() {
+                        continue;
+                    } else if dv.len() == qv.len() {
+                        vec![dv.as_slice()]
+                    } else if dv.len() % qv.len() == 0 {
+                        dv.chunks(qv.len()).collect()
+                    } else {
+                        continue;
+                    };
+                    for piece in pieces {
+                        let mut s = 0f32;
+                        for (a, b) in qv.iter().zip(piece) {
+                            s += quantize_elem(*a, ElemType::Float32)
+                                * quantize_elem(*b, ElemType::Float32);
+                        }
+                        if s > best {
+                            best = s;
+                        }
+                    }
+                }
+                if best.is_finite() {
+                    sum += best;
+                }
+            }
+            old_acc += sum as f64;
+        }
+        let old = t0.elapsed() / rounds;
+        eprintln!(
+            "tensor_maxsim nq={nq} nd={nd} dim={dim}: per_pair_vec+scalar={old:?} \
+             chunks+simd={now:?} ({:.2}x) acc={acc} {old_acc}",
+            old.as_secs_f64() / now.as_secs_f64()
+        );
+    }
+
+    /// The PLAID budget is "do not build", not "build and spill": this port has
+    /// no buffer-manager/mmap search path, so a table past
+    /// `INFINITY_PLAID_MAX_BYTES` answers from the sealed brute-force scan. That
+    /// decision has to be final for the process - otherwise every later query
+    /// rescans the table, retrains the centroids and rewrites the chunk set only
+    /// to decline again.
+    ///
+    /// The budget is a process-wide `OnceLock`, so the case runs in a child
+    /// started with a 1-byte budget.
+    #[test]
+    fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
+        const CHILD: &str = "INFINITY_PLAID_BUDGET_CHILD";
+        const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
+        if let Ok(dir) = std::env::var(DIR) {
+            let e = Engine::open(std::path::Path::new(&dir)).unwrap();
+            e.execute("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute("CREATE INDEX pbi ON pb (t) USING PLAID;")
+                .unwrap();
+            let first = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            {
+                let guard = first.read().unwrap();
+                assert!(guard.plaid.is_none(), "PLAID must not be built over budget");
+                assert!(guard.plaid_unavailable, "the refusal must be recorded");
+                assert!(guard.plaid_dropped, "the index must report the fallback");
+            }
+            // The refusal is final, so the cached index is reused: a rebuild
+            // would scan the table and retrain the centroids again.
+            let again = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            assert!(
+                std::sync::Arc::ptr_eq(&first, &again),
+                "the index was rebuilt although the budget refused to build PLAID"
+            );
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "engine::tests_ut::tests::a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .env(DIR, dir.path())
+            .env("INFINITY_PLAID_MAX_BYTES", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            out.status.success(),
+            "child failed:\n{stdout}\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            stdout.contains("1 passed"),
+            "the child ran no test:\n{stdout}"
+        );
+    }
+
+    /// A NULL sparse cell writes no postings, so `doc_count` can never reach the
+    /// table's row count on such a table: the coverage check based on it never
+    /// agreed and every `MATCH SPARSE` rebuilt the whole index, chunks
+    /// included. Coverage is measured by the rows the index has *seen*.
+    #[test]
+    fn sparse_index_with_null_rows_is_not_rebuilt_per_query() {
+        use storage::bmp::IdxWidth;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+            .unwrap();
+        e.execute("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+            .unwrap();
+        e.execute("CREATE INDEX spnv ON spn (v);").unwrap();
+        let first = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        let again = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the index was rebuilt although it had seen every row"
+        );
+        // A NULL insert keeps the same instance: the write hook counts the row
+        // even though it contributes no postings.
+        e.execute("INSERT INTO spn VALUES (4, NULL);").unwrap();
+        let after = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt after a NULL row landed in the tail"
+        );
+    }
+
+    /// `kill -9` in the middle of a dump leaves a spilled chunk file half
+    /// written while the rows themselves are already durable. The restart
+    /// rebuilds every secondary index from the rows (`rebuild_indexes`), and the
+    /// rebuild rewrites the spill set, so the truncated file must never reach
+    /// the reloaded index - a query answered from a half-parsed chunk would
+    /// silently lose rows.
+    #[test]
+    fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tc (id INT, v INT);").unwrap();
+        let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
+        e.execute(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute("CREATE INDEX tcv ON tc (v);").unwrap();
+        e.dump_index_transaction("tc", "tcv").unwrap();
+        e.flush().unwrap();
+        drop(e);
+
+        assert!(
+            truncate_spilled_chunks(dir.path()) > 0,
+            "the dump must have written a chunk file to truncate"
+        );
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM tc WHERE v >= 0;");
+        assert_eq!(found.len(), 500, "a truncated chunk lost rows");
+    }
+
+    /// Cuts every spilled secondary chunk down to half its length: what a
+    /// process killed in the middle of a dump leaves behind.
+    fn truncate_spilled_chunks(root: &std::path::Path) -> usize {
+        let mut cut = 0;
+        for sub in ["secondary", "secondary_low"] {
+            let Ok(entries) = std::fs::read_dir(root.join(sub)) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Ok(files) = std::fs::read_dir(&path) {
+                        for file in files.flatten() {
+                            cut += truncate_chunk_file(&file.path());
+                        }
+                    }
+                } else {
+                    cut += truncate_chunk_file(&path);
+                }
+            }
+        }
+        cut
+    }
+
+    fn truncate_chunk_file(path: &std::path::Path) -> usize {
+        let Ok(meta) = std::fs::metadata(path) else {
+            return 0;
+        };
+        if !path.extension().is_some_and(|e| e == "idx") || meta.len() < 16 {
+            return 0;
+        }
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open(path) else {
+            return 0;
+        };
+        usize::from(file.set_len(meta.len() / 2).is_ok())
+    }
+
+    /// The sustained-load shape: a wide table written in bursts with index
+    /// dumps between them, then a reopen. It is the million-row counterpart of
+    /// `secondary_index_is_correct_under_concurrent_writes_and_dumps`, and it is
+    /// ignored by default because it writes `INFINITY_STRESS_ROWS` rows
+    /// (1,000,000 unless the variable says otherwise):
+    ///
+    /// ```text
+    /// INFINITY_STRESS_ROWS=2000000 cargo test -p executor --lib \
+    ///     secondary_stress_sustained_dumps -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "writes up to a million rows; run explicitly"]
+    fn secondary_stress_sustained_dumps() {
+        let total: usize = std::env::var("INFINITY_STRESS_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1_000_000);
+        const BATCH: usize = 5_000;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE st (id INT, v INT);").unwrap();
+        e.execute("CREATE INDEX stv ON st (v);").unwrap();
+
+        let mut written = 0usize;
+        let mut batches = 0usize;
+        while written < total {
+            let end = (written + BATCH).min(total);
+            let values: Vec<String> = (written..end).map(|i| format!("({i}, {i})")).collect();
+            e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+                .unwrap();
+            written = end;
+            batches += 1;
+            // Every tenth burst dumps what the tail accumulated, so the chunk
+            // set grows while later bursts keep appending to the fresh tail.
+            if batches % 10 == 0 {
+                e.dump_index_transaction("st", "stv").unwrap();
+            }
+            // A read in the middle of the load: it must see at least the rows
+            // the dumps have already sealed, and never a row that is not there.
+            if batches % 25 == 0 {
+                let _ = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+            }
+        }
+        // The tail is dumped so the final read comes from the chunks, not from
+        // the buffer that would hide a broken chunk set.
+        e.dump_index_transaction("st", "stv").unwrap();
+
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the index lost rows under load");
+        drop(e);
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the rebuild lost rows under load");
+    }
+
+    /// `CREATE INDEX i ON t (lower(name))` is the reference's
+    /// `kSecondaryFunctional`: the expression is the catalog's column, the base
+    /// column is what the rows are read from, the key domain is the function's
+    /// return type, and `lower(name) = 'abc'` is answered from the index.
+    #[test]
+    fn functional_index_answers_a_function_predicate() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE f (id INT, name VARCHAR);").unwrap();
+        e.execute("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+            .unwrap();
+        e.execute("CREATE INDEX fi ON f (lower(name));").unwrap();
+
+        let q = "SELECT id FROM f WHERE lower(name) = 'abc';";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        // A new row lands in the memory tail, evaluated the same way.
+        e.execute("INSERT INTO f VALUES (4, 'ABC');").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        // And after the dump the answer comes from the term chunk.
+        e.dump_index_transaction("f", "fi").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM f WHERE lower(name) = 'xyz';"),
+            vec![vec!["3".to_string()]]
+        );
+
+        // The record carries the function, so reopening restores the index.
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+    }
+
+    /// A hashed (`VARCHAR`) key has no order, but an equality range still has an
+    /// exact key: `ConvertToHashU64` plus the chunk's lower/upper_bound pair.
+    /// A non-equality range has no hash order, so it falls back to the rows.
+    #[test]
+    fn hashed_text_equality_uses_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE h (id INT, name VARCHAR);").unwrap();
+        e.execute("CREATE INDEX hn ON h (name);").unwrap();
+        e.execute("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+            .unwrap();
+        let probe = |e: &Engine| {
+            e.index_range_lookup(
+                "h",
+                "name",
+                &[(Value::Str("a".into()), Value::Str("a".into()))],
+            )
+            .unwrap()
+        };
+        assert_eq!(probe(&e), vec![0, 2]);
+
+        e.dump_index_transaction("h", "hn").unwrap();
+        assert_eq!(probe(&e), vec![0, 2]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM h WHERE name = 'a';"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert!(e
+            .index_range_lookup(
+                "h",
+                "name",
+                &[(Value::Str("a".into()), Value::Str("b".into()))],
+            )
+            .is_none());
+    }
+
+    /// A NULL is not a key: `SecondaryIndexInMemT::InsertInner` skips a row
+    /// whose null bit is set, so neither the memory tail nor a chunk can answer
+    /// for it.
+    #[test]
+    fn null_cells_are_not_indexed() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
+            .unwrap();
+        e.execute("CREATE INDEX nf ON n (flag);").unwrap();
+        e.execute("CREATE INDEX nn ON n (name);").unwrap();
+        e.execute("INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');")
+            .unwrap();
+
+        // Row 3's NULL flag must not join the `false` bitmap.
+        assert_eq!(
+            e.index_lookup("n", "flag", &Literal::Str("false".into()))
+                .unwrap(),
+            vec![1]
+        );
+        // Row 2's NULL name has no key at all.
+        assert!(e
+            .index_lookup("n", "name", &Literal::Str(String::new()))
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            rows(&e, "SELECT id FROM n WHERE name = 'a';"),
+            vec![vec!["1".to_string()]]
+        );
+
+        // Same after the dump: the chunks carry only the non-NULL keys.
+        e.dump_index_transaction("n", "nf").unwrap();
+        assert_eq!(
+            e.index_lookup("n", "flag", &Literal::Str("false".into()))
+                .unwrap(),
+            vec![1]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM n WHERE flag = false;"),
+            vec![vec!["2".to_string()]]
+        );
+    }
+
+    /// The index-scan filter reads the column's chunk bitmaps rather than
+    /// re-scanning the rows (`IndexFilterEvaluatorSecondary` ->
+    /// `TrunkReaderT::OutPut`), so its answers must still match a plain
+    /// predicate across a dump, a range and a tombstone.
+    #[test]
+    fn secondary_filter_answers_from_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE s (id INT, v INT);").unwrap();
+        e.execute("CREATE INDEX sv ON s (v);").unwrap();
+        let values: Vec<String> = (0..200).map(|i| format!("({i}, {})", i % 13)).collect();
+        e.execute(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+            .unwrap();
+        e.dump_index_transaction("s", "sv").unwrap();
+
+        let mut expected: Vec<String> = (0..200)
+            .filter(|i| (10..=12).contains(&(i % 13)))
+            .map(|i| i.to_string())
+            .collect();
+        expected.sort_by_key(|id| id.parse::<u32>().unwrap());
+        let mut got: Vec<String> = rows(&e, "SELECT id FROM s WHERE v BETWEEN 10 AND 12;")
+            .into_iter()
+            .map(|row| row[0].clone())
+            .collect();
+        got.sort_by_key(|id| id.parse::<u32>().unwrap());
+        assert_eq!(got, expected);
+
+        // A tombstone is not in the row set, so its index entry selects no row.
+        e.execute("DELETE FROM s WHERE id = 22;").unwrap();
+        let after = rows(&e, "SELECT id FROM s WHERE v = 9;");
+        assert!(!after.iter().any(|row| row[0] == "22"));
+        // 15 rows carry v = 9 before the delete, so 14 remain.
+        assert_eq!(after.len(), 14);
+    }
+
+    /// `OptimizeIndex` folds a segment's secondary chunks into one: the merge is
+    /// a sort over the old chunks' `(key, offset)` pairs, whose offsets are
+    /// already segment-relative, so the merged chunk answers the same queries.
+    #[test]
+    fn optimize_merges_secondary_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE m (id INT, v INT, flag BOOL);")
+            .unwrap();
+        e.execute("CREATE INDEX mv ON m (v);").unwrap();
+        e.execute("CREATE INDEX mf ON m (flag);").unwrap();
+        e.execute("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
+            .unwrap();
+        for index in ["mv", "mf"] {
+            e.dump_index_transaction("m", index).unwrap();
+        }
+        e.execute("INSERT INTO m VALUES (3, 10, true);").unwrap();
+        for index in ["mv", "mf"] {
+            e.dump_index_transaction("m", index).unwrap();
+        }
+        let high = |e: &Engine, column: &str| -> usize {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find_map(|t| t.secondary.disk.get(column))
+                .map(|r| r.len())
+                .unwrap_or(0)
+        };
+        let low = |e: &Engine, column: &str| -> usize {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find_map(|t| t.secondary.low.get(column))
+                .map(|r| r.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(high(&e, "v"), 2);
+        assert_eq!(low(&e, "flag"), 2);
+
+        e.optimize_index_chunks().unwrap();
+
+        assert_eq!(high(&e, "v"), 1);
+        assert_eq!(low(&e, "flag"), 1);
+        assert_eq!(e.secondary_chunk_meta("m", "v"), vec![(0, 3)]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE v = 10;"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE flag = false;"),
+            vec![vec!["2".to_string()]]
+        );
+        // A merged segment publishes one chunk; the next dump adds a tail chunk.
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE v = 20;"),
+            vec![vec!["2".to_string()]]
+        );
     }
 
     /// One quota governs every index form: when it is exceeded the tails are

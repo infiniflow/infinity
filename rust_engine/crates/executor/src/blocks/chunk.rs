@@ -15,8 +15,13 @@ pub(crate) fn decode_secondary_key(
         KeyKind::U64 => Key::U64(u64::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::I64 => Key::I64(i64::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::I32 => Key::I32(i32::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I16 => Key::I16(i16::from_le_bytes(bytes.try_into().ok()?)),
+        KeyKind::I8 => Key::I8(*bytes.first()? as i8),
+        KeyKind::Bool => Key::Bool(*bytes.first()? != 0),
         KeyKind::F32 => Key::F32(f32::from_le_bytes(bytes.try_into().ok()?)),
         KeyKind::F64 => Key::F64(f64::from_le_bytes(bytes.try_into().ok()?)),
+        // A JSON chunk is low-cardinality and has no ordered key array.
+        KeyKind::Bytes => return None,
     })
 }
 
@@ -45,6 +50,10 @@ pub(crate) fn publish_secondary_chunks(
     let width = kind.key_width();
     let stride = width + 4;
     let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
+    // A merged spill file holds the whole segment (`merge_secondary_chunks`),
+    // which is the reference's layout after `OptimizeIndex`: one chunk per
+    // segment rather than one per block.
+    let mut merged = false;
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -70,6 +79,9 @@ pub(crate) fn publish_secondary_chunks(
         if run_segment.parse::<u32>() != Ok(segment) {
             continue;
         };
+        if rest.contains("_merged") {
+            merged = true;
+        }
         let (Ok(bytes), Ok(reader)) = (
             std::fs::read(&path),
             SecondarySegmentReader::open_with_kind(&path, kind),
@@ -96,7 +108,7 @@ pub(crate) fn publish_secondary_chunks(
     // one in-memory index and dumps **once**, so an imported segment has a
     // single chunk covering all of its blocks (`InsertBlockData` is called per
     // block, `Dump` once after the loop).
-    if single_chunk {
+    if single_chunk || merged {
         let mut entries: Vec<_> = by_block.into_values().flatten().collect();
         if entries.is_empty() || std::fs::create_dir_all(seg_dir).is_err() {
             return Vec::new();

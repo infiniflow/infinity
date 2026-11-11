@@ -4447,6 +4447,14 @@ impl Engine {
                     if let Err(error) = self.optimize_all_fulltext_indexes() {
                         eprintln!("optimize: merging the full-text chunks failed: {error}");
                     }
+                    // The secondary half of `OptimizeIndexInner`
+                    // (`new_txn_index_impl.cpp:336-340`): a segment with more than
+                    // one chunk folds them into one. Like the full-text rewrite its
+                    // catalog records are derived from the files, so it also runs
+                    // after the vector commit.
+                    if let Err(error) = self.optimize_all_secondary_indexes() {
+                        eprintln!("optimize: merging the secondary chunks failed: {error}");
+                    }
                     Ok(())
                 }
                 // A concurrent merge (or a drop that took the index away) is a
@@ -5825,7 +5833,12 @@ impl Engine {
                 if let Ok(v) = value.parse() {
                     options.nbits = v;
                 }
-            } else if key.eq_ignore_ascii_case("n_centroids") {
+            } else if key.eq_ignore_ascii_case("n_centroids")
+                || key.eq_ignore_ascii_case("centroids")
+            {
+                // `centroids` is the SQL spelling (`CREATE INDEX … WITH
+                // (centroids = 4096)`); `n_centroids` is the catalog field the
+                // record carries. Both name the same option.
                 if let Ok(v) = value.parse() {
                     options.n_centroids = v;
                 }
@@ -5961,14 +5974,29 @@ impl Engine {
             .nbits;
         let mut chunks = Vec::new();
         for (id, path) in self.live_chunk_files(table, index_name, 0, &mirror.dir) {
-            let bytes = std::fs::read(&path).map_err(|e| Error::Io {
-                path: path.clone(),
-                source: e,
-            })?;
-            let (index, _) =
-                PlaidIndex::from_bytes(0, mirror.dims, nbits, &bytes).map_err(|e| {
-                    Error::Invalid(format!("bad PLAID chunk '{}': {e}", path.display()))
-                })?;
+            // Map the chunk and keep its packed residual codes file-backed (the
+            // reference's buffer-manager chunk): reading them into a `Vec` doubled
+            // the resident size of a large index. A zero-length or unopenable file
+            // falls back to a plain read.
+            let bad = |e: &dyn std::fmt::Display| {
+                Error::Invalid(format!("bad PLAID chunk '{}': {e}", path.display()))
+            };
+            let index = match storage::buffer::mapped::MappedFile::open(&path) {
+                Ok(mapped) if !mapped.is_empty() => {
+                    let backing: std::sync::Arc<dyn AsRef<[u8]> + Send + Sync> =
+                        std::sync::Arc::new(mapped);
+                    PlaidIndex::from_shared(backing, mirror.dims, nbits).map_err(|e| bad(&e))?
+                }
+                _ => {
+                    let bytes = std::fs::read(&path).map_err(|e| Error::Io {
+                        path: path.clone(),
+                        source: e,
+                    })?;
+                    PlaidIndex::from_bytes(0, mirror.dims, nbits, &bytes)
+                        .map_err(|e| bad(&e))?
+                        .0
+                }
+            };
             chunks.push(PlaidChunkFile { id, index });
         }
         Ok(chunks)

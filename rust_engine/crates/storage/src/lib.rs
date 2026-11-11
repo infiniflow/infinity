@@ -88,11 +88,13 @@ pub mod definition;
 pub mod fast_rough_filter;
 pub mod invertedindex;
 pub mod io;
+pub mod json_index;
 pub mod knn_index;
 pub mod new_txn;
 pub mod persistence;
 pub mod result_cache_manager;
 pub mod secondary_index;
+pub mod simd;
 pub mod wal;
 
 // The module tree above mirrors the reference's src/storage/. The re-exports

@@ -225,6 +225,7 @@ impl Engine {
                 // block-level indexes, the in-memory secondary tails, the full-text
                 // inverted index, the sparse documents and the vector buffers.
                 entry.secondary.indexes.clear();
+                entry.secondary.declared_types.clear();
                 entry.secondary.disk.clear();
                 entry.text.clear();
                 entry.sparse.clear();
