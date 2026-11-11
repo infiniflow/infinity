@@ -29,6 +29,7 @@
 //! whose object is a `std::map`; `serde_json`'s default map is a `BTreeMap`, so
 //! the term order matches too).
 
+use serde::Deserialize;
 use serde_json::Value;
 
 /// One flattened term: a key in the column's low-cardinality chunk.
@@ -42,7 +43,14 @@ pub struct FlattenedTerm {
 /// Invalid JSON yields no terms rather than an error, matching the reference's
 /// `if (json_obj)` guard around the recursive walk.
 pub fn flatten_json(text: &str) -> Vec<FlattenedTerm> {
-    let Ok(value) = serde_json::from_str::<Value>(text) else {
+    // `serde_json` stops at 128 levels of nesting by default, while the
+    // reference parses with `nlohmann::json`, which has no limit: a document
+    // nested deeper (`test/sql/ddl/index/test_json_index.slt`'s long-term case
+    // nests ~130 levels) is valid JSON and must index, not silently yield no
+    // terms at all.
+    let mut deserializer = serde_json::Deserializer::from_str(text);
+    deserializer.disable_recursion_limit();
+    let Ok(value) = Value::deserialize(&mut deserializer) else {
         return Vec::new();
     };
     let mut terms = Vec::new();
@@ -91,6 +99,11 @@ fn flatten_recursive(value: &Value, current_path: &str, terms: &mut Vec<Flattene
             };
             for item in items {
                 add_scalar_term(item, parent_path, terms);
+                // `json_contains` compares an element against a literal, and
+                // `50` and `50.0` are the same number to a caller: emit the
+                // element under the other numeric tag as well, so either
+                // spelling of the probe finds it.
+                add_numeric_alias(item, parent_path, terms);
             }
             terms.push(FlattenedTerm {
                 term: format!("{parent_path}:p:"),
@@ -129,6 +142,32 @@ fn add_scalar_term(value: &Value, path: &str, terms: &mut Vec<FlattenedTerm>) {
         _ => return,
     };
     terms.push(FlattenedTerm { term });
+}
+
+/// The same number under the other numeric tag, so that `json_contains` finds
+/// an array element whichever way its literal was spelled.
+///
+/// An element written `50` is stored as `<path>:i:…` and a probe written `50.0`
+/// as `<path>:d:…`, so the two would never meet. A value with no exact
+/// counterpart (a fractional double, a non-finite one, an integer beyond
+/// `2^53`) gets no alias: the predicate then falls back to the row filter
+/// rather than selecting nothing.
+fn add_numeric_alias(value: &Value, path: &str, terms: &mut Vec<FlattenedTerm>) {
+    let Value::Number(number) = value else {
+        return;
+    };
+    if let Some(integer) = number.as_i64().or_else(|| number.as_u64().map(|u| u as i64)) {
+        terms.push(FlattenedTerm {
+            term: format!("{path}:d:{}", encode_double(integer as f64)),
+        });
+    } else if let Some(double) = number.as_f64() {
+        // `2^53` is the largest magnitude an `i64` holds exactly as an `f64`.
+        if double.is_finite() && double.fract() == 0.0 && double.abs() <= 9_007_199_254_740_992.0 {
+            terms.push(FlattenedTerm {
+                term: format!("{path}:i:{}", encode_integer(double as i64)),
+            });
+        }
+    }
 }
 
 /// `std::bit_cast<uint64_t>(value) ^ (1 << 63)`, printed as 16 uppercase hex

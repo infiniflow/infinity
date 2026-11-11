@@ -135,6 +135,10 @@ impl Error {
             // 3009 INVALID_INDEX_DEFINITION (index kind vs column type).
             Error::Invalid(m) if m.starts_with("SECONDARY index requires") => 3009,
             Error::Invalid(m) if m.contains("index requires a") => 3009,
+            // `IndexSecondary::ValidateColumnDataType` refuses the column type
+            // with `InvalidIndexDefinition`, so a secondary index on a column
+            // that cannot carry one is 3009, not a generic invalid parameter.
+            Error::Invalid(m) if m.starts_with("Cannot build secondary index on data type") => 3009,
             // 3077 ANALYZER_NOT_FOUND (unknown name, or a C++ family the Rust
             // port does not vendor; both carry an explanatory suffix).
             Error::Invalid(m) if m.starts_with("analyzer ") && m.contains("not found") => 3077,
@@ -269,5 +273,16 @@ mod tests {
         let error = Error::InvalidNodeRole("Attempt to write on non-writable node".to_string());
         assert_eq!(error.status_code(), 8007);
         assert_eq!(error.to_string(), "Attempt to write on non-writable node");
+    }
+
+    /// `IndexSecondary::ValidateColumnDataType` rejects a column type that
+    /// cannot carry the index with `Status::InvalidIndexDefinition` (3009), the
+    /// code the SDK's `test_sparse_knn_with_invalid_index_type` asserts.
+    #[test]
+    fn a_secondary_index_on_an_unsupported_column_type_maps_to_3009() {
+        let error = Error::Invalid(
+            "Cannot build secondary index on data type: SPARSE(FLOAT,1000)".to_string(),
+        );
+        assert_eq!(error.status_code(), 3009);
     }
 }

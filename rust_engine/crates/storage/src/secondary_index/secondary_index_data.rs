@@ -182,7 +182,7 @@ impl LowCardinalityReader {
     }
 
     pub fn offsets_for_key(&self, key: u64) -> Vec<u32> {
-        self.reader.lookup(&LowCardKey::Fixed(Key::U64(key)))
+        self.reader.lookup(LowCardKey::Fixed(Key::U64(key)))
     }
 }
 

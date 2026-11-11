@@ -1,6 +1,19 @@
 use super::*;
 use catalog::IndexMeta;
 
+/// One secondary index column's readers, snapshotted under the table lock so
+/// that the key lookups run without holding it: the sealed PGM chunks, the
+/// sealed low-cardinality (roaring) chunks, the in-memory tail written since the
+/// last dump, the tails a dump has frozen but not yet registered, and the
+/// column's declared type - the one the writer encoded the tail's keys with.
+struct SecondarySnapshot {
+    disk: Option<SecondaryDiskChunks>,
+    low: Option<SecondaryLowChunks>,
+    tail: Option<Arc<SecondaryIndex>>,
+    declared: Option<String>,
+    sealing: Vec<Arc<index::SealedTail>>,
+}
+
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
@@ -252,7 +265,15 @@ impl Engine {
             .secondary
             .disk
             .remove(column);
-        let int_column = type_upper.starts_with("INT") || type_upper.starts_with("UINT");
+        // `TINYINT`/`SMALLINT`/`BIGINT` are integral but do not start with
+        // `INT`, and a functional index contributes its *return* type here
+        // (`abs(c1)` over an integer is a `BIGINT`), so the classification asks
+        // the key domain, which knows every spelling. The key width cannot make
+        // this call: an integer and a date both encode to an `I64` key, and only
+        // the declared type says which branch - integer encoding or
+        // `temporal_key` - builds it. Sending the integers to the temporal
+        // branch is what left `tinyint` chunks empty.
+        let int_column = key_domain(&type_upper) == KeyDomain::Integer;
         let key_kind = secondary_key_kind(&type_upper);
         let low_card = self.secondary_low_cardinality(table, column, &type_upper);
         if low_card {
@@ -817,7 +838,9 @@ impl Engine {
     fn seal_index_tail(&self, table: &str, meta: &IndexMeta) {
         let table = self.qualified_table(table);
         if is_secondary_kind(&meta.index_type) {
-            self.seal_secondary_index(&table, &meta.column);
+            // The dump transaction already holds `flush_lock`, so this takes the
+            // body directly instead of re-locking.
+            self.seal_secondary_indexes_filtered(Some((&table, &meta.column)));
         } else if meta.index_type.eq_ignore_ascii_case("FULLTEXT") {
             self.seal_text_index(&table, &meta.column);
         } else if meta.index_type.eq_ignore_ascii_case("BMP") {
@@ -872,15 +895,26 @@ impl Engine {
         }
     }
 
+    /// Seals every spill-backed secondary tail.
+    ///
+    /// Sealing writes chunk files, renames them into place and drops the tail
+    /// they came from, operations a concurrent dump, capacity-triggered seal or
+    /// merge would race on, so every path that seals takes `flush_lock` - the
+    /// same one the checkpoint and the dump transaction hold.
     pub(crate) fn seal_secondary_indexes(&self) {
+        let _serial = self.storage.flush_lock.lock().unwrap();
         self.seal_secondary_indexes_filtered(None);
     }
 
     /// Dumps one secondary index's memory tail (`DumpMemIndex` for `index`).
     pub(crate) fn seal_secondary_index(&self, table: &str, column: &str) {
+        let _serial = self.storage.flush_lock.lock().unwrap();
         self.seal_secondary_indexes_filtered(Some((table, column)));
     }
 
+    /// The sealing body, for a caller that already holds `flush_lock`: the dump
+    /// transaction seals under it and then publishes the chunks, so it must not
+    /// take the (non-reentrant) lock again.
     pub(crate) fn seal_secondary_indexes_filtered(&self, only: Option<(&str, &str)>) {
         let wanted = only.map(|(t, c)| (self.table_key(t), c.to_string()));
         let mut backed: Vec<(String, String)> = {
@@ -911,19 +945,38 @@ impl Engine {
             else {
                 continue;
             };
-            let Ok(schema) = self.table_schema(&im.table) else {
-                continue;
+            // The key type is what the writer recorded beside the tail
+            // (`declared_types`), and a functional index records the function's
+            // return type there (`IndexSecondaryFunctional::GetFuncReturnType`):
+            // `sqrt(c1)` stores doubles while `c1` is an integer. Sealing with
+            // the catalog's base-column type decoded such keys at the wrong
+            // width and emptied the range as soon as `DUMP INDEX` retired the
+            // memory tail. Read it under the lock that guards the tail; the
+            // schema lookup is only for a tail written before the map existed.
+            let declared = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.secondary.declared_types.get(&column).cloned())
             };
-            let Some(ci) = schema.iter().position(|c| c == &im.column) else {
-                continue;
+            let ty = match declared {
+                Some(ty) => ty.trim().to_ascii_uppercase(),
+                None => {
+                    let Ok(schema) = self.table_schema(&im.table) else {
+                        continue;
+                    };
+                    let Ok(types) = self.column_types(&im.table) else {
+                        continue;
+                    };
+                    match schema.iter().position(|c| c == &im.column) {
+                        Some(ci) => types
+                            .get(ci)
+                            .map(|t| t.trim().to_ascii_uppercase())
+                            .unwrap_or_default(),
+                        None => continue,
+                    }
+                }
             };
-            let Ok(types) = self.column_types(&im.table) else {
-                continue;
-            };
-            let ty = types
-                .get(ci)
-                .map(|t| t.trim().to_ascii_uppercase())
-                .unwrap_or_default();
             let low_card = self.secondary_low_cardinality(&im.table, &column, &ty);
             let tail_kind = secondary_key_kind(&ty);
             let key = index_key(&im.table, &column);
@@ -1185,6 +1238,21 @@ impl Engine {
         use storage::secondary_lowcard::{write_lowcard_segment_typed, LowCardKey, LowCardReader};
         let key = index_key(table, column);
         let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
+        // A rebuild (`suffix` empty) rewrites the whole spill set, exactly like
+        // `write_secondary_pgm_chunks`: the file name carries the row count, so
+        // a leftover from an earlier (smaller) snapshot would publish a second
+        // chunk for rows this one already covers. A dump (`tail` suffix) appends
+        // to the set instead and must leave it alone. Only `.idx` files are
+        // removed; anything else the directory holds stays untouched.
+        if suffix.is_empty() {
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    if entry.path().extension().is_some_and(|e| e == "idx") {
+                        let _ = std::fs::remove_file(entry.path());
+                    }
+                }
+            }
+        }
         let start = std::fs::read_dir(&dir)
             .map(|d| {
                 d.filter_map(|e| e.ok())
@@ -1319,6 +1387,11 @@ impl Engine {
     /// `OptimizeIndexInner`'s secondary case for every secondary index
     /// (`new_txn_index_impl.cpp:336-340` -> `OptimizeSecondaryIndex`).
     pub(crate) fn optimize_all_secondary_indexes(&self) -> Result<()> {
+        // A merge rewrites the chunk files of the indexes it folds and then
+        // reloads them, so it serialises with sealing and with the checkpoint on
+        // `flush_lock`. The optimize pass reaches here after its dump
+        // transaction released the lock, so it takes it exactly once.
+        let _serial = self.storage.flush_lock.lock().unwrap();
         for im in self.storage.catalog.list_indexes()? {
             if !is_secondary_kind(&im.index_type) {
                 continue;
@@ -1494,12 +1567,25 @@ impl Engine {
                     Some((key, offsets))
                 })
                 .collect();
-            let path = dir.join(format!("seg_{segment}_merged{}.idx", entries.len()));
+            // The merged chunk must not land on one of its inputs (writing over
+            // a file still in `paths` would either be deleted again below or be
+            // read while half written) nor over an unrelated leftover, so walk
+            // the name until it is free.
+            let mut path = dir.join(format!("seg_{segment}_merged{}.idx", entries.len()));
+            let mut serial = 0u32;
+            while path.exists() || paths.iter().any(|old| old == &path) {
+                path = dir.join(format!("seg_{segment}_merged{}_{serial}.idx", entries.len()));
+                serial += 1;
+            }
             if write_lowcard_segment_typed(&path, &entries).is_err() {
                 continue;
             }
             for old in &paths {
-                let _ = std::fs::remove_file(old);
+                // Never an input by construction, but skipping the output keeps
+                // the merged chunk reloadable even if that ever changes.
+                if old != &path {
+                    let _ = std::fs::remove_file(old);
+                }
             }
             merged = true;
         }
@@ -1551,29 +1637,35 @@ impl Engine {
         column: &str,
         value: &Literal,
     ) -> Option<Vec<u64>> {
-        if let Some(ids) = self.index_lookup_one(table, column, value) {
-            return Some(ids);
-        }
-        // Same fallback as the range read: a functional index's catalog column
-        // is its expression, so an equality on the base column has to be probed
-        // against every function over it (the residual predicate proves
-        // membership).
-        let expressions = self.functional_over(table, column);
-        if expressions.is_empty() {
+        // An equality on a base column is not an equality on a function of that
+        // column (`c1 = 2` says nothing about `sqrt(c1)`), so only the index
+        // named by `column` may answer. A functional index is registered under
+        // its expression, which is exactly the name its predicate arrives with.
+        self.index_lookup_one(table, column, value)
+    }
+
+    /// One secondary index column's readers, or `None` when the column carries
+    /// no secondary index at all.
+    fn secondary_snapshot(&self, tkey: &str, column: &str) -> Option<SecondarySnapshot> {
+        let tables = self.tables.lock().unwrap();
+        let reg = tables.get(tkey).map(|e| &e.secondary)?;
+        let known = reg.indexes.contains_key(column)
+            || reg.disk.contains_key(column)
+            || reg.low.contains_key(column)
+            || reg.sealing.contains_key(column);
+        if !known {
             return None;
         }
-        let mut out: Vec<u64> = Vec::new();
-        let mut answered = false;
-        for expression in expressions {
-            if let Some(mut ids) = self.index_lookup_one(table, &expression, value) {
-                answered = true;
-                out.append(&mut ids);
-            }
-        }
-        answered.then(|| {
-            out.sort_unstable();
-            out.dedup();
-            out
+        Some(SecondarySnapshot {
+            disk: reg.disk.get(column).cloned(),
+            low: reg.low.get(column).cloned(),
+            tail: reg.indexes.get(column).cloned(),
+            declared: reg.declared_types.get(column).cloned(),
+            sealing: reg
+                .sealing
+                .get(column)
+                .map(|tails| tails.iter().map(Arc::clone).collect())
+                .unwrap_or_default(),
         })
     }
 
@@ -1581,37 +1673,17 @@ impl Engine {
     fn index_lookup_one(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
-        // Snapshot the readers (cheap Arc clones) and the memory tail so the
+        // Snapshot the readers (cheap `Arc` clones) and the memory tail so the
         // table lock is not held across the row lookup. The tail's declared
         // type comes from the registry rather than the catalog: it is the one
         // the writer encoded the keys with.
-        let (disk, low, tail_index, declared, sealing): (
-            Option<SecondaryDiskChunks>,
-            Option<SecondaryLowChunks>,
-            Option<Arc<SecondaryIndex>>,
-            Option<String>,
-            Vec<Arc<index::SealedTail>>,
-        ) = {
-            let tables = self.tables.lock().unwrap();
-            let reg = tables.get(&tkey).map(|e| &e.secondary)?;
-            let known = reg.indexes.contains_key(column)
-                || reg.disk.contains_key(column)
-                || reg.low.contains_key(column)
-                || reg.sealing.contains_key(column);
-            if !known {
-                return None;
-            }
-            (
-                reg.disk.get(column).cloned(),
-                reg.low.get(column).cloned(),
-                reg.indexes.get(column).cloned(),
-                reg.declared_types.get(column).cloned(),
-                reg.sealing
-                    .get(column)
-                    .map(|tails| tails.iter().map(Arc::clone).collect())
-                    .unwrap_or_default(),
-            )
-        };
+        let SecondarySnapshot {
+            disk,
+            low,
+            tail: tail_index,
+            declared,
+            sealing,
+        } = self.secondary_snapshot(&tkey, column)?;
         // The tail holds the column's ordered key encoding, so the probe is the
         // same `text_to_key` the writer used, not the literal's text. A tail a
         // dump has just frozen is still authoritative for the rows its chunk
@@ -1819,8 +1891,16 @@ impl Engine {
                 return None;
             }
         }
-        let column = scan_columns.get(secondary.column_id)?;
-        self.index_range_lookup(table, column, &secondary.ranges)
+        // A functional index is registered under its *expression*
+        // (`sqrt(c1)`), not under the base column the planner's `column_id`
+        // names, so the evaluator's own expression decides which index answers.
+        // A plain column predicate keeps the column name.
+        let column = match self.functional_expression_for(table, &secondary.src_expr, scan_columns)
+        {
+            Some(expression) => expression,
+            None => scan_columns.get(secondary.column_id)?.clone(),
+        };
+        self.index_range_lookup_one(table, &column, &secondary.ranges)
     }
 
     /// Rows whose indexed key falls in one of `ranges` (inclusive bounds,
@@ -1839,49 +1919,45 @@ impl Engine {
         column: &str,
         ranges: &[(Value, Value)],
     ) -> Option<Vec<u64>> {
-        if let Some(ids) = self.index_range_lookup_one(table, column, ranges) {
-            return Some(ids);
-        }
-        // A functional index's catalog column is its expression, so the
-        // planner's `column_id` (the base column) does not name it. Its ranges
-        // are already the function's results, so every functional index over the
-        // column is a candidate; the residual predicate proves membership, which
-        // keeps the union safe even when two functions share one column.
-        let expressions = self.functional_over(table, column);
-        if expressions.is_empty() {
-            return None;
-        }
-        let mut out: Vec<u64> = Vec::new();
-        let mut answered = false;
-        for expression in expressions {
-            if let Some(mut ids) = self.index_range_lookup_one(table, &expression, ranges) {
-                answered = true;
-                out.append(&mut ids);
-            }
-        }
-        answered.then(|| {
-            out.sort_unstable();
-            out.dedup();
-            out
-        })
+        // `column` already names the index to read: a plain column, or the
+        // expression of the functional index the predicate was pushed down for
+        // (see [`Self::functional_expression_for`]). Probing every function over
+        // a base column with the predicate's *value* would look up a function's
+        // key range in another function's key space.
+        self.index_range_lookup_one(table, column, ranges)
     }
 
-    /// The functional indexes whose base column is `column`.
-    fn functional_over(&self, table: &str, column: &str) -> Vec<String> {
+    /// The functional index the evaluator's expression names, if the registry
+    /// carries one.
+    ///
+    /// The planner keys a functional index by `ExtractFunctionInfo`'s spelling
+    /// (`sqrt(c0)`, the column by id) while the registry keeps the catalog's
+    /// text (`sqrt(c1)`), so the two are matched on the function name and on the
+    /// base column the expression reads.
+    fn functional_expression_for(
+        &self,
+        table: &str,
+        expr: &Expr,
+        scan_columns: &[String],
+    ) -> Option<String> {
+        let Expr::Func { name, args } = expr else {
+            return None;
+        };
+        let Some(Expr::Column(pos)) = args.first() else {
+            return None;
+        };
+        let base = scan_columns.get(*pos)?;
         let tkey = self.table_key(table);
         let tables = self.tables.lock().unwrap();
         tables
-            .get(&tkey)
-            .map(|entry| {
-                entry
-                    .secondary
-                    .functional
-                    .iter()
-                    .filter(|(_, function)| function.base == column)
-                    .map(|(expression, _)| expression.clone())
-                    .collect()
+            .get(&tkey)?
+            .secondary
+            .functional
+            .iter()
+            .find(|(_, function)| {
+                function.func.eq_ignore_ascii_case(name) && &function.base == base
             })
-            .unwrap_or_default()
+            .map(|(expression, _)| expression.clone())
     }
 
     /// One column's (or one functional expression's) rows in `ranges`.
@@ -1928,8 +2004,7 @@ impl Engine {
         // through the chunk's lower/upper_bound pair
         // (`index_filter_evaluators_impl.cpp:770-772`), and a `<>` range is left
         // to the residual filter.
-        let hashed = kind == KeyKind::U64
-            && !(column_type.starts_with("INT") || column_type.starts_with("UINT"));
+        let hashed = kind == KeyKind::U64 && key_domain(&column_type) == KeyDomain::Hashed;
         // Bounds: `Value::Int(i64::MIN/MAX)` for the planner's open ends,
         // `Value::Float` for a float column and the literal's text for a
         // date/time one. `bound_key` puts each in the chunk's own domain.
@@ -1959,31 +2034,13 @@ impl Engine {
         }
         // Snapshot the sealed readers and the memory tail (cheap `Arc` clones),
         // so the key lookups run without the table lock.
-        let (disk, low, tail, sealing): (
-            Option<SecondaryDiskChunks>,
-            Option<SecondaryLowChunks>,
-            Option<Arc<SecondaryIndex>>,
-            Vec<Arc<index::SealedTail>>,
-        ) = {
-            let tables = self.tables.lock().unwrap();
-            let reg = tables.get(&tkey).map(|e| &e.secondary)?;
-            let known = reg.indexes.contains_key(column)
-                || reg.disk.contains_key(column)
-                || reg.low.contains_key(column)
-                || reg.sealing.contains_key(column);
-            if !known {
-                return None;
-            }
-            (
-                reg.disk.get(column).cloned(),
-                reg.low.get(column).cloned(),
-                reg.indexes.get(column).cloned(),
-                reg.sealing
-                    .get(column)
-                    .map(|tails| tails.iter().map(Arc::clone).collect())
-                    .unwrap_or_default(),
-            )
-        };
+        let SecondarySnapshot {
+            disk,
+            low,
+            tail,
+            sealing,
+            ..
+        } = self.secondary_snapshot(&tkey, column)?;
         let mut candidates: Vec<u64> = Vec::new();
         if let Some(segments) = &disk {
             for (base, reader) in segments {
@@ -2114,7 +2171,9 @@ impl Engine {
         table: &str,
         columns: &[String],
     ) -> planner::index_scan::IndexCatalog {
-        use planner::index_scan::{ColumnKind, IndexCatalog, SecondaryIndexInfo};
+        use planner::index_scan::{
+            ColumnKind, FunctionalIndexInfo, IndexCatalog, SecondaryIndexInfo,
+        };
         let key = self.table_key(table);
         let meta = self.storage.catalog.get_table_by_name(&key).ok().flatten();
         let kinds: Vec<ColumnKind> = columns
@@ -2155,26 +2214,24 @@ impl Engine {
                     );
                 }
             }
-            // A functional index answers `func(col)` predicates: the planner
-            // keys it by `ExtractFunctionInfo`'s spelling, `func(c<column id>)`
-            // (`index_scan.rs:143`), and reads the base column from the record.
-            for (expression, function) in &entry.secondary.functional {
+            // A functional index answers `func(col)` predicates only: the
+            // planner keys it by `ExtractFunctionInfo`'s spelling,
+            // `func(c<column id>)` (`index_scan.rs:157`), and reads the base
+            // column from the record. Its base column is deliberately *not*
+            // registered as a secondary index - `c1 = 2` says nothing about
+            // `sqrt(c1)`, and registering it made such a predicate look
+            // index-answerable.
+            for (_, function) in &entry.secondary.functional {
                 let Some(pos) = columns.iter().position(|c| c == &function.base) else {
                     continue;
                 };
                 catalog.functional.insert(
                     format!("{}(c{})", function.func, pos),
-                    function.base.clone(),
-                );
-                catalog.secondary.insert(
-                    function.base.clone(),
-                    SecondaryIndexInfo {
-                        column_id: pos,
-                        json: false,
+                    FunctionalIndexInfo {
+                        column: function.base.clone(),
                         kind: column_kind_of(&function.returns),
                     },
                 );
-                let _ = expression;
             }
         }
         catalog

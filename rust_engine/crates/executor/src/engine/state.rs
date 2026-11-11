@@ -5906,8 +5906,17 @@ pub(crate) fn key_domain(declared: &str) -> KeyDomain {
         || ty.starts_with("timestamp")
     {
         KeyDomain::Temporal
-    } else if ty.starts_with("int") || ty.starts_with("uint") {
+    } else if ty.starts_with("int")
+        || ty.starts_with("uint")
+        || ty.starts_with("tinyint")
+        || ty.starts_with("smallint")
+        || ty.starts_with("bigint")
+    {
         // `INTEGER`, `BIGINT`, `TINYINT`, `SMALLINT` and the port's `UINT`.
+        // The narrow spellings have to be listed: `"tinyint"` does not start
+        // with `"int"`, and mis-classifying it as `Hashed` made the writer
+        // store `std::hash(value)` while `secondary_key_kind` handed the reader
+        // an `I8` bound, so every range on such a column came back empty.
         KeyDomain::Integer
     } else {
         KeyDomain::Hashed

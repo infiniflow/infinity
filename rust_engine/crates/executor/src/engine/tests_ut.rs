@@ -4027,7 +4027,7 @@ mod tests {
             guard.sealed.is_empty(),
             "the index was rebuilt from the rows instead of loaded from its chunks"
         );
-        assert_eq!(guard.plaid_dropped, false);
+        assert!(!guard.plaid_dropped, "PLAID was left dropped");
     }
 
     /// `IndexOptions`' PLAID knobs: the reference's defaults

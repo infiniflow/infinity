@@ -15,7 +15,11 @@ rustls-native-certs.workspace = true
 crc32fast.workspace = true
 roaring.workspace = true
 memmap2.workspace = true
-serde_json.workspace = true
+serde.workspace = true
+# `unbounded_depth`: the reference parses with `nlohmann::json`, which has no
+# nesting limit, and the reference's own `.slt` suite nests a JSON document
+# past 128 levels.
+serde_json = { workspace = true, features = ["unbounded_depth"] }
 # The catalog / row KV: RocksDB, the substrate the C++ engine uses, so a
 # directory either engine wrote reads back byte-for-byte.
 rocksdb = { version = "0.25", default-features = false }

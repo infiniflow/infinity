@@ -83,6 +83,10 @@ impl PlaidQueryResult {
     }
 }
 
+/// The mmap'd chunk a PLAID index was read from: the backing bytes, and the
+/// range inside them that holds the packed residual codes.
+type MappedPacked = (Arc<dyn AsRef<[u8]> + Send + Sync>, std::ops::Range<usize>);
+
 /// C++: `PlaidIndex`.
 pub struct PlaidIndex {
     pub start_segment_offset: u32,
@@ -104,10 +108,7 @@ pub struct PlaidIndex {
     /// (file-backed, like the reference's buffer-manager chunk) and
     /// `packed_residuals` is empty; a mutation materializes the codes into it
     /// first.
-    packed_map: Option<(
-        std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>,
-        std::ops::Range<usize>,
-    )>,
+    packed_map: Option<MappedPacked>,
     ivf_lists: Vec<Vec<u32>>,
     ivf_data: Vec<u32>,
     ivf_offsets: Vec<u32>,
