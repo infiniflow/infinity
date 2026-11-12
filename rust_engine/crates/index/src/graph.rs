@@ -82,6 +82,11 @@ impl<'a> Neighbors<'a> {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
     pub fn get(&self, index: usize) -> Option<u32> {
         match self.slots {
             Slots::Shared(s) => s.get(index).map(|s| s.load(Ordering::Relaxed)),
@@ -223,7 +228,17 @@ impl MappedGraph {
     }
 
     /// `count` slots at `at`, read out of the mapping.
+    ///
+    /// `from_cpp_region_mapped` only publishes a mapping whose base, strides and
+    /// record degrees all check out, so the failure an unaligned read would cause
+    /// - `u32s_at` refusing the slice and the list silently coming back empty -
+    ///   cannot happen here. What is left is a count that runs past the region,
+    ///   which the same validation rejects.
     fn slots_at(&self, at: usize, count: usize) -> Neighbors<'_> {
+        debug_assert!(
+            at.is_multiple_of(4),
+            "a published mapping has word-aligned slots"
+        );
         match at
             .checked_add(count.saturating_mul(4))
             .and_then(|end| self.bytes().get(at..end))
@@ -331,7 +346,8 @@ impl GraphStore {
         n: usize,
         m: usize,
     ) -> Result<Self, String> {
-        let l0 = VERTEX_L0_SIZE + 4 * (m * 2);
+        let m0 = m.checked_mul(2).ok_or("graph size overflow")?;
+        let l0 = VERTEX_L0_SIZE + 4 * m0;
         let lx = VERTEX_LX_SIZE + 4 * m;
         let bytes = src.as_ref().as_ref();
         let need = 8usize
@@ -342,12 +358,78 @@ impl GraphStore {
             return Err(format!("graph region truncated: {} < {end}", bytes.len()));
         }
         let layer_sum = u64::from_le_bytes(bytes[base..base + 8].try_into().unwrap()) as usize;
-        let mut upper_end = base + need;
-        upper_end = upper_end
-            .checked_add(layer_sum.checked_mul(lx).ok_or("graph size overflow")?)
-            .ok_or("graph size overflow")?;
+        let upper_len = layer_sum.checked_mul(lx).ok_or("graph size overflow")?;
+        let upper_end = end.checked_add(upper_len).ok_or("graph size overflow")?;
         if bytes.len() < upper_end {
             return Err("upper-layer region truncated".to_string());
+        }
+        // A mapped graph is read as `u32` slices, which is only sound when the
+        // region starts on a four-byte boundary. The chunk layout does not
+        // promise that: the graph region begins right after `n * record_size`
+        // vector bytes, and a quantized record is not always a word wide
+        // (`LvqStore` packs two dimensions per byte, so a 100-dimension column
+        // stores 50 bytes). C++ reads such a file through pointers that tolerate
+        // the misalignment, so the bytes are legal; a `u32` slice is not, and
+        // `u32s_at` would refuse every slot read and silently empty the graph.
+        // Copy the (comparatively small) graph region instead - the same decode
+        // the unaligned writer would have forced.
+        if base % 4 != 0 || l0 % 4 != 0 || lx % 4 != 0 {
+            return Self::from_cpp_region(&bytes[base..upper_end], n, m0, m);
+        }
+        // Validate every vertex record, exactly as `from_cpp_region` does. The
+        // mapped readers below treat a field that is missing, negative or out of
+        // range as "level 0, no neighbours" (`level_of`, `neighbors`), so a
+        // malformed record would not fail the load - it would quietly drop a
+        // vertex out of the graph, and a query would answer short instead of
+        // reporting a broken chunk.
+        let upper_base = base + 8 + n * l0;
+        let mut level_total = 0usize;
+        for node in 0..n {
+            let record = base + 8 + node * l0;
+            let level = i32::from_le_bytes(bytes[record..record + 4].try_into().unwrap());
+            if level < 0 {
+                return Err(format!("vertex {node} has negative layer count"));
+            }
+            let level = level as usize;
+            level_total += level;
+            let count = i32::from_le_bytes(bytes[record + 16..record + 20].try_into().unwrap());
+            if count < 0 || count as usize > m0 {
+                return Err(format!("vertex {node} has invalid degree {count}"));
+            }
+            if level == 0 {
+                continue;
+            }
+            let at = u64::from_le_bytes(bytes[record + 8..record + 16].try_into().unwrap());
+            let at = usize::try_from(at)
+                .map_err(|_| format!("vertex {node} has an out-of-range upper-layer offset"))?;
+            // `layers_p_` is a byte offset into the upper region at block
+            // granularity (`up_start * lx`), so a record that names anything
+            // else cannot be walked.
+            if at % lx != 0 {
+                return Err(format!(
+                    "vertex {node} has an unaligned upper-layer offset {at}"
+                ));
+            }
+            let span = at
+                .checked_add(level.checked_mul(lx).ok_or("graph size overflow")?)
+                .ok_or("graph size overflow")?;
+            if span > upper_len {
+                return Err(format!(
+                    "vertex {node}'s upper layers run past the graph region"
+                ));
+            }
+            for layer in 0..level {
+                let block = upper_base + at + layer * lx;
+                let count = i32::from_le_bytes(bytes[block..block + 4].try_into().unwrap());
+                if count < 0 || count as usize > m {
+                    return Err(format!("vertex {node} has invalid degree {count}"));
+                }
+            }
+        }
+        if level_total != layer_sum {
+            return Err(format!(
+                "layer_sum {layer_sum} does not match the vertex records ({level_total})"
+            ));
         }
         let mut graph = Self::new(m);
         graph.mapped = Some(MappedGraph {
@@ -578,10 +660,12 @@ impl GraphStore {
         let mut out = Vec::with_capacity(8 + n * l0 + layer_sum as usize * lx);
         out.extend_from_slice(&layer_sum.to_le_bytes());
 
-        let mut layers_p = Vec::with_capacity(n);
-        for node in 0..n {
-            layers_p.push((self.up_start[node] as usize * lx) as u64);
-        }
+        let layers_p: Vec<u64> = self
+            .up_start
+            .iter()
+            .take(n)
+            .map(|&start| (start as usize * lx) as u64)
+            .collect();
         for node in 0..n {
             let start = out.len();
             out.extend_from_slice(&(self.levels[node] as i32).to_le_bytes());
@@ -778,6 +862,57 @@ mod tests {
         let short = region[..region.len() - 4].to_vec();
         let src: crate::vector::ByteSource = std::sync::Arc::new(short);
         assert!(GraphStore::from_cpp_region_mapped(src, 0, 3, 2).is_err());
+    }
+
+    /// The chunk layout does not promise a word-aligned graph region - it starts
+    /// right after `n * record_size` vector bytes, and a quantized record is not
+    /// always four bytes wide - and a `u32` view of a misaligned region reads
+    /// every slot as empty. Such a region is copied instead of mapped.
+    #[test]
+    fn a_misaligned_region_is_copied_rather_than_mapped() {
+        let owned = small_graph();
+        let region = owned.to_cpp_region();
+        let mut shifted = vec![0u8];
+        shifted.extend_from_slice(&region);
+        let src: crate::vector::ByteSource = std::sync::Arc::new(shifted);
+        let mapped = GraphStore::from_cpp_region_mapped(src, 1, 3, 2).unwrap();
+        assert!(!mapped.is_mapped(), "an unaligned region cannot be mapped");
+        for node in 0..3 {
+            assert_eq!(mapped.level_of(node), owned.level_of(node));
+            for layer in 0..=owned.level_of(node) {
+                assert_eq!(
+                    mapped.neighbors(layer, node).to_vec(),
+                    owned.neighbors(layer, node).to_vec(),
+                    "node {node} layer {layer}"
+                );
+            }
+        }
+    }
+
+    /// A mapped graph reads its levels, degrees and block offsets on demand and
+    /// quietly treats a bad field as "level 0, no neighbours", so a malformed
+    /// record has to fail the load the way `from_cpp_region` fails it.
+    #[test]
+    fn malformed_vertex_records_are_rejected_when_mapped() {
+        let region = small_graph().to_cpp_region();
+        let load = |bytes: Vec<u8>| {
+            let src: crate::vector::ByteSource = std::sync::Arc::new(bytes);
+            GraphStore::from_cpp_region_mapped(src, 0, 3, 2)
+        };
+        // Node 0's record starts at 8: level at +0, `layers_p_` at +8,
+        // `neighbor_n_` at +16.
+        let mut negative = region.clone();
+        negative[8..12].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(load(negative).is_err(), "negative level");
+        let mut degree = region.clone();
+        degree[8 + 16..8 + 20].copy_from_slice(&9i32.to_le_bytes());
+        assert!(load(degree).is_err(), "degree above Mmax0");
+        let mut offset = region.clone();
+        offset[8 + 8..8 + 16].copy_from_slice(&(4 * 12u64).to_le_bytes());
+        assert!(load(offset).is_err(), "upper layers past the region");
+        let mut sum = region;
+        sum[0] = 9;
+        assert!(load(sum).is_err(), "layer_sum mismatch");
     }
 
     #[test]

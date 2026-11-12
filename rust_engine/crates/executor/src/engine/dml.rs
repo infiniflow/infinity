@@ -2039,7 +2039,17 @@ impl Engine {
                     false
                 }
             };
-            if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+            // Only a dump that actually wrote a chunk sealed the memory
+            // segment. `Ok(0)` means there was nothing to seal - an LSG index
+            // is never dumped from the buffer at all (its graph is linked with
+            // unadjusted distances), so dropping `hnsw_mem` here would throw
+            // away the only copy of the rows written since the last full build.
+            if dump
+                && matches!(
+                    self.dump_hnsw_index(&im.table, &im.name),
+                    Ok(written) if written > 0
+                )
+            {
                 // The dumped segment leaves memory. The bytes above the
                 // quota were already left in the counter, so nothing else to
                 // do here but drop the graph the dump just sealed.

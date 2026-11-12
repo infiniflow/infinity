@@ -3156,9 +3156,34 @@ impl Engine {
         // `InsertVecs` builds it in buckets across the dense-index pool. Feeding
         // the rows one at a time made `CREATE INDEX` a serial point-by-point
         // build.
+        // The column's declared shape drives the parsing: a `BIT` column stores
+        // a bit string rather than a list of numbers.
+        let decl = self
+            .column_types(table)
+            .ok()
+            .and_then(|t| t.get(ci).cloned())
+            .unwrap_or_default();
+        let (dim, bit) = crate::blocks::engine::vector_column_shape(&decl);
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+            // Strict, and validated against the declared dimension: a cell the
+            // parser cannot read in full (`[1,2,bad,4]`) or that is not a whole
+            // number of `dim`-sized tokens has no place in a graph whose every
+            // vertex is `dim` wide, so it fails the build instead of being
+            // indexed as something else.
+            let v = parse_vector_cell(&text, bit)
+                .map_err(|e| Error::Invalid(format!("'{table}.{column}' row {seq}: {e}")))?;
+            if let Some(dim) = dim {
+                if !v.is_empty() && v.len() % dim != 0 {
+                    return Err(Error::Invalid(format!(
+                        "'{table}.{column}' row {seq}: {} coordinates is not a whole number of {dim}-dimensional tokens",
+                        v.len()
+                    )));
+                }
+            }
+            if v.is_empty() {
+                continue;
+            }
             rows.push((seq as u64, v));
         }
         let read = t_read.elapsed();
@@ -3171,20 +3196,36 @@ impl Engine {
                     // One vertex per token, all labelled with the row id: the
                     // single-vector filter below would drop every cell holding
                     // more than one token and index a whole multi-vector cell
-                    // as a single vertex.
+                    // as a single vertex. A cell whose tokens are not all
+                    // `mem.dims` wide is one of those invalid rows and is left
+                    // out rather than reshaping the whole batch.
                     let tokens: Vec<(u64, Vec<Vec<f32>>)> = rows
                         .iter()
-                        .map(|(seq, v)| (*seq, crate::hnsw_mem::split_tokens(v, mem.dims)))
+                        .filter_map(|(seq, v)| {
+                            let tokens = crate::hnsw_mem::split_tokens(v, mem.dims);
+                            tokens
+                                .iter()
+                                .all(|t| t.len() == mem.dims)
+                                .then_some((*seq, tokens))
+                        })
                         .collect();
-                    mem.insert_token_batch(&tokens, workers);
+                    if !tokens.is_empty() && !mem.insert_token_batch(&tokens, workers) {
+                        return Err(Error::Invalid(format!(
+                            "'{table}.{column}': the multi-vector index rejected a batch of {} rows",
+                            tokens.len()
+                        )));
+                    }
                 } else {
                     let batch: Vec<(u64, Vec<f32>)> = rows
                         .iter()
                         .filter(|(_, v)| v.len() == mem.dims)
                         .map(|(seq, v)| (*seq, v.clone()))
                         .collect();
-                    if !batch.is_empty() {
-                        mem.insert_batch(&batch, workers);
+                    if !batch.is_empty() && !mem.insert_batch(&batch, workers) {
+                        return Err(Error::Invalid(format!(
+                            "'{table}.{column}': the index rejected a batch of {} rows",
+                            batch.len()
+                        )));
                     }
                 }
             }
@@ -5027,15 +5068,15 @@ impl Engine {
                                 )));
                             }
                         }
-                        "ENCODE" => {
+                        "ENCODE"
                             if !matches!(
                                 v.trim().to_ascii_lowercase().as_str(),
                                 "plain" | "lvq" | "rabitq"
-                            ) {
-                                return Err(Error::Invalid(format!(
-                                    "invalid index parameter: unknown encoding '{v}'"
-                                )));
-                            }
+                            ) =>
+                        {
+                            return Err(Error::Invalid(format!(
+                                "invalid index parameter: unknown encoding '{v}'"
+                            )));
                         }
                         _ => {}
                     }

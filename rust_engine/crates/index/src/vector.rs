@@ -271,10 +271,14 @@ impl SearchScratch {
 }
 
 thread_local! {
-    /// One scratch buffer per thread. `HnswIndex::search_layer_filtered`
-    /// takes `&self` (the reference's `SearchLayer` is `const` too)
-    /// and searches never nest, so a thread-local keeps the O(n) buffer out of
-    /// the per-insert cost without changing that signature.
+    /// One scratch buffer per thread. `HnswIndex::search_layer_filtered` and
+    /// `HnswIndex::search_labeled` take `&self` (the reference's `SearchLayer`
+    /// is `const` too) and searches never nest, so a thread-local keeps the
+    /// O(n) buffer out of the per-call cost without changing that signature.
+    ///
+    /// Both traversals are hot per call, not per build: the first runs once per
+    /// vertex per layer while building, the second once per query token in
+    /// `search_multivector`.
     static SCRATCH: std::cell::RefCell<SearchScratch> =
         const { std::cell::RefCell::new(SearchScratch::new()) };
 }
@@ -396,6 +400,30 @@ impl PlainVecs {
             "a mapped vector region is read-only; build into an owned store"
         );
         self.data.extend_from_slice(v);
+    }
+
+    /// The vector region as the chunk layout holds it: `dims` little-endian
+    /// `f32`s per vertex, contiguous.
+    ///
+    /// A mapped region is copied straight out of the mapping it borrows: its
+    /// `data` is empty by construction, so serializing only the owned buffer
+    /// would write a zero-length region for a loaded chunk.
+    fn records_bytes(&self) -> Vec<u8> {
+        if let Some(m) = &self.mapped {
+            let start = m.off;
+            let len = m.n.saturating_mul(self.dims).saturating_mul(4);
+            if let Some(slice) = start
+                .checked_add(len)
+                .and_then(|end| m.src.as_ref().as_ref().get(start..end))
+            {
+                return slice.to_vec();
+            }
+        }
+        let mut out = Vec::with_capacity(self.data.len() * 4);
+        for x in &self.data {
+            out.extend_from_slice(&x.to_le_bytes());
+        }
+        out
     }
 
     /// `GetVec`: the `dims` floats of vertex `i`, or `None` past the end.
@@ -1134,12 +1162,9 @@ impl HnswIndex {
             Store::Plain { data, .. } => {
                 // The buffer is already `dims` little-endian `f32`s per vertex,
                 // so the chunk's vector region is its bytes verbatim (C++
-                // `PlainVecStoreInner::Save` is one `Append` of the same span).
-                let mut out = Vec::with_capacity(data.data.len() * 4);
-                for x in &data.data {
-                    out.extend_from_slice(&x.to_le_bytes());
-                }
-                out
+                // `PlainVecStoreInner::Save` is one `Append` of the same span) -
+                // owned or mapped, which is why `PlainVecs` owns the encoding.
+                data.records_bytes()
             }
             Store::Lvq(store) => store.records_bytes(),
             Store::Rabitq(store) => store.records_bytes(),
@@ -1934,37 +1959,44 @@ impl HnswIndex {
         }
         let nodes = self.store.len();
         let ef = self.beam(beam);
-        let mut visited = Visited::new();
-        visited.begin(nodes, cur);
-        let mut candidates: std::collections::BinaryHeap<std::cmp::Reverse<Cand>> =
-            std::collections::BinaryHeap::new();
         let entry_d = self.distance_query(query, None, cur);
-        let mut rows = LabelSet::new(ef);
-        candidates.push(Reverse(Cand(entry_d, cur)));
         let accept = |row: u64| allow.is_none_or(|f| f(row));
-        if accept(row_of(cur)) {
-            rows.add(entry_d, row_of(cur));
-        }
-        while let Some(Reverse(Cand(cd, c))) = candidates.pop() {
-            if cd > rows.bar() {
-                break;
+        let mut rows = LabelSet::new(ef);
+        // The visited stamps and the frontier heap come from the same
+        // per-thread scratch the single-vector traversal uses.
+        // `search_multivector` reaches here once per query token, so a fresh
+        // `Visited` was one graph-sized allocation (n/4 bytes) per token.
+        SCRATCH.with(|cell| {
+            let mut scratch = cell.borrow_mut();
+            scratch.begin(nodes, cur);
+            let SearchScratch {
+                visited, candidate, ..
+            } = &mut *scratch;
+            candidate.push(Reverse(Cand(entry_d, cur)));
+            if accept(row_of(cur)) {
+                rows.add(entry_d, row_of(cur));
             }
-            let list = self.graph.neighbors(0, c);
-            for index in 0..list.len() {
-                let nb = list.get(index).unwrap() as usize;
-                if nb >= nodes || !visited.visit(nb) {
-                    continue;
+            while let Some(Reverse(Cand(cd, c))) = candidate.pop() {
+                if cd > rows.bar() {
+                    break;
                 }
-                let d = self.distance_query(query, None, nb);
-                if d <= rows.bar() {
-                    candidates.push(Reverse(Cand(d, nb)));
-                    let row = row_of(nb);
-                    if accept(row) {
-                        rows.add(d, row);
+                let list = self.graph.neighbors(0, c);
+                for index in 0..list.len() {
+                    let nb = list.get(index).unwrap() as usize;
+                    if nb >= nodes || !visited.visit(nb) {
+                        continue;
+                    }
+                    let d = self.distance_query(query, None, nb);
+                    if d <= rows.bar() {
+                        candidate.push(Reverse(Cand(d, nb)));
+                        let row = row_of(nb);
+                        if accept(row) {
+                            rows.add(d, row);
+                        }
                     }
                 }
             }
-        }
+        });
         let mut out: Vec<(u64, f32)> = rows.best.into_iter().collect();
         out.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
         // `LabelSet` already caps at `beam` rows, so this is the reference's
@@ -2241,6 +2273,22 @@ mod tests {
             .collect()
     }
 
+    /// A mapped chunk's vector region has to serialize back to the bytes it
+    /// borrows: `data` is empty by construction, so a `Save` that only walked
+    /// the owned buffer wrote a zero-length region for every loaded chunk.
+    #[test]
+    fn a_mapped_vector_region_serializes_back_to_its_bytes() {
+        let owned = PlainVecs::from_rows(2, vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
+        let bytes = owned.records_bytes();
+        assert_eq!(bytes.len(), 16);
+        let src: ByteSource = std::sync::Arc::new(bytes.clone());
+        let mapped = PlainVecs::mapped(2, src, 0, 2).expect("region is readable");
+        assert!(mapped.mapped.is_some(), "expected a mapped region");
+        assert!(mapped.data.is_empty(), "a mapped region owns no floats");
+        assert_eq!(mapped.records_bytes(), bytes);
+        assert_eq!(mapped.get(1), Some(&[3.0f32, 4.0][..]));
+    }
+
     #[test]
     fn flat_exact_top1() {
         let data = dataset(50, 4);
@@ -2344,7 +2392,13 @@ mod tests {
     fn multivector_search_keeps_the_best_token_per_row() {
         let (index, labels) = multivector_index();
         let query = vec![1.0f32, 0.0];
-        let hits = index.search_multivector(&[query.clone()], 2, 32, &|node| labels[node], None);
+        let hits = index.search_multivector(
+            std::slice::from_ref(&query),
+            2,
+            32,
+            &|node| labels[node],
+            None,
+        );
         assert_eq!(hits.len(), 2, "both rows are candidates: {hits:?}");
         // Row 0 holds the near copy of the query, so it must rank first.
         assert_eq!(hits[0].0, 0);

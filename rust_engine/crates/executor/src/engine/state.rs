@@ -6333,22 +6333,76 @@ pub(crate) fn bound_key(
     }
 }
 
+/// Which end of an inclusive range a bound is.
+///
+/// It decides which way a bound steps when the tail's width cannot represent it:
+/// the interval must keep every stored value the predicate admits and nothing it
+/// rejects, so the lower end rounds *up* to the first representable value inside
+/// the interval and the upper end rounds *down*.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum RangeBound {
+    Lower,
+    Upper,
+}
+
 /// A query bound as the memory tail's ordered bytes.
 ///
 /// [`bound_key`] widens a float bound to `f64` so that a chunk's `f32`
 /// comparison cannot clip a boundary row; the tail stores the column's own
-/// width, so the bound is narrowed back here. Narrowing rounds monotonically, so
-/// a row that satisfies the bound still falls inside the narrowed interval —
-/// any extra candidates the rounding adds are removed by the residual filter.
+/// width, so the bound is narrowed back here.
+///
+/// The narrowing is not a plain cast. `0.1 as f32` is `0.09999999`, so
+/// round-to-nearest can start `f >= 0.1` *below* the bound and admit a row the
+/// predicate rejects - and that is only harmless while something later re-checks
+/// the row. The indexed KNN path has no such filter (its rows are a vector
+/// projection, so the predicate is never re-evaluated), so the interval has to
+/// be exactly the set of stored `f32`s the predicate admits: step to the
+/// adjacent representable value whenever the nearest one falls outside.
 pub(crate) fn tail_bound(
     kind: storage::secondary_segment::KeyKind,
     key: storage::secondary_segment::Key,
+    side: RangeBound,
 ) -> Vec<u8> {
     use storage::secondary_segment::{Key, KeyKind};
     match (kind, key) {
-        (KeyKind::F32, Key::F64(v)) => Key::F32(v as f32).ordered_bytes(),
+        (KeyKind::F32, Key::F64(v)) => {
+            let narrowed = v as f32;
+            let narrowed = match side {
+                // The smallest `f32` that is still `>= v`.
+                RangeBound::Lower if f64::from(narrowed) < v => next_up_f32(narrowed),
+                // The largest `f32` that is still `<= v`.
+                RangeBound::Upper if f64::from(narrowed) > v => next_down_f32(narrowed),
+                _ => narrowed,
+            };
+            Key::F32(narrowed).ordered_bytes()
+        }
         _ => key.ordered_bytes(),
     }
+}
+
+/// `std::nextafter(x, +inf)`: a positive magnitude grows, a negative one shrinks,
+/// and `±0` steps to the smallest positive subnormal.
+fn next_up_f32(x: f32) -> f32 {
+    if x.is_nan() || x == f32::INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f32::from_bits(1);
+    }
+    let bits = x.to_bits();
+    f32::from_bits(if x > 0.0 { bits + 1 } else { bits - 1 })
+}
+
+/// `std::nextafter(x, -inf)`.
+fn next_down_f32(x: f32) -> f32 {
+    if x.is_nan() || x == f32::NEG_INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f32::from_bits(0x8000_0001);
+    }
+    let bits = x.to_bits();
+    f32::from_bits(if x > 0.0 { bits - 1 } else { bits + 1 })
 }
 
 /// A date/time bound: the planner passes the literal's text for a finite bound
@@ -7031,6 +7085,49 @@ pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
         .filter(|x| !x.is_empty())
         .filter_map(|x| x.parse::<f64>().ok())
         .collect()
+}
+
+/// Parses a stored vector cell strictly, for a caller about to index it.
+///
+/// [`parse_vec_str`] drops every leaf it cannot parse, which is right for a
+/// best-effort display path but wrong for a build: `[1,2,bad,4]` silently
+/// becomes three coordinates, so a row ends up with a token count (and hence a
+/// vertex dimension) the column never declared. Here an unparseable leaf is an
+/// error, and the caller turns it into the build failure it is.
+///
+/// A `BIT` column stores its value in the display form (`[10110001]`, or the
+/// comma-separated variant), one character per coordinate;
+/// [`parse_vec_str`] would read that as the single number `10110001`, so each
+/// bit character is decoded into its own 0/1 coordinate instead.
+pub(crate) fn parse_vector_cell(text: &str, bit: bool) -> std::result::Result<Vec<f32>, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+    if bit {
+        let mut out = Vec::with_capacity(trimmed.len());
+        for c in trimmed.chars() {
+            match c {
+                '0' => out.push(0.0),
+                '1' => out.push(1.0),
+                // A literal's brackets, separators and padding are not payload.
+                '[' | ']' | ',' | ' ' | '\t' | '\n' | '\r' => {}
+                other => return Err(format!("'{other}' is not a bit")),
+            }
+        }
+        return Ok(out);
+    }
+    let mut out = Vec::new();
+    for leaf in trimmed
+        .split([',', ' ', '[', ']', '\t', '\n', '\r'])
+        .filter(|x| !x.is_empty())
+    {
+        match leaf.parse::<f32>() {
+            Ok(v) => out.push(v),
+            Err(_) => return Err(format!("'{leaf}' is not a number")),
+        }
+    }
+    Ok(out)
 }
 
 /// Splits a stored multi-vector value into `dims`-sized token rows. Bit

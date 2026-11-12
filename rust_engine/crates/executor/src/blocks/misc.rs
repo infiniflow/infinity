@@ -1637,6 +1637,74 @@ mod tests {
     }
 
     #[test]
+    fn vector_cells_are_parsed_strictly() {
+        // A `BIT` column stores a bit string: one coordinate per character,
+        // where `parse_vec_str` would read the whole leaf as one number.
+        let bits = vec![1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        assert_eq!(crate::parse_vector_cell("[10110001]", true).unwrap(), bits);
+        // The comma form is the same vector.
+        assert_eq!(
+            crate::parse_vector_cell("[1,0,1,1,0,0,0,1]", true).unwrap(),
+            bits
+        );
+        assert_eq!(
+            crate::parse_vector_cell("[1,2,3]", false).unwrap(),
+            vec![1.0, 2.0, 3.0]
+        );
+        assert_eq!(
+            crate::parse_vector_cell("", false).unwrap(),
+            Vec::<f32>::new()
+        );
+        // A leaf the parser cannot read is an error: `parse_vec_str` drops it,
+        // which shifts every coordinate after it (and changes the dimension).
+        assert!(crate::parse_vector_cell("[1,2,bad,4]", false).is_err());
+        assert_eq!(crate::parse_vec_str("[1,2,bad,4]"), vec![1.0, 2.0, 4.0]);
+        assert!(crate::parse_vector_cell("[1,0,2,1]", true).is_err());
+    }
+
+    #[test]
+    fn a_bit_embedding_index_decodes_each_bit_as_a_coordinate() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE bv (id INT, v EMBEDDING(BIT,8));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO bv VALUES (1, [1,0,1,1,0,0,0,1]), (2, [1,1,1,1,0,0,0,0]);")
+            .unwrap();
+        engine
+            .execute("CREATE INDEX bv_idx ON bv (v) USING HNSW;")
+            .unwrap();
+        assert_eq!(engine.write_hnsw_index("bv", "bv_idx").unwrap(), 2);
+        let back = engine.read_hnsw_index("bv", "bv_idx").unwrap();
+        assert_eq!(back.len(), 2);
+        // One vertex per row, `dim` bits wide - not one vertex holding the
+        // single number 10110001.
+        assert_eq!(back[0], (0, vec![1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0]));
+        assert_eq!(back[1], (1, vec![1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn hnsw_chunk_coverage_counts_rows_not_tokens() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE mvc (id INT, v MULTIVECTOR(FLOAT,2));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO mvc VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.5,0.5],[0.2,0.2],[0.9,0.1]]);")
+            .unwrap();
+        engine
+            .execute("CREATE INDEX mvc_i ON mvc (v) USING HNSW;")
+            .unwrap();
+        assert_eq!(engine.write_hnsw_index("mvc", "mvc_i").unwrap(), 5);
+        // Five token vertices over two rows: the header's vertex count is not
+        // the chunk's row coverage, and reclaiming on it would drop chunks that
+        // still hold rows.
+        assert_eq!(engine.hnsw_chunk_coverage("mvc", "mvc_i"), (5, 2));
+    }
+
+    #[test]
     fn a_bit_tensor_array_survives_a_block_round_trip() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();

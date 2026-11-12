@@ -30,6 +30,19 @@ fn ids_at(timeline: &[(u64, Vec<u64>)], ts: u64, current: &[u64]) -> Vec<u64> {
     }
 }
 
+/// A vector column's declared `(dimension, is_bit)`.
+///
+/// `is_bit` is what tells [`crate::parse_vector_cell`] to read the cell as the
+/// bit string an `EMBEDDING(BIT, d)` / `MULTIVECTOR(BIT, d)` stores
+/// (`[10110001]`, one character per coordinate) instead of as numbers; a
+/// `BIT` element is `element_code` 0 for both shapes.
+pub(crate) fn vector_column_shape(decl: &str) -> (Option<usize>, bool) {
+    let decl = decl.trim().to_ascii_uppercase();
+    let bit = embedding_shape(&decl).is_some_and(|(_, code)| code == 0)
+        || tensor_shape(&decl).is_some_and(|(_, _, code)| code == 0);
+    (crate::type_dim(&decl).filter(|d| *d > 0), bit)
+}
+
 /// Rewrites one replayed row onto the table's current columns.
 ///
 /// The frame's cells follow `frame_ids` - the column ids that were live when
@@ -4099,13 +4112,18 @@ impl Engine {
     /// C++ layout (§9.2): 56-byte header, plain vector region, graph region, then
     /// the `u32` label array. Byte-identity with a C++-built index is not
     /// required — the offsets are explicit, so the C++ loader reads it.
+    ///
+    /// `Ok(None)` means the column has no vectors to index (no cell parsed, or
+    /// no declared dimension) - nothing to write, which the caller treats as
+    /// "leave the chunks alone". A malformed cell is an `Err` instead: see
+    /// [`Self::column_tokens`].
     pub(crate) fn hnsw_chunk(
         &self,
         table: &str,
         column: &str,
         options: &HnswOptions,
         segment: Option<u32>,
-    ) -> Result<(usize, Vec<u8>)> {
+    ) -> Result<Option<(usize, Vec<u8>)>> {
         let tokens = self.column_tokens(table, column, segment)?;
         let total: usize = tokens.iter().map(|(_, t)| t.len()).sum();
         let Some(dim) = tokens
@@ -4113,14 +4131,10 @@ impl Engine {
             .find_map(|(_, t)| t.first().map(Vec::len))
             .filter(|d| *d > 0)
         else {
-            return Err(Error::Invalid(format!(
-                "no vectors to index in '{table}.{column}'"
-            )));
+            return Ok(None);
         };
         if total == 0 {
-            return Err(Error::Invalid(format!(
-                "no vectors to index in '{table}.{column}'"
-            )));
+            return Ok(None);
         }
         let mut index = HnswIndex::with_encoding(
             dim,
@@ -4147,12 +4161,18 @@ impl Engine {
         // Bucket-parallel construction, as the reference does on its dense-index
         // pool; a store that is not plain keeps the serial path.
         index.add_batch(&vectors, self.hnsw_build_workers());
-        Ok(encode_hnsw_chunk_from(&index, &labels))
+        Ok(Some(encode_hnsw_chunk_from(&index, &labels)))
     }
 
     /// The vectors of `column` split into one entry per graph vertex: a single
     /// vector per row for an `EMBEDDING` column, the row's `dim`-sized tokens
     /// for a `MULTIVECTOR`.
+    ///
+    /// Every cell is parsed strictly ([`crate::parse_vector_cell`]) and must be
+    /// a whole number of `dim`-sized tokens, because that is the only shape the
+    /// graph can hold: a cell with a missing coordinate, or one whose length is
+    /// not a multiple of the declared dimension, is a build error rather than a
+    /// vertex of a different width.
     #[allow(clippy::type_complexity)]
     pub(crate) fn column_tokens(
         &self,
@@ -4165,18 +4185,16 @@ impl Engine {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
-        let dim = self
+        let decl = self
             .storage
             .catalog
             .get_table_by_name(&self.qualified_table(table))
             .ok()
             .flatten()
-            .and_then(|meta| {
-                meta.types
-                    .get(col_idx)
-                    .and_then(|decl| crate::type_dim(decl))
-            })
-            .filter(|d| *d > 0);
+            .and_then(|meta| meta.types.get(col_idx).cloned())
+            .map(|decl| decl.to_ascii_uppercase())
+            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
+        let (dim, bit) = vector_column_shape(&decl);
         let mut out = Vec::new();
         for (seq, row) in self.fetch_rows_with_ids(table)? {
             if let Some(only) = segment {
@@ -4187,18 +4205,30 @@ impl Engine {
             let Some(Value::Str(s)) = row.get(col_idx) else {
                 continue;
             };
-            let flat: Vec<f32> = crate::parse_vec_str(s).iter().map(|x| *x as f32).collect();
+            // Strict: `parse_vec_str` drops leaves it cannot parse, and a cell
+            // that loses one coordinate silently changes the vertex dimension
+            // for that row, which is exactly the kind of value the graph must
+            // not be built from.
+            let flat = crate::parse_vector_cell(s, bit)
+                .map_err(|e| Error::Invalid(format!("'{table}.{column}' row {seq}: {e}")))?;
             if flat.is_empty() {
                 continue;
             }
             let tokens: Vec<Vec<f32>> = match dim {
-                Some(dim) if flat.len() % dim == 0 && !flat.is_empty() => {
+                Some(dim) if flat.len() % dim == 0 => {
                     flat.chunks_exact(dim).map(<[f32]>::to_vec).collect()
                 }
-                // A cell whose length is not a multiple of the declared
-                // dimension is not a multi-vector payload: index it as one
-                // vertex, which is what a single-vector column looks like.
-                _ => vec![flat],
+                // A cell that is not a whole number of `dim`-sized tokens has
+                // no vertex dimension the token layout can express: indexing it
+                // as one vertex would put a vector of the wrong length into a
+                // graph whose every other vertex is `dim` wide.
+                Some(dim) => {
+                    return Err(Error::Invalid(format!(
+                        "'{table}.{column}' row {seq}: {} coordinates is not a whole number of {dim}-dimensional tokens",
+                        flat.len()
+                    )))
+                }
+                None => vec![flat],
             };
             if !tokens.is_empty() {
                 out.push((seq as u32, tokens));
@@ -4390,8 +4420,11 @@ impl Engine {
                     if *rows == 0 {
                         None
                     } else {
-                        self.hnsw_chunk(&table, &column, &options, Some(*segment))
-                            .ok()
+                        // A cell the build cannot parse is reported, not
+                        // swallowed: skipping the chunk would leave the mirror
+                        // without the rows the table holds, and the query side
+                        // would answer from a partial index.
+                        self.hnsw_chunk(&table, &column, &options, Some(*segment))?
                     }
                 }
             };
@@ -4604,29 +4637,15 @@ impl Engine {
             if chunks.len() < 2 {
                 continue;
             }
-            let covered = self
-                .hnsw_chunk_path(&im.table, &im.name)
-                .ok()
-                .and_then(|p| std::fs::read(p).ok())
-                .and_then(|b| {
-                    knn_format::decode_hnsw_chunk(
-                        &b,
-                        4,
-                        knn_format::VERTEX_L0_SIZE,
-                        knn_format::VERTEX_LX_SIZE,
-                    )
-                    .ok()
-                })
-                .map(|c| c.header.cur_vec_num as usize)
-                .unwrap_or(0);
-            if covered >= rows {
+            // A merged chunk covers the table only when it labels every row.
+            // The header counts *vertices* - one per row for an `EMBEDDING`
+            // column, one per token for a `MULTIVECTOR` one - so a token count
+            // can reach the row count while rows are still missing; the label
+            // array is what answers "which rows are in here".
+            let (covered_vertices, covered_rows) = self.hnsw_chunk_coverage(&im.table, &im.name);
+            if covered_rows >= rows {
                 continue;
             }
-            // A merge holds the vectors, the rebuilt graph and the encoded
-            // chunk at the same time. On a multi-gigabyte table that transient
-            // is larger than the whole memory budget (C++ streams it through
-            // the buffer manager), so leave the incremental chunks alone
-            // rather than rebuilding the table every tick.
             let dim = self
                 .table_schema(&im.table)
                 .ok()
@@ -4638,7 +4657,27 @@ impl Engine {
                 })
                 .and_then(|t| crate::type_dim(&t))
                 .unwrap_or(0);
-            let rebuild_bytes = rows.saturating_mul(dim).saturating_mul(4 * 3 + 64);
+            // A merge holds the vectors, the rebuilt graph and the encoded
+            // chunk at the same time. On a multi-gigabyte table that transient
+            // is larger than the whole memory budget (C++ streams it through
+            // the buffer manager), so leave the incremental chunks alone
+            // rather than rebuilding the table every tick.
+            //
+            // The row count is a vertex count only for a single-vector column:
+            // a `MULTIVECTOR` rebuild is one vertex per token, so its vectors,
+            // graph and chunk grow with the tokens per row, which the chunk
+            // already on disk tells us even when it covers part of the table.
+            let tokens_per_row = if self.multivector_column(&im.table, &im.column) {
+                covered_vertices.div_ceil(covered_rows.max(1)).max(1)
+            } else {
+                1
+            };
+            let rebuild_vertices = rows.saturating_mul(tokens_per_row);
+            // Three copies of a token (the decoded input, the graph's store and
+            // the encoded chunk) plus the graph, the labels and the per-vertex
+            // headers around them.
+            let per_vertex = dim.saturating_mul(4).saturating_mul(3).saturating_add(256);
+            let rebuild_bytes = rebuild_vertices.saturating_mul(per_vertex);
             if rebuild_bytes > 1024 * 1024 * 1024 {
                 continue;
             }
@@ -4779,27 +4818,18 @@ impl Engine {
             };
             self.reclaim_deprecated_chunks(&im.table, &im.name, 0, &dir)?;
             let chunks = hnsw_chunks(&dir);
-            let covered = self
-                .hnsw_chunk_path(&im.table, &im.name)
-                .ok()
-                .and_then(|p| std::fs::read(p).ok())
-                .and_then(|b| {
-                    knn_format::decode_hnsw_chunk(
-                        &b,
-                        4,
-                        knn_format::VERTEX_L0_SIZE,
-                        knn_format::VERTEX_LX_SIZE,
-                    )
-                    .ok()
-                })
-                .map(|c| c.header.cur_vec_num as usize)
-                .unwrap_or(0);
             // The newest chunk covers the table only when it is a merged
             // chunk; incremental dumps cover just their own rows. A committed
             // optimize already dropped the chunks it superseded (the entry's
             // `deprecate_ids`), so this is the fallback for a crash between that
             // commit and the deletion.
-            if covered < rows {
+            //
+            // Coverage is *rows*, not vertices: a `MULTIVECTOR` chunk holds one
+            // vertex per token, so its vertex count passes the row count long
+            // before it labels every row, and reclaiming on that would delete
+            // chunks that are still the only copy of some rows.
+            let (_, covered_rows) = self.hnsw_chunk_coverage(&im.table, &im.name);
+            if covered_rows < rows {
                 continue;
             }
             if let Some((keep, _)) = chunks.last() {
@@ -4962,6 +4992,27 @@ impl Engine {
             .pop()
             .map(|(_, p)| p)
             .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", dir.display())))
+    }
+
+    /// `(vertices, distinct rows)` of `index_name`'s newest HNSW chunk.
+    ///
+    /// The header counts vertices, which is a row count only for an
+    /// `EMBEDDING` column: a `MULTIVECTOR` chunk stores one vertex per token and
+    /// labels each with its row id, so "how many rows does this chunk cover" has
+    /// to be read off the label array. Both numbers come from one mapped read -
+    /// the vectors and the graph are never touched, which is why this costs a
+    /// few hundred kilobytes for a million-vertex chunk instead of decoding it.
+    pub(crate) fn hnsw_chunk_coverage(&self, table: &str, index_name: &str) -> (usize, usize) {
+        let Some(path) = self.hnsw_chunk_path(table, index_name).ok() else {
+            return (0, 0);
+        };
+        let Some(src) = map_hnsw_chunk(&path) else {
+            return (0, 0);
+        };
+        let Some(parts) = self.read_hnsw_chunk_parts_mapped(table, index_name, &src) else {
+            return (0, 0);
+        };
+        (parts.n, labelled_rows(&parts.labels))
     }
 
     /// Writes `table`'s full-text index as the C++ `.dic`/`.pos`/`.len` chunk
@@ -5303,16 +5354,6 @@ impl Engine {
             return None;
         }
         let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
-        // Only what enters the heap counts against the segment budget: a mapped
-        // chunk's payload and neighbour lists live in the page cache, so its
-        // footprint is the label bookkeeping alone.
-        let bytes = parts.labels.len() * 4
-            + parts.n * 4
-            + if parts.mapped.is_some() {
-                0
-            } else {
-                parts.records.len() + parts.graph_region.len()
-            };
         // The neighbour lists go from the chunk bytes straight into the
         // compact slabs: no per-vertex `Vec` in between.
         let index = match &parts.mapped {
@@ -5345,6 +5386,14 @@ impl Engine {
                 parts.max_layer,
             )?,
         };
+        // Only what enters the heap counts against the segment budget, and only
+        // the constructed index knows which parts those are: a mapped plain
+        // store reads its vectors and neighbour lists through the page cache
+        // (nothing to charge), while an LVQ/RaBitQ region is *decoded out of*
+        // the mapping into a copied store even when `parts.mapped` is set, and
+        // its codes are real heap. `mem_usage` is that split; the labels and the
+        // distinct-row set are the per-chunk bookkeeping on top.
+        let bytes = parts.labels.len() * 4 + parts.n * 4 + index.mem_usage();
         let labelled_rows = labelled_rows(&parts.labels);
         Some(LoadedVectorIndex {
             index: HnswHandler::from_index(index),

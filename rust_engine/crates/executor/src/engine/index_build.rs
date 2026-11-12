@@ -888,7 +888,13 @@ impl Engine {
         } else if meta.index_type.eq_ignore_ascii_case("BMP") {
             self.seal_sparse_index(&table, &meta.column);
         } else if meta.index_type.eq_ignore_ascii_case("HNSW") {
-            if self.dump_hnsw_index(&table, &meta.name).is_ok() {
+            // `Ok(0)` wrote no chunk: an LSG index is never dumped from the
+            // buffer, so its memory segment is still the only copy of the rows
+            // written since the last full build and must be kept.
+            if matches!(
+                self.dump_hnsw_index(&table, &meta.name),
+                Ok(written) if written > 0
+            ) {
                 let key = self.table_key(&table);
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&key) {
@@ -1729,8 +1735,65 @@ impl Engine {
         })
     }
 
+    /// The declared type the secondary index's keys were encoded with.
+    ///
+    /// The registry's `declared_types` comes first: it is what the writer used,
+    /// while the catalog lookup is keyed by a qualified table name and so can
+    /// miss a bare one.
+    fn index_declared_type(&self, table: &str, column: &str) -> Option<String> {
+        let tkey = self.table_key(table);
+        let from_registry = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.secondary.declared_types.get(column).cloned())
+        };
+        from_registry.or_else(|| {
+            let schema = self.table_schema(table).ok()?;
+            let ci = schema.iter().position(|c| c == column)?;
+            self.column_types(table).ok()?.get(ci).cloned()
+        })
+    }
+
+    /// A float equality value as the literal its column's keys actually use.
+    ///
+    /// `col = 3.0` and `col = 3` are the same predicate (`Expr` compares
+    /// numerically), but the index answered them differently: the float branch of
+    /// [`Self::index_lookup_one`] only probes float chunks, so a float on an
+    /// integer column found nothing in a sealed chunk, and the memory tail could
+    /// not parse an integer key out of `"3.000000"` either - the equality
+    /// silently matched no row at all. An integer column therefore gets the value
+    /// converted, and only when the conversion is exact: `col = 3.5` cannot equal
+    /// any integer key, and probing a truncated key would answer a different
+    /// question, so it declines (`None`) and the caller evaluates the predicate
+    /// against the decoded columns instead.
+    fn float_lookup_literal(&self, table: &str, column: &str, f: f64) -> Option<Literal> {
+        let declared = self.index_declared_type(table, column).unwrap_or_default();
+        if key_domain(&declared) != KeyDomain::Integer {
+            return Some(Literal::Float(f));
+        }
+        // `i64`'s exact range as `f64`: `i64::MAX as f64` rounds up to 2^63, so
+        // the upper end is exclusive.
+        const I64_LOW: f64 = -9_223_372_036_854_775_808.0;
+        const I64_HIGH: f64 = 9_223_372_036_854_775_808.0;
+        if f.fract() != 0.0 || !(I64_LOW..I64_HIGH).contains(&f) {
+            return None;
+        }
+        Some(Literal::Int(f as i64))
+    }
+
     /// One column's (or one functional expression's) rows whose key is `value`.
     fn index_lookup_one(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
+        // A float equality value reaches the probe as the key type its column
+        // stores; see [`Self::float_lookup_literal`].
+        let converted;
+        let value: &Literal = match value {
+            Literal::Float(f) => {
+                converted = self.float_lookup_literal(table, column, *f)?;
+                &converted
+            }
+            other => other,
+        };
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
         // Snapshot the readers (cheap `Arc` clones) and the memory tail so the
@@ -2218,8 +2281,8 @@ impl Engine {
         // applies to it directly: one ordered slice per range, with no key
         // decoded and compared.
         for (start, end) in &keys {
-            let lo = tail_bound(kind, *start);
-            let hi = tail_bound(kind, *end);
+            let lo = tail_bound(kind, *start, RangeBound::Lower);
+            let hi = tail_bound(kind, *end, RangeBound::Upper);
             if let Some(index) = &tail {
                 for (_, ids) in index.range(Some(&lo), Some(&hi)) {
                     candidates.extend_from_slice(&ids);
@@ -2745,7 +2808,12 @@ impl Engine {
             if !same_table {
                 continue;
             }
-            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+            // `Ok(0)`: nothing was sealed (an LSG index never dumps from the
+            // buffer), so the memory segment must survive.
+            if matches!(
+                self.dump_hnsw_index(&im.table, &im.name),
+                Ok(written) if written > 0
+            ) {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);

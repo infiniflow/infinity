@@ -22,7 +22,7 @@ use index::vector::{HnswEncoding, HnswIndex, Metric};
 /// `CREATE INDEX`'s rebuild have to agree on that, or a row indexed twice would
 /// land twice in the graph.
 pub(crate) fn split_tokens(v: &[f32], dims: usize) -> Vec<Vec<f32>> {
-    if dims > 0 && !v.is_empty() && v.len() % dims == 0 {
+    if dims > 0 && !v.is_empty() && v.len().is_multiple_of(dims) {
         v.chunks_exact(dims).map(<[f32]>::to_vec).collect()
     } else {
         vec![v.to_vec()]

@@ -177,6 +177,15 @@ impl Engine {
                     candidates.insert(offset as usize);
                 }
             }
+            // A filtered query's rows carry the vector projection alone, so the
+            // scoring pass cannot re-evaluate the predicate (`row_filter` admits
+            // everything for an indexed query) and the probe's pushdown is the
+            // only place the filter applies. The sealed chunks get it through
+            // `allow_ref`; the memory segment is not probed at all - its rows
+            // are taken whole - so reject them here, before they reach scoring.
+            if let Some(allow) = q.allow {
+                candidates.retain(|row| allow.contains(row));
+            }
             let live = live_row_ids(q);
             if live.iter().all(|row| covered.contains(row)) {
                 return Some(candidates);

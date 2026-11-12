@@ -5278,6 +5278,73 @@ mod tests {
         }
     }
 
+    /// `v = 3.0` is the same predicate as `v = 3` for an integer column, but the
+    /// index used to answer neither side of it: the float probe only reads float
+    /// keys (so every sealed chunk returned nothing) and the memory tail cannot
+    /// parse `"3.000000"` as an integer key either. The value is converted to the
+    /// column's key exactly; a value that is not integral declines, so the
+    /// predicate is evaluated against the decoded rows instead of a truncated
+    /// probe answering a different question.
+    #[test]
+    fn an_integral_float_equality_reads_the_integer_keys() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fq (id INT, v INT);").unwrap();
+        e.execute("INSERT INTO fq VALUES (1, 3), (2, 4);").unwrap();
+        e.execute("CREATE INDEX fqv ON fq (v);").unwrap();
+        // The memory tail answers first, then the sealed chunk.
+        let hits = e
+            .index_lookup("fq", "v", &Literal::Float(3.0))
+            .expect("an integral float is answerable");
+        assert_eq!(hits.len(), 1);
+        e.dump_index_transaction("fq", "fqv").unwrap();
+        let hits = e
+            .index_lookup("fq", "v", &Literal::Float(3.0))
+            .expect("an integral float is answerable from a chunk");
+        assert_eq!(hits.len(), 1);
+        assert!(e.index_lookup("fq", "v", &Literal::Float(3.5)).is_none());
+        assert_eq!(
+            rows(&e, "SELECT id FROM fq WHERE v = 3.0;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert!(rows(&e, "SELECT id FROM fq WHERE v = 3.5;").is_empty());
+    }
+
+    /// The memory tail's `FLOAT` keys are `f32` while a bound arrives as `f64`,
+    /// and the nearest `f32` can sit on the wrong side of the bound. The indexed
+    /// KNN path never re-checks the predicate (its rows are a vector projection),
+    /// so the narrowed interval has to be exact: a lower bound rounds up to the
+    /// first representable value inside it, an upper bound rounds down.
+    #[test]
+    fn a_float_tail_bound_never_widens_the_interval() {
+        use crate::RangeBound;
+        use storage::secondary_segment::{Key, KeyKind};
+        let low = 1.0f32;
+        let high = f32::from_bits(1.0f32.to_bits() + 1);
+        let gap = f64::from(high) - f64::from(low);
+        // 30% of the way up: the nearest `f32` is `low`, which is *below* the
+        // bound, so `>= bound` must start at `high`.
+        let lower = f64::from(low) + 0.3 * gap;
+        assert_eq!(
+            tail_bound(KeyKind::F32, Key::F64(lower), RangeBound::Lower),
+            Key::F32(high).ordered_bytes()
+        );
+        // 70% of the way up: the nearest `f32` is `high`, which is *above* the
+        // bound, so `<= bound` must stop at `low`.
+        let upper = f64::from(low) + 0.7 * gap;
+        assert_eq!(
+            tail_bound(KeyKind::F32, Key::F64(upper), RangeBound::Upper),
+            Key::F32(low).ordered_bytes()
+        );
+        // A bound the `f32` grid holds exactly is used as it is.
+        for side in [RangeBound::Lower, RangeBound::Upper] {
+            assert_eq!(
+                tail_bound(KeyKind::F32, Key::F64(1.0), side),
+                Key::F32(1.0).ordered_bytes()
+            );
+        }
+    }
+
     /// `CREATE INDEX` reads the table without excluding writers (the reference
     /// leans on its transaction conflict detection, which this port does not
     /// have yet). A row committed after the scan had read the table is in
