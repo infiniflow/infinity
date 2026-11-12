@@ -14,23 +14,25 @@
 //!
 //! The byte-level golden for `CommonResponse` is established in PoC D.
 
-#![forbid(unsafe_code)]
-
 pub mod http;
 pub mod peer;
 pub mod pg;
 pub mod ring_buffer;
+pub mod service;
+
+// The async service generated from `thrift/infinity.thrift` (plan §6.3.2).
+include!(concat!(env!("OUT_DIR"), "/volo_gen.rs"));
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use common::{Error, Result};
 
 use crate::peer::PeerManager;
-use executor::{with_zero_dimension_sparse, Batch, ColumnData, Engine, QueryResult, Value};
+use executor::{Batch, ColumnData, Engine, QueryResult, Value};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -256,7 +258,7 @@ pub fn handshake(client_version: i64, assigned_session: i64) -> CommonResponse {
 /// A minimal TCP server that handles one `Connect` per connection.
 pub struct Server {
     listener: TcpListener,
-    sessions: Arc<Mutex<HashMap<i64, i64>>>,
+    sessions: Arc<RwLock<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
     /// The cluster state: this node's `NodeInfo`, the peer registry, the peer
@@ -270,7 +272,7 @@ impl Server {
         let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         Ok(Self {
             listener,
-            sessions: Arc::new(Mutex::new(HashMap::new())),
+            sessions: Arc::new(RwLock::new(HashMap::new())),
             next_session: Arc::new(AtomicI64::new(1)),
             engine: None,
             // A standalone server is a leader of an empty cluster; its peer
@@ -305,26 +307,32 @@ impl Server {
             .to_string())
     }
 
-    /// Runs the accept loop, spawning a thread per connection. Blocks forever.
-    pub fn run(self) -> ! {
-        for stream in self.listener.incoming() {
-            match stream {
-                Ok(s) => {
-                    // Small request/reply pairs must not wait on Nagle +
-                    // delayed ACK: that adds ~40 ms per RPC round trip.
-                    let _ = s.set_nodelay(true);
-                    let sessions = self.sessions.clone();
-                    let next = self.next_session.clone();
-                    let engine = self.engine.clone();
-                    let peer = Arc::clone(&self.peer);
-                    std::thread::spawn(move || {
-                        let _ = handle_connection(s, sessions, next, engine, peer);
-                    });
-                }
-                Err(_) => continue,
-            }
+    /// Serves Thrift on the **caller's** runtime, until it is shut down.
+    ///
+    /// `volo-thrift` runs one task per connection, so an idle client costs a
+    /// task, not a thread; the statement itself is handed to the engine's
+    /// scheduler by the handler. This used to build a runtime of its own (one
+    /// more pool of `cores` threads beside the HTTP, PG and engine runtimes);
+    /// now the front end is a task on whichever runtime spawned it, and the
+    /// caller decides when the process ends.
+    pub async fn serve(self) {
+        use volo::net::incoming::DefaultIncoming;
+        use volo_thrift::codec::default::thrift::MakeThriftCodec;
+        use volo_thrift::codec::default::DefaultMakeCodec;
+
+        self.listener
+            .set_nonblocking(true)
+            .expect("set the thrift listener non-blocking");
+        let listener =
+            tokio::net::TcpListener::from_std(self.listener).expect("adopt the thrift listener");
+        let service =
+            service::Service::new(self.engine, self.sessions, self.next_session, self.peer);
+        // Unframed `TBinaryProtocol`, which is what the python/go SDKs speak.
+        let server = volo_gen::infinity::InfinityServiceServer::new(service)
+            .make_codec(DefaultMakeCodec::new(MakeThriftCodec::new()));
+        if let Err(e) = server.run(DefaultIncoming::from(listener)).await {
+            eprintln!("[THRIFT] server stopped: {e}");
         }
-        unreachable!()
     }
 }
 
@@ -415,1581 +423,1635 @@ pub fn write_reply_common(
     Ok(())
 }
 
-/// Writes a Thrift `TApplicationException` (UNKNOWN_METHOD).
-fn write_app_exception(w: &mut impl Write, method: &str, seq: i32, msg: &str) -> Result<()> {
-    let mut o = TBinaryOutputProtocol::new(w, true);
-    o.write_message_begin(&TMessageIdentifier::new(
-        method,
-        TMessageType::Exception,
-        seq,
-    ))
-    .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("TApplicationException"))
-        .map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("message", TType::String, 1i16))
-        .map_err(tw)?;
-    o.write_string(msg).map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("type", TType::I32, 2i16))
-        .map_err(tw)?;
-    o.write_i32(1).map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_stop().map_err(tw)?;
-    o.write_struct_end().map_err(tw)?;
-    o.flush().map_err(tw)?;
-    Ok(())
+/// What one RPC produced, before it becomes a reply.
+///
+/// The Thrift front end decodes the request, hands the argument bytes to
+/// [`dispatch_arm`] and turns the returned value into the generated reply
+/// struct (plan §6.3). The same value feeds the byte-parity harnesses in
+/// `src/bin`, which is why the arms do not write replies themselves.
+pub(crate) enum ArmResponse {
+    Common(CommonResponse),
+    Select(SelectResponseWire),
+    Delete {
+        error_code: i64,
+        error_msg: String,
+        deleted_rows: i64,
+    },
+    /// `ListDatabase` / `ListTable` / `ListIndex` — the caller knows which
+    /// list field of the reply carries the names.
+    List(Vec<String>),
+    ShowTable {
+        db: String,
+        table: String,
+        error_code: i64,
+        error_msg: String,
+        column_count: i64,
+        segment_count: i64,
+        row_count: i64,
+    },
+    ShowIndex {
+        db: String,
+        table: String,
+        index: String,
+        comment: String,
+        error_code: i64,
+        error_msg: String,
+        index_type: String,
+        columns: String,
+    },
+    ShowDatabase {
+        name: String,
+        table_count: i64,
+        comment: String,
+    },
+    ShowCurrentNode {
+        node_role: String,
+        server_status: String,
+    },
+    ShowSnapshot {
+        name: String,
+        found: bool,
+    },
+    ListSnapshots(Vec<String>),
+    ShowConfig {
+        name: String,
+        value: Option<String>,
+    },
 }
 
+/// Runs one RPC against the engine.
+///
+/// `reader` is the request as the wire carries it: the caller re-encodes the
+/// struct it just decoded, so the SQL rendering below (filters, search
+/// expressions, literals) has exactly one implementation for both the async
+/// front end and the harnesses.
 #[allow(clippy::too_many_lines)]
-fn handle_connection(
-    stream: TcpStream,
-    sessions: Arc<Mutex<HashMap<i64, i64>>>,
-    next_session: Arc<AtomicI64>,
+async fn dispatch_arm(
+    name: &str,
+    mut reader: &[u8],
     engine: Option<Arc<Engine>>,
-    peer: Arc<PeerManager>,
-) -> Result<()> {
-    // Thrift writes scalar fields one at a time (a `list<bool>` bitmask is one
-    // `writeBool` per row); on a raw `TcpStream` that is one syscall per value.
-    // The C++ server wraps the socket in a buffered transport, so do the same.
-    let mut reader = std::io::BufReader::new(stream.try_clone().map_err(io)?);
-    let mut writer = std::io::BufWriter::new(stream);
-    // Set when a request could not be fully decoded: the stream is then
-    // desynchronised, so reply and close instead of misreading the next call.
-    let mut close_after_reply = false;
-    loop {
-        let (name, seq) = {
-            let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-            match ip.read_message_begin() {
-                Ok(m) => (m.name, m.sequence_number),
-                Err(_) => break, // client closed the connection
+    sessions: &RwLock<HashMap<i64, i64>>,
+    next_session: &AtomicI64,
+    peer: &PeerManager,
+    // Kept for symmetry with the session-scoped call site: the scope itself is
+    // entered by the handler (`with_session_async`), which is the only place
+    // that can wrap the awaited future.
+    _sid: i64,
+) -> Result<ArmResponse> {
+    match name {
+        "Connect" => {
+            let cv = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_connect_args(&mut ip)?
+            };
+            let sid = match engine.as_ref() {
+                // The engine owns the session's current database, so
+                // two clients that USE different databases do not
+                // share a choice (plan 6.1). Every later RPC carries
+                // the id back and runs under that session.
+                Some(eng) => eng.open_session("default_db"),
+                None => next_session.fetch_add(1, Ordering::SeqCst),
+            };
+            let resp = handshake(cv, sid);
+            if resp.error_code == OK {
+                sessions.write().unwrap().insert(sid, cv);
             }
-        };
-        // Handle the request, but never let a decode/execute error kill the
-        // connection: reply with a Thrift exception instead of dropping the
-        // socket (the SDK reports `connection reset` otherwise).
-        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-            eprintln!("[RPC] {name}");
+            Ok(ArmResponse::Common(resp))
         }
-        // `NewTxnManager::BeginTxnShared` runs once per statement, so every RPC
-        // but the session handshake spends a transaction id — a read-only one
-        // (`SELECT`, `SHOW …`, `GetDatabase`) included. The reference's WAL
-        // carries the id in its frame header, so the two engines only agree on
-        // that byte when both spend ids at the same points.
-        if !matches!(name.as_str(), "Connect" | "Disconnect") {
+        "Disconnect" => {
+            let sid = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_common_args(&mut ip)?
+            };
+            sessions.write().unwrap().remove(&sid);
             if let Some(eng) = engine.as_ref() {
-                eng.begin_statement();
+                // A session that is already gone still answers OK: the
+                // reference's Disconnect is idempotent.
+                eng.close_session(sid);
             }
+            let resp = CommonResponse {
+                error_code: OK,
+                error_msg: "OK".into(),
+                session_id: sid,
+            };
+            Ok(ArmResponse::Common(resp))
         }
-        let rpc_started = std::time::Instant::now();
-        let handled: Result<()> = (|| {
-            match name.as_str() {
-                "Connect" => {
-                    let cv = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_connect_args(&mut ip)?
-                    };
-                    let sid = next_session.fetch_add(1, Ordering::SeqCst);
-                    let resp = handshake(cv, sid);
-                    if resp.error_code == OK {
-                        sessions.lock().unwrap().insert(sid, cv);
-                    }
-                    write_reply_common(&mut writer, "Connect", seq, &resp)?;
-                }
-                "Disconnect" => {
-                    let sid = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_common_args(&mut ip)?
-                    };
-                    sessions.lock().unwrap().remove(&sid);
-                    let resp = CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: sid,
-                    };
-                    write_reply_common(&mut writer, "Disconnect", seq, &resp)?;
-                }
-                "CreateTable" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_create_table_args(&mut ip)?
-                    };
-                    let resp = run_create_table(engine.as_deref(), &req);
-                    write_reply_common(&mut writer, "CreateTable", seq, &resp)?;
-                }
-                "ListDatabase" => {
-                    let _sid = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_list_database_args(&mut ip)?
-                    };
-                    let names = match &engine {
-                        Some(eng) => eng.catalog().list_databases().unwrap_or_default(),
-                        None => vec!["default_db".to_string()],
-                    };
-                    write_list_database_response(&mut writer, seq, &names)?;
-                }
-                "Delete" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_delete_args(&mut ip)?
-                    };
-                    let (code, msg, deleted) = match &engine {
-                        Some(eng) => match eng.execute(&req.to_sql()) {
-                            Ok(rs) => {
-                                let deleted = rs
-                                    .into_iter()
-                                    .map(|r| {
-                                        if let QueryResult::Deleted { count } = r {
-                                            count as i64
-                                        } else {
-                                            0
-                                        }
-                                    })
-                                    .sum::<i64>();
-                                (OK, "OK".to_string(), deleted.max(0))
-                            }
-                            // A missing table is a request error, not `0 rows`.
-                            Err(e) => (e.status_code(), e.to_string(), 0),
-                        },
-                        None => (1, "no engine bound".to_string(), 0),
-                    };
-                    write_delete_response(&mut writer, seq, code, &msg, deleted)?;
-                }
-                "Update" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_update_args(&mut ip)?
-                    };
-                    let resp = if req.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
-                        CommonResponse {
-                            error_code: 7012,
-                            error_msg: "parser: the filter must be a boolean expression".into(),
-                            session_id: req.session_id,
-                        }
-                    } else {
-                        match &engine {
-                            Some(eng) => match eng.execute(&req.to_sql()) {
-                                Ok(_) => CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: req.session_id,
-                                },
-                                Err(e) => CommonResponse {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    session_id: req.session_id,
-                                },
-                            },
-                            None => CommonResponse {
-                                error_code: 1,
-                                error_msg: "no engine bound".into(),
-                                session_id: req.session_id,
-                            },
-                        }
-                    };
-                    write_reply_common(&mut writer, "Update", seq, &resp)?;
-                }
-                "ShowTable" => {
-                    let (db, table, _sid) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_show_table_args(&mut ip)?
-                    };
-                    let full = full_table_name(&db, &table);
-                    let found = engine.as_ref().and_then(|eng| {
-                        eng.catalog()
-                            .get_table_by_name(&full)
-                            .ok()
-                            .flatten()
-                            .map(|m| (m, eng.row_count(&full).unwrap_or(0) as i64))
-                    });
-                    let (code, msg, col_count, row_count, segments) = match found {
-                        Some((meta, rows)) => (
-                            0i64,
-                            "OK".to_string(),
-                            meta.columns.len() as i64,
-                            rows,
-                            if rows == 0 {
-                                0
-                            } else {
-                                engine
-                                    .as_ref()
-                                    .map(|e| e.segment_count(&full) as i64)
-                                    .unwrap_or(1)
-                            },
-                        ),
-                        None => (3022i64, format!("Table: {table} doesn't exist."), 0, 0, 0),
-                    };
-                    write_show_table_response(
-                        &mut writer,
-                        seq,
-                        &db,
-                        &table,
-                        code,
-                        &msg,
-                        col_count,
-                        segments,
-                        row_count,
-                    )?;
-                }
-                "ShowIndex" => {
-                    let (db, table, index_name, _sid) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_show_index_args(&mut ip)?
-                    };
-                    let full = full_table_name(&db, &table);
-                    let found = engine.as_ref().and_then(|eng| {
-                        eng.catalog().list_indexes().ok()?.into_iter().find(|im| {
-                            im.table == full && im.name.eq_ignore_ascii_case(&index_name)
-                        })
-                    });
-                    let (code, msg, name, kind, cols) = match found {
-                        Some(im) => (0i64, "OK".to_string(), im.name, im.index_type, im.column),
-                        None => (
-                            3023i64,
-                            format!("index '{index_name}' does not exist"),
-                            index_name.clone(),
-                            String::new(),
-                            String::new(),
-                        ),
-                    };
-                    let comment = engine
-                        .as_ref()
-                        .and_then(|eng| eng.index_comment(&full, &name))
-                        .unwrap_or_default();
-                    let comment = comment.as_str();
-                    write_show_index_response(
-                        &mut writer,
-                        seq,
-                        &db,
-                        &table,
-                        &name,
-                        comment,
-                        code,
-                        &msg,
-                        &kind,
-                        &cols,
-                    )?;
-                }
-                // Database / table / index lifecycle RPCs that return a plain
-                // `CommonResponse`.
-                "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
-                | "DropIndex" => {
-                    let (sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let db = fields.get(&1).cloned().unwrap_or_default();
-                    let name2 = fields.get(&2).cloned().unwrap_or_default();
-                    let name3 = fields.get(&3).cloned().unwrap_or_default();
-                    // Identifiers are case-insensitive; the engine keeps
-                    // lower-case names, so existence checks must use them too.
-                    let qualify = |t: &str| -> String {
-                        let t = t.to_ascii_lowercase();
-                        if t.is_empty() || t.contains('.') || db.is_empty() {
-                            t
-                        } else {
-                            format!("{}.{t}", db.to_ascii_lowercase())
-                        }
-                    };
-                    // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
-                    // sits in whichever field the request struct reserves for it
-                    // (3 for the database ops, 4 for table/index ops), so scan them.
-                    let conflict: Option<i64> = [3i16, 4, 5]
-                        .iter()
-                        .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
-                    // A database name must start with a letter and contain only
-                    // word characters (the reference rejects the rest with 3003).
-                    let mut chars = db.chars();
-                    let first_ok = chars
-                        .next()
-                        .map(|c| c.is_ascii_alphabetic())
-                        .unwrap_or(false);
-                    let body_ok = db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
-                    let good_db = first_ok && body_ok;
-                    let bad_db = !db.is_empty() && !good_db;
-                    let resp = match name.as_str() {
-                        "CreateDatabase" | "DropDatabase" if bad_db || db.is_empty() => {
-                            CommonResponse {
-                                error_code: 3003, // INVALID_IDENTIFIER_NAME
-                                error_msg: format!("invalid database name '{db}'"),
-                                session_id: sid,
-                            }
-                        }
-                        "CreateDatabase" if !db.is_empty() => {
-                            let sql = if conflict == Some(0) {
-                                format!("CREATE DATABASE IF NOT EXISTS {db}")
-                            } else {
-                                format!("CREATE DATABASE {db}")
-                            };
-                            run_common(engine.as_ref(), &sql, sid)
-                        }
-                        "GetDatabase" if !db.is_empty() => {
-                            let exists = engine
-                                .as_ref()
-                                .and_then(|eng| eng.catalog().list_databases().ok())
-                                .map(|dbs| dbs.iter().any(|d| d.eq_ignore_ascii_case(&db)))
-                                .unwrap_or(false);
-                            if exists {
-                                CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: sid,
-                                }
-                            } else {
-                                CommonResponse {
-                                    error_code: 3021, // DB_NOT_EXIST
-                                    error_msg: format!("Database: {db} doesn't exist."),
-                                    session_id: sid,
-                                }
-                            }
-                        }
-                        "DropDatabase" if !db.is_empty() => {
-                            let sql = if conflict == Some(0) {
-                                format!("DROP DATABASE IF EXISTS {db}")
-                            } else {
-                                format!("DROP DATABASE {db}")
-                            };
-                            run_common(engine.as_ref(), &sql, sid)
-                        }
-                        "GetTable" if !name2.is_empty() => {
-                            let full = qualify(&name2);
-                            let exists = engine
-                                .as_ref()
-                                .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
-                                .is_some();
-                            if exists {
-                                CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: sid,
-                                }
-                            } else {
-                                CommonResponse {
-                                    error_code: 3022, // TABLE_NOT_EXIST
-                                    error_msg: format!("Table: {name2} doesn't exist."),
-                                    session_id: sid,
-                                }
-                            }
-                        }
-                        "DropTable" if !name2.is_empty() => {
-                            let full = qualify(&name2);
-                            let exists = engine
-                                .as_ref()
-                                .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
-                                .is_some();
-                            if !exists && conflict != Some(0) {
-                                CommonResponse {
-                                    error_code: 3022,
-                                    error_msg: format!("table '{name2}' does not exist"),
-                                    session_id: sid,
-                                }
-                            } else {
-                                let sql = if conflict == Some(0) {
-                                    format!("DROP TABLE IF EXISTS {full}")
+        "CreateTable" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_create_table_args(&mut ip)?
+            };
+            let resp = run_create_table(engine.as_deref(), &req).await;
+            Ok(ArmResponse::Common(resp))
+        }
+        "ListDatabase" => {
+            let _sid = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_list_database_args(&mut ip)?
+            };
+            // Kept on the worker on purpose, unlike the catalog sweeps below.
+            // The list is a prefix scan over a handful of `db:` records (~30 us
+            // measured), while a `spawn_blocking` round trip costs 10-20 us:
+            // handing this one off cut throughput by ~9% on four cores and
+            // bought nothing back. It is also the call a client makes to prove
+            // it is alive (10 000 sessions poll it twice a second), which is
+            // exactly the load that must stay cheap.
+            let names = match &engine {
+                Some(eng) => eng.catalog().list_databases().unwrap_or_default(),
+                None => vec!["default_db".to_string()],
+            };
+            Ok(ArmResponse::List(names))
+        }
+        "Delete" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_delete_args(&mut ip)?
+            };
+            let (code, msg, deleted) = match &engine {
+                Some(eng) => match eng.execute(&req.to_sql()).await {
+                    Ok(rs) => {
+                        let deleted = rs
+                            .into_iter()
+                            .map(|r| {
+                                if let QueryResult::Deleted { count } = r {
+                                    count as i64
                                 } else {
-                                    format!("DROP TABLE {full}")
-                                };
-                                run_common(engine.as_ref(), &sql, sid)
-                            }
-                        }
-                        "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
-                            engine.as_ref(),
-                            &format!("DROP INDEX IF EXISTS {}", name3.to_ascii_lowercase()),
-                            sid,
-                        ),
-                        "DropIndex" if !name3.is_empty() => run_common(
-                            engine.as_ref(),
-                            &format!("DROP INDEX {}", name3.to_ascii_lowercase()),
-                            sid,
-                        ),
-                        // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
-                        // side effect for the operations the SDK performs on the
-                        // default database.
-                        _ => CommonResponse {
+                                    0
+                                }
+                            })
+                            .sum::<i64>();
+                        (OK, "OK".to_string(), deleted.max(0))
+                    }
+                    // A missing table is a request error, not `0 rows`.
+                    Err(e) => (e.status_code(), e.to_string(), 0),
+                },
+                None => (1, "no engine bound".to_string(), 0),
+            };
+            Ok(ArmResponse::Delete {
+                error_code: code,
+                error_msg: msg,
+                deleted_rows: deleted,
+            })
+        }
+        "Update" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_update_args(&mut ip)?
+            };
+            let resp = if req.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
+                CommonResponse {
+                    error_code: 7012,
+                    error_msg: "parser: the filter must be a boolean expression".into(),
+                    session_id: req.session_id,
+                }
+            } else {
+                match &engine {
+                    Some(eng) => match eng.execute(&req.to_sql()).await {
+                        Ok(_) => CommonResponse {
                             error_code: OK,
                             error_msg: "OK".into(),
-                            session_id: sid,
+                            session_id: req.session_id,
                         },
-                    };
-                    write_reply_common(&mut writer, &name, seq, &resp)?;
-                }
-                "Insert" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_insert_args(&mut ip)?
-                    };
-                    let sid = req.session_id;
-                    let table = if req.db_name.is_empty() {
-                        req.table_name.clone()
-                    } else {
-                        format!("{}.{}", req.db_name, req.table_name)
-                    };
-                    // Rows that share a column list are batched into one statement.
-                    let mut resp = CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: sid,
-                    };
-                    // The reference rejects a single INSERT batch above one
-                    // block's worth of rows (8192).
-                    if req.rows.is_empty() {
-                        resp = CommonResponse {
-                            error_code: 3014,
-                            error_msg: "insert without values".into(),
-                            session_id: sid,
-                        };
-                    } else if req.rows.len() > 8192 {
-                        resp = CommonResponse {
-                            error_code: 3014,
-                            error_msg: "Insert batch row limit shouldn't more than 8193".into(),
-                            session_id: sid,
-                        };
-                    }
-                    // A scalar batch goes straight to the executor: rendering
-                    // 1000 rows to SQL and re-parsing them cost ~13 ms per
-                    // batch, more than the insert itself. Values that need the
-                    // parser (arrays, tensors, sparse vectors) keep the SQL path.
-                    let direct = req.rows.iter().all(|(_, vals)| {
-                        !vals.is_empty()
-                            && vals.iter().all(|v| {
-                                matches!(
-                                    v,
-                                    ValueLit::Int(_)
-                                        | ValueLit::Float(_)
-                                        | ValueLit::Str(_)
-                                        | ValueLit::Null
-                                        | ValueLit::Bool(_)
-                                        | ValueLit::IntArray(_)
-                                        | ValueLit::FloatArray(_)
-                                        | ValueLit::IntTensor(_)
-                                        | ValueLit::FloatTensor(_)
-                                        | ValueLit::Sparse { .. }
-                                )
-                            })
-                    });
-                    if direct {
-                        let mut i = 0usize;
-                        while resp.error_code == OK && i < req.rows.len() {
-                            let cols = req.rows[i].0.clone();
-                            let mut rows_lit: Vec<Vec<parser::Literal>> = Vec::new();
-                            while i < req.rows.len() && req.rows[i].0 == cols {
-                                rows_lit.push(
-                                    req.rows[i]
-                                        .1
-                                        .iter()
-                                        .map(|v| match v {
-                                            ValueLit::Int(n) => parser::Literal::Int(*n),
-                                            ValueLit::Float(f) => parser::Literal::Float(*f),
-                                            ValueLit::Str(t) => parser::Literal::Str(t.clone()),
-                                            ValueLit::Null => parser::Literal::Null,
-                                            ValueLit::Bool(b) => {
-                                                parser::Literal::Str(b.to_string())
-                                            }
-                                            ValueLit::IntArray(v) => parser::Literal::Vector(
-                                                v.iter().map(|x| *x as f64).collect(),
-                                            ),
-                                            ValueLit::FloatArray(v) => {
-                                                parser::Literal::Vector(v.clone())
-                                            }
-                                            ValueLit::IntTensor(rows) => parser::Literal::Vector(
-                                                rows.iter().flatten().map(|x| *x as f64).collect(),
-                                            ),
-                                            ValueLit::FloatTensor(rows) => parser::Literal::Vector(
-                                                rows.iter().flatten().copied().collect(),
-                                            ),
-                                            ValueLit::Sparse {
-                                                indices,
-                                                ints,
-                                                floats,
-                                                is_float,
-                                            } => {
-                                                let items: Vec<String> = indices
-                                                    .iter()
-                                                    .enumerate()
-                                                    .map(|(k, i)| {
-                                                        if *is_float {
-                                                            format!("{i}:{}", floats[k])
-                                                        } else {
-                                                            format!("{i}:{}", ints[k])
-                                                        }
-                                                    })
-                                                    .collect();
-                                                parser::Literal::Array(items)
-                                            }
-                                            _ => parser::Literal::Null,
-                                        })
-                                        .collect(),
-                                );
-                                i += 1;
-                            }
-                            let cols_opt = if cols.is_empty() {
-                                None
-                            } else {
-                                Some(cols.as_slice())
-                            };
-                            resp = match engine.as_ref() {
-                                Some(eng) => {
-                                    match eng.insert_literals(&table, cols_opt, rows_lit) {
-                                        Ok(_) => CommonResponse {
-                                            error_code: OK,
-                                            error_msg: "OK".into(),
-                                            session_id: sid,
-                                        },
-                                        Err(e) => CommonResponse {
-                                            error_code: e.status_code(),
-                                            error_msg: e.to_string(),
-                                            session_id: sid,
-                                        },
-                                    }
-                                }
-                                None => CommonResponse {
-                                    error_code: 1,
-                                    error_msg: "no engine bound".into(),
-                                    session_id: sid,
-                                },
-                            };
-                        }
-                    }
-                    let mut i = 0usize;
-                    while !direct && resp.error_code == OK && i < req.rows.len() {
-                        let (cols, _) = &req.rows[i];
-                        let mut batch: Vec<String> = Vec::new();
-                        while i < req.rows.len() && &req.rows[i].0 == cols {
-                            batch.push(format!(
-                                "({})",
-                                req.rows[i]
-                                    .1
-                                    .iter()
-                                    .map(|v| v.to_sql())
-                                    .collect::<Vec<_>>()
-                                    .join(",")
-                            ));
-                            i += 1;
-                        }
-                        let sql = if cols.is_empty() {
-                            format!("INSERT INTO {table} VALUES {};", batch.join(","))
-                        } else {
-                            format!(
-                                "INSERT INTO {table} ({}) VALUES {};",
-                                cols.join(","),
-                                batch.join(",")
-                            )
-                        };
-                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                            eprintln!("[INSERT] {sql}");
-                        }
-                        let t0 = std::time::Instant::now();
-                        resp = run_common(engine.as_ref(), &sql, sid);
-                        if std::env::var_os("INF_DEBUG_INS").is_some() {
-                            eprintln!(
-                                "[INS] rpc rows={} sql={}B exec={:?}",
-                                batch.len(),
-                                sql.len(),
-                                t0.elapsed()
-                            );
-                        }
-                        if resp.error_code != OK {
-                            break;
-                        }
-                    }
-                    write_reply_common(&mut writer, "Insert", seq, &resp)?;
-                }
-                "Select" => {
-                    let rpc_started = std::time::Instant::now();
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        match read_select_args(&mut ip) {
-                            Ok((_r, bad)) if !bad.is_empty() => {
-                                let resp = SelectResponseWire {
-                                    error_code: 7012,
-                                    error_msg: bad[0].clone(),
-                                    column_defs: Vec::new(),
-                                    column_fields: Vec::new(),
-                                    extra_result: String::new(),
-                                };
-                                write_select_response(&mut writer, seq, &resp)?;
-                                return Ok(());
-                            }
-                            Ok((r, _)) => r,
-                            // A malformed select list is reported through the
-                            // SelectResponse (the SDK turns error_code into an
-                            // InfinityException), not a thrift exception.
-                            Err(e) => {
-                                let resp = SelectResponseWire {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    column_defs: Vec::new(),
-                                    column_fields: Vec::new(),
-                                    extra_result: String::new(),
-                                };
-                                // The request was fully consumed: reply with the
-                                // validation error and keep the connection alive
-                                // (closing here makes SDKs mark it dead even
-                                // though the error was delivered).
-                                write_select_response(&mut writer, seq, &resp)?;
-                                return Ok(());
-                            }
-                        }
-                    };
-                    let err = |msg: String| SelectResponseWire {
+                        Err(e) => CommonResponse {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            session_id: req.session_id,
+                        },
+                    },
+                    None => CommonResponse {
                         error_code: 1,
-                        error_msg: msg,
-                        column_defs: Vec::new(),
-                        column_fields: Vec::new(),
-                        extra_result: String::new(),
-                    };
-                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                        eprintln!("[SELECT] {}", req.to_sql());
+                        error_msg: "no engine bound".into(),
+                        session_id: req.session_id,
+                    },
+                }
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        "ShowTable" => {
+            let (db, table, _sid) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_show_table_args(&mut ip)?
+            };
+            let full = full_table_name(&db, &table);
+            // Same reason as `ListDatabase`: a catalog read plus a row count is
+            // store I/O.
+            let found = match engine {
+                Some(eng) => {
+                    let full = full.clone();
+                    executor::scheduler()
+                        .spawn_blocking(move || {
+                            eng.catalog()
+                                .get_table_by_name(&full)
+                                .ok()
+                                .flatten()
+                                .map(|m| {
+                                    let rows = eng.row_count(&full).unwrap_or(0) as i64;
+                                    let segments = if rows == 0 {
+                                        0
+                                    } else {
+                                        eng.segment_count(&full) as i64
+                                    };
+                                    (m, rows, segments)
+                                })
+                        })
+                        .await
+                }
+                None => None,
+            };
+            let (code, msg, col_count, row_count, segments) = match found {
+                Some((meta, rows, segments)) => (
+                    0i64,
+                    "OK".to_string(),
+                    meta.columns.len() as i64,
+                    rows,
+                    segments,
+                ),
+                None => (3022i64, format!("Table: {table} doesn't exist."), 0, 0, 0),
+            };
+            Ok(ArmResponse::ShowTable {
+                db,
+                table,
+                error_code: code,
+                error_msg: msg,
+                column_count: col_count,
+                segment_count: segments,
+                row_count,
+            })
+        }
+        "ShowIndex" => {
+            let (db, table, index_name, _sid) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_show_index_args(&mut ip)?
+            };
+            let full = full_table_name(&db, &table);
+            // Same reason as `ListDatabase`: these are catalog reads.
+            let probe = full.clone();
+            let index_name_owned = index_name.clone();
+            let found = match engine {
+                Some(eng) => {
+                    executor::scheduler()
+                        .spawn_blocking(move || {
+                            let im = eng
+                                .catalog()
+                                .indexes_of_table(&probe)
+                                .ok()?
+                                .into_iter()
+                                .find(|im| im.name.eq_ignore_ascii_case(&index_name_owned))?;
+                            let comment = eng.index_comment(&probe, &im.name).unwrap_or_default();
+                            Some((im, comment))
+                        })
+                        .await
+                }
+                None => None,
+            };
+            let (code, msg, name, kind, cols, comment) = match found {
+                Some((im, comment)) => (
+                    0i64,
+                    "OK".to_string(),
+                    im.name,
+                    im.index_type,
+                    im.column,
+                    comment,
+                ),
+                None => (
+                    3023i64,
+                    format!("index '{index_name}' does not exist"),
+                    index_name.clone(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                ),
+            };
+            Ok(ArmResponse::ShowIndex {
+                db,
+                table,
+                index: name,
+                comment,
+                error_code: code,
+                error_msg: msg,
+                index_type: kind,
+                columns: cols,
+            })
+        }
+        // Database / table / index lifecycle RPCs that return a plain
+        // `CommonResponse`.
+        "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
+        | "DropIndex" => {
+            let (sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let db = fields.get(&1).cloned().unwrap_or_default();
+            let name2 = fields.get(&2).cloned().unwrap_or_default();
+            let name3 = fields.get(&3).cloned().unwrap_or_default();
+            // Identifiers are case-insensitive; the engine keeps
+            // lower-case names, so existence checks must use them too.
+            let qualify = |t: &str| -> String {
+                let t = t.to_ascii_lowercase();
+                if t.is_empty() || t.contains('.') || db.is_empty() {
+                    t
+                } else {
+                    format!("{}.{t}", db.to_ascii_lowercase())
+                }
+            };
+            // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
+            // sits in whichever field the request struct reserves for it
+            // (3 for the database ops, 4 for table/index ops), so scan them.
+            let conflict: Option<i64> = [3i16, 4, 5]
+                .iter()
+                .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
+            // A database name must start with a letter and contain only
+            // word characters (the reference rejects the rest with 3003).
+            let mut chars = db.chars();
+            let first_ok = chars
+                .next()
+                .map(|c| c.is_ascii_alphabetic())
+                .unwrap_or(false);
+            let body_ok = db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+            let good_db = first_ok && body_ok;
+            let bad_db = !db.is_empty() && !good_db;
+            let resp = match name {
+                "CreateDatabase" | "DropDatabase" if bad_db || db.is_empty() => {
+                    CommonResponse {
+                        error_code: 3003, // INVALID_IDENTIFIER_NAME
+                        error_msg: format!("invalid database name '{db}'"),
+                        session_id: sid,
                     }
-                    let exec_started = std::time::Instant::now();
-                    let srv_started = exec_started;
-                    // Plain projection over one table with no other clause: the
-                    // engine hands back typed column buffers and the writer packs
-                    // them without a `Value` per cell.
-                    let batch_resp = match &engine {
-                        Some(eng) if !req.total_hits => eng
-                            .select_columns(&req.to_sql())
-                            .ok()
-                            .flatten()
-                            .map(|batch| {
-                                let mut columns = batch.columns.clone();
-                                if !req.star && req.names.len() == columns.len() {
-                                    columns = req.names.clone();
-                                } else if req.star
-                                    && !req.names.is_empty()
-                                    && columns.len() >= req.names.len()
-                                {
-                                    let start = columns.len() - req.names.len();
-                                    for (i, n) in req.names.iter().enumerate() {
-                                        columns[start + i] = n.clone();
-                                    }
-                                }
-                                let types = declared_types(eng, &req.table_name, &columns);
-                                select_response_from_batch(&columns, &types, &batch)
-                            }),
-                        _ => None,
-                    };
-                    let resp = match batch_resp {
-                        Some(resp) => resp,
-                        None => match &engine {
-                            Some(eng) => match eng.execute(&req.to_sql()) {
-                                Ok(rs) => {
-                                    let mut columns: Vec<String> = Vec::new();
-                                    let mut rows: Vec<Vec<Value>> = Vec::new();
-                                    for r in rs {
-                                        if let QueryResult::Rows {
-                                            columns: c,
-                                            rows: rw,
-                                        } = r
-                                        {
-                                            columns = c;
-                                            rows = rw;
-                                        }
-                                    }
-                                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                                        eprintln!(
-                                            "[COLS] star={} req={:?} got={:?}",
-                                            req.star, req.columns, columns
-                                        );
-                                    }
-                                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                                        eprintln!(
-                                            "[COLS] star={} req={:?} got={:?}",
-                                            req.star, req.columns, columns
-                                        );
-                                    }
-                                    // A projected expression is named by the SQL
-                                    // text the client sent (`(c1 + c2)`).
-                                    if !req.star && req.names.len() == columns.len() {
-                                        columns = req.names.clone();
-                                    } else if req.star
-                                        && !req.names.is_empty()
-                                        && columns.len() >= req.names.len()
-                                    {
-                                        // `SELECT *, distance()`: only the trailing
-                                        // expression columns are renamed.
-                                        let start = columns.len() - req.names.len();
-                                        for (i, n) in req.names.iter().enumerate() {
-                                            columns[start + i] = n.clone();
-                                        }
-                                    }
-                                    let exec_elapsed = exec_started.elapsed();
-                                    let encode_started = std::time::Instant::now();
-                                    let mut resp = select_response_from_typed(
-                                        &columns,
-                                        &declared_types(eng, &req.table_name, &columns),
-                                        &rows,
-                                    );
-                                    if std::env::var_os("INF_DEBUG_SEL").is_some() {
-                                        eprintln!(
-                                            "[SEL] rows={} exec={:?} encode={:?}",
-                                            rows.len(),
-                                            exec_elapsed,
-                                            encode_started.elapsed()
-                                        );
-                                    }
-                                    if req.total_hits {
-                                        // The count is the result set *before*
-                                        // LIMIT/OFFSET.
-                                        let mut all = req.clone();
-                                        all.limit = None;
-                                        all.offset = None;
-                                        let total = eng
-                                            .execute(&all.to_sql())
-                                            .map(|rs| {
-                                                rs.into_iter()
-                                                    .map(|r| {
-                                                        if let QueryResult::Rows { rows, .. } = r {
-                                                            rows.len()
-                                                        } else {
-                                                            0
-                                                        }
-                                                    })
-                                                    .sum::<usize>()
-                                            })
-                                            .unwrap_or(0);
-                                        resp.extra_result =
-                                            format!("{{\"total_hits_count\":{total}}}");
-                                    }
-                                    resp
-                                }
-                                // Keep the engine's C++ error code (3023, 3053, …)
-                                // so SDK assertions on `args[0]` hold.
-                                Err(e) => SelectResponseWire {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    column_defs: Vec::new(),
-                                    column_fields: Vec::new(),
-                                    extra_result: String::new(),
-                                },
-                            },
-                            None => err("no engine bound".into()),
-                        },
-                    };
-                    if std::env::var_os("INF_SERVER_TIMER").is_some() {
-                        let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
-                        eprintln!(
-                            "[SRV] plan_ms {:.3} search_ms {:.3} ser_ms 0.000 total_ms {:.3}",
-                            ms(srv_started.duration_since(rpc_started)),
-                            ms(srv_started.elapsed()),
-                            ms(rpc_started.elapsed())
-                        );
-                    }
-                    write_select_response(&mut writer, seq, &resp)?;
                 }
-                // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
-                // `Flush` persists table data into the C++ block layout and the
-                // indexes into their chunk files, which is what the restart
-                // harness inspects on disk.
-                // `Flush` persists table data into the C++ block layout and the
-                // indexes into their chunk files, which is what the restart
-                // harness inspects on disk. `Cleanup` removes the mirrors of
-                // dropped tables/indexes, so it flushes too.
-                "Flush" | "Cleanup" => {
-                    let (sid, _) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let resp = match engine.as_ref() {
-                        Some(eng) => match if name == "Cleanup" {
-                            eng.cleanup()
-                        } else {
-                            eng.flush()
-                        } {
-                            Ok(()) => CommonResponse {
-                                error_code: OK,
-                                error_msg: "OK".into(),
-                                session_id: sid,
-                            },
-                            Err(e) => CommonResponse {
-                                error_code: e.status_code(),
-                                error_msg: e.to_string(),
-                                session_id: sid,
-                            },
-                        },
-                        None => CommonResponse {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
-                            session_id: sid,
-                        },
-                    };
-                    write_reply_common(&mut writer, &name, seq, &resp)?;
-                }
-                // `Compact` merges the table's segments into one.
-                "Compact" => {
-                    let (sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let (db, table) = (
-                        fields.get(&2).cloned().unwrap_or_default(),
-                        fields.get(&3).cloned().unwrap_or_default(),
-                    );
-                    let full = full_table_name(&db, &table);
-                    let resp = match engine.as_ref() {
-                        Some(eng) => match eng.compact_table(&full) {
-                            Ok(()) => CommonResponse {
-                                error_code: OK,
-                                error_msg: "OK".into(),
-                                session_id: sid,
-                            },
-                            Err(e) => CommonResponse {
-                                error_code: e.status_code(),
-                                error_msg: e.to_string(),
-                                session_id: sid,
-                            },
-                        },
-                        None => CommonResponse {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
-                            session_id: sid,
-                        },
-                    };
-                    write_reply_common(&mut writer, "Compact", seq, &resp)?;
-                }
-                // Database snapshots are stored as one blob per database; a
-                // `RestoreSnapshot` with `scope="database"` restores it (the
-                // table scope falls through to the SQL statement).
-                "CreateDatabaseSnapshot" | "CreateSystemSnapshot" | "RestoreSnapshot" => {
-                    let (sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
-                    let resp = match engine.as_ref() {
-                        Some(eng) => {
-                            let res = if name == "CreateDatabaseSnapshot" {
-                                // `{2: db_name, 3: snapshot_name}`
-                                eng.create_database_snapshot(&get(3), &get(2))
-                            } else if name == "CreateSystemSnapshot" {
-                                // `{2: snapshot_name}`
-                                eng.create_system_snapshot(&get(2))
-                            } else if get(3).eq_ignore_ascii_case("system") {
-                                // `{2: snapshot_name, 3: scope}`: a system
-                                // snapshot nests its tables under each database,
-                                // so it has to go through the system restore - a
-                                // database restore reads the top-level
-                                // `table_snapshots`, which a system snapshot
-                                // does not have.
-                                eng.restore_system_snapshot(&get(2))
-                            } else if get(3).eq_ignore_ascii_case("database") {
-                                eng.restore_database_snapshot(&get(2))
-                            } else {
-                                eng.execute(&format!(
-                                    "RESTORE TABLE SNAPSHOT {};",
-                                    sql_name(&get(2))
-                                ))
-                                .map(|_| ())
-                            };
-                            match res {
-                                Ok(()) => CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: sid,
-                                },
-                                Err(e) => CommonResponse {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    session_id: sid,
-                                },
-                            }
-                        }
-                        None => CommonResponse {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
-                            session_id: sid,
-                        },
-                    };
-                    write_reply_common(&mut writer, &name, seq, &resp)?;
-                }
-                // `RenameTable` is executed for real; the rest are engine-level
-                // maintenance that the in-memory engine has nothing to do for, so
-                // they report success rather than `unknown method`.
-                "Optimize"
-                | "Command"
-                | "AlterIndex"
-                | "DumpIndex"
-                | "CreateTableSnapshot"
-                | "DropSnapshot"
-                | "RenameTable" => {
-                    let (sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
-                    let resp = if name == "RenameTable" {
-                        let (db, table, new_name) = (get(1), get(2), get(3));
-                        let full = full_table_name(&db, &table);
-                        run_common(
-                            engine.as_ref(),
-                            &format!("ALTER TABLE {full} RENAME TO {new_name};"),
-                            sid,
-                        )
-                    } else if name == "CreateTableSnapshot" {
-                        // {1: session_id, 2: db, 3: table, 4: snapshot}
-                        let (db, table, snap) = (get(2), get(3), get(4));
-                        let full = full_table_name(&db, &table);
-                        run_common(
-                            engine.as_ref(),
-                            &format!("CREATE SNAPSHOT {} ON TABLE {full};", sql_name(&snap)),
-                            sid,
-                        )
-                    } else if name == "DropSnapshot" {
-                        // {1: session_id, 2: snapshot}
-                        let snap = get(2);
-                        run_common(
-                            engine.as_ref(),
-                            &format!("DROP SNAPSHOT {};", sql_name(&snap)),
-                            sid,
-                        )
-                    } else if name == "DumpIndex" {
-                        // `DumpIndexRequest` is the one request whose session id
-                        // comes last: {1: db, 2: table, 3: index, 4: session_id}
-                        // (`thrift/infinity.thrift:685`).
-                        let (db, table, index_name) = (get(1), get(2), get(3));
-                        let full = full_table_name(&db, &table);
-                        match engine.as_ref() {
-                            Some(eng) => match eng.dump_index_transaction(&full, &index_name) {
-                                Ok(()) => CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: sid,
-                                },
-                                Err(e) => CommonResponse {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    session_id: sid,
-                                },
-                            },
-                            None => CommonResponse {
-                                error_code: 1,
-                                error_msg: "no engine bound".into(),
-                                session_id: sid,
-                            },
-                        }
-                    } else if name == "Optimize" {
-                        // Merge the index chunks that earlier memory dumps left
-                        // behind, as the reference's optimize does.
-                        match engine.as_ref() {
-                            Some(eng) => match eng.optimize_indexes() {
-                                Ok(()) => CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: sid,
-                                },
-                                Err(e) => CommonResponse {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    session_id: sid,
-                                },
-                            },
-                            None => CommonResponse {
-                                error_code: 1,
-                                error_msg: "no engine bound".into(),
-                                session_id: sid,
-                            },
-                        }
+                "CreateDatabase" if !db.is_empty() => {
+                    let sql = if conflict == Some(0) {
+                        format!("CREATE DATABASE IF NOT EXISTS {db}")
                     } else {
+                        format!("CREATE DATABASE {db}")
+                    };
+                    run_common(engine.as_ref(), &sql, sid).await
+                }
+                "GetDatabase" if !db.is_empty() => {
+                    let exists = engine
+                        .as_ref()
+                        .and_then(|eng| eng.catalog().list_databases().ok())
+                        .map(|dbs| dbs.iter().any(|d| d.eq_ignore_ascii_case(&db)))
+                        .unwrap_or(false);
+                    if exists {
                         CommonResponse {
                             error_code: OK,
                             error_msg: "OK".into(),
                             session_id: sid,
                         }
-                    };
-                    write_reply_common(&mut writer, &name, seq, &resp)?;
-                }
-                "Explain" => {
-                    let (req, etype) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_explain_args(&mut ip)?
-                    };
-                    let kind = match etype {
-                        4 => "PHYSICAL",
-                        6 => "FRAGMENT",
-                        _ => "PHYSICAL",
-                    };
-                    let sql = format!("EXPLAIN {kind} {}", req.to_sql());
-                    let resp = match engine.as_ref() {
-                        Some(eng) => match eng.execute(&sql) {
-                            Ok(rs) => {
-                                let mut rows: Vec<Vec<Value>> = Vec::new();
-                                for r in rs {
-                                    if let QueryResult::Rows { rows: rw, .. } = r {
-                                        rows = rw;
-                                    }
-                                }
-                                select_response_from_typed(&["explain".to_string()], &[], &rows)
-                            }
-                            Err(e) => SelectResponseWire {
-                                error_code: e.status_code(),
-                                error_msg: e.to_string(),
-                                column_defs: Vec::new(),
-                                column_fields: Vec::new(),
-                                extra_result: String::new(),
-                            },
-                        },
-                        None => SelectResponseWire {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
-                            column_defs: Vec::new(),
-                            column_fields: Vec::new(),
-                            extra_result: String::new(),
-                        },
-                    };
-                    write_result_response(&mut writer, seq, "Explain", &resp)?;
-                }
-                "AddColumns" => {
-                    let (db, table, cols, sid) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_alter_add_args(&mut ip)?
-                    };
-                    let full = full_table_name(&db, &table);
-                    let defs: Vec<String> = cols
-                        .iter()
-                        .map(|c| {
-                            let mut def = format!("{} {}", c.name, column_sql_type(c));
-                            if c.not_null {
-                                def.push_str(" NOT NULL");
-                            }
-                            if let Some(d) = &c.default {
-                                def.push_str(&format!(" DEFAULT {}", render_default(d)));
-                            }
-                            def
-                        })
-                        .collect();
-                    let sql = format!("ALTER TABLE {full} ADD COLUMN {}", defs.join(", "));
-                    let resp = run_common(engine.as_ref(), &sql, sid);
-                    write_reply_common(&mut writer, "AddColumns", seq, &resp)?;
-                }
-                "DropColumns" => {
-                    let (db, table, names, sid) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_alter_drop_args(&mut ip)?
-                    };
-                    let full = full_table_name(&db, &table);
-                    let mut resp = CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: sid,
-                    };
-                    for name in names {
-                        let sql = format!("ALTER TABLE {full} DROP COLUMN {name}");
-                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                            eprintln!("[INSERT] {sql}");
-                        }
-                        resp = run_common(engine.as_ref(), &sql, sid);
-                        if resp.error_code != OK {
-                            break;
-                        }
-                    }
-                    write_reply_common(&mut writer, "DropColumns", seq, &resp)?;
-                }
-                "Export" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_export_args(&mut ip)?
-                    };
-                    let full = full_table_name(&req.db, &req.table);
-                    let format = match req.file_type {
-                        1 => "JSON",
-                        2 => "JSONL",
-                        3 => "FVECS",
-                        _ => "CSV",
-                    };
-                    // `limit` is the total number of rows, `row_limit` the size
-                    // of each part: the reference writes the first `row_limit`
-                    // rows to `<file>` and the rest to `<file>.part1`, `.part2`…
-                    let total = (req.limit > 0).then_some(req.limit);
-                    let part = (req.row_limit > 0).then_some(req.row_limit);
-                    let mut written = 0i64;
-                    let mut index = 0i64;
-                    let mut resp = CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: req.session_id,
-                    };
-                    loop {
-                        let remaining = total.map(|t| t - written);
-                        if remaining.is_some_and(|r| r <= 0) {
-                            break;
-                        }
-                        let take = match (part, remaining) {
-                            (Some(p), Some(r)) => p.min(r),
-                            (Some(p), None) => p,
-                            (None, Some(r)) => r,
-                            (None, None) => 0,
-                        };
-                        let path = if index == 0 {
-                            req.file.clone()
-                        } else {
-                            format!("{}.part{index}", req.file)
-                        };
-                        let mut sql = format!(
-                            "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}, OFFSET {}",
-                            path.replace('\'', "''"),
-                            req.delimiter.replace('\'', "''"),
-                            req.offset + written
-                        );
-                        if take > 0 {
-                            sql.push_str(&format!(", LIMIT {take}"));
-                        }
-                        if !req.columns.is_empty() {
-                            sql.push_str(&format!(", COLUMNS '{}'", req.columns.join(",")));
-                        }
-                        sql.push_str(" )");
-                        let Some(eng) = engine.as_ref() else {
-                            resp = CommonResponse {
-                                error_code: 1,
-                                error_msg: "no engine bound".into(),
-                                session_id: req.session_id,
-                            };
-                            break;
-                        };
-                        match eng.execute(&sql) {
-                            Ok(rs) => {
-                                let n = rs
-                                    .into_iter()
-                                    .map(|r| match r {
-                                        QueryResult::Inserted { count } => count as i64,
-                                        _ => 0,
-                                    })
-                                    .max()
-                                    .unwrap_or(0);
-                                resp = CommonResponse {
-                                    error_code: OK,
-                                    error_msg: "OK".into(),
-                                    session_id: req.session_id,
-                                };
-                                written += n;
-                                if n == 0 || part.is_none() {
-                                    break;
-                                }
-                                index += 1;
-                            }
-                            Err(e) => {
-                                resp = CommonResponse {
-                                    error_code: e.status_code(),
-                                    error_msg: e.to_string(),
-                                    session_id: req.session_id,
-                                };
-                                break;
-                            }
-                        }
-                    }
-                    write_reply_common(&mut writer, "Export", seq, &resp)?;
-                }
-                "SetConfig" => {
-                    let (sid, name, value, kind) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_set_config_args(&mut ip)?
-                    };
-                    let resp = match name.to_ascii_lowercase().as_str() {
-                        // read-only knobs reject any assignment
-                        "mem_index_capacity" => CommonResponse {
-                            error_code: 3076,
-                            error_msg: "Invalid command: Config mem_index_capacity is read-only"
-                                .into(),
-                            session_id: sid,
-                        },
-                        // `log_level` is a string knob; a number is a type mismatch
-                        "log_level" if kind != 1 => CommonResponse {
-                            error_code: 3010,
-                            error_msg: "data type mismatch for config 'log_level'".into(),
-                            session_id: sid,
-                        },
-                        _ => {
-                            let sql = format!("SET CONFIG {name} {value}");
-                            run_common(engine.as_ref(), &sql, sid)
-                        }
-                    };
-                    write_reply_common(&mut writer, "SetConfig", seq, &resp)?;
-                }
-                "ShowConfig" => {
-                    let (sid, name) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_show_config_args(&mut ip)?
-                    };
-                    let value = engine
-                        .as_ref()
-                        .and_then(|e| e.config_get(&name))
-                        // Read-only informational entries the reference always
-                        // answers, even though nothing sets them.
-                        .or_else(|| match name.as_str() {
-                            "version" => Some("0.0.0".to_string()),
-                            "profile" => Some(String::new()),
-                            "mem_index_capacity" => Some("0".to_string()),
-                            _ => None,
-                        });
-                    write_show_config_response(&mut writer, seq, sid, &name, value.as_deref())?;
-                }
-                "ShowSegments" => {
-                    let (sid, db, table) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_table_args(&mut ip)?
-                    };
-                    let _ = (sid, &db);
-                    let rows = text_cells(
-                        engine
-                            .as_ref()
-                            .map(|e| show_segments_rows(e, &table))
-                            .unwrap_or_default(),
-                    );
-                    let columns: Vec<String> = SHOW_SEGMENTS_COLUMNS
-                        .iter()
-                        .map(|c| c.to_string())
-                        .collect();
-                    let types: Vec<String> =
-                        SHOW_SEGMENTS_TYPES.iter().map(|t| t.to_string()).collect();
-                    let resp = select_response_from_typed(&columns, &types, &rows);
-                    write_result_response(&mut writer, seq, "ShowSegments", &resp)?;
-                }
-                "ShowBlocks" => {
-                    let (sid, db, table, segment) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_block_args(&mut ip)?
-                    };
-                    let _ = (sid, &db);
-                    let rows = text_cells(
-                        engine
-                            .as_ref()
-                            .map(|e| show_blocks_rows(e, &table, segment.max(0) as u32))
-                            .unwrap_or_default(),
-                    );
-                    let columns: Vec<String> =
-                        SHOW_BLOCKS_COLUMNS.iter().map(|c| c.to_string()).collect();
-                    let types: Vec<String> =
-                        SHOW_BLOCKS_TYPES.iter().map(|t| t.to_string()).collect();
-                    let resp = select_response_from_typed(&columns, &types, &rows);
-                    write_result_response(&mut writer, seq, "ShowBlocks", &resp)?;
-                }
-                "Import" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_import_args(&mut ip)?
-                    };
-                    let table = if req.db.is_empty() {
-                        req.table.clone()
                     } else {
-                        format!("{}.{}", req.db, req.table)
-                    };
-                    let format = match req.file_type {
-                        1 => "JSON",
-                        2 => "JSONL",
-                        3 => "FVECS",
-                        _ => "CSV",
-                    };
-                    // C++ takes `delimiter[0]` and zsv treats NUL as `,`; an
-                    // unset SDK option serialises as a single NUL byte.
-                    let delimiter = match req.delimiter.chars().next() {
-                        Some(c) if c != '\0' => c.to_string(),
-                        _ => ",".to_string(),
-                    };
-                    let mut sql = format!(
-                        "COPY {table} FROM '{}' WITH ( DELIMITER '{}', FORMAT {format} )",
-                        req.file.replace('\'', "''"),
-                        delimiter.replace('\'', "''")
-                    );
-                    if req.has_header {
-                        sql.push_str(" ;");
+                        CommonResponse {
+                            error_code: 3021, // DB_NOT_EXIST
+                            error_msg: format!("Database: {db} doesn't exist."),
+                            session_id: sid,
+                        }
                     }
-                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                        eprintln!("[IMPORT] {sql}");
+                }
+                "DropDatabase" if !db.is_empty() => {
+                    let sql = if conflict == Some(0) {
+                        format!("DROP DATABASE IF EXISTS {db}")
+                    } else {
+                        format!("DROP DATABASE {db}")
+                    };
+                    run_common(engine.as_ref(), &sql, sid).await
+                }
+                "GetTable" if !name2.is_empty() => {
+                    let full = qualify(&name2);
+                    let exists = engine
+                        .as_ref()
+                        .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
+                        .is_some();
+                    if exists {
+                        CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        }
+                    } else {
+                        CommonResponse {
+                            error_code: 3022, // TABLE_NOT_EXIST
+                            error_msg: format!("Table: {name2} doesn't exist."),
+                            session_id: sid,
+                        }
                     }
-                    let resp = match engine.as_ref() {
-                        Some(eng) => match eng.execute(&sql) {
+                }
+                "DropTable" if !name2.is_empty() => {
+                    let full = qualify(&name2);
+                    let exists = engine
+                        .as_ref()
+                        .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
+                        .is_some();
+                    if !exists && conflict != Some(0) {
+                        CommonResponse {
+                            error_code: 3022,
+                            error_msg: format!("table '{name2}' does not exist"),
+                            session_id: sid,
+                        }
+                    } else {
+                        let sql = if conflict == Some(0) {
+                            format!("DROP TABLE IF EXISTS {full}")
+                        } else {
+                            format!("DROP TABLE {full}")
+                        };
+                        run_common(engine.as_ref(), &sql, sid).await
+                    }
+                }
+                "DropIndex" if !name3.is_empty() && conflict == Some(0) => {
+                    run_common(
+                        engine.as_ref(),
+                        &format!("DROP INDEX IF EXISTS {}", name3.to_ascii_lowercase()),
+                        sid,
+                    )
+                    .await
+                }
+                "DropIndex" if !name3.is_empty() => {
+                    run_common(
+                        engine.as_ref(),
+                        &format!("DROP INDEX {}", name3.to_ascii_lowercase()),
+                        sid,
+                    )
+                    .await
+                }
+                // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
+                // side effect for the operations the SDK performs on the
+                // default database.
+                _ => CommonResponse {
+                    error_code: OK,
+                    error_msg: "OK".into(),
+                    session_id: sid,
+                },
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        "Insert" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_insert_args(&mut ip)?
+            };
+            let sid = req.session_id;
+            let table = if req.db_name.is_empty() {
+                req.table_name.clone()
+            } else {
+                format!("{}.{}", req.db_name, req.table_name)
+            };
+            // Rows that share a column list are batched into one statement.
+            let mut resp = CommonResponse {
+                error_code: OK,
+                error_msg: "OK".into(),
+                session_id: sid,
+            };
+            // The reference rejects a single INSERT batch above one
+            // block's worth of rows (8192).
+            if req.rows.is_empty() {
+                resp = CommonResponse {
+                    error_code: 3014,
+                    error_msg: "insert without values".into(),
+                    session_id: sid,
+                };
+            } else if req.rows.len() > 8192 {
+                resp = CommonResponse {
+                    error_code: 3014,
+                    error_msg: "Insert batch row limit shouldn't more than 8193".into(),
+                    session_id: sid,
+                };
+            }
+            // A scalar batch goes straight to the executor: rendering
+            // 1000 rows to SQL and re-parsing them cost ~13 ms per
+            // batch, more than the insert itself. Values that need the
+            // parser (arrays, tensors, sparse vectors) keep the SQL path.
+            let direct = req.rows.iter().all(|(_, vals)| {
+                !vals.is_empty()
+                    && vals.iter().all(|v| {
+                        matches!(
+                            v,
+                            ValueLit::Int(_)
+                                | ValueLit::Float(_)
+                                | ValueLit::Str(_)
+                                | ValueLit::Null
+                                | ValueLit::Bool(_)
+                                | ValueLit::IntArray(_)
+                                | ValueLit::FloatArray(_)
+                                | ValueLit::IntTensor(_)
+                                | ValueLit::FloatTensor(_)
+                                | ValueLit::Sparse { .. }
+                        )
+                    })
+            });
+            if direct {
+                let mut i = 0usize;
+                while resp.error_code == OK && i < req.rows.len() {
+                    let cols = req.rows[i].0.clone();
+                    let mut rows_lit: Vec<Vec<parser::Literal>> = Vec::new();
+                    while i < req.rows.len() && req.rows[i].0 == cols {
+                        rows_lit.push(
+                            req.rows[i]
+                                .1
+                                .iter()
+                                .map(|v| match v {
+                                    ValueLit::Int(n) => parser::Literal::Int(*n),
+                                    ValueLit::Float(f) => parser::Literal::Float(*f),
+                                    ValueLit::Str(t) => parser::Literal::Str(t.clone()),
+                                    ValueLit::Null => parser::Literal::Null,
+                                    ValueLit::Bool(b) => parser::Literal::Str(b.to_string()),
+                                    ValueLit::IntArray(v) => parser::Literal::Vector(
+                                        v.iter().map(|x| *x as f64).collect(),
+                                    ),
+                                    ValueLit::FloatArray(v) => parser::Literal::Vector(v.clone()),
+                                    ValueLit::IntTensor(rows) => parser::Literal::Vector(
+                                        rows.iter().flatten().map(|x| *x as f64).collect(),
+                                    ),
+                                    ValueLit::FloatTensor(rows) => parser::Literal::Vector(
+                                        rows.iter().flatten().copied().collect(),
+                                    ),
+                                    ValueLit::Sparse {
+                                        indices,
+                                        ints,
+                                        floats,
+                                        is_float,
+                                    } => {
+                                        let items: Vec<String> = indices
+                                            .iter()
+                                            .enumerate()
+                                            .map(|(k, i)| {
+                                                if *is_float {
+                                                    format!("{i}:{}", floats[k])
+                                                } else {
+                                                    format!("{i}:{}", ints[k])
+                                                }
+                                            })
+                                            .collect();
+                                        parser::Literal::Array(items)
+                                    }
+                                    _ => parser::Literal::Null,
+                                })
+                                .collect(),
+                        );
+                        i += 1;
+                    }
+                    let cols_opt = if cols.is_empty() {
+                        None
+                    } else {
+                        Some(cols.as_slice())
+                    };
+                    // `insert_literals_inner` is awaited **on this task**: not
+                    // bridged with `block_on`, and not wrapped in
+                    // `spawn_blocking`. The statement is a mixed workload - it
+                    // awaits the WAL, the row allocator and the bottom half,
+                    // and it encodes rows and writes index entries - so the
+                    // blocking pool would put its waits and its compute in one
+                    // concurrency budget (plan §6.6), and `block_on` would park
+                    // this worker on a future only other workers can finish.
+                    // Awaiting keeps the whole statement a future.
+                    let cols_owned: Option<Vec<String>> = cols_opt.map(|c| c.to_vec());
+                    resp = match engine.as_ref() {
+                        Some(eng) => match eng
+                            .insert_literals_inner(&table, cols_owned.as_deref(), rows_lit, false)
+                            .await
+                        {
                             Ok(_) => CommonResponse {
                                 error_code: OK,
                                 error_msg: "OK".into(),
-                                session_id: req.session_id,
+                                session_id: sid,
                             },
                             Err(e) => CommonResponse {
                                 error_code: e.status_code(),
                                 error_msg: e.to_string(),
-                                session_id: req.session_id,
+                                session_id: sid,
                             },
                         },
                         None => CommonResponse {
                             error_code: 1,
                             error_msg: "no engine bound".into(),
-                            session_id: req.session_id,
+                            session_id: sid,
                         },
                     };
-                    write_reply_common(&mut writer, "Import", seq, &resp)?;
                 }
-                "ShowColumns" => {
-                    let (_sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let db = fields.get(&1).cloned().unwrap_or_default();
-                    let table = fields.get(&2).cloned().unwrap_or_default();
-                    let full = full_table_name(&db, &table);
-                    let resp = match &engine {
-                        Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
-                            Ok(rs) => {
-                                let mut rows: Vec<Vec<Value>> = Vec::new();
-                                for r in rs {
-                                    if let QueryResult::Rows { rows: rw, .. } = r {
-                                        rows = rw;
-                                    }
-                                }
-                                // The SQL renderer marks an absent comment
-                                // `(empty)`; the SDK sees an empty string.
-                                for row in rows.iter_mut() {
-                                    if let Some(Value::Str(c)) = row.get_mut(3) {
-                                        if c == "(empty)" {
-                                            c.clear();
-                                        }
-                                    }
-                                }
-                                select_response_from_typed(
-                                    &[
-                                        "name".to_string(),
-                                        "type".to_string(),
-                                        "default".to_string(),
-                                        "comment".to_string(),
-                                    ],
-                                    &vec!["VARCHAR".to_string(); 4],
-                                    &rows,
-                                )
+            }
+            let mut i = 0usize;
+            while !direct && resp.error_code == OK && i < req.rows.len() {
+                let (cols, _) = &req.rows[i];
+                let mut batch: Vec<String> = Vec::new();
+                while i < req.rows.len() && &req.rows[i].0 == cols {
+                    batch.push(format!(
+                        "({})",
+                        req.rows[i]
+                            .1
+                            .iter()
+                            .map(|v| v.to_sql())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ));
+                    i += 1;
+                }
+                let sql = if cols.is_empty() {
+                    format!("INSERT INTO {table} VALUES {};", batch.join(","))
+                } else {
+                    format!(
+                        "INSERT INTO {table} ({}) VALUES {};",
+                        cols.join(","),
+                        batch.join(",")
+                    )
+                };
+                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                    eprintln!("[INSERT] {sql}");
+                }
+                let t0 = std::time::Instant::now();
+                resp = run_common(engine.as_ref(), &sql, sid).await;
+                if std::env::var_os("INF_DEBUG_INS").is_some() {
+                    eprintln!(
+                        "[INS] rpc rows={} sql={}B exec={:?}",
+                        batch.len(),
+                        sql.len(),
+                        t0.elapsed()
+                    );
+                }
+                if resp.error_code != OK {
+                    break;
+                }
+            }
+            Ok(ArmResponse::Common(resp))
+        }
+        "Select" => {
+            let rpc_started = std::time::Instant::now();
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                match read_select_args(&mut ip) {
+                    Ok((_r, bad)) if !bad.is_empty() => {
+                        let resp = SelectResponseWire {
+                            error_code: 7012,
+                            error_msg: bad[0].clone(),
+                            column_defs: Vec::new(),
+                            column_fields: Vec::new(),
+                            extra_result: String::new(),
+                        };
+                        return Ok(ArmResponse::Select(resp));
+                    }
+                    Ok((r, _)) => r,
+                    // A malformed select list is reported through the
+                    // SelectResponse (the SDK turns error_code into an
+                    // InfinityException), not a thrift exception.
+                    Err(e) => {
+                        let resp = SelectResponseWire {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            column_defs: Vec::new(),
+                            column_fields: Vec::new(),
+                            extra_result: String::new(),
+                        };
+                        // The request was fully consumed: reply with the
+                        // validation error and keep the connection alive
+                        // (closing here makes SDKs mark it dead even
+                        // though the error was delivered).
+                        return Ok(ArmResponse::Select(resp));
+                    }
+                }
+            };
+            let err = |msg: String| SelectResponseWire {
+                error_code: 1,
+                error_msg: msg,
+                column_defs: Vec::new(),
+                column_fields: Vec::new(),
+                extra_result: String::new(),
+            };
+            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                eprintln!("[SELECT] {}", req.to_sql());
+            }
+            let exec_started = std::time::Instant::now();
+            let srv_started = exec_started;
+            // Plain projection over one table with no other clause: the
+            // engine hands back typed column buffers and the writer packs
+            // them without a `Value` per cell.
+            let batch_resp = match &engine {
+                Some(eng) if !req.total_hits => eng
+                    .select_columns(&req.to_sql())
+                    .ok()
+                    .flatten()
+                    .map(|batch| {
+                        let mut columns = batch.columns.clone();
+                        if !req.star && req.names.len() == columns.len() {
+                            columns = req.names.clone();
+                        } else if req.star
+                            && !req.names.is_empty()
+                            && columns.len() >= req.names.len()
+                        {
+                            let start = columns.len() - req.names.len();
+                            for (i, n) in req.names.iter().enumerate() {
+                                columns[start + i] = n.clone();
                             }
-                            Err(e) => SelectResponseWire {
-                                error_code: e.status_code(),
-                                error_msg: e.to_string(),
-                                column_defs: Vec::new(),
-                                column_fields: Vec::new(),
-                                extra_result: String::new(),
-                            },
-                        },
-                        None => SelectResponseWire {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
+                        }
+                        let types = declared_types(eng, &req.table_name, &columns);
+                        select_response_from_batch(&columns, &types, &batch)
+                    }),
+                _ => None,
+            };
+            let resp = match batch_resp {
+                Some(resp) => resp,
+                None => match &engine {
+                    Some(eng) => match eng.execute(&req.to_sql()).await {
+                        Ok(rs) => {
+                            let mut columns: Vec<String> = Vec::new();
+                            let mut rows: Vec<Vec<Value>> = Vec::new();
+                            for r in rs {
+                                if let QueryResult::Rows {
+                                    columns: c,
+                                    rows: rw,
+                                } = r
+                                {
+                                    columns = c;
+                                    rows = rw;
+                                }
+                            }
+                            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                                eprintln!(
+                                    "[COLS] star={} req={:?} got={:?}",
+                                    req.star, req.columns, columns
+                                );
+                            }
+                            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                                eprintln!(
+                                    "[COLS] star={} req={:?} got={:?}",
+                                    req.star, req.columns, columns
+                                );
+                            }
+                            // A projected expression is named by the SQL
+                            // text the client sent (`(c1 + c2)`).
+                            if !req.star && req.names.len() == columns.len() {
+                                columns = req.names.clone();
+                            } else if req.star
+                                && !req.names.is_empty()
+                                && columns.len() >= req.names.len()
+                            {
+                                // `SELECT *, distance()`: only the trailing
+                                // expression columns are renamed.
+                                let start = columns.len() - req.names.len();
+                                for (i, n) in req.names.iter().enumerate() {
+                                    columns[start + i] = n.clone();
+                                }
+                            }
+                            let exec_elapsed = exec_started.elapsed();
+                            let encode_started = std::time::Instant::now();
+                            let mut resp = select_response_from_typed(
+                                &columns,
+                                &declared_types(eng, &req.table_name, &columns),
+                                &rows,
+                            );
+                            if std::env::var_os("INF_DEBUG_SEL").is_some() {
+                                eprintln!(
+                                    "[SEL] rows={} exec={:?} encode={:?}",
+                                    rows.len(),
+                                    exec_elapsed,
+                                    encode_started.elapsed()
+                                );
+                            }
+                            if req.total_hits {
+                                // The count is the result set *before*
+                                // LIMIT/OFFSET.
+                                let mut all = req.clone();
+                                all.limit = None;
+                                all.offset = None;
+                                let total = eng
+                                    .execute(&all.to_sql())
+                                    .await
+                                    .map(|rs| {
+                                        rs.into_iter()
+                                            .map(|r| {
+                                                if let QueryResult::Rows { rows, .. } = r {
+                                                    rows.len()
+                                                } else {
+                                                    0
+                                                }
+                                            })
+                                            .sum::<usize>()
+                                    })
+                                    .unwrap_or(0);
+                                resp.extra_result = format!("{{\"total_hits_count\":{total}}}");
+                            }
+                            resp
+                        }
+                        // Keep the engine's C++ error code (3023, 3053, …)
+                        // so SDK assertions on `args[0]` hold.
+                        Err(e) => SelectResponseWire {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
                             column_defs: Vec::new(),
                             column_fields: Vec::new(),
                             extra_result: String::new(),
                         },
+                    },
+                    None => err("no engine bound".into()),
+                },
+            };
+            if std::env::var_os("INF_SERVER_TIMER").is_some() {
+                let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+                eprintln!(
+                    "[SRV] plan_ms {:.3} search_ms {:.3} ser_ms 0.000 total_ms {:.3}",
+                    ms(srv_started.duration_since(rpc_started)),
+                    ms(srv_started.elapsed()),
+                    ms(rpc_started.elapsed())
+                );
+            }
+            Ok(ArmResponse::Select(resp))
+        }
+        // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
+        // `Flush` persists table data into the C++ block layout and the
+        // indexes into their chunk files, which is what the restart
+        // harness inspects on disk.
+        // `Flush` persists table data into the C++ block layout and the
+        // indexes into their chunk files, which is what the restart
+        // harness inspects on disk. `Cleanup` removes the mirrors of
+        // dropped tables/indexes, so it flushes too.
+        "Flush" | "Cleanup" => {
+            let (sid, _) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let resp = match engine.as_ref() {
+                Some(eng) => match if name == "Cleanup" {
+                    eng.cleanup().await
+                } else {
+                    eng.flush().await
+                } {
+                    Ok(()) => CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    },
+                    Err(e) => CommonResponse {
+                        error_code: e.status_code(),
+                        error_msg: e.to_string(),
+                        session_id: sid,
+                    },
+                },
+                None => CommonResponse {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    session_id: sid,
+                },
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        // `Compact` merges the table's segments into one.
+        "Compact" => {
+            let (sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let (db, table) = (
+                fields.get(&2).cloned().unwrap_or_default(),
+                fields.get(&3).cloned().unwrap_or_default(),
+            );
+            let full = full_table_name(&db, &table);
+            // Await the async half: `compact_table` bridges it with
+            // `block_on`, which parks this worker for the whole merge. Same
+            // reason as `insert_literals_inner` above.
+            let resp = match engine.as_ref() {
+                Some(eng) => match eng.compact_table_async(&full).await {
+                    Ok(()) => CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    },
+                    Err(e) => CommonResponse {
+                        error_code: e.status_code(),
+                        error_msg: e.to_string(),
+                        session_id: sid,
+                    },
+                },
+                None => CommonResponse {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    session_id: sid,
+                },
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        // Database snapshots are stored as one blob per database; a
+        // `RestoreSnapshot` with `scope="database"` restores it (the
+        // table scope falls through to the SQL statement).
+        "CreateDatabaseSnapshot" | "CreateSystemSnapshot" | "RestoreSnapshot" => {
+            let (sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
+            let resp = match engine.as_ref() {
+                Some(eng) => {
+                    let res = if name == "CreateDatabaseSnapshot" {
+                        // `{2: db_name, 3: snapshot_name}`
+                        eng.create_database_snapshot(&get(3), &get(2)).await
+                    } else if name == "CreateSystemSnapshot" {
+                        // `{2: snapshot_name}`
+                        eng.create_system_snapshot(&get(2)).await
+                    } else if get(3).eq_ignore_ascii_case("system") {
+                        // `{2: snapshot_name, 3: scope}`: a system
+                        // snapshot nests its tables under each database,
+                        // so it has to go through the system restore - a
+                        // database restore reads the top-level
+                        // `table_snapshots`, which a system snapshot
+                        // does not have.
+                        eng.restore_system_snapshot(&get(2)).await
+                    } else if get(3).eq_ignore_ascii_case("database") {
+                        eng.restore_database_snapshot(&get(2)).await
+                    } else {
+                        eng.execute(&format!("RESTORE TABLE SNAPSHOT {};", sql_name(&get(2))))
+                            .await
+                            .map(|_| ())
                     };
-                    write_result_response(&mut writer, seq, "ShowColumns", &resp)?;
+                    match res {
+                        Ok(()) => CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        },
+                        Err(e) => CommonResponse {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            session_id: sid,
+                        },
+                    }
                 }
-                "ListTable" => {
-                    let (_sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let db = fields.get(&1).cloned().unwrap_or_default();
-                    let prefix = format!("{db}.");
-                    let names: Vec<String> = match &engine {
-                        Some(eng) => eng
-                            .catalog()
-                            .list_tables()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
-                            .map(|t| {
-                                if db.is_empty() {
-                                    t.name
-                                } else {
-                                    t.name.trim_start_matches(&prefix).to_string()
-                                }
-                            })
-                            .collect(),
-                        None => Vec::new(),
-                    };
-                    write_string_list_response(
-                        &mut writer,
-                        seq,
-                        "ListTable",
-                        "table_names",
-                        &names,
-                    )?;
+                None => CommonResponse {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    session_id: sid,
+                },
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        // `RenameTable` is executed for real; the rest are engine-level
+        // maintenance that the in-memory engine has nothing to do for, so
+        // they report success rather than `unknown method`.
+        "Optimize"
+        | "Command"
+        | "AlterIndex"
+        | "DumpIndex"
+        | "CreateTableSnapshot"
+        | "DropSnapshot"
+        | "RenameTable" => {
+            let (sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
+            let resp = if name == "RenameTable" {
+                let (db, table, new_name) = (get(1), get(2), get(3));
+                let full = full_table_name(&db, &table);
+                run_common(
+                    engine.as_ref(),
+                    &format!("ALTER TABLE {full} RENAME TO {new_name};"),
+                    sid,
+                )
+                .await
+            } else if name == "CreateTableSnapshot" {
+                // {1: session_id, 2: db, 3: table, 4: snapshot}
+                let (db, table, snap) = (get(2), get(3), get(4));
+                let full = full_table_name(&db, &table);
+                run_common(
+                    engine.as_ref(),
+                    &format!("CREATE SNAPSHOT {} ON TABLE {full};", sql_name(&snap)),
+                    sid,
+                )
+                .await
+            } else if name == "DropSnapshot" {
+                // {1: session_id, 2: snapshot}
+                let snap = get(2);
+                run_common(
+                    engine.as_ref(),
+                    &format!("DROP SNAPSHOT {};", sql_name(&snap)),
+                    sid,
+                )
+                .await
+            } else if name == "DumpIndex" {
+                // `DumpIndexRequest` is the one request whose session id
+                // comes last: {1: db, 2: table, 3: index, 4: session_id}
+                // (`thrift/infinity.thrift:685`).
+                let (db, table, index_name) = (get(1), get(2), get(3));
+                let full = full_table_name(&db, &table);
+                match engine.as_ref() {
+                    Some(eng) => match eng.dump_index_transaction(&full, &index_name).await {
+                        Ok(()) => CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        },
+                        Err(e) => CommonResponse {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            session_id: sid,
+                        },
+                    },
+                    None => CommonResponse {
+                        error_code: 1,
+                        error_msg: "no engine bound".into(),
+                        session_id: sid,
+                    },
                 }
-                "ListIndex" => {
-                    let (_sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let table = fields.get(&2).cloned().unwrap_or_default();
-                    let names: Vec<String> = match &engine {
-                        Some(eng) => eng
-                            .catalog()
-                            .list_indexes()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .filter(|im| {
-                                table.is_empty()
-                                    || im.table == table
-                                    || im.table.ends_with(&format!(".{table}"))
-                            })
-                            .map(|im| im.name)
-                            .collect(),
-                        None => Vec::new(),
-                    };
-                    write_string_list_response(
-                        &mut writer,
-                        seq,
-                        "ListIndex",
-                        "index_names",
-                        &names,
-                    )?;
+            } else if name == "Optimize" {
+                // Merge the index chunks that earlier memory dumps left
+                // behind, as the reference's optimize does.
+                match engine.as_ref() {
+                    Some(eng) => match eng.optimize_indexes_async().await {
+                        Ok(()) => CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        },
+                        Err(e) => CommonResponse {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            session_id: sid,
+                        },
+                    },
+                    None => CommonResponse {
+                        error_code: 1,
+                        error_msg: "no engine bound".into(),
+                        session_id: sid,
+                    },
                 }
-                "ShowDatabase" => {
-                    let (_sid, fields) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_string_request(&mut ip)?
-                    };
-                    let db = fields.get(&1).cloned().unwrap_or_default();
-                    let prefix = format!("{db}.");
-                    let table_count = match &engine {
-                        Some(eng) => eng
-                            .catalog()
-                            .list_tables()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
-                            .count() as i64,
-                        None => 0,
-                    };
-                    // Identifiers are normalised to lower case, so `SHOW DATABASE`
-                    // echoes the canonical name even for `"DEFAULT_DB"`.
-                    write_show_database_response(
-                        &mut writer,
-                        seq,
-                        &db.to_ascii_lowercase(),
-                        table_count,
-                        "",
-                    )?;
+            } else {
+                CommonResponse {
+                    error_code: OK,
+                    error_msg: "OK".into(),
+                    session_id: sid,
                 }
-                "CreateIndex" => {
-                    let req = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        let r = read_create_index_args(&mut ip)?;
-                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                            eprintln!("[CREATEINDEX] {r:?}");
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        "Explain" => {
+            let (req, etype) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_explain_args(&mut ip)?
+            };
+            let kind = match etype {
+                4 => "PHYSICAL",
+                6 => "FRAGMENT",
+                _ => "PHYSICAL",
+            };
+            let sql = format!("EXPLAIN {kind} {}", req.to_sql());
+            let resp = match engine.as_ref() {
+                Some(eng) => match eng.execute(&sql).await {
+                    Ok(rs) => {
+                        let mut rows: Vec<Vec<Value>> = Vec::new();
+                        for r in rs {
+                            if let QueryResult::Rows { rows: rw, .. } = r {
+                                rows = rw;
+                            }
                         }
-                        r
+                        select_response_from_typed(&["explain".to_string()], &[], &rows)
+                    }
+                    Err(e) => SelectResponseWire {
+                        error_code: e.status_code(),
+                        error_msg: e.to_string(),
+                        column_defs: Vec::new(),
+                        column_fields: Vec::new(),
+                        extra_result: String::new(),
+                    },
+                },
+                None => SelectResponseWire {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    column_defs: Vec::new(),
+                    column_fields: Vec::new(),
+                    extra_result: String::new(),
+                },
+            };
+            Ok(ArmResponse::Select(resp))
+        }
+        "AddColumns" => {
+            let (db, table, cols, sid) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_alter_add_args(&mut ip)?
+            };
+            let full = full_table_name(&db, &table);
+            let defs: Vec<String> = cols
+                .iter()
+                .map(|c| {
+                    let mut def = format!("{} {}", c.name, column_sql_type(c));
+                    if c.not_null {
+                        def.push_str(" NOT NULL");
+                    }
+                    if let Some(d) = &c.default {
+                        def.push_str(&format!(" DEFAULT {}", render_default(d)));
+                    }
+                    def
+                })
+                .collect();
+            let sql = format!("ALTER TABLE {full} ADD COLUMN {}", defs.join(", "));
+            let resp = run_common(engine.as_ref(), &sql, sid).await;
+            Ok(ArmResponse::Common(resp))
+        }
+        "DropColumns" => {
+            let (db, table, names, sid) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_alter_drop_args(&mut ip)?
+            };
+            let full = full_table_name(&db, &table);
+            let mut resp = CommonResponse {
+                error_code: OK,
+                error_msg: "OK".into(),
+                session_id: sid,
+            };
+            for name in names {
+                let sql = format!("ALTER TABLE {full} DROP COLUMN {name}");
+                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                    eprintln!("[INSERT] {sql}");
+                }
+                resp = run_common(engine.as_ref(), &sql, sid).await;
+                if resp.error_code != OK {
+                    break;
+                }
+            }
+            Ok(ArmResponse::Common(resp))
+        }
+        "Export" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_export_args(&mut ip)?
+            };
+            let full = full_table_name(&req.db, &req.table);
+            let format = match req.file_type {
+                1 => "JSON",
+                2 => "JSONL",
+                3 => "FVECS",
+                _ => "CSV",
+            };
+            // `limit` is the total number of rows, `row_limit` the size
+            // of each part: the reference writes the first `row_limit`
+            // rows to `<file>` and the rest to `<file>.part1`, `.part2`…
+            let total = (req.limit > 0).then_some(req.limit);
+            let part = (req.row_limit > 0).then_some(req.row_limit);
+            let mut written = 0i64;
+            let mut index = 0i64;
+            let mut resp = CommonResponse {
+                error_code: OK,
+                error_msg: "OK".into(),
+                session_id: req.session_id,
+            };
+            loop {
+                let remaining = total.map(|t| t - written);
+                if remaining.is_some_and(|r| r <= 0) {
+                    break;
+                }
+                let take = match (part, remaining) {
+                    (Some(p), Some(r)) => p.min(r),
+                    (Some(p), None) => p,
+                    (None, Some(r)) => r,
+                    (None, None) => 0,
+                };
+                let path = if index == 0 {
+                    req.file.clone()
+                } else {
+                    format!("{}.part{index}", req.file)
+                };
+                let mut sql = format!(
+                    "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}, OFFSET {}",
+                    path.replace('\'', "''"),
+                    req.delimiter.replace('\'', "''"),
+                    req.offset + written
+                );
+                if take > 0 {
+                    sql.push_str(&format!(", LIMIT {take}"));
+                }
+                if !req.columns.is_empty() {
+                    sql.push_str(&format!(", COLUMNS '{}'", req.columns.join(",")));
+                }
+                sql.push_str(" )");
+                let Some(eng) = engine.as_ref() else {
+                    resp = CommonResponse {
+                        error_code: 1,
+                        error_msg: "no engine bound".into(),
+                        session_id: req.session_id,
                     };
-                    let full = full_table_name(&req.db_name, &req.table_name);
-                    let target = req.function.clone().unwrap_or_else(|| req.column.clone());
-                    let resp = if target.is_empty() {
-                        CommonResponse {
+                    break;
+                };
+                match eng.execute(&sql).await {
+                    Ok(rs) => {
+                        let n = rs
+                            .into_iter()
+                            .map(|r| match r {
+                                QueryResult::Inserted { count } => count as i64,
+                                _ => 0,
+                            })
+                            .max()
+                            .unwrap_or(0);
+                        resp = CommonResponse {
                             error_code: OK,
                             error_msg: "OK".into(),
                             session_id: req.session_id,
+                        };
+                        written += n;
+                        if n == 0 || part.is_none() {
+                            break;
                         }
-                    } else {
-                        // Identifiers are case-insensitive; the catalog keeps the
-                        // canonical lower-case spelling.
-                        let name = req.index_name.to_ascii_lowercase();
-                        let mut sql = format!(
-                            "CREATE INDEX {}{name} ON {full} ({target})",
-                            if req.conflict == 0 {
-                                "IF NOT EXISTS "
-                            } else {
-                                ""
-                            }
-                        );
-                        if !req.index_type.is_empty() {
-                            sql.push_str(&format!(" USING {}", req.index_type));
-                        }
-                        if !req.params.is_empty() {
-                            // C++ `Infinity::CreateIndex` lowercases every
-                            // `InitParameter` name *and* value before the
-                            // statement runs, so over Thrift `analyzer='Chinese'`
-                            // means `chinese` (the SQL path keeps the spelling
-                            // and stays case sensitive). The value is quoted so
-                            // one with spaces (`invalid compress type`) still
-                            // parses.
-                            let opts = req
-                                .params
-                                .iter()
-                                .map(|(k, v)| {
-                                    format!(
-                                        "{}='{}'",
-                                        k.to_lowercase(),
-                                        v.to_lowercase().replace('\'', "''")
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                                .join(",");
-                            sql.push_str(&format!(" WITH ({opts})"));
-                        }
-                        sql.push(';');
-                        let resp = run_common(engine.as_ref(), &sql, req.session_id);
-                        if resp.error_code == OK {
-                            if let Some(eng) = engine.as_ref() {
-                                eng.set_index_comment(&full, &name, &req.index_comment);
-                            }
-                        }
-                        resp
-                    };
-                    write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
-                }
-                "ShowCurrentNode" => {
-                    {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        skip_struct(&mut ip)?;
+                        index += 1;
                     }
-                    let (node_role, server_status) = peer.node_state();
-                    write_show_current_node_response(&mut writer, seq, &node_role, &server_status)?;
-                }
-                "ShowSnapshot" => {
-                    let (sid, name) = {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_snapshot_args(&mut ip)?
-                    };
-                    let _ = sid;
-                    let known = engine
-                        .as_ref()
-                        .and_then(|e| e.snapshot_names().ok())
-                        .map(|n| n.iter().any(|x| x == &name))
-                        .unwrap_or(false);
-                    write_show_snapshot_response(&mut writer, seq, &name, known)?;
-                }
-                "ListSnapshots" => {
-                    {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        skip_struct(&mut ip)?;
+                    Err(e) => {
+                        resp = CommonResponse {
+                            error_code: e.status_code(),
+                            error_msg: e.to_string(),
+                            session_id: req.session_id,
+                        };
+                        break;
                     }
-                    let names = engine
-                        .as_ref()
-                        .and_then(|e| e.snapshot_names().ok())
-                        .unwrap_or_default();
-                    write_list_snapshots_response(&mut writer, seq, &names)?;
-                }
-                other => {
-                    {
-                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        skip_struct(&mut ip)?;
-                    }
-                    write_app_exception(
-                        &mut writer,
-                        other,
-                        seq,
-                        &format!("unknown method: {other}"),
-                    )?;
                 }
             }
-            Ok(())
-        })();
-        if std::env::var_os("INFINITY_PROFILE_RPC").is_some() {
-            eprintln!("[RPC] {name} {}us", rpc_started.elapsed().as_micros());
+            Ok(ArmResponse::Common(resp))
         }
-        if let Some(eng) = engine.as_ref() {
-            eng.end_statement();
+        "SetConfig" => {
+            let (sid, name, value, kind) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_set_config_args(&mut ip)?
+            };
+            let resp = match name.to_ascii_lowercase().as_str() {
+                // read-only knobs reject any assignment
+                "mem_index_capacity" => CommonResponse {
+                    error_code: 3076,
+                    error_msg: "Invalid command: Config mem_index_capacity is read-only".into(),
+                    session_id: sid,
+                },
+                // `log_level` is a string knob; a number is a type mismatch
+                "log_level" if kind != 1 => CommonResponse {
+                    error_code: 3010,
+                    error_msg: "data type mismatch for config 'log_level'".into(),
+                    session_id: sid,
+                },
+                _ => {
+                    let sql = format!("SET CONFIG {name} {value}");
+                    run_common(engine.as_ref(), &sql, sid).await
+                }
+            };
+            Ok(ArmResponse::Common(resp))
         }
-        if let Err(e) = handled {
+        "ShowConfig" => {
+            let (_sid, name) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_show_config_args(&mut ip)?
+            };
+            let value = engine
+                .as_ref()
+                .and_then(|e| e.config_get(&name))
+                // Read-only informational entries the reference always
+                // answers, even though nothing sets them.
+                .or_else(|| match name.as_str() {
+                    "version" => Some("0.0.0".to_string()),
+                    "profile" => Some(String::new()),
+                    "mem_index_capacity" => Some("0".to_string()),
+                    _ => None,
+                });
+            Ok(ArmResponse::ShowConfig { name, value })
+        }
+        "ShowSegments" => {
+            let (sid, db, table) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_table_args(&mut ip)?
+            };
+            let _ = (sid, &db);
+            // Same reason as `ListDatabase`: the segment layer is a catalog
+            // read.
+            let rows = match engine {
+                Some(e) => {
+                    let table = table.clone();
+                    text_cells(
+                        executor::scheduler()
+                            .spawn_blocking(move || show_segments_rows(&e, &table))
+                            .await,
+                    )
+                }
+                None => text_cells(Vec::new()),
+            };
+            let columns: Vec<String> = SHOW_SEGMENTS_COLUMNS
+                .iter()
+                .map(|c| c.to_string())
+                .collect();
+            let types: Vec<String> = SHOW_SEGMENTS_TYPES.iter().map(|t| t.to_string()).collect();
+            let resp = select_response_from_typed(&columns, &types, &rows);
+            Ok(ArmResponse::Select(resp))
+        }
+        "ShowBlocks" => {
+            let (sid, db, table, segment) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_block_args(&mut ip)?
+            };
+            let _ = (sid, &db);
+            // Same reason as `ListDatabase`.
+            let rows = match engine {
+                Some(e) => {
+                    let table = table.clone();
+                    text_cells(
+                        executor::scheduler()
+                            .spawn_blocking(move || {
+                                show_blocks_rows(&e, &table, segment.max(0) as u32)
+                            })
+                            .await,
+                    )
+                }
+                None => text_cells(Vec::new()),
+            };
+            let columns: Vec<String> = SHOW_BLOCKS_COLUMNS.iter().map(|c| c.to_string()).collect();
+            let types: Vec<String> = SHOW_BLOCKS_TYPES.iter().map(|t| t.to_string()).collect();
+            let resp = select_response_from_typed(&columns, &types, &rows);
+            Ok(ArmResponse::Select(resp))
+        }
+        "Import" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_import_args(&mut ip)?
+            };
+            let table = if req.db.is_empty() {
+                req.table.clone()
+            } else {
+                format!("{}.{}", req.db, req.table)
+            };
+            let format = match req.file_type {
+                1 => "JSON",
+                2 => "JSONL",
+                3 => "FVECS",
+                _ => "CSV",
+            };
+            // C++ takes `delimiter[0]` and zsv treats NUL as `,`; an
+            // unset SDK option serialises as a single NUL byte.
+            let delimiter = match req.delimiter.chars().next() {
+                Some(c) if c != '\0' => c.to_string(),
+                _ => ",".to_string(),
+            };
+            let mut sql = format!(
+                "COPY {table} FROM '{}' WITH ( DELIMITER '{}', FORMAT {format} )",
+                req.file.replace('\'', "''"),
+                delimiter.replace('\'', "''")
+            );
+            if req.has_header {
+                sql.push_str(" ;");
+            }
             if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                eprintln!("[RPC-ERR] {name}: {e}");
+                eprintln!("[IMPORT] {sql}");
             }
-            let _ = write_app_exception(&mut writer, &name, seq, &format!("{e}"));
-            // A decode error leaves unread bytes behind; do not try to parse
-            // whatever follows as a new message.
-            close_after_reply = true;
+            let resp = match engine.as_ref() {
+                Some(eng) => match eng.execute(&sql).await {
+                    Ok(_) => CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: req.session_id,
+                    },
+                    Err(e) => CommonResponse {
+                        error_code: e.status_code(),
+                        error_msg: e.to_string(),
+                        session_id: req.session_id,
+                    },
+                },
+                None => CommonResponse {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    session_id: req.session_id,
+                },
+            };
+            Ok(ArmResponse::Common(resp))
         }
-        if close_after_reply {
-            break;
+        "ShowColumns" => {
+            let (_sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let db = fields.get(&1).cloned().unwrap_or_default();
+            let table = fields.get(&2).cloned().unwrap_or_default();
+            let full = full_table_name(&db, &table);
+            let resp = match &engine {
+                Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")).await {
+                    Ok(rs) => {
+                        let mut rows: Vec<Vec<Value>> = Vec::new();
+                        for r in rs {
+                            if let QueryResult::Rows { rows: rw, .. } = r {
+                                rows = rw;
+                            }
+                        }
+                        // The SQL renderer marks an absent comment
+                        // `(empty)`; the SDK sees an empty string.
+                        for row in rows.iter_mut() {
+                            if let Some(Value::Str(c)) = row.get_mut(3) {
+                                if c == "(empty)" {
+                                    c.clear();
+                                }
+                            }
+                        }
+                        select_response_from_typed(
+                            &[
+                                "name".to_string(),
+                                "type".to_string(),
+                                "default".to_string(),
+                                "comment".to_string(),
+                            ],
+                            &vec!["VARCHAR".to_string(); 4],
+                            &rows,
+                        )
+                    }
+                    Err(e) => SelectResponseWire {
+                        error_code: e.status_code(),
+                        error_msg: e.to_string(),
+                        column_defs: Vec::new(),
+                        column_fields: Vec::new(),
+                        extra_result: String::new(),
+                    },
+                },
+                None => SelectResponseWire {
+                    error_code: 1,
+                    error_msg: "no engine bound".into(),
+                    column_defs: Vec::new(),
+                    column_fields: Vec::new(),
+                    extra_result: String::new(),
+                },
+            };
+            Ok(ArmResponse::Select(resp))
         }
+        "ListTable" => {
+            let (_sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let db = fields.get(&1).cloned().unwrap_or_default();
+            let prefix = format!("{db}.");
+            // Same reason as `ListDatabase`: the catalog walk is RocksDB I/O.
+            let names: Vec<String> = match engine {
+                Some(eng) => executor::scheduler()
+                    .spawn_blocking(move || eng.catalog().list_tables())
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                    .map(|t| {
+                        if db.is_empty() {
+                            t.name
+                        } else {
+                            t.name.trim_start_matches(&prefix).to_string()
+                        }
+                    })
+                    .collect(),
+                None => Vec::new(),
+            };
+            Ok(ArmResponse::List(names))
+        }
+        "ListIndex" => {
+            let (_sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let table = fields.get(&2).cloned().unwrap_or_default();
+            // Same reason as `ListDatabase`: both branches walk the catalog
+            // store, and an empty table walks all of it.
+            let listed = match engine {
+                Some(eng) => {
+                    let named = table.clone();
+                    executor::scheduler()
+                        .spawn_blocking(move || {
+                            // An empty table means "every index"; a named one
+                            // resolves through the per-table directory.
+                            if named.is_empty() {
+                                eng.catalog().list_indexes()
+                            } else {
+                                eng.catalog().indexes_of_table(&named)
+                            }
+                        })
+                        .await
+                        .unwrap_or_default()
+                }
+                None => Vec::new(),
+            };
+            let names: Vec<String> = listed
+                .into_iter()
+                .filter(|im| {
+                    table.is_empty()
+                        || im.table == table
+                        || im.table.ends_with(&format!(".{table}"))
+                })
+                .map(|im| im.name)
+                .collect();
+            Ok(ArmResponse::List(names))
+        }
+        "ShowDatabase" => {
+            let (_sid, fields) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_string_request(&mut ip)?
+            };
+            let db = fields.get(&1).cloned().unwrap_or_default();
+            let prefix = format!("{db}.");
+            // Same reason as `ListDatabase`.
+            let table_count = match engine {
+                Some(eng) => executor::scheduler()
+                    .spawn_blocking(move || eng.catalog().list_tables())
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                    .count() as i64,
+                None => 0,
+            };
+            // Identifiers are normalised to lower case, so `SHOW DATABASE`
+            // echoes the canonical name even for `"DEFAULT_DB"`.
+            Ok(ArmResponse::ShowDatabase {
+                name: db.to_ascii_lowercase(),
+                table_count,
+                comment: String::new(),
+            })
+        }
+        "CreateIndex" => {
+            let req = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                let r = read_create_index_args(&mut ip)?;
+                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                    eprintln!("[CREATEINDEX] {r:?}");
+                }
+                r
+            };
+            let full = full_table_name(&req.db_name, &req.table_name);
+            let target = req.function.clone().unwrap_or_else(|| req.column.clone());
+            let resp = if target.is_empty() {
+                CommonResponse {
+                    error_code: OK,
+                    error_msg: "OK".into(),
+                    session_id: req.session_id,
+                }
+            } else {
+                // Identifiers are case-insensitive; the catalog keeps the
+                // canonical lower-case spelling.
+                let name = req.index_name.to_ascii_lowercase();
+                let mut sql = format!(
+                    "CREATE INDEX {}{name} ON {full} ({target})",
+                    if req.conflict == 0 {
+                        "IF NOT EXISTS "
+                    } else {
+                        ""
+                    }
+                );
+                if !req.index_type.is_empty() {
+                    sql.push_str(&format!(" USING {}", req.index_type));
+                }
+                if !req.params.is_empty() {
+                    // C++ `Infinity::CreateIndex` lowercases every
+                    // `InitParameter` name *and* value before the
+                    // statement runs, so over Thrift `analyzer='Chinese'`
+                    // means `chinese` (the SQL path keeps the spelling
+                    // and stays case sensitive). The value is quoted so
+                    // one with spaces (`invalid compress type`) still
+                    // parses.
+                    let opts = req
+                        .params
+                        .iter()
+                        .map(|(k, v)| {
+                            format!(
+                                "{}='{}'",
+                                k.to_lowercase(),
+                                v.to_lowercase().replace('\'', "''")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    sql.push_str(&format!(" WITH ({opts})"));
+                }
+                sql.push(';');
+                let resp = run_common(engine.as_ref(), &sql, req.session_id).await;
+                if resp.error_code == OK {
+                    if let Some(eng) = engine.as_ref() {
+                        eng.set_index_comment(&full, &name, &req.index_comment);
+                    }
+                }
+                resp
+            };
+            Ok(ArmResponse::Common(resp))
+        }
+        "ShowCurrentNode" => {
+            {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                skip_struct(&mut ip)?;
+            }
+            let (node_role, server_status) = peer.node_state();
+            Ok(ArmResponse::ShowCurrentNode {
+                node_role,
+                server_status,
+            })
+        }
+        "ShowSnapshot" => {
+            let (sid, name) = {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                read_snapshot_args(&mut ip)?
+            };
+            let _ = sid;
+            let known = engine
+                .as_ref()
+                .and_then(|e| e.snapshot_names().ok())
+                .map(|n| n.iter().any(|x| x == &name))
+                .unwrap_or(false);
+            Ok(ArmResponse::ShowSnapshot { name, found: known })
+        }
+        "ListSnapshots" => {
+            {
+                let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                skip_struct(&mut ip)?;
+            }
+            let names = engine
+                .as_ref()
+                .and_then(|e| e.snapshot_names().ok())
+                .unwrap_or_default();
+            Ok(ArmResponse::ListSnapshots(names))
+        }
+        other => Err(Error::Invalid(format!("unknown method: {other}"))),
     }
-    Ok(())
 }
 
 /// The `ElementType` name the engine expects inside `EMBEDDING(<elem>,<dim>)`.
@@ -2121,7 +2183,7 @@ fn sql_name(name: &str) -> String {
     }
 }
 
-fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
+async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
     let Some(engine) = engine else {
         return CommonResponse {
             error_code: 1,
@@ -2206,7 +2268,10 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
     }
     let sql = format!("CREATE TABLE {table} ({});", cols.join(", "));
     // The SDK's `sparse,0,…` type carries dimension 0, which SQL DDL rejects.
-    match with_zero_dimension_sparse(|| engine.execute(&sql)) {
+    // The flag is thread-local, so it is set around the **await-free** call
+    // below: `execute_async` reads it during DDL planning, before any of its
+    // dispatch points.
+    match engine.execute(&sql).await {
         Ok(_) => CommonResponse {
             error_code: OK,
             error_msg: "OK".into(),
@@ -6694,9 +6759,17 @@ fn full_table_name(db: &str, table: &str) -> String {
     }
 }
 
-fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
+/// Runs `sql` on the caller's task and maps the outcome to a `CommonResponse`.
+///
+/// **Async on purpose.** It used to call `execute_blocking`, which bridges
+/// `Engine::execute` with `scheduler::block_on`: on a runtime worker that is a
+/// park/unpark loop holding the worker, and the statement it waits for needs
+/// workers of its own (the WAL reply, the allocator, the bottom half). Under
+/// concurrent DDL and inserts that parked every worker and the server sat at
+/// 8% CPU with all threads asleep while the client timed out.
+async fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
     match engine {
-        Some(eng) => match eng.execute(sql) {
+        Some(eng) => match eng.execute(sql).await {
             Ok(_) => CommonResponse {
                 error_code: OK,
                 error_msg: "OK".into(),
@@ -6939,72 +7012,6 @@ fn read_snapshot_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(
     ip.read_struct_end().map_err(tw)?;
     end_args(ip)?;
     Ok((sid, name))
-}
-
-/// `ShowSnapshotResponse { 1: error_code, 2: error_msg, 3: SnapshotInfo }`.
-fn write_show_snapshot_response(
-    w: &mut impl Write,
-    seq: i32,
-    name: &str,
-    found: bool,
-) -> Result<()> {
-    let mut o = TBinaryOutputProtocol::new(w, true);
-    o.write_message_begin(&TMessageIdentifier::new(
-        "ShowSnapshot",
-        TMessageType::Reply,
-        seq,
-    ))
-    .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("ShowSnapshot_result"))
-        .map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
-        .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("ShowSnapshotResponse"))
-        .map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
-        .map_err(tw)?;
-    o.write_i64(if found { OK } else { 3022 }).map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    let msg = if found {
-        "OK".to_string()
-    } else {
-        format!("snapshot '{name}' does not exist")
-    };
-    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
-        .map_err(tw)?;
-    o.write_string(&msg).map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    if found {
-        o.write_field_begin(&TFieldIdentifier::new("snapshot", TType::Struct, 3i16))
-            .map_err(tw)?;
-        o.write_struct_begin(&TStructIdentifier::new("SnapshotInfo"))
-            .map_err(tw)?;
-        for (field, id, value) in [
-            ("name", 1i16, name.to_string()),
-            ("scope", 2i16, "table".to_string()),
-            ("time", 3i16, String::new()),
-            ("size", 5i16, String::new()),
-        ] {
-            o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
-                .map_err(tw)?;
-            o.write_string(&value).map_err(tw)?;
-            o.write_field_end().map_err(tw)?;
-        }
-        o.write_field_begin(&TFieldIdentifier::new("commit", TType::I64, 4i16))
-            .map_err(tw)?;
-        o.write_i64(0).map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
-        o.write_field_stop().map_err(tw)?;
-        o.write_struct_end().map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
-    }
-    o.write_field_stop().map_err(tw)?;
-    o.write_struct_end().map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_stop().map_err(tw)?;
-    o.write_struct_end().map_err(tw)?;
-    o.flush().map_err(tw)?;
-    Ok(())
 }
 
 pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32, names: &[String]) -> Result<()> {
@@ -7648,74 +7655,6 @@ fn read_show_config_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Resul
     Ok((sid, name))
 }
 
-/// `ShowConfigResponse { 1: error_code, 2: error_msg, 3: config_name, 4: ConfigValue }`.
-fn write_show_config_response(
-    w: &mut impl Write,
-    seq: i32,
-    sid: i64,
-    name: &str,
-    value: Option<&str>,
-) -> Result<()> {
-    let mut o = TBinaryOutputProtocol::new(w, true);
-    o.write_message_begin(&TMessageIdentifier::new(
-        "ShowConfig",
-        TMessageType::Reply,
-        seq,
-    ))
-    .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("ShowConfig_result"))
-        .map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
-        .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("ShowConfigResponse"))
-        .map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
-        .map_err(tw)?;
-    o.write_i64(if value.is_some() { OK } else { 3014 })
-        .map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
-        .map_err(tw)?;
-    o.write_string(value.map(|_| "OK").unwrap_or("unknown config"))
-        .map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_begin(&TFieldIdentifier::new("config_name", TType::String, 3i16))
-        .map_err(tw)?;
-    o.write_string(name).map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    if let Some(v) = value {
-        // Numeric knobs answer with the `int_value` arm, the rest with a string.
-        // The reference's `IntegerOption`s answer with `int_value`; everything
-        // else carries a string.
-        let numeric = crate::http::config_is_numeric(name);
-        o.write_field_begin(&TFieldIdentifier::new("config_value", TType::Struct, 4i16))
-            .map_err(tw)?;
-        o.write_struct_begin(&TStructIdentifier::new("ConfigValue"))
-            .map_err(tw)?;
-        if numeric {
-            o.write_field_begin(&TFieldIdentifier::new("int_value", TType::I64, 2i16))
-                .map_err(tw)?;
-            o.write_i64(v.parse().unwrap_or(0)).map_err(tw)?;
-        } else {
-            o.write_field_begin(&TFieldIdentifier::new("string_value", TType::String, 1i16))
-                .map_err(tw)?;
-            o.write_string(v).map_err(tw)?;
-        }
-        o.write_field_end().map_err(tw)?;
-        o.write_field_stop().map_err(tw)?;
-        o.write_struct_end().map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
-    }
-    o.write_field_stop().map_err(tw)?;
-    o.write_struct_end().map_err(tw)?;
-    o.write_field_end().map_err(tw)?;
-    o.write_field_stop().map_err(tw)?;
-    o.write_struct_end().map_err(tw)?;
-    o.flush().map_err(tw)?;
-    let _ = sid;
-    Ok(())
-}
-
 /// `AddColumnsRequest { 1: db, 2: table, 3: list<ColumnDef>, 4: session_id }`.
 fn read_alter_add_args(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
@@ -7921,6 +7860,45 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 mod tests {
     use super::*;
 
+    /// A header that never ends must not grow the server's buffer (plan 6.2.1).
+    #[test]
+    fn an_endless_header_is_rejected() {
+        use std::io::{Read, Write};
+        let dir = std::env::temp_dir().join(format!("inf_http_431_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let engine = Engine::open(&dir).unwrap();
+        let server = crate::http::HttpServer::bind("127.0.0.1:0", Arc::new(engine)).unwrap();
+        let addr = server.local_addr().unwrap();
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let mut sock = std::net::TcpStream::connect(&addr).unwrap();
+        sock.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        sock.write_all(b"GET / HTTP/1.1\r\nHost: x\r\n").unwrap();
+        // 96 KiB of header bytes with no terminator.
+        sock.write_all(&vec![b'a'; 96 * 1024]).unwrap();
+        let mut buf = [0u8; 128];
+        let n = sock.read(&mut buf).unwrap();
+        let head = String::from_utf8_lossy(&buf[..n]);
+        assert!(
+            head.starts_with("HTTP/1.1 431"),
+            "expected 431, got {head:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn handshake_policy() {
         assert_eq!(handshake(CURRENT_VERSION_INDEX, 7).session_id, 7);
@@ -7969,7 +7947,17 @@ mod tests {
     fn tcp_connect_success_and_mismatch() {
         let server = Server::bind("127.0.0.1:0").unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
         let ok = connect(&addr, CURRENT_VERSION_INDEX).unwrap();
         assert_eq!(ok.error_code, OK);
@@ -7993,7 +7981,17 @@ mod tests {
         let server = Server::bind("127.0.0.1:0").unwrap();
         let addr = server.local_addr().unwrap();
         let peer = server.peer();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
         let node = show_current_node(&addr, 1).unwrap();
         assert_eq!(node.error_code, OK);
@@ -8125,8 +8123,22 @@ mod tests {
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
         let server = Server::bind_with_engine("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
+        // A real session: the server rejects an id it never handed out
+        // (`SessionNotFound`), so the test connects first like any client.
+        let session_id = connect(&addr, CURRENT_VERSION_INDEX).unwrap().session_id;
+        assert!(session_id > 0);
         let req = CreateTableReq {
             db_name: "default_db".into(),
             table_name: "t".into(),
@@ -8141,7 +8153,7 @@ mod tests {
                 physical: PhysicalWire::None,
                 comment: String::new(),
             }],
-            session_id: 1,
+            session_id,
             conflict: 1,
         };
         assert_eq!(create_table(&addr, &req).unwrap().error_code, OK);
@@ -8566,6 +8578,8 @@ mod tests {
         segment: Option<i64>,
     ) -> Result<Vec<(String, Vec<String>)>> {
         use std::net::TcpStream;
+        // A real session: the server rejects an id it never handed out.
+        let session_id = connect(addr, CURRENT_VERSION_INDEX)?.session_id;
         let mut stream = TcpStream::connect(addr).unwrap();
         let mut buf = Vec::new();
         {
@@ -8580,7 +8594,7 @@ mod tests {
                 .map_err(tw)?;
             o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 1i16))
                 .map_err(tw)?;
-            o.write_i64(1).map_err(tw)?;
+            o.write_i64(session_id).map_err(tw)?;
             o.write_field_end().map_err(tw)?;
             o.write_field_begin(&TFieldIdentifier::new("db_name", TType::String, 2i16))
                 .map_err(tw)?;
@@ -8611,19 +8625,118 @@ mod tests {
     /// (`physical_show_segments_impl.cpp`, `physical_show_blocks_impl.cpp`):
     /// one row per live segment with its row count, and one row per block of
     /// that segment with the block's row count — not `rows / 8192`.
+    /// `ShowSegments`/`ShowBlocks` report the real segment and block metadata
+    /// A session id the server never handed out is `SessionNotFound` (3034),
+    /// and `Disconnect` really removes one - the reference keeps sessions in a
+    /// static map keyed by id, so a stale id must stop working.
+    #[test]
+    fn an_unknown_session_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let server = Server::bind_with_engine("127.0.0.1:0", engine).unwrap();
+        let addr = server.local_addr().unwrap();
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
+
+        // `ListDatabase` is a business RPC: it takes the session id and its
+        // reply carries `error_code`, so a rejected session is observable here
+        // (unlike `Disconnect`, which is idempotent by design).
+        let call_with = |session_id: i64| -> Result<(i64, String)> {
+            use std::net::TcpStream;
+            let mut stream = TcpStream::connect(&addr).map_err(io)?;
+            let mut buf = Vec::new();
+            {
+                let mut o = TBinaryOutputProtocol::new(&mut buf, true);
+                o.write_message_begin(&TMessageIdentifier::new(
+                    "ListDatabase",
+                    TMessageType::Call,
+                    9,
+                ))
+                .map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("ListDatabase_args"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("request", TType::Struct, 1i16))
+                    .map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("ListDatabaseRequest"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 1i16))
+                    .map_err(tw)?;
+                o.write_i64(session_id).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+            }
+            use std::io::Write;
+            stream.write_all(&buf).map_err(io)?;
+            let mut i = TBinaryInputProtocol::new(&mut stream, true);
+            i.read_message_begin().map_err(tw)?;
+            i.read_struct_begin().map_err(tw)?; // ListDatabase_result
+            let success = i.read_field_begin().map_err(tw)?;
+            if success.field_type != TType::Struct {
+                return Err(Error::Invalid("expected success struct".into()));
+            }
+            i.read_struct_begin().map_err(tw)?; // ListDatabaseResponse
+            let (mut code, mut msg) = (0i64, String::new());
+            loop {
+                let f = i.read_field_begin().map_err(tw)?;
+                if f.field_type == TType::Stop {
+                    break;
+                }
+                match f.id {
+                    Some(1) => code = i.read_i64().map_err(tw)?,
+                    Some(2) => msg = i.read_string().map_err(tw)?,
+                    _ => i.skip(f.field_type).map_err(tw)?,
+                }
+                i.read_field_end().map_err(tw)?;
+            }
+            Ok((code, msg))
+        };
+
+        // An id nobody opened.
+        let (code, msg) = call_with(999_999).unwrap();
+        assert_eq!(code, 3034);
+        assert!(msg.contains("isn't found"), "{msg}");
+
+        // A session that exists answers ...
+        let session_id = connect(&addr, CURRENT_VERSION_INDEX).unwrap().session_id;
+        assert_ne!(call_with(session_id).unwrap().0, 3034);
+
+        // ... and stops answering once it is disconnected.
+        let _ = disconnect(&addr, session_id);
+        assert_eq!(call_with(session_id).unwrap().0, 3034);
+    }
+
+    /// `ShowSegments`/`ShowBlocks` report the real segment and block metadata
+    /// (`physical_show_segments_impl.cpp`, `physical_show_blocks_impl.cpp`):
+    /// one row per live segment with its row count, and one row per block of
+    /// that segment with the block's row count — not `rows / 8192`.
     #[test]
     fn thrift_show_segments_and_blocks_report_real_metadata() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
         // An `INSERT` appends to the open segment; a `COPY` seals the segment
         // it writes, so `INSERT` + `COPY` leaves two segments of one row each
         // (the C++ row-id allocator behaves the same way).
-        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
         let csv = dir.path().join("one_row.csv");
         std::fs::write(&csv, "2\n").unwrap();
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 csv.display()
             ))
@@ -8632,7 +8745,7 @@ mod tests {
         assert_eq!(segments.len(), 2, "{segments:?}");
         // Blocks are materialised by the C++-format mirror (a flush or
         // checkpoint), as in the reference.
-        engine.flush().unwrap();
+        executor::block_on(engine.flush()).unwrap();
         let segment0 = segments[0].0;
         let blocks = engine.block_ids("t", segment0);
         assert!(!blocks.is_empty(), "flush must create blocks");
@@ -8640,7 +8753,17 @@ mod tests {
 
         let server = Server::bind_with_engine("127.0.0.1:0", engine.clone()).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
         let cols = show_call(&addr, "ShowSegments", "t", None).unwrap();
         let names: Vec<&str> = cols.iter().map(|(n, _)| n.as_str()).collect();

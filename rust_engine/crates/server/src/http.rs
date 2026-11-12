@@ -12,8 +12,7 @@
 //!   `GET  /health`  -> `ok`
 //!   `POST /query`   body `{"sql": "..."}` -> `{"columns":[...],"rows":[[...]]}` or `{"error":"..."}`
 
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::sync::Arc;
 
 use executor::{Engine, QueryResult};
@@ -62,21 +61,29 @@ impl HttpServer {
             .to_string())
     }
 
-    pub fn run(self) -> ! {
-        for stream in self.listener.incoming() {
-            match stream {
-                Ok(s) => {
-                    let _ = s.set_nodelay(true);
-                    let engine = self.engine.clone();
-                    let peer = self.peer.clone();
-                    std::thread::spawn(move || {
-                        let _ = handle(s, &engine, &peer);
-                    });
-                }
-                Err(_) => continue,
-            }
+    /// Serves HTTP on the **caller's** runtime.
+    ///
+    /// One task per connection; the request body is decoded on the reactor and
+    /// the SQL runs on the engine's scheduler, so a slow query never blocks the
+    /// accept loop. The front end no longer owns a runtime: it is a task on the
+    /// one the caller spawned it on.
+    pub async fn serve(self) {
+        self.listener
+            .set_nonblocking(true)
+            .expect("set the http listener non-blocking");
+        let listener =
+            tokio::net::TcpListener::from_std(self.listener).expect("adopt the http listener");
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                continue;
+            };
+            let _ = stream.set_nodelay(true);
+            let engine = Arc::clone(&self.engine);
+            let peer = Arc::clone(&self.peer);
+            tokio::spawn(async move {
+                let _ = handle_async(stream, engine, peer).await;
+            });
         }
-        unreachable!()
     }
 }
 
@@ -686,10 +693,10 @@ fn engine_err(e: &Error) -> (u16, String) {
 }
 
 /// The declared types of a table's columns (`SHOW TABLE … COLUMNS`).
-fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
+async fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
     let sql = format!("SHOW TABLE {table} COLUMNS;");
     let mut out = Vec::new();
-    if let Ok(results) = engine.execute(&sql) {
+    if let Ok(results) = engine.execute(&sql).await {
         for r in results {
             if let QueryResult::Rows { rows, .. } = r {
                 for row in rows {
@@ -1217,7 +1224,7 @@ fn count_of(results: Vec<QueryResult>) -> i64 {
 }
 
 /// Routes a request to `(status, body)`.
-pub fn route(
+pub async fn route(
     engine: &Engine,
     peer: &PeerManager,
     method: &str,
@@ -1230,7 +1237,7 @@ pub fn route(
     if method == "POST" && path == "/query" {
         return match extract_sql(body) {
             None => (400, "{\"error\":\"missing sql\"}".to_string()),
-            Some(sql) => match engine.execute(&sql) {
+            Some(sql) => match engine.execute(&sql).await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
                     (200, rows_json(&cols, &rows))
@@ -1258,9 +1265,16 @@ pub fn route(
         .filter(|p| !p.is_empty())
         .collect();
 
-    let run = |sql: &str| -> std::result::Result<Vec<QueryResult>, (u16, String)> {
-        engine.execute(sql).map_err(|e| engine_err(&e))
-    };
+    // The router is a task, so a statement must be awaited: `execute_blocking`
+    // parks the calling thread and a statement's completion can need the very
+    // worker it parked (verified by its own assertion, which the HTTP suite hit
+    // as `DROP TABLE` killed the connection).
+    async fn run(
+        engine: &Engine,
+        sql: &str,
+    ) -> std::result::Result<Vec<QueryResult>, (u16, String)> {
+        engine.execute(sql).await.map_err(|e| engine_err(&e))
+    }
 
     match (method, parts.as_slice()) {
         // ---- databases ----
@@ -1285,14 +1299,14 @@ pub fn route(
                 Err(e) => return e,
             };
             if replace {
-                let _ = engine.execute(&format!("DROP DATABASE IF EXISTS {db};"));
+                let _ = engine.execute(&format!("DROP DATABASE IF EXISTS {db};")).await;
             }
             let sql = if ignore {
                 format!("CREATE DATABASE IF NOT EXISTS {db};")
             } else {
                 format!("CREATE DATABASE {db};")
             };
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1310,7 +1324,7 @@ pub fn route(
             } else {
                 format!("DROP DATABASE {db};")
             };
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1392,7 +1406,7 @@ pub fn route(
             };
             let full = format!("{db}.{table}");
             if replace {
-                let _ = engine.execute(&format!("DROP TABLE IF EXISTS {full};"));
+                let _ = engine.execute(&format!("DROP TABLE IF EXISTS {full};")).await;
             } else if ignore
                 && engine
                     .catalog()
@@ -1404,7 +1418,7 @@ pub fn route(
                 return (200, ok_json());
             }
             let sql = format!("CREATE TABLE {full} ({});", cols.join(", "));
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1421,7 +1435,7 @@ pub fn route(
                 "DROP TABLE {}{db}.{table};",
                 if drop_ignore { "IF EXISTS " } else { "" }
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1531,7 +1545,7 @@ pub fn route(
                 cols.push(def);
             }
             let stmt = format!("ALTER TABLE {db}.{table} ADD COLUMN ({});", cols.join(", "));
-            match run(&stmt) {
+            match run(engine, &stmt).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1550,7 +1564,7 @@ pub fn route(
                 if safe_ident(n).is_none() {
                     return err_response(3003, "invalid column name");
                 }
-                match run(&format!("ALTER TABLE {db}.{table} DROP COLUMN {n};")) {
+                match run(engine, &format!("ALTER TABLE {db}.{table} DROP COLUMN {n};")).await {
                     Ok(_) => {}
                     Err(e) => return e,
                 }
@@ -1563,7 +1577,7 @@ pub fn route(
                 return (404, String::new());
             };
             let sql = format!("SHOW TABLE {db}.{table} COLUMNS;");
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(results) => {
                     let (_, rows) = rows_of(results);
                     let cols = rows
@@ -1663,7 +1677,7 @@ pub fn route(
                 sql.push_str(&format!(" WITH ({})", opts.join(",")));
             }
             sql.push(';');
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => {
                     // `SHOW INDEX` reports this back, as in the reference.
                     engine.set_index_comment(&full, &index, &comment);
@@ -1679,11 +1693,11 @@ pub fn route(
             else {
                 return (404, String::new());
             };
-            let _ = table;
+            let full = format!("{db}.{table}");
             let exists = engine
                 .catalog()
-                .list_indexes()
-                .map(|is| is.iter().any(|i| i.name == index))
+                .index_by_name(&full, &index)
+                .map(|i| i.is_some())
                 .unwrap_or(false);
             if !exists {
                 return err_response(3023, &format!("index '{index}' does not exist"));
@@ -1704,7 +1718,7 @@ pub fn route(
                 "DROP INDEX {}{index};",
                 if drop_ignore { "IF EXISTS " } else { "" }
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1717,7 +1731,7 @@ pub fn route(
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
-            match engine.dump_index_transaction(&full, &index) {
+            match engine.dump_index_transaction(&full, &index).await {
                 Ok(()) => (200, ok_json()),
                 Err(e) => engine_err(&e),
             }
@@ -1729,10 +1743,9 @@ pub fn route(
             let full = format!("{db}.{table}");
             let names: Vec<String> = engine
                 .catalog()
-                .list_indexes()
+                .indexes_of_table(&full)
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|i| i.table == full)
                 .map(|i| i.name)
                 .collect();
             let list = names
@@ -1762,10 +1775,10 @@ pub fn route(
             let full = format!("{db}.{table}");
             let found = engine
                 .catalog()
-                .list_indexes()
+                .indexes_of_table(&full)
                 .unwrap_or_default()
                 .into_iter()
-                .find(|i| i.table == full && i.name.eq_ignore_ascii_case(index));
+                .find(|i| i.name.eq_ignore_ascii_case(index));
             match found {
                 Some(i) => (
                     200,
@@ -1812,7 +1825,7 @@ pub fn route(
                 _ => "PHYSICAL",
             };
             let sql = format!("EXPLAIN {kind} {inner};");
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
                     // the SDK renders every value under its column name
@@ -1871,7 +1884,7 @@ pub fn route(
                 "COPY {db}.{table} FROM {path} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header});",
                 delim.replace('\'', "''")
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1933,7 +1946,7 @@ pub fn route(
                     sql.push_str(&format!(", LIMIT {take}"));
                 }
                 sql.push_str(" )");
-                let n = match run(&sql) {
+                let n = match run(engine, &sql).await {
                     Ok(results) => results
                         .into_iter()
                         .map(|r| match r {
@@ -1963,7 +1976,7 @@ pub fn route(
             let Some(new_name) = safe_ident(new_name) else {
                 return err_response(3003, "invalid table name");
             };
-            match run(&format!("ALTER TABLE {db}.{table} RENAME TO {new_name};")) {
+            match run(engine, &format!("ALTER TABLE {db}.{table} RENAME TO {new_name};")).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1975,7 +1988,7 @@ pub fn route(
             // `COMPACT TABLE …` parses to the no-op `Statement::Utility`; the
             // Thrift `Compact` request calls the engine entry point instead, and
             // the REST front end has to do the same.
-            match engine.compact_table(&format!("{db}.{table}")) {
+            match engine.compact_table_async(&format!("{db}.{table}")).await {
                 Ok(()) => (200, ok_json()),
                 Err(e) => engine_err(&e),
             }
@@ -1985,7 +1998,7 @@ pub fn route(
                 return (404, String::new());
             };
             let _ = (db, table);
-            match engine.optimize_indexes() {
+            match engine.optimize_indexes_async().await {
                 Ok(()) => (200, ok_json()),
                 Err(e) => engine_err(&e),
             }
@@ -2065,7 +2078,7 @@ pub fn route(
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full);
+            let types = column_types(engine, &full).await;
             let ty_of = |name: &str| -> String {
                 types
                     .iter()
@@ -2106,7 +2119,7 @@ pub fn route(
                     cols.join(","),
                     vals.join(",")
                 );
-                match run(&sql) {
+                match run(engine, &sql).await {
                     Ok(_) => n += 1,
                     Err(e) => return e,
                 }
@@ -2129,7 +2142,7 @@ pub fn route(
                     format!(" WHERE {filter}")
                 }
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(results) => (
                     200,
                     format!(
@@ -2149,7 +2162,7 @@ pub fn route(
                 return err_response(3013, "update needs values");
             };
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full);
+            let types = column_types(engine, &full).await;
             let sets = update
                 .iter()
                 .map(|(k, v)| {
@@ -2170,7 +2183,7 @@ pub fn route(
                     format!(" WHERE {filter}")
                 }
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2180,12 +2193,12 @@ pub fn route(
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full);
+            let types = column_types(engine, &full).await;
             let sql = docs_sql(&doc, &db, &table);
             if std::env::var_os("INF_DEBUG_SQL").is_some() {
                 eprintln!("[HTTP-SQL] {sql}");
             }
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
                     let out_types: Vec<String> = cols
@@ -2227,7 +2240,7 @@ pub fn route(
                                 count_sql.replace_range(a + 7..b, "count(*) AS n");
                             }
                             count_sql.push(';');
-                            let total = match engine.execute(&count_sql) {
+                            let total = match engine.execute(&count_sql).await {
                                 Ok(rs) => {
                                     let (_, rows) = rows_of(rs);
                                     rows.first()
@@ -2283,7 +2296,7 @@ pub fn route(
                 return err_response(3010, "data type mismatch for config 'log_level'");
             }
             let sql = format!("SET CONFIG {lower} {literal};");
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2395,7 +2408,7 @@ pub fn route(
                 "CREATE SNAPSHOT {} ON TABLE {db}.{table};",
                 snapshot_sql(snapshot)
             );
-            match run(&sql) {
+            match run(engine, &sql).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2404,10 +2417,10 @@ pub fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(&format!(
+            match run(engine, &format!(
                 "RESTORE TABLE SNAPSHOT {};",
                 snapshot_sql(snapshot)
-            )) {
+            )).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2416,10 +2429,10 @@ pub fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(&format!(
+            match run(engine, &format!(
                 "CREATE SNAPSHOT {} ON SYSTEM;",
                 snapshot_sql(snapshot)
-            )) {
+            )).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2428,10 +2441,10 @@ pub fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(&format!(
+            match run(engine, &format!(
                 "RESTORE SYSTEM SNAPSHOT {};",
                 snapshot_sql(snapshot)
-            )) {
+            )).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2444,10 +2457,10 @@ pub fn route(
             let Some(db) = safe_ident(db) else {
                 return err_response(3003, "invalid database name");
             };
-            match run(&format!(
+            match run(engine, &format!(
                 "CREATE SNAPSHOT {} ON DATABASE {db};",
                 snapshot_sql(snapshot)
-            )) {
+            )).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2456,16 +2469,16 @@ pub fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(&format!(
+            match run(engine, &format!(
                 "RESTORE DATABASE SNAPSHOT {};",
                 snapshot_sql(snapshot)
-            )) {
+            )).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
         }
         ("DELETE", ["snapshots", name]) => {
-            match run(&format!("DROP SNAPSHOT {};", snapshot_sql(name))) {
+            match run(engine, &format!("DROP SNAPSHOT {};", snapshot_sql(name))).await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2476,7 +2489,7 @@ pub fn route(
         // PROFILES`, `SHOW MEMINDEX`, `SHOW QUERIES`, `SHOW QUERY <id>`, `SHOW
         // TRANSACTIONS`, `SHOW TRANSACTION <id>`, `SHOW OBJECTS`, `SHOW FILES`,
         // `SHOW MEMORY` (`physical_show_impl.cpp:160-240`).
-        ("POST", ["instance", "flush"]) => match engine.flush() {
+        ("POST", ["instance", "flush"]) => match engine.flush().await {
             Ok(()) => (200, ok_json()),
             Err(e) => engine_err(&e),
         },
@@ -2875,12 +2888,24 @@ fn ok_json() -> String {
     "{\"error_code\":0,\"error_msg\":\"OK\"}".to_string()
 }
 
-fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<()> {
+/// The async connection loop: read the request on the reactor, run the route
+/// on the engine's pool, write the reply on the reactor (plan §6.3/§6.5).
+async fn handle_async(
+    mut stream: tokio::net::TcpStream,
+    engine: Arc<Engine>,
+    peer: Arc<PeerManager>,
+) -> Result<()> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut buf = Vec::new();
     let mut tmp = [0u8; 1024];
-    // read until end of headers
+    // Same bound as the synchronous reader (plan §6.2.1): a client that never
+    // sends the terminator cannot grow this buffer without limit.
+    const MAX_HEADER_BYTES: usize = 64 * 1024;
     let header_end = loop {
-        let n = stream.read(&mut tmp).map_err(|e| Error::io("<http>", e))?;
+        let n = stream
+            .read(&mut tmp)
+            .await
+            .map_err(|e| Error::io("<http>", e))?;
         if n == 0 {
             return Ok(());
         }
@@ -2888,14 +2913,20 @@ fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<
         if let Some(pos) = find_subslice(&buf, b"\r\n\r\n") {
             break pos + 4;
         }
+        if buf.len() > MAX_HEADER_BYTES {
+            let _ = stream
+                .write_all(
+                    b"HTTP/1.1 431 Request Header Fields Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .await;
+            return Ok(());
+        }
     };
     let head = String::from_utf8_lossy(&buf[..header_end]).to_string();
-    let mut lines = head.lines();
-    let request_line = lines.next().unwrap_or("");
+    let request_line = head.lines().next().unwrap_or("");
     let mut parts = request_line.split_whitespace();
-    let method = parts.next().unwrap_or("");
-    let path = parts.next().unwrap_or("");
-
+    let method = parts.next().unwrap_or("").to_string();
+    let path = parts.next().unwrap_or("").to_string();
     let content_length = head
         .lines()
         .find_map(|l| {
@@ -2905,7 +2936,10 @@ fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<
         })
         .unwrap_or(0);
     while buf.len() < header_end + content_length {
-        let n = stream.read(&mut tmp).map_err(|e| Error::io("<http>", e))?;
+        let n = stream
+            .read(&mut tmp)
+            .await
+            .map_err(|e| Error::io("<http>", e))?;
         if n == 0 {
             break;
         }
@@ -2913,7 +2947,7 @@ fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<
     }
     let body = String::from_utf8_lossy(&buf[header_end..]).to_string();
 
-    let (status, resp_body) = route(engine, peer, method, path, &body);
+    let (status, resp_body) = route(&engine, &peer, &method, &path, &body).await;
     let reason = if status == 200 { "OK" } else { "Error" };
     let response = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -2922,8 +2956,9 @@ fn handle(mut stream: TcpStream, engine: &Engine, peer: &PeerManager) -> Result<
     );
     stream
         .write_all(response.as_bytes())
+        .await
         .map_err(|e| Error::io("<http>", e))?;
-    stream.flush().map_err(|e| Error::io("<http>", e))?;
+    stream.flush().await.map_err(|e| Error::io("<http>", e))?;
     Ok(())
 }
 
@@ -2934,6 +2969,8 @@ fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
     use tempfile::tempdir;
 
     /// A standalone node, the same registry `Server::bind` installs.
@@ -2947,27 +2984,35 @@ mod tests {
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
         engine
-            .execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        engine.execute("INSERT INTO t VALUES (1, 'a');").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1, 'a');")
+            .unwrap();
 
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/query",
             "{\"sql\":\"SELECT * FROM t;\"}",
-        );
+        ));
         assert_eq!(s, 200);
         assert!(b.contains("\"columns\":[\"id\",\"name\"]"), "{b}");
         assert!(b.contains("[\"1\",\"a\"]"), "{b}");
 
         assert_eq!(
-            route(&engine, &peer, "GET", "/health", ""),
+            executor::block_on(route(&engine, &peer, "GET", "/health", "")),
             (200, "ok".to_string())
         );
-        assert_eq!(route(&engine, &peer, "POST", "/query", "{}").0, 400);
-        assert_eq!(route(&engine, &peer, "GET", "/nope", "").0, 404);
+        assert_eq!(
+            executor::block_on(route(&engine, &peer, "POST", "/query", "{}")).0,
+            400
+        );
+        assert_eq!(
+            executor::block_on(route(&engine, &peer, "GET", "/nope", "")).0,
+            404
+        );
     }
 
     /// `/configs` (`ShowConfigsHandler`, `ShowConfigHandler`,
@@ -2978,33 +3023,39 @@ mod tests {
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
 
-        let (s, b) = route(&engine, &peer, "GET", "/configs", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"cache_result_capacity\":"), "{b}");
         assert!(b.contains("\"log_level\":\"info\""), "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/configs/log_level", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/log_level", ""));
         assert_eq!(s, 200, "{b}");
         assert_eq!(b, "{\"log_level\":\"info\",\"error_code\":0}");
 
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/configs",
             "{\"log_level\":\"debug\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
-        let (_, b) = route(&engine, &peer, "GET", "/configs/log_level", "");
+        let (_, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/log_level", ""));
         assert!(b.contains("\"debug\""), "{b}");
 
         // Unknown knob: the reference's InvalidConfig (1008).
-        let (s, b) = route(&engine, &peer, "GET", "/configs/nope", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/nope", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":1008"), "{b}");
         // Two fields is "No config will be set" (3076).
-        let (s, b) = route(&engine, &peer, "POST", "/configs", "{\"a\":1,\"b\":2}");
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "POST",
+            "/configs",
+            "{\"a\":1,\"b\":2}",
+        ));
         assert!(s != 200, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
     }
@@ -3017,69 +3068,71 @@ mod tests {
         let dir = tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
-        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
 
-        let (s, b) = route(&engine, &peer, "GET", "/snapshots", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"snapshots\":[]"), "{b}");
 
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/snapshots",
             "{\"db_name\":\"default_db\",\"table_name\":\"t\",\"snapshot_name\":\"snap0\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/snapshots", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("{\"name\":\"snap0\"}"), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/snapshots/snap0", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots/snap0", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"snapshot\":{\"name\":\"snap0\"}"), "{b}");
 
         // Restoring into an existing table fails (DROP TABLE first), so the
         // restore path is exercised after dropping it.
-        engine.execute("DROP TABLE t;").unwrap();
-        let (s, b) = route(
+        engine.execute_blocking("DROP TABLE t;").unwrap();
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/snapshots/restore",
             "{\"snapshot_name\":\"snap0\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert_eq!(
-            engine.execute("SELECT * FROM t;").unwrap().len(),
+            engine.execute_blocking("SELECT * FROM t;").unwrap().len(),
             1,
             "the restored table serves its rows"
         );
 
         // Database and system snapshots share the engine's snapshot store.
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/snapshots/database",
             "{\"db_name\":\"default_db\",\"snapshot_name\":\"dbsnap\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/snapshots/system",
             "{\"snapshot_name\":\"sysnap\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
 
-        let (s, b) = route(&engine, &peer, "DELETE", "/snapshots/snap0", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "DELETE", "/snapshots/snap0", ""));
         assert_eq!(s, 200, "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/snapshots/snap0", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots/snap0", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("does not exist"), "{b}");
     }
@@ -3090,10 +3143,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
-        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
 
-        let (s, b) = route(&engine, &peer, "POST", "/instance/flush", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/instance/flush", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
@@ -3101,7 +3156,7 @@ mod tests {
         // block, so the buffer/objects routes must list the mapping the test
         // itself touched.
         engine.read_blocks("t").unwrap();
-        let (s, b) = route(&engine, &peer, "GET", "/instance/buffer", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/buffer", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
         assert!(b.contains("\"buffer\":[{\"path\":\""), "{b}");
@@ -3111,29 +3166,35 @@ mod tests {
         assert!(b.contains("\"type\":\"data\""), "{b}");
         assert!(!b.contains("\"size\":0,"), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/instance/objects", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/objects", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"objects\":[{\"path\":\""), "{b}");
         assert!(b.contains("/seg_0/blk_0\""), "{b}");
 
         // The object is addressable by its path suffix (the C++ route takes one
         // path segment, a block path has several).
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "GET",
             "/instance/objects/data/db_1/tbl_0/seg_0/blk_0",
             "",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"object\":{\"path\":\""), "{b}");
         assert!(b.contains("\"status\":\"Loaded\""), "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/instance/objects/data/nope", "");
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/instance/objects/data/nope",
+            "",
+        ));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
 
         // Files: the block mirror and the catalog are on disk, with sizes.
-        let (s, b) = route(&engine, &peer, "GET", "/instance/files", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/files", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"files\":["), "{b}");
         assert!(b.contains("/blk_0/"), "{b}");
@@ -3146,23 +3207,23 @@ mod tests {
             ("/instance/transactions", "transactions"),
             ("/instance/profiles", "profiles"),
         ] {
-            let (s, b) = route(&engine, &peer, "GET", path, "");
+            let (s, b) = executor::block_on(route(&engine, &peer, "GET", path, ""));
             assert_eq!(s, 200, "{path}: {b}");
             assert!(b.contains(&format!("\"{key}\":[")), "{path}: {b}");
         }
 
         // With profiling on, a finished statement is in the history and is
         // addressable through `SHOW QUERY <id>`.
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"profile\":true}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
-        engine.execute("SELECT 1;").unwrap();
-        let (s, b) = route(&engine, &peer, "GET", "/instance/profiles", "");
+        engine.execute_blocking("SELECT 1;").unwrap();
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/profiles", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
         assert!(b.contains("\"query_text\":\"SELECT 1;\""), "{b}");
@@ -3172,25 +3233,26 @@ mod tests {
             .find(|p| p.query_kind == "SELECT")
             .expect("the SELECT is in the profile history")
             .query_id;
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "GET",
             &format!("/instance/queries/{select_id}"),
             "",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains(&format!("\"query_id\":{select_id}")), "{b}");
         assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/instance/queries/999", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/queries/999", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/instance/transactions/1", "");
+        let (s, b) =
+            executor::block_on(route(&engine, &peer, "GET", "/instance/transactions/1", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
 
         // Memory: the port's two real counters.
-        let (s, b) = route(&engine, &peer, "GET", "/instance/memory", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/memory", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"memory_objects\":\""), "{b}");
         assert!(b.contains("\"memory_allocation\":\""), "{b}");
@@ -3202,7 +3264,7 @@ mod tests {
             "/instance/memory/objects",
             "/instance/memory/allocations",
         ] {
-            let (s, b) = route(&engine, &peer, "GET", path, "");
+            let (s, b) = executor::block_on(route(&engine, &peer, "GET", path, ""));
             assert_eq!(s, 501, "{path}: {b}");
             assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
             assert!(b.contains("not supported in this build"), "{path}: {b}");
@@ -3218,7 +3280,7 @@ mod tests {
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
 
-        let (s, b) = route(&engine, &peer, "GET", "/variables/global", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/global", ""));
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
@@ -3230,62 +3292,80 @@ mod tests {
         assert!(!b.contains("\"system_memory_usage\":\"0\""), "{b}");
         assert!(!b.contains("\"open_file_count\":\"0\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/variables/global/query_count", "");
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/variables/global/query_count",
+            "",
+        ));
         assert_eq!(s, 200, "{b}");
         assert_eq!(b.matches("query_count").count(), 1, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/variables/session", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/session", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"connected_timestamp\":\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/variables/session/query_count", "");
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/variables/session/query_count",
+            "",
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
 
         // An unknown name is the reference's "No system variable" error.
-        let (s, b) = route(&engine, &peer, "GET", "/variables/global/nope", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/global/nope", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No system variable: nope"), "{b}");
 
         // SET profile works, SET a read-only variable is 3076.
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"profile\":true}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
-        let (_, b) = route(&engine, &peer, "GET", "/variables/global/profile", "");
+        let (_, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/variables/global/profile",
+            "",
+        ));
         assert!(b.contains("\"profile\":\"true\""), "{b}");
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"query_count\":9}",
-        );
+        ));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
         // Two fields is "No variable will be set".
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"a\":1,\"b\":2}",
-        );
+        ));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No variable will be set"), "{b}");
         // Session variables are read-only.
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "SET",
             "/variables/session",
             "{\"query_count\":1}",
-        );
+        ));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
     }
@@ -3299,7 +3379,7 @@ mod tests {
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
 
-        let (s, b) = route(&engine, &peer, "GET", "/admin/nodes", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/nodes", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"nodes\":[{"), "{b}");
         assert!(b.contains("\"name\":\"leader\""), "{b}");
@@ -3307,49 +3387,49 @@ mod tests {
         assert!(b.contains("\"status\":\"alive\""), "{b}");
         assert!(b.contains("\"address\":\"127.0.0.1:23820\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/admin/node/current", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/current", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"node\":{"), "{b}");
         assert!(b.contains("\"role\":\"leader\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/admin/node/leader", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/leader", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"name\":\"leader\""), "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/admin/node/ghost", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/ghost", ""));
         assert_eq!(s, 500, "{b}");
 
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/admin/node/current",
             "{\"role\":\"admin\"}",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
-        let (_, b) = route(&engine, &peer, "GET", "/admin/node/current", "");
+        let (_, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/current", ""));
         assert!(b.contains("\"role\":\"admin\""), "{b}");
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "POST",
             "/admin/node/current",
             "{\"role\":\"nope\"}",
-        );
+        ));
         assert_eq!(s, 500, "{b}");
-        let (s, b) = route(&engine, &peer, "POST", "/admin/node/current", "{}");
+        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/admin/node/current", "{}"));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("Field 'role' is required"), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/admin/configs", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/configs", ""));
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"log_level\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "DELETE", "/admin/node/leader", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "DELETE", "/admin/node/leader", ""));
         assert!(s == 200 || s == 500, "{b}");
         assert!(b.contains("\"error_code\":"), "{b}");
 
         // The node's variables are the engine's global table.
-        let (s, b) = route(&engine, &peer, "GET", "/admin/variables", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/variables", ""));
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
@@ -3357,15 +3437,21 @@ mod tests {
         );
         assert!(b.contains("\"schedule_policy\":\"round robin\""), "{b}");
 
-        let (s, b) = route(&engine, &peer, "GET", "/admin/variables/query_count", "");
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/admin/variables/query_count",
+            "",
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
-        let (s, b) = route(&engine, &peer, "GET", "/admin/variables/nope", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/variables/nope", ""));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No system variable: nope"), "{b}");
 
         // No log-file directory exists, so the log listing keeps 3032.
-        let (s, b) = route(&engine, &peer, "GET", "/admin/logs", "");
+        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/logs", ""));
         assert_eq!(s, 501, "{b}");
         assert!(b.contains("\"error_code\":3032"), "{b}");
         assert!(b.contains("needs "), "{b}");
@@ -3379,26 +3465,28 @@ mod tests {
         let dir = tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         let peer = leader();
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
-        engine.execute("INSERT INTO t VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
         // A `COPY` seals its segment, so the table ends up with two segments.
         let csv = dir.path().join("one_row.csv");
         std::fs::write(&csv, "2\n").unwrap();
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 csv.display()
             ))
             .unwrap();
-        engine.flush().unwrap();
+        executor::block_on(engine.flush()).unwrap();
 
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "GET",
             "/databases/default_db/tables/t/segments",
             "",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"table_name\":\"t\",\"segments\":[{"),
@@ -3410,13 +3498,13 @@ mod tests {
 
         // The mirror writes each segment into its own directory, so the two
         // one-row segments have one block each.
-        let (s, b) = route(
+        let (s, b) = executor::block_on(route(
             &engine,
             &peer,
             "GET",
             "/databases/default_db/tables/t/segments/1/blocks",
             "",
-        );
+        ));
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"segment_id\":1,\"blocks\":[{"),
@@ -3430,11 +3518,23 @@ mod tests {
     fn http_over_socket() {
         let dir = tempdir().unwrap();
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
-        engine.execute("INSERT INTO t VALUES (42);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (42);")
+            .unwrap();
         let server = HttpServer::bind("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
         let mut stream = TcpStream::connect(&addr).unwrap();
         let body = "{\"sql\":\"SELECT * FROM t;\"}";

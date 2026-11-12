@@ -48,14 +48,6 @@ public:
     static constexpr std::string_view SPARSEGRAM = "sparsegram";
 
 private:
-    // Guards cache_. GetAnalyzer() is called from every fulltext indexing worker
-    // and from concurrent queries: without the lock two threads could both load
-    // a prototype and the second store would destroy the first one, leaving the
-    // analyzers already handed out with dangling borrowed members (trie_,
-    // pos_table_, wordnet_lemma_, opencc_). Entries are never erased, so the
-    // borrowed members stay valid for the lifetime of the process.
-    std::mutex cache_mtx_;
-
     CacheType cache_{};
 };
 

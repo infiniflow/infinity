@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 common.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

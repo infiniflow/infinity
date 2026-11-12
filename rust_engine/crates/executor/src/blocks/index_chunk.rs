@@ -52,10 +52,6 @@ pub(crate) struct HnswOptions {
 pub struct LoadedVectorIndex {
     pub index: HnswHandler,
     pub labels: Vec<u32>,
-    /// Distinct rows the graph labels. Equal to `labels.len()` for a
-    /// single-vector column; a `MULTIVECTOR` chunk labels one row several
-    /// times, one per token, so the count is what the coverage check needs.
-    pub labelled_rows: usize,
     /// The `chunk_{id}.idx` this graph came from, so a later reload can load
     /// only the chunks written since the last one.
     pub chunk_id: u64,
@@ -64,45 +60,6 @@ pub struct LoadedVectorIndex {
     /// `(len, mtime_secs)` of the chunk file when it was decoded; a rewritten
     /// chunk under the same id is detected by a stamp change.
     pub stamp: (u64, u64),
-}
-
-/// What an encoded HNSW chunk covers.
-///
-/// The header records `vertices` (`cur_vec_num`): one per row for an
-/// `EMBEDDING` column, one per **token** for a `MULTIVECTOR` one. The row
-/// coverage a chunk is published with is the number of *distinct labels*
-/// instead - a 100-row chunk of two-token rows labels 200 vertices but covers
-/// 100 rows, and publishing 200 would let restart recovery skip an unsealed
-/// tail inside that fictitious range.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct HnswChunkCover {
-    pub rows: usize,
-    pub vertices: usize,
-}
-
-impl HnswChunkCover {
-    fn of(labels: &[u32]) -> Self {
-        Self {
-            rows: labelled_rows(labels),
-            vertices: labels.len(),
-        }
-    }
-}
-
-/// One IVF chunk loaded from the mirror, with the segment it was written for.
-///
-/// An IVF chunk stores *in-segment* offsets (`RowID(segment, offset)`): the
-/// reference trains and dumps one chunk per segment (`PopulateIvfIndexInner`
-/// takes a `SegmentMeta`), so an offset only becomes a row id once the segment
-/// is put in the high 32 bits. Keeping the segment next to the chunk is what
-/// lets a probe answer with row ids instead of offsets that collide across
-/// segments.
-pub struct LoadedIvfIndex {
-    /// The `seg_{segment}` directory the chunk came from.
-    pub segment: u32,
-    pub index: index::ivf::IvfSegment,
-    /// Pretty name of the chunk file, for diagnostics.
-    pub path: std::path::PathBuf,
 }
 
 /// The IVF index options the mirror has to honour
@@ -174,21 +131,6 @@ pub(crate) struct PlaidOptions {
     pub(crate) colbertsar: bool,
 }
 
-/// Maps one sealed HNSW chunk read-only.
-///
-/// A chunk is immutable once published (every publisher renames a temp file over
-/// it), so a reader points at the page cache instead of reading the payload into
-/// the heap — the reference's buffer-manager chunk, without the LRU. Publisher
-/// and reader agree because a rewrite swaps the directory entry and leaves the
-/// inode this mapping names untouched.
-pub(crate) fn map_hnsw_chunk(path: &std::path::Path) -> Option<index::vector::ByteSource> {
-    let mapped = storage::buffer::mapped::MappedFile::open(path).ok()?;
-    if mapped.is_empty() {
-        return None;
-    }
-    Some(std::sync::Arc::new(mapped))
-}
-
 pub(crate) fn file_stamp(path: &std::path::Path) -> (u64, u64) {
     std::fs::metadata(path)
         .ok()
@@ -207,14 +149,7 @@ pub(crate) fn file_stamp(path: &std::path::Path) -> (u64, u64) {
 /// Serializes an existing graph as a C++ HNSW chunk (vec-store meta, graph
 /// region, `u32` labels). The vector region depends on the encoding: plain
 /// f32 vectors, LVQ i8 codes or RaBitQ 1-bit codes.
-///
-/// The coverage it returns is what a publisher may claim: [`HnswChunkCover::rows`]
-/// for row coverage, [`HnswChunkCover::vertices`] for the header's
-/// `cur_vec_num` (they differ for a `MULTIVECTOR` chunk).
-pub(crate) fn encode_hnsw_chunk_from(
-    index: &HnswIndex,
-    labels: &[u32],
-) -> (HnswChunkCover, Vec<u8>) {
+pub(crate) fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>) {
     let m = index.m() as u64;
     let (mmax0, mmax) = knn_format::get_mmax(m);
     let ef_construction = index.ef_construction() as u64;
@@ -222,10 +157,34 @@ pub(crate) fn encode_hnsw_chunk_from(
     let enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
     let store_meta = index.store_meta_bytes();
     let vector_region = index.store_records_bytes();
-    // The graph region is written straight from the compact slabs: routing it
-    // through one `HnswGraphVertex` per node cost a full second copy of the
-    // graph, which is what the compact store exists to avoid.
-    let graph = index.encode_graph_region();
+    // Neighbour counts must not exceed the level's limit.
+    let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
+        .map(|n| {
+            let level = index.level_of(n);
+            let neighbors_l0 = index
+                .neighbors(0, n)
+                .iter()
+                .take(mmax0 as usize)
+                .map(|&x| x as u32)
+                .collect();
+            let upper = (1..=level)
+                .map(|l| {
+                    index
+                        .neighbors(l, n)
+                        .iter()
+                        .take(mmax as usize)
+                        .map(|&x| x as u32)
+                        .collect()
+                })
+                .collect();
+            knn_format::HnswGraphVertex {
+                layer_count: level as i32,
+                neighbors_l0,
+                upper,
+            }
+        })
+        .collect();
+    let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
     let chunk = knn_format::encode_hnsw_chunk_ext(
         m,
         ef_construction,
@@ -239,5 +198,5 @@ pub(crate) fn encode_hnsw_chunk_from(
         &graph,
         labels,
     );
-    (HnswChunkCover::of(labels), chunk)
+    (index.len(), chunk)
 }

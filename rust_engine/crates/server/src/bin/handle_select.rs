@@ -17,11 +17,11 @@ fn main() {
     let t = &req.table_name;
 
     // fixture so the query returns data
-    let _ = engine.execute(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
-    let _ = engine.execute(&format!("INSERT INTO {t} VALUES (1, 'a');"));
-    let _ = engine.execute(&format!("INSERT INTO {t} VALUES (2, 'b');"));
+    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
+    let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (1, 'a');"));
+    let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (2, 'b');"));
 
-    let resp = match engine.execute(&req.to_sql()) {
+    let resp = match engine.execute_blocking(&req.to_sql()) {
         Ok(rs) => match rs.into_iter().next() {
             Some(QueryResult::Rows { columns, rows }) => {
                 let text: Vec<Vec<String>> = rows
@@ -46,7 +46,7 @@ fn main() {
             extra_result: String::new(),
         },
     };
-    let _ = engine.flush();
+    let _ = executor::block_on(engine.flush());
 
     let mut out = std::io::stdout().lock();
     write_select_response(&mut out, seq, &resp).expect("write reply");

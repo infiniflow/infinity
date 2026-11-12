@@ -12,7 +12,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::{parse, Statement};
+    use crate::{parse, FlushKind, Statement};
 
     fn data_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test/data")
@@ -47,12 +47,15 @@ mod tests {
         let sql = read(&data_dir().join("infinity/good.sql"));
         let statements = parse(&sql).expect("infinity corpus must parse");
         assert_eq!(statements.len(), 3);
-        // The parser's `Utility` text holds the tokens after `FLUSH`.
-        for (statement, expected) in statements.iter().zip(["DATA", "LOG", "BUFFER"]) {
-            let Statement::Utility { text } = statement else {
-                panic!("expected a utility statement, got {statement:?}");
+        for (statement, expected) in
+            statements
+                .iter()
+                .zip([FlushKind::Data, FlushKind::Log, FlushKind::Buffer])
+        {
+            let Statement::Flush { kind } = statement else {
+                panic!("expected a flush statement, got {statement:?}");
             };
-            assert_eq!(text, expected);
+            assert_eq!(*kind, expected);
         }
     }
 

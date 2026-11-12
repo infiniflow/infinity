@@ -118,7 +118,7 @@ fn update_multiple_blocks() {
     // deleted row's cells in its block and hides it through the block's
     // `version` file (`deleted_`), so the physical total is the 16384 original
     // rows plus the 8192 appended updates, of which 8192 slots are marked.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let physical: usize = e
         .block_ids("db1.tb1", 0)
         .iter()
@@ -154,7 +154,7 @@ fn update_then_drop_database() {
         "INSERT INTO db1.tb1 VALUES (1, 'x');",
         "DELETE FROM db1.tb1;",
     ] {
-        assert!(e.execute(sql).is_err(), "{sql} should fail");
+        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
     }
 }
 
@@ -170,9 +170,11 @@ fn update_then_drop_table() {
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute("UPDATE db1.tb1 SET col1 = 3;").is_err());
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
-    assert!(e.execute("INSERT INTO db1.tb1 VALUES (1, 'x');").is_err());
+    assert!(e.execute_blocking("UPDATE db1.tb1 SET col1 = 3;").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e
+        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:935`
@@ -236,7 +238,7 @@ fn update_then_dump_index() {
         &e,
         "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     // The rewritten rows carry the marker in the unindexed column; counting
@@ -509,7 +511,7 @@ fn import_with_index_rollback() {
     }
     let bad_path = csv(dir.path(), "bad.csv", &bad);
     assert!(e
-        .execute(&format!(
+        .execute_blocking(&format!(
             "COPY db1.tb1 FROM '{bad_path}' WITH (DELIMITER ',', FORMAT CSV);"
         ))
         .is_err());
@@ -570,7 +572,7 @@ fn import_then_drop_database() {
         "INSERT INTO db1.tb1 VALUES (1, 'x');",
         "COPY db1.tb1 FROM '/nonexistent' WITH (FORMAT CSV);",
     ] {
-        assert!(e.execute(sql).is_err(), "{sql} should fail");
+        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
     }
 }
 
@@ -587,8 +589,10 @@ fn import_then_drop_table() {
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(e.segment_ids("db1.tb1").is_empty());
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
-    assert!(e.execute("INSERT INTO db1.tb1 VALUES (1, 'x');").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e
+        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:1858`
@@ -797,7 +801,7 @@ fn import_then_optimize_index() {
     copy(&e, "db1.tb1", &path);
 
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
         h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),

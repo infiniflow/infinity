@@ -71,9 +71,6 @@ constexpr std::string_view SWEDISH = "-swedish";
 constexpr std::string_view TURKISH = "-turkish";
 
 std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_view &name) {
-    // The prototype cache is filled lazily and shared by all caller threads.
-    std::unique_lock<std::mutex> lock(cache_mtx_);
-
     switch (Str2Int(name.data())) {
         case Str2Int(CHINESE.data()): {
             // chinese-{coarse|fine}

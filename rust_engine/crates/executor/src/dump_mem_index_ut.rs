@@ -18,7 +18,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -80,15 +80,15 @@ impl Engine {
 /// `TableDef::Make(... {col1 INT, col3 EMBEDDING(FLOAT,4), col4 SPARSE})` plus
 /// `IndexSecondary` on `col1` (`index1`).
 fn fixture(engine: &Engine) {
-    engine.execute("CREATE DATABASE db1;").unwrap();
+    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
     engine
-        .execute(
+        .execute_blocking(
             "CREATE TABLE db1.tb1 (col1 INT, col3 EMBEDDING(FLOAT,4), \
              col4 SPARSE(FLOAT,10));",
         )
         .unwrap();
     engine
-        .execute("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
         .unwrap();
 }
 
@@ -114,7 +114,7 @@ fn append_block(engine: &Engine) {
 /// checkpoint does not seal the memory tail, so every "dump" in this file goes
 /// through the dump transaction, exactly like `NewTxn::DumpMemIndex`.
 fn dump(engine: &Engine) {
-    engine.dump_index_transaction("db1.tb1", "index1").unwrap();
+    crate::scheduler::block_on(engine.dump_index_transaction("db1.tb1", "index1")).unwrap();
 }
 
 /// `NewTxn::Import` for one 8192-row block: always opens a new segment.
@@ -175,11 +175,13 @@ fn dump_and_add_column() {
         append_block(&e);
         assert_second_block_in_tail(&e);
 
-        e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col5 VARCHAR DEFAULT 'default');")
+        e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col5 VARCHAR DEFAULT 'default');")
             .unwrap();
         assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-        assert!(e.execute("SELECT col5 FROM db1.tb1 LIMIT 1;").is_ok());
-        e.execute("DROP DATABASE db1;").unwrap();
+        assert!(e
+            .execute_blocking("SELECT col5 FROM db1.tb1 LIMIT 1;")
+            .is_ok());
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
     }
 
     // add column then dump
@@ -188,7 +190,7 @@ fn dump_and_add_column() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col5 VARCHAR DEFAULT 'default');")
+        e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col5 VARCHAR DEFAULT 'default');")
             .unwrap();
         append_block(&e);
         dump(&e);
@@ -198,7 +200,7 @@ fn dump_and_add_column() {
             vec![(0, 16384)]
         );
         assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
     }
 }
 
@@ -217,14 +219,16 @@ fn dump_and_drop_column() {
     append_block(&e);
     assert_second_block_in_tail(&e);
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
         .unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
         rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 IN (1, 2);")[0][0],
         "16384"
     );
-    assert!(e.execute("SELECT col3 FROM db1.tb1 LIMIT 1;").is_err());
+    assert!(e
+        .execute_blocking("SELECT col3 FROM db1.tb1 LIMIT 1;")
+        .is_err());
 
     // `append_a_block_after_drop_column`: two columns, no embedding.
     let block: Vec<Vec<Literal>> = (0..8192)
@@ -237,7 +241,7 @@ fn dump_and_drop_column() {
         .collect();
     e.insert_literals("db1.tb1", None, block).unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++: `dump_mem_index_ut.cpp:2984` (`dump_and_create_index`).
@@ -254,12 +258,14 @@ fn dump_and_create_index() {
     assert_dumped(&e);
 
     // Duplicate create without IF NOT EXISTS is `ConflictType::kError`.
-    assert!(e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").is_err());
+    assert!(e
+        .execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .is_err());
 
     append_block(&e);
     assert_second_block_in_tail(&e);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++: `dump_mem_index_ut.cpp:4566` (`dump_and_append`).
@@ -326,7 +332,7 @@ fn dump_and_delete() {
     let col1: Vec<Vec<String>> = rows(&e, "SELECT col1 FROM db1.tb1;");
     assert_eq!(col1.len(), 4096);
     assert!(col1.iter().all(|r| r[0] == "1"));
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++: `dump_mem_index_ut.cpp:5767` (`DISABLED_SLOW_dump_and_dump`).
@@ -359,7 +365,7 @@ fn dump_and_dump() {
         Some((16384, 8192))
     );
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++: `dump_mem_index_ut.cpp:67` (`dump_and_drop_db`).
@@ -382,7 +388,7 @@ fn dump_and_drop_db() {
         assert_dumped(&e);
         assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
 
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
         assert!(!databases(&e).iter().any(|d| d == "db1"));
         assert!(!e.table_exists("db1.tb1"));
     }
@@ -396,7 +402,7 @@ fn dump_and_drop_db() {
 
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
         assert!(txn.commit().is_err(), "dump committed after the db drop");
         assert!(!databases(&e).iter().any(|d| d == "db1"));
         assert!(!e.table_exists("db1.tb1"));
@@ -408,7 +414,7 @@ fn dump_and_drop_db() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
 
         let mut txn = e.begin_txn();
         assert!(txn.dump_index("db1.tb1", "index1").is_err());
@@ -431,7 +437,7 @@ fn dump_and_drop_table() {
         txn.commit().unwrap();
         assert_dumped(&e);
 
-        e.execute("DROP TABLE db1.tb1;").unwrap();
+        e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
         assert!(!e.table_exists("db1.tb1"));
         assert!(!has_index(&e, "db1.tb1", "index1"));
         assert!(databases(&e).iter().any(|d| d == "db1"));
@@ -446,7 +452,7 @@ fn dump_and_drop_table() {
 
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
-        e.execute("DROP TABLE db1.tb1;").unwrap();
+        e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
         assert!(txn.commit().is_err(), "dump committed after the table drop");
         assert!(!e.table_exists("db1.tb1"));
         assert!(!has_index(&e, "db1.tb1", "index1"));
@@ -458,7 +464,7 @@ fn dump_and_drop_table() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("DROP TABLE db1.tb1;").unwrap();
+        e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
 
         let mut txn = e.begin_txn();
         assert!(txn.dump_index("db1.tb1", "index1").is_err());
@@ -484,7 +490,8 @@ fn dump_and_rename_table() {
         txn.commit().unwrap();
         assert_dumped(&e);
 
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+        e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+            .unwrap();
         assert!(!e.table_exists("db1.tb1"));
         assert!(e.table_exists("db1.tb2"));
         assert!(has_index(&e, "db1.tb2", "index1"));
@@ -501,7 +508,8 @@ fn dump_and_rename_table() {
 
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+        e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+            .unwrap();
         assert!(txn.commit().is_err(), "dump committed after the rename");
         assert!(!e.table_exists("db1.tb1"));
         assert!(e.table_exists("db1.tb2"));
@@ -514,7 +522,8 @@ fn dump_and_rename_table() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+        e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+            .unwrap();
 
         let mut txn = e.begin_txn();
         assert!(txn.dump_index("db1.tb1", "index1").is_err());
@@ -543,7 +552,7 @@ fn dump_and_drop_index() {
         txn.commit().unwrap();
         assert_dumped(&e);
 
-        e.execute("DROP INDEX index1 ON db1.tb1;").unwrap();
+        e.execute_blocking("DROP INDEX index1 ON db1.tb1;").unwrap();
         assert!(!has_index(&e, "db1.tb1", "index1"));
         assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     }
@@ -557,7 +566,7 @@ fn dump_and_drop_index() {
 
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
-        e.execute("DROP INDEX index1 ON db1.tb1;").unwrap();
+        e.execute_blocking("DROP INDEX index1 ON db1.tb1;").unwrap();
         assert!(txn.commit().is_err(), "dump committed after the index drop");
         assert!(!has_index(&e, "db1.tb1", "index1"));
         assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
@@ -569,7 +578,7 @@ fn dump_and_drop_index() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("DROP INDEX index1 ON db1.tb1;").unwrap();
+        e.execute_blocking("DROP INDEX index1 ON db1.tb1;").unwrap();
 
         let mut txn = e.begin_txn();
         assert!(txn.dump_index("db1.tb1", "index1").is_err());
@@ -665,10 +674,11 @@ fn dump_and_import() {
 #[ignore = "SLOW: reference is DISABLED_SLOW_"]
 fn dump_index_and_optimize_index() {
     fn prepare(e: &Engine) {
-        e.execute("CREATE DATABASE db1;").unwrap();
-        e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
+        e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+            .unwrap();
         for _ in 0..2 {
             let batch: Vec<Vec<Literal>> = (0..8192)
                 .map(|_| {
@@ -701,7 +711,7 @@ fn dump_index_and_optimize_index() {
         dump.dump_index("db1.tb1", "index1").unwrap();
         dump.commit().unwrap();
         e.optimize_indexes().unwrap();
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
     }
 
     // dump staged, optimize commits first -> dump commit fails.
@@ -713,7 +723,7 @@ fn dump_index_and_optimize_index() {
         dump.dump_index("db1.tb1", "index1").unwrap();
         e.optimize_indexes().unwrap();
         assert!(dump.commit().is_err(), "dump committed after the optimize");
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
     }
 }
 
@@ -737,5 +747,5 @@ fn test_dump_index_and_compact() {
     let col1: Vec<Vec<String>> = rows(&e, "SELECT col1 FROM db1.tb1;");
     assert_eq!(col1.iter().filter(|r| r[0] == "1").count(), 4096);
     assert_eq!(col1.iter().filter(|r| r[0] == "2").count(), 4096);
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }

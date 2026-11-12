@@ -15,7 +15,10 @@
 package infinity
 
 import (
+	"errors"
 	"fmt"
+
+	"github.com/apache/thrift/lib/go/thrift"
 )
 
 // NetworkAddress represents a network address with IP and port
@@ -61,7 +64,7 @@ func (a Array) String() string {
 
 // FDE (Fixed Dimensional Encoding) represents a function call for insert operations
 type FDE struct {
-	TensorData     [][]float64
+	TensorData      [][]float64
 	TargetDimension int
 }
 
@@ -119,6 +122,21 @@ func NewInfinityException(errorCode int, errorMsg string) *InfinityException {
 		ErrorCode: errorCode,
 		ErrorMsg:  errorMsg,
 	}
+}
+
+// transportErrorCode classifies a failed Thrift call.
+//
+// A `TApplicationException` frame (message type 3) is a protocol failure: the
+// server could not decode the request, or the method does not exist. It is not
+// a connection problem, so reporting it as `CantConnectServer` hid the real
+// cause - the Python SDK already maps it to `PROTOCOL_ERROR`
+// (`PARALLEL_ASYNC.md` §6.4 / O12), and this keeps the two SDKs in step.
+func transportErrorCode(err error) int {
+	var app thrift.TApplicationException
+	if errors.As(err, &app) {
+		return int(ErrorCodeProtocolError)
+	}
+	return int(ErrorCodeCantConnectServer)
 }
 
 // Constants

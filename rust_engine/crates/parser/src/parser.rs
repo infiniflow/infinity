@@ -3,9 +3,9 @@
 use common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
-    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, SparseStore,
-    Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, FlushKind, JoinClause,
+    JoinKind, Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem,
+    SparseStore, Statement,
 };
 use crate::lexer::{tokenize, Token};
 
@@ -68,6 +68,26 @@ impl Parser {
         } else {
             self.err(&format!("expected keyword {kw}"))
         }
+    }
+    /// The remaining tokens of a tolerated statement, rendered as words
+    /// (`SET …`, `PRAGMA …`, and a `FLUSH` target this parser does not know).
+    fn rest_words(&mut self) -> Vec<String> {
+        let mut parts: Vec<String> = Vec::new();
+        while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+            parts.push(match self.advance() {
+                Token::Ident(s) => s,
+                Token::Int(i) => i.to_string(),
+                Token::Float(f) => f.to_string(),
+                Token::Str(s) => s,
+                Token::Star => "*".to_string(),
+                Token::Comma => ",".to_string(),
+                Token::LParen => "(".to_string(),
+                Token::RParen => ")".to_string(),
+                Token::Op(o) => o,
+                _ => String::new(),
+            });
+        }
+        parts
     }
     /// `(k = v, …)`: a property list as `WITH (…)` / `PROPERTIES (…)` spells
     /// it. Keys are upper-cased; a bare flag (`HEADER`) has an empty value.
@@ -634,23 +654,34 @@ impl Parser {
                 let table = self.expect_table_name()?;
                 Ok(Statement::Describe { table })
             }
-            "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH" | "CHECK" => {
+            // `FLUSH DATA|CATALOG|LOG|BUFFER` (C++ `FlushStatement`). An
+            // unknown target keeps the old tolerated `Utility` shape.
+            "FLUSH" => {
                 self.advance();
-                let mut parts: Vec<String> = Vec::new();
-                while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
-                    parts.push(match self.advance() {
-                        Token::Ident(s) => s,
-                        Token::Int(i) => i.to_string(),
-                        Token::Float(f) => f.to_string(),
-                        Token::Str(s) => s,
-                        Token::Star => "*".to_string(),
-                        Token::Comma => ",".to_string(),
-                        Token::LParen => "(".to_string(),
-                        Token::RParen => ")".to_string(),
-                        Token::Op(o) => o,
-                        _ => String::new(),
-                    });
+                let kind = match self.peek() {
+                    Token::Ident(s) if s.eq_ignore_ascii_case("DATA") => Some(FlushKind::Data),
+                    Token::Ident(s) if s.eq_ignore_ascii_case("CATALOG") => {
+                        Some(FlushKind::Catalog)
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("LOG") => Some(FlushKind::Log),
+                    Token::Ident(s) if s.eq_ignore_ascii_case("BUFFER") => Some(FlushKind::Buffer),
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    self.advance();
+                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        self.advance();
+                    }
+                    return Ok(Statement::Flush { kind });
                 }
+                let parts = self.rest_words();
+                Ok(Statement::Utility {
+                    text: parts.join(" "),
+                })
+            }
+            "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "CHECK" => {
+                self.advance();
+                let parts = self.rest_words();
                 Ok(Statement::Utility {
                     text: parts.join(" "),
                 })
@@ -3817,6 +3848,33 @@ mod tests {
         assert!(parse("select 1;").is_ok());
         assert!(parse("select a, sum(b), function(c, nested(d)) from t1;").is_ok());
     }
+    /// `FLUSH` names one of the reference's four targets; anything else keeps
+    /// the tolerated `Utility` shape the parser used before it had a node.
+    #[test]
+    fn flush_names_its_target() {
+        assert_eq!(
+            parse("FLUSH DATA;").unwrap(),
+            vec![Statement::Flush {
+                kind: FlushKind::Data
+            }]
+        );
+        for (sql, kind) in [
+            ("FLUSH catalog", FlushKind::Catalog),
+            ("flush log", FlushKind::Log),
+            ("FLUSH BUFFER", FlushKind::Buffer),
+        ] {
+            assert_eq!(
+                parse(sql).unwrap(),
+                vec![Statement::Flush { kind }],
+                "{sql}"
+            );
+        }
+        let Statement::Utility { text } = &parse("FLUSH SOMETHING").unwrap()[0] else {
+            panic!("an unknown target stays a utility statement");
+        };
+        assert_eq!(text, "SOMETHING");
+    }
+
     /// C++ `src/unit_test/parser/sql_select_statement_ut.cpp:988-1213
     /// SelectStatementParsingTest.good_test3`.
     #[test]

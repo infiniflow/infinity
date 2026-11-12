@@ -41,6 +41,9 @@ const (
 	ExprTypeParen
 	ExprTypeLike
 	ExprTypeNotLike
+	// ExprTypeIsNull is `col IS NULL`; `IS NOT NULL` is the same type with
+	// InType set to false (the field already distinguishes IN from NOT IN).
+	ExprTypeIsNull
 )
 
 // Expression represents a parsed expression
@@ -194,6 +197,13 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 	// Check for BETWEEN expression (after binary operators to allow AND to work)
 	if betweenExpr := parseBetweenExpression(expr); betweenExpr != nil {
 		return betweenExpr, nil
+	}
+
+	// Check for IS NULL / IS NOT NULL. The predicate is a function of one
+	// column on the server (`is_null` / `is_not_null`), exactly as the Python
+	// SDK encodes it.
+	if isExpr := parseIsNullExpression(expr); isExpr != nil {
+		return isExpr, nil
 	}
 
 	// Check for LIKE / NOT LIKE expression (after binary operators to allow AND to work)
@@ -509,6 +519,42 @@ func parseLikeExpression(expr string) *Expression {
 		}
 	}
 
+	return nil
+}
+
+// parseIsNullExpression parses `expr IS NULL` / `expr IS NOT NULL`.
+//
+// Only the NULL forms are accepted: the reference rejects `IS TRUE`,
+// `IS FALSE` and `IS UNKNOWN` (`utils.py` in the Python SDK does the same), so
+// matching anything else here would let a predicate through that the server
+// cannot answer.
+func parseIsNullExpression(expr string) *Expression {
+	exprUpper := strings.ToUpper(strings.TrimSpace(expr))
+	// `IS NOT NULL` first: it contains `IS NULL` as a suffix.
+	for _, form := range []struct {
+		suffix string
+		isNull bool
+	}{
+		{" IS NOT NULL", false},
+		{" IS NULL", true},
+	} {
+		if !strings.HasSuffix(exprUpper, form.suffix) {
+			continue
+		}
+		leftText := strings.TrimSpace(expr[:len(expr)-len(form.suffix)])
+		if leftText == "" {
+			return nil
+		}
+		left, err := parseExpressionInternal(leftText)
+		if err != nil {
+			return nil
+		}
+		return &Expression{
+			Type:   ExprTypeIsNull,
+			Left:   left,
+			InType: form.isNull,
+		}
+	}
 	return nil
 }
 
@@ -1272,6 +1318,22 @@ func convertToThriftParsedExpr(expr *Expression) (*thriftapi.ParsedExpr, error) 
 			funcExpr.Arguments = append(funcExpr.Arguments, thriftArg)
 		}
 		exprType.FunctionExpr = funcExpr
+
+	case ExprTypeIsNull:
+		// `col IS NULL` is `is_null(col)` on the server, and `IS NOT NULL` is
+		// `is_not_null(col)` - the same two functions the Python SDK emits.
+		name := "is_not_null"
+		if expr.InType {
+			name = "is_null"
+		}
+		arg, err := convertToThriftParsedExpr(expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		exprType.FunctionExpr = &thriftapi.FunctionExpr{
+			FunctionName: name,
+			Arguments:    []*thriftapi.ParsedExpr{arg},
+		}
 
 	case ExprTypeLike:
 		// LIKE is represented as a function: like(column, pattern, escape)

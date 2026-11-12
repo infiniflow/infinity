@@ -1,5 +1,4 @@
 use super::*;
-use std::sync::RwLock;
 
 impl QueryResult {
     /// This result's rows as display text (what a `.slt` file or the CLI shows).
@@ -57,6 +56,72 @@ impl Drop for HeldBottom {
             held.borrow_mut().remove(&self.0);
         });
     }
+}
+
+tokio::task_local! {
+    /// The session a statement running on this task belongs to (plan §6.1).
+    /// A statement outside a session leaves it unset and sees the process-wide
+    /// default database.
+    ///
+    /// A **task** local, not a thread local: a statement now awaits (WAL,
+    /// allocator, bottom, CPU decode), so it can be resumed on a different
+    /// runtime worker than the one it started on. A thread local would then
+    /// read `None` mid-statement and resolve an unqualified table against the
+    /// wrong database.
+    pub static ACTIVE_SESSION: Option<i64>;
+}
+
+thread_local! {
+    /// The session a **pool thread** is acting for.
+    ///
+    /// The request path keeps the session in the task-local `ACTIVE_SESSION`,
+    /// but work dispatched to the CPU/blocking pools (`spawn_cpu`, `spawn_io`)
+    /// runs on a thread that has no task context. `scheduler` copies the
+    /// task-local into this thread-local before running such a job, so a decode
+    /// that resolves `db()` still sees the statement's database.
+    static POOL_SESSION: std::cell::Cell<Option<i64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Sets the pool thread's session for the duration of `f`.
+pub(crate) fn with_pool_session<T>(session: Option<i64>, f: impl FnOnce() -> T) -> T {
+    struct Reset(Option<i64>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            POOL_SESSION.with(|c| c.set(self.0));
+        }
+    }
+    let previous = POOL_SESSION.with(|c| c.replace(session));
+    let _restore = Reset(previous);
+    f()
+}
+
+/// The session the current task (or pool thread) belongs to.
+pub(crate) fn active_session() -> Option<i64> {
+    // Inside a task, the task-local is authoritative (it may be `None` for a
+    // statement that belongs to no session). A pool thread has no task context,
+    // so it falls back to the session carried across the dispatch.
+    match ACTIVE_SESSION.try_with(|id| *id) {
+        Ok(id) => id,
+        Err(_) => POOL_SESSION.with(|c| c.get()),
+    }
+}
+
+/// Runs `f` with `id` as the task's session.
+///
+/// A task-local scope, not a guard: tokio restores the binding when the future
+/// completes (including on a panic), which is the same "the binding must not
+/// outlive the statement" contract the old thread-local guard had.
+pub async fn with_session_scope<T, F>(id: i64, f: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    ACTIVE_SESSION.scope(Some(id), f).await
+}
+
+/// Runs a **synchronous** `f` with `id` as the task's session, for the
+/// `block_on` adapters and the tests.
+pub fn with_session_sync<T>(id: i64, f: impl FnOnce() -> T) -> T {
+    crate::scheduler::block_on(with_session_scope(id, async { f() }))
 }
 
 impl Engine {
@@ -140,7 +205,7 @@ impl Engine {
         let engine = Self {
             storage: Storage {
                 catalog,
-                flush_lock: Mutex::new(()),
+                flush_lock: tokio::sync::RwLock::new(()),
                 // The subsystems are built above, so the storage is writable
                 // the moment it exists: the reference's standalone/leader
                 // startup path reaches `kWritable` in `AdminToWriter` before
@@ -156,7 +221,9 @@ impl Engine {
                 block_map_misses: std::sync::atomic::AtomicU64::new(0),
                 config: Mutex::new(HashMap::new()),
                 memindex_quota: std::sync::atomic::AtomicU64::new(0),
+                memindex_total: std::sync::atomic::AtomicUsize::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
+                flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
                 memindex_pending: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
                 last_quota_check_ms: std::sync::atomic::AtomicU64::new(0),
                 object_store: Mutex::new(None),
@@ -184,8 +251,9 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
+            sessions: Mutex::new(HashMap::new()),
             tables: Arc::new(Mutex::new(HashMap::new())),
-            ddl_lock: Mutex::new(()),
+            ddl_lock: tokio::sync::Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             batch_locks: Mutex::new(HashMap::new()),
@@ -292,21 +360,21 @@ impl Engine {
         // records how far the SST goes (`synced`), which is what a WAL-only
         // checkpoint frame is allowed to claim.
         engine.txn.flush()?;
-        engine.txn.append_checkpoint_flushed()?;
+        crate::scheduler::block_on(engine.txn.append_checkpoint_flushed())?;
         // The frame is appended unsynced (the commit path syncs in batches, as
         // NewFlush does); the startup checkpoint is its own batch, so sync it
         // here. Without this a directory whose only frame is this one would
         // reopen at an older position - or not at all once that segment is
         // pruned - after a power loss.
-        engine.txn.sync_wal()?;
+        crate::scheduler::block_on(engine.txn.sync_wal())?;
         if !engine.storage.catalog.has_database_record("default_db")? {
-            engine.ddl_commit_typed(
+            crate::scheduler::block_on(engine.ddl_commit_typed(
                 TxnOp::CreateDatabase {
                     db: "default_db".to_string(),
                 },
                 || engine.storage.catalog.create_database("default_db", false),
                 |batch| crate::wal_bridge::create_database_command_from_batch(batch, "default_db"),
-            )?;
+            ))?;
         }
         // The reference stamps `db_id`/`table_id` into every row command; a
         // directory opened here has to name its tables the same way.
@@ -317,6 +385,8 @@ impl Engine {
         // so the rows its chunks do not cover are re-indexed into the tail
         // here, once the blocks, the WAL and the segment map are all in place.
         engine.recover_mem_index()?;
+        // The in-memory indexes were just rebuilt; the quota reads this total.
+        engine.recompute_memindex_total();
         Ok(engine)
     }
 
@@ -357,14 +427,23 @@ impl Engine {
     }
 
     /// Dumps every memory index when the unified budget is exceeded, mirroring
-    /// the reference's memindex dump. `memindex_memory_quota = 0` disables it.
+    /// the reference's memindex dump. The budget is one number for the whole
+    /// engine (`memindex_bytes`: every dumpable family, including the HNSW
+    /// charge and the IVF rows), not one per index.
+    /// `memindex_memory_quota = 0` disables it.
     ///
     /// With a `BGTaskProcessor` attached this proposes one background
     /// `DumpMemIndexTask` (C++ `BGMemIndexTracer::IncreaseMemoryUsage`): the
     /// pending flag coalesces the per-row checks, and the task dumps whatever
     /// was buffered when the worker runs. Without a processor the dump stays
     /// synchronous, which is the engine's historical in-process behaviour.
-    pub(crate) fn enforce_memindex_quota(&self) {
+    /// `table` is the one whose tails just changed (the per-row call); `None`
+    /// asks for a full recompute first (an explicit check).
+    /// The quota check, in its **async** form: every caller
+    /// (`run_bottom`, `insert_literals_inner`, `copy_from_inner`,
+    /// `execute_stmt_inner`) is already a task, so the fallback dump is an
+    /// `.await` instead of a nested `block_on` on a runtime worker.
+    pub(crate) async fn enforce_memindex_quota(&self, table: Option<&str>) {
         let quota = self
             .context
             .memindex_quota
@@ -372,24 +451,39 @@ impl Engine {
         if quota == 0 {
             return;
         }
-        // `memindex_bytes` walks every table and every index, and this runs per
-        // row: at 20k rows through eight threads it was the insert path's
-        // hottest lock. The reference's tracer checks on its own thread, so a
-        // 10 ms gate here is finer than the reference's own granularity.
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-        let last = self
-            .context
-            .last_quota_check_ms
-            .load(std::sync::atomic::Ordering::Relaxed);
-        if now.saturating_sub(last) < 10 {
-            return;
+        // This runs per row, so it is gated: at 20k rows through eight threads
+        // the ungated check was the insert path's hottest lock. The
+        // reference's tracer checks on its own thread, so a 10 ms gate is
+        // finer than the reference's own granularity.
+        // The gate is for the **per-row** call only. An explicit check
+        // (`table == None`, `Engine::enforce_memindex_quota(None)`) is the
+        // caller asking "enforce it now" - a test, or a statement that just
+        // changed the charge - and must not be dropped because another row
+        // checked 3 ms ago.
+        if table.is_some() {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let last = self
+                .context
+                .last_quota_check_ms
+                .load(std::sync::atomic::Ordering::Relaxed);
+            if now.saturating_sub(last) < 10 {
+                return;
+            }
+            self.context
+                .last_quota_check_ms
+                .store(now, std::sync::atomic::Ordering::Relaxed);
         }
-        self.context
-            .last_quota_check_ms
-            .store(now, std::sync::atomic::Ordering::Relaxed);
+        // Fold in what changed before comparing: one table when the caller
+        // names it (O(that table's indexes)), everything for an explicit check.
+        match table {
+            Some(table) => self.refresh_memindex_charge(table),
+            None => {
+                self.recompute_memindex_total();
+            }
+        }
         if self.memindex_bytes() <= quota {
             return;
         }
@@ -423,7 +517,7 @@ impl Engine {
             }
             return;
         }
-        self.dump_all_memory_indexes();
+        self.dump_all_memory_indexes().await;
     }
 
     /// The rows an indexed predicate names, for the columnar select.
@@ -498,7 +592,63 @@ impl Engine {
 
     /// The session's current database.
     pub(crate) fn db(&self) -> String {
+        // A statement that belongs to a session sees that session's database;
+        // everything else (a test, a background task) sees the default.
+        if let Some(id) = active_session() {
+            if let Some(db) = self.sessions.lock().unwrap().get(&id) {
+                return db.clone();
+            }
+        }
         self.current_db.lock().unwrap().clone()
+    }
+
+    /// Registers a session, with the database it starts in.
+    pub fn open_session(&self, db: impl Into<String>) -> i64 {
+        static NEXT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
+        let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.sessions.lock().unwrap().insert(id, db.into());
+        id
+    }
+
+    /// Drops a session. `false` when the id was never registered (or already
+    /// dropped), which the server reports as `SessionNotFound`.
+    pub fn close_session(&self, id: i64) -> bool {
+        self.sessions.lock().unwrap().remove(&id).is_some()
+    }
+
+    /// The database `id` is in, or `None` for an unknown session.
+    pub fn session_db(&self, id: i64) -> Option<String> {
+        self.sessions.lock().unwrap().get(&id).cloned()
+    }
+
+    /// Runs one statement for `id`, so `USE` and unqualified table names see
+    /// that session's database instead of the process-wide default.
+    pub fn execute_in_session(&self, id: i64, sql: &str) -> Result<Vec<QueryResult>> {
+        if self.session_db(id).is_none() {
+            return Err(Error::NotFound(format!("session {id}")));
+        }
+        self.with_session(id, || self.execute_blocking(sql))
+    }
+
+    /// Runs `f` with `id` as the active session.
+    ///
+    /// This is the scope the wire layer needs once a statement can run on any
+    /// pool thread: everything inside `f` — not only `execute`, but the
+    /// catalog lookups and helper calls it makes — sees that session's
+    /// database, and the previous binding is restored afterwards.
+    pub fn with_session<T>(&self, id: i64, f: impl FnOnce() -> T) -> T {
+        // The scope restores the binding when it completes, panic included, so
+        // a failed statement cannot leave its session on a reused task.
+        with_session_sync(id, f)
+    }
+
+    /// The form the wire handler awaits: the scope wraps the whole statement,
+    /// across its suspensions.
+    pub async fn with_session_async<T, F>(&self, id: i64, f: F) -> T
+    where
+        F: std::future::Future<Output = T>,
+    {
+        with_session_scope(id, f).await
     }
 
     /// True when at least one index (secondary / fulltext / vector / sparse /
@@ -549,11 +699,10 @@ impl Engine {
     /// [`Self::any_in_memory_index`] so the per-row hook runs whenever any
     /// index state could need it.
     pub(crate) fn has_index_declaration(&self, table: &str) -> bool {
-        let short = table.split('.').next_back().unwrap_or(table);
         self.storage
             .catalog
-            .list_indexes()
-            .map(|is| is.iter().any(|i| i.table == short || i.table == table))
+            .indexes_of_table(table)
+            .map(|is| !is.is_empty())
             .unwrap_or(true)
     }
 
@@ -637,7 +786,7 @@ impl Engine {
     /// Runs one statement's post-commit work the way `NewTxnManager::
     /// CommitBottom` does: on the `BottomExecutor` worker that owns `table`,
     /// the caller waiting for it, or inline when no pool is attached.
-    pub(crate) fn run_commit_bottom<F>(&self, table: &str, work: F) -> Result<()>
+    pub(crate) async fn run_commit_bottom<F>(&self, table: &str, work: F) -> Result<()>
     where
         F: FnOnce(&Engine) -> Result<()> + Send + 'static,
     {
@@ -654,16 +803,27 @@ impl Engine {
         }
         if self.engine_handle().is_none() || !self.bottom_pool_attached() {
             let gate = self.bottom_gate(table);
-            let _turn = gate.lock().unwrap();
+            let _turn = gate.lock().await;
             let _held = HeldBottom::enter(&key);
             return work(self);
         }
         let engine = self.engine_handle().expect("checked above");
         let work_key = key.clone();
+        // The bottom may run on another thread, so the session travels with it
+        // (the `HeldBottom` thread-local does the same for the gate).
+        let session = active_session();
+        // The read timestamp travels with it for the same reason: the pool
+        // thread has no task context, so `read_ts()` there would otherwise read
+        // whatever the previous job left in the thread-local.
+        let read_ts = crate::engine::state::read_ts();
         let wrapped = move |engine: &Engine| {
             let _held = HeldBottom::enter(&work_key);
-            work(engine)
+            // The bottom runs on a pool thread: carry the session across.
+            with_pool_session(session, || {
+                crate::engine::state::with_pool_read_ts(read_ts, || work(engine))
+            })
         };
+        let (done, finished) = tokio::sync::oneshot::channel();
         let task = Arc::new(BottomWork {
             engine,
             table_id: key.clone(),
@@ -671,11 +831,11 @@ impl Engine {
             work: std::sync::Mutex::new(Some(
                 Box::new(wrapped) as Box<dyn FnOnce(&Engine) -> Result<()> + Send>
             )),
-            state: std::sync::Mutex::new(BottomState::default()),
-            done: std::sync::Condvar::new(),
+            done: std::sync::Mutex::new(Some(done)),
+            finished: std::sync::Mutex::new(Some(finished)),
         });
         self.submit_bottom(task.clone());
-        task.wait()
+        task.wait().await
     }
 
     /// Starts `TxnAllocator` on first use and returns its queue.
@@ -691,14 +851,32 @@ impl Engine {
             return Some(allocator);
         }
         let engine = self.engine_handle()?;
-        let (jobs, queue) = std::sync::mpsc::channel::<AllocJob>();
+        // Bounded, like the reference's blocking queue: every append blocks on
+        // its answer anyway, so a producer that outran the allocator would pile
+        // jobs up with no upper limit. The cap is generous enough that the
+        // allocator only ever sees a burst of concurrently committing
+        // statements, never a backlog. A tokio channel carries it (plan 6.12.4
+        // step 2), so the send can become `.await` when the statement path is
+        // async; today both ends are blocking threads.
+        let (jobs, mut queue) = tokio::sync::mpsc::channel::<AllocJob>(ALLOC_QUEUE_CAPACITY);
         let weak = Arc::downgrade(&engine);
-        // The consumer lives as long as the engine, so it takes one of the
-        // task scheduler's blocking threads rather than creating a thread of
-        // its own (`TxnAllocator::Start` starts its processor thread; here the
-        // pool already has them).
+        // The consumer is a **task**, not a blocking-pool thread. Every job is
+        // pure memory: it reads/writes the in-memory row counter (the one
+        // `next_row_seq` path that touches the filesystem only runs on an empty
+        // table, where `BlockIndex::open` finds no directory and returns
+        // immediately).
+        //
+        // **A dedicated blocking thread, not a runtime task.** The allocator is
+        // called from a commit's `before_wal` callback, which the commit chain
+        // invokes **synchronously** while it holds the commit-ts turn; the
+        // caller bridges that with `block_on`. If the consumer were a task, that
+        // `block_on` would park the very runtime worker the task needs to be
+        // polled on - every INSERT/IMPORT would deadlock the first time it
+        // allocated (measured: 19 executor tests hung past 60 s). A blocking
+        // thread makes the reply independent of the runtime, so the bridge
+        // always completes.
         crate::scheduler::scheduler().spawn_worker(Box::new(move || {
-            while let Ok(job) = queue.recv() {
+            while let Some(job) = queue.blocking_recv() {
                 match weak.upgrade() {
                     Some(engine) => {
                         engine
@@ -720,7 +898,7 @@ impl Engine {
     /// `BottomExecutor` gives the reference the same shape with a thread pool
     /// sharded by table id: two transactions of one table take their bottom
     /// turn in order, transactions of different tables overlap.
-    pub(crate) fn bottom_gate(&self, table: &str) -> Arc<Mutex<()>> {
+    pub(crate) fn bottom_gate(&self, table: &str) -> Arc<tokio::sync::Mutex<()>> {
         let key = self.table_key(table);
         let mut gates = self.bottom_gates.lock().unwrap();
         Arc::clone(gates.entry(key).or_default())
@@ -1250,6 +1428,18 @@ impl Engine {
     /// commit, where the commit ts is already known: the append record is
     /// settled at once, so a checkpoint can tell it from an append still in
     /// flight.
+    ///
+    /// **Always inline, never through the allocator queue.** The allocator
+    /// thread exists so that row ids follow **commit order** (its doc comment
+    /// in `state.rs` says so). But every caller of this function runs inside
+    /// `before_wal`, which the commit chain invokes while it holds the commit-ts
+    /// turn - so at most one transaction allocates at a time, in commit order,
+    /// and the turn already provides the ordering the queue was there for.
+    ///
+    /// Routing it through the queue instead is what forced a `block_on` on a
+    /// runtime worker that was holding both the turn and `commit_lock`: a
+    /// parked worker holding a `tokio::sync::Mutex` guard, waiting for a reply
+    /// only another worker could make. See `docs/THREADS_TO_TOKIO.md` §1.2.
     pub(crate) fn reserve_rows_at(
         &self,
         table: &str,
@@ -1257,7 +1447,49 @@ impl Engine {
         new_segment: bool,
         ts: u64,
     ) -> Result<RowRange> {
-        self.reserve_rows_from(table, n, new_segment, new_segment, Some(ts))
+        // `ts` is deliberately **not** recorded on the append record here. The
+        // record exists (the row ids are taken), but the rows only become
+        // readable in the commit's bottom half; stamping it now would let
+        // `committed_rows` count rows that are still in flight. The caller
+        // settles it with `settle_append_at` once they are published, which is
+        // where the reference's block keeps `created_` and its data together.
+        let _ = ts;
+        self.reserve_rows_inline(table, n, new_segment, new_segment, None)
+    }
+
+    /// [`Self::reserve_rows_from`] in its **async** form, for the write paths
+    /// that are already async.
+    ///
+    /// The allocator hands out row ids in commit order, so the request is a job
+    /// on one FIFO and the reply is a `oneshot`. Both ends of that are tokio;
+    /// the synchronous wrapper below exists only for the tests and for
+    /// `EngineTxn::append`, whose callers are not async.
+    pub(crate) async fn reserve_rows_from_async(
+        &self,
+        table: &str,
+        n: usize,
+        new_segment: bool,
+        copy: bool,
+        ts: Option<u64>,
+    ) -> Result<RowRange> {
+        let Some(allocator) = self.allocator() else {
+            return self.reserve_rows_inline(table, n, new_segment, copy, ts);
+        };
+        let (reply, answer) = tokio::sync::oneshot::channel();
+        let table = table.to_string();
+        // The job body runs on the allocator task and only touches memory, so
+        // sending it is a bounded queue push and awaiting the reply is a
+        // `oneshot` - neither holds a thread.
+        allocator
+            .jobs
+            .send(Box::new(move |engine| {
+                let _ = reply.send(engine.reserve_rows_inline(&table, n, new_segment, copy, ts));
+            }))
+            .await
+            .map_err(|_| Error::Txn("the row allocator stopped".into()))?;
+        answer
+            .await
+            .map_err(|_| Error::Txn("the row allocator stopped".into()))?
     }
 
     /// [`Self::reserve_rows`] with the append's provenance stated separately:
@@ -1271,20 +1503,7 @@ impl Engine {
         copy: bool,
         ts: Option<u64>,
     ) -> Result<RowRange> {
-        let Some(allocator) = self.allocator() else {
-            return self.reserve_rows_inline(table, n, new_segment, copy, ts);
-        };
-        let (reply, answer) = std::sync::mpsc::channel();
-        let table = table.to_string();
-        allocator
-            .jobs
-            .send(Box::new(move |engine| {
-                let _ = reply.send(engine.reserve_rows_inline(&table, n, new_segment, copy, ts));
-            }))
-            .map_err(|_| Error::Txn("the row allocator stopped".into()))?;
-        answer
-            .recv()
-            .map_err(|_| Error::Txn("the row allocator stopped".into()))?
+        crate::scheduler::block_on(self.reserve_rows_from_async(table, n, new_segment, copy, ts))
     }
 
     /// The allocation itself, run on the allocator thread (`TxnAllocator::
@@ -1369,11 +1588,13 @@ impl Engine {
     /// The import's first batch: opens a segment of the statement's own and
     /// hands back its cursor (`TableMeta::GetSegmentIDs1` -> `ApplySegmentIDs`
     /// in the reference, which is what keeps another writer out of it).
-    pub(crate) fn begin_import(&self, table: &str) -> Result<ImportCursor> {
+    pub(crate) async fn begin_import(&self, table: &str) -> Result<ImportCursor> {
         // `ApplySegmentIDs`: the statement claims a fresh segment and owns every
         // offset in it. No append record is written yet - the whole import is
         // one transaction, and its records are only created when it commits.
-        let range = self.reserve_rows_from(table, 0, true, true, None)?;
+        let range = self
+            .reserve_rows_from_async(table, 0, true, true, None)
+            .await?;
         Ok(ImportCursor {
             segment: (range.base >> 32) as u32,
             offset: 0,
@@ -1386,7 +1607,7 @@ impl Engine {
     /// The table's `row_counter` is shared by every writer, so a concurrent
     /// `INSERT` moves it on; the import must not read it again or its blocks
     /// would start at another writer's offset.
-    pub(crate) fn reserve_import_rows(
+    pub(crate) async fn reserve_import_rows(
         &self,
         table: &str,
         n: usize,
@@ -1395,16 +1616,17 @@ impl Engine {
         let Some(allocator) = self.allocator() else {
             return Ok(self.reserve_import_rows_inline(table, n, cursor));
         };
-        let (reply, answer) = std::sync::mpsc::channel();
+        let (reply, answer) = tokio::sync::oneshot::channel();
         let table = table.to_string();
         allocator
             .jobs
             .send(Box::new(move |engine| {
                 let _ = reply.send(engine.reserve_import_rows_inline(&table, n, cursor));
             }))
+            .await
             .map_err(|_| Error::Txn("the row allocator stopped".into()))?;
         answer
-            .recv()
+            .await
             .map_err(|_| Error::Txn("the row allocator stopped".into()))
     }
 
@@ -1490,14 +1712,11 @@ impl Engine {
         {
             return Some(a);
         }
-        let short = table.split('.').next_back().unwrap_or(table);
         let column = self
             .storage
             .catalog
-            .list_indexes()
-            .ok()?
-            .into_iter()
-            .find(|im| im.name == index_name && (im.table == short || im.table == table))?
+            .index_by_name(table, index_name)
+            .ok()??
             .column;
         let key = self.table_key(table);
         self.tables
@@ -1514,12 +1733,9 @@ impl Engine {
         &self,
         table: &str,
     ) -> Result<Vec<(String, u32, u32, bool)>> {
-        let short = table.split('.').next_back().unwrap_or(table);
         let mut out = Vec::new();
-        for im in self.storage.catalog.list_indexes()? {
-            if !(im.table == short || im.table == table)
-                || !im.index_type.eq_ignore_ascii_case("FULLTEXT")
-            {
+        for im in self.storage.catalog.indexes_of_table(table)? {
+            if !im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 continue;
             }
             let Some(analyzer) = im
@@ -1542,13 +1758,11 @@ impl Engine {
     /// Columns of `table` that carry any index, for the `EXPLAIN` index/leftover
     /// filter split.
     pub(crate) fn indexed_columns(&self, table: &str) -> Result<Vec<String>> {
-        let short = table.split('.').next_back().unwrap_or(table);
         Ok(self
             .storage
             .catalog
-            .list_indexes()?
+            .indexes_of_table(table)?
             .into_iter()
-            .filter(|i| i.table == short || i.table == table)
             .map(|i| i.column)
             .collect())
     }
@@ -1695,7 +1909,7 @@ impl Engine {
     /// `WalCmdCreateIndexV2`, …). The catalog writes are still applied to the
     /// store by `commit_at`; replay deliberately skips typed DDL (the catalog
     /// is durable at commit), so this only changes the WAL's bytes.
-    pub(crate) fn ddl_commit_typed<T>(
+    pub(crate) async fn ddl_commit_typed<T>(
         &self,
         op: TxnOp,
         f: impl FnOnce() -> Result<T>,
@@ -1703,7 +1917,7 @@ impl Engine {
     ) -> Result<T> {
         // One DDL at a time: a second capture would interleave two statements'
         // layout rewrites, and only one capture slot exists.
-        let _ddl = self.ddl_lock.lock().unwrap();
+        let _ddl = self.ddl_lock.lock().await;
         let (out, mut batch) = self.storage.catalog.capture(f)?;
         // A statement that changes nothing must not spend a timestamp. The
         // reference commits such a transaction through `GetReadCommitTS` — an
@@ -1738,7 +1952,7 @@ impl Engine {
         // hands the batch back for the WAL and the commit), so the cache has to
         // be dropped again here: a reader between the two would otherwise
         // repopulate it with the pre-commit schema.
-        let committed = self.txn.commit_at(txn, commit_ts);
+        let committed = self.txn.commit_at(txn, commit_ts).await;
         self.storage.catalog.invalidate_tables();
         committed?;
         // The catalog records this DDL wrote are made durable by the commit
@@ -1758,17 +1972,20 @@ impl Engine {
     /// before `finish_bottom` makes the commit visible: a statement that loses
     /// a conflict leaves no buffer cell and no `{id}.col` behind, which is what
     /// lets two DDLs commit without serialising their whole commit phase.
-    pub(crate) fn ddl_commit_with_effects<T, E>(
+    pub(crate) async fn ddl_commit_with_effects<T, E, Fut>(
         &self,
         op: TxnOp,
         stage: impl FnOnce() -> Result<(T, E)>,
-        effects: impl FnOnce(E) -> Result<()>,
+        effects: impl FnOnce(E) -> Fut,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
-    ) -> Result<T> {
+    ) -> Result<T>
+    where
+        Fut: std::future::Future<Output = Result<()>>,
+    {
         // Only the capture is serialised (`catalog.capture` has one overlay and
         // one slot); the commit phase is ordered by the transaction manager.
         let ((out, plan), mut batch) = {
-            let _ddl = self.ddl_lock.lock().unwrap();
+            let _ddl = self.ddl_lock.lock().await;
             self.storage.catalog.capture(stage)?
         };
         if batch.is_empty() || self.batch_is_noop(&batch)? {
@@ -1789,13 +2006,13 @@ impl Engine {
         if let Some(cmd) = typed {
             txn.set_typed_commands(vec![cmd]);
         }
-        let committed = self.txn.commit_at_deferred(txn, commit_ts);
+        let committed = self.txn.commit_at_deferred(txn, commit_ts).await;
         self.storage.catalog.invalidate_tables();
         let ts = committed?;
         // The commit stays invisible until its data is in place; the publish
         // runs even when the effects fail, or the commit barrier would wait for
         // a transaction that already owns a timestamp.
-        let effect_result = effects(plan);
+        let effect_result = effects(plan).await;
         self.txn.finish_bottom(ts);
         effect_result?;
         Ok(out)
@@ -3153,89 +3370,25 @@ impl Engine {
         let t_read = std::time::Instant::now();
         // Read the column, then hand it to the memory segment as one batch: the
         // reference's `IndexBuilder` calls `InsertVecs` once for the table, and
-        // `InsertVecs` builds it in buckets across the dense-index pool. Feeding
-        // the rows one at a time made `CREATE INDEX` a serial point-by-point
-        // build.
-        // The column's declared shape drives the parsing: a `BIT` column stores
-        // a bit string rather than a list of numbers.
-        let decl = self
-            .column_types(table)
-            .ok()
-            .and_then(|t| t.get(ci).cloned())
-            .unwrap_or_default();
-        let (dim, bit) = crate::blocks::engine::vector_column_shape(&decl);
+        // `InsertVecs` builds it in parallel buckets. Feeding the rows one at a
+        // time made `CREATE INDEX` a serial point-by-point build.
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            // A NULL cell reads as the literal `null` out of the blocks and has
-            // no vector, so it is skipped before the strict parse (which would
-            // otherwise report `'null' is not a number`): a nullable vector
-            // column with a NULL row is still a valid index build. This is the
-            // same rule `column_tokens` applies on the rebuild path.
-            let trimmed = text.trim();
-            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
-                continue;
-            }
-            // Strict, and validated against the declared dimension: a cell the
-            // parser cannot read in full (`[1,2,bad,4]`) or that is not a whole
-            // number of `dim`-sized tokens has no place in a graph whose every
-            // vertex is `dim` wide, so it fails the build instead of being
-            // indexed as something else.
-            let v = parse_vector_cell(&text, bit)
-                .map_err(|e| Error::Invalid(format!("'{table}.{column}' row {seq}: {e}")))?;
-            if let Some(dim) = dim {
-                if !v.is_empty() && v.len() % dim != 0 {
-                    return Err(Error::Invalid(format!(
-                        "'{table}.{column}' row {seq}: {} coordinates is not a whole number of {dim}-dimensional tokens",
-                        v.len()
-                    )));
-                }
-            }
-            if v.is_empty() {
-                continue;
-            }
+            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
             rows.push((seq as u64, v));
         }
         let read = t_read.elapsed();
         let segments = self.hnsw_mem_segments(table, column)?;
         let t_build = std::time::Instant::now();
-        let workers = self.hnsw_build_workers();
         for mem in segments {
-            if let Ok(mut mem) = mem.write() {
-                if mem.is_multivector() {
-                    // One vertex per token, all labelled with the row id: the
-                    // single-vector filter below would drop every cell holding
-                    // more than one token and index a whole multi-vector cell
-                    // as a single vertex. A cell whose tokens are not all
-                    // `mem.dims` wide is one of those invalid rows and is left
-                    // out rather than reshaping the whole batch.
-                    let tokens: Vec<(u64, Vec<Vec<f32>>)> = rows
-                        .iter()
-                        .filter_map(|(seq, v)| {
-                            let tokens = crate::hnsw_mem::split_tokens(v, mem.dims);
-                            tokens
-                                .iter()
-                                .all(|t| t.len() == mem.dims)
-                                .then_some((*seq, tokens))
-                        })
-                        .collect();
-                    if !tokens.is_empty() && !mem.insert_token_batch(&tokens, workers) {
-                        return Err(Error::Invalid(format!(
-                            "'{table}.{column}': the multi-vector index rejected a batch of {} rows",
-                            tokens.len()
-                        )));
-                    }
-                } else {
-                    let batch: Vec<(u64, Vec<f32>)> = rows
-                        .iter()
-                        .filter(|(_, v)| v.len() == mem.dims)
-                        .map(|(seq, v)| (*seq, v.clone()))
-                        .collect();
-                    if !batch.is_empty() && !mem.insert_batch(&batch, workers) {
-                        return Err(Error::Invalid(format!(
-                            "'{table}.{column}': the index rejected a batch of {} rows",
-                            batch.len()
-                        )));
-                    }
+            if let Ok(mut mem) = mem.lock() {
+                let batch: Vec<(u64, Vec<f32>)> = rows
+                    .iter()
+                    .filter(|(_, v)| v.len() == mem.dims)
+                    .map(|(seq, v)| (*seq, v.clone()))
+                    .collect();
+                if !batch.is_empty() {
+                    mem.insert_batch(&batch, self.hnsw_build_workers());
                 }
             }
         }
@@ -3253,20 +3406,17 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-    ) -> Result<Vec<Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>> {
+    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
         let key = self.table_key(table);
         let schema = self.table_schema(table)?;
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
         if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
             entry.hnsw_probed = true;
-            let indexes = self.storage.catalog.list_indexes()?;
+            let indexes = self.storage.catalog.indexes_of_table(table)?;
             let types = self.column_types(table)?;
-            let short = table.split('.').next_back().unwrap_or(table);
             for im in indexes {
-                if !(im.table == table || im.table == short)
-                    || !im.index_type.eq_ignore_ascii_case("HNSW")
-                {
+                if !im.index_type.eq_ignore_ascii_case("HNSW") {
                     continue;
                 }
                 let Some(ci) = schema.iter().position(|c| c == &im.column) else {
@@ -3293,23 +3443,10 @@ impl Engine {
                     index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                 let encoding =
                     index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-                // A MULTIVECTOR column keeps one vertex per token, all labelled
-                // with the row id (the reference's `MemIndexInserterIter1<
-                // MultiVectorRef>`). The segment has to know that from the
-                // moment it is created: whichever of the query path (here) and
-                // the write path (`dml::insert_vector_indexes`) wins the
-                // `or_insert_with` race decides, and a plain segment silently
-                // drops every multi-token cell and reports token counts where
-                // the coverage check expects row counts.
-                let multivector = self.multivector_column(table, &im.column);
                 entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                    Arc::new(RwLock::new(if multivector {
-                        crate::hnsw_mem::HnswIndexInMem::new_multivector(
-                            dims, m, efc, metric, encoding,
-                        )
-                    } else {
-                        crate::hnsw_mem::HnswIndexInMem::new_with(dims, m, efc, metric, encoding)
-                    }))
+                    Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
+                        dims, m, efc, metric, encoding,
+                    )))
                 });
             }
         }
@@ -3602,18 +3739,13 @@ impl Engine {
     /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)` on
     /// `table.column`, if one exists.
     pub(crate) fn mv_plaid_config(&self, table: &str, column: &str) -> Option<PlaidConfig> {
-        let short = table.rsplit('.').next().unwrap_or(table);
         let im = self
             .storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .ok()?
             .into_iter()
-            .find(|im| {
-                im.index_type.eq_ignore_ascii_case("PLAID")
-                    && im.column == column
-                    && (im.table == table || im.table == short)
-            })?;
+            .find(|im| im.index_type.eq_ignore_ascii_case("PLAID") && im.column == column)?;
         let mut cfg = PlaidConfig {
             nbits: 4,
             n_centroids: 0,
@@ -3639,15 +3771,13 @@ impl Engine {
     /// Whether `table.column` carries an ANN index that the tensor scan can
     /// answer from (`PLAID`/`SMVE`; `EMVB` uses the same multi-vector path).
     pub(crate) fn tensor_has_ann_index(&self, table: &str, column: &str) -> bool {
-        let short = table.rsplit('.').next().unwrap_or(table);
         self.storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .unwrap_or_default()
             .into_iter()
             .any(|im| {
                 im.column == column
-                    && (im.table == table || im.table == short)
                     && (im.index_type.eq_ignore_ascii_case("PLAID")
                         || im.index_type.eq_ignore_ascii_case("SMVE")
                         || im.index_type.eq_ignore_ascii_case("EMVB"))
@@ -3657,18 +3787,13 @@ impl Engine {
     /// `CREATE INDEX … USING EMVB WITH (pq_subspace_num=…, pq_subspace_bits=…)`
     /// on `table.column`.
     pub(crate) fn mv_emvb_config(&self, table: &str, column: &str) -> Option<EmvbConfig> {
-        let short = table.rsplit('.').next().unwrap_or(table);
         let im = self
             .storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .ok()?
             .into_iter()
-            .find(|im| {
-                im.index_type.eq_ignore_ascii_case("EMVB")
-                    && im.column == column
-                    && (im.table == table || im.table == short)
-            })?;
+            .find(|im| im.index_type.eq_ignore_ascii_case("EMVB") && im.column == column)?;
         let mut cfg = EmvbConfig {
             subspace_num: 1,
             subspace_bits: 8,
@@ -3689,18 +3814,13 @@ impl Engine {
 
     /// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)` on `table.column`.
     pub(crate) fn mv_smve_config(&self, table: &str, column: &str) -> Option<SmveConfig> {
-        let short = table.rsplit('.').next().unwrap_or(table);
         let im = self
             .storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .ok()?
             .into_iter()
-            .find(|im| {
-                im.index_type.eq_ignore_ascii_case("SMVE")
-                    && im.column == column
-                    && (im.table == table || im.table == short)
-            })?;
+            .find(|im| im.index_type.eq_ignore_ascii_case("SMVE") && im.column == column)?;
         let mut cfg = SmveConfig {
             width: 2048,
             topk: 8,
@@ -3838,7 +3958,7 @@ impl Engine {
         let block_size = self
             .storage
             .catalog
-            .list_indexes()?
+            .indexes_of_table(table)?
             .into_iter()
             .find(|im| im.column == *column && im.index_type.eq_ignore_ascii_case("BMP"))
             .map(|im| index_block_size(&im))
@@ -4299,12 +4419,12 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables.get(&key)?.hnsw_mem.get(column)?.clone()
         };
-        let len = mem.read().unwrap().len();
+        let len = mem.lock().unwrap().len();
         Some(len)
     }
 
-    /// Configured byte budget of the in-memory index buffers (the reference's
-    /// `[buffer] buffer_manager_size`).
+    /// Configured byte budget of the in-memory index buffers (built in at
+    /// 8 GiB; the reference's `[buffer] buffer_manager_size` is ignored).
     pub fn buffer_memory_limit(&self) -> usize {
         self.context
             .buffer_budget
@@ -4513,9 +4633,8 @@ impl Engine {
             let index_ids: Vec<u64> = self
                 .storage
                 .catalog
-                .list_indexes()?
+                .indexes_of_table(&meta.name)?
                 .iter()
-                .filter(|im| im.table == meta.name || im.table == self.qualified_table(&meta.name))
                 .map(|im| im.id)
                 .collect();
             // The records being reclaimed live in the C++ key space, i.e. the
@@ -5040,55 +5159,6 @@ impl Engine {
                             "invalid index parameter: unsupported HNSW option '{k}'"
                         )));
                     }
-                    // An index is a persisted artefact, so a typo or an
-                    // out-of-range number is rejected here rather than silently
-                    // defaulted: `M = 0` builds a graph with no neighbour slots
-                    // at all, and `metric = 'l1'` would quietly become `l2`.
-                    match k.as_str() {
-                        "M" | "EF_CONSTRUCTION" => {
-                            let n: usize = v.trim().parse().map_err(|_| {
-                                Error::Invalid(format!(
-                                    "invalid index parameter: {k} expects an integer, got '{v}'"
-                                ))
-                            })?;
-                            let (lo, hi) = if k == "M" {
-                                (2usize, 2048usize)
-                            } else {
-                                (2usize, 65_536usize)
-                            };
-                            if !(lo..=hi).contains(&n) {
-                                return Err(Error::Invalid(format!(
-                                    "invalid index parameter: {k} must be in [{lo}, {hi}], got {n}"
-                                )));
-                            }
-                        }
-                        "METRIC" => {
-                            if !matches!(
-                                v.trim().to_ascii_lowercase().as_str(),
-                                "l2" | "ip"
-                                    | "inner_product"
-                                    | "innerproduct"
-                                    | "cosine"
-                                    | "cos"
-                                    | "hamming"
-                            ) {
-                                return Err(Error::Invalid(format!(
-                                    "invalid index parameter: unknown metric '{v}'"
-                                )));
-                            }
-                        }
-                        "ENCODE"
-                            if !matches!(
-                                v.trim().to_ascii_lowercase().as_str(),
-                                "plain" | "lvq" | "rabitq"
-                            ) =>
-                        {
-                            return Err(Error::Invalid(format!(
-                                "invalid index parameter: unknown encoding '{v}'"
-                            )));
-                        }
-                        _ => {}
-                    }
                     if k == "ENCODE" && v.eq_ignore_ascii_case("lvq") && int_elem {
                         return Err(Error::Invalid(
                             "LVQ encoding is not supported for integer embeddings".into(),
@@ -5351,6 +5421,21 @@ impl Engine {
         // A full-text scan holds the whole table's token data; bound how many
         // run at once so a handful of concurrent readers cannot exhaust memory.
         let _scan = self.context.scan_gate.enter();
+        self.search_text_terms_with_slot(table, m, pred, hidden)
+    }
+
+    /// [`Self::search_text_terms`] for a caller that already holds the scan
+    /// slot. The `default_field` fallback re-enters the statement with the
+    /// field filled in, and taking a second slot on one thread is a deadlock:
+    /// the gate admits two scans, so two concurrent statements doing that
+    /// would each wait for the slot the other is holding.
+    fn search_text_terms_with_slot(
+        &self,
+        table: &str,
+        m: &MatchClause,
+        pred: Option<&Expr>,
+        hidden: &[String],
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         // A full-text search runs through an index; without one the C++ engine
         // refuses the statement.
@@ -5456,7 +5541,24 @@ impl Engine {
             if let Some(groups) = parse_field_query(&query) {
                 return self.search_field_query(table, &groups, &query, pred, &params, hidden);
             }
-            return Ok((Vec::new(), hidden.to_vec()));
+            // ...and otherwise falls back to `default_field=<col>`, which is
+            // what the SDK's `match_text("", q, n, {"default_field": "body"})`
+            // sends: an empty field list means "the default field", not "no
+            // field". Without this the plain keyword below has nothing to be
+            // searched in and the statement silently returned no rows.
+            let fallback = super::state::search_option(&params, "default_field");
+            match fallback.and_then(|name| schema.iter().position(|s| s == &name)) {
+                Some(ci) => {
+                    let name = schema[ci].clone();
+                    // Re-dispatch with the field filled in, so the single-field
+                    // path below does the tokenising, scoring and boosting.
+                    // Carries this call's scan slot rather than taking another.
+                    let mut m2 = m.clone();
+                    m2.column = name;
+                    return self.search_text_terms_with_slot(table, &m2, pred, hidden);
+                }
+                None => return Ok((Vec::new(), hidden.to_vec())),
+            }
         }
         // `whitespace`/`keyword` split only on whitespace (so `2023-01-01` stays
         // one token); `whitespace-<chars>` splits **only** on the listed
@@ -7537,13 +7639,7 @@ impl Engine {
             ));
         }
         if let Some(want) = option_value("index_name") {
-            let short = table.split('.').next_back().unwrap_or(table);
-            let exists = self
-                .storage
-                .catalog
-                .list_indexes()?
-                .iter()
-                .any(|im| im.name == want && (im.table == *table || im.table == short));
+            let exists = self.storage.catalog.index_by_name(table, &want)?.is_some();
             if !exists {
                 return Err(Error::NotFound(format!("index '{want}'")));
             }
@@ -7814,14 +7910,6 @@ impl Engine {
         // the table. `rows` therefore starts empty and is filled once the
         // candidate set is known.
         let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
-        // Every predicate the scan applies (C++ `PhysicalKnnScan`'s block
-        // filter): one closure, so pushing it into the graph and applying it
-        // during scoring cannot drift apart.
-        let keep = |row: &[Value]| {
-            pred.is_none_or(|p| p.eval_predicate(row))
-                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-        };
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
         // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
@@ -7831,70 +7919,14 @@ impl Engine {
         // below, so the ranking equals the exhaustive scan whenever the graph
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
-        // Filter pushdown: a filtered query can still use the index when the
-        // rows the predicate admits are known. The reference compiles each
-        // block's predicate into a `BitmaskFilter` and hands it to the graph
-        // (`CalculateFilterBitmask` -> `SearchIndex(..., bitmask)`), so the
-        // graph returns `topn` accepted rows instead of the exact scan walking
-        // the table. Reading the rows once here is that bitmask's cost.
-        let allow_rows: Option<std::collections::HashSet<usize>> = if has_filter && cache.is_none()
-        {
-            let indexed_column = match_columns(&m.column)
-                .first()
-                .cloned()
-                .unwrap_or_default();
-            // The reference answers a filter from the secondary indexes and hands
-            // the bitmask to the graph (`CommonQueryFilter::filter_result_`).
-            // Only a plain conjunction is answerable that way; an `IN` list or a
-            // text search keeps the decode path.
-            let from_indexes = match (pred, in_filter.as_ref(), search_filter.as_ref()) {
-                (Some(pred), None, None) => self.predicate_rows_from_indexes(table, pred),
-                _ => None,
-            };
-            if !self.has_vector_index(table, &indexed_column) {
-                // Nothing to push the bitmask into: the exact scan decodes the
-                // table once and applies `keep` itself.
-                None
-            } else if from_indexes.is_some() {
-                from_indexes
-            } else {
-                // Only the columns the predicate names are decoded: the bitmask
-                // is a property of the filter columns, and the vector payload is
-                // the largest column in the table. Every other cell comes back
-                // `NULL`, which is why the rows are *not* reused for scoring.
-                let mut cols: Vec<usize> = [pred, in_filter.as_ref(), search_filter.as_ref()]
-                    .into_iter()
-                    .flatten()
-                    .flat_map(expression::Expr::referenced_columns)
-                    .collect();
-                cols.sort_unstable();
-                cols.dedup();
-                Some(
-                    self.read_blocks_values(table, Some(&cols), &[], Some(&keep), None)?
-                        .1
-                        .into_iter()
-                        .map(|(seq, _)| seq)
-                        .collect(),
-                )
-            }
-        } else {
-            None
-        };
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
-            if is_sparse {
+            if is_sparse || is_tensor {
                 return None;
             }
             let col_name = match_columns(&m.column).first()?.clone();
             let col_type = types.get(col_idx)?.to_ascii_uppercase();
-            if is_bit_type(&col_type) {
-                return None;
-            }
-            // A `MULTIVECTOR` column indexes one vertex per token, so the query
-            // row's tokens are the query set; any other tensor column has no
-            // single-vector graph.
-            let multivector = col_type.starts_with("MULTIVECTOR");
-            if is_tensor && !multivector {
-                return None;
+            if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
+                return None; // a single-vector index
             }
             let qv: Vec<f32> = query_items
                 .iter()
@@ -7904,21 +7936,16 @@ impl Engine {
             if qv.is_empty() {
                 return None;
             }
-            let queries: Vec<Vec<f32>> = if multivector {
-                let dims = type_dim(&col_type).filter(|d| *d > 0)?;
-                if !qv.len().is_multiple_of(dims) {
-                    return None;
-                }
-                qv.chunks_exact(dims).map(<[f32]>::to_vec).collect()
-            } else {
-                vec![qv]
-            };
+            // A predicate can exclude rows the graph returned, so the graph alone
+            // cannot decide the top-k: the reference re-scores every row the
+            // filter admits. Keep the exact scan for filtered queries.
+            if has_filter {
+                return None;
+            }
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 column: &col_name,
-                queries: &queries,
-                multivector,
-                allow: allow_rows.as_ref(),
+                query: &qv,
                 rows: &rows,
                 live_rows: None,
                 cache: cache.as_ref(),
@@ -7927,26 +7954,17 @@ impl Engine {
                 options: &knn_opts,
             })
         })();
-        // A filtered query whose predicate could not be answered as a set (no
-        // secondary index, an `OR`, an unindexed column) has no bitmask to push
-        // into the probe. An index can still appear between `has_vector_index`
-        // and this probe - a concurrent `CREATE INDEX`, or the memory segment
-        // the first insert after a restart creates - and the candidates it then
-        // returns would be scored with the residual predicate disabled (the rows
-        // are a vector-only projection, so `keep` cannot run on them). Decline
-        // them: the exact scan decodes the table and applies the predicate.
-        let vector_candidates = if has_filter && allow_rows.is_none() {
-            None
-        } else {
-            vector_candidates
-        };
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
+                // A predicate reads other columns, so a filtered query needs the
+                // whole row; an unfiltered one is scored from the vector column
+                // alone and gets its output rows from the block pass below.
                 Some(cands) if !cands.is_empty() => {
-                    self.read_blocks_candidates_values(table, &[col_idx], cands)?
-                        .1
+                    let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
+                    let (_, got) = self.read_blocks_candidates_values(table, wanted, cands)?;
+                    got
                 }
                 Some(_) => Vec::new(),
                 None => self.fetch_rows_with_ids(table)?,
@@ -8083,12 +8101,16 @@ impl Engine {
         // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
         // (filters live in the filter-scan base; the index probe above is
         // `KnnCandidateScan`).
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
         let column_decl = types
             .get(col_idx)
             .map(|t| t.to_ascii_uppercase())
             .unwrap_or_default();
         let query_elem_arg = arg_str(m.args.get(1));
-        let indexed = vector_candidates.is_some();
         let scan = knn_scan::PhysicalKnnScan {
             column_index: col_idx,
             column_type: &column_decl,
@@ -8107,15 +8129,7 @@ impl Engine {
         // Scoring only ever reads the vector column, so the rows it decoded are
         // projections of it. The result rows are read separately (all columns),
         // which is why this scan cannot reuse them.
-        //
-        // An indexed query's rows carry that projection alone: every other cell
-        // is `NULL`, so re-evaluating the predicate here would reject every row.
-        // The predicate is already in the candidate set instead - `allow_rows`
-        // holds every row it admits, and `KnnCandidateScan` intersects the rows
-        // the graph did not label with it.
-        let admitted = |_: &[Value]| true;
-        let row_filter: &dyn Fn(&[Value]) -> bool = if indexed { &admitted } else { &keep };
-        let state = scan.finish(scan.execute(row_filter, &bmp_scores, &mv_scores)?);
+        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
         let use_sim = state.use_sim;
         let scored = state.scored;
 
@@ -8284,9 +8298,38 @@ impl Engine {
 
     /// A checkpoint (`PhysicalFlush`). The reference only serves it from a
     /// writable node (`physical_flush_impl.cpp:42-52`).
-    pub fn flush(&self) -> Result<()> {
+    ///
+    /// With `[storage] flush_dumps_mem_index = true` this also releases every
+    /// memory index: after the checkpoint (which must finish first - a dump
+    /// takes `flush_lock` internally, and the lock is not re-entrant) each
+    /// index is sealed and published by its own `DumpMemIndex` transaction.
+    /// That spends a commit ts per non-empty tail, which is why it is off by
+    /// default: the reference's flush leaves the tails in memory.
+    pub async fn flush(&self) -> Result<()> {
+        self.checkpoint().await?;
+        if self
+            .context
+            .flush_dumps_mem_index
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            self.dump_all_memory_indexes().await;
+            // The dumps wrote new chunk files; drop their mappings and reload
+            // the readers so the released memory actually leaves RSS.
+            self.drop_index_caches();
+            self.reload_vector_indexes();
+        }
+        Ok(())
+    }
+
+    /// The checkpoint alone: `flush_storage` and nothing else.
+    ///
+    /// The periodic trigger uses this, not [`Self::flush`]: the reference's
+    /// `PeriodicTriggerThread` only checkpoints, so
+    /// `[storage] flush_dumps_mem_index` must not turn every interval into a
+    /// dump of every index (each non-empty tail spends a commit ts).
+    pub async fn checkpoint(&self) -> Result<()> {
         self.ensure_writable()?;
-        self.flush_storage()
+        self.flush_storage().await
     }
 
     /// Attaches a `BGTaskProcessor` (`Storage::dump_index_processor`). While
@@ -8374,21 +8417,21 @@ impl Engine {
         // alike, which is the wrong limit for a directory of 100k tables.
         // `Storage::Start` also starts the memory-index appender
         // (`storage_impl.cpp` / `mem_index_appender_impl.cpp:52`).
+        // The trigger is a **task**, not a thread: every step it performs is an
+        // `.await` or a pure enqueue, so between ticks it costs a future
+        // instead of a parked OS thread. It runs on the engine's own runtime,
+        // which is the same one the statements and the fan-outs use.
         let engine = Arc::downgrade(self);
-        let spawned = std::thread::Builder::new()
-            .name("infinity-trigger".to_string())
-            .spawn(move || {
-                trigger_loop(
-                    engine,
-                    checkpoint_interval,
-                    cleanup_interval,
-                    compact_interval,
-                    optimize_interval,
-                )
-            });
-        if let Err(error) = spawned {
-            eprintln!("background trigger thread not started: {error}");
-        }
+        crate::scheduler::scheduler().spawn_task(async move {
+            trigger_loop(
+                engine,
+                checkpoint_interval,
+                cleanup_interval,
+                compact_interval,
+                optimize_interval,
+            )
+            .await
+        });
     }
 
     /// `ChunkIndexMetaInfo` of the sealed secondary chunks: `(base row id,
@@ -8677,7 +8720,7 @@ impl Engine {
         /// read once the table lock is released (a scan holds one of these
         /// guards while it waits for `tables`).
         enum Handle {
-            Hnsw(Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>),
+            Hnsw(Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>),
             Text(SharedTextIndex),
             Sparse(Arc<std::sync::RwLock<SparseIndex>>),
             Mv(Arc<std::sync::RwLock<MultiVectorIndex>>),
@@ -8714,7 +8757,7 @@ impl Engine {
             };
             let (row_count, mem_used) = match handle {
                 Some(Handle::Hnsw(h)) => {
-                    let h = h.read().unwrap();
+                    let h = h.lock().unwrap();
                     (h.len(), h.mem_usage())
                 }
                 Some(Handle::Text(t)) => {
@@ -8857,7 +8900,7 @@ impl Engine {
     /// so a cleanup is one transaction - one commit ts, one `CLEANUP` entry.
     /// Flushing here made it two (a checkpoint frame plus the cleanup entry),
     /// which shifted every later statement's ts by one checkpoint.
-    pub fn cleanup(&self) -> Result<()> {
+    pub async fn cleanup(&self) -> Result<()> {
         // The cleanup task runs in `kWritable` and `kReadable`
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
@@ -8882,7 +8925,7 @@ impl Engine {
         // command carrying the begin ts (`CleanupTxnStore::ToWalEntry`), which
         // the reference's replay ignores. Without it a directory that ran a
         // cleanup has one frame less than the reference's.
-        self.txn.append_cleanup()?;
+        self.txn.append_cleanup().await?;
         cleaned
     }
 }

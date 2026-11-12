@@ -111,7 +111,7 @@ fn replay_flush_gap_create() {
 
     let e = h::reopen(e, dir.path());
     assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").len(), 3);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     assert!(e.table_exists("db1.tb1"));
 }
 
@@ -133,8 +133,8 @@ fn replay_flush_gap_append_drop() {
 
     let e = h::reopen(e, dir.path());
     assert!(!e.table_exists("db1.tb1"));
-    e.cleanup().unwrap();
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
+    crate::scheduler::block_on(e.cleanup()).unwrap();
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:416`
@@ -156,7 +156,7 @@ fn replay_flush_gap_append_drop_column_add_column() {
     assert_eq!(cols.len(), 2);
     assert_eq!(cols[0][0], "col2");
     assert_eq!(cols[1][0], "col3");
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:532`
@@ -174,7 +174,7 @@ fn replay_flush_gap_append_compact() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:631`
@@ -196,7 +196,7 @@ fn replay_flush_gap_delete_compact() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 4096);
     assert_eq!(h::count(&e, "db1.tb1"), 4096);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:740`
@@ -218,7 +218,7 @@ fn replay_flush_gap_append_rename() {
     // the row moved with whichever name the catalog holds.
     let renamed = e.table_exists("default_db.table2") || e.table_exists("db1.table2");
     assert!(renamed, "renamed table is missing");
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:826`
@@ -231,7 +231,7 @@ fn replay_flush_gap_append_dump_optimize_index() {
     h::ok(&e, "CREATE INDEX index_name ON db1.tb1 (col2);");
     for _ in 0..2 {
         h::append(&e, "db1.tb1", block());
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
     e.checkpoint_wal();
@@ -239,7 +239,7 @@ fn replay_flush_gap_append_dump_optimize_index() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:942`
@@ -258,7 +258,7 @@ fn replay_flush_gap_append_append() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 16384);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1]);
     assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8192));
     assert_eq!(e.block_row_count("db1.tb1", 0, 1), Some(8192));
@@ -274,7 +274,7 @@ fn replay_flush_gap_dump_index() {
     h::ok(&e, "CREATE INDEX index_name ON db1.tb1 (col2);");
     for _ in 0..2 {
         h::append(&e, "db1.tb1", block());
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.checkpoint_wal();
 
@@ -294,7 +294,7 @@ fn replay_flush_gap_optimize_index() {
     h::ok(&e, "CREATE INDEX index_name ON db1.tb1 (col2);");
     for _ in 0..2 {
         h::append(&e, "db1.tb1", block());
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
     e.checkpoint_wal();
@@ -302,7 +302,7 @@ fn replay_flush_gap_optimize_index() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_with_ckp_ut.cpp:76`
@@ -399,7 +399,7 @@ fn ckp_replay_insert() {
 
     let e = h::reopen(e, dir.path());
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_alter_ut.cpp:60`

@@ -14,81 +14,6 @@ struct SecondarySnapshot {
     sealing: Vec<Arc<index::SealedTail>>,
 }
 
-/// The largest integer magnitude at which `f64` still orders the integers.
-///
-/// The evaluator compares numerics as `f64` (`Value::partial_cmp_value`), so
-/// from `2^53` up two distinct integers are one value to the predicate while the
-/// index keeps one key each: `9007199254740992 = 9007199254740993` admits both
-/// rows there but probes a single key, and `> 9007199254740992` admits neither
-/// while the closed range minus its boundary keeps the second. A bound at this
-/// magnitude is not the predicate's answer, so it declines.
-const EXACT_INTEGER_LIMIT: f64 = 9_007_199_254_740_992.0;
-
-/// Whether `value`'s **key** is the key of `value` itself, *and* comparing that
-/// key orders the stored rows the way the evaluator does.
-///
-/// The chunk and tail keys hold the *stored* value (`i8`, `i16`, `i32`, `i64`,
-/// `f32`, `f64`, a temporal count, a hash), so a conversion that rounds,
-/// saturates or truncates names a different value: `TINYINT 300` becomes `44`,
-/// `FLOAT 1.00000003` becomes `1.0`, and `TIME '12:34:56.1'` becomes `45296`.
-/// Probing such a key answers another predicate, so an equality has no answer
-/// and a strict range must not subtract that key from its boundary.
-///
-/// This gates the indexed KNN path alone (`index_rows_for`), which treats the
-/// answer as final because its rows are a vector projection and nothing
-/// re-evaluates the predicate. Whatever this declines is decoded and evaluated
-/// row by row instead.
-pub(crate) fn key_is_exact(declared: &str, value: &expression::Value) -> bool {
-    use expression::Value as V;
-    use storage::secondary_segment::KeyKind;
-    let kind = secondary_key_kind(declared);
-    match (key_domain(declared), value) {
-        (KeyDomain::Integer, V::Int(i)) => {
-            // Representable in the key's width *and* orderable by the
-            // evaluator: from 2^53 up `f64` folds neighbours together.
-            let f = *i as f64;
-            let (low, high) = integer_key_bounds(declared);
-            f >= low && f < high && f.abs() < EXACT_INTEGER_LIMIT
-        }
-        (KeyDomain::Integer, V::Float(f)) => {
-            // The same rule `float_lookup_literal` applies: only an integral
-            // value inside the key's own width has an integer key.
-            let (low, high) = integer_key_bounds(declared);
-            f.fract() == 0.0 && *f >= low && *f < high && f.abs() < EXACT_INTEGER_LIMIT
-        }
-        // A floating-point key is not the predicate's answer yet. A `FLOAT`
-        // chunk narrows the key to `f32`, so `1.0` and `1.00000003` share one
-        // key, and the tail and equality probes are built from
-        // `to_slt_string`, six decimals, so `1.0000004` is probed as `1.0`.
-        // Either way an equality can admit a row the predicate rejects and the
-        // strict-bound subtraction can remove one it admits, and filtered KNN
-        // never re-evaluates what it is handed.
-        (KeyDomain::Float, _) => false,
-        // A temporal key is a truncated count - the reference's `DateT`/`TimeT`
-        // value, seconds since midnight with the fraction dropped - while the
-        // evaluator compares the text: `t < '12:34:56.1'` admits `12:34:56`,
-        // but the bound and that row share the key `45296`, so the strict bound
-        // would subtract it - and `12:34:56.9`, which the predicate rejects,
-        // shares it as well.
-        (KeyDomain::Temporal, _) => false,
-        (KeyDomain::Hashed, V::Str(text)) => {
-            // A `BOOL` key is `0`/`1` (`BooleanT`) while the evaluator compares
-            // the exact text (`"true".cmp("TRUE")` is not equal), so only the
-            // two lowercase spellings are exact: `flag = '1'` rejects every row
-            // although the key would read `true`. No trimming, no case folding,
-            // no numeric aliases.
-            //
-            // The other hashed keys are not predicate answers at all: a varchar
-            // key is a 64-bit hash (two texts can collide), and a JSON key is a
-            // term, not a document, so a document equality has no key here.
-            kind == KeyKind::Bool && matches!(text.as_str(), "true" | "false")
-        }
-        // A numeric literal on a text column, or a temporal literal that is not
-        // text, has no key in that column's space.
-        _ => false,
-    }
-}
-
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
@@ -120,7 +45,11 @@ impl Engine {
                     .iter()
                     .any(|c| c == &im.column)
                 {
-                    self.build_index(&im.table, &im.column)?;
+                    // Map the published chunks and index only the rows they do
+                    // not cover, instead of re-reading the whole column: a
+                    // reopened table keeps its chunk readers and its memory tail
+                    // holds exactly the gap.
+                    self.load_secondary_index(&im)?;
                 }
             }
             // A vector index's persisted HNSW graph, loaded so the search path
@@ -157,6 +86,167 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    /// Maps a secondary index's published chunks and indexes the rows they do
+    /// not cover.
+    ///
+    /// The catalog's `idx_chunk|…|chunk_info` records carry each chunk's
+    /// `base_row_id` and `row_count`, so the covered ranges are known without
+    /// reading a single row; only the gaps are scanned (the reference's
+    /// `CountMemIndexGapInSegment` + `AppendIndex`).
+    fn load_secondary_index(&self, im: &IndexMeta) -> Result<()> {
+        let table = self.qualified_table(&im.table);
+        let Some(meta) = self.storage.catalog.get_table_by_name(&table)? else {
+            return Ok(());
+        };
+        let Some(ci) = meta.columns.iter().position(|c| c == &im.column) else {
+            return Ok(());
+        };
+        // A hand-written record without an id has no directory of its own:
+        // there is nothing to map, so the old full build is the only answer.
+        if im.id == 0 {
+            return self.build_index(&table, &im.column);
+        }
+        let db_id = self.database_id_of(&table).to_string();
+        let table_id = meta.id.to_string();
+        let ty = meta.types.get(ci).cloned().unwrap_or_default();
+        let kind = secondary_key_kind(&ty);
+        let is_low = ty.trim().to_ascii_uppercase().starts_with("BOOL");
+        let dir = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{table_id}/idx_{}", im.id));
+        let chunks = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id,
+            &table_id,
+            &im.id.to_string(),
+        )?;
+        let mut disk = Vec::new();
+        let mut low = Vec::new();
+        let mut chunk_meta = Vec::new();
+        let mut covered: std::collections::BTreeMap<u32, Vec<(u64, u64)>> = Default::default();
+        for (segment, entries) in chunks {
+            for (chunk_id, info) in entries {
+                let path = dir.join(format!("seg_{segment}/chunk_{chunk_id}.idx"));
+                if is_low {
+                    let Ok(reader) = storage::secondary_lowcard::LowCardReader::open(&path) else {
+                        continue;
+                    };
+                    low.push((u64::from(segment) << 32, Arc::new(reader)));
+                } else {
+                    let Ok(reader) =
+                        storage::secondary_segment::SecondarySegmentReader::open_with_kind(
+                            &path, kind,
+                        )
+                    else {
+                        continue;
+                    };
+                    disk.push((u64::from(segment) << 32, Arc::new(reader)));
+                }
+                let base = info.base_row_id & 0xffff_ffff;
+                covered
+                    .entry(segment)
+                    .or_default()
+                    .push((base, base + info.row_count));
+                chunk_meta.push((info.base_row_id, info.row_count as usize));
+            }
+        }
+        {
+            let key = self.table_key(&table);
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            if is_low {
+                entry.secondary.low.insert(im.column.clone(), low);
+            } else {
+                entry.secondary.disk.insert(im.column.clone(), disk);
+            }
+            entry
+                .secondary
+                .chunk_meta
+                .insert(im.column.clone(), chunk_meta);
+            entry.secondary.disk_backed.insert(im.column.clone());
+            // The ordered key domain of the column: the gap rows below are
+            // encoded with it, and so is the query. Without it the two would
+            // use different encodings and never meet.
+            entry
+                .secondary
+                .declared_types
+                .insert(im.column.clone(), ty.trim().to_ascii_uppercase());
+            // The memory tail needs an entry *even when it starts empty*: the
+            // per-row insert hook and `dump_index` both look the index up in
+            // this map, so without it a reopened table never indexes the rows
+            // written after the restart and their dump finds nothing to seal.
+            entry
+                .secondary
+                .indexes
+                .entry(im.column.clone())
+                .or_default();
+        }
+        // The rows no chunk covers go into the memory tail; the normal
+        // capacity/quota rules dump them later.
+        //
+        // The set of rows is taken from the stored rows themselves, not from
+        // `segment_row_counts`: that one counts what the **blocks** hold, and a
+        // row appended after the last checkpoint lives only in the append
+        // buffer - it is exactly the "gap" this has to index.
+        self.index_secondary_gap(&table, &im.column, ci, &covered);
+        Ok(())
+    }
+
+    /// Feeds the rows **no chunk covers** into one secondary index's memory
+    /// tail, in the same key form the per-row insert hook uses.
+    ///
+    /// Membership is judged per row: a row is a gap when its `(segment,
+    /// offset)` falls in no span `covered` lists. That is stricter (and more
+    /// correct) than intersecting with a row count, which would miss a row that
+    /// exists only in the append buffer.
+    fn index_secondary_gap(
+        &self,
+        table: &str,
+        column: &str,
+        ci: usize,
+        covered: &std::collections::BTreeMap<u32, Vec<(u64, u64)>>,
+    ) {
+        let tkey = self.table_key(table);
+        let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
+            return;
+        };
+        for (seq, row) in rows {
+            let segment = (seq as u64 >> 32) as u32;
+            let offset = seq as u64 & 0xffff_ffff;
+            let in_chunk = covered
+                .get(&segment)
+                .is_some_and(|spans| spans.iter().any(|(a, b)| offset >= *a && offset < *b));
+            if in_chunk {
+                continue;
+            }
+            let Some(value) = row.get(ci) else { continue };
+            if matches!(value, Value::Null) {
+                continue;
+            }
+            // The key is the **ordered** encoding of the value
+            // (`ConvertToOrderedType`), the same one the per-row hook writes:
+            // a raw text key would never match a key the query encodes.
+            let mut tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get_mut(&tkey) else {
+                continue;
+            };
+            let Some(index) = entry.secondary.indexes.get(column) else {
+                continue;
+            };
+            let index = Arc::clone(index);
+            let declared = entry
+                .secondary
+                .declared_types
+                .get(column)
+                .cloned()
+                .unwrap_or_default();
+            drop(tables);
+            for key in value_to_tail_keys(&declared, value) {
+                index.insert(&key, seq as u64);
+            }
+        }
     }
 
     /// `NewTxn::RecoverMemIndex`: rebuilds an index's memory tail from the rows
@@ -238,36 +328,16 @@ impl Engine {
             }
             if kind.eq_ignore_ascii_case("HNSW") {
                 let segments = self.hnsw_mem_segments(&table, &meta.column)?;
-                let workers = self.hnsw_build_workers();
                 for mem in segments {
-                    let Ok(mut mem) = mem.write() else { continue };
-                    let dims = mem.dims;
-                    // One vertex per `dims`-sized token, labelled with its row,
-                    // exactly as the write path inserts a multi-vector cell
-                    // (`split_tokens` + `insert_token_batch`). Keeping only
-                    // cells whose flattened length *equalled* `dims` dropped
-                    // every multi-token row from the recovered graph, and the
-                    // next dump then sealed a graph that had never held them.
-                    let recovered: Vec<(u64, Vec<Vec<f32>>)> = gap
-                        .iter()
-                        .filter_map(|(seq, cells)| {
-                            let text = cells.get(ci)?.to_slt_string();
-                            let flat: Vec<f32> =
-                                parse_vec_str(&text).iter().map(|x| *x as f32).collect();
-                            let tokens = crate::hnsw_mem::split_tokens(&flat, dims);
-                            // `insert_token_batch` rejects the *whole* batch when
-                            // one token does not match `dims`, so a single
-                            // malformed cell would drop every valid row behind
-                            // it. A cell that is not a whole number of tokens has
-                            // no vertex width this graph can hold; leave it to
-                            // the exact scan.
-                            let usable =
-                                !tokens.is_empty() && tokens.iter().all(|t| t.len() == dims);
-                            usable.then_some((*seq as u64, tokens))
-                        })
-                        .collect();
-                    if !recovered.is_empty() {
-                        mem.insert_token_batch(&recovered, workers);
+                    let Ok(mut mem) = mem.lock() else { continue };
+                    for (seq, cells) in &gap {
+                        let Some(value) = cells.get(ci) else { continue };
+                        let text = value.to_slt_string();
+                        let vector: Vec<f32> =
+                            parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+                        if vector.len() == mem.dims {
+                            mem.insert(*seq as u64, &vector);
+                        }
                     }
                 }
             } else if kind.eq_ignore_ascii_case("IVF") {
@@ -624,9 +694,7 @@ impl Engine {
                         .vector
                         .entry(im.column.clone())
                         .or_default();
-                    // Ascending, so `pop` takes the largest: evicting the
-                    // biggest graph frees the most with one query left cold.
-                    list.sort_by_key(|s| s.bytes);
+                    list.sort_by_key(|s| std::cmp::Reverse(s.bytes));
                     while total > budget && list.len() > 1 {
                         let gone = list.pop().unwrap();
                         total = total.saturating_sub(gone.bytes);
@@ -704,7 +772,7 @@ impl Engine {
                     .and_then(|e| e.hnsw_mem.get(&meta.column).cloned())
             };
             return mem
-                .and_then(|m| m.read().ok().map(|g| !g.is_empty()))
+                .and_then(|m| m.lock().ok().map(|g| !g.is_empty()))
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("IVF") {
@@ -815,7 +883,7 @@ impl Engine {
     /// entry. Otherwise the tail is sealed **inside** the transaction, so the
     /// chunk it writes carries this statement's ts, exactly like the
     /// reference's `DumpMemIndexTxnStore`.
-    pub fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
+    pub async fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
         let table = self.qualified_table(table);
         // The reference skips a dump when the memory index has nothing new.
@@ -838,8 +906,27 @@ impl Engine {
         // records with this ts. The checkpoint publishes the same files, so it
         // takes the same lock.
         {
-            let _serial = self.storage.flush_lock.lock().unwrap();
-            self.seal_index_tail(&table, &version.index);
+            // The seal writes this index's whole spill/chunk file set; that is
+            // the blocking leaf, and it runs on the blocking pool while the
+            // lock is held.
+            //
+            // **Exclusive, not read**: two dumps of one index must not run
+            // together. Each counts the files already on disk to pick its
+            // chunk's path, so two concurrent dumps of the same segment choose
+            // the same name and one write replaces the other - the index then
+            // misses rows the other dump had sealed. A read lock let that
+            // happen (dump and checkpoint only exclude each other, not two
+            // dumps), so this takes the same `write()` the checkpoint does.
+            let _serial = self.storage.flush_lock.write().await;
+            let (seal_table, seal_index) = (table.clone(), version.index.clone());
+            match self.engine_handle() {
+                Some(engine) => {
+                    crate::scheduler::scheduler()
+                        .spawn_blocking(move || engine.seal_index_tail(&seal_table, &seal_index))
+                        .await;
+                }
+                None => self.seal_index_tail(&seal_table, &seal_index),
+            }
             if let Some(meta) = self.storage.catalog.get_table_by_name(&table)? {
                 let _ = self.publish_index_chunks(&table, meta.id, Some((index, ts)));
             }
@@ -862,7 +949,7 @@ impl Engine {
         if !commands.is_empty() {
             dump_txn.set_typed_commands(commands);
         }
-        self.txn.commit_at(dump_txn, ts)?;
+        self.txn.commit_at(dump_txn, ts).await?;
         // `CommitBottom` of the dump transaction, on the table's worker: the
         // dump ts record, the chunk stamps, the checkpoint cover and the
         // sealed chunk write.
@@ -886,6 +973,7 @@ impl Engine {
             }
             Ok(())
         })
+        .await
     }
 
     /// The `DumpIndex` payload of an explicit dump
@@ -954,7 +1042,10 @@ impl Engine {
     pub fn dump_index(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
         if is_secondary_kind(&version.index.index_type) {
-            self.seal_secondary_index(table, &version.index.column);
+            // `seal_index_tail` seals without re-taking `flush_lock`: the dump
+            // transaction already holds it, and `seal_secondary_index` (the
+            // locking form) would self-deadlock from here.
+            self.seal_index_tail(table, &version.index);
             return Ok(());
         }
         Err(Error::Invalid(format!(
@@ -983,13 +1074,7 @@ impl Engine {
         } else if meta.index_type.eq_ignore_ascii_case("BMP") {
             self.seal_sparse_index(&table, &meta.column);
         } else if meta.index_type.eq_ignore_ascii_case("HNSW") {
-            // `Ok(0)` wrote no chunk: an LSG index is never dumped from the
-            // buffer, so its memory segment is still the only copy of the rows
-            // written since the last full build and must be kept.
-            if matches!(
-                self.dump_hnsw_index(&table, &meta.name),
-                Ok(written) if written > 0
-            ) {
+            if self.dump_hnsw_index(&table, &meta.name).is_ok() {
                 let key = self.table_key(&table);
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&key) {
@@ -1042,16 +1127,14 @@ impl Engine {
     ///
     /// Sealing writes chunk files, renames them into place and drops the tail
     /// they came from, operations a concurrent dump, capacity-triggered seal or
-    /// merge would race on, so every path that seals takes `flush_lock` - the
-    /// same one the checkpoint and the dump transaction hold.
-    pub(crate) fn seal_secondary_indexes(&self) {
-        let _serial = self.storage.flush_lock.lock().unwrap();
-        self.seal_secondary_indexes_filtered(None);
-    }
-
-    /// Dumps one secondary index's memory tail (`DumpMemIndex` for `index`).
-    pub(crate) fn seal_secondary_index(&self, table: &str, column: &str) {
-        let _serial = self.storage.flush_lock.lock().unwrap();
+    /// merge would race on, so every path that seals takes `flush_lock`
+    /// **exclusively** - the same one the checkpoint and the dump transaction
+    /// hold. A read lock would let two seals run together and pick the same
+    /// chunk path for one segment.
+    /// [`Self::seal_secondary_indexes_filtered`] for one table's column,
+    /// taking `flush_lock` for it.
+    async fn seal_secondary_column(&self, table: &str, column: &str) {
+        let _serial = self.storage.flush_lock.write().await;
         self.seal_secondary_indexes_filtered(Some((table, column)));
     }
 
@@ -1281,22 +1364,43 @@ impl Engine {
 
     /// Total bytes buffered by every in-memory index form. The unified budget
     /// covers full-text, HNSW, sparse, multi-vector and secondary tails.
-    pub(crate) fn memindex_bytes(&self) -> usize {
+    /// Bytes one table's in-memory index forms hold right now.
+    ///
+    /// This is the accounting the quota compares against, so it covers every
+    /// family a dump can release: full-text, sparse, multi-vector, secondary,
+    /// the HNSW charge and the IVF rows. PLAID, SMVE and the EMVB tail are
+    /// deliberately not counted (they are whole-column objects whose `seal`
+    /// only clears `tail`, so counting them would keep the engine over the
+    /// limit forever).
+    pub(crate) fn memindex_bytes_of(&self, tkey: &str) -> usize {
         // The `Arc`s are cloned out of `tables` before any index is locked: a
         // scan holds one of these read guards while it fetches rows, and that
         // fetch needs `tables`, so locking an index under `tables` closes the
         // cycle `Engine::text_index_for` documents.
-        let (text, sparse, mv) = {
+        let (text, sparse, mv, charged) = {
             let tables = self.tables.lock().unwrap();
-            let mut text = Vec::new();
-            let mut sparse = Vec::new();
-            let mut mv = Vec::new();
-            for e in tables.values() {
-                text.extend(e.text.values().cloned());
-                sparse.extend(e.sparse.values().cloned());
-                mv.extend(e.mv.values().cloned());
-            }
-            (text, sparse, mv)
+            let Some(e) = tables.get(tkey) else {
+                return 0;
+            };
+            (
+                e.text.values().cloned().collect::<Vec<_>>(),
+                e.sparse.values().cloned().collect::<Vec<_>>(),
+                e.mv.values().cloned().collect::<Vec<_>>(),
+                e.index_pending_bytes.values().sum::<usize>()
+                    + e.secondary
+                        .indexes
+                        .values()
+                        .map(|index| index.approx_bytes())
+                        .sum::<usize>()
+                    + e.ivf_mem
+                        .values()
+                        .map(|rows| {
+                            rows.first()
+                                .map(|(_, v)| rows.len() * v.len() * std::mem::size_of::<f32>())
+                                .unwrap_or(0)
+                        })
+                        .sum::<usize>(),
+            )
         };
         let mut total = 0usize;
         for idx in text {
@@ -1314,19 +1418,63 @@ impl Engine {
                 total += g.tail_bytes;
             }
         }
-        // HNSW is not counted here: `note_index_insert` owns its budget (the
-        // reference charges the tracer per appended block, and this counter
-        // would double it), so the per-row check below is about the text,
-        // sparse, multivector and secondary tails only.
+        total + charged
+    }
+
+    /// Moves the process-wide total by `table`'s change and remembers the new
+    /// charge on the table. Call it after anything that grows or shrinks this
+    /// table's memory indexes.
+    pub(crate) fn refresh_memindex_charge(&self, table: &str) {
+        let tkey = self.table_key(table);
+        let now = self.memindex_bytes_of(&tkey);
+        let prev = {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey).or_default();
+            std::mem::replace(&mut entry.memindex_bytes, now)
+        };
+        match now.cmp(&prev) {
+            std::cmp::Ordering::Greater => self
+                .context
+                .memindex_total
+                .fetch_add(now - prev, std::sync::atomic::Ordering::Relaxed),
+            std::cmp::Ordering::Less => self
+                .context
+                .memindex_total
+                .fetch_sub(prev - now, std::sync::atomic::Ordering::Relaxed),
+            std::cmp::Ordering::Equal => 0,
+        };
+    }
+
+    /// Recomputes every table's charge from scratch and rewrites the total.
+    ///
+    /// The checkpoint does this once per run. It is also the safety net for a
+    /// path that changed a tail without refreshing: the number a quota check
+    /// reads is never older than the last checkpoint.
+    pub(crate) fn recompute_memindex_total(&self) -> usize {
+        let keys: Vec<String> = self.tables.lock().unwrap().keys().cloned().collect();
+        let mut total = 0usize;
+        for key in keys {
+            let now = self.memindex_bytes_of(&key);
+            {
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    entry.memindex_bytes = now;
+                }
+            }
+            total += now;
+        }
+        self.context
+            .memindex_total
+            .store(total, std::sync::atomic::Ordering::Relaxed);
         total
-            + self
-                .tables
-                .lock()
-                .unwrap()
-                .values()
-                .flat_map(|e| e.secondary.indexes.values())
-                .map(|index| index.approx_bytes())
-                .sum::<usize>()
+    }
+
+    /// The engine-wide total: one atomic load. It is what the quota compares
+    /// against, and it never takes the table lock or an index lock.
+    pub(crate) fn memindex_bytes(&self) -> usize {
+        self.context
+            .memindex_total
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// `SecondaryIndexCardinality` of one indexed column.
@@ -1544,12 +1692,15 @@ impl Engine {
 
     /// `OptimizeIndexInner`'s secondary case for every secondary index
     /// (`new_txn_index_impl.cpp:336-340` -> `OptimizeSecondaryIndex`).
-    pub(crate) fn optimize_all_secondary_indexes(&self) -> Result<()> {
+    pub(crate) async fn optimize_all_secondary_indexes(&self) -> Result<()> {
         // A merge rewrites the chunk files of the indexes it folds and then
         // reloads them, so it serialises with sealing and with the checkpoint on
-        // `flush_lock`. The optimize pass reaches here after its dump
-        // transaction released the lock, so it takes it exactly once.
-        let _serial = self.storage.flush_lock.lock().unwrap();
+        // `flush_lock` - **exclusively**: two merges of one index would pick the
+        // same new chunk path for the same segment, and a merge overlapping a
+        // seal could drop rows the seal had just written. The optimize pass
+        // reaches here after its dump transaction released the lock, so it
+        // takes it exactly once.
+        let _serial = self.storage.flush_lock.write().await;
         for im in self.storage.catalog.list_indexes()? {
             if !is_secondary_kind(&im.index_type) {
                 continue;
@@ -1830,67 +1981,8 @@ impl Engine {
         })
     }
 
-    /// The declared type the secondary index's keys were encoded with.
-    ///
-    /// The registry's `declared_types` comes first: it is what the writer used,
-    /// while the catalog lookup is keyed by a qualified table name and so can
-    /// miss a bare one.
-    fn index_declared_type(&self, table: &str, column: &str) -> Option<String> {
-        let tkey = self.table_key(table);
-        let from_registry = {
-            let tables = self.tables.lock().unwrap();
-            tables
-                .get(&tkey)
-                .and_then(|e| e.secondary.declared_types.get(column).cloned())
-        };
-        from_registry.or_else(|| {
-            let schema = self.table_schema(table).ok()?;
-            let ci = schema.iter().position(|c| c == column)?;
-            self.column_types(table).ok()?.get(ci).cloned()
-        })
-    }
-
-    /// A float equality value as the literal its column's keys actually use.
-    ///
-    /// `col = 3.0` and `col = 3` are the same predicate (`Expr` compares
-    /// numerically), but the index answered them differently: the float branch of
-    /// [`Self::index_lookup_one`] only probes float chunks, so a float on an
-    /// integer column found nothing in a sealed chunk, and the memory tail could
-    /// not parse an integer key out of `"3.000000"` either - the equality
-    /// silently matched no row at all. An integer column therefore gets the value
-    /// converted, and only when the conversion is exact: `col = 3.5` cannot equal
-    /// any integer key, and probing a truncated key would answer a different
-    /// question, so it declines (`None`) and the caller evaluates the predicate
-    /// against the decoded columns instead.
-    fn float_lookup_literal(&self, table: &str, column: &str, f: f64) -> Option<Literal> {
-        let declared = self.index_declared_type(table, column).unwrap_or_default();
-        if key_domain(&declared) != KeyDomain::Integer {
-            return Some(Literal::Float(f));
-        }
-        // The column's key width decides which integers it can hold, so the
-        // bounds come from its key kind rather than from `i64` alone:
-        // `tinyint_col = 300.0` matches no key, and truncating it to `44` would
-        // answer the wrong predicate. Both probes (sealed chunks and the memory
-        // tail) are then declined together.
-        let (low, high) = integer_key_bounds(&declared);
-        if f.fract() != 0.0 || !(low..high).contains(&f) {
-            return None;
-        }
-        Some(Literal::Int(f as i64))
-    }
-
     /// One column's (or one functional expression's) rows whose key is `value`.
     fn index_lookup_one(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
-        // A float equality value reaches the probe as the key type its column
-        // stores; see [`Self::float_lookup_literal`].
-        let converted;
-        let value: &Literal = match value {
-            Literal::Float(f) => {
-                converted = self.float_lookup_literal(table, column, *f)?;
-                &converted
-            }
-            other => other,
-        };
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
         // Snapshot the readers (cheap `Arc` clones) and the memory tail so the
@@ -2147,130 +2239,6 @@ impl Engine {
         self.index_range_lookup_one(table, column, ranges)
     }
 
-    /// Rows a predicate admits, answered by the secondary indexes alone.
-    ///
-    /// The reference compiles a filter into a bitmask from whichever index can
-    /// answer it (`CommonQueryFilter::filter_result_`) and hands that bitmask to
-    /// the vector index. Answering the same predicate from the secondary indexes
-    /// keeps a filtered KNN probe from decoding the predicate's own columns.
-    ///
-    /// Only a conjunction of indexed comparisons is answerable. An `OR`, an
-    /// unindexed column, `LIKE` or a function of two columns returns `None`, and
-    /// the caller decodes the columns as it did before.
-    pub(crate) fn predicate_rows_from_indexes(
-        &self,
-        table: &str,
-        pred: &expression::Expr,
-    ) -> Option<std::collections::HashSet<usize>> {
-        let schema = self.table_schema(table).ok()?;
-        let mut conjuncts = Vec::new();
-        flatten_and(pred, &mut conjuncts);
-        let mut rows: Option<std::collections::HashSet<usize>> = None;
-        for conjunct in conjuncts {
-            let admitted = self.conjunct_rows(table, &schema, conjunct)?;
-            rows = Some(match rows {
-                Some(previous) => previous.intersection(&admitted).copied().collect(),
-                None => admitted,
-            });
-        }
-        rows
-    }
-
-    fn conjunct_rows(
-        &self,
-        table: &str,
-        schema: &[String],
-        expr: &expression::Expr,
-    ) -> Option<std::collections::HashSet<usize>> {
-        let expression::Expr::Cmp(left, op, right) = expr else {
-            return None;
-        };
-        // `column <op> literal`, or the literal on the left with the operator
-        // mirrored (`7 > column` is `column < 7`).
-        let (index, value, op) = match (&**left, &**right) {
-            (expression::Expr::Column(i), expression::Expr::Literal(v)) => (*i, v, *op),
-            (expression::Expr::Literal(v), expression::Expr::Column(i)) => (*i, v, mirror_cmp(*op)),
-            _ => return None,
-        };
-        let column = schema.get(index)?;
-        self.index_rows_for(table, column, op, value)
-    }
-
-    /// One conjunct's admitted rows, or `None` when the index cannot answer it
-    /// *exactly*.
-    ///
-    /// Unlike [`Self::index_lookup`] and [`Self::index_range_lookup`], whose
-    /// results are re-checked against the fetched rows, this answer is final:
-    /// `predicate_rows_from_indexes` hands it to the indexed KNN path as the
-    /// predicate's own result, and that path cannot re-evaluate it (its rows are
-    /// a vector projection). A lossy key therefore declines the shortcut instead
-    /// of approximating it - see [`key_is_exact`].
-    fn index_rows_for(
-        &self,
-        table: &str,
-        column: &str,
-        op: parser::CmpOp,
-        value: &expression::Value,
-    ) -> Option<std::collections::HashSet<usize>> {
-        use parser::{CmpOp, Literal};
-        let literal = match value {
-            expression::Value::Int(i) => Literal::Int(*i),
-            expression::Value::Float(f) => Literal::Float(*f),
-            expression::Value::Str(s) => Literal::Str(s.clone()),
-            _ => return None,
-        };
-        let set = |rows: Vec<u64>| rows.into_iter().map(|row| row as usize).collect();
-        let declared = self.index_declared_type(table, column).unwrap_or_default();
-        let exact = key_is_exact(&declared, value);
-        match op {
-            CmpOp::Eq => Some(set(self
-                .index_lookup(table, column, &literal)
-                .filter(|_| exact)?)),
-            CmpOp::Ge | CmpOp::Le | CmpOp::Gt | CmpOp::Lt => {
-                // A bound whose key is not the bound value - a saturated
-                // `TINYINT` key, a rounded `FLOAT` one, a truncated
-                // `TIME`/`DATETIME` count, an integer past `2^53`, a hashed
-                // text - makes both the closed range and the strict-bound
-                // subtraction answer another predicate.
-                if !exact {
-                    return None;
-                }
-                // The range read takes closed bounds, so an open end is a
-                // sentinel outside every key of the column. `i64::MIN`/`i64::MAX`
-                // are outside the integers and the temporal counts, but a `BOOL`
-                // key is `false`/`true` and *both* of those sentinels convert to
-                // `true` (`BooleanT(i != 0)`): `flag <= 'true'` would then start
-                // at `true` and drop every `false` row, and `flag < 'true'`
-                // would come out empty.
-                let (low, high) = if secondary_key_kind(&declared) == KeyKind::Bool {
-                    (expression::Value::Int(0), expression::Value::Int(1))
-                } else {
-                    (
-                        expression::Value::Int(i64::MIN),
-                        expression::Value::Int(i64::MAX),
-                    )
-                };
-                let (lo, hi) = match op {
-                    CmpOp::Ge | CmpOp::Gt => (value.clone(), high),
-                    _ => (low, value.clone()),
-                };
-                let mut rows: std::collections::HashSet<usize> =
-                    set(self.index_range_lookup(table, column, &[(lo, hi)])?);
-                if matches!(op, CmpOp::Gt | CmpOp::Lt) {
-                    // A strict bound is the closed range minus its boundary,
-                    // which is sound because `exact` just said the boundary's
-                    // key *is* the boundary value.
-                    let equal = self.index_lookup(table, column, &literal)?;
-                    for row in equal {
-                        rows.remove(&(row as usize));
-                    }
-                }
-                Some(rows)
-            }
-            _ => None,
-        }
-    }
-
     /// The functional index the evaluator's expression names, if the registry
     /// carries one.
     ///
@@ -2413,17 +2381,8 @@ impl Engine {
         // applies to it directly: one ordered slice per range, with no key
         // decoded and compared.
         for (start, end) in &keys {
-            let lo = tail_bound(kind, *start, RangeBound::Lower);
-            let hi = tail_bound(kind, *end, RangeBound::Upper);
-            // Narrowing a `FLOAT` bound to the chunk's `f32` moves it *inwards*
-            // (the smallest `f32` that is still `>= lo`, the largest that is
-            // still `<= hi`), so a pair that was ordered as `f64` can come out
-            // inverted - `[1.0000001, 1.0000001)` narrows to `[1.0000002,
-            // 1.0)`. That range is empty: querying it would either ask the tail
-            // for `hi..lo` or make it answer with a reversed slice.
-            if lo > hi {
-                continue;
-            }
+            let lo = tail_bound(kind, *start);
+            let hi = tail_bound(kind, *end);
             if let Some(index) = &tail {
                 for (_, ids) in index.range(Some(&lo), Some(&hi)) {
                     candidates.extend_from_slice(&ids);
@@ -2846,12 +2805,21 @@ impl Engine {
     /// Each dump seals its own tail ([`Self::seal_index_tail`]) under
     /// `flush_lock`, and an index with an empty tail is skipped without
     /// spending a timestamp.
-    pub(crate) fn dump_all_memory_indexes(&self) {
+    pub(crate) async fn dump_all_memory_indexes(&self) {
+        // Serial on purpose. This runs from the insert path
+        // (`enforce_memindex_quota`) while the table's bottom gate is held, so
+        // handing each index to a pool and waiting (`pool.install`) deadlocks:
+        // the worker needs the gate its caller is holding. The sweep is
+        // per-index work on one table's indexes, not the whole directory, so
+        // the serial form is what the call sites can afford.
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for im in indexes {
-            let _ = self.dump_index_transaction(&im.table, &im.name);
+            let _ = self.dump_index_transaction(&im.table, &im.name).await;
         }
         self.seal_orphan_memory_tails();
+        // The dumps released tails: fold that into the engine-wide total so the
+        // quota sees it without a second scan.
+        self.recompute_memindex_total();
     }
 
     /// Seals the memory tails the catalog has no index record for.
@@ -2927,7 +2895,7 @@ impl Engine {
                 .map(|e| {
                     e.hnsw_mem
                         .iter()
-                        .filter(|(_, m)| m.read().map(|g| g.len() >= capacity).unwrap_or(false))
+                        .filter(|(_, m)| m.lock().map(|g| g.len() >= capacity).unwrap_or(false))
                         .map(|(c, _)| c.clone())
                         .collect()
                 })
@@ -2949,32 +2917,13 @@ impl Engine {
             if !same_table {
                 continue;
             }
-            let sealed = matches!(
-                self.dump_hnsw_index(&im.table, &im.name),
-                Ok(written) if written > 0
-            );
-            if sealed {
+            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
                     e.index_pending_bytes.insert(im.column.clone(), 0);
                     e.hnsw_probed = false;
                 }
-                continue;
-            }
-            // `Ok(0)`: nothing was sealed, so the segment still holds these
-            // rows and must survive the dump. It must not grow without limit
-            // either - a capacity that is crossed every batch and never
-            // satisfied is an unbounded tail, which is exactly what the row
-            // bound exists to prevent. Past twice the capacity the tail is
-            // released: memory really goes down, and the rows no chunk holds
-            // fall back to the exact scan until the full mirror write or an
-            // optimize merge folds them into a chunk.
-            if self
-                .hnsw_tail_len(&tkey, &im.column)
-                .is_some_and(|len| len >= capacity.saturating_mul(2))
-            {
-                self.release_hnsw_tail(&tkey, &im.column);
             }
         }
     }
@@ -2983,27 +2932,52 @@ impl Engine {
     /// tail that reached `mem_index_capacity` rows. This is the row bound the
     /// reference applies at the end of the batch (the sibling of
     /// [`Self::dump_hnsw_over_capacity`]).
-    pub(crate) fn dump_secondary_over_capacity(&self, table: &str) {
-        let capacity = self.memindex_capacity();
-        if capacity == 0 {
+    /// The synchronous form, for a commit's bottom half (a `run_commit_bottom`
+    /// callback), which is not an async context: the one lock it may take is
+    /// bridged with `blocking_read`, which is legal there because that thread
+    /// is a blocking-pool thread, not a runtime worker.
+    pub(crate) fn dump_secondary_over_capacity_blocking(&self, table: &str) {
+        let full = self.secondary_columns_over_capacity(table);
+        if full.is_empty() {
             return;
         }
+        let _serial = self.storage.flush_lock.blocking_read();
+        // Only this table's full columns: sealing every table's every index
+        // made one insert's dump cost the whole catalog, and a suite with a
+        // thousand tables spent the run inside `list_indexes`.
+        for column in full {
+            self.seal_secondary_indexes_filtered(Some((table, &column)));
+        }
+    }
+
+    /// The secondary-index columns of `table` whose memory tail reached the
+    /// configured capacity, and therefore have to be sealed.
+    fn secondary_columns_over_capacity(&self, table: &str) -> Vec<String> {
+        let capacity = self.memindex_capacity();
+        if capacity == 0 {
+            return Vec::new();
+        }
         let tkey = self.table_key(table);
-        let full = {
-            let tables = self.tables.lock().unwrap();
-            tables
-                .get(&tkey)
-                .map(|entry| {
-                    entry
-                        .secondary
-                        .indexes
-                        .values()
-                        .any(|index| index.row_count() >= capacity)
-                })
-                .unwrap_or(false)
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&tkey) else {
+            return Vec::new();
         };
-        if full {
-            self.seal_secondary_indexes();
+        entry
+            .secondary
+            .indexes
+            .iter()
+            .filter(|(_, index)| index.row_count() >= capacity)
+            .map(|(column, _)| column.clone())
+            .collect()
+    }
+
+    pub(crate) async fn dump_secondary_over_capacity(&self, table: &str) {
+        let full = self.secondary_columns_over_capacity(table);
+        if full.is_empty() {
+            return;
+        }
+        for column in full {
+            self.seal_secondary_column(table, &column).await;
         }
     }
 }
@@ -3033,27 +3007,4 @@ fn merge_covered_ranges(chunks: &[catalog::layout::SegmentIndex]) -> Vec<(u64, u
         }
     }
     merged
-}
-
-/// The conjuncts of an `AND` tree, in order.
-fn flatten_and<'a>(expr: &'a expression::Expr, out: &mut Vec<&'a expression::Expr>) {
-    match expr {
-        expression::Expr::And(a, b) => {
-            flatten_and(a, out);
-            flatten_and(b, out);
-        }
-        other => out.push(other),
-    }
-}
-
-/// `op` with its operands swapped (`a < b` is `b > a`).
-fn mirror_cmp(op: parser::CmpOp) -> parser::CmpOp {
-    use parser::CmpOp;
-    match op {
-        CmpOp::Lt => CmpOp::Gt,
-        CmpOp::Le => CmpOp::Ge,
-        CmpOp::Gt => CmpOp::Lt,
-        CmpOp::Ge => CmpOp::Le,
-        other => other,
-    }
 }

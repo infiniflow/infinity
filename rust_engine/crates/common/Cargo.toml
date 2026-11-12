@@ -6,6 +6,13 @@ license.workspace = true
 
 [dependencies]
 thiserror.workspace = true
+# The global allocator lives here because `#[global_allocator]` may be declared
+# only once per program, while every executable and every unit-test binary needs
+# it. `common` is the one crate the whole workspace depends on, so declaring it
+# here covers `infinity`, the helpers under `src/bin/`, the examples and
+# `cargo test` alike - no per-target boilerplate, and no link-time conflict when
+# a binary happens to reach two crates that both wanted it.
+mimalloc.workspace = true
 
 [lints]
 workspace = true

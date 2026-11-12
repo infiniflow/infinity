@@ -1,0 +1,23 @@
+[package]
+name = "volo_wire"
+version = "0.1.0"
+edition = "2021"
+
+# Wire-parity harness: serves canned SelectResponse values so
+# tools/volo_wire/test_wire_parity.py can compare volo's encoding with the
+# Rust server's reply byte for byte.
+[dependencies]
+volo = "0.12"
+volo-thrift = "0.12"
+pilota = "0.13"
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+volo-build = "0.12"
+
+[patch.crates-io]
+# The fork carries two patches: the parser accepts the IDL reference fields
+# ("&"), and the protocols bound container sizes before the generated decode
+# reserves a Vec for them.
+pilota = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }
+pilota-thrift-parser = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }

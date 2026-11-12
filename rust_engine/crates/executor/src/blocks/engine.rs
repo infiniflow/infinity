@@ -13,6 +13,17 @@ pub(crate) type BlockValueRows = (Vec<String>, DecodedRows);
 /// A row predicate: `true` keeps the row.
 pub(crate) type RowFilter<'a> = Option<&'a dyn Fn(&[Value]) -> bool>;
 
+/// One block's share of a scan, after the version filter.
+///
+/// The two failures are kept apart because the scan distinguishes them: a block
+/// that will not *open* at the head of the table means the table has no blocks
+/// at all, while a block that opened but would not *decode* only ends the walk.
+pub(crate) enum BlockDecode {
+    Rows(DecodedRows),
+    OpenFailed,
+    DecodeFailed,
+}
+
 /// The column ids a row with `ts` was written with, in schema order.
 ///
 /// `timeline` is the table's schema history (`Catalog::column_timeline`),
@@ -28,19 +39,6 @@ fn ids_at(timeline: &[(u64, Vec<u64>)], ts: u64, current: &[u64]) -> Vec<u64> {
         Some((_, ids)) => ids.clone(),
         None => current.to_vec(),
     }
-}
-
-/// A vector column's declared `(dimension, is_bit)`.
-///
-/// `is_bit` is what tells [`crate::parse_vector_cell`] to read the cell as the
-/// bit string an `EMBEDDING(BIT, d)` / `MULTIVECTOR(BIT, d)` stores
-/// (`[10110001]`, one character per coordinate) instead of as numbers; a
-/// `BIT` element is `element_code` 0 for both shapes.
-pub(crate) fn vector_column_shape(decl: &str) -> (Option<usize>, bool) {
-    let decl = decl.trim().to_ascii_uppercase();
-    let bit = embedding_shape(&decl).is_some_and(|(_, code)| code == 0)
-        || tensor_shape(&decl).is_some_and(|(_, _, code)| code == 0);
-    (crate::type_dim(&decl).filter(|d| *d > 0), bit)
 }
 
 /// Rewrites one replayed row onto the table's current columns.
@@ -156,21 +154,14 @@ impl Engine {
                 id.block_id,
             ))
             .join(storage::definition::format::VERSION_FILE);
-        // Read the block **straight from disk**, not through the process-wide
-        // map (`Self::block_map`). The shared entry can be a mapping a reader
-        // took before the last write grew the file, re-registered after this
-        // write dropped the maps; a rewrite built from that short view writes
-        // the block back with the rows it did not see, and the rows the file
-        // held are already gone from the append buffer (the write that grew it
-        // drained them), so they would be lost for good.
-        let held = match MappedBlock::open(&root, id) {
+        let held = match self.block_map(table, &root, id) {
             Ok(block) => Self::decode_rows_of(
                 &meta.ids,
                 &meta.types,
                 types,
                 id,
                 block.version(),
-                &block,
+                block.as_ref(),
                 None,
             )
             .ok_or_else(|| {
@@ -207,8 +198,24 @@ impl Engine {
     /// in the C++ block layout, returning the number of rows written.
     ///
     /// Rows are chunked `DEFAULT_BLOCK_CAPACITY` (8192) per block, as C++ does.
-    pub fn write_blocks(&self, table: &str) -> Result<usize> {
-        self.write_blocks_bounded(table, self.checkpoint_ts())
+    /// Async because its one production caller - a snapshot - runs on a
+    /// runtime worker, and the block write takes the table's bottom gate.
+    /// Synchronous callers (unit tests) use `block_on`.
+    pub async fn write_blocks(&self, table: &str) -> Result<usize> {
+        self.write_blocks_bounded_async(table, self.checkpoint_ts())
+            .await
+    }
+
+    /// [`Self::write_blocks_bounded`] for an async caller: it awaits the
+    /// table's bottom gate instead of blocking on it.
+    pub async fn write_blocks_bounded_async(
+        &self,
+        table: &str,
+        checkpoint_ts: u64,
+    ) -> Result<usize> {
+        let gate = self.bottom_gate(table);
+        let _turn = gate.lock().await;
+        self.write_blocks_mode(table, &[], false, checkpoint_ts)
     }
 
     /// [`Self::write_blocks`] with the checkpoint's upper bound spelled out.
@@ -226,10 +233,29 @@ impl Engine {
         self.write_blocks_mode(table, &[], false, checkpoint_ts)
     }
 
+    /// [`Self::write_blocks_bounded`] for a caller that **already holds** the
+    /// table's bottom gate (a checkpoint's per-table step).
+    pub(crate) fn write_blocks_bounded_locked(
+        &self,
+        table: &str,
+        checkpoint_ts: u64,
+    ) -> Result<usize> {
+        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+    }
+
     /// Writes only the blocks this commit's rows and deletes land in.
     ///
     /// That is the reference's `AppendInBlock` / `DeleteInBlock`: a `COPY` of a
     /// few rows into a growing segment touches one block, not the table.
+    /// Writes the blocks this commit's rows landed in.
+    ///
+    /// **The caller already holds the table's bottom gate** - both commit
+    /// bottoms (`commit_import_chunk`, the binary import's tail) take it before
+    /// calling - so this must not take it again: the gate is a
+    /// `tokio::sync::Mutex` and re-entering it self-locks. (The `HeldBottom`
+    /// marker cannot be trusted here: one of these callers runs inside a
+    /// `before_wal` callback that may execute on a different thread than the
+    /// one that set it.)
     pub(crate) fn write_blocks_commit(&self, table: &str, ts: u64) -> Result<usize> {
         self.write_blocks_mode(table, &[], false, ts)
     }
@@ -248,12 +274,22 @@ impl Engine {
         // The block writer runs under the **table's bottom gate**: the reference
         // writes a block's rows inside the table's bottom half (`AppendInBlock`),
         // so a checkpoint and an append of one table never write at the same
-        // time while different tables proceed in parallel. A caller that is
-        // already the table's bottom (the import path does its block write in
-        // `CommitBottomAppend`) must not re-enter the gate.
-        let bottom_gate = self.bottom_gate(table);
-        let _bottom = (!crate::engine::statements::HeldBottom::holds(&self.table_key(table)))
-            .then(|| bottom_gate.lock().unwrap());
+        // time while different tables proceed in parallel.
+        //
+        // A caller that is already the table's bottom must not re-enter the
+        // gate. That is decided **by the caller**, not by `HeldBottom`: the
+        // thread-local marker only describes the thread that entered it, and a
+        // checkpoint's write now runs on a blocking-pool thread, where the
+        // marker is absent - asking it there would take the gate a second time
+        // and self-lock. `write_blocks_bounded` is the checkpoint entry: it
+        // takes the gate. `write_blocks_flat` is for a caller that already
+        // holds it (`flush_table`, the commit bottoms).
+        // **No lock is taken here**: every caller already holds the table's
+        // bottom gate. `write_blocks_mode` runs on a blocking thread (a
+        // checkpoint leaf, a commit's bottom half, a snapshot's file copy), so
+        // it must never touch a `tokio::sync::Mutex` - taking the gate is the
+        // caller's job, and the async entry
+        // (`write_blocks_bounded_async`) awaits it.
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -381,7 +417,11 @@ impl Engine {
         // held across them (a commit takes the bottom gate before this, and the
         // checkpoint takes the table lock on its own, so holding both here in
         // the other order deadlocks the two threads).
-        let _serialised = MIRROR_WRITE_LOCK
+        // Per table: everything this rewrite touches is that table's
+        // directories and records, so another table proceeds alongside. The
+        // registry lock is released before this one is taken.
+        let mirror_lock = crate::blocks::misc::mirror_write_lock(&tkey);
+        let _serialised = mirror_lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         // Taken under the lock: a checkpoint that queued behind this one must
@@ -613,12 +653,10 @@ impl Engine {
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
                 let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
                 let slot_base = seg_start + start;
-                // Drop the readers' mappings of this block **before** the
-                // files are rewritten, so none of them keeps serving the
-                // previous contents once the new block lands. The writer itself
-                // reads the block straight from disk (`mirror_block_rows`),
-                // because a reader can put a stale mapping back into the shared
-                // map while this write runs.
+                // Drop the mapping of this block **before** the rows are
+                // merged: a mapped view of an older (shorter) file would make
+                // the merge miss the rows the file holds, and the rewrite
+                // would drop them.
                 self.drop_block_maps(meta.id);
                 let chunk = self.mirror_block_rows(
                     &table,
@@ -633,29 +671,30 @@ impl Engine {
                 // A block is addressed by slot: row *n* of block *b* is id
                 // `segment << 32 | b * capacity + n`. The window is the
                 // committed prefix, and ids are handed out in commit-ts order
-                // (`SubmitForAllocation`), so the chunk has to reach the end of
-                // it; falling short means the row buffer lost a row, which must
-                // not be written to disk as a shifted block.
+                // (`SubmitForAllocation`), so the chunk must tile it exactly;
+                // anything else means the row buffer lost a row, which must not
+                // be written to disk as a shifted block.
                 let first_id = ((segment_id as usize) << 32) | start;
-                // Every id from `first_id` on has to be the next slot - a hole
+                // Every id from `first_id` on has to be the next slot: a hole
                 // means the row buffer lost a row, which must not reach disk as
-                // a shifted block. A *short tail* is allowed only for the
-                // whole-table rewrite (a column change): it carries the rows of
-                // its own snapshot, and a commit that allocated ids after that
-                // snapshot writes them itself. With a bounded checkpoint ts a
-                // short block is a lost row and still an error.
+                // a shifted block. A short tail is a **commit in flight**, not
+                // a lost row: the append record is stamped while the
+                // transaction commits (`reserve_rows_at`) and the rows join the
+                // buffer afterwards, in the commit's bottom half
+                // (`publish_encoded_rows` -> `AppendInBlock`), so a checkpoint
+                // that reads the log between the two sees a window a few rows
+                // wider than the data. The block is written for the rows that
+                // exist; the rest stay buffered and the next checkpoint writes
+                // them (the buffer keeps every row this write did not take).
+                //
+                // An **empty** block over a non-empty window is still an error:
+                // that is not a racing tail, it is a window built from ids
+                // nothing ever wrote.
                 let contiguous = chunk
                     .iter()
                     .enumerate()
                     .all(|(slot, (seq, _))| *seq == first_id + slot);
-                // A checkpoint that queued behind a later one reads an older
-                // bound, so its window can stop short of what the block file
-                // already holds. Those rows are committed and on disk and the
-                // append buffer has drained them, so the rewrite keeps them
-                // (they are the dense prefix `contiguous` just checked) instead
-                // of failing the whole flush.
-                let short_tail_is_a_race = checkpoint_ts == u64::MAX;
-                if !contiguous || (chunk.len() < end - start && !short_tail_is_a_race) {
+                if !contiguous || chunk.len() > end - start || chunk.is_empty() {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
                          committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
@@ -1092,72 +1131,167 @@ impl Engine {
     /// directory readable by the C++ engine. Tables whose columns are not yet
     /// packable (array/tensor/sparse/embedding) are skipped rather than
     /// mis-encoded.
-    pub fn flush_blocks(&self, checkpoint_ts: u64) -> Result<()> {
-        for meta in self.storage.catalog.list_tables()? {
-            if meta.types.iter().all(|t| column_type_of(t).is_some()) {
-                self.write_blocks_bounded(&meta.name, checkpoint_ts)?;
-                // The mirror now covers every row; the IVF memory segment is
-                // redundant and would double-count candidates.
-                let key = self.table_key(&meta.name);
-                let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(key).or_default();
+    ///
+    /// The unit of work is one **table** (plan §5.1): its blocks, its own
+    /// indexes, its chunk layer, and the memory tails the fresh mirror makes
+    /// redundant. A table's internal order is unchanged - blocks, then indexes,
+    /// then the publish, then the tails, with `version` still the last file the
+    /// block writer writes - and two tables share nothing, so they run side by
+    /// side. The global steps (the checkpoint ts, the index-cache reload, the
+    /// catalog layout, the final `store.flush`) stay in the caller.
+    pub async fn flush_blocks(&self, checkpoint_ts: u64) -> Result<()> {
+        let tables = self.storage.catalog.list_tables()?;
+        self.flush_tables(&tables, checkpoint_ts, checkpoint_workers())
+            .await
+    }
+
+    /// The same checkpoint with an explicit worker count.
+    ///
+    /// [`Self::flush_blocks`] takes it from `INFINITY_CHECKPOINT_CONCURRENCY`;
+    /// the scaling probe passes it directly, because a test cannot change a
+    /// process-wide variable without racing the rest of the suite.
+    pub(crate) async fn flush_tables(
+        &self,
+        tables: &[catalog::TableMeta],
+        checkpoint_ts: u64,
+        workers: usize,
+    ) -> Result<()> {
+        let workers = workers.min(tables.len()).max(1);
+        if workers <= 1 {
+            for meta in tables {
+                self.flush_table(meta, checkpoint_ts).await?;
+            }
+            return Ok(());
+        }
+        // One table's checkpoint is an **async** unit: it waits for the
+        // table's bottom gate (`.await`), then writes that table's blocks and
+        // index chunks - and only those writes, each one a file write, go to
+        // the blocking pool inside the body.
+        //
+        // A task needs an owned engine handle, so the fan-out runs when the
+        // engine lives in an `Arc` (every serving path does); a bare `Engine`
+        // (a unit test that opened a directory directly) takes the serial pass
+        // below, which is the same work.
+        if let Some(engine) = self.engine_handle() {
+            let metas: Vec<catalog::TableMeta> = tables.to_vec();
+            return crate::fanout::for_each_async(metas, workers, move |meta| {
+                let engine = engine.clone();
+                async move { engine.flush_table(&meta, checkpoint_ts).await }
+            })
+            .await;
+        }
+        for meta in tables {
+            self.flush_table(meta, checkpoint_ts).await?;
+        }
+        Ok(())
+    }
+
+    /// One table's share of a checkpoint.
+    ///
+    /// The table's bottom gate is held for the whole step: the block files it
+    /// writes cover every row the table has at that moment, so the tails it
+    /// clears afterwards are exactly the rows those files now hold (plan §5.2).
+    /// An append queued behind the gate cannot slip a row in between.
+    ///
+    /// The shape is: **await the gate**, then hand each write to the blocking
+    /// pool **one at a time** - the block mirror, then one call per index - and
+    /// touch the in-memory registries only after each write came back. No
+    /// `std::sync::Mutex` is held across an await, and no blocking pool thread
+    /// ever runs more than one file write.
+    async fn flush_table(&self, meta: &catalog::TableMeta, checkpoint_ts: u64) -> Result<()> {
+        let key = self.table_key(&meta.name);
+        let gate = self.bottom_gate(&key);
+        let _turn = gate.lock().await;
+        let _held = crate::engine::statements::HeldBottom::enter(&key);
+        if meta.types.iter().all(|t| column_type_of(t).is_some()) {
+            let table = meta.name.clone();
+            self.flush_leaf(move |engine| {
+                engine.write_blocks_bounded_locked(&table, checkpoint_ts)
+            })
+            .await?;
+            // The mirror now covers every row; the IVF memory segment is
+            // redundant and would double-count candidates.
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&key) {
                 for rows in entry.ivf_mem.values_mut() {
                     rows.clear();
                 }
             }
-            // A dropped index keeps its `idx_{id}` mirror until `Cleanup`:
-            // `NewTxn::DropIndexByName` writes a `drop|idx|` marker and leaves
-            // the chunk files alone (`CleanupInner` reclaims them), so deleting
-            // the directory here made a directory that had dropped an index
-            // differ from the reference's by that one file.
         }
-        // Vector indexes mirror alongside the rows. This is best-effort: an
-        // index whose column is not an embedding column simply has no mirror.
-        for im in self.storage.catalog.list_indexes()? {
+        // A dropped index keeps its `idx_{id}` mirror until `Cleanup`:
+        // `NewTxn::DropIndexByName` writes a `drop|idx|` marker and leaves the
+        // chunk files alone (`CleanupInner` reclaims them), so deleting the
+        // directory here made a directory that had dropped an index differ from
+        // the reference's by that one file.
+        for im in self.storage.catalog.indexes_of_table(&meta.name)? {
+            let (table, name, column) = (im.table.clone(), im.name.clone(), im.column.clone());
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 // A chunk written here covers every row (the mirror builds it
                 // from the blocks when the index has no chunk yet), so the
                 // memory segment it was built from is released: keeping it
                 // would make the next dump seal the same rows a second time.
-                if matches!(
-                    self.write_hnsw_index(&im.table, &im.name),
-                    Ok(written) if written > 0
-                ) {
-                    {
-                        let key = self.table_key(&im.table);
-                        let mut tables = self.tables.lock().unwrap();
-                        if let Some(e) = tables.get_mut(&key) {
-                            e.hnsw_mem.remove(&im.column);
-                            e.index_pending_bytes.insert(im.column.clone(), 0);
-                            e.hnsw_probed = false;
-                        }
+                let written = self
+                    .flush_leaf(move |engine| engine.write_hnsw_index(&table, &name))
+                    .await?;
+                if written > 0 {
+                    let mut tables = self.tables.lock().unwrap();
+                    if let Some(e) = tables.get_mut(&key) {
+                        e.hnsw_mem.remove(&column);
+                        e.index_pending_bytes.insert(column.clone(), 0);
+                        e.hnsw_probed = false;
                     }
-                    // The chunk just written is the only thing holding these
-                    // rows now. Without loading it the next query finds neither a
-                    // sealed segment nor a memory segment and falls back to the
-                    // exact scan - every vector query after the first flush
-                    // decoded the whole column.
-                    self.reload_vector_indexes();
                 }
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
-                let _ = self.write_fulltext_index(&im.table, &im.name);
+                let _ = self
+                    .flush_leaf(move |engine| engine.write_fulltext_index(&table, &name))
+                    .await;
             } else if im.index_type.eq_ignore_ascii_case("PLAID") {
-                let _ = self.write_plaid_index(&im.table, &im.name);
+                let _ = self
+                    .flush_leaf(move |engine| engine.write_plaid_index(&table, &name))
+                    .await;
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
-                let _ = self.write_ivf_index(&im.table, &im.name);
+                let _ = self
+                    .flush_leaf(move |engine| engine.write_ivf_index(&table, &name))
+                    .await;
             }
         }
-        // Publish the chunk layer of every index mirror. The reference only
-        // enumerates the chunks listed in `idx_chunk|…|chunk_info`, and a scan
-        // whose chunk file is missing reads a zero-length buffer (the BMP path
-        // indexes `res[block_offset]` of an empty vector and aborts). Some
-        // mirrors are already in the reference's byte layout but live in their
-        // own directory (`secondary/…`, `sparse/…`), so copy them into
-        // `idx_{id}/seg_0/chunk_0.idx`.
-        for meta in self.storage.catalog.list_tables()? {
-            let _ = self.publish_index_chunks(&meta.name, meta.id, None);
-        }
+        // The reference only enumerates the chunks listed in
+        // `idx_chunk|…|chunk_info`, and a scan whose chunk file is missing reads
+        // a zero-length buffer (the BMP path indexes `res[block_offset]` of an
+        // empty vector and aborts). Some mirrors are already in the reference's
+        // byte layout but live in their own directory (`secondary/…`,
+        // `sparse/…`), so copy them into `idx_{id}/seg_0/chunk_0.idx`.
+        let table = meta.name.clone();
+        let id = meta.id;
+        // `publish_index_chunks` returns `()`; the leaf helper is typed on
+        // `Result<usize>`, so the count of published chunks is what it reports.
+        let _ = self
+            .flush_leaf(move |engine| engine.publish_index_chunks(&table, id, None).map(|_| 0))
+            .await;
+        // The step released this table's tails; move its charge inside the
+        // same bottom, so the quota sees the drop with the write that caused it.
+        self.refresh_memindex_charge(&meta.name);
         Ok(())
+    }
+
+    /// Runs one file write of a checkpoint on the blocking pool.
+    ///
+    /// `write` is exactly one table's block mirror or exactly one index's
+    /// chunk write - the granularity a blocking thread should hold. When the
+    /// engine has no `Arc` handle (a bare `Engine` in a unit test) the write
+    /// runs in place; it is the same call either way.
+    async fn flush_leaf<F>(&self, write: F) -> Result<usize>
+    where
+        F: FnOnce(&Engine) -> Result<usize> + Send + 'static,
+    {
+        match self.engine_handle() {
+            Some(handle) => {
+                crate::scheduler::scheduler()
+                    .spawn_blocking(move || write(&handle))
+                    .await
+            }
+            None => write(self),
+        }
     }
 
     /// Mirrors each index's sealed chunk into `idx_{id}/seg_0/chunk_0.idx` and
@@ -1297,6 +1431,20 @@ impl Engine {
         table_id: u64,
         only: Option<(&str, u64)>,
     ) -> Result<()> {
+        let mut indexes = self.storage.catalog.indexes_of_table(table)?;
+        if let Some((name, _)) = only {
+            indexes.retain(|im| im.name == name);
+        }
+        self.publish_index_chunks_of(table, table_id, &indexes, only)
+    }
+
+    fn publish_index_chunks_of(
+        &self,
+        table: &str,
+        table_id: u64,
+        indexes: &[catalog::IndexMeta],
+        only: Option<(&str, u64)>,
+    ) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
             .blocks_root()
@@ -1310,15 +1458,22 @@ impl Engine {
             segments.push((0, 0));
         }
         let mut published = Vec::new();
-        for im in self.storage.catalog.list_indexes()? {
+        for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
             }
             if only.is_some_and(|(name, _)| name != im.name) {
                 continue;
             }
-            let Ok(index_id) = self.index_position(table, &im.name) else {
-                continue;
+            // The list already carries the C++ id; only a hand-written
+            // record without one needs the lookup.
+            let index_id = if im.id > 0 {
+                im.id as usize
+            } else {
+                let Ok(id) = self.index_position(table, &im.name) else {
+                    continue;
+                };
+                id
             };
             let private =
                 crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
@@ -1401,7 +1556,7 @@ impl Engine {
                             .unwrap_or(empty),
                         crate::sparse_idx_width(&declared),
                         crate::sparse_declared_bound(&declared).unwrap_or(0),
-                        crate::index_block_size(&im),
+                        crate::index_block_size(im),
                         *segment,
                         imported,
                     )
@@ -1581,7 +1736,7 @@ impl Engine {
             columns.join(", "),
             values.join(",")
         );
-        self.execute(&sql)?;
+        self.execute_blocking(&sql)?;
         Ok(rows.len())
     }
 
@@ -1940,6 +2095,28 @@ impl Engine {
         Ok(())
     }
 
+    /// [`Self::add_column_files`] for an **async** caller (`ALTER TABLE ADD
+    /// COLUMN`, whose commit effects run on a runtime worker).
+    ///
+    /// The gate is awaited rather than bridged with `block_on`: a `block_on` on
+    /// a worker would park the very thread that has to make progress elsewhere
+    /// in the same statement.
+    pub(crate) async fn add_column_files_async(
+        &self,
+        table: &str,
+        first: usize,
+        blocks: &[(u32, u16, usize, Option<usize>)],
+    ) -> Result<()> {
+        let bottom_gate = self.bottom_gate(table);
+        let _bottom = (!crate::engine::statements::HeldBottom::holds(&self.table_key(table)))
+            .then(|| bottom_gate.lock());
+        let _bottom = match _bottom {
+            Some(turn) => Some(turn.await),
+            None => None,
+        };
+        self.add_column_files_inner(table, first, blocks)
+    }
+
     pub(crate) fn add_column_files(
         &self,
         table: &str,
@@ -1947,10 +2124,20 @@ impl Engine {
         blocks: &[(u32, u16, usize, Option<usize>)],
     ) -> Result<()> {
         // This writes a new column file into block directories the table's block
-        // writer may be rewriting, so it takes the same table bottom gate.
+        // writer may be rewriting, so it takes the same table bottom gate - and
+        // this function is the caller that must take it, so the flag is `true`.
         let bottom_gate = self.bottom_gate(table);
         let _bottom = (!crate::engine::statements::HeldBottom::holds(&self.table_key(table)))
-            .then(|| bottom_gate.lock().unwrap());
+            .then(|| crate::scheduler::block_on(bottom_gate.lock()));
+        self.add_column_files_inner(table, first, blocks)
+    }
+
+    fn add_column_files_inner(
+        &self,
+        table: &str,
+        first: usize,
+        blocks: &[(u32, u16, usize, Option<usize>)],
+    ) -> Result<()> {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Ok(());
@@ -2662,6 +2849,10 @@ impl Engine {
 
     /// [`Self::read_blocks_pruned`] with the cells already decoded to
     /// `Value`: what a scan reads, so it does not parse the text back.
+    ///
+    /// The decode runs on the CPU pool (`spawn_cpu`) and this awaits it, so the
+    /// statement task keeps its worker while a wide block is decoded
+    /// (plan 6.13).
     pub fn read_blocks_pruned_values(
         &self,
         table: &str,
@@ -2790,6 +2981,68 @@ impl Engine {
             block.version(),
             block.as_ref(),
             wanted,
+        )
+    }
+
+    /// One block's visible rows, as a scan step: map it, decode it, then drop
+    /// the slots the block's `version` hides *at the statement's* `read_ts`.
+    ///
+    /// This is the unit `read_blocks_values` fans out over tokio tasks (plan
+    /// 6.13.2): it touches no shared mutable state - the mapping is an `Arc`,
+    /// the column bytes are immutable - so blocks decode in parallel and the
+    /// row order is restored by the caller's `zip` with its block list.
+    #[allow(clippy::too_many_arguments)] // one argument per piece of the block it reads
+    fn decode_block_visible(
+        &self,
+        table: &str,
+        root: &Path,
+        meta: &catalog::TableMeta,
+        types: &[i32],
+        id: BlockId,
+        wanted: Option<&[usize]>,
+        keep: RowFilter<'_>,
+        rows_wanted: Option<&std::collections::HashSet<usize>>,
+        read_ts: u64,
+    ) -> BlockDecode {
+        let Ok(block) = self.block_map(table, root, id) else {
+            return BlockDecode::OpenFailed;
+        };
+        let version = block.version();
+        let Some(cells) = Self::decode_rows_of_values(
+            &meta.ids,
+            &meta.types,
+            types,
+            id,
+            version,
+            block.as_ref(),
+            wanted,
+            keep,
+            rows_wanted,
+        ) else {
+            return BlockDecode::DecodeFailed;
+        };
+        // A deleted slot keeps its cells in the block file (the reference hides
+        // it with the version, it does not rewrite the block), so the scan
+        // drops it here - the same slots `visible_row_count` subtracts, which
+        // is what keeps the two numbers equal.
+        //
+        // The verdict is taken at the statement's `begin_ts`
+        // (`BlockVersion::GetRowCount(begin_ts)`): a slot created after it does
+        // not exist yet, and one deleted after it is still there.
+        //
+        // The slot comes from the row id, not from the position in `cells`: a
+        // `keep` predicate drops rejected rows during the decode, so the k-th
+        // surviving row is not the k-th slot and enumerating the survivors let
+        // a deleted row through whenever some live low slot took its place.
+        let created_at = Self::created_at(version, read_ts);
+        BlockDecode::Rows(
+            cells
+                .into_iter()
+                .filter(|(seq, _)| {
+                    let slot = (*seq as u64 & 0xffff_ffff) as usize % DEFAULT_BLOCK_CAPACITY;
+                    Self::slot_visible(version, slot, created_at, read_ts)
+                })
+                .collect(),
         )
     }
 
@@ -3231,55 +3484,6 @@ impl Engine {
         drop(tables);
         out.sort_by_key(|(seq, _)| *seq);
         Some(out)
-    }
-
-    /// Every live row id, with no column decoded.
-    ///
-    /// The KNN probe asks this to decide whether the index covers the table;
-    /// the rows themselves are a deferred vector projection at that point, so
-    /// the ids come from the block versions plus the buffered appends, exactly
-    /// as `row_ids_in_bounds` reads them but without a bounds scan.
-    pub(crate) fn live_row_ids(&self, table: &str) -> Vec<usize> {
-        let table = self.qualified_table(table);
-        let root = self.blocks_root();
-        let read_ts = crate::read_ts();
-        // The journal's deletes as of *this* statement, read once and applied to
-        // both sources: a block's `version` only carries the deletes a flush has
-        // written, and the buffered rows never reach a `version` at all.
-        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
-        let mut out: Vec<usize> = Vec::new();
-        for id in self.visible_block_ids(&table) {
-            let Ok(block) = self.block_map(&table, &root, id) else {
-                break;
-            };
-            let version = block.version();
-            let row_count: usize = version
-                .created
-                .last()
-                .map(|c| c.cumulative_row_count as usize)
-                .unwrap_or(0);
-            let created_at = Self::created_at(version, read_ts);
-            for slot in 0..row_count {
-                if !Self::slot_visible(version, slot, created_at, read_ts) {
-                    continue;
-                }
-                let seq = ((id.segment_id as usize) << 32)
-                    | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
-                if dead.contains(&(seq as u64)) {
-                    continue;
-                }
-                out.push(seq);
-            }
-        }
-        // Rows above the last checkpoint live in the append buffer.
-        for (seq, _) in self.pending_rows_of(&table) {
-            if !dead.contains(&(seq as u64)) {
-                out.push(seq);
-            }
-        }
-        out.sort_unstable();
-        out.dedup();
-        out
     }
 
     /// The rows whose `bounds` column falls in range, read straight out of the
@@ -3728,10 +3932,16 @@ impl Engine {
                         } else {
                             Some(cols[o].value_at(ri))
                         }
-                    } else if decoded.is_some() {
-                        // The slot is hidden by the block version.
-                        Some(Value::Null)
                     } else {
+                        // Either the block does not hold this slot at all (the
+                        // row was written after the last checkpoint, so its
+                        // slot is past the block's `row_count`), or the version
+                        // hides it. The append buffer decides: a buffered row
+                        // is the row, and only a genuinely absent one is NULL.
+                        // Checking the buffer only when `decoded` was `None`
+                        // made a row inserted after a checkpoint read as NULL
+                        // through an indexed lookup, because the block for its
+                        // slot existed but did not cover it yet.
                         buffered.get(&s).and_then(|v| v.get(*pos).cloned())
                     };
                     match cell {
@@ -3871,6 +4081,28 @@ impl Engine {
         keep: RowFilter<'_>,
         rows_wanted: Option<&std::collections::HashSet<usize>>,
     ) -> Result<BlockValueRows> {
+        self.read_blocks_values_at(table, wanted, prune, keep, rows_wanted, crate::read_ts())
+    }
+
+    /// [`Self::read_blocks_values`] with the statement's read timestamp passed
+    /// **by value**.
+    ///
+    /// The read timestamp lives in a thread-local, which is correct only while
+    /// the statement stays on its own thread. Decoding now runs on the blocking
+    /// pool, where that thread-local does not exist and would read
+    /// `u64::MAX` - i.e. every row would look visible, including rows deleted
+    /// after the statement began. Taking the timestamp before the dispatch and
+    /// passing it in keeps the snapshot semantics intact.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn read_blocks_values_at(
+        &self,
+        table: &str,
+        wanted: Option<&[usize]>,
+        prune: &[crate::fast_rough_filter::PruneCond],
+        keep: RowFilter<'_>,
+        rows_wanted: Option<&std::collections::HashSet<usize>>,
+        read_ts: u64,
+    ) -> Result<BlockValueRows> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -3890,7 +4122,6 @@ impl Engine {
             .collect::<Result<_>>()?;
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
-        let read_ts = crate::read_ts();
 
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
         // The mirror is segmented (`seg_{id}/blk_{n}`), and a row's id carries
@@ -3923,6 +4154,10 @@ impl Engine {
                     .map(|i| (i, cond.op, cond.value.clone()))
             })
             .collect();
+        // The blocks that survive pruning and the index's row filter, in scan
+        // order. Selecting them is serial (each test is a catalog read), the
+        // decoding that follows is not (plan 6.13.2).
+        let mut candidates: Vec<(usize, BlockId)> = Vec::new();
         for (at, id) in blocks.into_iter().enumerate() {
             let BlockId {
                 segment_id,
@@ -3960,47 +4195,79 @@ impl Engine {
                     continue;
                 }
             }
-            match self.block_map(&table, &root, id) {
-                Ok(block) => {
-                    let version = block.version();
-                    let Some(cells) = Self::decode_rows_of_values(
-                        &meta.ids,
-                        &meta.types,
-                        &types,
+            candidates.push((at, id));
+        }
+        let decode = |id: BlockId, keep: RowFilter<'_>| {
+            self.decode_block_visible(
+                &table,
+                &root,
+                &meta,
+                &types,
+                id,
+                wanted,
+                keep,
+                rows_wanted,
+                read_ts,
+            )
+        };
+        // A predicate is `&dyn Fn`, which is not `Sync`, so the parallel path
+        // only exists when there is none. It is also the common case: a scan
+        // without a pushed-down equality decodes plain (plan 6.13.2).
+        let decoded: Vec<BlockDecode> = match keep {
+            None if candidates.len() > 1
+                && self.engine_handle().is_some()
+                && !crate::fanout::on_a_runtime_worker() =>
+            {
+                let workers = std::thread::available_parallelism()
+                    .map(|n| n.get())
+                    .unwrap_or(1)
+                    .min(candidates.len());
+                // A block decode is the pure-CPU leaf: it reads mapped bytes
+                // and builds `Value`s. Each block is a tokio task under the
+                // core bound, and only the decode itself runs on the blocking
+                // pool.
+                //
+                // The body needs its inputs owned (a task outlives this frame):
+                // the table name, the block root, the schema and the row filter
+                // are cloned once for the whole scan, not per block.
+                let engine = self.engine_handle().expect("checked above");
+                let table_owned = table.clone();
+                let root_owned = root.clone();
+                let meta_owned = meta.clone();
+                let types_owned = types.clone();
+                let wanted_owned = wanted.map(|w| w.to_vec());
+                let rows_owned = rows_wanted.cloned();
+                let blocks: Vec<(usize, BlockId)> = candidates.clone();
+                crate::fanout::map_blocking(blocks, workers, move |(at, id)| {
+                    let value = engine.decode_block_visible(
+                        &table_owned,
+                        &root_owned,
+                        &meta_owned,
+                        &types_owned,
                         id,
-                        version,
-                        block.as_ref(),
-                        wanted,
-                        keep,
-                        rows_wanted,
-                    ) else {
-                        break;
-                    };
-                    // A deleted slot keeps its cells in the block file (the
-                    // reference hides it with the version, it does not rewrite
-                    // the block), so the scan drops it here - the same slots
-                    // `visible_row_count` subtracts, which is what keeps
-                    // the two numbers equal.
-                    //
-                    // The verdict is taken at the statement's `begin_ts`
-                    // (`BlockVersion::GetRowCount(begin_ts)`): a slot created
-                    // after it does not exist yet, and one deleted after it is
-                    // still there.
-                    let created_at = Self::created_at(version, read_ts);
-                    // The slot comes from the row id, not from the position in
-                    // `cells`: a `keep` predicate drops rejected rows during
-                    // the decode, so the k-th surviving row is not the k-th slot
-                    // and enumerating the survivors let a deleted row through
-                    // whenever some live low slot took its place.
-                    rows.extend(cells.into_iter().filter(|(seq, _)| {
-                        let slot = (*seq as u64 & 0xffff_ffff) as usize % DEFAULT_BLOCK_CAPACITY;
-                        Self::slot_visible(version, slot, created_at, read_ts)
-                    }));
-                }
-                Err(_) if at == 0 => {
+                        wanted_owned.as_deref(),
+                        None,
+                        rows_owned.as_ref(),
+                        read_ts,
+                    );
+                    Ok((at, value))
+                })
+                .map(|decoded| decoded.into_iter().map(|(_, value)| value).collect())
+                .unwrap_or_else(|_| candidates.iter().map(|(_, id)| decode(*id, None)).collect())
+            }
+            _ => candidates.iter().map(|(_, id)| decode(*id, keep)).collect(),
+        };
+        for ((at, _id), decoded) in candidates.into_iter().zip(decoded) {
+            match decoded {
+                BlockDecode::Rows(cells) => rows.extend(cells),
+                // The first block that cannot be opened is "no blocks for this
+                // table"; one that opened but did not decode, or any failure
+                // after the first block, ends the scan - exactly the split the
+                // sequential walk made.
+                BlockDecode::OpenFailed if at == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))
                 }
-                Err(_) => break,
+                BlockDecode::OpenFailed | BlockDecode::DecodeFailed => break,
             }
         }
         // Rows a commit appended since the last checkpoint are in the table's
@@ -4069,12 +4336,10 @@ impl Engine {
     /// index) and the reference then read the sparse chunk with the HNSW
     /// parser and aborted.
     pub(crate) fn index_position(&self, table: &str, index_name: &str) -> Result<usize> {
-        let short = table.split('.').next_back().unwrap_or(table);
-        let indexes = self.storage.catalog.list_indexes()?;
-        let id = indexes
-            .iter()
-            .filter(|im| im.table == short || im.table == table)
-            .find(|im| im.name == index_name)
+        let id = self
+            .storage
+            .catalog
+            .index_by_name(table, index_name)?
             .map(|im| im.id)
             .filter(|id| *id > 0)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))?;
@@ -4176,30 +4441,20 @@ impl Engine {
     /// C++ layout (§9.2): 56-byte header, plain vector region, graph region, then
     /// the `u32` label array. Byte-identity with a C++-built index is not
     /// required — the offsets are explicit, so the C++ loader reads it.
-    ///
-    /// `Ok(None)` means the column has no vectors to index (no cell parsed, or
-    /// no declared dimension) - nothing to write, which the caller treats as
-    /// "leave the chunks alone". A malformed cell is an `Err` instead: see
-    /// [`Self::column_tokens`].
     pub(crate) fn hnsw_chunk(
         &self,
         table: &str,
         column: &str,
         options: &HnswOptions,
         segment: Option<u32>,
-    ) -> Result<Option<(HnswChunkCover, Vec<u8>)>> {
-        let tokens = self.column_tokens(table, column, segment)?;
-        let total: usize = tokens.iter().map(|(_, t)| t.len()).sum();
-        let Some(dim) = tokens
-            .iter()
-            .find_map(|(_, t)| t.first().map(Vec::len))
-            .filter(|d| *d > 0)
-        else {
-            return Ok(None);
-        };
-        if total == 0 {
-            return Ok(None);
+    ) -> Result<(usize, Vec<u8>)> {
+        let vectors = self.column_vectors(table, column, segment)?;
+        if vectors.is_empty() {
+            return Err(Error::Invalid(format!(
+                "no vectors to index in '{table}.{column}'"
+            )));
         }
+        let dim = vectors[0].1.len();
         let mut index = HnswIndex::with_encoding(
             dim,
             options.m,
@@ -4208,110 +4463,26 @@ impl Engine {
             options.metric,
             options.encoding,
         );
-        // One vertex per row for an `EMBEDDING` column, one per token for a
-        // `MULTIVECTOR` — the reference's `MemIndexInserterIter1<MultiVectorRef>`
-        // (a token-level graph whose labels are row ids).
-        let mut vectors: Vec<Vec<f32>> = Vec::with_capacity(total);
-        let mut labels: Vec<u32> = Vec::with_capacity(total);
-        for (label, row_tokens) in &tokens {
-            for token in row_tokens {
-                vectors.push(token.clone());
-                labels.push(*label);
-            }
-        }
-        // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on every
-        // vertex, then build the graph with the trained store.
-        index.train_store(&vectors, options.lsg);
+        // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on the whole
+        // column, then build the graph with the trained store.
+        let rows: Vec<Vec<f32>> = vectors.iter().map(|(_, v)| v.clone()).collect();
+        index.train_store(&rows, options.lsg);
+        let labels: Vec<u32> = vectors.iter().map(|(label, _)| *label).collect();
         // Bucket-parallel construction, as the reference does on its dense-index
         // pool; a store that is not plain keeps the serial path.
-        index.add_batch(&vectors, self.hnsw_build_workers());
-        Ok(Some(encode_hnsw_chunk_from(&index, &labels)))
-    }
-
-    /// The vectors of `column` split into one entry per graph vertex: a single
-    /// vector per row for an `EMBEDDING` column, the row's `dim`-sized tokens
-    /// for a `MULTIVECTOR`.
-    ///
-    /// Every cell is parsed strictly ([`crate::parse_vector_cell`]) and must be
-    /// a whole number of `dim`-sized tokens, because that is the only shape the
-    /// graph can hold: a cell with a missing coordinate, or one whose length is
-    /// not a multiple of the declared dimension, is a build error rather than a
-    /// vertex of a different width.
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn column_tokens(
-        &self,
-        table: &str,
-        column: &str,
-        segment: Option<u32>,
-    ) -> Result<Vec<(u32, Vec<Vec<f32>>)>> {
-        let schema = self.table_schema(table)?;
-        let col_idx = schema
-            .iter()
-            .position(|c| c == column)
-            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
-        let decl = self
-            .storage
-            .catalog
-            .get_table_by_name(&self.qualified_table(table))
-            .ok()
-            .flatten()
-            .and_then(|meta| meta.types.get(col_idx).cloned())
-            .map(|decl| decl.to_ascii_uppercase())
-            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
-        let (dim, bit) = vector_column_shape(&decl);
-        let mut out = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
-            if let Some(only) = segment {
-                if (seq >> 32) as u32 != only {
-                    continue;
-                }
-            }
-            let Some(Value::Str(s)) = row.get(col_idx) else {
-                continue;
-            };
-            // Strict: `parse_vec_str` drops leaves it cannot parse, and a cell
-            // that loses one coordinate silently changes the vertex dimension
-            // for that row, which is exactly the kind of value the graph must
-            // not be built from.
-            let flat = crate::parse_vector_cell(s, bit)
-                .map_err(|e| Error::Invalid(format!("'{table}.{column}' row {seq}: {e}")))?;
-            if flat.is_empty() {
-                continue;
-            }
-            let tokens: Vec<Vec<f32>> = match dim {
-                Some(dim) if flat.len() % dim == 0 => {
-                    flat.chunks_exact(dim).map(<[f32]>::to_vec).collect()
-                }
-                // A cell that is not a whole number of `dim`-sized tokens has
-                // no vertex dimension the token layout can express: indexing it
-                // as one vertex would put a vector of the wrong length into a
-                // graph whose every other vertex is `dim` wide.
-                Some(dim) => {
-                    return Err(Error::Invalid(format!(
-                        "'{table}.{column}' row {seq}: {} coordinates is not a whole number of {dim}-dimensional tokens",
-                        flat.len()
-                    )))
-                }
-                None => vec![flat],
-            };
-            if !tokens.is_empty() {
-                out.push((seq as u32, tokens));
-            }
-        }
-        Ok(out)
+        index.add_batch(&rows, self.hnsw_build_workers());
+        Ok(encode_hnsw_chunk_from(&index, &labels))
     }
 
     /// The HNSW options of `index_name` (`metric`, `encode`, `build_type`,
     /// `lsg_config`).
     pub(crate) fn hnsw_options(&self, table: &str, index_name: &str) -> HnswOptions {
-        let short = table.rsplit('.').next().unwrap_or(table);
         let Some(im) = self
             .storage
             .catalog
-            .list_indexes()
-            .unwrap_or_default()
-            .into_iter()
-            .find(|im| im.name == index_name && (im.table == table || im.table == short))
+            .index_by_name(table, index_name)
+            .ok()
+            .flatten()
         else {
             return HnswOptions::default();
         };
@@ -4343,31 +4514,6 @@ impl Engine {
             metric,
             encoding,
             lsg,
-        }
-    }
-
-    /// The HNSW memory segment of `column`, if one is loaded.
-    pub(crate) fn hnsw_tail_len(&self, tkey: &str, column: &str) -> Option<usize> {
-        let tables = self.tables.lock().unwrap();
-        let mem = tables.get(tkey)?.hnsw_mem.get(column)?.clone();
-        mem.read().ok().map(|graph| graph.len())
-    }
-
-    /// Releases an HNSW memory segment nothing can seal, with its charge.
-    ///
-    /// A dump that reported `Ok(0)` wrote nothing - an LSG index links its graph
-    /// with unadjusted distances, so the memory segment is never sealed
-    /// incrementally - and the bytes it holds are therefore still resident.
-    /// Releasing keeps the footprint bounded; the rows are still answered, from
-    /// whichever chunks do hold them plus the exact scan for the rest
-    /// (`knn_candidates` → `uncovered_candidates`), so this costs speed and
-    /// never correctness.
-    pub(crate) fn release_hnsw_tail(&self, tkey: &str, column: &str) {
-        let mut tables = self.tables.lock().unwrap();
-        if let Some(entry) = tables.get_mut(tkey) {
-            entry.hnsw_mem.remove(column);
-            entry.index_pending_bytes.insert(column.to_string(), 0);
-            entry.hnsw_probed = false;
         }
     }
 
@@ -4421,14 +4567,23 @@ impl Engine {
         let column = self
             .storage
             .catalog
-            .list_indexes()?
-            .into_iter()
-            .find(|im| {
-                im.name == index_name
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            })
+            .index_by_name(&table, index_name)?
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        // A MULTIVECTOR holds several sub-vectors per row; the C++ mirror is a
+        // single-vector graph, so there is nothing to write for it.
+        if let Some(i) = meta.columns.iter().position(|c| c == &column) {
+            if meta
+                .types
+                .get(i)
+                .map(|t| t.trim().to_ascii_uppercase().starts_with("MULTIVECTOR"))
+                .unwrap_or(false)
+            {
+                return Err(Error::Invalid(format!(
+                    "no single-vector HNSW mirror for multivector column '{column}'"
+                )));
+            }
+        }
         // A checkpoint dumps the **memory segment** (rows since the previous
         // dump), not a graph rebuilt from every row: rebuilding cost O(table)
         // memory and time on every checkpoint and was the Gate C OOM driver.
@@ -4446,20 +4601,6 @@ impl Engine {
         } else {
             segments
         };
-        // A local-to-scaling-graph index is never dumped from the buffer. LSG
-        // needs a two-pass build - sample the rows, derive each row's mean
-        // distance to its `ls_k` nearest samples, then link vertices - and the
-        // memory segment links them as they arrive, so its graph uses
-        // *unadjusted* distances. Publishing it would mix two distance
-        // functions across a segment's chunks; and rebuilding here on every
-        // checkpoint is the O(table) transient this function exists to avoid.
-        // The LSG chunk therefore comes from the full mirror write/optimize
-        // merge, while rows added since then are answered by the memory segment
-        // the query side already merges.
-        let options = self.hnsw_options(&table, index_name);
-        if new_chunk && options.lsg.is_some() {
-            return Ok((0, Vec::new()));
-        }
         let from_memory = if new_chunk && segments.len() == 1 {
             let Some(mem) = self
                 .tables
@@ -4472,7 +4613,7 @@ impl Engine {
                 // nothing to write and must not rebuild the whole graph.
                 return Ok((0, Vec::new()));
             };
-            let Ok(mem) = mem.read() else {
+            let Ok(mem) = mem.lock() else {
                 return Ok((0, Vec::new()));
             };
             if mem.is_empty() {
@@ -4484,6 +4625,7 @@ impl Engine {
             None
         };
         let db_id = self.database_id_of(&table);
+        let options = self.hnsw_options(&table, index_name);
         let mut written = 0usize;
         let mut rewrites: Vec<ChunkRewrite> = Vec::new();
         for (segment, rows) in &segments {
@@ -4504,20 +4646,17 @@ impl Engine {
                 continue;
             }
             let built = match &from_memory {
-                Some((cover, chunk)) => Some((*cover, chunk.clone())),
+                Some((count, chunk)) => Some((*count, chunk.clone())),
                 None => {
                     if *rows == 0 {
                         None
                     } else {
-                        // A cell the build cannot parse is reported, not
-                        // swallowed: skipping the chunk would leave the mirror
-                        // without the rows the table holds, and the query side
-                        // would answer from a partial index.
-                        self.hnsw_chunk(&table, &column, &options, Some(*segment))?
+                        self.hnsw_chunk(&table, &column, &options, Some(*segment))
+                            .ok()
                     }
                 }
             };
-            let Some((cover, chunk)) = built else {
+            let Some((count, chunk)) = built else {
                 continue;
             };
             let name = format!(
@@ -4536,17 +4675,14 @@ impl Engine {
                     source: e,
                 }
             })?;
-            written += cover.vertices;
+            written += count;
             // The chunks this one supersedes: the reference's
             // `deprecate_chunks_`, which its optimize transaction removes from
-            // the segment's chunk list. The rewrite publishes *row* coverage:
-            // a `MULTIVECTOR` chunk labels one row per token, and claiming the
-            // vertex count would let restart recovery skip a tail that the
-            // chunk does not cover.
+            // the segment's chunk list.
             rewrites.push(ChunkRewrite {
                 segment: *segment,
                 chunk_id,
-                row_count: cover.rows as u32,
+                row_count: count as u32,
                 deprecate_ids: chunks.iter().map(|(id, _)| *id as u32).collect(),
             });
         }
@@ -4588,7 +4724,7 @@ impl Engine {
     /// pass rewrote, so two merges never run together and a merge meets the
     /// appends and updates on its table. A failed pass is rolled back; a lost
     /// conflict is logged and left alone, which is what the processor does.
-    pub fn optimize_index_chunks(&self) -> Result<()> {
+    pub async fn optimize_index_chunks(&self) -> Result<()> {
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
         let mut txn = self.txn.begin();
@@ -4622,7 +4758,7 @@ impl Engine {
             txn.set_typed_commands(commands);
         }
         match outcome {
-            Ok(()) => match self.txn.commit_at(txn, ts) {
+            Ok(()) => match self.txn.commit_at(txn, ts).await {
                 Ok(_) => {
                     // `RemoveChunkIDs(deprecate_ids)` + `PrepareCommitDumpIndex`
                     // of the reference: the merged chunk is what the segment holds
@@ -4651,7 +4787,7 @@ impl Engine {
                     // entry and therefore runs after the vector commit: a failed
                     // merge leaves the source chunks readable instead of rolling
                     // back the vector work.
-                    if let Err(error) = self.optimize_all_fulltext_indexes() {
+                    if let Err(error) = self.optimize_all_fulltext_indexes_async().await {
                         eprintln!("optimize: merging the full-text chunks failed: {error}");
                     }
                     // The secondary half of `OptimizeIndexInner`
@@ -4659,7 +4795,7 @@ impl Engine {
                     // one chunk folds them into one. Like the full-text rewrite its
                     // catalog records are derived from the files, so it also runs
                     // after the vector commit.
-                    if let Err(error) = self.optimize_all_secondary_indexes() {
+                    if let Err(error) = self.optimize_all_secondary_indexes().await {
                         eprintln!("optimize: merging the secondary chunks failed: {error}");
                     }
                     Ok(())
@@ -4714,6 +4850,12 @@ impl Engine {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
+            // A MULTIVECTOR column has no single-vector graph in this build, so
+            // its mirror has nothing to merge (`write_hnsw_chunk` refuses
+            // it); skipping it keeps one such index from failing the pass.
+            if self.multivector_column(&im.table, &im.column) {
+                continue;
+            }
             // The rows an optimize would merge are the *live* ones: a table
             // whose writes have not been checkpointed (or whose rows were just
             // replayed from the WAL) keeps them in the append buffer, and the
@@ -4729,15 +4871,29 @@ impl Engine {
             if chunks.len() < 2 {
                 continue;
             }
-            // A merged chunk covers the table only when it labels every row.
-            // The header counts *vertices* - one per row for an `EMBEDDING`
-            // column, one per token for a `MULTIVECTOR` one - so a token count
-            // can reach the row count while rows are still missing; the label
-            // array is what answers "which rows are in here".
-            let (covered_vertices, covered_rows) = self.hnsw_chunk_coverage(&im.table, &im.name);
-            if covered_rows >= rows {
+            let covered = self
+                .hnsw_chunk_path(&im.table, &im.name)
+                .ok()
+                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|b| {
+                    knn_format::decode_hnsw_chunk(
+                        &b,
+                        4,
+                        knn_format::VERTEX_L0_SIZE,
+                        knn_format::VERTEX_LX_SIZE,
+                    )
+                    .ok()
+                })
+                .map(|c| c.header.cur_vec_num as usize)
+                .unwrap_or(0);
+            if covered >= rows {
                 continue;
             }
+            // A merge holds the vectors, the rebuilt graph and the encoded
+            // chunk at the same time. On a multi-gigabyte table that transient
+            // is larger than the whole memory budget (C++ streams it through
+            // the buffer manager), so leave the incremental chunks alone
+            // rather than rebuilding the table every tick.
             let dim = self
                 .table_schema(&im.table)
                 .ok()
@@ -4749,27 +4905,7 @@ impl Engine {
                 })
                 .and_then(|t| crate::type_dim(&t))
                 .unwrap_or(0);
-            // A merge holds the vectors, the rebuilt graph and the encoded
-            // chunk at the same time. On a multi-gigabyte table that transient
-            // is larger than the whole memory budget (C++ streams it through
-            // the buffer manager), so leave the incremental chunks alone
-            // rather than rebuilding the table every tick.
-            //
-            // The row count is a vertex count only for a single-vector column:
-            // a `MULTIVECTOR` rebuild is one vertex per token, so its vectors,
-            // graph and chunk grow with the tokens per row, which the chunk
-            // already on disk tells us even when it covers part of the table.
-            let tokens_per_row = if self.multivector_column(&im.table, &im.column) {
-                covered_vertices.div_ceil(covered_rows.max(1)).max(1)
-            } else {
-                1
-            };
-            let rebuild_vertices = rows.saturating_mul(tokens_per_row);
-            // Three copies of a token (the decoded input, the graph's store and
-            // the encoded chunk) plus the graph, the labels and the per-vertex
-            // headers around them.
-            let per_vertex = dim.saturating_mul(4).saturating_mul(3).saturating_add(256);
-            let rebuild_bytes = rebuild_vertices.saturating_mul(per_vertex);
+            let rebuild_bytes = rows.saturating_mul(dim).saturating_mul(4 * 3 + 64);
             if rebuild_bytes > 1024 * 1024 * 1024 {
                 continue;
             }
@@ -4910,18 +5046,27 @@ impl Engine {
             };
             self.reclaim_deprecated_chunks(&im.table, &im.name, 0, &dir)?;
             let chunks = hnsw_chunks(&dir);
+            let covered = self
+                .hnsw_chunk_path(&im.table, &im.name)
+                .ok()
+                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|b| {
+                    knn_format::decode_hnsw_chunk(
+                        &b,
+                        4,
+                        knn_format::VERTEX_L0_SIZE,
+                        knn_format::VERTEX_LX_SIZE,
+                    )
+                    .ok()
+                })
+                .map(|c| c.header.cur_vec_num as usize)
+                .unwrap_or(0);
             // The newest chunk covers the table only when it is a merged
             // chunk; incremental dumps cover just their own rows. A committed
             // optimize already dropped the chunks it superseded (the entry's
             // `deprecate_ids`), so this is the fallback for a crash between that
             // commit and the deletion.
-            //
-            // Coverage is *rows*, not vertices: a `MULTIVECTOR` chunk holds one
-            // vertex per token, so its vertex count passes the row count long
-            // before it labels every row, and reclaiming on that would delete
-            // chunks that are still the only copy of some rows.
-            let (_, covered_rows) = self.hnsw_chunk_coverage(&im.table, &im.name);
-            if covered_rows < rows {
+            if covered < rows {
                 continue;
             }
             if let Some((keep, _)) = chunks.last() {
@@ -4935,23 +5080,16 @@ impl Engine {
         Ok(())
     }
 
-    /// The directory holding `table`'s index mirror (`db_{db}/tbl_{t}/idx_{id}`),
-    /// whose `seg_{n}` subdirectories hold the per-segment chunks, if the table
-    /// and the index exist.
-    pub(crate) fn index_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
+    /// The directory holding `table`'s HNSW mirror, if the table exists.
+    pub(crate) fn hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let index_id = self.index_position(&table, index_name).ok()?;
         let db_id = self.database_id_of(&table);
         Some(
             self.blocks_root()
-                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id)),
         )
-    }
-
-    /// The directory holding `table`'s HNSW mirror, if the table exists.
-    pub(crate) fn hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
-        Some(self.index_dir(table, index_name)?.join("seg_0"))
     }
 
     /// The chunk ids of one segment index that an optimize deprecated and
@@ -5093,27 +5231,6 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", dir.display())))
     }
 
-    /// `(vertices, distinct rows)` of `index_name`'s newest HNSW chunk.
-    ///
-    /// The header counts vertices, which is a row count only for an
-    /// `EMBEDDING` column: a `MULTIVECTOR` chunk stores one vertex per token and
-    /// labels each with its row id, so "how many rows does this chunk cover" has
-    /// to be read off the label array. Both numbers come from one mapped read -
-    /// the vectors and the graph are never touched, which is why this costs a
-    /// few hundred kilobytes for a million-vertex chunk instead of decoding it.
-    pub(crate) fn hnsw_chunk_coverage(&self, table: &str, index_name: &str) -> (usize, usize) {
-        let Some(path) = self.hnsw_chunk_path(table, index_name).ok() else {
-            return (0, 0);
-        };
-        let Some(src) = map_hnsw_chunk(&path) else {
-            return (0, 0);
-        };
-        let Some(parts) = self.read_hnsw_chunk_parts_mapped(table, index_name, &src) else {
-            return (0, 0);
-        };
-        (parts.n, labelled_rows(&parts.labels))
-    }
-
     /// Writes `table`'s full-text index as the C++ `.dic`/`.pos`/`.len` chunk
     /// family under `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/`,
     /// returning the number of documents indexed.
@@ -5127,12 +5244,7 @@ impl Engine {
         let im = self
             .storage
             .catalog
-            .list_indexes()?
-            .into_iter()
-            .find(|im| {
-                im.name == index_name
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            })
+            .index_by_name(&table, index_name)?
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let col = meta
             .columns
@@ -5369,6 +5481,13 @@ impl Engine {
             knn_format::VERTEX_LX_SIZE,
         )
         .ok()?;
+        let vertices = knn_format::decode_graph_region(
+            &chunk.graph,
+            chunk.cur_vec_num as usize,
+            chunk.mmax0,
+            chunk.mmax,
+        )
+        .ok()?;
         Some(HnswChunkParts {
             m,
             ef,
@@ -5378,68 +5497,8 @@ impl Engine {
             enterpoint: (chunk.enterpoint >= 0).then_some(chunk.enterpoint as usize),
             store_meta: chunk.store_meta,
             records: chunk.vectors,
-            mapped: None,
-            graph_region: chunk.graph,
+            vertices,
             labels: chunk.labels,
-            options,
-        })
-    }
-
-    /// Decodes a chunk that is **mapped** rather than read: the vector region
-    /// stays where it is and only the (much smaller) graph and labels are
-    /// copied out.
-    ///
-    /// This is the reference's shape — `PlainVecStoreInner` holds a pointer into
-    /// the buffer manager's chunk — and it is what keeps a loaded index's
-    /// footprint to its graph instead of a full second copy of every vector.
-    pub(crate) fn read_hnsw_chunk_parts_mapped(
-        &self,
-        table: &str,
-        index_name: &str,
-        src: &index::vector::ByteSource,
-    ) -> Option<HnswChunkParts> {
-        let options = self.hnsw_options(table, index_name);
-        let bytes = src.as_ref().as_ref();
-        if bytes.len() < 32 {
-            return None;
-        }
-        let u64_at = |at: usize| -> Option<u64> {
-            bytes
-                .get(at..at + 8)
-                .and_then(|b| b.try_into().ok())
-                .map(u64::from_le_bytes)
-        };
-        let m = u64_at(0)?;
-        let ef = u64_at(8)?;
-        let n = u64_at(16)? as usize;
-        let dims = u64_at(24)? as usize;
-        let meta_len = hnsw_store_meta_len(dims, options.metric, options.encoding);
-        let record_size = hnsw_record_size(dims, options.encoding);
-        let regions = knn_format::hnsw_chunk_regions(
-            bytes,
-            meta_len,
-            record_size,
-            knn_format::VERTEX_L0_SIZE,
-            knn_format::VERTEX_LX_SIZE,
-        )
-        .ok()?;
-        Some(HnswChunkParts {
-            m,
-            ef,
-            n,
-            dims,
-            max_layer: regions.max_layer.max(0) as usize,
-            enterpoint: (regions.enterpoint >= 0).then_some(regions.enterpoint as usize),
-            store_meta: bytes[regions.store_meta].to_vec(),
-            records: Vec::new(),
-            mapped: Some(MappedChunk {
-                src: src.clone(),
-                vector_off: regions.vectors.start,
-                record_size,
-                graph_off: regions.graph.start,
-            }),
-            graph_region: Vec::new(),
-            labels: knn_format::decode_labels(&bytes[regions.labels]).ok()?,
             options,
         })
     }
@@ -5452,52 +5511,52 @@ impl Engine {
         if parts.n == 0 {
             return None;
         }
+        let levels: Vec<usize> = parts
+            .vertices
+            .iter()
+            .map(|v| v.layer_count.max(0) as usize)
+            .collect();
+        let mut links: Vec<Vec<Vec<usize>>> = vec![Vec::new()];
+        for (node, v) in parts.vertices.iter().enumerate() {
+            while links[0].len() <= node {
+                links[0].push(Vec::new());
+            }
+            links[0][node] = v.neighbors_l0.iter().map(|&x| x as usize).collect();
+            for (l, nbrs) in v.upper.iter().enumerate() {
+                let layer = l + 1;
+                while links.len() <= layer {
+                    links.push(Vec::new());
+                }
+                while links[layer].len() <= node {
+                    links[layer].push(Vec::new());
+                }
+                links[layer][node] = nbrs.iter().map(|&x| x as usize).collect();
+            }
+        }
         let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
-        // The neighbour lists go from the chunk bytes straight into the
-        // compact slabs: no per-vertex `Vec` in between.
-        let index = match &parts.mapped {
-            Some(mapped) => HnswIndex::from_chunk_region_mapped(
-                parts.dims,
-                parts.m.max(1) as usize,
-                (parts.ef as usize).max(64),
-                parts.options.metric,
-                parts.options.encoding,
-                &parts.store_meta,
-                mapped.src.clone(),
-                mapped.vector_off,
-                mapped.record_size,
-                parts.n,
-                mapped.graph_off,
-                entry,
-                parts.max_layer,
-            )?,
-            None => HnswIndex::from_chunk_region(
-                parts.dims,
-                parts.m.max(1) as usize,
-                (parts.ef as usize).max(64),
-                parts.options.metric,
-                parts.options.encoding,
-                &parts.store_meta,
-                &parts.records,
-                parts.n,
-                &parts.graph_region,
-                entry,
-                parts.max_layer,
-            )?,
-        };
-        // Only what enters the heap counts against the segment budget, and only
-        // the constructed index knows which parts those are: a mapped plain
-        // store reads its vectors and neighbour lists through the page cache
-        // (nothing to charge), while an LVQ/RaBitQ region is *decoded out of*
-        // the mapping into a copied store even when `parts.mapped` is set, and
-        // its codes are real heap. `mem_usage` is that split; the labels and the
-        // distinct-row set are the per-chunk bookkeeping on top.
-        let bytes = parts.labels.len() * 4 + parts.n * 4 + index.mem_usage();
-        let labelled_rows = labelled_rows(&parts.labels);
+        let graph_bytes: usize = links
+            .iter()
+            .flat_map(|layer| layer.iter())
+            .map(|neighbors| neighbors.len() * 4 + 24)
+            .sum();
+        let bytes = parts.records.len() + parts.labels.len() * 4 + levels.len() * 8 + graph_bytes;
+        let index = HnswIndex::from_chunk_parts(
+            parts.dims,
+            parts.m.max(1) as usize,
+            (parts.ef as usize).max(64),
+            parts.options.metric,
+            parts.options.encoding,
+            &parts.store_meta,
+            &parts.records,
+            parts.n,
+            levels,
+            links,
+            entry,
+            parts.max_layer,
+        )?;
         Some(LoadedVectorIndex {
             index: HnswHandler::from_index(index),
             labels: parts.labels,
-            labelled_rows,
             chunk_id,
             bytes,
             stamp,
@@ -5509,10 +5568,10 @@ impl Engine {
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let src = map_hnsw_chunk(&path)
-            .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
-            .read_hnsw_chunk_parts_mapped(&table, index_name, &src)
+            .read_hnsw_chunk_parts(&table, index_name, &bytes)
             .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
         Self::assemble_loaded_index(parts, 0, file_stamp(&path))
             .ok_or_else(|| Error::Invalid("HNSW mirror has no vectors".to_string()))
@@ -5543,12 +5602,10 @@ impl Engine {
             if after.is_some_and(|a| chunk_id <= a) {
                 continue;
             }
-            // Mapped, not read: a chunk's vectors are the largest thing this
-            // process holds, and they are immutable once written.
-            let Some(src) = map_hnsw_chunk(&path) else {
+            let Ok(bytes) = std::fs::read(&path) else {
                 continue;
             };
-            let Some(parts) = self.read_hnsw_chunk_parts_mapped(&table, index_name, &src) else {
+            let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
                 continue;
             };
             if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path)) {
@@ -5587,8 +5644,8 @@ impl Engine {
             .into_iter()
             .find(|(id, _)| *id == chunk_id)
             .map(|(_, path)| path)?;
-        let src = map_hnsw_chunk(&path)?;
-        let parts = self.read_hnsw_chunk_parts_mapped(&table, index_name, &src)?;
+        let bytes = std::fs::read(&path).ok()?;
+        let parts = self.read_hnsw_chunk_parts(&table, index_name, &bytes)?;
         Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path))
     }
 
@@ -5875,12 +5932,7 @@ impl Engine {
         let column = self
             .storage
             .catalog
-            .list_indexes()?
-            .into_iter()
-            .find(|im| {
-                im.name == index_name
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            })
+            .index_by_name(&table, index_name)?
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let options = self.ivf_storage_option(&table, index_name);
@@ -5917,92 +5969,67 @@ impl Engine {
         Ok(written)
     }
 
-    /// Reads back the mirror written by [`Self::write_ivf_index`]: every
-    /// segment's chunk, so a query can probe all of them (plan #89).
-    ///
-    /// The reference trains and dumps one chunk per segment
-    /// (`PopulateIvfIndexInner` takes a `SegmentMeta`) into
-    /// `idx_{id}/seg_{segment}/chunk_{n}.idx`, and the offsets inside a chunk
-    /// are **in-segment**. Reading only `seg_0` - which is all this used to do -
-    /// left every row of the other segments unfindable, and made their probe
-    /// results collide on the offsets of segment 0. The segment number is
-    /// therefore part of what is returned, not a detail of the path.
-    pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<LoadedIvfIndex> {
-        let Some(dir) = self.index_dir(table, index_name) else {
+    /// Reads back a mirror written by [`Self::write_ivf_index`], returning
+    /// the IVF chunks so a query can probe them (plan #89).
+    pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<index::ivf::IvfSegment> {
+        let Some(dir) = self.hnsw_dir(table, index_name) else {
             return Vec::new();
         };
         let options = self.ivf_storage_option(table, index_name);
-        let mut segment_dirs: Vec<(u32, PathBuf)> = std::fs::read_dir(&dir)
-            .map(|entries| {
-                entries
-                    .flatten()
-                    .filter_map(|entry| {
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        let segment = name.strip_prefix("seg_")?.parse::<u32>().ok()?;
-                        Some((segment, entry.path()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        segment_dirs.sort_by_key(|(segment, _)| *segment);
         let mut out = Vec::new();
-        for (segment, seg_dir) in segment_dirs {
-            for (_, path) in hnsw_chunks(&seg_dir) {
-                let Ok(bytes) = std::fs::read(&path) else {
-                    continue;
-                };
-                let decoded = if options.storage.eq_ignore_ascii_case("scalar_quantization") {
-                    Self::decode_ivf_sq_chunk(&bytes, options.sq_bits)
-                } else if options.storage.eq_ignore_ascii_case("product_quantization") {
-                    Self::decode_ivf_pq_chunk(&bytes, &options)
-                } else {
-                    Self::decode_ivf_plain_chunk(&bytes)
-                };
-                if let Some(index) = decoded {
-                    out.push(LoadedIvfIndex {
-                        segment,
-                        index,
-                        path,
-                    });
+        for (_, path) in hnsw_chunks(&dir) {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            if options.storage.eq_ignore_ascii_case("scalar_quantization") {
+                if let Some(segment) = Self::decode_ivf_sq_chunk(&bytes, options.sq_bits) {
+                    out.push(segment);
                 }
+                continue;
             }
+            if options.storage.eq_ignore_ascii_case("product_quantization") {
+                if let Some(segment) = Self::decode_ivf_pq_chunk(&bytes, &options) {
+                    out.push(segment);
+                }
+                continue;
+            }
+            let Ok((header, flat, parts)) = knn_format::decode_ivf_plain_chunk(&bytes, 4) else {
+                continue;
+            };
+            let dims = header.dimension as usize;
+            if dims == 0 {
+                continue;
+            }
+            let parts: Vec<Vec<(u32, Vec<f32>)>> = parts
+                .into_iter()
+                .map(|part| {
+                    part.segment_offsets
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, offset)| {
+                            let at = i * dims * 4;
+                            let vector = (0..dims)
+                                .map(|d| {
+                                    f32::from_le_bytes(
+                                        part.vectors[at + d * 4..at + d * 4 + 4]
+                                            .try_into()
+                                            .unwrap(),
+                                    )
+                                })
+                                .collect();
+                            (offset, vector)
+                        })
+                        .collect()
+                })
+                .collect();
+            out.push(index::ivf::IvfSegment::Plain(index::ivf::IvfIndex::new(
+                dims,
+                header.centroid_count as usize,
+                flat,
+                parts,
+            )));
         }
         out
-    }
-
-    /// Decodes one `kPlain` IVF chunk (`IVF_Parts_Storage_Info<kPlain>`).
-    fn decode_ivf_plain_chunk(bytes: &[u8]) -> Option<index::ivf::IvfSegment> {
-        let (header, flat, parts) = knn_format::decode_ivf_plain_chunk(bytes, 4).ok()?;
-        let dims = header.dimension as usize;
-        if dims == 0 {
-            return None;
-        }
-        let parts: Vec<Vec<(u32, Vec<f32>)>> = parts
-            .into_iter()
-            .map(|part| {
-                part.segment_offsets
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, offset)| {
-                        let at = i * dims * 4;
-                        let vector = (0..dims)
-                            .map(|d| {
-                                f32::from_le_bytes(
-                                    part.vectors[at + d * 4..at + d * 4 + 4].try_into().unwrap(),
-                                )
-                            })
-                            .collect();
-                        (offset, vector)
-                    })
-                    .collect()
-            })
-            .collect();
-        Some(index::ivf::IvfSegment::Plain(index::ivf::IvfIndex::new(
-            dims,
-            header.centroid_count as usize,
-            flat,
-            parts,
-        )))
     }
 
     /// The index's IVF options (`IndexIVFStorageOption` + the centroid option),
@@ -6013,17 +6040,10 @@ impl Engine {
         let options = self
             .storage
             .catalog
-            .list_indexes()
+            .index_by_name(&table, index_name)
             .ok()
-            .and_then(|list| {
-                list.into_iter()
-                    .find(|im| {
-                        im.name == index_name
-                            && (im.table == table
-                                || table.rsplit('.').next() == Some(im.table.as_str()))
-                    })
-                    .map(|im| im.options)
-            })
+            .flatten()
+            .map(|im| im.options)
             .unwrap_or_default();
         let find = |key: &str| {
             options
@@ -6121,14 +6141,12 @@ impl Engine {
     /// PLAID index options of `index_name` (`nbits`, `n_centroids`,
     /// `colbertsar`), from `CREATE INDEX … USING PLAID WITH (…)`.
     pub(crate) fn plaid_options(&self, table: &str, index_name: &str) -> PlaidOptions {
-        let short = table.rsplit('.').next().unwrap_or(table);
         let Some(im) = self
             .storage
             .catalog
-            .list_indexes()
-            .unwrap_or_default()
-            .into_iter()
-            .find(|im| im.name == index_name && (im.table == table || im.table == short))
+            .index_by_name(table, index_name)
+            .ok()
+            .flatten()
         else {
             return PlaidOptions::default();
         };
@@ -6237,12 +6255,7 @@ impl Engine {
         let column = self
             .storage
             .catalog
-            .list_indexes()?
-            .into_iter()
-            .find(|im| {
-                im.name == index_name
-                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
-            })
+            .index_by_name(&table, index_name)?
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let ci = meta
@@ -6603,4 +6616,21 @@ fn coerce_row(row: &[Value], types: &[String]) -> Vec<Value> {
         };
     }
     out
+}
+/// Tables a checkpoint mirrors at a time.
+///
+/// Independent of `INFINITY_FLUSH_DUMP_CONCURRENCY` (that one splits a bulk
+/// dump across **indexes**): a checkpoint's unit is one table, so it defaults
+/// to the core count and is clamped so a stray value cannot start hundreds of
+/// threads.
+fn checkpoint_workers() -> usize {
+    std::env::var("INFINITY_CHECKPOINT_CONCURRENCY")
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        })
+        .clamp(1, 64)
 }

@@ -28,7 +28,7 @@ typedef struct {
     converter_t converter;
 } opencc_desc;
 
-static OPENCC_THREAD_LOCAL opencc_error errnum = OPENCC_ERROR_VOID;
+static opencc_error errnum = OPENCC_ERROR_VOID;
 static int lib_initialized = FALSE;
 
 static void lib_initialize(void) { lib_initialized = TRUE; }
@@ -83,9 +83,7 @@ char *opencc_convert_utf8(opencc_t t_opencc, const char *inbuf, size_t length) {
     while (inbuf_left > 0) {
         size_t retval = opencc_convert(t_opencc, &pinbuf, &inbuf_left, &poutbuf, &outbuf_left);
         if (retval == (size_t)-1) {
-            /* outbuf points into original_outbuf once a chunk has been emitted,
-             * so the block start has to be released, not the cursor. */
-            free(original_outbuf);
+            free(outbuf);
             free(winbuf);
             free(woutbuf);
             return (char *)-1;
@@ -96,7 +94,7 @@ char *opencc_convert_utf8(opencc_t t_opencc, const char *inbuf, size_t length) {
         char *ubuff = ucs4_to_utf8(woutbuf, (size_t)-1);
 
         if (ubuff == (char *)-1) {
-            free(original_outbuf);
+            free(outbuf);
             free(winbuf);
             free(woutbuf);
             errnum = OPENCC_ERROR_ENCODIND;

@@ -135,7 +135,7 @@ drop 的数据库。
 `Arc<MappedBlock>`，同一块的并发读共用它，块被重写/压缩/删除时按表丢弃（`drop_block_maps`）。因此参考
 那套「读进预算内的 owned buffer + LRU 淘汰 + 溢出到临时文件 + 句柄引用计数」没有对应物：`BufferObj` /
 `BufferHandle` / `BufferPool` / `FileWorker` / `VarBuffer` 都不再存在，`[buffer] buffer_manager_size`
-只剩索引缓冲的预算。`SHOW BUFFERS` 因此一行对应一个映射（路径是块目录，状态 `Loaded`、类型 `Mmap`），
+仍被解析（C++ 配置要能加载）但被忽略，索引缓冲用内置的 8 GiB 预算。`SHOW BUFFERS` 因此一行对应一个映射（路径是块目录，状态 `Loaded`、类型 `Mmap`），
 `buffer_pool_usage` 是已映射字节/预算，`SHOW VARIABLES` 的 `buffered_object_count` 是映射数。
 未封存的行（append buffer）本来就在引擎的 `TableEntry::pending_rows` 里，按表一份，所有读者共享。
 

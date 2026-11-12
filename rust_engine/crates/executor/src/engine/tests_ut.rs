@@ -83,13 +83,13 @@ mod tests {
     fn a_correlated_subquery_is_evaluated_per_outer_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
             .unwrap();
-        e.execute("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute_blocking("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
             .unwrap();
-        e.execute("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute_blocking("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
             .unwrap();
-        e.execute("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute_blocking("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
             .unwrap();
         let names = |sql: &str| rows(&e, sql);
         assert_eq!(
@@ -115,20 +115,22 @@ mod tests {
     fn probe_exact() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
-        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
-        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
         for sql in [
             "WITH c AS (SELECT * FROM cj_o) SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;",
             "SELECT id FROM (SELECT * FROM cj_o) WHERE EXISTS (SELECT 1 FROM cj_s WHERE cj_s.a = a) ORDER BY id;",
             "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;",
         ] {
-            match e.execute(sql) {
+            match e.execute_blocking(sql) {
                 Ok(r) => println!("PROBE ok {sql} => {r:?}"),
                 Err(err) => println!("PROBE err {sql} => {err}"),
             }
@@ -143,14 +145,16 @@ mod tests {
     fn a_correlated_subquery_reads_a_cte_or_joined_relation() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
-        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
-        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
 
         // A CTE as the outer relation: `c.a` is substituted with the alias the
         // statement used, not the internal one.
@@ -184,11 +188,13 @@ mod tests {
     fn a_correlated_subquery_runs_once_per_distinct_key() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ck (id INT, k INT);").unwrap();
-        e.execute("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+        e.execute_blocking("CREATE TABLE ck (id INT, k INT);")
             .unwrap();
-        e.execute("CREATE TABLE cv (k INT, x INT);").unwrap();
-        e.execute("INSERT INTO cv VALUES (10, 1), (20, 2);")
+        e.execute_blocking("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE cv (k INT, x INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cv VALUES (10, 1), (20, 2);")
             .unwrap();
 
         crate::dependent::INNER_RUNS.with(|runs| runs.set(0));
@@ -240,13 +246,13 @@ mod tests {
     fn a_correlated_subquery_works_outside_the_where_clause() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
             .unwrap();
-        e.execute("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute_blocking("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
             .unwrap();
-        e.execute("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute_blocking("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
             .unwrap();
-        e.execute("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute_blocking("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
             .unwrap();
 
         // Projected scalar subquery, one value per outer row.
@@ -294,6 +300,150 @@ mod tests {
     // `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
     // `standard` index.
 
+    /// The batch path must produce exactly the postings the row-by-row path
+    /// does: tokenizing in parallel is only safe if applying in row order leaves
+    /// every posting list ascending and identical.
+    #[test]
+    fn a_batch_indexed_column_matches_the_row_by_row_one() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(1 << 20);
+        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+            .unwrap();
+        // One INSERT of many rows goes through the batch path.
+        let mut values = Vec::new();
+        for i in 0..64 {
+            values.push(format!("({i}, 'alpha beta gamma{i} delta')"));
+        }
+        e.execute_blocking(&format!("INSERT INTO bt VALUES {};", values.join(",")))
+            .unwrap();
+        // The same rows, one statement each, go through the per-row path.
+        e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..64 {
+            e.execute_blocking(&format!(
+                "INSERT INTO rt VALUES ({i}, 'alpha beta gamma{i} delta');"
+            ))
+            .unwrap();
+        }
+        let query = |t: &str, term: &str| {
+            rows(
+                &e,
+                &format!("SELECT id FROM {t} SEARCH MATCH TEXT (body, '{term}', 200);"),
+            )
+        };
+        assert_eq!(query("bt", "alpha"), query("rt", "alpha"));
+        assert_eq!(query("bt", "beta"), query("rt", "beta"));
+        assert_eq!(query("bt", "gamma7"), query("rt", "gamma7"));
+    }
+
+    /// A batch big enough for several workers must still produce exactly the
+    /// postings a row-by-row insert does, and every posting list must stay in
+    /// ascending row order (that is what applying in sequence order buys).
+    #[test]
+    fn a_large_batch_matches_the_row_by_row_postings() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(1 << 20);
+        e.execute_blocking("CREATE TABLE big (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX big_idx ON big (body) USING FULLTEXT")
+            .unwrap();
+        // A vocabulary wide enough that the workers' local dictionaries do not
+        // trivially hit, and 5000 rows so the batch splits across several.
+        let vocab = 2_000;
+        let mut values = Vec::new();
+        for i in 0..5_000 {
+            let doc: Vec<String> = (0..30)
+                .map(|k| format!("w{}", (i * 7 + k * 13) % vocab))
+                .collect();
+            values.push(format!("({i}, '{}')", doc.join(" ")));
+        }
+        e.execute_blocking(&format!("INSERT INTO big VALUES {};", values.join(",")))
+            .unwrap();
+
+        e.execute_blocking("CREATE TABLE small (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX small_idx ON small (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..5_000 {
+            let doc: Vec<String> = (0..30)
+                .map(|k| format!("w{}", (i * 7 + k * 13) % vocab))
+                .collect();
+            e.execute_blocking(&format!(
+                "INSERT INTO small VALUES ({i}, '{}');",
+                doc.join(" ")
+            ))
+            .unwrap();
+        }
+        for term in ["w0", "w7", "w1234", "w1999"] {
+            assert_eq!(
+                rows(
+                    &e,
+                    &format!("SELECT id FROM big SEARCH MATCH TEXT (body, '{term}', 9999);"),
+                ),
+                rows(
+                    &e,
+                    &format!("SELECT id FROM small SEARCH MATCH TEXT (body, '{term}', 9999);"),
+                ),
+                "term {term} differs between the batch and the row-by-row index"
+            );
+        }
+        // Row order is *not* what makes this correct: `insert_tokens` keeps each
+        // list sorted either way. What the batch must preserve is the content -
+        // the same documents under the same terms, with the same term
+        // frequencies - and that is what the queries above compare.
+    }
+
+    /// A row inserted after a checkpoint must be readable through an indexed
+    /// lookup.
+    ///
+    /// Its slot lies past the block's `row_count` (the block was written before
+    /// the row existed), and the columnar batch path used to read that as
+    /// "hidden by the block version" and answer NULL - so the row disappeared
+    /// from every indexed query while a full scan still found it.
+    #[test]
+    fn a_row_inserted_after_a_checkpoint_is_visible_through_its_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE post (id INT, grp INT);")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..8 {
+            values.push(format!("({i},0)"));
+        }
+        e.execute_blocking(&format!("INSERT INTO post VALUES {};", values.join(",")))
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX post_grp ON post (grp);")
+            .unwrap();
+        // The row that lands past the block's window.
+        e.execute_blocking("INSERT INTO post VALUES (99,0);")
+            .unwrap();
+
+        // The server's SELECT goes through the columnar batch path, which is
+        // the one that mapped the missing slot to NULL.
+        let batch = |sql: &str| {
+            e.select_columns(sql)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{sql} did not take the columnar path"))
+        };
+        assert_eq!(
+            batch("SELECT id FROM post WHERE grp = 0;").row_count,
+            9,
+            "the indexed lookup lost the row written after the checkpoint"
+        );
+        assert_eq!(
+            batch("SELECT id FROM post WHERE id = 99;").row_count,
+            1,
+            "the row inserted after the checkpoint is missing"
+        );
+    }
+
     /// A reopened engine maps the chunks the previous process sealed instead of
     /// re-indexing the table, so its memory tail holds no document and the
     /// sealed readers cover every row.
@@ -303,17 +453,17 @@ mod tests {
         let before = {
             let e = Engine::open(dir.path()).unwrap();
             e.set_memindex_capacity(4);
-            e.execute("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..12 {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO rt VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
@@ -358,17 +508,17 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // One chunk per two rows, so the index starts fragmented.
             e.set_memindex_capacity(2);
-            e.execute("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE opt (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..10 {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             before = rows(&e, query);
             assert_eq!(before.len(), 10);
             let chunks = fulltext_chunks(&e);
@@ -385,7 +535,7 @@ mod tests {
             );
             assert_eq!(rows(&e, query), before, "the merge must not lose rows");
             assert_eq!(
-                e.optimize_fulltext("opt").unwrap(),
+                crate::scheduler::block_on(e.optimize_fulltext_async("opt")).unwrap(),
                 0,
                 "an already-merged index is a no-op"
             );
@@ -414,9 +564,9 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // Two rows per segment: the query has to walk several of them.
             e.set_memindex_capacity(capacity);
-            e.execute("CREATE TABLE seg (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE seg (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..20 {
                 let body = match i % 4 {
@@ -425,10 +575,10 @@ mod tests {
                     2 => "beta gamma",
                     _ => "gamma epsilon",
                 };
-                e.execute(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
+                e.execute_blocking(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
                     .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             QUERIES.iter().map(|sql| rows(&e, sql)).collect()
         };
         let many = build(2);
@@ -444,16 +594,16 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         for (table, analyzer) in [("an_std", "standard"), ("an_gram", "ngram-3")] {
-            e.execute(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
                 .unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX {table}_idx ON {table} (body) USING FULLTEXT WITH (analyzer='{analyzer}')"
             ))
             .unwrap();
-            e.execute(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
+            e.execute_blocking(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let hits = |table: &str| {
             rows(
                 &e,
@@ -478,23 +628,24 @@ mod tests {
     fn the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rc (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE rc (id INTEGER, name VARCHAR)")
             .unwrap();
         for i in 0..5 {
-            e.execute(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
+            e.execute_blocking(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
                 .unwrap();
         }
         assert_eq!(e.plan_cache.len(), 0);
         // The cache is opt-in, as in the reference (`DEFAULT_RESULT_CACHE`).
         let before = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
         assert_eq!(e.plan_cache.len(), 0);
-        e.execute("SET CONFIG result_cache ON").unwrap();
+        e.execute_blocking("SET CONFIG result_cache ON").unwrap();
         let first = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
         assert_eq!(first, before);
         assert!(!e.plan_cache.is_empty(), "the scan did not fill the cache");
         assert_eq!(rows(&e, "SELECT id FROM rc WHERE id >= 2;"), first);
         // A write clears every entry: the answer could have changed.
-        e.execute("INSERT INTO rc VALUES (9, 'n9');").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (9, 'n9');")
+            .unwrap();
         assert_eq!(e.plan_cache.len(), 0);
         assert_eq!(
             rows(&e, "SELECT id FROM rc WHERE id >= 2;").len(),
@@ -508,7 +659,7 @@ mod tests {
     fn notify_compact_merges_the_segments_the_alg_picks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE nc (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE nc (id INTEGER)").unwrap();
         // Four imports of one block each: layer 0 holds four segments, which is
         // exactly what `DBTCompactionAlg` merges.
         for part in 0..4 {
@@ -517,7 +668,7 @@ mod tests {
                 .map(|i| format!("{}\n", part * 8192 + i))
                 .collect();
             std::fs::write(&path, text).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "COPY nc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 path.display()
             ))
@@ -542,19 +693,19 @@ mod tests {
     fn the_block_prefilter_skips_blocks_that_cannot_match() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pf (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE pf (id INTEGER)").unwrap();
         // `COPY` seals the segment, which is when the reference builds the
         // block prefilters. Two blocks: ids 8192..8999 live in the second one,
         // so `id < 10` can never match it.
         let csv = dir.path().join("pf.csv");
         let text: String = (0..9000).map(|i| format!("{i}\n")).collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY pf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         crate::blocks::PRUNED_BLOCKS.with(|n| n.set(0));
         let got = rows(&e, "SELECT id FROM pf WHERE id < 10;");
         assert_eq!(got.len(), 10, "{got:?}");
@@ -578,7 +729,7 @@ mod tests {
     fn a_bloom_filter_column_is_accepted_but_never_built() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE bf (b BOOLEAN, i INTEGER) PROPERTIES (bloom_filter_columns = ' b ');",
         )
         .unwrap();
@@ -589,12 +740,12 @@ mod tests {
             .map(|i| format!("{},{i}\n", if i % 2 == 0 { "true" } else { "false" }))
             .collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY bf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let record = {
             let mut found = None;
             for (k, v) in e.storage.catalog.store().scan_prefix(b"seg|1|").unwrap() {
@@ -616,7 +767,7 @@ mod tests {
 
         // DDL errors, as the reference's planner reports them.
         let error = e
-            .execute("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
+            .execute_blocking("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
             .expect_err("FLOAT has no bloom filter");
         assert!(
             error
@@ -626,7 +777,9 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3013);
         let error = e
-            .execute("CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');")
+            .execute_blocking(
+                "CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');",
+            )
             .expect_err("unknown column");
         assert!(
             error
@@ -635,7 +788,7 @@ mod tests {
             "{error}"
         );
         let error = e
-            .execute(
+            .execute_blocking(
                 "CREATE TABLE bf4 (b BOOLEAN, c BOOLEAN) PROPERTIES (bloom_filter_columns = 'b', bloom_filter_columns = 'c');",
             )
             .expect_err("duplicate property");
@@ -655,10 +808,11 @@ mod tests {
     fn create_table_as_select_is_rejected_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cta_src (a INT);").unwrap();
-        e.execute("INSERT INTO cta_src VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE cta_src (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO cta_src VALUES (1);")
+            .unwrap();
         let error = e
-            .execute("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
+            .execute_blocking("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
             .expect_err("CTAS must be rejected");
         assert_eq!(
             error.to_string(),
@@ -666,7 +820,7 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3048);
         // Nothing was created.
-        assert!(e.execute("SELECT * FROM cta_dst;").is_err());
+        assert!(e.execute_blocking("SELECT * FROM cta_dst;").is_err());
     }
 
     /// The rows of a `SELECT`, as rendered strings.
@@ -677,23 +831,26 @@ mod tests {
     fn a_secondary_index_answers_equality_after_a_checkpoint() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
             .unwrap();
         for base in (0..20000).step_by(2000) {
             let values: Vec<String> = (base..base + 2000)
                 .map(|i| format!("({i}, {}.0, 'n-{i}')", i % 100))
                 .collect();
-            e.execute(&format!("INSERT INTO si VALUES {};", values.join(", ")))
+            e.execute_blocking(&format!("INSERT INTO si VALUES {};", values.join(", ")))
                 .unwrap();
         }
-        e.execute("CREATE INDEX si_id ON si (id);").unwrap();
-        e.execute("CREATE INDEX si_score ON si (score);").unwrap();
-        e.execute("CREATE INDEX si_name ON si (name);").unwrap();
+        e.execute_blocking("CREATE INDEX si_id ON si (id);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX si_score ON si (score);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX si_name ON si (name);")
+            .unwrap();
         let count = |sql: &str| rows(&e, sql).len();
         assert_eq!(count("SELECT id FROM si WHERE id = 5;"), 1);
         assert_eq!(count("SELECT id FROM si WHERE score = 5.0;"), 200);
         assert_eq!(count("SELECT id FROM si WHERE name = 'n-5';"), 1);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             count("SELECT id FROM si WHERE id = 5;"),
             1,
@@ -730,7 +887,7 @@ mod tests {
         assert_eq!(batch("SELECT id FROM si WHERE id > 10;").row_count, 19989);
     }
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-        for r in e.execute(sql).unwrap() {
+        for r in e.execute_blocking(sql).unwrap() {
             if let QueryResult::Rows { .. } = r {
                 return r.rows_text();
             }
@@ -762,9 +919,9 @@ mod tests {
         // Only the byte budget may seal, so the tail is exactly what the test
         // inserts.
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
@@ -804,9 +961,9 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // Only the explicit seals below may write a chunk.
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE publish (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE publish (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
@@ -871,12 +1028,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE slip (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE slip (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
             .unwrap();
         for i in 0..6 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO slip VALUES ({i}, 'alpha beta row{i}');"
             ))
             .unwrap();
@@ -950,12 +1107,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE fail (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE fail (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
             .unwrap();
         for i in 0..4 {
-            e.execute(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
         let query = "SELECT id FROM fail SEARCH MATCH TEXT (body, 'alpha', 100);";
@@ -985,7 +1142,7 @@ mod tests {
 
         // The next write retries: the in-flight tail becomes the chunk and the
         // new row stays in the (fresh) resident tail.
-        e.execute("INSERT INTO fail VALUES (4, 'alpha row4');")
+        e.execute_blocking("INSERT INTO fail VALUES (4, 'alpha row4');")
             .unwrap();
         {
             let index = shared.read().unwrap();
@@ -1052,9 +1209,9 @@ mod tests {
     fn search_honours_the_phrase_slop() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sl (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE sl (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1062,10 +1219,10 @@ mod tests {
             (2, "alpha x x beta"),
             (3, "beta alpha"),
         ] {
-            e.execute(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let exact = rows(
             &e,
@@ -1111,9 +1268,9 @@ mod tests {
     fn operator_and_requires_every_clause_without_adjacency() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ba (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE ba (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1121,10 +1278,10 @@ mod tests {
             (2, "beta"),
             (3, "alpha x beta"),
         ] {
-            e.execute(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let default_or = rows(
             &e,
@@ -1163,15 +1320,15 @@ mod tests {
     fn an_explicit_operator_switches_off_the_query_grammar() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE og (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE og (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [(0, "alpha or beta"), (1, "alpha beta"), (2, "gamma")] {
-            e.execute(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sorted = |sql: &str| -> Vec<String> {
             let mut ids: Vec<String> = rows(&e, sql).iter().map(|r| r[0].clone()).collect();
             ids.sort();
@@ -1210,9 +1367,9 @@ mod tests {
     fn search_supports_the_query_string_grammar() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1222,10 +1379,10 @@ mod tests {
             (4, "gamma"),
             (5, "alpha gamma"),
         ] {
-            e.execute(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let ids = |query: &str| {
             let mut out: Vec<String> = rows(
@@ -1357,15 +1514,15 @@ mod tests {
         // Eight rows per seal: several chunks plus a memory tail, so the cursors
         // of a sealed segment and the ones of the tail both take the pushdown.
         e.set_memindex_capacity(8);
-        e.execute("CREATE TABLE fts (id INT, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE fts (id INT, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
             .unwrap();
         for i in 0..40 {
-            e.execute(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let all = rows(
             &e,
             "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100');",
@@ -1417,12 +1574,12 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // Two rows per chunk: six rows become three sealed chunks.
         e.set_memindex_capacity(2);
-        e.execute("CREATE TABLE stat (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE stat (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
             .unwrap();
         for i in 0..6 {
-            e.execute(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
         let stats = e.fulltext_stats("stat");
@@ -1440,7 +1597,8 @@ mod tests {
         // and the scan drops them through the tombstone. `overridden` only tracks
         // a row re-indexed **in place**, which the append-only `UPDATE` path does
         // not produce (it appends a new row id), so the set stays empty.
-        e.execute("DELETE FROM stat WHERE id = 0;").unwrap();
+        e.execute_blocking("DELETE FROM stat WHERE id = 0;")
+            .unwrap();
         let stats = e.fulltext_stats("stat");
         assert_eq!(stats[0].chunks, 3, "a delete does not seal anything");
         assert_eq!(
@@ -1467,11 +1625,11 @@ mod tests {
     fn a_batch_tokenised_before_the_gate_indexes_every_row_once() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE batch (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE batch (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO batch VALUES \
              (0, 'unique0 common'), (1, 'unique1 common'), (2, 'unique2 common'), \
              (3, 'unique3 common'), (4, 'unique4 common'), (5, 'unique5 common');",
@@ -1508,9 +1666,9 @@ mod tests {
         for threads in [1usize, 2, 4] {
             let dir = tempdir().unwrap();
             let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-            e.execute("CREATE TABLE conc (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE conc (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
                 .unwrap();
             let words: String = (0..40).map(|w| format!("word{w} ")).collect::<String>();
             let started = std::time::Instant::now();
@@ -1520,7 +1678,7 @@ mod tests {
                 let words = words.clone();
                 handles.push(std::thread::spawn(move || {
                     for i in 0..(2000 / threads) {
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO conc VALUES ({}, '{words}');",
                             1000 * t + i
                         ))
@@ -1549,13 +1707,13 @@ mod tests {
         const BATCH: usize = 4_000;
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE del (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE del (id INTEGER)").unwrap();
         for chunk in 0..3 {
             let values: String = (0..BATCH)
                 .map(|i| format!("({})", chunk * BATCH + i))
                 .collect::<Vec<_>>()
                 .join(",");
-            e.execute(&format!("INSERT INTO del VALUES {values}"))
+            e.execute_blocking(&format!("INSERT INTO del VALUES {values}"))
                 .unwrap();
         }
         for pass in 0..3u32 {
@@ -1730,21 +1888,21 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // Two rows per chunk, so row 1 is sealed by the first one.
             e.set_memindex_capacity(2);
-            e.execute("CREATE TABLE upd (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE upd (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..6 {
-                e.execute(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
+                e.execute_blocking(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
                     .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert!(fulltext_chunks(&e) > 1, "the table starts fragmented");
 
-            e.execute("UPDATE upd SET body = 'gamma' WHERE id = 1;")
+            e.execute_blocking("UPDATE upd SET body = 'gamma' WHERE id = 1;")
                 .unwrap();
             // Dumping the tail is what turns the update into its own chunk.
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(rows(&e, query), hit(), "the new text is searchable");
             assert_eq!(rows(&e, stale).len(), 5, "the old text is gone");
 
@@ -1826,14 +1984,14 @@ mod tests {
 
         let build = |dir: &std::path::Path, budget: Option<usize>| {
             let e = Engine::open(dir).unwrap();
-            e.execute("CREATE TABLE offl (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE offl (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
                 .unwrap();
             // One seal at the twentieth row, so both builds write one chunk.
             e.set_memindex_capacity(ROWS);
             for i in 0..ROWS {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO offl VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
@@ -1907,8 +2065,9 @@ mod tests {
     fn run_plan_runs_the_production_optimizer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rp (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO rp VALUES (1, 2);").unwrap();
+        e.execute_blocking("CREATE TABLE rp (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO rp VALUES (1, 2);").unwrap();
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Scan {
                 table: "default_db.rp".to_string(),
@@ -1942,8 +2101,10 @@ mod tests {
     fn run_plan_executes_a_projection_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE om (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO om VALUES (1, 2), (3, 4);").unwrap();
+        e.execute_blocking("CREATE TABLE om (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO om VALUES (1, 2), (3, 4);")
+            .unwrap();
         let before = crate::operator::operator_run_count();
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Scan {
@@ -1971,8 +2132,9 @@ mod tests {
     fn run_plan_executes_a_filter_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE of (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
+        e.execute_blocking("CREATE TABLE of (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
             .unwrap();
         let before = crate::operator::operator_run_count();
         // An expression in the select list keeps the plan on the operator
@@ -1987,7 +2149,7 @@ mod tests {
             vec![vec!["20".to_string()], vec!["30".to_string()]]
         );
         // No match: the projection still defines the schema.
-        let mut result = e.execute("SELECT b FROM of WHERE a > 9;").unwrap();
+        let mut result = e.execute_blocking("SELECT b FROM of WHERE a > 9;").unwrap();
         let QueryResult::Rows { columns, rows } = result.remove(0) else {
             panic!("expected rows");
         };
@@ -2001,8 +2163,9 @@ mod tests {
     fn run_plan_executes_limit_and_top_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ol (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
+        e.execute_blocking("CREATE TABLE ol (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2059,9 +2222,9 @@ mod tests {
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.attach_bottom_pool();
         for t in 0..8 {
-            e.execute(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
                 .unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX ct{t}_body ON ct{t} (body) WITH (analyzer = 'standard');"
             ))
             .unwrap();
@@ -2072,7 +2235,7 @@ mod tests {
             let e = Arc::clone(&e);
             handles.push(std::thread::spawn(move || {
                 for i in 0..20 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO ct{t} VALUES ({i}, 'word{i} of t{t}');"
                     ))
                     .unwrap();
@@ -2112,11 +2275,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.attach_bottom_pool();
-        e.execute("CREATE TABLE be (a INT, b VARCHAR);").unwrap();
-        e.execute("CREATE INDEX be_b ON be (b);").unwrap();
+        e.execute_blocking("CREATE TABLE be (a INT, b VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX be_b ON be (b);").unwrap();
 
         let before = bottom_work_count();
-        e.execute("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
+        e.execute_blocking("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
             .unwrap();
         assert_eq!(
             bottom_work_count(),
@@ -2132,7 +2296,7 @@ mod tests {
             rows(&e, "SELECT count(*) FROM be;"),
             vec![vec!["2".to_string()]]
         );
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert!(dir.path().join("data").exists());
     }
 
@@ -2140,7 +2304,7 @@ mod tests {
     fn emvb_index_options_are_validated_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
             .unwrap();
         for sql in [
             // a multi-vector column is not a tensor column
@@ -2154,14 +2318,14 @@ mod tests {
             "CREATE INDEX e ON em (v) USING EMVB WITH (pq_subspace_bits = 8);",
             "CREATE INDEX f ON em (v) USING EMVB WITH (pq_subspace_num = 2);",
         ] {
-            assert!(e.execute(sql).is_err(), "{sql} should be rejected");
+            assert!(e.execute_blocking(sql).is_err(), "{sql} should be rejected");
         }
-        e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+        e.execute_blocking("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
             .unwrap();
         // "dimension % subspace_num != 0" is only checked by `GetEMVBOPQ`
         // when the index is built, so the DDL itself succeeds (the reference
         // accepts it too; `parallel_test` relies on that).
-        e.execute("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
+        e.execute_blocking("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
             .unwrap();
     }
 
@@ -2169,24 +2333,31 @@ mod tests {
     /// (`TxnAllocator::Process` -> `AllocateRowID`), which is what keeps them
     /// contiguous when several transactions allocate at the same time.
     #[test]
-    fn row_ids_are_allocated_on_the_allocator_thread() {
+    fn row_ids_are_allocated_in_commit_order() {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.install_engine_handle();
-        e.execute("CREATE TABLE alloc_t (a INT);").unwrap();
-        let before = e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst);
-        e.execute("INSERT INTO alloc_t VALUES (1), (2), (3);")
+        e.execute_blocking("CREATE TABLE alloc_t (a INT);").unwrap();
+        // `before_wal` allocates **inline** under the commit turn rather than
+        // through the allocator queue (see `Engine::reserve_rows_at`): a
+        // queued allocation would need a `block_on` on the worker that holds
+        // the turn and `commit_lock`. What has to hold is the contract the
+        // queue existed for, so that is what this asserts - ids dense, in
+        // commit order, no overlap - not which thread handed them out.
+        e.execute_blocking("INSERT INTO alloc_t VALUES (1), (2), (3);")
             .unwrap();
-        assert!(
-            e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst) > before,
-            "the ids must come from the allocator thread, not the inline fallback"
+        assert_eq!(
+            rows(&e, "SELECT a FROM alloc_t;").len(),
+            3,
+            "the append must have taken exactly three ids"
         );
         // Two concurrent appends still get disjoint, contiguous ranges.
         let mut handles = Vec::new();
         for _ in 0..4 {
             let e = Arc::clone(&e);
             handles.push(std::thread::spawn(move || {
-                e.execute("INSERT INTO alloc_t VALUES (9);").unwrap();
+                e.execute_blocking("INSERT INTO alloc_t VALUES (9);")
+                    .unwrap();
             }));
         }
         for h in handles {
@@ -2217,7 +2388,7 @@ mod tests {
             Arc::ptr_eq(&a, &e.batch_gate("db1.t1")),
             "the same table keeps one gate"
         );
-        let held = a.lock().unwrap();
+        let held = crate::scheduler::block_on(a.lock());
         // The other table is still writable while this one's batch runs.
         assert!(b.try_lock().is_ok());
         drop(held);
@@ -2229,7 +2400,8 @@ mod tests {
     fn explain_fragment_wraps_a_plain_plan() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ef (a INT, b INT);").unwrap();
+        e.execute_blocking("CREATE TABLE ef (a INT, b INT);")
+            .unwrap();
 
         let physical = rows(&e, "EXPLAIN PHYSICAL SELECT a FROM ef WHERE b = 1;");
         let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;");
@@ -2259,7 +2431,8 @@ mod tests {
     fn explain_fragment_type_follows_the_blocking_operator() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE eft (a INT, b INT);").unwrap();
+        e.execute_blocking("CREATE TABLE eft (a INT, b INT);")
+            .unwrap();
         for (sql, want) in [
             ("EXPLAIN FRAGMENT SELECT a FROM eft;", "ParallelStream"),
             (
@@ -2283,7 +2456,7 @@ mod tests {
     fn a_limit_over_a_big_table_still_stops_early() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lim (a INT);").unwrap();
+        e.execute_blocking("CREATE TABLE lim (a INT);").unwrap();
         let input: Vec<Vec<Literal>> = (0..100_000).map(|i| vec![Literal::Int(i)]).collect();
         e.insert_literals("default_db.lim", None, input).unwrap();
 
@@ -2308,8 +2481,9 @@ mod tests {
     fn run_plan_executes_a_group_by_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE og (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
+        e.execute_blocking("CREATE TABLE og (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2352,8 +2526,9 @@ mod tests {
     fn run_plan_executes_a_sort_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE os (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
+        e.execute_blocking("CREATE TABLE os (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2383,20 +2558,22 @@ mod tests {
     }
 
     fn seed(e: &Engine) {
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
 
     #[test]
     fn a_derived_table_scans_the_subquery_result() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE d (id INT, s VARCHAR);").unwrap();
-        e.execute("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
+        e.execute_blocking("CREATE TABLE d (id INT, s VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
             .unwrap();
         // The outer query scans the subquery's rows, and may filter/sort them.
         assert_eq!(
@@ -2415,9 +2592,10 @@ mod tests {
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
         // A table legitimately named `select3` is not mistaken for a subquery.
-        e.execute("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
+        e.execute_blocking("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
             .unwrap();
-        e.execute("INSERT INTO select3 VALUES (1,2,3);").unwrap();
+        e.execute_blocking("INSERT INTO select3 VALUES (1,2,3);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT c3, c2, c1 from select3;"),
             vec![vec!["3".to_string(), "2".to_string(), "1".to_string()]]
@@ -2431,11 +2609,12 @@ mod tests {
     fn a_correlated_subquery_sees_each_outer_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs (id INT, v INT);").unwrap();
-        e.execute("INSERT INTO cs VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cs (id INT, v INT);")
             .unwrap();
-        e.execute("CREATE TABLE cs2 (id INT);").unwrap();
-        e.execute("INSERT INTO cs2 VALUES (2);").unwrap();
+        e.execute_blocking("INSERT INTO cs VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE cs2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO cs2 VALUES (2);").unwrap();
         // Uncorrelated: the subquery is evaluated on its own, so every outer
         // row sees the same answer.
         assert_eq!(
@@ -2462,10 +2641,13 @@ mod tests {
     fn a_cte_alias_shadowing_a_table_is_not_bound_as_that_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE shadow (other INT);").unwrap();
-        e.execute("INSERT INTO shadow VALUES (99);").unwrap();
-        e.execute("CREATE TABLE src (id INT);").unwrap();
-        e.execute("INSERT INTO src VALUES (1), (2);").unwrap();
+        e.execute_blocking("CREATE TABLE shadow (other INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO shadow VALUES (99);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE src (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO src VALUES (1), (2);")
+            .unwrap();
         // `shadow` in the subquery's FROM is the CTE, which exposes `id`; the
         // base table of the same name only has `other`.
         assert_eq!(
@@ -2484,9 +2666,9 @@ mod tests {
     fn an_outer_cte_supplies_the_correlation_scope() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE otc (id INT);").unwrap();
-        e.execute("INSERT INTO otc VALUES (1);").unwrap();
-        e.execute("CREATE TABLE otc2 (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE otc (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO otc VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE otc2 (id INT);").unwrap();
         // The CTE supplies the outer rows; `otc2` is empty, so nothing matches.
         assert_eq!(
             rows(
@@ -2505,16 +2687,16 @@ mod tests {
     fn a_subquery_in_a_match_filter_is_not_folded_to_a_constant() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mf (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE mf (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
+        e.execute_blocking("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
             .unwrap();
-        e.execute("CREATE TABLE mf2 (id INT);").unwrap();
-        e.execute("INSERT INTO mf2 VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE mf2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO mf2 VALUES (1);").unwrap();
         let err = e
-            .execute(
+            .execute_blocking(
                 "SELECT id FROM mf SEARCH MATCH TEXT ('body', 'x', 'topn=10', \
                  WHERE EXISTS (SELECT id FROM mf2 WHERE mf2.id = mf.id));",
             )
@@ -2532,14 +2714,15 @@ mod tests {
     fn a_subquery_in_a_search_option_filter_is_rejected() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO sf VALUES (1, 'x');").unwrap();
-        e.execute("CREATE TABLE sf2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES (1, 'x');")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE sf2 (id INT);").unwrap();
         let err = e
-            .execute(
+            .execute_blocking(
                 "SELECT id FROM sf SEARCH MATCH TEXT ('body', 'x', \
                  'topn=10;filter=EXISTS (SELECT id FROM sf2)');",
             )
@@ -2558,8 +2741,8 @@ mod tests {
     fn an_inherited_cte_alias_shadows_the_base_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivb (id INT);").unwrap();
-        e.execute("INSERT INTO ivb VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE ivb (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO ivb VALUES (1);").unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -2575,9 +2758,11 @@ mod tests {
     fn a_subquery_local_cte_shadows_a_base_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lcte (id INT);").unwrap();
-        e.execute("INSERT INTO lcte VALUES (1), (2);").unwrap();
-        e.execute("CREATE TABLE lshadow (other INT);").unwrap();
+        e.execute_blocking("CREATE TABLE lcte (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO lcte VALUES (1), (2);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE lshadow (other INT);")
+            .unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -2593,11 +2778,11 @@ mod tests {
     fn match_tensor_fusion_reranks_by_the_search_tensor() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
+        e.execute_blocking("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
+        e.execute_blocking("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
             .unwrap();
         // The rerank ignores the children's BM25: only the tensor similarity counts.
         let rows = rows(
@@ -2619,11 +2804,13 @@ mod tests {
     fn fulltext_threshold_filter_uses_the_index_score() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ft (num INT, doc VARCHAR);")
+        e.execute_blocking("CREATE TABLE ft (num INT, doc VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');")
-            .unwrap();
-        e.execute("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
+        e.execute_blocking(
+            "INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
             .unwrap();
         // A threshold is a *score* filter, which only the index can answer.
         let keep = rows(
@@ -2642,16 +2829,21 @@ mod tests {
     fn a_gram_index_filter_requires_the_query_contiguously() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE g (id INT, doc VARCHAR);").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE TABLE g (id INT, doc VARCHAR);")
+            .unwrap();
+        e.execute_blocking(
             "INSERT INTO g VALUES (1,'harmful chemical reaction'), \
              (2,'chemical processes are harmful');",
         )
         .unwrap();
-        e.execute("CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');")
-            .unwrap();
-        e.execute("CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');",
+        )
+        .unwrap();
         // The gram index needs the query contiguous; the regular one accepts the
         // terms apart. Same filter, different index named by `@`.
         let gram = rows(
@@ -2795,9 +2987,9 @@ mod tests {
         );
         assert_eq!(e.column_types("default_db.ts").unwrap()[0], "INTEGER");
         // The imported table is usable.
-        e.execute("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
+        e.execute_blocking("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
             .unwrap();
-        match &e.execute("SELECT id FROM default_db.ts;").unwrap()[0] {
+        match &e.execute_blocking("SELECT id FROM default_db.ts;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("unexpected {other:?}"),
         }
@@ -2809,7 +3001,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
+            .execute_blocking("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
             .unwrap()[0]
         {
             QueryResult::Rows { rows, columns } => {
@@ -2828,7 +3020,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
+            .execute_blocking("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2863,7 +3055,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
+            .execute_blocking("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2888,19 +3080,21 @@ mod tests {
     fn join_between_two_tables() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE a (aid INT, an VARCHAR);").unwrap();
-        e.execute("CREATE TABLE b (bid INT, bn VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE a (aid INT, an VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE b (bid INT, bn VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "x"), (2, "y")] {
-            e.execute(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
                 .unwrap();
         }
         for (i, n) in [(2, "yy"), (3, "zz")] {
-            e.execute(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         match &e
-            .execute("SELECT aid, bn FROM a JOIN b ON aid = bid;")
+            .execute_blocking("SELECT aid, bn FROM a JOIN b ON aid = bid;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2915,16 +3109,17 @@ mod tests {
     fn bounded_capacity_one_does_not_deadlock() {
         let dir = tempdir().unwrap();
         let e = Engine::open_with_capacity(dir.path(), 1).unwrap();
-        e.execute("CREATE TABLE t (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
         for i in 0..50 {
-            e.execute(&format!("INSERT INTO t VALUES ({i});")).unwrap();
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i});"))
+                .unwrap();
         }
-        e.flush().unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        crate::scheduler::block_on(e.flush()).unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 50),
             other => panic!("{other:?}"),
         }
-        match &e.execute("SELECT * FROM t LIMIT 3;").unwrap()[0] {
+        match &e.execute_blocking("SELECT * FROM t LIMIT 3;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
@@ -2935,27 +3130,33 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(
-            e.execute("SELECT 1, 'x';").unwrap(),
+            e.execute_blocking("SELECT 1, 'x';").unwrap(),
             vec![QueryResult::Rows {
                 columns: vec!["c0".into(), "c1".into()],
                 rows: vec![vec![Value::Int(1), Value::Str("x".into())]]
             }]
         );
-        assert!(e.execute("SELECT * FROM nope;").is_err());
+        assert!(e.execute_blocking("SELECT * FROM nope;").is_err());
     }
 
     #[test]
     fn index_scan_matches_expected_and_survives_restart() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "a"), (2, "b"), (3, "a"), (4, "b")] {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.execute("CREATE INDEX idx_name ON t (name);").unwrap();
-        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
-        match &e.execute("SELECT id FROM t WHERE name = 'a';").unwrap()[0] {
+        e.execute_blocking("CREATE INDEX idx_name ON t (name);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
+            .unwrap();
+        match &e
+            .execute_blocking("SELECT id FROM t WHERE name = 'a';")
+            .unwrap()[0]
+        {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(
                     texts(rows),
@@ -2964,11 +3165,14 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         drop(e); // release the RocksDB lock before reopening
                  // reopen: the index is rebuilt from catalog metadata and still scans
         let e2 = Engine::open(dir.path()).unwrap();
-        match &e2.execute("SELECT id FROM t WHERE name = 'b';").unwrap()[0] {
+        match &e2
+            .execute_blocking("SELECT id FROM t WHERE name = 'b';")
+            .unwrap()[0]
+        {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 2),
             other => panic!("{other:?}"),
         }
@@ -2985,7 +3189,7 @@ mod tests {
 
     /// The first column of a one-column query over `t`.
     fn query_column(e: &Engine, sql: &str) -> Vec<String> {
-        match &e.execute(sql).unwrap()[0] {
+        match &e.execute_blocking(sql).unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 rows.iter().map(|row| row[0].to_slt_string()).collect()
             }
@@ -3013,7 +3217,7 @@ mod tests {
     fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
         let filter = predicate.map(|p| format!("WHERE {p}")).unwrap_or_default();
         match &e
-            .execute(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
+            .execute_blocking(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => rows
@@ -3042,17 +3246,19 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // The same SQL runs twice below; keep the result cache from answering
         // the second round, which is the one that reads all sealed chunks.
-        e.execute("SET CONFIG result_cache off;").unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for i in 0..150 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
                 .unwrap();
         }
         // `CREATE INDEX` builds from the rows that exist, so 0..150 land in a
         // sealed chunk; 150..200 stay in the memory tail until `flush`.
-        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
+        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
+            .unwrap();
         for i in 150..200 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
                 .unwrap();
         }
         let cases: [(&str, Vec<i64>); 7] = [
@@ -3075,7 +3281,7 @@ mod tests {
             for (predicate, expected) in &cases {
                 assert_eq!(&ids(&e, predicate), expected, "round {round}: {predicate}");
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
         // `=` keeps its own path, and must still agree with the range path.
         assert_eq!(ids(&e, "id = 42"), vec![42]);
@@ -3096,9 +3302,9 @@ mod tests {
     fn float_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE TABLE {table} (id INT, f FLOAT, d DOUBLE, tag VARCHAR);"
             ))
             .unwrap();
@@ -3107,21 +3313,21 @@ mod tests {
         // chunks; 60..80 land in the memory tail until the first `flush`.
         for i in 0..60 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
                 .unwrap();
             }
         }
         for column in ["id", "f", "d", "tag"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
             .unwrap();
         }
         for i in 60..80 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
                 .unwrap();
@@ -3154,8 +3360,10 @@ mod tests {
             // A checkpoint does not dump the memory indexes; one dump
             // transaction per index seals the rows written since the last one.
             for column in ["id", "f", "d", "tag"] {
-                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
-                    .unwrap();
+                crate::scheduler::block_on(
+                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
+                )
+                .unwrap();
             }
         }
         // VARCHAR keys are hashes: the range cannot use the index, but the rows
@@ -3183,9 +3391,9 @@ mod tests {
     fn temporal_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE TABLE {table} (id INT, d DATE, tm TIME, ts DATETIME);"
             ))
             .unwrap();
@@ -3208,7 +3416,7 @@ mod tests {
             for (i, day) in days.iter().enumerate().take(to).skip(from) {
                 let time = format!("{:02}:00:00", i);
                 for table in ["t_indexed", "t_plain"] {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO {table} VALUES ({i}, '{day}', '{time}', '{day} {time}');"
                     ))
                     .unwrap();
@@ -3218,7 +3426,7 @@ mod tests {
         // 0..7 are sealed by `CREATE INDEX`; 7..10 land in the memory tail.
         insert(&e, 0, 7);
         for column in ["id", "d", "tm", "ts"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
             .unwrap();
@@ -3258,8 +3466,10 @@ mod tests {
             }
             // One dump transaction per index; a checkpoint keeps the tails.
             for column in ["id", "d", "tm", "ts"] {
-                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
-                    .unwrap();
+                crate::scheduler::block_on(
+                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
+                )
+                .unwrap();
             }
         }
         // Equality on a date column rides the same ordered key.
@@ -3276,14 +3486,15 @@ mod tests {
     fn range_on_an_unordered_key_falls_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
-        e.execute("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
             .unwrap();
         for i in 0..50 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
                 .unwrap();
         }
-        e.execute("CREATE INDEX idx_tag ON t (tag);").unwrap();
+        e.execute_blocking("CREATE INDEX idx_tag ON t (tag);")
+            .unwrap();
         for round in 0..2 {
             // A varchar chunk stores a hash of the key, so there is no order to
             // scan: the rows must still be right.
@@ -3298,7 +3509,7 @@ mod tests {
                 vec![45, 46, 47, 48, 49],
                 "round {round}: unindexed column"
             );
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
     }
 
@@ -3306,16 +3517,17 @@ mod tests {
     fn delete_with_where_and_all() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("DELETE FROM t WHERE id >= 2;").unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id >= 2;").unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("{other:?}"),
         }
-        e.execute("DELETE FROM t;").unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("DELETE FROM t;").unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 0),
             other => panic!("{other:?}"),
         }
@@ -3325,11 +3537,13 @@ mod tests {
     fn update_is_delete_plus_append() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("UPDATE t SET name = 'X' WHERE id >= 2;").unwrap();
-        match &e.execute("SELECT * FROM t ORDER BY id;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        e.execute_blocking("UPDATE t SET name = 'X' WHERE id >= 2;")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t ORDER BY id;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
                 assert_eq!(row_text(rows, 0), vec!["1".to_string(), "a".to_string()]);
@@ -3344,10 +3558,11 @@ mod tests {
     fn multi_row_insert() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
@@ -3361,7 +3576,7 @@ mod tests {
             seed(&e);
         }
         let e = Engine::open(dir.path()).unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 4),
             other => panic!("{other:?}"),
         }
@@ -3378,9 +3593,9 @@ mod tests {
         )
         .unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
+        e.execute_blocking("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY v FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
@@ -3389,7 +3604,7 @@ mod tests {
 
         // cosine top-3 → c1 8, 6, 4 with hidden row-id / similarity columns.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1, ROW_ID(), SIMILARITY() FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);",
             )
@@ -3405,7 +3620,7 @@ mod tests {
 
         // threshold prunes the weakest match.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) \
                  WITH (threshold = 0.9);",
@@ -3418,7 +3633,7 @@ mod tests {
 
         // WHERE filters candidates before top-N (l2 over {2,4,6} → 6 then 4).
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 2) \
                  WHERE c1 < 7;",
@@ -3444,7 +3659,7 @@ mod tests {
         for (metric, target) in [("l2", 42), ("cosine", 42), ("ip", 199)] {
             let dir = tempdir().unwrap();
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
                 .unwrap();
             let mut sql = String::from("INSERT INTO hm VALUES ");
             for i in 0..200 {
@@ -3454,12 +3669,12 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(&format!(
                 "CREATE INDEX hm_i ON hm (v) USING HNSW WITH (metric='{metric}');"
             ))
             .unwrap();
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             let got = rows(
                 &e,
                 &format!(
@@ -3471,434 +3686,6 @@ mod tests {
             );
             assert_eq!(got, vec![vec![target.to_string()]], "metric {metric}");
         }
-    }
-
-    /// A bad HNSW option is a DDL error, not a silent default: `M = 0` builds a
-    /// graph with no neighbour slots at all and `metric = 'l1'` would quietly
-    /// become `l2`, and both are persisted into the catalog.
-    #[test]
-    fn hnsw_rejects_invalid_index_options() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE io (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        for (i, opt) in [
-            "M=0",
-            "M=abc",
-            "M=99999",
-            "EF_CONSTRUCTION=1",
-            "METRIC='l1'",
-            "ENCODE='foo'",
-        ]
-        .iter()
-        .enumerate()
-        {
-            let sql = format!("CREATE INDEX io_{i} ON io (v) USING HNSW WITH ({opt});");
-            assert!(e.execute(&sql).is_err(), "{opt} must be rejected");
-        }
-        // The valid spellings still work.
-        e.execute(
-            "CREATE INDEX io_ok ON io (v) USING HNSW              WITH (M=8, EF_CONSTRUCTION=100, METRIC='cosine', ENCODE='plain');",
-        )
-        .unwrap();
-    }
-
-    /// One `DELETE` must not send every later KNN query to the exact scan: the
-    /// coverage check asks whether every *live* row is labelled, not whether the
-    /// counts match (the graph still labels the deleted row).
-    #[test]
-    fn a_deleted_row_leaves_the_graph_in_charge() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dv (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO dv VALUES ");
-        for i in 0..200 {
-            sql.push_str(&format!("({i}, [{i}.0,0.0,0.0,0.0])"));
-            if i < 199 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute(&sql).unwrap();
-        e.execute("CREATE INDEX dv_i ON dv (v) USING HNSW WITH (metric='l2');")
-            .unwrap();
-        e.flush().unwrap();
-        e.execute("DELETE FROM dv WHERE id = 7;").unwrap();
-        // The deleted row is gone and the nearest survivor answers.
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.4,0.0,0.0,0.0], 'float', 'l2', 1);"
-            ),
-            vec![vec!["8".to_string()]]
-        );
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.0,0.0,0.0,0.0], 'float', 'l2', 3);"
-            )
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>(),
-            vec!["6".to_string(), "8".to_string(), "5".to_string()]
-        );
-    }
-
-    /// A filtered KNN answered from a secondary index must rank exactly like the
-    /// same filter evaluated over decoded columns: the bitmask comes from the
-    /// index (`CommonQueryFilter::filter_result_`), the answers must not.
-    #[test]
-    fn an_index_answered_filter_matches_the_decoded_one() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        // `fvi` indexes `tag`; `fvd` does not, so the same predicate is answered
-        // from the index in one table and by decoding it in the other.
-        for t in ["fvi", "fvd"] {
-            e.execute(&format!(
-                "CREATE TABLE {t} (id INT, tag INT, v EMBEDDING(FLOAT,4));"
-            ))
-            .unwrap();
-            let mut sql = format!("INSERT INTO {t} VALUES ");
-            for i in 0..200 {
-                sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 7));
-                if i < 199 {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute(&format!(
-                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
-            ))
-            .unwrap();
-        }
-        e.execute("CREATE INDEX fvi_tag ON fvi (tag);").unwrap();
-        e.flush().unwrap();
-
-        for filter in [
-            "tag = 3",
-            "tag >= 5",
-            "tag <= 1",
-            "tag > 4",
-            "tag < 2",
-            "tag >= 2 AND tag <= 3",
-            "3 = tag",
-        ] {
-            let query = |t: &str| {
-                format!(
-                    "SELECT id FROM {t} SEARCH MATCH VECTOR                      (v, [97.4,0.0,0.0,0.0], 'float', 'l2', 5) WHERE {filter};"
-                )
-            };
-            let indexed = rows(&e, &query("fvi"));
-            let decoded = rows(&e, &query("fvd"));
-            assert_eq!(indexed, decoded, "filter `{filter}`");
-            assert!(!indexed.is_empty(), "filter `{filter}` admits rows");
-            // Every answer satisfies the filter.
-            let tags: Vec<i64> = indexed
-                .iter()
-                .map(|r| r[0].parse::<i64>().unwrap() % 7)
-                .collect();
-            assert_eq!(tags.len(), indexed.len(), "filter `{filter}`");
-        }
-    }
-
-    /// A `BOOL`/`INT`/`DOUBLE`/`TIME`/`VARCHAR`/`JSON` index and a filter on
-    /// each of its columns, so the shortcut has something to decline.
-    fn lossy_key_table(e: &Engine, t: &str) {
-        e.execute(&format!(
-            "CREATE TABLE {t} (id INT, big BIGINT, db DOUBLE, tm TIME, flag BOOL, \
-             vc VARCHAR, js JSON, v EMBEDDING(FLOAT,4));"
-        ))
-        .unwrap();
-        e.execute(&format!(
-            "INSERT INTO {t} VALUES \
-             (0, 9007199254740992, 1.0, '12:34:56', true, '123', '{{\"a\":1}}', [0.0,0.0,0.0,0.0]), \
-             (1, 9007199254740993, 1.0000004, '12:34:57', false, '0123', '{{\"a\":2}}', [1.0,0.0,0.0,0.0]), \
-             (2, 5, 2.0, '10:00:00', true, 'x', '{{\"a\":1}}', [2.0,0.0,0.0,0.0]), \
-             (3, 6, 3.0, '09:00:00', false, 'y', 'null', [3.0,0.0,0.0,0.0]);"
-        ))
-        .unwrap();
-        e.execute(&format!(
-            "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
-        ))
-        .unwrap();
-    }
-
-    /// An indexed KNN answer is final (its rows are a vector projection, so
-    /// nothing re-evaluates the predicate), so the shortcut may only take a
-    /// predicate whose key comparison *is* the evaluator's:
-    ///
-    /// * from `2^53` up the evaluator's `f64` comparison folds neighbouring
-    ///   integers together while the index keeps one key each;
-    /// * a float chunk narrows the key to `f32` and a probe is built from six
-    ///   decimals, so `db = 1.0000004` probes `1.000000`;
-    /// * a temporal key drops the fraction while the evaluator keeps it;
-    /// * a varchar key is a hash and the evaluator coerces numeric text, so
-    ///   `vc = '0123'` matches a stored `123` whose hash differs;
-    /// * a `BOOL` key is `0`/`1` while the evaluator compares the text, so
-    ///   `flag = '1'` admits nothing there and `flag = 'TRUE'` admits nothing
-    ///   either;
-    /// * a JSON key is a term, not a document.
-    #[test]
-    fn a_filter_the_keys_cannot_answer_declines_the_shortcut() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        lossy_key_table(&e, "lk");
-        for c in ["big", "db", "tm", "flag", "vc", "js"] {
-            e.execute(&format!("CREATE INDEX lk_{c} ON lk ({c});"))
-                .unwrap();
-        }
-        let t = "default_db.lk";
-        let schema = e.table_schema(t).unwrap();
-        let cmp = |column: &str, op, value| {
-            let i = schema.iter().position(|c| c == column).unwrap();
-            expression::Expr::Cmp(
-                Box::new(expression::Expr::Column(i)),
-                op,
-                Box::new(expression::Expr::Literal(value)),
-            )
-        };
-        // The indexes answer these columns: the declines below come from the
-        // comparison, not from a missing index.
-        for (column, literal) in [
-            ("big", parser::Literal::Int(9007199254740992)),
-            ("db", parser::Literal::Float(1.0)),
-            ("tm", parser::Literal::Str("12:34:56".into())),
-            ("flag", parser::Literal::Str("true".into())),
-            ("vc", parser::Literal::Str("123".into())),
-            ("js", parser::Literal::Str("{\"a\":1}".into())),
-        ] {
-            assert!(
-                e.index_lookup(t, column, &literal).is_some(),
-                "no index on `{column}`"
-            );
-        }
-
-        for (column, op, value) in [
-            // `2^53 = 2^53 + 1` and `2^53 > 2^53` are both `f64` comparisons
-            // that the i64 keys answer differently.
-            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_992)),
-            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_993)),
-            ("big", parser::CmpOp::Ge, Value::Int(9_007_199_254_740_993)),
-            ("big", parser::CmpOp::Gt, Value::Int(9_007_199_254_740_992)),
-            // The probe is built from six decimals.
-            ("db", parser::CmpOp::Eq, Value::Float(1.000_000_4)),
-            ("db", parser::CmpOp::Lt, Value::Float(1.000_000_4)),
-            ("db", parser::CmpOp::Eq, Value::Float(1.0)),
-            // The key truncates the fraction.
-            ("tm", parser::CmpOp::Lt, Value::Str("12:34:56.1".into())),
-            ("tm", parser::CmpOp::Eq, Value::Str("12:34:56".into())),
-            // The key is `0`/`1`, the comparison is on the text. (The canonical
-            // spellings keep the index path: see the `BOOL` range test.)
-            ("flag", parser::CmpOp::Eq, Value::Str("1".into())),
-            ("flag", parser::CmpOp::Eq, Value::Str("TRUE".into())),
-            // The key is a hash, the comparison coerces numeric text.
-            ("vc", parser::CmpOp::Eq, Value::Str("0123".into())),
-            ("vc", parser::CmpOp::Eq, Value::Str("123".into())),
-            // A JSON key is a term, not a document.
-            ("js", parser::CmpOp::Eq, Value::Str("{\"a\":1}".into())),
-        ] {
-            assert!(
-                e.predicate_rows_from_indexes(t, &cmp(column, op, value.clone()))
-                    .is_none(),
-                "`{column} {op:?} {value:?}` must be decoded, not answered from the keys"
-            );
-        }
-
-        // The keys that *are* the values still answer, so the shortcut keeps
-        // working where it can.
-        assert!(e
-            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Ge, Value::Int(5)))
-            .is_some());
-        assert!(e
-            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Eq, Value::Int(5)))
-            .is_some());
-        assert!(e
-            .predicate_rows_from_indexes(
-                t,
-                &cmp("flag", parser::CmpOp::Eq, Value::Str("true".into()))
-            )
-            .is_some());
-    }
-
-    /// The declined shortcut is what makes the *answer* right: `flag <= 'true'`
-    /// admits both `false` and `true` rows, while a `BOOL` range whose open end
-    /// is `i64::MAX`/`i64::MIN` converts both sentinels to `true` and hands back
-    /// the `true` rows alone.
-    #[test]
-    fn a_bool_range_does_not_drop_the_false_rows() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        lossy_key_table(&e, "brk");
-        e.execute("CREATE INDEX brk_flag ON brk (flag);").unwrap();
-        e.flush().unwrap();
-        for (filter, want) in [
-            ("flag <= 'true'", vec!["3", "2"]),
-            ("flag < 'true'", vec!["3", "1"]),
-            ("flag >= 'false'", vec!["3", "2"]),
-            ("flag > 'false'", vec!["2", "0"]),
-            ("flag = '1'", vec![]),
-        ] {
-            assert_eq!(
-                rows(
-                    &e,
-                    &format!(
-                        "SELECT id FROM brk SEARCH MATCH VECTOR \
-                         (v, [9.0,0.0,0.0,0.0], 'float', 'l2', 2) WHERE {filter};"
-                    )
-                )
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>(),
-                want,
-                "filter `{filter}`"
-            );
-        }
-    }
-
-    /// A filter that admits very few rows still returns a full `topn`: the probe
-    /// widens its beam instead of handing back a short answer, and the rows it
-    /// finds are the nearest admitted ones.
-    #[test]
-    fn a_selective_filter_still_returns_topn() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO sf VALUES ");
-        for i in 0..400 {
-            sql.push_str(&format!(
-                "({i}, {}, [{i}.0,0.0,0.0,0.0])",
-                if i % 200 == 7 { 1 } else { 0 }
-            ));
-            if i < 399 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute(&sql).unwrap();
-        // Two admitted rows out of four hundred, both far from the query.
-        e.execute("CREATE INDEX sf_i ON sf (v) USING HNSW WITH (metric='l2', M=8);")
-            .unwrap();
-        e.flush().unwrap();
-        let got = rows(
-            &e,
-            "SELECT id FROM sf SEARCH MATCH VECTOR (v, [399.0,0.0,0.0,0.0], 'float', 'l2', 2)              WHERE tag = 1;",
-        );
-        assert_eq!(
-            got,
-            vec![vec!["207".to_string()], vec!["7".to_string()]],
-            "both admitted rows come back, nearest first"
-        );
-    }
-
-    /// A sealed HNSW chunk is **mapped**, not read: its vector payload stays in
-    /// the page cache and a loaded segment's heap is its graph, which is the
-    /// reference's shape (`PlainVecStoreInner` points into the buffer).
-    #[test]
-    fn a_sealed_hnsw_chunk_maps_its_vectors() {
-        let dir = tempdir().unwrap();
-        {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE mp (id INT, v EMBEDDING(FLOAT,8));")
-                .unwrap();
-            let mut sql = String::from("INSERT INTO mp VALUES ");
-            for i in 0..300 {
-                let parts: Vec<String> = (0..8).map(|j| format!("{}", i + j)).collect();
-                sql.push_str(&format!("({i}, [{}])", parts.join(",")));
-                if i < 299 {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute("CREATE INDEX mp_i ON mp (v) USING HNSW WITH (metric='l2');")
-                .unwrap();
-            e.flush().unwrap();
-        }
-        let e = Engine::open(dir.path()).unwrap();
-        let loaded = e.load_vector_index("mp", "mp_i").unwrap();
-        let index = loaded.index.index();
-        assert!(
-            index.vectors_are_mapped(),
-            "the payload must be borrowed from the mapping"
-        );
-        assert_eq!(
-            index.store_mem_bytes(),
-            0,
-            "a mapped store keeps no vectors"
-        );
-        assert!(
-            index.neighbors_are_mapped(),
-            "the neighbour lists must be read out of the mapping too"
-        );
-        assert_eq!(index.mem_usage(), 0, "a loaded chunk costs no heap");
-        assert_eq!(index.len(), 300);
-        // The mapped payload is what answers: this engine has no memory segment.
-        // Row 42's own vector: [42, 43, …, 49].
-        let query: Vec<String> = (0..8).map(|j| format!("{}", 42 + j)).collect();
-        assert_eq!(
-            rows(
-                &e,
-                &format!(
-                    "SELECT id FROM mp SEARCH MATCH VECTOR (v, [{}], 'float', 'l2', 1);",
-                    query.join(",")
-                )
-            ),
-            vec![vec!["42".to_string()]]
-        );
-    }
-
-    /// A filtered query on an indexed column evaluates its predicate on the
-    /// columns it names and pushes the result into the graph as a bitmask
-    /// (`CalculateFilterBitmask`): the answer is the nearest *admitted* row, not
-    /// the nearest row that then gets discarded.
-    #[test]
-    fn a_filtered_hnsw_query_answers_only_admitted_rows() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fv (id INT, tag INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO fv VALUES ");
-        for i in 0..200 {
-            sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 2));
-            if i < 199 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute(&sql).unwrap();
-        e.execute("CREATE INDEX fv_i ON fv (v) USING HNSW WITH (metric='l2');")
-            .unwrap();
-        e.flush().unwrap();
-
-        // 49 is the nearest row and is odd; only the even rows are admitted, so
-        // the answer is the nearest of those.
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1) \
-                 WHERE tag = 0;"
-            ),
-            vec![vec!["48".to_string()]]
-        );
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1);"
-            ),
-            vec![vec!["49".to_string()]]
-        );
-        // More results than the graph would return unfiltered: every one of them
-        // still satisfies the predicate.
-        let got = rows(
-            &e,
-            "SELECT id, tag FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 5) \
-             WHERE tag = 0;",
-        );
-        assert_eq!(got.len(), 5);
-        assert!(got.iter().all(|r| r[1] == "0"), "{got:?}");
     }
 
     /// C++ `test_lsg_build_ut.cpp::test1`: an LSG-built HNSW keeps >= 95%
@@ -3918,7 +3705,7 @@ mod tests {
         };
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
+        e.execute_blocking("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
             .unwrap();
         let mut sql = String::from("INSERT INTO lg VALUES ");
         for i in 0..n {
@@ -3928,13 +3715,13 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
-        e.execute(
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
             "CREATE INDEX lg_i ON lg (v) USING HNSW WITH \
              (metric='l2', build_type='lsg', lsg_config='sample_ratio=0.5,ls_k=10,alpha=1.0');",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let mut hits = 0;
         for i in 0..n {
             let got = rows(
@@ -3959,7 +3746,7 @@ mod tests {
         for encode in ["plain", "lvq", "rabitq"] {
             let dir = tempdir().unwrap();
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
                 .unwrap();
             let mut sql = String::from("INSERT INTO he VALUES ");
             for i in 0..200 {
@@ -3969,12 +3756,12 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(&format!(
                 "CREATE INDEX he_i ON he (v) USING HNSW WITH (metric='l2', encode='{encode}');"
             ))
             .unwrap();
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             let rows = rows(
                 &e,
                 "SELECT id FROM he SEARCH MATCH VECTOR \
@@ -3999,11 +3786,11 @@ mod tests {
         .unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(3);
-        e.execute("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY cvi FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
@@ -4014,7 +3801,7 @@ mod tests {
             .unwrap()
             .values()
             .flat_map(|t| t.hnsw_mem.values())
-            .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
+            .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
             .sum();
         assert_eq!(
             indexed, 0,
@@ -4032,15 +3819,17 @@ mod tests {
     fn sparse_and_tensor_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO s VALUES (1, [0:1.0,10:1.0,20:1.0,80:1.0]), \
              (2, [0:2.0,20:2.0,80:2.0]), (4, [0:4.0,80:4.0]), (5, []);",
         )
         .unwrap();
         match &e
-            .execute("SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);")
+            .execute_blocking(
+                "SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);",
+            )
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -4056,16 +3845,16 @@ mod tests {
             other => panic!("{other:?}"),
         }
 
-        e.execute("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO t VALUES (2, [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]]), \
              (4, [[0.2,0.1,0.3,0.4]]);",
         )
         .unwrap();
         // MaxSim over the query's two vectors: 2.21 + (-7.4) = -5.19.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1, ROUND(SCORE(), 4) FROM t SEARCH MATCH TENSOR \
                  (c2, [[0.0,-10.0,0.0,0.7],[9.2,45.6,-55.8,3.5]], 'float', 'maxsim', '');",
             )
@@ -4092,7 +3881,7 @@ mod tests {
     fn plaid_index_answers_tensor_search_and_mirrors_a_chunk() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -4105,7 +3894,7 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO pt VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO pt VALUES {};", values.join(",")))
             .unwrap();
         let query = "SELECT id FROM pt SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
@@ -4113,8 +3902,10 @@ mod tests {
         let baseline = rows(&e, query);
         assert_eq!(baseline.len(), 3);
 
-        e.execute("CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);",
+        )
+        .unwrap();
         // The scan builds `PlaidIndexInMem` over the 1200 embeddings.
         let indexed = rows(&e, query);
         let tkey = e.table_key("default_db.pt");
@@ -4131,7 +3922,7 @@ mod tests {
         assert_eq!(indexed.len(), 3);
         assert_eq!(indexed[0], baseline[0]);
 
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let loaded = e.read_plaid_index("default_db.pt", "pidx").unwrap();
         assert_eq!(loaded.doc_num(), 300);
         assert_eq!(loaded.total_embedding_num(), 1200);
@@ -4147,7 +3938,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
         engine
-            .execute("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
+            .execute_blocking("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let tensor_rows = |lo: usize, hi: usize| -> String {
             let mut values = Vec::new();
@@ -4162,10 +3953,10 @@ mod tests {
             values.join(",")
         };
         engine
-            .execute(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
+            .execute_blocking(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
             .unwrap();
         engine
-            .execute("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
+            .execute_blocking("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
 
         let query = "SELECT id FROM pcc SEARCH MATCH TENSOR \
@@ -4176,13 +3967,13 @@ mod tests {
                 for step in 0..4 {
                     let lo = 200 + step * 50;
                     engine
-                        .execute(&format!(
+                        .execute_blocking(&format!(
                             "INSERT INTO pcc VALUES {};",
                             tensor_rows(lo, lo + 50)
                         ))
                         .unwrap();
                 }
-                engine.flush().unwrap();
+                crate::scheduler::block_on(engine.flush()).unwrap();
             })
         };
         let observed: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(Vec::new()));
@@ -4267,17 +4058,17 @@ mod tests {
 
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "CREATE TABLE {table} (id INT, t TENSOR(FLOAT,4));"
             ))
             .unwrap();
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "INSERT INTO {table} VALUES {};",
                 tensor_rows(0, 200)
             ))
             .unwrap();
-        engine.execute(&ddl).unwrap();
+        engine.execute_blocking(&ddl).unwrap();
 
         // 1. The index answers for the whole corpus.
         let mut expected: std::collections::BTreeSet<i64> = (0..200).collect();
@@ -4285,7 +4076,7 @@ mod tests {
 
         // 2. Rows appended after the build are indexed too (incremental add).
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "INSERT INTO {table} VALUES {};",
                 tensor_rows(200, 260)
             ))
@@ -4294,7 +4085,7 @@ mod tests {
         assert_eq!(ids(&engine, &query(260, None)), expected);
 
         // 3. A flush + reopen loads the flushed chunk (mmap) instead of rebuilding.
-        engine.flush().unwrap();
+        crate::scheduler::block_on(engine.flush()).unwrap();
         drop(engine);
         let engine = Engine::open(dir.path()).unwrap();
         assert_eq!(ids(&engine, &query(260, None)), expected);
@@ -4317,7 +4108,7 @@ mod tests {
         }
 
         // 4. The optimize pass merges the chunks; the answers stay the same.
-        engine.optimize_index_chunks().unwrap();
+        crate::scheduler::block_on(engine.optimize_index_chunks()).unwrap();
         assert_eq!(ids(&engine, &query(260, None)), expected);
 
         // 5. A `filter=` is answered from the index bitmask.
@@ -4326,21 +4117,21 @@ mod tests {
 
         // 6. A tombstoned row is no longer returned.
         engine
-            .execute(&format!("DELETE FROM {table} WHERE id = 5;"))
+            .execute_blocking(&format!("DELETE FROM {table} WHERE id = 5;"))
             .unwrap();
         expected.remove(&5);
         assert_eq!(ids(&engine, &query(260, None)), expected);
 
         // 7. An update rewrites the tensor and the row stays searchable.
         engine
-            .execute(&format!(
+            .execute_blocking(&format!(
                 "UPDATE {table} SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 6;"
             ))
             .unwrap();
         assert_eq!(ids(&engine, &query(260, None)), expected);
 
         // 8. A clean shutdown and restart keeps the same answers.
-        engine.flush().unwrap();
+        crate::scheduler::block_on(engine.flush()).unwrap();
         drop(engine);
         let engine = Engine::open(dir.path()).unwrap();
         assert_eq!(ids(&engine, &query(260, None)), expected);
@@ -4367,7 +4158,7 @@ mod tests {
     fn match_tensor_filter_narrows_through_the_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -4378,9 +4169,9 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO pf VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO pf VALUES {};", values.join(",")))
             .unwrap();
-        e.execute("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute_blocking("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
 
         let all = rows(
@@ -4420,7 +4211,7 @@ mod tests {
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
                 .unwrap();
             let mut values = Vec::new();
             for i in 0..300 {
@@ -4431,12 +4222,12 @@ mod tests {
                 }
                 values.push(format!("({i}, [{}])", tokens.join(",")));
             }
-            e.execute(&format!("INSERT INTO pr VALUES {};", values.join(",")))
+            e.execute_blocking(&format!("INSERT INTO pr VALUES {};", values.join(",")))
                 .unwrap();
-            e.execute("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
+            e.execute_blocking("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
                 .unwrap();
             assert_eq!(rows(&e, q).len(), 3);
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(rows(&e, q).len(), 3);
@@ -4493,17 +4284,18 @@ mod tests {
     fn a_null_tensor_row_keeps_the_multivector_index_complete() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
             .unwrap();
         let values: Vec<String> = (0..300)
             .map(|i| format!("({i}, [[1.0,0.5,0.25,0.125]])"))
             .collect();
-        e.execute(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO mn VALUES {};", values.join(",")))
             .unwrap();
-        e.execute("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+        e.execute_blocking("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
         let first = e.multivector_index_for("mn", "m", 4).unwrap();
-        e.execute("INSERT INTO mn VALUES (300, NULL);").unwrap();
+        e.execute_blocking("INSERT INTO mn VALUES (300, NULL);")
+            .unwrap();
         let after = e.multivector_index_for("mn", "m", 4).unwrap();
         assert!(
             std::sync::Arc::ptr_eq(&first, &after),
@@ -4517,14 +4309,14 @@ mod tests {
     fn plaid_search_options_are_accepted_by_the_validator() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let values: Vec<String> = (0..300)
             .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
             .collect();
-        e.execute(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO pv VALUES {};", values.join(",")))
             .unwrap();
-        e.execute("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute_blocking("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
         let query = "SELECT id FROM pv SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', \
@@ -4541,27 +4333,27 @@ mod tests {
         let dir = tempdir().unwrap();
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
                 .unwrap();
             let values: Vec<String> = (0..300)
                 .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
                 .collect();
-            e.execute(&format!("INSERT INTO md VALUES {};", values.join(",")))
+            e.execute_blocking(&format!("INSERT INTO md VALUES {};", values.join(",")))
                 .unwrap();
-            e.execute("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+            e.execute_blocking("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
                 .unwrap();
-            e.flush().unwrap();
-            e.execute("DELETE FROM md WHERE id = 0;").unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            e.execute_blocking("DELETE FROM md WHERE id = 0;").unwrap();
             // A delete drops the in-memory PLAID index, and the next search
             // rebuilds it; the following flush then rewrites the chunk from the
             // live rows (`plaid_chunk` -> `column_docs`), which is the chunk
             // this test reopens.
-            e.execute(
+            e.execute_blocking(
                 "SELECT id FROM md SEARCH MATCH TENSOR \
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
             )
             .unwrap();
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
         let e = Engine::open(dir.path()).unwrap();
         let hits = rows(
@@ -4644,7 +4436,7 @@ mod tests {
     fn plaid_index_rebuilds_only_when_the_rows_change() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..320 {
@@ -4659,9 +4451,9 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO pm VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO pm VALUES {};", values.join(",")))
             .unwrap();
-        e.execute("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute_blocking("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
 
         let q = "SELECT id FROM pm SEARCH MATCH TENSOR \
@@ -4684,7 +4476,7 @@ mod tests {
         // An update appends a new row id (the old one is tombstoned), so PLAID
         // either grows by one or is rebuilt - it must cover every document
         // afterwards either way.
-        e.execute("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
+        e.execute_blocking("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
             .unwrap();
         assert!(!rows(&e, q).is_empty());
         let after = e.multivector_index_for("pm", "t", 4).unwrap();
@@ -4709,7 +4501,7 @@ mod tests {
     fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -4722,13 +4514,13 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO cs VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO cs VALUES {};", values.join(",")))
             .unwrap();
 
         // `nbits` is unused without residuals, so `IndexPLAID::Make` skips its
         // check in this mode; `centroids` is the SQL spelling of
         // `n_centroids` and has to reach the index.
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX csi ON cs (t) USING PLAID \
              WITH (centroids = 8, nbits = 8, colbertsar_mode = true);",
         )
@@ -4741,7 +4533,7 @@ mod tests {
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
         assert_eq!(rows(&e, query).len(), 3);
 
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let chunks = e.read_plaid_index_chunks("cs", "csi").unwrap();
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].is_colbertsar_mode(), "chunk lost the mode");
@@ -4757,11 +4549,13 @@ mod tests {
 
         // A flag value outside `true/false/1/0` is rejected, as in `IndexPLAID::Make`.
         assert!(e
-            .execute("CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);")
+            .execute_blocking(
+                "CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);"
+            )
             .is_err());
         // Without the mode `nbits` is validated as before.
         assert!(e
-            .execute("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
+            .execute_blocking("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
             .is_err());
     }
 
@@ -4771,7 +4565,7 @@ mod tests {
     fn smve_index_answers_tensor_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..40 {
@@ -4783,14 +4577,14 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
             .unwrap();
         let query = "SELECT id FROM st SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.5,0.0]], 'float', 'maxsim', 'topn=3');";
         let baseline = rows(&e, query);
         assert_eq!(baseline.len(), 3);
 
-        e.execute("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
+        e.execute_blocking("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
             .unwrap();
         let indexed = rows(&e, query);
         eprintln!(
@@ -4827,9 +4621,9 @@ mod tests {
     fn multivector_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+        e.execute_blocking("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
             .unwrap();
         let q = "SELECT id FROM mv SEARCH MATCH TENSOR \
                  (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
@@ -4855,7 +4649,7 @@ mod tests {
         assert_eq!(count("emvb"), 1);
 
         // A later insert goes to the memory tail and ranks immediately.
-        e.execute("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
+        e.execute_blocking("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
             .unwrap();
         assert_eq!(
             rows(&e, q),
@@ -4868,7 +4662,7 @@ mod tests {
 
         // A dump transaction seals the tail as a second chunk; the query still
         // agrees. A checkpoint keeps the tail in memory.
-        e.dump_all_memory_indexes();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         assert_eq!(count("mvec"), 2);
         assert_eq!(count("emvb"), 2);
         assert_eq!(
@@ -4881,54 +4675,10 @@ mod tests {
         );
 
         // A tombstoned document is filtered out of the index hits.
-        e.execute("DELETE FROM mv WHERE id = 3;").unwrap();
+        e.execute_blocking("DELETE FROM mv WHERE id = 3;").unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
-        );
-    }
-
-    /// A `MULTIVECTOR` column's HNSW graph is one vertex per token, and it stays
-    /// that way across the restart boundary. The query path materialises the
-    /// memory segment from the catalog before any write touches it
-    /// (`hnsw_mem_segments`), so whichever path creates the segment decides
-    /// whether multi-token cells are indexed at all
-    /// (`MemIndexInserterIter1<MultiVectorRef>`).
-    ///
-    /// The answers alone cannot prove the graph holds the tokens — the coverage
-    /// check folds unlabelled rows back in (`include_uncovered`) — so the token
-    /// accounting is pinned by `hnsw_mem::tests` instead.
-    #[test]
-    fn multivector_hnsw_indexes_every_token_after_a_restart() {
-        let dir = tempdir().unwrap();
-        {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE mvt (id INT, v MULTIVECTOR(FLOAT,2));")
-                .unwrap();
-            e.execute("INSERT INTO mvt VALUES (1, [[0.0,1.0],[1.0,0.0]]), (2, [[0.0,0.5]]);")
-                .unwrap();
-            e.execute("CREATE INDEX mvt_i ON mvt (v) USING HNSW WITH (metric='l2');")
-                .unwrap();
-            e.flush().unwrap();
-        }
-        let e = Engine::open(dir.path()).unwrap();
-        // The first query is what creates the reopened engine's memory segment.
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.0,1.0], 'float', 'l2', 1);"
-            ),
-            vec![vec!["1".to_string()]]
-        );
-        // A cell with two tokens: the single-vector path would drop it whole.
-        e.execute("INSERT INTO mvt VALUES (3, [[0.3,0.7],[0.9,0.9]]);")
-            .unwrap();
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.3,0.7], 'float', 'l2', 1);"
-            ),
-            vec![vec!["3".to_string()]]
         );
     }
 
@@ -4938,9 +4688,9 @@ mod tests {
     fn sparse_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
             .unwrap();
-        e.execute("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+        e.execute_blocking("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
             .unwrap();
         let q = "SELECT id FROM sp SEARCH MATCH SPARSE \
                  (v, [0:1.0,20:2.0], 'ip', 3);";
@@ -4964,7 +4714,7 @@ mod tests {
         assert_eq!(count("bmp"), 1);
 
         // The write-time tail is visible before the dump.
-        e.execute("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
+        e.execute_blocking("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
             .unwrap();
         assert_eq!(
             rows(&e, q),
@@ -4977,7 +4727,7 @@ mod tests {
 
         // A dump transaction seals the tail as a second chunk and the ranking
         // holds.
-        e.dump_all_memory_indexes();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         assert_eq!(count("bmp"), 2);
         assert_eq!(
             rows(&e, q),
@@ -4989,7 +4739,7 @@ mod tests {
         );
 
         // Tombstoned rows never appear.
-        e.execute("DELETE FROM sp WHERE id = 3;").unwrap();
+        e.execute_blocking("DELETE FROM sp WHERE id = 3;").unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
@@ -5006,9 +4756,9 @@ mod tests {
         let first;
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
+            e.execute_blocking("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
                 .unwrap();
-            e.execute("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
+            e.execute_blocking("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
                 .unwrap();
 
             let meta = e
@@ -5031,8 +4781,9 @@ mod tests {
                 .unwrap();
             assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sort));
 
-            e.execute("CREATE INDEX ss_i ON ss (v) USING BMP;").unwrap();
-            e.execute("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            e.execute_blocking("CREATE INDEX ss_i ON ss (v) USING BMP;")
+                .unwrap();
+            e.execute_blocking("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
                 .unwrap();
             first = rows(&e, q);
             assert_eq!(first, vec![vec!["2".to_string()], vec!["1".to_string()]]);
@@ -5047,7 +4798,7 @@ mod tests {
 
             // Sealing the tail rewrites the same-format chunks; the ranking
             // and the recorded hint both hold.
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(rows(&e, q), first);
             assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
         }
@@ -5081,15 +4832,18 @@ mod tests {
     fn secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sec (id INT, v INT);").unwrap();
-        e.execute("INSERT INTO sec VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE sec (id INT, v INT);")
             .unwrap();
-        e.execute("CREATE INDEX idx_v ON sec (v);").unwrap();
+        e.execute_blocking("INSERT INTO sec VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_v ON sec (v);")
+            .unwrap();
         let q = "SELECT id FROM sec WHERE v = 20;";
         assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
 
         // New rows land in the memory tail and are visible immediately.
-        e.execute("INSERT INTO sec VALUES (3, 20);").unwrap();
+        e.execute_blocking("INSERT INTO sec VALUES (3, 20);")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
@@ -5103,7 +4857,7 @@ mod tests {
         drop(tables);
 
         // The checkpoint keeps the tail...
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -5113,7 +4867,7 @@ mod tests {
         drop(tables);
 
         // ...and the dump drains it; the answer comes from the chunk + new tail.
-        e.dump_index_transaction("sec", "idx_v").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("sec", "idx_v")).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -5131,7 +4885,7 @@ mod tests {
         );
 
         // Tombstoned rows are filtered from both forms.
-        e.execute("DELETE FROM sec WHERE id = 2;").unwrap();
+        e.execute_blocking("DELETE FROM sec WHERE id = 2;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
@@ -5141,23 +4895,26 @@ mod tests {
     fn low_card_secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE b (id INT, flag BOOL);").unwrap();
-        e.execute("INSERT INTO b VALUES (1, true), (2, false);")
+        e.execute_blocking("CREATE TABLE b (id INT, flag BOOL);")
             .unwrap();
-        e.execute("CREATE INDEX idx_flag ON b (flag);").unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (1, true), (2, false);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_flag ON b (flag);")
+            .unwrap();
         let q = "SELECT id FROM b WHERE flag = true;";
         assert_eq!(rows(&e, q), vec![vec!["1".to_string()]]);
-        e.execute("INSERT INTO b VALUES (3, true);").unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (3, true);")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.execute("DELETE FROM b WHERE id = 1;").unwrap();
+        e.execute_blocking("DELETE FROM b WHERE id = 1;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
@@ -5168,10 +4925,12 @@ mod tests {
     fn json_secondary_index_seals_term_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE j (id INT, meta JSON);").unwrap();
-        e.execute(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+        e.execute_blocking("CREATE TABLE j (id INT, meta JSON);")
             .unwrap();
-        e.execute("CREATE INDEX idx_meta ON j (meta);").unwrap();
+        e.execute_blocking(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_meta ON j (meta);")
+            .unwrap();
         let by_a = "SELECT id FROM j WHERE json_extract_int(meta, '$.a') = 1;";
         let has_b = "SELECT id FROM j WHERE json_exists_path(meta, '$.b');";
         assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
@@ -5179,7 +4938,7 @@ mod tests {
 
         // The dump turns the tail into one low-cardinality chunk per segment: the
         // document's scalar, path and array terms, not a single hashed document.
-        e.dump_index_transaction("j", "idx_meta").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("j", "idx_meta")).unwrap();
         {
             let tables = e.tables.lock().unwrap();
             let segments = tables
@@ -5198,7 +4957,7 @@ mod tests {
         assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
 
         // A new row lands in the tail and is visible through the same filters.
-        e.execute(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
+        e.execute_blocking(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
             .unwrap();
         assert_eq!(
             rows(&e, by_a),
@@ -5222,22 +4981,24 @@ mod tests {
     fn over_depth_json_rows_stay_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE jd (id INT, meta JSON);").unwrap();
+        e.execute_blocking("CREATE TABLE jd (id INT, meta JSON);")
+            .unwrap();
         // Row 2 nests past `MAX_JSON_DEPTH` (512) and is still valid JSON whose
         // `$.a` is 1 - exactly the row a term-range read would lose.
         let deep = format!("{{\"a\":1,\"d\":{}1{}}}", "[".repeat(513), "]".repeat(513));
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO jd VALUES (1, '{{\"a\":1}}'), (2, '{deep}');"
         ))
         .unwrap();
-        e.execute("CREATE INDEX idx_jd ON jd (meta);").unwrap();
+        e.execute_blocking("CREATE INDEX idx_jd ON jd (meta);")
+            .unwrap();
         let q = "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 1;";
         let both = vec![vec!["1".to_string()], vec!["2".to_string()]];
         assert_eq!(rows(&e, q), both);
 
         // The dump rewrites the tail's terms into a low-cardinality chunk. The
         // marker is a key like any other, so the row is still found.
-        e.dump_index_transaction("jd", "idx_jd").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("jd", "idx_jd")).unwrap();
         assert_eq!(rows(&e, q), both);
 
         // Widening the candidate set must not become a false positive: the
@@ -5289,17 +5050,18 @@ mod tests {
     fn low_cardinality_option_uses_bitmap_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lc (id INT, v INT);").unwrap();
-        e.execute("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+        e.execute_blocking("CREATE TABLE lc (id INT, v INT);")
             .unwrap();
-        e.execute("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
+        e.execute_blocking("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
             .unwrap();
         let q = "SELECT id FROM lc WHERE v = 10;";
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.dump_index_transaction("lc", "lcv").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("lc", "lcv")).unwrap();
         {
             let tables = e.tables.lock().unwrap();
             let low = tables
@@ -5338,8 +5100,9 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE c (id INT, v INT);").unwrap();
-        e.execute("CREATE INDEX cv ON c (v);").unwrap();
+        e.execute_blocking("CREATE TABLE c (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cv ON c (v);").unwrap();
 
         // Every row gets its own value, so the tail folds its pending map
         // several times while the readers probe it.
@@ -5363,7 +5126,7 @@ mod tests {
             std::thread::spawn(move || {
                 for _ in 0..40 {
                     std::thread::sleep(std::time::Duration::from_millis(3));
-                    let _ = e.dump_index_transaction("c", "cv");
+                    let _ = crate::scheduler::block_on(e.dump_index_transaction("c", "cv"));
                 }
             })
         };
@@ -5393,7 +5156,7 @@ mod tests {
         }
         dumper.join().unwrap();
         // Everything written is sealed or in the tail.
-        e.dump_index_transaction("c", "cv").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("c", "cv")).unwrap();
 
         // The rows themselves, as `seq -> value`.
         let rows: Vec<(u64, i64)> = e
@@ -5432,175 +5195,6 @@ mod tests {
         }
     }
 
-    /// `v = 3.0` is the same predicate as `v = 3` for an integer column, but the
-    /// index used to answer neither side of it: the float probe only reads float
-    /// keys (so every sealed chunk returned nothing) and the memory tail cannot
-    /// parse `"3.000000"` as an integer key either. The value is converted to the
-    /// column's key exactly; a value that is not integral declines, so the
-    /// predicate is evaluated against the decoded rows instead of a truncated
-    /// probe answering a different question.
-    #[test]
-    fn an_integral_float_equality_reads_the_integer_keys() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fq (id INT, v INT);").unwrap();
-        e.execute("INSERT INTO fq VALUES (1, 3), (2, 4);").unwrap();
-        e.execute("CREATE INDEX fqv ON fq (v);").unwrap();
-        // The memory tail answers first, then the sealed chunk.
-        let hits = e
-            .index_lookup("fq", "v", &Literal::Float(3.0))
-            .expect("an integral float is answerable");
-        assert_eq!(hits.len(), 1);
-        e.dump_index_transaction("fq", "fqv").unwrap();
-        let hits = e
-            .index_lookup("fq", "v", &Literal::Float(3.0))
-            .expect("an integral float is answerable from a chunk");
-        assert_eq!(hits.len(), 1);
-        assert!(e.index_lookup("fq", "v", &Literal::Float(3.5)).is_none());
-        assert_eq!(
-            rows(&e, "SELECT id FROM fq WHERE v = 3.0;"),
-            vec![vec!["1".to_string()]]
-        );
-        assert!(rows(&e, "SELECT id FROM fq WHERE v = 3.5;").is_empty());
-    }
-
-    /// The memory tail's `FLOAT` keys are `f32` while a bound arrives as `f64`,
-    /// and the nearest `f32` can sit on the wrong side of the bound. The indexed
-    /// KNN path never re-checks the predicate (its rows are a vector projection),
-    /// so the narrowed interval has to be exact: a lower bound rounds up to the
-    /// first representable value inside it, an upper bound rounds down.
-    #[test]
-    fn a_float_tail_bound_never_widens_the_interval() {
-        use crate::RangeBound;
-        use storage::secondary_segment::{Key, KeyKind};
-        let low = 1.0f32;
-        let high = f32::from_bits(1.0f32.to_bits() + 1);
-        let gap = f64::from(high) - f64::from(low);
-        // 30% of the way up: the nearest `f32` is `low`, which is *below* the
-        // bound, so `>= bound` must start at `high`.
-        let lower = f64::from(low) + 0.3 * gap;
-        assert_eq!(
-            tail_bound(KeyKind::F32, Key::F64(lower), RangeBound::Lower),
-            Key::F32(high).ordered_bytes()
-        );
-        // 70% of the way up: the nearest `f32` is `high`, which is *above* the
-        // bound, so `<= bound` must stop at `low`.
-        let upper = f64::from(low) + 0.7 * gap;
-        assert_eq!(
-            tail_bound(KeyKind::F32, Key::F64(upper), RangeBound::Upper),
-            Key::F32(low).ordered_bytes()
-        );
-        // A bound the `f32` grid holds exactly is used as it is.
-        for side in [RangeBound::Lower, RangeBound::Upper] {
-            assert_eq!(
-                tail_bound(KeyKind::F32, Key::F64(1.0), side),
-                Key::F32(1.0).ordered_bytes()
-            );
-        }
-    }
-
-    /// Only a value whose key *is* the value itself may take the index
-    /// shortcut: the indexed KNN path treats a lookup's rows as the predicate's
-    /// final answer, so a rounded key (`TINYINT 300` → `44`, `FLOAT 1.00000003`
-    /// → `1.0`) has to decline instead of matching another value.
-    #[test]
-    fn a_lossy_key_value_is_not_exact() {
-        use crate::engine::index_build::key_is_exact;
-        let int = |i: i64| Value::Int(i);
-        let float = |f: f64| Value::Float(f);
-        assert!(key_is_exact("TINYINT", &int(127)));
-        assert!(!key_is_exact("TINYINT", &int(300)));
-        assert!(!key_is_exact("TINYINT", &int(-129)));
-        // `INTEGER` keys are `i32`; `BIGINT` keeps the raw `i64`.
-        assert!(!key_is_exact("INTEGER", &int(5_000_000_000)));
-        assert!(key_is_exact("BIGINT", &int(5_000_000_000)));
-        assert!(!key_is_exact("INTEGER", &float(3.5)));
-        assert!(key_is_exact("INTEGER", &float(3.0)));
-        // The key is lossless but the comparison is not: from 2^53 up the
-        // evaluator's `f64` comparison folds neighbours together
-        // (`2^53 = 2^53 + 1` admits both rows) while the index keeps one key
-        // each, so a bound that high declines.
-        assert!(key_is_exact("BIGINT", &int(9_007_199_254_740_991)));
-        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_992)));
-        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_993)));
-        // A floating-point key is lossy on both sides of the comparison: the
-        // chunk narrows to `f32` and the probe is built from six decimals, so
-        // no floating column takes the shortcut at all.
-        assert!(!key_is_exact("FLOAT", &float(1.0)));
-        assert!(!key_is_exact("FLOAT", &float(1.000_000_03)));
-        assert!(!key_is_exact("DOUBLE", &float(1.000_000_03)));
-        assert!(!key_is_exact("DOUBLE", &float(1.0)));
-        // A temporal key drops the fraction (`'12:34:56.1'` → `45296`) while the
-        // evaluator compares the text, so the bound and its neighbours share a
-        // key.
-        assert!(!key_is_exact("TIME", &Value::Str("12:34:56".into())));
-        assert!(!key_is_exact("TIME", &Value::Str("12:34:56.1".into())));
-        assert!(!key_is_exact("DATE", &Value::Str("2024-01-01".into())));
-        // A varchar key is a hash and a JSON one a term, not a document: neither
-        // is the predicate's answer. A `BOOL` key is `0`/`1` and the evaluator
-        // compares the text, so only the two lowercase spellings are exact.
-        assert!(!key_is_exact("VARCHAR", &Value::Str("a".into())));
-        assert!(!key_is_exact("JSON", &Value::Str("{\"a\":1}".into())));
-        assert!(key_is_exact("BOOL", &Value::Str("true".into())));
-        assert!(key_is_exact("BOOL", &Value::Str("false".into())));
-        assert!(!key_is_exact("BOOL", &Value::Str("TRUE".into())));
-        assert!(!key_is_exact("BOOL", &Value::Str("1".into())));
-        assert!(!key_is_exact("BOOL", &Value::Str(" true".into())));
-    }
-
-    /// Both ends of a `FLOAT` range can fall between the same two `f32` values,
-    /// and the two narrowings then move in *opposite* directions: the inclusive
-    /// lower bound up, the inclusive upper bound down. The pair comes out
-    /// inverted, which is an empty range - asking the tail for it used to panic
-    /// inside `BTreeMap::range` (`start > end`).
-    #[test]
-    fn a_float_range_that_inverts_when_narrowed_is_empty() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fr (f FLOAT, id INT);").unwrap();
-        e.execute("INSERT INTO fr VALUES (1.0, 1), (2.0, 2);")
-            .unwrap();
-        e.execute("CREATE INDEX frf ON fr (f);").unwrap();
-        // 30% of the way from `1.0` to the next `f32`: `>= v` narrows up to the
-        // next `f32`, `<= v` narrows down to `1.0`.
-        let low = 1.0f32;
-        let high = f32::from_bits(1.0f32.to_bits() + 1);
-        let v = f64::from(low) + 0.3 * (f64::from(high) - f64::from(low));
-        assert_eq!(
-            e.index_range_lookup("fr", "f", &[(Value::Float(v), Value::Float(v))]),
-            Some(Vec::new())
-        );
-    }
-
-    /// The key width decides which floats an integer column can answer. `v = 300`
-    /// on a `TINYINT` matches no key (the column holds -128..=127), and encoding
-    /// the truncated `44` would answer a *different* predicate, so both probes -
-    /// the sealed chunks and the memory tail - decline and the predicate is
-    /// evaluated against the decoded rows instead.
-    #[test]
-    fn an_out_of_range_float_equality_declines_on_a_narrow_key() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE nk (id INT, v TINYINT);").unwrap();
-        e.execute("INSERT INTO nk VALUES (1, 44), (2, 100);")
-            .unwrap();
-        e.execute("CREATE INDEX nkv ON nk (v);").unwrap();
-        assert_eq!(
-            e.index_lookup("nk", "v", &Literal::Float(100.0))
-                .expect("100 fits a tinyint")
-                .len(),
-            1
-        );
-        assert!(e.index_lookup("nk", "v", &Literal::Float(300.0)).is_none());
-        assert!(e.index_lookup("nk", "v", &Literal::Float(-129.0)).is_none());
-        // `300 as i8` is `44`, so a truncated probe would return this row.
-        assert!(rows(&e, "SELECT id FROM nk WHERE v = 300.0;").is_empty());
-        assert_eq!(
-            rows(&e, "SELECT id FROM nk WHERE v = 44.0;"),
-            vec![vec!["1".to_string()]]
-        );
-    }
-
     /// `CREATE INDEX` reads the table without excluding writers (the reference
     /// leans on its transaction conflict detection, which this port does not
     /// have yet). A row committed after the scan had read the table is in
@@ -5617,9 +5211,10 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE cd (id INT, v INT);").unwrap();
+        e.execute_blocking("CREATE TABLE cd (id INT, v INT);")
+            .unwrap();
         for i in 0..BEFORE {
-            e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+            e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
                 .unwrap();
         }
         // One writer keeps appending while the build scans; the values are
@@ -5628,12 +5223,12 @@ mod tests {
             let e = Arc::clone(&e);
             std::thread::spawn(move || {
                 for i in BEFORE..(BEFORE + DURING) {
-                    e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                    e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
                         .unwrap();
                 }
             })
         };
-        e.execute("CREATE INDEX cdv ON cd (v);").unwrap();
+        e.execute_blocking("CREATE INDEX cdv ON cd (v);").unwrap();
         writer.join().unwrap();
 
         // A range predicate is answered by the index (chunk keys plus the
@@ -5737,14 +5332,14 @@ mod tests {
         const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
         if let Ok(dir) = std::env::var(DIR) {
             let e = Engine::open(std::path::Path::new(&dir)).unwrap();
-            e.execute("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
                 .unwrap();
             let values: Vec<String> = (0..300)
                 .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
                 .collect();
-            e.execute(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+            e.execute_blocking(&format!("INSERT INTO pb VALUES {};", values.join(",")))
                 .unwrap();
-            e.execute("CREATE INDEX pbi ON pb (t) USING PLAID;")
+            e.execute_blocking("CREATE INDEX pbi ON pb (t) USING PLAID;")
                 .unwrap();
             let first = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
             {
@@ -5796,11 +5391,11 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+        e.execute_blocking("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
             .unwrap();
-        e.execute("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+        e.execute_blocking("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
             .unwrap();
-        e.execute("CREATE INDEX spnv ON spn (v);").unwrap();
+        e.execute_blocking("CREATE INDEX spnv ON spn (v);").unwrap();
         let first = e
             .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
             .unwrap();
@@ -5813,7 +5408,8 @@ mod tests {
         );
         // A NULL insert keeps the same instance: the write hook counts the row
         // even though it contributes no postings.
-        e.execute("INSERT INTO spn VALUES (4, NULL);").unwrap();
+        e.execute_blocking("INSERT INTO spn VALUES (4, NULL);")
+            .unwrap();
         let after = e
             .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
             .unwrap();
@@ -5833,13 +5429,14 @@ mod tests {
     fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tc (id INT, v INT);").unwrap();
-        let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
-        e.execute(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+        e.execute_blocking("CREATE TABLE tc (id INT, v INT);")
             .unwrap();
-        e.execute("CREATE INDEX tcv ON tc (v);").unwrap();
-        e.dump_index_transaction("tc", "tcv").unwrap();
-        e.flush().unwrap();
+        let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
+        e.execute_blocking(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX tcv ON tc (v);").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("tc", "tcv")).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         drop(e);
 
         assert!(
@@ -5910,22 +5507,23 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE st (id INT, v INT);").unwrap();
-        e.execute("CREATE INDEX stv ON st (v);").unwrap();
+        e.execute_blocking("CREATE TABLE st (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX stv ON st (v);").unwrap();
 
         let mut written = 0usize;
         let mut batches = 0usize;
         while written < total {
             let end = (written + BATCH).min(total);
             let values: Vec<String> = (written..end).map(|i| format!("({i}, {i})")).collect();
-            e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+            e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
                 .unwrap();
             written = end;
             batches += 1;
             // Every tenth burst dumps what the tail accumulated, so the chunk
             // set grows while later bursts keep appending to the fresh tail.
             if batches % 10 == 0 {
-                e.dump_index_transaction("st", "stv").unwrap();
+                crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
             }
             // A read in the middle of the load: it must see at least the rows
             // the dumps have already sealed, and never a row that is not there.
@@ -5935,7 +5533,7 @@ mod tests {
         }
         // The tail is dumped so the final read comes from the chunks, not from
         // the buffer that would hide a broken chunk set.
-        e.dump_index_transaction("st", "stv").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
 
         let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
         assert_eq!(found.len(), total, "the index lost rows under load");
@@ -5954,10 +5552,12 @@ mod tests {
     fn functional_index_answers_a_function_predicate() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE f (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+        e.execute_blocking("CREATE TABLE f (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX fi ON f (lower(name));").unwrap();
+        e.execute_blocking("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fi ON f (lower(name));")
+            .unwrap();
 
         let q = "SELECT id FROM f WHERE lower(name) = 'abc';";
         assert_eq!(
@@ -5965,7 +5565,8 @@ mod tests {
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
         // A new row lands in the memory tail, evaluated the same way.
-        e.execute("INSERT INTO f VALUES (4, 'ABC');").unwrap();
+        e.execute_blocking("INSERT INTO f VALUES (4, 'ABC');")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![
@@ -5975,7 +5576,7 @@ mod tests {
             ]
         );
         // And after the dump the answer comes from the term chunk.
-        e.dump_index_transaction("f", "fi").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("f", "fi")).unwrap();
         assert_eq!(
             rows(&e, q),
             vec![
@@ -6009,9 +5610,10 @@ mod tests {
     fn hashed_text_equality_uses_the_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE h (id INT, name VARCHAR);").unwrap();
-        e.execute("CREATE INDEX hn ON h (name);").unwrap();
-        e.execute("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+        e.execute_blocking("CREATE TABLE h (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX hn ON h (name);").unwrap();
+        e.execute_blocking("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
             .unwrap();
         let probe = |e: &Engine| {
             e.index_range_lookup(
@@ -6023,7 +5625,7 @@ mod tests {
         };
         assert_eq!(probe(&e), vec![0, 2]);
 
-        e.dump_index_transaction("h", "hn").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("h", "hn")).unwrap();
         assert_eq!(probe(&e), vec![0, 2]);
         assert_eq!(
             rows(&e, "SELECT id FROM h WHERE name = 'a';"),
@@ -6045,12 +5647,14 @@ mod tests {
     fn null_cells_are_not_indexed() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX nf ON n (flag);").unwrap();
-        e.execute("CREATE INDEX nn ON n (name);").unwrap();
-        e.execute("INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');")
-            .unwrap();
+        e.execute_blocking("CREATE INDEX nf ON n (flag);").unwrap();
+        e.execute_blocking("CREATE INDEX nn ON n (name);").unwrap();
+        e.execute_blocking(
+            "INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');",
+        )
+        .unwrap();
 
         // Row 3's NULL flag must not join the `false` bitmap.
         assert_eq!(
@@ -6069,7 +5673,7 @@ mod tests {
         );
 
         // Same after the dump: the chunks carry only the non-NULL keys.
-        e.dump_index_transaction("n", "nf").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("n", "nf")).unwrap();
         assert_eq!(
             e.index_lookup("n", "flag", &Literal::Str("false".into()))
                 .unwrap(),
@@ -6089,12 +5693,13 @@ mod tests {
     fn secondary_filter_answers_from_the_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE s (id INT, v INT);").unwrap();
-        e.execute("CREATE INDEX sv ON s (v);").unwrap();
-        let values: Vec<String> = (0..200).map(|i| format!("({i}, {})", i % 13)).collect();
-        e.execute(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+        e.execute_blocking("CREATE TABLE s (id INT, v INT);")
             .unwrap();
-        e.dump_index_transaction("s", "sv").unwrap();
+        e.execute_blocking("CREATE INDEX sv ON s (v);").unwrap();
+        let values: Vec<String> = (0..200).map(|i| format!("({i}, {})", i % 13)).collect();
+        e.execute_blocking(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+            .unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("s", "sv")).unwrap();
 
         let mut expected: Vec<String> = (0..200)
             .filter(|i| (10..=12).contains(&(i % 13)))
@@ -6109,7 +5714,7 @@ mod tests {
         assert_eq!(got, expected);
 
         // A tombstone is not in the row set, so its index entry selects no row.
-        e.execute("DELETE FROM s WHERE id = 22;").unwrap();
+        e.execute_blocking("DELETE FROM s WHERE id = 22;").unwrap();
         let after = rows(&e, "SELECT id FROM s WHERE v = 9;");
         assert!(!after.iter().any(|row| row[0] == "22"));
         // 15 rows carry v = 9 before the delete, so 14 remain.
@@ -6123,18 +5728,19 @@ mod tests {
     fn optimize_merges_secondary_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE m (id INT, v INT, flag BOOL);")
+        e.execute_blocking("CREATE TABLE m (id INT, v INT, flag BOOL);")
             .unwrap();
-        e.execute("CREATE INDEX mv ON m (v);").unwrap();
-        e.execute("CREATE INDEX mf ON m (flag);").unwrap();
-        e.execute("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
+        e.execute_blocking("CREATE INDEX mv ON m (v);").unwrap();
+        e.execute_blocking("CREATE INDEX mf ON m (flag);").unwrap();
+        e.execute_blocking("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
             .unwrap();
         for index in ["mv", "mf"] {
-            e.dump_index_transaction("m", index).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
         }
-        e.execute("INSERT INTO m VALUES (3, 10, true);").unwrap();
+        e.execute_blocking("INSERT INTO m VALUES (3, 10, true);")
+            .unwrap();
         for index in ["mv", "mf"] {
-            e.dump_index_transaction("m", index).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
         }
         let high = |e: &Engine, column: &str| -> usize {
             let tables = e.tables.lock().unwrap();
@@ -6155,7 +5761,7 @@ mod tests {
         assert_eq!(high(&e, "v"), 2);
         assert_eq!(low(&e, "flag"), 2);
 
-        e.optimize_index_chunks().unwrap();
+        crate::scheduler::block_on(e.optimize_index_chunks()).unwrap();
 
         assert_eq!(high(&e, "v"), 1);
         assert_eq!(low(&e, "flag"), 1);
@@ -6186,17 +5792,20 @@ mod tests {
         // EMVB is a tensor-column index in the reference
         // (`IndexEMVB::ValidateColumnDataType`), so the multi-vector form here
         // is a `TENSOR(FLOAT,2)`.
-        e.execute("CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
-            .unwrap();
-        e.execute("CREATE INDEX qi ON q (c);").unwrap();
+        e.execute_blocking(
+            "CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX qi ON q (c);").unwrap();
         // Both PQ options are mandatory in the reference (`IndexEMVB::Make`
         // starts them at 0 and 0 is not an acceptable value).
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX qm ON q (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
         .unwrap();
-        e.execute("CREATE INDEX qs ON q (s) USING BMP;").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE INDEX qs ON q (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
             "INSERT INTO q VALUES (1, [1.0,0.0], [0:1.0, 1:2.0], 7), \
              (2, [0.0,1.0], [1:3.0], 7);",
         )
@@ -6253,14 +5862,14 @@ mod tests {
     fn wand_covers_boolean_filters_min_should_and_delta() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ftw (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE ftw (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ftw VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
             .unwrap();
 
         // Boolean similarity: one point per matched term.
@@ -6328,14 +5937,14 @@ mod tests {
     fn bm25_params_override_the_constants() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bm (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE bm (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO bm VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
             .unwrap();
 
         // id=4: tf=1 per term, dl=3; N=4, total_len=9 → avgdl=2.25; df=3.
@@ -6380,10 +5989,14 @@ mod tests {
 
         // The reference rejects out-of-range values.
         assert!(e
-            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');")
+            .execute_blocking(
+                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');"
+            )
             .is_err());
         assert!(e
-            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');")
+            .execute_blocking(
+                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');"
+            )
             .is_err());
     }
 
@@ -6395,14 +6008,14 @@ mod tests {
     fn threshold_is_a_strict_lower_bound_and_prunes_the_scan() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tt (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE tt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO tt VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
             .unwrap();
 
         // `similarity=boolean` scores one point per matched term, so the scores
@@ -6443,16 +6056,16 @@ mod tests {
     fn rank_features_reads_the_index_doc_payload() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
+        e.execute_blocking("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO rf VALUES (1,'alpha','[{\"Tag1\":1}]'),\
              (2,'alpha','[{\"Tag1\":2}]');",
         )
         .unwrap();
-        e.execute("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX rf_feat ON rf (feat) USING FULLTEXT WITH (analyzer='rankfeatures');",
         )
         .unwrap();
@@ -6481,7 +6094,7 @@ mod tests {
         // Round-trip through the sealed segment: the payload is written into the
         // doc list's `of_doc_payload` column and read back by
         // `SegmentIndexReader::doc_payloads`.
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sealed = rows(
             &e,
             "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
@@ -6505,13 +6118,13 @@ mod tests {
     fn a_recreated_table_does_not_search_the_dropped_tables_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
+        e.execute_blocking("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
             .unwrap();
-        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -6521,14 +6134,14 @@ mod tests {
             2
         );
 
-        e.execute("DROP TABLE rt;").unwrap();
-        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+        e.execute_blocking("DROP TABLE rt;").unwrap();
+        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rt VALUES (1,'delta epsilon');")
+        e.execute_blocking("INSERT INTO rt VALUES (1,'delta epsilon');")
             .unwrap();
-        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         assert_eq!(
             rows(
@@ -6552,14 +6165,14 @@ mod tests {
     fn a_phrase_match_answers_from_the_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fp (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fp (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fp VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma'),(5,'beta alpha'),(6,'gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
@@ -6638,14 +6251,14 @@ mod tests {
     fn a_field_group_match_tokenises_only_the_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fg2 (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fg2 (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fg2 VALUES (1,'alpha beta'),(2,'gamma'),(3,'delta'),\
              (4,'alpha gamma'),(5,'epsilon'),(6,'zeta');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
@@ -6686,18 +6299,19 @@ mod tests {
     fn ivf_index_serves_vector_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO iv VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
         .unwrap();
-        e.execute("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
             .unwrap();
         // Rows written before the dump live in the IVF memory segment and are
         // merged with the sealed chunks.
-        e.execute("INSERT INTO iv VALUES (5,[0.9,0.1]);").unwrap();
+        e.execute_blocking("INSERT INTO iv VALUES (5,[0.9,0.1]);")
+            .unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
         assert!(!entry.ivf_mem.get("v").unwrap().is_empty());
@@ -6708,7 +6322,7 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
         assert!(entry.ivf_mem.get("v").unwrap().is_empty());
@@ -6720,67 +6334,23 @@ mod tests {
         );
     }
 
-    /// A filtered IVF query probes every segment's chunk.
-    ///
-    /// The mirror writes one chunk per segment and the offsets inside a chunk
-    /// are in-segment (`RowID(segment, offset)`). Reading only `seg_0`, or
-    /// resolving an offset without putting the segment in the high bits, left
-    /// every other segment's rows unfindable and made their offsets collide
-    /// with segment 0's; each segment here holds the same four vectors, so the
-    /// filtered top-3 is that segment's `c1 = 6` row three times over.
-    #[test]
-    fn ivf_filtered_probe_covers_every_segment() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivm (c1 INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        // `COPY` seals the segment it filled, so three imports make three
-        // segments - each with its own IVF chunk.
-        let csv = dir.path().join("ivm.csv");
-        std::fs::write(
-            &csv,
-            "2,\"[0.1,0.2,0.3,-0.2]\"\n4,\"[0.2,0.1,0.3,0.4]\"\n\
-             6,\"[0.3,0.2,0.1,0.4]\"\n8,\"[0.4,0.3,0.2,0.1]\"\n",
-        )
-        .unwrap();
-        for _ in 0..3 {
-            e.execute(&format!(
-                "COPY ivm FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-                csv.display()
-            ))
-            .unwrap();
-        }
-        e.execute("CREATE INDEX ivm_idx ON ivm (v) USING IVF WITH (metric = ip);")
-            .unwrap();
-        e.flush().unwrap();
-        let chunks = e.load_ivf_indexes("ivm", "ivm_idx");
-        assert_eq!(chunks.len(), 3, "one chunk per segment");
-        assert_eq!(
-            chunks.iter().map(|c| c.segment).collect::<Vec<_>>(),
-            vec![0, 1, 2]
-        );
-        let q = "SELECT c1 FROM ivm SEARCH MATCH VECTOR \
-                 (v, [0.3,0.3,0.2,0.2], 'float', 'ip', 3) WITH (nprobe = 10) WHERE c1 < 7;";
-        assert_eq!(rows(&e, q), vec![vec!["6".to_string()]; 3]);
-    }
-
     /// `CREATE INDEX` materialises the index (C++ `IndexBuilder`); the first
     /// query must not be what builds it.
     #[test]
     fn create_index_builds_fulltext_and_hnsw_from_existing_rows() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO bi VALUES (1,'alpha beta',[0.1,0.2,0.3,0.4]),\
              (2,'alpha gamma',[0.4,0.3,0.2,0.1]),\
              (3,'delta',[0.0,0.0,0.0,0.0]);",
         )
         .unwrap();
-        e.execute("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX bi_v ON bi (v) USING HNSW WITH (M=16, ef_construction=20, metric=l2);",
         )
         .unwrap();
@@ -6791,7 +6361,7 @@ mod tests {
         let text = entry.text.get("body").unwrap().read().unwrap();
         assert_eq!(text.total_docs(), 3);
         drop(text);
-        let mem = entry.hnsw_mem.get("v").unwrap().read().unwrap();
+        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
@@ -6805,20 +6375,20 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_quota(1024);
-        e.execute("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
             .unwrap();
         let row = "(2,[0.1,0.2,0.3,-0.2])";
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
         ))
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX hx ON hc (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
              metric = l2, block_size = 1);",
         )
         .unwrap();
         for _ in 0..3 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
             ))
             .unwrap();
@@ -6829,122 +6399,640 @@ mod tests {
         assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
     }
 
-    /// A buffer that cannot be sealed must still be bounded. An LSG index is
-    /// never dumped from the memory segment (its graph is linked with unadjusted
-    /// distances), so a crossing dump returns `Ok(0)` and released nothing: the
-    /// charge stays - the graph it accounts for is still held - and the graph is
-    /// released only once the retained charge passes twice the quota, which caps
-    /// what a write path can pin. Releasing is genuine: memory goes down and the
-    /// rows no chunk holds are answered by the exact scan.
+    /// The budget is one number for the whole engine, not one per index.
+    ///
+    /// C++ `MemIndexTracer` compares `cur_index_memory_` - everything every
+    /// index has charged - with `index_memory_limit_`. A per-index check lets
+    /// `tables × quota` bytes live at once, which is what a deployment with
+    /// many small tables runs into.
+    /// Each session keeps its own database (plan §6.1): two sessions that
+    /// `USE` different databases do not see each other's choice, a bare table
+    /// name resolves in the session's database, and a closed session is
+    /// rejected.
     #[test]
-    fn an_unsealable_memindex_keeps_its_charge_and_is_bounded() {
+    fn sessions_keep_their_own_database() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_quota(1024);
-        e.execute("CREATE TABLE lg (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE DATABASE a;").unwrap();
+        e.execute_blocking("CREATE DATABASE b;").unwrap();
+        for db in ["a", "b"] {
+            e.execute_blocking(&format!("CREATE TABLE {db}.t (id INT);"))
+                .unwrap();
+        }
+        let sa = e.open_session("default_db");
+        let sb = e.open_session("default_db");
+        e.execute_in_session(sa, "USE a;").unwrap();
+        e.execute_in_session(sb, "USE b;").unwrap();
+        assert_eq!(e.session_db(sa).unwrap(), "a");
+        assert_eq!(e.session_db(sb).unwrap(), "b");
+
+        // A bare name resolves in the session's own database.
+        e.execute_in_session(sa, "INSERT INTO t VALUES (1);")
             .unwrap();
-        let row = "(2,[0.1,0.2,0.3,-0.2])";
-        e.execute(&format!(
-            "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
-        ))
-        .unwrap();
-        e.execute(
-            "CREATE INDEX lgx ON lg (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
-             metric = l2, build_type = lsg);",
+        e.execute_in_session(sb, "INSERT INTO t VALUES (2);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM a.t;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM b.t;"),
+            vec![vec!["1".to_string()]]
+        );
+
+        // The process-wide default never moved.
+        assert_eq!(e.db(), "default_db");
+
+        // A dropped connection does not drop its session (the reference keeps
+        // it in a static map): a client that reconnects and reuses the id still
+        // sees the database it switched to.
+        assert_eq!(e.session_db(sa).unwrap(), "a");
+
+        assert!(e.close_session(sa));
+        assert!(e.execute_in_session(sa, "SELECT 1;").is_err());
+        assert_eq!(e.session_db(sa), None, "a closed session is unknown");
+        // The other session is unaffected.
+        assert_eq!(e.session_db(sb).unwrap(), "b");
+    }
+    /// The delta-maintained total equals a full scan after every kind of
+    /// change: appends, a checkpoint, a delete and a drop (plan 4.2).
+    #[test]
+    fn memindex_total_matches_a_full_scan() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let scan = |e: &Engine| -> usize {
+            let keys: Vec<String> = e.tables.lock().unwrap().keys().cloned().collect();
+            keys.iter().map(|k| e.memindex_bytes_of(k)).sum()
+        };
+        e.execute_blocking(
+            "CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10), c INT);",
         )
         .unwrap();
-        // Six batches of six rows: 1008 bytes each, so the charge crosses the
-        // quota twice over and the fallback has to fire.
-        for _ in 0..6 {
-            e.execute(&format!(
-                "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
+        e.execute_blocking(
+            "CREATE INDEX t_v ON t (v) USING HNSW WITH (M = 16, ef_construction = 20);",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX t_c ON t (c);").unwrap();
+        e.execute_blocking("CREATE INDEX t_s ON t (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO t VALUES (1,[0.1,0.2,0.3,0.4],[0:1.0],1), \
+             (2,[0.2,0.3,0.4,0.5],[1:2.0],2);",
+        )
+        .unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after the append");
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after the checkpoint");
+        e.execute_blocking("INSERT INTO t VALUES (3,[0.3,0.4,0.5,0.6],[2:3.0],3);")
+            .unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after a second append");
+        e.execute_blocking("DELETE FROM t WHERE id = 1;").unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after a delete");
+        e.execute_blocking("DROP INDEX t_c;").unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after dropping an index");
+        e.execute_blocking("DROP TABLE t;").unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "after dropping the table");
+    }
+
+    #[test]
+    fn the_memindex_quota_is_global_across_tables() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Six four-dimensional rows cost 6 × (4 × 4 + 152) = 1008 bytes, below
+        // 1500; two tables together cross it.
+        e.set_memindex_quota(1500);
+        for name in ["g1", "g2"] {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {name} (id INT, v EMBEDDING(FLOAT, 4));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name}_v ON {name} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
             ))
             .unwrap();
         }
-        let charge = |e: &Engine| -> usize {
-            let tables = e.tables.lock().unwrap();
-            tables
-                .get("default_db.lg")
-                .and_then(|entry| entry.index_pending_bytes.get("c2").copied())
-                .unwrap_or(0)
-        };
-        // Six batches of 1008 bytes against a 1 KB quota: the charge crosses,
-        // the dump seals nothing, and the third crossing (3024 bytes, past twice
-        // the quota) releases the graph, so nothing accumulates.
-        assert_eq!(charge(&e), 0, "the unsealable buffer was not released");
-        // The write path re-creates the segment for the rows it takes after a
-        // drop, so drive the accounting directly to observe the release.
-        for _ in 0..2 {
-            e.note_index_insert("default_db.lg", 6);
+        // Raise the quota while the rows go in, so the insert path's own
+        // per-row check cannot dump a half-built tail: the first table's rows
+        // are still the only charge, so nothing crosses the bound and the dump
+        // that would have run mid-insert never happens. What this test is
+        // about is the check that sees **both** tables, which is the one below.
+        e.set_memindex_quota(1 << 30);
+        for name in ["g1", "g2"] {
+            e.execute_blocking(&format!(
+                "INSERT INTO {name} VALUES (1,[0.1,0.2,0.3,-0.2]),(2,[0.1,0.2,0.3,-0.2]),\
+                 (3,[0.1,0.2,0.3,-0.2]),(4,[0.1,0.2,0.3,-0.2]),\
+                 (5,[0.1,0.2,0.3,-0.2]),(6,[0.1,0.2,0.3,-0.2]);"
+            ))
+            .unwrap();
         }
-        // Two batches of 1008 bytes: the charge stays at 2016 rather than
-        // dropping to `2016 - quota`, because a dump that sealed nothing
-        // released nothing.
-        assert_eq!(
-            charge(&e),
-            2016,
-            "a crossing that sealed nothing keeps its charge"
-        );
-        e.note_index_insert("default_db.lg", 6);
-        let graph_held = {
+        // Both tails are complete now; the quota is the two-tables-cross-it
+        // value, and this explicit check is the only one that sees both.
+        e.set_memindex_quota(1500);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        crate::scheduler::block_on(e.enforce_memindex_quota(None));
+
+        for name in ["g1", "g2"] {
+            assert!(
+                !e.hnsw_chunk_ids(name, &format!("{name}_v")).is_empty(),
+                "{name}: the two tables together cross the quota, so both tails must be dumped"
+            );
             let tables = e.tables.lock().unwrap();
-            tables
-                .get("default_db.lg")
-                .is_some_and(|entry| entry.hnsw_mem.contains_key("c2"))
-        };
-        assert_eq!(charge(&e), 0, "the released graph's charge is gone");
-        assert!(
-            !graph_held,
-            "a buffer nothing can seal has to be released, not pinned"
-        );
-        // The rows are still answerable: the exact scan covers what no chunk
-        // holds.
-        assert_eq!(
-            rows(&e, "SELECT count(*) FROM lg;"),
-            vec![vec!["42".to_string()]]
-        );
-        let hits = rows(
-            &e,
-            "SELECT c1 FROM lg SEARCH MATCH VECTOR \
-             (c2, [0.1,0.2,0.3,-0.2], 'float', 'l2', 3);",
-        );
-        assert_eq!(hits.len(), 3, "{hits:?}");
+            assert!(
+                tables[&e.table_key(name)].hnsw_mem.is_empty(),
+                "{name}: a dumped HNSW tail is released"
+            );
+        }
+        assert!(e.memindex_bytes() <= 1500);
     }
 
-    /// A deleted row still occupies graph slots until a chunk rewrite drops it,
-    /// so a probe that admits deleted labels answers short - or nothing at all
-    /// when the nearest vertices are all gone. Liveness is part of admission,
-    /// and a probe that still cannot fill `topn` falls back to the exact scan.
+    /// The unified budget counts the HNSW charge, not only the text/sparse/
+    /// multi-vector/secondary tails: an engine whose only memory is a graph
+    /// must still notice it is over.
     #[test]
-    fn a_knn_probe_skips_deleted_vertices_and_still_answers() {
+    fn the_budget_counts_the_hnsw_charge() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE kd (c1 INT, v EMBEDDING(FLOAT,2));")
+        // Large enough that nothing dumps, so the charge stays live.
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE hb (id INT, v EMBEDDING(FLOAT, 4));")
             .unwrap();
-        let mut values = String::new();
-        for i in 0..200 {
-            if i > 0 {
-                values.push(',');
-            }
-            values.push_str(&format!("({i},[{},0.0])", i as f32 / 100.0));
-        }
-        e.execute(&format!("INSERT INTO kd VALUES {values};"))
-            .unwrap();
-        e.execute(
-            "CREATE INDEX kdx ON kd (v) USING HNSW WITH (M = 16, ef_construction = 40, \
-             metric = l2);",
+        e.execute_blocking(
+            "CREATE INDEX hb_v ON hb (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
         )
         .unwrap();
-        // The 70 rows nearest the query are deleted: more than the probe's
-        // candidate budget, so admitting them leaves nothing to score.
-        e.execute("DELETE FROM kd WHERE c1 < 70;").unwrap();
+        let row = "(1,[0.1,0.2,0.3,-0.2])";
+        e.execute_blocking(&format!(
+            "INSERT INTO hb VALUES {row},{row},{row},{row},{row},{row};"
+        ))
+        .unwrap();
+        assert!(
+            e.memindex_bytes() >= 1008,
+            "six rows charge 1008 bytes, got {}",
+            e.memindex_bytes()
+        );
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        let tables = e.tables.lock().unwrap();
+        assert!(tables[&e.table_key("hb")].hnsw_mem.is_empty());
+    }
+
+    /// Every dumpable family is in the budget and every one is released by a
+    /// dump. PLAID/SMVE are deliberately left out: they are whole-column
+    /// objects in this port and `seal` does not drop them, so charging them
+    /// would make every check over-quota and dump forever.
+    #[test]
+    fn the_budget_covers_every_dumpable_family() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking(
+            "CREATE TABLE fam (id INT, body VARCHAR, s SPARSE(FLOAT, 10), \
+             m TENSOR(FLOAT, 2), c INT, v EMBEDDING(FLOAT, 4));",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX fam_c ON fam (c);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fam_body ON fam (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fam_s ON fam (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fam_m ON fam (m) USING EMVB WITH \
+             (pq_subspace_num = 2, pq_subspace_bits = 8);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fam_v ON fam (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "INSERT INTO fam VALUES \
+             (1,'alpha beta',[0:1.0, 1:2.0],[1.0,0.0],7,[0.1,0.2,0.3,-0.2]), \
+             (2,'alpha gamma',[1:3.0],[0.0,1.0],7,[0.1,0.2,0.3,-0.2]);",
+        )
+        .unwrap();
+        assert!(e.memindex_bytes() > 0);
+
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(
+            e.memindex_bytes(),
+            0,
+            "every dumpable tail must be released"
+        );
+        let tables = e.tables.lock().unwrap();
+        let entry = &tables[&e.table_key("fam")];
+        assert!(entry.hnsw_mem.is_empty());
+        assert_eq!(
+            entry
+                .text
+                .get("body")
+                .unwrap()
+                .read()
+                .unwrap()
+                .mem
+                .mem_used(),
+            0
+        );
+        assert_eq!(entry.sparse.get("s").unwrap().read().unwrap().tail_bytes, 0);
+        assert_eq!(entry.mv.get("m").unwrap().read().unwrap().tail_bytes, 0);
+        assert_eq!(entry.secondary.indexes.get("c").unwrap().key_count(), 0);
+    }
+
+    /// The IVF memory segment is part of the same budget: rows written since
+    /// the last mirror dump are charged, and a dump releases them.
+    #[test]
+    fn the_budget_counts_the_ivf_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT, 4));")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO iv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
+             (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
+             (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
+             (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX iv_v ON iv (v) USING IVF WITH \
+             (metric = l2, storage_type = product_quantization, \
+             product_quantization_subspace_num = 2, \
+             product_quantization_subspace_bits = 12);",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO iv VALUES (9,[0.5,0.5,0.5,0.5]);")
+            .unwrap();
+        let tables = e.tables.lock().unwrap();
+        let rows = tables[&e.table_key("iv")]
+            .ivf_mem
+            .get("v")
+            .map(|r| r.len())
+            .unwrap_or(0);
+        drop(tables);
+        assert_eq!(rows, 1, "the row written since the index was built");
+        assert!(
+            e.memindex_bytes() >= 4 * 4 * rows,
+            "the IVF tail is charged, got {}",
+            e.memindex_bytes()
+        );
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        let tables = e.tables.lock().unwrap();
+        assert!(tables[&e.table_key("iv")]
+            .ivf_mem
+            .get("v")
+            .unwrap()
+            .is_empty());
+    }
+
+    /// SQL `FLUSH DATA` reaches the same entry the Thrift/HTTP flush does: it
+    /// runs the checkpoint, and with the switch on it releases the indexes.
+    #[test]
+    fn sql_flush_data_runs_the_checkpoint() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX sf_body ON sf (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES (1,'alpha'),(2,'beta');")
+            .unwrap();
+        // The block columns are the checkpoint's output; the buffer alone has
+        // the rows before it.
+        fn block_columns(dir: &std::path::Path) -> usize {
+            let mut count = 0;
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    count += block_columns(&path);
+                } else if path.extension().is_some_and(|ext| ext == "col") {
+                    count += 1;
+                }
+            }
+            count
+        }
+        assert_eq!(block_columns(dir.path()), 0);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert!(
+            block_columns(dir.path()) > 0,
+            "FLUSH DATA writes the block mirror"
+        );
+        assert!(
+            e.memindex_bytes() > 0,
+            "the default FLUSH DATA is a checkpoint only"
+        );
+
+        e.set_flush_dumps_mem_index(true);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "the switch reaches SQL too");
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM sf"),
+            vec![vec!["2".to_string()]]
+        );
+        // The reference answers these with `Status::NotSupport`.
+        assert_eq!(
+            e.execute_blocking("FLUSH LOG;").unwrap_err().to_string(),
+            "Flush log"
+        );
+        assert_eq!(
+            e.execute_blocking("FLUSH BUFFER;").unwrap_err().to_string(),
+            "Flush buffer"
+        );
+    }
+
+    /// A bulk FLUSH over many tables seals them concurrently: every index still
+    /// gets its chunk, the budget returns to zero and both index kinds answer.
+    #[test]
+    fn flush_dumps_many_tables_at_once() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        let tables: Vec<String> = (0..8).map(|i| format!("ft{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 4));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!(
+                "INSERT INTO {t} VALUES (1,7,[0.1,0.2,0.3,-0.2]),(2,8,[0.1,0.2,0.3,-0.2]);"
+            ))
+            .unwrap();
+        }
+        assert!(e.memindex_bytes() > 0);
+        // The dump runs on the shared pool, so this asserts the concurrent path
+        // produces the same chunks a serial one would.
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        for t in &tables {
+            assert!(
+                !e.hnsw_chunk_ids(t, &format!("{t}_v")).is_empty(),
+                "{t}: the vector index must be dumped"
+            );
+            assert_eq!(
+                rows(&e, &format!("SELECT count(*) FROM {t}")),
+                vec![vec!["2".to_string()]],
+                "{t}: the rows must be readable"
+            );
+            assert_eq!(
+                rows(&e, &format!("SELECT id FROM {t} WHERE c = 7")),
+                vec![vec!["1".to_string()]],
+                "{t}: the secondary index must answer"
+            );
+        }
+    }
+
+    /// Times the bulk dump. Not a gate: run it twice, with
+    /// `INFINITY_FLUSH_DUMP_CONCURRENCY=1` and unset, to see the win.
+    #[test]
+    #[ignore = "SLOW: a timing probe, not a gate"]
+    fn flush_dump_wall_time_probe() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.set_flush_dumps_mem_index(true);
+        let tables: Vec<String> = (0..64).map(|i| format!("p{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 32));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+        }
+        let vector = (0..32)
+            .map(|k| format!("{:.3}", (k as f32) / 32.0))
+            .collect::<Vec<_>>()
+            .join(",");
+        for t in &tables {
+            let mut values = Vec::new();
+            for row in 0..256 {
+                values.push(format!("({row},{},[{vector}])", row % 7));
+            }
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .unwrap();
+        }
+        // The dump is what this probe times; `flush()` also checkpoints 64
+        // tables, which would drown the signal.
+        let started = std::time::Instant::now();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        eprintln!(
+            "dump of {} tables: {:?} ({} workers)",
+            tables.len(),
+            started.elapsed(),
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        );
+        assert_eq!(e.memindex_bytes(), 0);
+    }
+
+    /// A checkpoint's fan-out mirrors every table at either bound, and a
+    /// one-worker sweep stays on the caller.
+    ///
+    /// The fan-out is tokio tasks with `workers` permits (`index::parallel`),
+    /// and its concurrency semantics are pinned there
+    /// (`the_bound_is_the_callers`, `map_keeps_input_order`). What matters here
+    /// is that the table-level work is still complete at both bounds: a table
+    /// silently dropped by the dispatch would pass a thread count and fail the
+    /// mirror check, so that is the assertion.
+    #[test]
+    fn a_checkpoint_uses_the_worker_count_it_was_given() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let tables: Vec<String> = (0..32).map(|i| format!("tw{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!("CREATE TABLE {t} (id INT, c INT);"))
+                .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES (1,1),(2,2);"))
+                .unwrap();
+        }
+        assert!(crate::scheduler::block_on(e.flush_tables(
+            &e.catalog().list_tables().unwrap(),
+            1,
+            1
+        ))
+        .is_ok());
+        for t in &tables {
+            assert!(
+                !e.read_blocks(t).unwrap().1.is_empty(),
+                "{t} was not mirrored by the 1-worker sweep"
+            );
+        }
+        assert!(crate::scheduler::block_on(e.flush_tables(
+            &e.catalog().list_tables().unwrap(),
+            2,
+            4
+        ))
+        .is_ok());
+        for t in &tables {
+            assert!(
+                !e.read_blocks(t).unwrap().1.is_empty(),
+                "{t} was not mirrored by the 4-worker sweep"
+            );
+        }
+    }
+
+    /// A checkpoint's wall time falls as table-level workers are added
+    /// (plan §5.1 / §9): an `#[ignore]` probe, because wall time on a shared
+    /// host is not a stable assertion and the sweep is I/O bound.
+    ///
+    /// 64 tables with two indexes each, 2048 rows apiece, a full warm-up
+    /// checkpoint (94 s - it writes every block) and then one timed pass per
+    /// worker count that rewrites the one block each table moved. Measured on
+    /// this box (16 cores): 1 worker 159 ms, 2 workers 131 ms, 4 workers 129 ms,
+    /// 8 workers 192 ms - beyond four workers the shared store work in the
+    /// caller dominates and the extra threads only add contention. Run with
+    /// `cargo test -p executor --lib a_checkpoint_scaling_probe -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "wall-time probe: run it explicitly, the numbers are host dependent"]
+    fn a_checkpoint_scaling_probe() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        let tables: Vec<String> = (0..64).map(|i| format!("w{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 8));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+        }
+        let vector = (0..8)
+            .map(|k| format!("{:.3}", (k as f32) / 8.0))
+            .collect::<Vec<_>>()
+            .join(",");
+        for t in &tables {
+            let mut values = Vec::new();
+            for row in 0..2048 {
+                values.push(format!("({row},{},[{vector}])", row % 7));
+            }
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .unwrap();
+        }
+        let metas = e.catalog().list_tables().unwrap();
+        // A checkpoint only writes the blocks whose data moved (`write_blocks_
+        // bounded` compares `checkpoint_ts_`), so each timed pass first dirties
+        // one block per table: without that every pass would measure the
+        // near-no-op path and show no scaling at all.
+        // Warm-up: the first checkpoint writes every block in full (94 s for
+        // this shape on 16 cores), the timed ones only rewrite the block that
+        // moved. Time the steady state, which is what a periodic checkpoint
+        // pays.
+        crate::scheduler::block_on(e.flush_tables(&metas, 1, 1)).unwrap();
+        let mut ts = 2u64;
+        for w in [1usize, 2, 4, 8] {
+            for (i, t) in tables.iter().enumerate() {
+                e.execute_blocking(&format!(
+                    "INSERT INTO {t} VALUES ({},{},[{vector}]);",
+                    i + 10_000 + w * 100,
+                    i % 7
+                ))
+                .unwrap();
+            }
+            ts += 1;
+            let started = std::time::Instant::now();
+            crate::scheduler::block_on(e.flush_tables(&metas, ts, w)).unwrap();
+            eprintln!(
+                "checkpoint of {} tables at {w} workers: {:?}",
+                metas.len(),
+                started.elapsed()
+            );
+        }
+    }
+
+    /// `[storage] flush_dumps_mem_index`: opt-in, `FLUSH` releases every
+    /// memory index instead of only writing the checkpoint. Off by default -
+    /// the reference's flush leaves the tails in memory and the cross-engine
+    /// byte gates compare directories after `flush_data()`.
+    #[test]
+    fn flush_dumps_every_memory_index_when_configured() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE fd (id INT, body VARCHAR, v EMBEDDING(FLOAT, 4));")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fd_body ON fd (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fd_v ON fd (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "INSERT INTO fd VALUES \
+             (1,'alpha beta',[0.1,0.2,0.3,-0.2]),(2,'alpha gamma',[0.1,0.2,0.3,-0.2]);",
+        )
+        .unwrap();
+        assert!(e.memindex_bytes() > 0);
+
+        // Default: a flush is a checkpoint, and the tails stay.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert!(
+            e.memindex_bytes() > 0,
+            "a plain FLUSH must not dump, or the byte gates diverge from the reference"
+        );
+
+        e.set_flush_dumps_mem_index(true);
+        // The periodic checkpoint stays a checkpoint: the flag is about the
+        // operator's `FLUSH DATA`, so an interval cannot churn a ts per index.
+        crate::scheduler::block_on(e.checkpoint()).unwrap();
+        assert!(e.memindex_bytes() > 0, "a periodic checkpoint never dumps");
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "FLUSH dumps every memory index");
+        let tables = e.tables.lock().unwrap();
+        let entry = &tables[&e.table_key("fd")];
+        assert_eq!(
+            entry
+                .text
+                .get("body")
+                .unwrap()
+                .read()
+                .unwrap()
+                .mem
+                .mem_used(),
+            0
+        );
+        assert!(entry.hnsw_mem.is_empty());
+        drop(tables);
+        assert!(!e.hnsw_chunk_ids("fd", "fd_v").is_empty());
+
+        // The sealed chunks still answer.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM fd"),
+            vec![vec!["2".to_string()]]
+        );
         assert_eq!(
             rows(
                 &e,
-                "SELECT c1 FROM kd SEARCH MATCH VECTOR \
-                 (v, [0.0,0.0], 'float', 'l2', 1);"
-            ),
-            vec![vec!["70".to_string()]]
+                "SELECT id FROM fd SEARCH MATCH TEXT ('body','alpha','topn=5');"
+            )
+            .len(),
+            2
         );
     }
 
@@ -6956,7 +7044,7 @@ mod tests {
         use parser::Literal;
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dc (c1 INT);").unwrap();
+        e.execute_blocking("CREATE TABLE dc (c1 INT);").unwrap();
         e.insert_literals(
             "default_db.dc",
             None,
@@ -6982,31 +7070,27 @@ mod tests {
     fn a_product_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ivpq VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
              (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
              (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
              (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
         )
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX ivpq_idx ON ivpq (v) USING IVF WITH \
              (metric = l2, storage_type = product_quantization, \
              product_quantization_subspace_num = 2, \
              product_quantization_subspace_bits = 12);",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
-            matches!(
-                segments.as_slice(),
-                [chunk] if chunk.segment == 0
-                    && matches!(chunk.index, index::ivf::IvfSegment::Product(_))
-            ),
-            "expected one PQ segment in segment 0"
+            matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
+            "expected one PQ segment"
         );
         let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
                  (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
@@ -7020,29 +7104,25 @@ mod tests {
     fn a_scalar_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ivsq VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX ivsq_idx ON ivsq (v) USING IVF WITH \
              (metric = l2, storage_type = scalar_quantization, \
              scalar_quantization_bits = 8);",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
-            matches!(
-                segments.as_slice(),
-                [chunk] if chunk.segment == 0
-                    && matches!(chunk.index, index::ivf::IvfSegment::Scalar(_))
-            ),
-            "expected one SQ segment in segment 0"
+            matches!(segments.as_slice(), [index::ivf::IvfSegment::Scalar(_)]),
+            "expected one SQ segment"
         );
         // Candidates come from the quantized codes; the executor then scores
         // them exactly, so the top-1 is the same as an exhaustive scan.
@@ -7057,9 +7137,9 @@ mod tests {
     fn multivector_prefilter_uses_the_persisted_residual_codes() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX mvp_i ON mvp (v) USING EMVB \
              WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
@@ -7072,8 +7152,8 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
-        e.dump_all_memory_indexes();
+        e.execute_blocking(&sql).unwrap();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         let mv = e
             .tables
             .lock()
@@ -7105,16 +7185,16 @@ mod tests {
     fn wand_scores_multiple_fields_separately() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ftm VALUES (1,'alpha','beta'),(2,'alpha alpha',''),\
              (3,'beta','alpha');",
         )
         .unwrap();
-        e.execute("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
             .unwrap();
-        e.execute("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
             .unwrap();
         let got = rows(
             &e,
@@ -7150,16 +7230,16 @@ mod tests {
     fn field_group_match_scores_like_the_named_column() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fg VALUES (1,'alpha beta','gamma'),(2,'alpha','beta gamma'),\
              (3,'beta','alpha'),(4,'gamma','alpha beta');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
             .unwrap();
-        e.execute("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
             .unwrap();
 
         // OR of two terms.
@@ -7218,14 +7298,14 @@ mod tests {
     fn projection_reads_columns_from_the_block_mirror() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO p VALUES (1,'a',[0.0,0.0]),(2,'b',[1.0,0.0]),\
              (3,'c',[0.0,1.0]);",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(e.mirror_block_row_count("p").unwrap(), 3);
         let items = [
             SelectItem::Column("id".to_string()),
@@ -7244,7 +7324,7 @@ mod tests {
         // A row written after the flush is not in the block snapshot: the
         // projection overlays it from the row journal, so the new row is
         // visible without waiting for the next checkpoint.
-        e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
+        e.execute_blocking("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
         let projected = e.try_projection("p", &items).unwrap().unwrap();
         assert_eq!(projected.len(), 4);
@@ -7263,17 +7343,17 @@ mod tests {
     fn rewriting_a_block_keeps_every_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
         for i in 0..20i64 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO rw VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                 i * 2,
                 i * 2 + 1
             ))
             .unwrap();
             assert_eq!(e.row_count("rw").unwrap(), (i as usize + 1) * 2);
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(
                 e.row_count("rw").unwrap(),
                 (i as usize + 1) * 2,
@@ -7290,11 +7370,12 @@ mod tests {
     fn a_multivector_table_round_trips_through_its_blocks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO mv VALUES ([[1,2],[3,4]]);").unwrap();
+        e.execute_blocking("INSERT INTO mv VALUES ([[1,2],[3,4]]);")
+            .unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
         drop(e);
 
@@ -7319,7 +7400,7 @@ mod tests {
     fn wide_vectors_stay_inline_and_survive_a_reopen() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
+        e.execute_blocking("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
             .unwrap();
         let vector = (0..64)
             .map(|i| format!("{i}.0"))
@@ -7329,7 +7410,7 @@ mod tests {
             .map(|i| format!("{i}:1.0"))
             .collect::<Vec<_>>()
             .join(",");
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO sb VALUES (1, [{vector}], [{sparse}]);"
         ))
         .unwrap();
@@ -7360,7 +7441,7 @@ mod tests {
         assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
         assert!(vector[0][0].contains("63"));
 
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         drop(e);
         let e = Engine::open(dir.path()).unwrap();
         let vector = rows(&e, "SELECT v FROM sb;");
@@ -7374,13 +7455,16 @@ mod tests {
     fn string_secondary_index_seals_hashed_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ss (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE ss (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO ss VALUES (1,'a'),(2,'b');").unwrap();
-        e.execute("CREATE INDEX ss_n ON ss (name);").unwrap();
+        e.execute_blocking("INSERT INTO ss VALUES (1,'a'),(2,'b');")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ss_n ON ss (name);")
+            .unwrap();
         let q = "SELECT id FROM ss WHERE name = 'b';";
         assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
-        e.execute("INSERT INTO ss VALUES (3,'b');").unwrap();
+        e.execute_blocking("INSERT INTO ss VALUES (3,'b');")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
@@ -7393,7 +7477,7 @@ mod tests {
         assert!(idx.key_count() > 0);
         drop(tables);
         // A dump transaction drains the tail; a checkpoint keeps it.
-        e.dump_index_transaction("ss", "ss_n").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ss", "ss_n")).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -7405,7 +7489,7 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        e.execute("DELETE FROM ss WHERE id = 2;").unwrap();
+        e.execute_blocking("DELETE FROM ss WHERE id = 2;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
@@ -7421,8 +7505,8 @@ mod tests {
         }
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dc (v INT);").unwrap();
-        e.execute("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
+        e.execute_blocking("CREATE TABLE dc (v INT);").unwrap();
+        e.execute_blocking("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
             .unwrap();
         let table = "default_db.dc";
         let seqs: Vec<usize> = e
@@ -7435,32 +7519,30 @@ mod tests {
         let t1 = stale_delete(&e);
         let t2 = stale_delete(&e);
         let t3 = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)
-            .unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)).unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2)),
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)
-            .unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let a = stale_delete(&e);
         let b = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a))
             .unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[2]], 0, &[], b),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], 0, &[], b)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);
@@ -7470,18 +7552,23 @@ mod tests {
     fn defaults_and_alter_add_column() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 2);").unwrap();
-        e.execute("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+        e.execute_blocking("CREATE TABLE t (a INT, b INT);")
             .unwrap();
-        e.execute("ALTER TABLE t ADD COLUMN (d INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1, 2);").unwrap();
+        e.execute_blocking("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+            .unwrap();
+        e.execute_blocking("ALTER TABLE t ADD COLUMN (d INT);")
+            .unwrap();
         // duplicate column must be rejected
-        assert!(e.execute("ALTER TABLE t ADD COLUMN (b INT);").is_err());
+        assert!(e
+            .execute_blocking("ALTER TABLE t ADD COLUMN (b INT);")
+            .is_err());
         // explicit column list leaves c/d at their defaults
-        e.execute("INSERT INTO t(a, b) VALUES (2, 2);").unwrap();
-        e.execute("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+        e.execute_blocking("INSERT INTO t(a, b) VALUES (2, 2);")
             .unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, columns } => {
                 assert_eq!(columns.len(), 4);
                 assert_eq!(row_text(rows, 0), vec!["1", "2", "default", "null"]);
@@ -7565,25 +7652,26 @@ mod tests {
     fn databases_are_namespaced() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         // a duplicate without IF NOT EXISTS is an error
-        assert!(e.execute("CREATE DATABASE db1;").is_err());
-        e.execute("CREATE DATABASE IF NOT EXISTS db1;").unwrap();
-        e.execute("USE db1;").unwrap();
-        e.execute("CREATE TABLE t (a INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1);").unwrap();
-        e.execute("USE default_db;").unwrap();
-        e.execute("CREATE TABLE t (a INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (2);").unwrap();
-        let rows = |sql: &str| match &e.execute(sql).unwrap()[0] {
-            QueryResult::Rows { .. } => e.execute(sql).unwrap()[0].rows_text(),
+        assert!(e.execute_blocking("CREATE DATABASE db1;").is_err());
+        e.execute_blocking("CREATE DATABASE IF NOT EXISTS db1;")
+            .unwrap();
+        e.execute_blocking("USE db1;").unwrap();
+        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1);").unwrap();
+        e.execute_blocking("USE default_db;").unwrap();
+        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (2);").unwrap();
+        let rows = |sql: &str| match &e.execute_blocking(sql).unwrap()[0] {
+            QueryResult::Rows { .. } => e.execute_blocking(sql).unwrap()[0].rows_text(),
             other => panic!("{other:?}"),
         };
         assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
         assert_eq!(rows("SELECT * FROM db1.t;"), vec![vec!["1".to_string()]]);
         // dropping the database removes its tables
-        e.execute("DROP DATABASE db1;").unwrap();
-        assert!(e.execute("SELECT * FROM db1.t;").is_err());
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
+        assert!(e.execute_blocking("SELECT * FROM db1.t;").is_err());
         assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
     }
 
@@ -7625,7 +7713,7 @@ mod tests {
     fn a_sparse_column_renders_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE sp_render (id INT, a SPARSE(FLOAT, 8), \
              b SPARSE(FLOAT, INT32, 8), c SPARSE(FLOAT, 30000));",
         )
@@ -7638,7 +7726,7 @@ mod tests {
         // An unknown bound is the SDK's `sparse,0,…` spelling; the reference
         // prints the same text for it.
         crate::with_zero_dimension_sparse(|| {
-            e.execute("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
+            e.execute_blocking("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
         })
         .unwrap();
         let got = rows(&e, "SHOW TABLE sp_zero COLUMNS;");
@@ -7646,7 +7734,7 @@ mod tests {
 
         // The rendering survives a restart, which reads the type back from the
         // catalog record (`type_text_of`).
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let e = crate::new_catalog_ut::reopen(e, dir.path());
         let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
         assert_eq!(got[1][1], "Sparse(float,int8,8)");
@@ -7806,13 +7894,15 @@ mod tests {
     fn highlight_uses_the_columns_analyzer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE hg (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE hg (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')")
+        e.execute_blocking(
+            "CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO hg VALUES (1, 'quick brown');")
             .unwrap();
-        e.execute("INSERT INTO hg VALUES (1, 'quick brown');")
-            .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let out = rows(
             &e,
             "SELECT body HIGHLIGHT body FROM hg SEARCH MATCH TEXT (body, 'qui', 10);",
@@ -7829,11 +7919,14 @@ mod tests {
     fn an_ik_fulltext_index_is_tokenised_by_its_analyzer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ik_t (doc VARCHAR);").unwrap();
-        e.execute("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
+        e.execute_blocking("CREATE TABLE ik_t (doc VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');")
+        e.execute_blocking("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
             .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');",
+        )
+        .unwrap();
         let tokenizer = e.index_tokenizer("ik_t", "doc");
         assert_eq!(tokenizer.analyzer.as_deref(), Some("ik"));
         let index = e.text_index_for("ik_t", "doc", tokenizer).unwrap();
@@ -7859,10 +7952,14 @@ mod tests {
     fn a_keyword_fulltext_index_takes_its_delimiters_from_the_name() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE kw_t (doc VARCHAR);").unwrap();
-        e.execute("INSERT INTO kw_t VALUES ('a,b');").unwrap();
-        e.execute("CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');")
+        e.execute_blocking("CREATE TABLE kw_t (doc VARCHAR);")
             .unwrap();
+        e.execute_blocking("INSERT INTO kw_t VALUES ('a,b');")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');",
+        )
+        .unwrap();
 
         assert_eq!(e.index_delims("kw_t", "doc"), Some(vec![',']));
         let tokenizer = e.index_tokenizer("kw_t", "doc");
@@ -7884,8 +7981,9 @@ mod tests {
         drop(guard);
 
         // The delimiter bytes are not lowercased on the way in.
-        e.execute("CREATE TABLE kw_case (doc VARCHAR);").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE TABLE kw_case (doc VARCHAR);")
+            .unwrap();
+        e.execute_blocking(
             "CREATE INDEX kwc ON kw_case (doc) USING FULLTEXT WITH (analyzer='whitespace-AB');",
         )
         .unwrap();
@@ -7911,12 +8009,12 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_bad_{i}");
-            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX bad_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute(&sql).is_err(), "{name} must be rejected");
+            assert!(e.execute_blocking(&sql).is_err(), "{name} must be rejected");
         }
         for (i, name) in [
             "ngram-3x",
@@ -7928,12 +8026,12 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_ok_{i}");
-            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX ok_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute(&sql).is_ok(), "{name} must be accepted");
+            assert!(e.execute_blocking(&sql).is_ok(), "{name} must be accepted");
         }
     }
 
@@ -7945,7 +8043,7 @@ mod tests {
     fn match_sparse_alpha_option_reaches_the_bmp_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
             .unwrap();
         // Block 0 (16 docs) has a loose bound: `10` peaks in one document and
         // `20` in another, so its bound is 2.0 while its best document scores
@@ -7962,7 +8060,7 @@ mod tests {
         for id in 17..=20 {
             values.push_str(&format!("({id}, [10:1.0,20:1.0]),"));
         }
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO sp VALUES {};",
             values.trim_end_matches(',')
         ))
@@ -8004,11 +8102,14 @@ mod tests {
     fn sparse_rejects_unknown_options() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
+        e.execute_blocking("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
             .unwrap();
-        e.execute("INSERT INTO sp VALUES (1, [10:1.0]);").unwrap();
+        e.execute_blocking("INSERT INTO sp VALUES (1, [10:1.0]);")
+            .unwrap();
         let err = e
-            .execute("SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')")
+            .execute_blocking(
+                "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')",
+            )
             .unwrap_err();
         let message = err.to_string();
         assert!(
@@ -8018,7 +8119,7 @@ mod tests {
         // The reference's four names are accepted (`tail` is a no-op there).
         for opts in ["alpha=0.5", "beta=0.5", "tail=F", "threshold=0.1"] {
             assert!(
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', '{opts}')"
                 ))
                 .is_ok(),
@@ -8032,9 +8133,10 @@ mod tests {
     fn empty_string_default_survives_a_catalog_round_trip() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
+        e.execute_blocking("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
             .unwrap();
-        e.execute("INSERT INTO t (num) VALUES (1)").unwrap();
+        e.execute_blocking("INSERT INTO t (num) VALUES (1)")
+            .unwrap();
         let rows = rows(&e, "SELECT * FROM t");
         assert_eq!(rows, vec![vec!["1".to_string(), String::new()]]);
     }
@@ -8072,9 +8174,9 @@ mod tests {
     fn arithmetic_and_boolean_operators_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
+        e.execute_blocking("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
             .unwrap();
-        e.execute("INSERT INTO lg VALUES (7, 3, true, false);")
+        e.execute_blocking("INSERT INTO lg VALUES (7, 3, true, false);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT -a, a + b, a - b, a * b, a % b FROM lg;"),
@@ -8106,8 +8208,9 @@ mod tests {
     fn string_and_power_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sf (s VARCHAR);").unwrap();
-        e.execute("INSERT INTO sf VALUES ('Hello');").unwrap();
+        e.execute_blocking("CREATE TABLE sf (s VARCHAR);").unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES ('Hello');")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT reverse(s), substr(s, 1, 3) FROM sf;"),
             vec![vec!["olleH".to_string(), "ell".to_string()]]
@@ -8133,9 +8236,9 @@ mod tests {
     fn date_component_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dtf (d DATE, ts DATETIME);")
+        e.execute_blocking("CREATE TABLE dtf (d DATE, ts DATETIME);")
             .unwrap();
-        e.execute("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
+        e.execute_blocking("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
             .unwrap();
         assert_eq!(
             rows(
@@ -8185,10 +8288,12 @@ mod tests {
     fn aggregate_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
+        e.execute_blocking("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
             .unwrap();
-        e.execute("INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);",
+        )
+        .unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -8220,10 +8325,12 @@ mod tests {
     fn arithmetic_and_equality_follow_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ar (a TINYINT, b TINYINT);")
+        e.execute_blocking("CREATE TABLE ar (a TINYINT, b TINYINT);")
             .unwrap();
-        e.execute("INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);",
+        )
+        .unwrap();
 
         // `+` on TINYINT (values within range; the i64-wide evaluator does not
         // model per-width checked overflow — recorded in CLASS_MAP).
@@ -8272,10 +8379,10 @@ mod tests {
     fn logical_planner_statements_succeed() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
+        e.execute_blocking("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
             .unwrap();
         for i in 0..200 {
-            e.execute(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
+            e.execute_blocking(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
                 .unwrap();
         }
         for sql in [
@@ -8289,14 +8396,15 @@ mod tests {
             "optimize tb;",
             "compact table tb;",
             "flush data;",
-            "flush log;",
+            "flush catalog;",
             "check table tb;",
             "create snapshot tb_snapshot on table tb;",
             "drop index idx;",
         ] {
-            e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+            e.execute_blocking(sql)
+                .unwrap_or_else(|err| panic!("{sql}: {err}"));
         }
-        e.execute("drop table tb;").unwrap();
+        e.execute_blocking("drop table tb;").unwrap();
     }
 
     /// C++: `function/scalar/abs_functions_ut.cpp::AbsFunctionsTest/abs_func`:
@@ -8306,11 +8414,11 @@ mod tests {
     fn abs_function_covers_every_numeric_type() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE av (a TINYINT, b SMALLINT, c INTEGER, d BIGINT, f FLOAT, g DOUBLE);",
         )
         .unwrap();
-        e.execute("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
+        e.execute_blocking("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
             .unwrap();
         assert_eq!(
             rows(
@@ -8327,7 +8435,7 @@ mod tests {
             ]]
         );
         // A NULL input yields a NULL output for every width.
-        e.execute("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
+        e.execute_blocking("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
             .unwrap();
         assert_eq!(
             rows(
@@ -8350,8 +8458,8 @@ mod tests {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for _ in 0..1280 {
-                    let _ = e.execute("CREATE DATABASE db1;");
-                    let _ = e.execute("DROP DATABASE db1;");
+                    let _ = e.execute_blocking("CREATE DATABASE db1;");
+                    let _ = e.execute_blocking("DROP DATABASE db1;");
                 }
             }));
         }
@@ -8373,14 +8481,14 @@ mod tests {
     fn disabled_slow_test_parallel_insert_table() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
+        e.execute_blocking("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..2 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for i in 0..600 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO pit VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
@@ -8417,9 +8525,9 @@ mod tests {
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         // Seven rows per chunk, so the writers seal while the readers search.
         e.set_memindex_capacity(7);
-        e.execute("CREATE TABLE mix (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE mix (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
             .unwrap();
         let barrier = std::sync::Arc::new(std::sync::Barrier::new(WRITERS + READERS + 1));
         // `()` results: every send is one finished unit of work.
@@ -8431,7 +8539,7 @@ mod tests {
                 for i in 0..PER_WRITER {
                     let id = w * 1000 + i;
                     let _ = tx.send(
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO mix VALUES ({id}, 'alpha beta row{id}');"
                         ))
                         .map(|_| ()),
@@ -8445,8 +8553,10 @@ mod tests {
                 barrier.wait();
                 for _ in 0..READS {
                     let _ = tx.send(
-                        e.execute("SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);")
-                            .map(|_| ()),
+                        e.execute_blocking(
+                            "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+                        )
+                        .map(|_| ()),
                     );
                 }
             });
@@ -8459,7 +8569,9 @@ mod tests {
                     // Optimize takes `batch_gate` and then the index's write
                     // lock (the writer's order) while the readers hold the read
                     // guard: exactly the pair a reversed acquisition would hang.
-                    let _ = tx.send(e.optimize_fulltext("mix").map(|_| ()));
+                    let _ = tx.send(
+                        crate::scheduler::block_on(e.optimize_fulltext_async("mix")).map(|_| ()),
+                    );
                 }
             });
         }
@@ -8496,14 +8608,14 @@ mod tests {
     fn disabled_slow_test_append_append_concurrent() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE cac (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE cac (id INT, name VARCHAR);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for i in 0..100 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO cac VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
@@ -8530,23 +8642,23 @@ mod tests {
             .unwrap_or(30);
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE chaos_test (id INT, body VARCHAR, other_vector EMBEDDING(FLOAT,4));",
         )
         .unwrap();
-        e.execute("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX other_index ON chaos_test (other_vector) USING HNSW WITH (metric = l2);",
         )
         .unwrap();
         for i in 0..100 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO chaos_test VALUES ({i}, 'the quick brown fox {i}', [{i}.0,1.0,2.0,3.0]);"
             ))
             .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let start = std::time::Instant::now();
         let mut handles = Vec::new();
         for t in 0..4 {
@@ -8557,22 +8669,22 @@ mod tests {
                     n += 1;
                     match n % 4 {
                         0 => {
-                            let _ = e.execute(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
+                            let _ = e.execute_blocking(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
                         }
                         1 => {
-                            let _ = e.execute(
+                            let _ = e.execute_blocking(
                                 "SELECT id FROM chaos_test SEARCH MATCH VECTOR (other_vector, [0.0,1.0,2.0,3.0], 'float', 'l2', 3);",
                             );
                         }
                         2 => {
-                            let _ = e.execute(&format!(
+                            let _ = e.execute_blocking(&format!(
                                 "UPDATE chaos_test SET body = 'the quick brown fox {}' WHERE id = {};",
                                 n,
                                 n % 100
                             ));
                         }
                         _ => {
-                            let _ = e.execute(
+                            let _ = e.execute_blocking(
                                 "SELECT id FROM chaos_test SEARCH MATCH TEXT ('body', 'quick', 'topn=3');",
                             );
                         }
@@ -8583,8 +8695,8 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
-        e.execute("DROP TABLE chaos_test;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("DROP TABLE chaos_test;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
 
     /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
@@ -8696,9 +8808,9 @@ mod tests {
     fn hnsw_dump_writes_only_the_memory_segment() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut sql = String::from("INSERT INTO hv VALUES ");
         for i in 0..10 {
@@ -8708,32 +8820,34 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
+        e.execute_blocking(&sql).unwrap();
         let indexed = |e: &Engine| {
             e.tables
                 .lock()
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 10);
 
-        e.dump_index_transaction("hv", "hv_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
         assert!(
             e.tables.lock().unwrap().values().all(|t| t
                 .hnsw_mem
                 .values()
-                .all(|m| m.read().map(|m| m.is_empty()).unwrap_or(true))),
+                .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
             "the dump empties the HNSW memory segment"
         );
 
-        e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);",
+        )
+        .unwrap();
         assert_eq!(indexed(&e), 2);
 
-        e.dump_index_transaction("hv", "hv_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
         let indexed: usize = e
             .load_vector_indexes("default_db.hv", "hv_i")
             .iter()
@@ -8757,9 +8871,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(4);
-        e.execute("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut sql = String::from("INSERT INTO hc VALUES ");
         for i in 0..10 {
@@ -8769,19 +8883,19 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
+        e.execute_blocking(&sql).unwrap();
         let indexed = |e: &Engine| {
             e.tables
                 .lock()
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");
 
-        e.execute("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
+        e.execute_blocking("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
             .unwrap();
         assert_eq!(indexed(&e), 1, "below the capacity the segment stays");
         let dumped: usize = e
@@ -8799,22 +8913,22 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(2);
-        e.execute("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
             .unwrap();
-        e.execute("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        e.execute_blocking("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
             .unwrap();
-        e.execute("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+        e.execute_blocking("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
             .unwrap();
         let chunks = |e: &Engine| e.load_vector_indexes("default_db.hk", "hk_i");
         assert_eq!(chunks(&e).len(), 2, "one chunk per memory-segment dump");
 
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         assert_eq!(chunks(&e).len(), 2, "no chunk covers the whole table yet");
 
         e.optimize_indexes().unwrap();
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         let merged = chunks(&e);
         assert_eq!(merged.len(), 1, "the merged chunk supersedes the others");
         assert_eq!(merged[0].labels.len(), 4);
@@ -8827,16 +8941,18 @@ mod tests {
     fn optimize_logs_one_dump_command_per_entry() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);")
+        e.execute_blocking(
+            "CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
             .unwrap();
-        e.execute("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
+        e.execute_blocking("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
             .unwrap();
-        e.dump_index_transaction("ot", "ot_i").unwrap();
-        e.execute("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
-            .unwrap();
-        e.dump_index_transaction("ot", "ot_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
         assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![0, 1]);
 
         e.optimize_indexes().unwrap();
@@ -8926,7 +9042,7 @@ mod tests {
 
         // `Cleanup` is the half that reclaims the bytes: the files go, the
         // markers go, and only the merged chunk is left.
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         assert!(
             !chunk_dir.join("chunk_0.idx").exists() && !chunk_dir.join("chunk_1.idx").exists(),
             "cleanup reclaims the bytes"
@@ -8951,13 +9067,15 @@ mod tests {
     fn test_hnsw_optimize() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);",
+        )
+        .unwrap();
         for _ in 0..3 {
             for _ in 0..2 {
-                e.execute(
+                e.execute_blocking(
                     "INSERT INTO tb1 VALUES \
                      (2,[0.1,0.2,0.3,-0.2]),(4,[0.2,0.1,0.3,0.4]),\
                      (6,[0.3,0.2,0.1,0.4]),(8,[0.4,0.3,0.2,0.1]);",
@@ -8965,7 +9083,7 @@ mod tests {
                 .unwrap();
             }
             // DumpMemIndex: one chunk per iteration's memory segment.
-            e.dump_index_transaction("tb1", "idx1").unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("tb1", "idx1")).unwrap();
         }
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -8974,7 +9092,7 @@ mod tests {
         );
 
         e.optimize_indexes().unwrap();
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
 
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -9009,10 +9127,11 @@ mod tests {
     fn full_rows_come_from_the_block_mirror_when_current() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bm (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE bm (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO bm VALUES (1,'a'),(2,'b');").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("INSERT INTO bm VALUES (1,'a'),(2,'b');")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         // The scalar row cache would answer first; drop it so the test proves
         // the block path.
         e.invalidate_row_cache("default_db.bm");
@@ -9028,14 +9147,14 @@ mod tests {
     fn block_mirror_covers_rows_after_deletes_and_updates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bmu (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE bmu (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
+        e.execute_blocking("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         e.invalidate_row_cache("default_db.bmu");
-        e.execute("DELETE FROM bmu WHERE id = 2;").unwrap();
-        e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
+        e.execute_blocking("DELETE FROM bmu WHERE id = 2;").unwrap();
+        e.execute_blocking("UPDATE bmu SET name = 'u' WHERE id = 3;")
             .unwrap();
         let rows = e.try_rows("default_db.bmu").unwrap().unwrap();
         let ids: Vec<&Value> = rows.iter().map(|(_, r)| &r[0]).collect();
@@ -9055,9 +9174,10 @@ mod tests {
     fn scalar_tables_use_the_row_cache() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rc (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE rc (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rc VALUES (1,'a'),(2,'b');").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (1,'a'),(2,'b');")
+            .unwrap();
         assert_eq!(rows(&e, "SELECT * FROM rc;").len(), 2);
         let key = e.table_key("rc");
         assert!(e
@@ -9072,9 +9192,10 @@ mod tests {
             vec![vec!["2".to_string()]]
         );
 
-        e.execute("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO av VALUES (1,[0.0,0.0]);").unwrap();
+        e.execute_blocking("INSERT INTO av VALUES (1,[0.0,0.0]);")
+            .unwrap();
         assert_eq!(rows(&e, "SELECT * FROM av;").len(), 1);
         let key = e.table_key("av");
         assert!(e
@@ -9092,7 +9213,7 @@ mod tests {
     fn segments_track_row_id_allocations() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sg (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE sg (id INT);").unwrap();
         e.reserve_rows("sg", 2, true).unwrap();
         e.reserve_rows("sg", 3, true).unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3)]);
@@ -9108,10 +9229,10 @@ mod tests {
     fn a_read_at_an_older_ts_hides_later_commits() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rts (id INT);").unwrap();
-        e.execute("INSERT INTO rts VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE rts (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO rts VALUES (1);").unwrap();
         let pin = e.current_ts();
-        e.execute("INSERT INTO rts VALUES (2);").unwrap();
+        e.execute_blocking("INSERT INTO rts VALUES (2);").unwrap();
 
         // Outside a statement the reader is at `u64::MAX`: both rows.
         assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
@@ -9126,7 +9247,7 @@ mod tests {
 
         // A delete after the pin is invisible to the pinned reader.
         let deleted_pin = e.current_ts();
-        e.execute("DELETE FROM rts WHERE id = 1;").unwrap();
+        e.execute_blocking("DELETE FROM rts WHERE id = 1;").unwrap();
         assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
         {
             let _pinned = ReadTsGuard::enter(deleted_pin);
@@ -9149,20 +9270,20 @@ mod tests {
         {
             let e = Arc::new(Engine::open(dir.path()).unwrap());
             e.install_engine_handle();
-            e.execute("CREATE TABLE ck (id INT);").unwrap();
+            e.execute_blocking("CREATE TABLE ck (id INT);").unwrap();
             let mut handles = Vec::new();
             for t in 0..4 {
                 let e = Arc::clone(&e);
                 handles.push(std::thread::spawn(move || {
                     for b in 0..10 {
                         let first = t * 1000 + b * 2;
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO ck VALUES ({first}), ({});",
                             first + 1
                         ))
                         .unwrap();
                         if b % 3 == 0 {
-                            e.flush().unwrap();
+                            crate::scheduler::block_on(e.flush()).unwrap();
                         }
                     }
                 }));
@@ -9180,6 +9301,215 @@ mod tests {
         );
     }
 
+    /// Reopening maps the published chunks instead of rebuilding them, and
+    /// indexes only the rows no chunk covers (plan §5.3: the reference's
+    /// RecoverMemIndex).
+    #[test]
+    fn reopen_loads_secondary_chunks_and_fills_only_the_gap() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE rg (id INT, c INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX rg_c ON rg (c);").unwrap();
+            e.execute_blocking("INSERT INTO rg VALUES (1,7),(2,8),(3,7);")
+                .unwrap();
+            // `FLUSH DATA` with the dump switch on is the checkpoint plus one
+            // `DumpMemIndex` per index, which is what names the chunk's ts.
+            e.set_flush_dumps_mem_index(true);
+            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.set_flush_dumps_mem_index(false);
+            // One row after the dump: the chunk cannot cover it.
+            e.execute_blocking("INSERT INTO rg VALUES (4,7);").unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let (chunks, meta, tail) = {
+            let tables = e.tables.lock().unwrap();
+            let sec = &tables
+                .values()
+                .find(|t| t.secondary.disk_backed.contains("c"))
+                .expect("the table reopened with a disk-backed index")
+                .secondary;
+            (
+                sec.disk.get("c").map(|d| d.len()).unwrap_or(0),
+                sec.chunk_meta.get("c").cloned().unwrap_or_default(),
+                sec.indexes.get("c").map(|i| i.key_count()).unwrap_or(0),
+            )
+        };
+        assert_eq!(chunks, 1, "the published chunk is mapped, not rebuilt");
+        assert_eq!(meta, vec![(0u64, 3usize)], "the catalog's chunk record");
+        assert_eq!(tail, 1, "only the uncovered row is in the memory tail");
+        assert_eq!(
+            rows(&e, "SELECT id FROM rg WHERE c = 7"),
+            vec![
+                vec!["1".to_string()],
+                vec!["3".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM rg;"),
+            vec![vec!["4".to_string()]]
+        );
+    }
+
+    /// A reopened table's secondary index must keep indexing.
+    ///
+    /// The reload maps the published chunks and fills the gap into the memory
+    /// tail; without a `secondary.indexes` entry the per-row insert hook and
+    /// `DumpIndex` both skip the column, so every row written after the restart
+    /// silently fell out of the index and `dump_index` sealed nothing.
+    #[test]
+    fn a_reopened_secondary_index_indexes_later_rows() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE ri (id INT, c INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX ri_c ON ri (c);").unwrap();
+            e.execute_blocking("INSERT INTO ri VALUES (1,7);").unwrap();
+            e.set_flush_dumps_mem_index(true);
+            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.set_flush_dumps_mem_index(false);
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("INSERT INTO ri VALUES (2,7),(3,9);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT id FROM ri WHERE c = 7 ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "the row inserted after the restart must be in the index"
+        );
+        // The dump must find the new rows in the tail and seal them.
+        crate::scheduler::block_on(e.dump_index_transaction("ri", "ri_c")).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let published = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find(|t| t.secondary.disk_backed.contains("c"))
+                .map(|t| t.secondary.disk.get("c").map(|d| d.len()).unwrap_or(0))
+                .unwrap_or(0)
+        };
+        assert!(
+            published >= 2,
+            "the dump sealed no chunk from the reopened tail (mapped {published})"
+        );
+    }
+
+    /// A compaction must leave the merged segment's indexes published.
+    ///
+    /// The reference runs `PopulateIndex` for the merged segment inside the
+    /// compaction transaction, so every index gets a chunk for it. The port's
+    /// reload only maps the chunks already in the catalog, so without rebuilding
+    /// the merged segment's secondary spills the index had no `seg_{merged}`
+    /// chunk and a reader lost those rows.
+    #[test]
+    fn a_compaction_publishes_the_merged_segments_secondary_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE rc (id INT, c INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX rc_c ON rc (c);").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (1,7),(2,8);")
+            .unwrap();
+        e.set_flush_dumps_mem_index(true);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.set_flush_dumps_mem_index(false);
+        // A second segment, so the compaction has something to merge.
+        let csv = dir.path().join("more.csv");
+        std::fs::write(&csv, "3,9\n4,7\n").unwrap();
+        e.execute_blocking(&format!(
+            "COPY rc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .unwrap();
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert_eq!(e.segment_row_counts("rc").len(), 2, "two segments to merge");
+        e.compact_table("rc").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        // The merged segment must have its own published chunk file: that is
+        // what a reader (and the reference) uses to answer for those rows.
+        let merged = e
+            .segment_row_counts("rc")
+            .last()
+            .map(|(id, _)| *id)
+            .unwrap();
+        let root = e.blocks_root().join("db_1").join("tbl_0");
+        let seg_dir = std::fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .map(|d| d.path())
+            .find(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("idx_"))
+            })
+            .map(|p| p.join(format!("seg_{merged}")))
+            .expect("the index directory");
+        let chunks: Vec<String> = std::fs::read_dir(&seg_dir)
+            .map(|d| {
+                d.flatten()
+                    .map(|f| f.file_name().to_string_lossy().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            chunks.iter().any(|n| n.ends_with(".idx")),
+            "the merged segment has no secondary chunk: {chunks:?}"
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM rc WHERE c = 7 ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+    }
+
+    /// A panic inside `with_zero_dimension_sparse` must not leave the flag set.
+    ///
+    /// The pool reuses its threads, so a leaked flag would let a later,
+    /// unrelated statement accept a zero-dimension sparse value.
+    #[test]
+    fn a_panicking_zero_dimension_scope_restores_the_flag() {
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::with_zero_dimension_sparse(|| panic!("boom"));
+        }));
+        assert!(caught.is_err(), "the panic must propagate");
+        let leaked = crate::engine::state::ALLOW_ZERO_SPARSE.with(|c| c.get());
+        assert!(!leaked, "the zero-dimension flag outlived the panic");
+    }
+
+    /// A panic inside a statement must not leak the session binding.
+    ///
+    /// The blocking pool reuses threads, so a `with_session` that restored the
+    /// previous value only on the normal path would leave the next statement of
+    /// an unrelated connection running in this session (r10 #2).
+    #[test]
+    fn a_panicking_statement_does_not_leak_its_session() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE DATABASE other;").unwrap();
+        let id = e.open_session("default_db");
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            e.with_session(id, || panic!("boom"));
+        }));
+        assert!(caught.is_err(), "the panic must propagate");
+        assert_eq!(
+            crate::engine::statements::active_session(),
+            None,
+            "the session binding outlived the panic"
+        );
+        // The default database is process-wide again, not the session's.
+        e.execute_blocking("CREATE TABLE leak_check (id INT);")
+            .unwrap();
+        assert!(e
+            .catalog()
+            .get_table_by_name("default_db.leak_check")
+            .unwrap()
+            .is_some());
+    }
+
     /// Writers and readers share the table/index state; this exercises the
     /// table-lock boundaries introduced for `TableEntry` (a deadlock hangs the
     /// test binary, which the harness timeout catches).
@@ -9187,23 +9517,23 @@ mod tests {
     fn concurrent_inserts_and_vector_searches_do_not_deadlock() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for b in 0..25 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO cc VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                         t * 1000 + b * 2,
                         t * 1000 + b * 2 + 1
                     ))
                     .unwrap();
                     if b % 5 == 0 {
-                        e.flush().unwrap();
+                        crate::scheduler::block_on(e.flush()).unwrap();
                     }
                 }
             }));
@@ -9212,10 +9542,10 @@ mod tests {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for _ in 0..40 {
-                    let _ = e.execute(
+                    let _ = e.execute_blocking(
                         "SELECT id FROM cc SEARCH MATCH VECTOR (v, [1.0,0.0,0.0,0.0], 'float', 'l2', 3);",
                     );
-                    let _ = e.execute("SELECT count(*) FROM cc;");
+                    let _ = e.execute_blocking("SELECT count(*) FROM cc;");
                 }
             }));
         }
@@ -9245,7 +9575,7 @@ mod tests {
             ]]
         );
 
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         let dbs = rows(&e, "SHOW DATABASES;");
         // The reference lists `db1` first (hash order); the Rust catalog is
         // sorted, so compare the set.
@@ -9283,7 +9613,7 @@ mod tests {
             .any(|d| d == "default_db"));
 
         // Create/Show/Get/Drop a table in `default_db`.
-        e.execute("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
+        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
             .unwrap();
         let tables = rows(&e, "SHOW TABLES FROM default_db;");
         assert_eq!(tables.len(), 1);
@@ -9295,7 +9625,7 @@ mod tests {
             .get_table_by_name("default_db.table1")
             .unwrap()
             .is_some());
-        e.execute("DROP TABLE default_db.table1;").unwrap();
+        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
         assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
         assert!(e
             .catalog()
@@ -9304,25 +9634,25 @@ mod tests {
             .is_none());
 
         // Insert and select through two columns of different widths.
-        e.execute("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
+        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
             .unwrap();
-        e.execute("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
+        e.execute_blocking("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT col1, col2 FROM default_db.table1;"),
             vec![vec!["11".to_string(), "22".to_string()]]
         );
-        e.execute("DROP TABLE default_db.table1;").unwrap();
+        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
 
         // `Query("create database db1;")` + `Query("show databases;")`.
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         let mut names: Vec<String> = rows(&e, "SHOW DATABASES;")
             .into_iter()
             .map(|r| r[0].clone())
             .collect();
         names.sort();
         assert_eq!(names, vec!["db1", "default_db"]);
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
         assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
         assert!(e
             .catalog()
@@ -9387,14 +9717,14 @@ mod tests {
     fn explain_covers_every_plan_kind() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         assert!(e
             .catalog()
             .list_databases()
             .unwrap()
             .iter()
             .any(|d| d == "db1"));
-        e.execute("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
+        e.execute_blocking("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
             .unwrap();
 
         // `Infinity::GetDatabase` / `GetTable`: the created table is
@@ -9420,7 +9750,7 @@ mod tests {
         // Insert and read back through the same facade.
         let embedding = vec!["0.5"; 128].join(",");
         for col2 in [42, 7] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO db1.knn_table (col1, col2) VALUES ([{embedding}], {col2});"
             ))
             .unwrap();
@@ -9440,7 +9770,9 @@ mod tests {
             "EXPLAIN FRAGMENT SELECT col2 FROM db1.knn_table;",
             "EXPLAIN PIPELINE SELECT col2 FROM db1.knn_table;",
         ] {
-            let mut res = e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+            let mut res = e
+                .execute_blocking(sql)
+                .unwrap_or_else(|err| panic!("{sql}: {err}"));
             assert_eq!(res.len(), 1, "{sql}");
             assert!(matches!(res.remove(0), QueryResult::Rows { .. }), "{sql}");
         }
@@ -9454,8 +9786,9 @@ mod tests {
     fn a_crashed_drop_does_not_resurrect_rows() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
-        e.execute("INSERT INTO crash_t VALUES (1), (2), (3);")
+        e.execute_blocking("CREATE TABLE crash_t (id INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO crash_t VALUES (1), (2), (3);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT count(*) FROM crash_t;"),
@@ -9474,13 +9807,15 @@ mod tests {
                 .is_none(),
             "the drop must be visible before the sweep runs"
         );
-        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE crash_t (id INT);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT count(*) FROM crash_t;"),
             vec![vec!["0".to_string()]],
             "the recreated table must not see the dropped table's rows"
         );
-        e.execute("INSERT INTO crash_t VALUES (7);").unwrap();
+        e.execute_blocking("INSERT INTO crash_t VALUES (7);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT id FROM crash_t;"),
             vec![vec!["7".to_string()]]

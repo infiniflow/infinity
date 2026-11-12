@@ -85,11 +85,12 @@ fn command_bytes(cmd: &WalCmd) -> String {
 fn a_compaction_logs_one_compact_command() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        .unwrap();
     // Four imported segments: `NewCompactionAlg` needs four in one layer.
     for (i, rows) in [100usize, 60, 40, 30].iter().enumerate() {
         let csv = write_csv(dir.path(), &format!("s{i}.csv"), *rows);
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
             csv.display()
         ))
@@ -154,9 +155,10 @@ fn a_compaction_logs_one_compact_command() {
 fn an_import_logs_import_commands() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        .unwrap();
     let csv = write_csv(dir.path(), "only.csv", 100);
-    e.execute(&format!(
+    e.execute_blocking(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
@@ -200,9 +202,10 @@ fn an_import_logs_import_commands() {
 fn a_long_import_is_still_one_frame() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        .unwrap();
     let csv = write_csv(dir.path(), "big.csv", 20_000);
-    e.execute(&format!(
+    e.execute_blocking(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
@@ -236,12 +239,13 @@ fn a_long_import_is_still_one_frame() {
 fn an_indexed_import_logs_the_dump_in_the_same_frame() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-    e.execute("CREATE INDEX idx ON t(id);").unwrap();
-    e.execute("CREATE INDEX ft ON t(name) USING fulltext;")
+    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idx ON t(id);").unwrap();
+    e.execute_blocking("CREATE INDEX ft ON t(name) USING fulltext;")
         .unwrap();
     let csv = write_csv(dir.path(), "idx.csv", 100);
-    e.execute(&format!(
+    e.execute_blocking(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
@@ -308,11 +312,12 @@ fn an_indexed_import_logs_the_dump_in_the_same_frame() {
 fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-    e.execute("CREATE INDEX idxc ON t(id);").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idxc ON t(id);").unwrap();
     for (i, rows) in [100usize, 60, 40, 30].iter().enumerate() {
         let csv = write_csv(dir.path(), &format!("c{i}.csv"), *rows);
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
             csv.display()
         ))
@@ -352,10 +357,10 @@ fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
 fn a_create_table_logs_the_bloom_flag() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE bf (b BOOLEAN, i INT) WITH (bloom_filter_columns = 'b');")
+    e.execute_blocking("CREATE TABLE bf (b BOOLEAN, i INT) WITH (bloom_filter_columns = 'b');")
         .unwrap();
     // The WAL writer buffers a frame until a checkpoint flushes it.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     for entry in wal_entries(dir.path()) {
         eprintln!(
             "ENTRY {} ts={} cmds={:?}",
@@ -398,10 +403,11 @@ fn a_ddl_frame_names_the_target_the_statement_created() {
     use storage::wal::index_def::IndexDef;
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t1 (a INT, b VARCHAR);").unwrap();
-    e.execute("CREATE TABLE t2 (id INT);").unwrap();
-    e.execute("CREATE INDEX i1 ON t1 (a);").unwrap();
-    e.execute("CREATE INDEX i2 ON t2 (id);").unwrap();
+    e.execute_blocking("CREATE TABLE t1 (a INT, b VARCHAR);")
+        .unwrap();
+    e.execute_blocking("CREATE TABLE t2 (id INT);").unwrap();
+    e.execute_blocking("CREATE INDEX i1 ON t1 (a);").unwrap();
+    e.execute_blocking("CREATE INDEX i2 ON t2 (id);").unwrap();
 
     let mut tables: Vec<(String, Vec<String>)> = Vec::new();
     let mut indexes: Vec<(String, String)> = Vec::new();

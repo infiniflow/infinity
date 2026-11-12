@@ -17,6 +17,7 @@ from functools import wraps
 
 from readerwriterlock import rwlock
 from thrift.protocol import TBinaryProtocol
+from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 from thrift.transport.TTransport import TTransportException
 
@@ -175,7 +176,14 @@ class ThriftInfinityClient:
         # version: 0.6.15, client_version: 35
         # version: 0.7.0, 0.7.1, 0.7.2, client_version: 36
         # version: 0.7.3, 0.7.4, 0.7.5, client_version: 37
-        res = self.client.Connect(ConnectRequest(client_version=37))  # 0.7.5
+        try:
+            res = self.client.Connect(ConnectRequest(client_version=37))  # 0.7.5
+        except TApplicationException as e:
+            # `Connect` bypasses `retry_wrapper`, so the mapping lives here too.
+            raise InfinityException(
+                ErrorCode.PROTOCOL_ERROR,
+                f"protocol error from server: {e.message or e}",
+            ) from e
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -197,6 +205,16 @@ class ThriftInfinityClient:
                             self.logger.debug(
                                 f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {e!s}"
                             )
+                except TApplicationException as e:
+                    # The server could not decode the request or does not know
+                    # the method: a protocol failure, not an application one.
+                    # Retrying the same bytes cannot succeed, and the statement
+                    # may already have run, so surface it as `InfinityException`
+                    # and stop (`PARALLEL_ASYNC.md` §6.4 / O12).
+                    raise InfinityException(
+                        ErrorCode.PROTOCOL_ERROR,
+                        f"protocol error from server: {e.message or e}",
+                    ) from e
                 except Exception:
                     raise
             else:

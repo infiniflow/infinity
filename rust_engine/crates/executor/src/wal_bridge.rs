@@ -1053,11 +1053,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                             | storage::wal::index_def::IndexDef::Smve { base, .. }
                             | storage::wal::index_def::IndexDef::Ivf { base, .. } => base,
                         };
-                        if !catalog
-                            .list_indexes()?
-                            .iter()
-                            .any(|im| im.name == base.index_name && im.table == full)
-                        {
+                        if catalog.index_by_name(&full, &base.index_name)?.is_none() {
                             let column = base.column_names.first().cloned().unwrap_or_default();
                             catalog.create_index_typed(
                                 &base.index_name,

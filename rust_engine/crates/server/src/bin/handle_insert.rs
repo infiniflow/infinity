@@ -17,7 +17,7 @@ fn main() {
 
     let ncols = req.rows.first().map(|(_, vs)| vs.len()).unwrap_or(1).max(1);
     let cols: Vec<String> = (0..ncols).map(|i| format!("c{i} VARCHAR")).collect();
-    let _ = engine.execute(&format!("CREATE TABLE {t} ({});", cols.join(", ")));
+    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} ({});", cols.join(", ")));
 
     let vals = req
         .rows
@@ -31,7 +31,7 @@ fn main() {
         .collect::<Vec<_>>()
         .join(", ");
     let sql = format!("INSERT INTO {t} VALUES {vals};");
-    let resp = match engine.execute(&sql) {
+    let resp = match engine.execute_blocking(&sql) {
         Ok(_) => CommonResponse {
             error_code: 0,
             error_msg: "OK".into(),
@@ -43,7 +43,7 @@ fn main() {
             session_id: req.session_id,
         },
     };
-    let _ = engine.flush();
+    let _ = executor::block_on(engine.flush());
 
     let mut out = std::io::stdout().lock();
     write_reply_common(&mut out, "Insert", seq, &resp).expect("write reply");

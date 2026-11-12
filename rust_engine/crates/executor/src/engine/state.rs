@@ -1,5 +1,4 @@
 use super::*;
-use std::sync::RwLock;
 
 #[cfg(test)]
 thread_local! {
@@ -8,13 +7,23 @@ thread_local! {
     pub static MATCH_ROWS_TOKENIZED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-thread_local! {
+tokio::task_local! {
     /// The timestamp the current statement reads at (`NewTxn::BeginTS`,
-    /// `current_ts + 1` at its start). Reads on the statement's thread hide
-    /// rows created after it and keep rows deleted after it; every other thread
-    /// - the bottom halves, the background tasks, a caller that reads directly -
-    /// runs with `u64::MAX` and sees the latest state.
-    static READ_TS: std::cell::Cell<u64> = const { std::cell::Cell::new(u64::MAX) };
+    /// `current_ts + 1` at its start). Reads under it hide rows created after
+    /// that point and keep rows deleted after it; everything else - the bottom
+    /// halves, the background tasks, a caller that reads directly - runs with
+    /// `u64::MAX` and sees the latest state.
+    ///
+    /// A **task** local, not a thread local. A statement awaits (WAL, allocator,
+    /// bottom, CPU decode), so it is resumed on whichever runtime worker is
+    /// free; a thread local set on the thread that started it is not the value
+    /// the rest of the statement reads, and the guard's `Drop` on a *different*
+    /// thread restores a stale value into that thread's slot. That leak is
+    /// visible: a later statement on the same worker inherited an old
+    /// `read_ts`, `append_view::covers` compared a fresh commit ts against it,
+    /// and every row it had just inserted was filtered out of the scan - the
+    /// table read as empty right after a small insert.
+    pub static READ_TS: u64;
 }
 
 thread_local! {
@@ -1296,11 +1305,20 @@ pub(crate) fn rewrite_unnest_pred(p: &Predicate, col: &str, alias: &str) -> Pred
 }
 
 /// Runs `f` allowing a zero-dimension sparse column.
+///
+/// A guard, not a call/restore: the flag is thread-local and the execution
+/// threads are reused by the pool, so a panic inside `f` that left it set would
+/// let an unrelated statement accept a zero-dimension sparse afterwards.
 pub fn with_zero_dimension_sparse<T>(f: impl FnOnce() -> T) -> T {
-    ALLOW_ZERO_SPARSE.with(|c| c.set(true));
-    let out = f();
-    ALLOW_ZERO_SPARSE.with(|c| c.set(false));
-    out
+    struct Reset(bool);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            ALLOW_ZERO_SPARSE.with(|c| c.set(self.0));
+        }
+    }
+    let previous = ALLOW_ZERO_SPARSE.with(|c| c.replace(true));
+    let _restore = Reset(previous);
+    f()
 }
 
 /// Rejects `AND`/`OR`/`NOT` with non-boolean operands (e.g. `c1 + 0.1 AND …`).
@@ -4291,9 +4309,14 @@ impl SparseIndex {
 /// tables and their metadata. The `Engine` composes it.
 pub struct Storage {
     pub(crate) catalog: Catalog,
-    /// Serializes checkpoints: the block mirror rewrites `seg_0`, so two
-    /// concurrent flushes would race on its files.
-    pub(crate) flush_lock: Mutex<()>,
+    /// Serializes checkpoints against index dumps: the block mirror rewrites
+    /// `seg_0` and the index chunks, so two checkpoints would race on their
+    /// files, and a dump must not publish while one runs.
+    ///
+    /// A checkpoint takes it for **writing**, a `DumpMemIndex` for **reading**:
+    /// a bulk FLUSH has many independent indexes to seal, and serialising them
+    /// behind one mutex made the wall time grow with the table count.
+    pub(crate) flush_lock: tokio::sync::RwLock<()>,
     /// The lifecycle mode (`Storage::current_storage_mode_`).
     pub(crate) mode: Mutex<StorageMode>,
 }
@@ -4523,6 +4546,9 @@ pub(crate) struct TableEntry {
     /// holders. A sealed block needs no such buffer - it is mapped (see
     /// `Context::block_maps`).
     pub(crate) pending_rows: Vec<(usize, Vec<Value>)>,
+    /// Bytes this table's in-memory index forms held when the process-wide
+    /// total was last updated for it (see `Context::memindex_total`).
+    pub(crate) memindex_bytes: usize,
     /// `seq -> position in pending_rows`.
     ///
     /// A point read asks for one row at a time (`BlockCursor::row`), and
@@ -4575,7 +4601,7 @@ pub(crate) struct TableEntry {
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
     /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).
-    pub(crate) hnsw_mem: HashMap<String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>,
+    pub(crate) hnsw_mem: HashMap<String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
     /// HNSW bytes buffered per column since its last dump (memindex quota).
     pub(crate) index_pending_bytes: HashMap<String, usize>,
     /// Whether this table's HNSW indexes were probed since the last dump.
@@ -4591,9 +4617,8 @@ pub(crate) struct TableEntry {
     /// HNSW chunks loaded from the C++ block mirror, per column (the
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
     pub(crate) vector: HashMap<String, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
-    /// IVF chunks loaded from the C++ mirror, per column, each with the
-    /// segment whose in-segment offsets it holds.
-    pub(crate) ivf: HashMap<String, Vec<Arc<crate::blocks::LoadedIvfIndex>>>,
+    /// IVF chunks loaded from the C++ mirror, per column.
+    pub(crate) ivf: HashMap<String, Vec<Arc<index::ivf::IvfSegment>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged
     /// with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
@@ -4649,25 +4674,68 @@ pub(crate) struct RowCache {
 
 pub(crate) const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 
-/// The timestamp the current statement reads at (`u64::MAX` outside one).
-pub(crate) fn read_ts() -> u64 {
-    READ_TS.with(|cell| cell.get())
+thread_local! {
+    /// [`READ_TS`] for a **pool thread**.
+    ///
+    /// A decode dispatched to the blocking pool runs on a thread with no task
+    /// context, so the task-local cannot be read there. `scheduler` copies it
+    /// into this thread-local before running the job (the same shape as
+    /// `POOL_SESSION`), and [`read_ts`] prefers the task-local when one is set.
+    static POOL_READ_TS: std::cell::Cell<u64> = const { std::cell::Cell::new(u64::MAX) };
 }
 
-/// Sets [`READ_TS`] for a statement and restores the previous value on drop.
-pub(crate) struct ReadTsGuard(pub(crate) u64);
+/// The timestamp the current statement reads at (`u64::MAX` outside one).
+pub(crate) fn read_ts() -> u64 {
+    match READ_TS.try_with(|ts| *ts) {
+        Ok(ts) => ts,
+        Err(_) => POOL_READ_TS.with(|cell| cell.get()),
+    }
+}
+
+/// Sets [`POOL_READ_TS`] for the duration of `f` (a blocking-pool job).
+pub(crate) fn with_pool_read_ts<T>(ts: u64, f: impl FnOnce() -> T) -> T {
+    struct Reset(u64);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            POOL_READ_TS.with(|c| c.set(self.0));
+        }
+    }
+    let previous = POOL_READ_TS.with(|c| c.replace(ts));
+    let _restore = Reset(previous);
+    f()
+}
+
+/// Sets [`POOL_READ_TS`] for the rest of a **synchronous** call, restoring the
+/// previous value on drop.
+///
+/// For the synchronous entry points (`select_columns`) and the tests, which run
+/// a whole statement on one thread and cannot open a task-local scope there.
+/// Inside an async statement the task-local is what [`read_ts`] reads, so this
+/// is only the value a pool thread or an off-runtime caller sees.
+pub(crate) struct ReadTsGuard(u64);
 
 impl ReadTsGuard {
     pub(crate) fn enter(ts: u64) -> Self {
-        let previous = READ_TS.with(|cell| cell.replace(ts));
-        Self(previous)
+        Self(POOL_READ_TS.with(|cell| cell.replace(ts)))
     }
 }
 
 impl Drop for ReadTsGuard {
     fn drop(&mut self) {
-        READ_TS.with(|cell| cell.set(self.0));
+        POOL_READ_TS.with(|cell| cell.set(self.0));
     }
+}
+
+/// Runs `f` with `ts` as the statement's read timestamp.
+///
+/// A task-local scope rather than a guard: tokio restores the binding when the
+/// future completes, including on a panic, and it follows the statement across
+/// the runtime workers it is resumed on.
+pub(crate) async fn with_read_ts<T, F>(ts: u64, f: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    READ_TS.scope(ts, f).await
 }
 
 /// How many times a statement re-runs after a retryable conflict
@@ -4727,9 +4795,11 @@ pub(crate) struct Context {
     /// deleted (`Engine::drop_block_maps`).
     pub(crate) block_maps:
         Mutex<std::collections::HashMap<storage::format::BlockId, Arc<MappedBlock>>>,
-    /// `[buffer] buffer_manager_size`: the budget the index buffers are held
-    /// to (`memindex_memory_quota` for the dump trigger is separate). Sealed
-    /// blocks are mapped, not buffered, so they do not spend it.
+    /// The budget the index buffers are held to (`memindex_memory_quota` for
+    /// the dump trigger is separate). Built in at 8 GiB: the reference's
+    /// `[buffer] buffer_manager_size` is accepted by the config parser but
+    /// ignored, and sealed blocks are mapped, not buffered, so they do not
+    /// spend it.
     pub(crate) buffer_budget: std::sync::atomic::AtomicUsize,
     /// Mappings served from the shared map, and mappings opened for a block
     /// it did not hold: `SHOW VARIABLE memory_cache_miss` reports the ratio.
@@ -4740,10 +4810,23 @@ pub(crate) struct Context {
     /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
     /// trigger (the reference only dumps when a quota is configured).
     pub(crate) memindex_quota: std::sync::atomic::AtomicU64,
+    /// Bytes every in-memory index form holds right now, kept by delta.
+    ///
+    /// The quota check used to walk every table and lock every index, so a
+    /// batch paid O(all tables × indexes) just to ask "am I over?". The number
+    /// is now maintained where it changes (appends, dumps, seals, drops) and
+    /// recomputed in full at each checkpoint to correct any drift; a read is
+    /// one atomic load.
+    pub(crate) memindex_total: std::sync::atomic::AtomicUsize,
     /// `[storage] mem_index_capacity`: rows an in-memory index may hold before
     /// it is dumped into a sealed segment (the reference's
     /// `Config::MemIndexCapacity()`). `0` disables the row trigger.
     pub(crate) memindex_capacity: std::sync::atomic::AtomicUsize,
+    /// `[storage] flush_dumps_mem_index`: `FLUSH DATA` also dumps every memory
+    /// index into its chunk. Off by default, because the reference's
+    /// `PhysicalFlush` only runs a checkpoint and the cross-engine byte gates
+    /// compare directories after `flush_data()`.
+    pub(crate) flush_dumps_mem_index: std::sync::atomic::AtomicBool,
     /// Set while a background `DumpMemIndexTask` proposed by the quota is
     /// queued or running (C++ `MemIndexTracer::proposed_dump_`). Prevents the
     /// per-row quota check from queueing one task per row.
@@ -4756,9 +4839,10 @@ pub(crate) struct Context {
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,
     /// Concurrency limit for full-table text/vector scans.
     pub(crate) scan_gate: ScanGate,
-    /// `[buffer] buffer_manager_size`: the decoded HNSW chunk budget. Loaded
-    /// graphs beyond it are evicted, and a scan that no longer sees full label
-    /// coverage falls back to the exact scan (the reference's buffer manager).
+    /// The decoded HNSW chunk budget (built in at 8 GiB; the reference's
+    /// `[buffer] buffer_manager_size` is accepted but ignored). Loaded graphs
+    /// beyond it are evicted, and a scan that no longer sees full label
+    /// coverage falls back to the exact scan.
     pub(crate) hnsw_budget: std::sync::atomic::AtomicUsize,
     /// `query_count` global/session variable: statements executed so far.
     pub(crate) query_count: std::sync::atomic::AtomicU64,
@@ -4789,15 +4873,34 @@ pub struct Engine {
     pub(crate) index_epoch: std::sync::atomic::AtomicU64,
     /// Engine-wide runtime state (the reference's `InfinityContext`).
     pub(crate) context: Context,
-    /// cached `SELECT` results keyed by the statement text
+    /// cached `SELECT` results keyed by the statement text. A `std::sync::Mutex`
+    /// for the same reason as `tables`: every access is one `get` / `len` /
+    /// `clear`, never held across an `.await` (see §1.9 of
+    /// `docs/THREADS_TO_TOKIO.md`).
     pub(crate) result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// `ResultCacheManager`: plan-node results the optimizer's
     /// `ResultCacheGetter` reads and the scan fills (`result_cache` config).
     pub(crate) plan_cache: Arc<planner::result_cache::SharedCache>,
     /// the database new unqualified table names are resolved against
     pub(crate) current_db: Mutex<String>,
+    /// Per-session database (plan §6.1): `session_id -> db`.
+    ///
+    /// The reference keeps its sessions in a process-wide map and each one
+    /// carries its own `current_db`; two connections that `USE` different
+    /// databases must not see each other's choice. `current_db` above stays as
+    /// the default a session-less caller (a test, a background task) sees.
+    pub(crate) sessions: Mutex<HashMap<i64, String>>,
+    /// Ids handed out by `open_session`; never reused, like the reference's.
     /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
     /// fully-qualified lower-case table name.
+    /// Per-table write bookkeeping. A `std::sync::Mutex`, deliberately: every
+    /// use is "lock, read or write one entry, unlock" - the longest critical
+    /// section is a `HashMap` lookup plus a clone, and **no caller holds it
+    /// across an `.await`**. Making it `tokio::sync::Mutex` would force the 102
+    /// synchronous accessors of this map (and through them `run_select`,
+    /// `run_plan` and the operator chain) to become `async`, for a lock that is
+    /// never contended for longer than a hash lookup. See
+    /// `docs/THREADS_TO_TOKIO.md` §1.9.
     pub(crate) tables: Arc<Mutex<HashMap<String, TableEntry>>>,
     /// Serialises the schema work a DDL does before its transaction commits.
     ///
@@ -4809,7 +4912,7 @@ pub struct Engine {
     /// capture and applies its cells and column files after the conflict
     /// check (`ddl_commit_with_effects`), so those commit phases are ordered by
     /// the transaction manager's conflict matrix instead of this lock.
-    pub(crate) ddl_lock: Mutex<()>,
+    pub(crate) ddl_lock: tokio::sync::Mutex<()>,
     /// Optional background task processor (`BGTaskProcessor`). When attached,
     /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
     /// quota is enforced synchronously.
@@ -4827,14 +4930,14 @@ pub struct Engine {
     /// reference's per-block `BlockLock` gives for writes that do not touch the
     /// same block (`storage/block/block_lock`). A dump holds every gate, in key
     /// order, so it sees whole batches.
-    pub(crate) batch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    pub(crate) batch_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// One gate per table: a transaction's bottom half (rows → index entries →
     /// block mirror) runs under its table's gate, so two transactions of the
     /// same table do their bottom work one after the other while transactions
     /// of different tables overlap - the order `BottomExecutor`'s
     /// `crc32(table_id) % n` queues give the reference
     /// (`bottom_executor_impl.cpp:32-78`).
-    pub(crate) bottom_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    pub(crate) bottom_gates: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// One FIFO of bottom-half jobs **per table**, drained on the shared pool.
     ///
     /// The reference routes a transaction to `crc32(table_id) % pool_size`, so
@@ -4971,9 +5074,17 @@ impl PendingRestore<'_> {
     /// Applies the restore, as `CommitTxn` does for a restore transaction.
     pub fn commit(self) -> Result<()> {
         match self.scope {
-            RestoreScope::Table => self.engine.restore_table_snapshot(&self.name),
-            RestoreScope::Database => self.engine.restore_database_snapshot(&self.name),
-            RestoreScope::System => self.engine.restore_system_snapshot(&self.name),
+            // A synchronous adapter for the tests and `EngineTxn`; the
+            // statement path awaits the snapshot functions directly.
+            RestoreScope::Table => {
+                crate::scheduler::block_on(self.engine.restore_table_snapshot(&self.name))
+            }
+            RestoreScope::Database => {
+                crate::scheduler::block_on(self.engine.restore_database_snapshot(&self.name))
+            }
+            RestoreScope::System => {
+                crate::scheduler::block_on(self.engine.restore_system_snapshot(&self.name))
+            }
         }
     }
 
@@ -5071,7 +5182,7 @@ impl Drop for BottomGuard<'_> {
     }
 }
 
-pub(crate) fn run_bottom(
+pub(crate) async fn run_bottom(
     engine: &Engine,
     appends: &[StagedAppend],
     deletes: &[(String, usize)],
@@ -5084,7 +5195,7 @@ pub(crate) fn run_bottom(
         // inside `CommitBottom` in the reference). The commit becomes
         // visible only once the index entries are in place, so a reader
         // never sees rows their index does not know about yet.
-        let ts = engine.txn.commit_deferred(txn)?;
+        let ts = engine.txn.commit_deferred(txn).await?;
         visible = Some(BottomGuard::new(&engine.txn, ts));
         // The block's `version` carries each append's and each delete's
         // commit ts (`BlockVersion::Append` / `Delete`). Each staged append
@@ -5118,7 +5229,7 @@ pub(crate) fn run_bottom(
         // every later statement's ts where the reference has it.
         let turn = engine.txn.reserve_commit_ts();
         let ts = turn.ts();
-        engine.txn.commit_at(txn, ts)?;
+        engine.txn.commit_at(txn, ts).await?;
     }
     for append in appends {
         let table = append.table.as_str();
@@ -5139,12 +5250,14 @@ pub(crate) fn run_bottom(
                 .iter()
                 .map(|(seq, cells)| (*seq, cells.as_slice()))
                 .collect();
-            engine.update_text_indexes_batch(table, &batch, &schema, None);
+            engine
+                .update_text_indexes_batch_async(table, &batch, &schema, None)
+                .await;
             for (seq, cells) in &texts {
                 engine.update_vector_caches(table, *seq, cells);
             }
             engine.dump_hnsw_over_capacity(table);
-            engine.dump_secondary_over_capacity(table);
+            engine.dump_secondary_over_capacity(table).await;
         }
         engine.bump_writes(table);
         engine.note_live_rows(table, append.rows.len() as isize);
@@ -5196,13 +5309,6 @@ pub(crate) fn run_bottom(
     Ok(())
 }
 
-/// Jobs the appender thread has run, for tests.
-#[derive(Default)]
-pub(crate) struct BottomState {
-    pub(crate) finished: bool,
-    pub(crate) result: Option<Result<()>>,
-}
-
 /// The per-table FIFO of bottom-half jobs (`Engine::bottom_queues`).
 #[derive(Default)]
 pub(crate) struct BottomQueues {
@@ -5220,26 +5326,42 @@ pub(crate) type BottomJob = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
 
 /// The post-commit work of one statement, handed to a [`BottomExecutor`]
 /// worker (`NewTxnManager::CommitBottom` for a single-table statement).
+///
+/// The completion handshake is a **tokio oneshot** (plan 6.12.4 step 2): the
+/// caller does not need a shared `finished` flag plus a `Condvar`, only "tell me
+/// when it is done, and give me the result". The result rides in the message, so
+/// the state mutex disappears with the condvar; when the statement path is async
+/// the `wait` becomes `await` without another change.
 pub(crate) struct BottomWork {
     pub(crate) engine: Arc<Engine>,
     pub(crate) table_id: String,
     /// The tables' gates, locked on the worker: bottom halves of one table take
     /// their turn in submission (= commit) order.
-    pub(crate) gates: Vec<Arc<std::sync::Mutex<()>>>,
+    pub(crate) gates: Vec<Arc<tokio::sync::Mutex<()>>>,
     pub(crate) work: std::sync::Mutex<Option<BottomJob>>,
-    pub(crate) state: std::sync::Mutex<BottomState>,
-    pub(crate) done: std::sync::Condvar,
+    /// The worker's end of the completion channel, taken by `commit_bottom`.
+    pub(crate) done: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<Result<()>>>>,
+    /// The waiter's end, taken by `wait`.
+    pub(crate) finished: std::sync::Mutex<Option<tokio::sync::oneshot::Receiver<Result<()>>>>,
 }
 
 impl BottomWork {
-    pub(crate) fn wait(&self) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
-        while !state.finished {
-            state = self.done.wait(state).unwrap();
-        }
-        match state.result.take() {
-            Some(result) => result,
-            None => Ok(()),
+    pub(crate) async fn wait(&self) -> Result<()> {
+        let receiver = {
+            let mut slot = self.finished.lock().unwrap();
+            match slot.take() {
+                Some(receiver) => receiver,
+                // Already answered (or never armed): nothing to wait for.
+                None => return Ok(()),
+            }
+        };
+        match receiver.await {
+            Ok(result) => result,
+            // The sender was dropped without sending: the worker died before
+            // the bottom ran. Reporting success would hide a lost commit.
+            Err(_) => Err(Error::Txn(
+                "a bottom-half task finished without a result".into(),
+            )),
         }
     }
 }
@@ -5259,17 +5381,20 @@ impl storage::wal::bottom_executor::BottomTask for BottomWork {
         let work = self.work.lock().unwrap().take();
         let result = match work {
             Some(work) => {
-                let _turn: Vec<std::sync::MutexGuard<'_, ()>> =
-                    self.gates.iter().map(|gate| gate.lock().unwrap()).collect();
+                let _turn: Vec<tokio::sync::MutexGuard<'_, ()>> = self
+                    .gates
+                    .iter()
+                    .map(|gate| crate::scheduler::block_on(gate.lock()))
+                    .collect::<Vec<_>>();
                 work(&self.engine)
             }
             None => Ok(()),
         };
-        let mut state = self.state.lock().unwrap();
-        state.result = Some(result);
-        state.finished = true;
-        drop(state);
-        self.done.notify_all();
+        // A waiter that has already given up (`wait` was never called, or the
+        // receiver dropped) simply loses the message; the bottom itself ran.
+        if let Some(sender) = self.done.lock().unwrap().take() {
+            let _ = sender.send(result);
+        }
     }
 }
 
@@ -5410,7 +5535,7 @@ impl<'a> EngineTxn<'a> {
     /// `NewTxn::CreateTableSnapshot`: reads committed state only, so this
     /// transaction's staged writes are invisible to the snapshot.
     pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
-        self.engine.create_table_snapshot(db, table, name)
+        crate::scheduler::block_on(self.engine.create_table_snapshot(db, table, name))
     }
 
     /// C++ `NewTxn::DumpMemIndex`: stages the dump of `index` on `table`.
@@ -5510,7 +5635,7 @@ impl<'a> EngineTxn<'a> {
             .collect();
         gate_keys.sort();
         gate_keys.dedup();
-        let gates: Vec<std::sync::Arc<std::sync::Mutex<()>>> = gate_keys
+        let gates: Vec<std::sync::Arc<tokio::sync::Mutex<()>>> = gate_keys
             .iter()
             .map(|table| self.engine.bottom_gate(table))
             .collect();
@@ -5532,22 +5657,25 @@ impl<'a> EngineTxn<'a> {
                 .or_else(|| deletes.first().map(|(table, _)| table.clone()))
                 .or_else(|| dumps.first().map(|dump| dump.table.clone()))
                 .unwrap_or_default();
+            let (done, finished) = tokio::sync::oneshot::channel();
             let task = std::sync::Arc::new(BottomWork {
                 engine,
                 table_id,
                 gates,
                 work: std::sync::Mutex::new(Some(Box::new(move |engine: &Engine| {
-                    run_bottom(engine, &appends, &deletes, &dumps, txn)
+                    crate::scheduler::block_on(run_bottom(engine, &appends, &deletes, &dumps, txn))
                 }))),
-                state: std::sync::Mutex::new(BottomState::default()),
-                done: std::sync::Condvar::new(),
+                done: std::sync::Mutex::new(Some(done)),
+                finished: std::sync::Mutex::new(Some(finished)),
             });
             self.engine.submit_bottom(task.clone());
-            return task.wait();
+            return crate::scheduler::block_on(task.wait());
         }
-        let _gates: Vec<std::sync::MutexGuard<'_, ()>> =
-            gates.iter().map(|gate| gate.lock().unwrap()).collect();
-        run_bottom(self.engine, &appends, &deletes, &dumps, txn)
+        let _gates: Vec<tokio::sync::MutexGuard<'_, ()>> = gates
+            .iter()
+            .map(|gate| crate::scheduler::block_on(gate.lock()))
+            .collect();
+        crate::scheduler::block_on(run_bottom(self.engine, &appends, &deletes, &dumps, txn))
     }
 
     /// `NewTxn::Rollback`: discards every staged write and counts the rollback
@@ -5803,6 +5931,14 @@ impl Default for EngineOptions {
 
 pub(crate) type AllocJob = Box<dyn FnOnce(&Engine) + Send>;
 
+/// Depth of the row allocator's queue.
+///
+/// The same size the background-task queue uses (`DEFAULT_BLOCKING_QUEUE_SIZE`).
+/// An append waits for its answer, so the queue only holds jobs the allocator
+/// has not picked up yet; the bound exists so a stalled allocator cannot make a
+/// burst of appends grow it without limit.
+pub(crate) const ALLOC_QUEUE_CAPACITY: usize = 1024;
+
 /// A reserved run of row ids and the append record that describes it.
 ///
 /// The record is what the block's `version` file needs (`BlockVersion::Append`
@@ -5824,8 +5960,14 @@ impl RowRange {
 }
 
 /// `TxnAllocator`: the single thread that hands out row ids.
+///
+/// The queue is a bounded `tokio` channel, and **both ends are now async**: the
+/// consumer is a runtime task that drains with `recv().await`, and the
+/// committers - which are all async (`run_bottom`, `insert_literals_inner`,
+/// `copy_from_inner`) - send with `send().await`. A job body only touches the
+/// in-memory row counter, so nothing on this path needs a blocking thread.
 pub(crate) struct Allocator {
-    pub(crate) jobs: std::sync::mpsc::Sender<AllocJob>,
+    pub(crate) jobs: tokio::sync::mpsc::Sender<AllocJob>,
 }
 
 /// Where one `COPY` stands inside the segment it opened.
@@ -5842,13 +5984,13 @@ pub(crate) struct ImportCursor {
     pub(crate) batches: Vec<usize>,
 }
 
-/// Which append records a bottom half has to stamp with its commit ts.
-pub(crate) enum AppendRecords {
-    None,
-    /// The last `n` records, for a transaction that staged its own appends
-    /// (`EngineTxn::append`).
-    Last(usize),
-}
+/// How many of the **last** append records a bottom half has to stamp with its
+/// commit ts (`None` when the transaction staged no appends of its own).
+///
+/// It was an enum with a `None` variant until every producer that appends now
+/// stamps its own record - an unstamped record is a row `committed_rows` does
+/// not see, which is exactly the bug that variant caused.
+pub(crate) type AppendRecords = Option<usize>;
 
 /// Renames the projection's output columns with the select-list aliases.
 pub(crate) fn apply_select_aliases(plan: &mut LogicalPlan, aliases: &[Option<String>]) {
@@ -5985,28 +6127,6 @@ pub(crate) fn secondary_key_kind(declared: &str) -> storage::secondary_segment::
         KeyKind::I32
     } else {
         KeyKind::U64
-    }
-}
-
-/// The half-open `[low, high)` range of the integers an **integer** column's
-/// chunk key can hold, as `f64`.
-///
-/// A key's width is the storage width, so a value outside it can never equal a
-/// stored key: `tinyint_col = 300` has no answer at all, and encoding the
-/// truncated `44` would answer a different predicate. The upper end is
-/// exclusive on every width because the next power of two is exactly
-/// representable in `f64` while the largest integer of the width (e.g.
-/// `i64::MAX`) is not - `i64::MAX as f64` rounds up to `2^63`.
-pub(crate) fn integer_key_bounds(declared: &str) -> (f64, f64) {
-    use storage::secondary_segment::KeyKind;
-    match secondary_key_kind(declared) {
-        KeyKind::I8 => (-128.0, 128.0),
-        KeyKind::I16 => (-32_768.0, 32_768.0),
-        KeyKind::I32 => (-2_147_483_648.0, 2_147_483_648.0),
-        KeyKind::I64 => (-9_223_372_036_854_775_808.0, 9_223_372_036_854_775_808.0),
-        // `UINT` keys are `u64`, but a probe value is a `Literal::Int` (`i64`):
-        // only the representable half can be asked for.
-        _ => (0.0, 9_223_372_036_854_775_808.0),
     }
 }
 
@@ -6356,76 +6476,22 @@ pub(crate) fn bound_key(
     }
 }
 
-/// Which end of an inclusive range a bound is.
-///
-/// It decides which way a bound steps when the tail's width cannot represent it:
-/// the interval must keep every stored value the predicate admits and nothing it
-/// rejects, so the lower end rounds *up* to the first representable value inside
-/// the interval and the upper end rounds *down*.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum RangeBound {
-    Lower,
-    Upper,
-}
-
 /// A query bound as the memory tail's ordered bytes.
 ///
 /// [`bound_key`] widens a float bound to `f64` so that a chunk's `f32`
 /// comparison cannot clip a boundary row; the tail stores the column's own
-/// width, so the bound is narrowed back here.
-///
-/// The narrowing is not a plain cast. `0.1 as f32` is `0.09999999`, so
-/// round-to-nearest can start `f >= 0.1` *below* the bound and admit a row the
-/// predicate rejects - and that is only harmless while something later re-checks
-/// the row. The indexed KNN path has no such filter (its rows are a vector
-/// projection, so the predicate is never re-evaluated), so the interval has to
-/// be exactly the set of stored `f32`s the predicate admits: step to the
-/// adjacent representable value whenever the nearest one falls outside.
+/// width, so the bound is narrowed back here. Narrowing rounds monotonically, so
+/// a row that satisfies the bound still falls inside the narrowed interval —
+/// any extra candidates the rounding adds are removed by the residual filter.
 pub(crate) fn tail_bound(
     kind: storage::secondary_segment::KeyKind,
     key: storage::secondary_segment::Key,
-    side: RangeBound,
 ) -> Vec<u8> {
     use storage::secondary_segment::{Key, KeyKind};
     match (kind, key) {
-        (KeyKind::F32, Key::F64(v)) => {
-            let narrowed = v as f32;
-            let narrowed = match side {
-                // The smallest `f32` that is still `>= v`.
-                RangeBound::Lower if f64::from(narrowed) < v => next_up_f32(narrowed),
-                // The largest `f32` that is still `<= v`.
-                RangeBound::Upper if f64::from(narrowed) > v => next_down_f32(narrowed),
-                _ => narrowed,
-            };
-            Key::F32(narrowed).ordered_bytes()
-        }
+        (KeyKind::F32, Key::F64(v)) => Key::F32(v as f32).ordered_bytes(),
         _ => key.ordered_bytes(),
     }
-}
-
-/// `std::nextafter(x, +inf)`: a positive magnitude grows, a negative one shrinks,
-/// and `±0` steps to the smallest positive subnormal.
-fn next_up_f32(x: f32) -> f32 {
-    if x.is_nan() || x == f32::INFINITY {
-        return x;
-    }
-    if x == 0.0 {
-        return f32::from_bits(1);
-    }
-    let bits = x.to_bits();
-    f32::from_bits(if x > 0.0 { bits + 1 } else { bits - 1 })
-}
-
-/// `std::nextafter(x, -inf)`.
-fn next_down_f32(x: f32) -> f32 {
-    if x.is_nan() || x == f32::NEG_INFINITY {
-        return x;
-    }
-    if x == 0.0 {
-        return f32::from_bits(0x8000_0001);
-    }
-    let bits = x.to_bits();
-    f32::from_bits(if x > 0.0 { bits - 1 } else { bits + 1 })
 }
 
 /// A date/time bound: the planner passes the literal's text for a finite bound
@@ -7098,63 +7164,11 @@ pub(crate) fn arg_int(e: &ExprAst) -> Option<i64> {
 }
 
 pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
-    // The brackets of a nested literal are *separators*, not payload: a
-    // `MULTIVECTOR` cell is stored as `[[a,b],[c,d]]`, and keeping the inner
-    // brackets makes `b]` and `[c` fail the parse, so the flat value silently
-    // loses every coordinate but the first and the last. Every caller wants the
-    // flattened coordinates (one vertex per `dim`-sized token), so both kinds of
-    // bracket are split on.
-    s.split([',', ' ', '[', ']'])
+    let t = s.trim().trim_start_matches('[').trim_end_matches(']');
+    t.split([',', ' '])
         .filter(|x| !x.is_empty())
         .filter_map(|x| x.parse::<f64>().ok())
         .collect()
-}
-
-/// Parses a stored vector cell strictly, for a caller about to index it.
-///
-/// [`parse_vec_str`] drops every leaf it cannot parse, which is right for a
-/// best-effort display path but wrong for a build: `[1,2,bad,4]` silently
-/// becomes three coordinates, so a row ends up with a token count (and hence a
-/// vertex dimension) the column never declared. Here an unparseable leaf is an
-/// error, and the caller turns it into the build failure it is.
-///
-/// A `BIT` column stores its value in the display form (`[10110001]`, or the
-/// comma-separated variant), one character per coordinate;
-/// [`parse_vec_str`] would read that as the single number `10110001`, so each
-/// bit character is decoded into its own 0/1 coordinate instead.
-pub(crate) fn parse_vector_cell(text: &str, bit: bool) -> std::result::Result<Vec<f32>, String> {
-    let trimmed = text.trim();
-    // A NULL cell is stored as the literal `null` (that is how the column and
-    // value encoders write it, and every reader reads it back as SQL NULL). It
-    // carries no coordinates, so it is empty rather than a parse failure: an
-    // index build skips it like the sparse builder does.
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
-        return Ok(Vec::new());
-    }
-    if bit {
-        let mut out = Vec::with_capacity(trimmed.len());
-        for c in trimmed.chars() {
-            match c {
-                '0' => out.push(0.0),
-                '1' => out.push(1.0),
-                // A literal's brackets, separators and padding are not payload.
-                '[' | ']' | ',' | ' ' | '\t' | '\n' | '\r' => {}
-                other => return Err(format!("'{other}' is not a bit")),
-            }
-        }
-        return Ok(out);
-    }
-    let mut out = Vec::new();
-    for leaf in trimmed
-        .split([',', ' ', '[', ']', '\t', '\n', '\r'])
-        .filter(|x| !x.is_empty())
-    {
-        match leaf.parse::<f32>() {
-            Ok(v) => out.push(v),
-            Err(_) => return Err(format!("'{leaf}' is not a number")),
-        }
-    }
-    Ok(out)
 }
 
 /// Splits a stored multi-vector value into `dims`-sized token rows. Bit
@@ -8367,6 +8381,18 @@ pub(crate) fn parse_topn_param(p: &str) -> Option<usize> {
     digits.parse().ok()
 }
 
+/// Reads one `key=value` out of a `;`-separated option string
+/// (`'topn=10;default_field=body'`). The key is matched case-insensitively and
+/// the value is trimmed, as every other option reader in this module does.
+pub(crate) fn search_option(params: &str, key: &str) -> Option<String> {
+    params
+        .split(';')
+        .filter_map(|p| p.split_once('='))
+        .find(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+        .map(|(_, v)| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 /// Returns `(similarity, distance)` for the given metric.
 pub(crate) fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
     let dot: f64 = q.iter().zip(v).map(|(a, b)| a * b).sum();
@@ -8462,14 +8488,19 @@ impl BgTask for DumpMemIndexTask {
         "DumpMemIndexTask"
     }
 
-    fn run(self: Box<Self>) {
-        if let Some(engine) = self.engine.upgrade() {
-            // A dump sees a whole write batch: the dump transaction conflicts
-            // with an append or update that already took its commit ts on the
-            // same segment and is retried, as the reference's `DoDump` is.
-            engine.dump_all_memory_indexes();
-        }
-        self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            if let Some(engine) = self.engine.upgrade() {
+                // A dump sees a whole write batch: the dump transaction
+                // conflicts with an append or update that already took its
+                // commit ts on the same segment and is retried, as the
+                // reference's `DoDump` is. Every step inside is an `.await`;
+                // the segment files it seals are written on the blocking pool,
+                // leaf by leaf.
+                engine.dump_all_memory_indexes().await;
+            }
+            self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
+        })
     }
 }
 
@@ -8478,12 +8509,14 @@ impl BgTask for CleanupTask {
         "CleanupTask"
     }
 
-    fn run(self: Box<Self>) {
-        if let Some(engine) = self.engine.upgrade() {
-            if let Err(error) = engine.cleanup() {
-                eprintln!("background cleanup failed: {error}");
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            if let Some(engine) = self.engine.upgrade() {
+                if let Err(error) = engine.cleanup().await {
+                    eprintln!("background cleanup failed: {error}");
+                }
             }
-        }
+        })
     }
 }
 
@@ -8492,12 +8525,14 @@ impl BgTask for OptimizeTask {
         "OptimizeTask"
     }
 
-    fn run(self: Box<Self>) {
-        if let Some(engine) = self.engine.upgrade() {
-            if let Err(error) = engine.optimize_indexes() {
-                eprintln!("background optimize failed: {error}");
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            if let Some(engine) = self.engine.upgrade() {
+                if let Err(error) = engine.optimize_indexes_async().await {
+                    eprintln!("background optimize failed: {error}");
+                }
             }
-        }
+        })
     }
 }
 
@@ -8529,26 +8564,5 @@ mod float_format_ut {
     #[allow(clippy::excessive_precision)]
     fn a_decimal_tie_rounds_like_ryu() {
         assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
-    }
-}
-
-#[cfg(test)]
-mod literal_tests {
-    use super::parse_vec_str;
-
-    /// A nested literal flattens to every one of its coordinates. The
-    /// multi-vector write paths split the flat value into `dim`-sized tokens,
-    /// so treating the inner brackets as payload silently reduced a two-token
-    /// cell to a single malformed token (`[a, d]` out of `[[a,b],[c,d]]`).
-    #[test]
-    fn a_nested_literal_flattens_to_all_of_its_coordinates() {
-        assert_eq!(
-            parse_vec_str("[[0.3,0.7],[0.9,0.9]]"),
-            vec![0.3, 0.7, 0.9, 0.9]
-        );
-        assert_eq!(parse_vec_str("[[1,2]]"), vec![1.0, 2.0]);
-        assert_eq!(parse_vec_str("[1,2]"), vec![1.0, 2.0]);
-        assert_eq!(parse_vec_str("  [ 1 , 2 ] "), vec![1.0, 2.0]);
-        assert_eq!(parse_vec_str("[]"), Vec::<f64>::new());
     }
 }

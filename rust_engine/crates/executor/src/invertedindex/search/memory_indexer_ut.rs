@@ -71,7 +71,7 @@ fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
 
 /// The rows of a `SELECT count(*)`.
 fn count_rows(e: &Engine, sql: &str) -> usize {
-    for r in e.execute(sql).unwrap() {
+    for r in e.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { rows, .. } = r {
             return rows[0][0].to_slt_string().parse().unwrap();
         }
@@ -248,8 +248,9 @@ fn terms_from_spilled_runs_survive_a_restart() {
     let index_dir;
     {
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ft_restart (doc VARCHAR);").unwrap();
-        e.execute("CREATE INDEX ft_restart_idx ON ft_restart (doc) USING FULLTEXT;")
+        e.execute_blocking("CREATE TABLE ft_restart (doc VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ft_restart_idx ON ft_restart (doc) USING FULLTEXT;")
             .unwrap();
         let shared = e
             .text_index_for("ft_restart", "doc", e.index_tokenizer("ft_restart", "doc"))
@@ -260,13 +261,13 @@ fn terms_from_spilled_runs_survive_a_restart() {
             guard.dir.clone()
         };
         for row in 0..40 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO ft_restart VALUES ('alpha beta gamma {row}');"
             ))
             .unwrap();
         }
         // A term that only appears after the budget was crossed.
-        e.execute("INSERT INTO ft_restart VALUES ('zebrafish');")
+        e.execute_blocking("INSERT INTO ft_restart VALUES ('zebrafish');")
             .unwrap();
         let mut guard = shared.write().unwrap();
         assert!(
