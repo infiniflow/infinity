@@ -3228,6 +3228,10 @@ impl Engine {
         let table = self.qualified_table(table);
         let root = self.blocks_root();
         let read_ts = crate::read_ts();
+        // The journal's deletes as of *this* statement, read once and applied to
+        // both sources: a block's `version` only carries the deletes a flush has
+        // written, and the buffered rows never reach a `version` at all.
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         let mut out: Vec<usize> = Vec::new();
         for id in self.visible_block_ids(&table) {
             let Ok(block) = self.block_map(&table, &root, id) else {
@@ -3244,14 +3248,15 @@ impl Engine {
                 if !Self::slot_visible(version, slot, created_at, read_ts) {
                     continue;
                 }
-                out.push(
-                    ((id.segment_id as usize) << 32)
-                        | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot),
-                );
+                let seq = ((id.segment_id as usize) << 32)
+                    | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
+                if dead.contains(&(seq as u64)) {
+                    continue;
+                }
+                out.push(seq);
             }
         }
         // Rows above the last checkpoint live in the append buffer.
-        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         for (seq, _) in self.pending_rows_of(&table) {
             if !dead.contains(&(seq as u64)) {
                 out.push(seq);

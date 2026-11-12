@@ -55,7 +55,21 @@ pub(crate) fn key_is_exact(declared: &str, value: &expression::Value) -> bool {
             _ => *i as f64 as i64 == *i,
         },
         (KeyDomain::Temporal, V::Str(text)) => temporal_key(declared, text).is_some(),
-        (KeyDomain::Hashed, V::Str(_)) => true,
+        (KeyDomain::Hashed, V::Str(text)) => {
+            // A `BOOL` column's key is `0`/`1` (`BooleanT`), and
+            // `text_to_key` reads *any* other text as `false`: `flag = 'maybe'`
+            // would then probe the `false` rows and answer a different
+            // predicate. Only the spellings the conversion keeps are exact.
+            if kind == KeyKind::Bool {
+                matches!(
+                    text.trim().to_ascii_lowercase().as_str(),
+                    "true" | "1" | "false" | "0"
+                )
+            } else {
+                // A varchar key is the hash of the text, which is lossless.
+                true
+            }
+        }
         // A numeric literal on a text column, or a temporal literal that is not
         // text, has no key in that column's space.
         _ => false,
@@ -228,10 +242,15 @@ impl Engine {
                             let flat: Vec<f32> =
                                 parse_vec_str(&text).iter().map(|x| *x as f32).collect();
                             let tokens = crate::hnsw_mem::split_tokens(&flat, dims);
-                            // A cell that is not a whole number of tokens has no
-                            // vertex width this graph can hold, which
-                            // `insert_token_batch` reports by rejecting.
-                            (!tokens.is_empty()).then_some((*seq as u64, tokens))
+                            // `insert_token_batch` rejects the *whole* batch when
+                            // one token does not match `dims`, so a single
+                            // malformed cell would drop every valid row behind
+                            // it. A cell that is not a whole number of tokens has
+                            // no vertex width this graph can hold; leave it to
+                            // the exact scan.
+                            let usable =
+                                !tokens.is_empty() && tokens.iter().all(|t| t.len() == dims);
+                            usable.then_some((*seq as u64, tokens))
                         })
                         .collect();
                     if !recovered.is_empty() {

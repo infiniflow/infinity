@@ -80,33 +80,6 @@ pub(crate) struct KnnCandidateScan<'a> {
 }
 
 impl Engine {
-    /// How many live rows the scan would score without an index, when a cheap
-    /// source knows it.
-    ///
-    /// The HNSW path asks coverage as a *count* first: labels are disjoint
-    /// across segments and each names one row, so "as many labels as live rows"
-    /// says the same thing as "every live row is labelled", at no set cost.
-    /// Building a 20k-entry set per query was 240-360 us of the ~600 us an
-    /// indexed query spent on the server.
-    fn knn_live_row_count(&self, q: &KnnCandidateScan<'_>) -> Option<usize> {
-        if let Some(live) = q.live_rows {
-            return Some(live.len());
-        }
-        if let Some(c) = &q.cache {
-            return c.read().ok().map(|guard| guard.live.len());
-        }
-        // A filtered query decodes only the predicate's columns before this
-        // point, so `rows` is still empty; the admitted set is the row set that
-        // matters.
-        if let Some(allow) = q.allow {
-            return Some(allow.len());
-        }
-        if !q.rows.is_empty() {
-            return Some(q.rows.len());
-        }
-        self.row_count(q.table).ok()
-    }
-
     /// The live row ids the scan would score without an index.
     ///
     /// Every cheap source is asked first; with none of them available (an
@@ -132,12 +105,6 @@ impl Engine {
         }
         let ids = self.live_row_ids(q.table);
         (!ids.is_empty()).then_some(ids)
-    }
-
-    /// Whether the index labels every live row.
-    fn all_covered(&self, q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
-        self.knn_live_row_count(q)
-            .is_some_and(|live| live == labelled)
     }
 }
 
@@ -167,7 +134,13 @@ impl Engine {
         // graph until a chunk is rewritten, so without this a query whose
         // nearest vertices are all deleted answers short - or, on the exact
         // path, rescues them from the decoded rows.
-        let dead = self.tombstone_set(q.table).unwrap_or_default();
+        //
+        // The set is the one *this statement's* snapshot sees
+        // (`tombstone_set_at(read_ts)`), not the journal's current state: a row
+        // deleted after the statement started is still part of its answer.
+        let dead = self
+            .tombstone_set_at(q.table, crate::read_ts())
+            .unwrap_or_default();
         let allow_row = |row: u64| {
             !dead.contains(&row) && q.allow.is_none_or(|set| set.contains(&(row as usize)))
         };
@@ -405,24 +378,20 @@ impl Engine {
             }
             break candidates;
         };
-        if self.all_covered(q, labelled) {
-            return Some(candidates);
-        }
-        // A count is not a set. `labelled` also counts rows deleted since the
-        // graph was written, so one deletion made `labelled == live` false for
-        // ever and every query after it fell back to the exact scan - the whole
-        // vector column decoded per query. Ask the question directly instead:
-        // every live row has to be held by some graph. It is only paid for once
-        // the count has already failed.
+        // Coverage is a property of the *row ids the index labels*, not of a
+        // count. A count comparison says nothing about which rows are held: a
+        // graph that labels 100 rows of a 100-row table may label rows the
+        // statement no longer sees and miss live ones - and `labelled` also
+        // counts vertices whose rows were deleted since the graph was written.
+        // Every live row therefore has to be found in the union of the labels.
         let mut covered: HashSet<usize> = HashSet::with_capacity(labelled);
         for seg in &segments {
             covered.extend(seg.labels.iter().map(|label| *label as usize));
         }
-        // The memory segment's labels are as authoritative as a chunk's, and
-        // this is the only place that needs them: a multi-vector segment holds
-        // one label per token, so copying them on every probe (and again on
-        // every filter retry) was an index-sized allocation the count check
-        // usually makes pointless.
+        // The memory segment's labels are as authoritative as a chunk's. The
+        // snapshot is taken here, once, rather than per probe: a multi-vector
+        // segment holds one label per token, so copying them on every retry was
+        // an index-sized allocation.
         if let Some(mem) = &mem {
             if let Ok(mem) = mem.read() {
                 covered.extend(mem.rows().iter().map(|label| *label as usize));
