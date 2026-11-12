@@ -20,7 +20,7 @@ fn main() {
         .map(|c| format!("{} VARCHAR", c.name))
         .collect();
     let sql = format!("CREATE TABLE {} ({});", req.table_name, cols.join(", "));
-    let resp = match engine.execute(&sql) {
+    let resp = match engine.execute_blocking(&sql) {
         Ok(_) => CommonResponse {
             error_code: 0,
             error_msg: "OK".into(),
@@ -32,7 +32,7 @@ fn main() {
             session_id: req.session_id,
         },
     };
-    let _ = engine.flush();
+    let _ = executor::block_on(engine.flush());
 
     let mut out = std::io::stdout().lock();
     write_reply_common(&mut out, "CreateTable", seq, &resp).expect("write reply");

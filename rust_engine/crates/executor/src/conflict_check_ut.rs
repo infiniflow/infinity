@@ -14,7 +14,7 @@ use txn::Txn;
 
 fn expect_conflict(e: &Engine, table: &str, seqs: &[usize], txn: Txn) {
     assert!(matches!(
-        e.commit_with_deletes(table, seqs, 0, &[], txn),
+        crate::scheduler::block_on(e.commit_with_deletes(table, seqs, 0, &[], txn)),
         Err(Error::TxnConflict(_))
     ));
 }
@@ -23,8 +23,9 @@ fn expect_conflict(e: &Engine, table: &str, seqs: &[usize], txn: Txn) {
 fn conflict_check_delete() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE table1 (col1 INT);").unwrap();
-    e.execute("INSERT INTO table1 VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);")
+    e.execute_blocking("CREATE TABLE table1 (col1 INT);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO table1 VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);")
         .unwrap();
 
     let table = "default_db.table1";
@@ -49,7 +50,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[0]]);
         let txn3 = delete_row(&[seq_of[0]]);
 
-        e.commit_with_deletes(table, &[seq_of[0]], 0, &[], txn1)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seq_of[0]], 0, &[], txn1))
             .unwrap();
         expect_conflict(&e, table, &[seq_of[0]], txn2);
         expect_conflict(&e, table, &[seq_of[0]], txn3);
@@ -60,7 +61,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[1]]);
         let txn3 = delete_row(&[seq_of[1]]);
 
-        e.commit_with_deletes(table, &[seq_of[1]], 0, &[], txn2)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seq_of[1]], 0, &[], txn2))
             .unwrap();
         expect_conflict(&e, table, &[seq_of[1]], txn1);
         expect_conflict(&e, table, &[seq_of[1]], txn3);
@@ -71,7 +72,7 @@ fn conflict_check_delete() {
         let txn2 = delete_row(&[seq_of[2]]);
         let txn3 = delete_row(&[seq_of[2]]);
 
-        e.commit_with_deletes(table, &[seq_of[2]], 0, &[], txn3)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seq_of[2]], 0, &[], txn3))
             .unwrap();
         expect_conflict(&e, table, &[seq_of[2]], txn2);
         expect_conflict(&e, table, &[seq_of[2]], txn1);
@@ -81,7 +82,7 @@ fn conflict_check_delete() {
         let txn1 = delete_row(&[seq_of[3]]);
         let txn2 = delete_row(&[seq_of[3], seq_of[4]]);
 
-        e.commit_with_deletes(table, &[seq_of[3]], 0, &[], txn1)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seq_of[3]], 0, &[], txn1))
             .unwrap();
         expect_conflict(&e, table, &[seq_of[3], seq_of[4]], txn2);
         assert_eq!(e.row_count(table).unwrap(), 6);
@@ -90,8 +91,14 @@ fn conflict_check_delete() {
         let txn1 = delete_row(&[seq_of[5], seq_of[6]]);
         let txn2 = delete_row(&[seq_of[5]]);
 
-        e.commit_with_deletes(table, &[seq_of[5], seq_of[6]], 0, &[], txn1)
-            .unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(
+            table,
+            &[seq_of[5], seq_of[6]],
+            0,
+            &[],
+            txn1,
+        ))
+        .unwrap();
         expect_conflict(&e, table, &[seq_of[5]], txn2);
         assert_eq!(e.row_count(table).unwrap(), 4);
     }

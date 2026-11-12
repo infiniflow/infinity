@@ -309,9 +309,11 @@ mod tests {
     #[test]
     fn a_table_scan_reads_the_table_and_aligns_the_pruned_layout() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT, b INT);").unwrap();
         engine
-            .execute("INSERT INTO s VALUES (1, 10), (2, 20);")
+            .execute_blocking("CREATE TABLE s (a INT, b INT);")
+            .unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1, 10), (2, 20);")
             .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
@@ -335,8 +337,10 @@ mod tests {
     #[test]
     fn an_unmatchable_scan_yields_no_row() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT);").unwrap();
-        engine.execute("INSERT INTO s VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1);")
+            .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],
@@ -357,8 +361,10 @@ mod tests {
     #[test]
     fn an_override_supplies_the_rows_instead_of_the_table() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT);").unwrap();
-        engine.execute("INSERT INTO s VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1);")
+            .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],

@@ -15,7 +15,7 @@ use tempfile::tempdir;
 const BLOCK_ROW_CNT: usize = 8192;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -41,7 +41,10 @@ fn append_block(engine: &Engine, table: &str, cells: Vec<Literal>, row_cnt: usiz
 /// 8192-row blocks and checks every cell of every block through the engine.
 fn assert_two_blocks(engine: &Engine, table: &str, expected_cells: &[String]) {
     assert_eq!(engine.segment_ids(table), vec![0]);
-    assert_eq!(engine.write_blocks(table).unwrap(), 2 * BLOCK_ROW_CNT);
+    assert_eq!(
+        crate::scheduler::block_on(engine.write_blocks(table)).unwrap(),
+        2 * BLOCK_ROW_CNT
+    );
     assert_eq!(engine.block_ids(table, 0), vec![0, 1]);
     let all = rows(engine, &format!("SELECT * FROM {table};"));
     assert_eq!(all.len(), 2 * BLOCK_ROW_CNT);
@@ -69,13 +72,13 @@ fn assert_two_blocks(engine: &Engine, table: &str, expected_cells: &[String]) {
 fn add_column0() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT);").unwrap();
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT);").unwrap();
 
     for _ in 0..2 {
         append_block(&e, "default_db.tb1", vec![Literal::Int(1)], BLOCK_ROW_CNT);
     }
 
-    e.execute("ALTER TABLE tb1 ADD COLUMN (col2 VARCHAR DEFAULT '');")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (col2 VARCHAR DEFAULT '');")
         .unwrap();
 
     let column_defs = columns(&e, "default_db.tb1");
@@ -92,7 +95,7 @@ fn add_column0() {
 
     assert_two_blocks(&e, "default_db.tb1", &["1".to_string(), String::new()]);
 
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
 }
 
 /// C++ `alter_ut.cpp:193` (`TestTxnAlter.drop_column0`): two appends of 8192
@@ -102,7 +105,7 @@ fn add_column0() {
 fn drop_column0() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     for _ in 0..2 {
@@ -117,7 +120,8 @@ fn drop_column0() {
         );
     }
 
-    e.execute("ALTER TABLE tb1 DROP COLUMN (col2);").unwrap();
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (col2);")
+        .unwrap();
 
     // `GetColumnDefs`: col2 (id 1) is gone, col1 (id 0) remains.
     assert_eq!(
@@ -125,11 +129,11 @@ fn drop_column0() {
         vec![("col1".to_string(), "Integer".to_string())]
     );
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 2 * BLOCK_ROW_CNT);
-    assert!(e.execute("SELECT col2 FROM tb1;").is_err());
+    assert!(e.execute_blocking("SELECT col2 FROM tb1;").is_err());
 
     assert_two_blocks(&e, "default_db.tb1", &["1".to_string()]);
 
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
 }
 
 /// A row that only the WAL holds, replayed after the catalog already carries
@@ -148,17 +152,18 @@ fn drop_column0() {
 fn replay_of_rows_that_predate_a_committed_column_change() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 2, 'before');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'before');")
         .unwrap();
     // Both DDLs are in the catalog now; the row above is still only in the WAL.
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'default');")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'default');")
         .unwrap();
-    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
+        .unwrap();
     // A row written after the changes: the replayed table has to converge on
     // one schema for both rows.
-    e.execute("INSERT INTO tb1 VALUES (2, 'after', 'x');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (2, 'after', 'x');")
         .unwrap();
 
     // `RestartTxnMgr`: drop the engine (no flush, so the rows are replayed from
@@ -184,10 +189,12 @@ fn replay_of_rows_that_predate_a_committed_column_change() {
 fn replay_of_a_row_that_predates_a_committed_drop_column() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 2, 'keep');").unwrap();
-    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'keep');")
+        .unwrap();
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
+        .unwrap();
 
     drop(e);
     let e = Engine::open(dir.path()).unwrap();
@@ -205,9 +212,11 @@ fn replay_of_a_row_that_predates_a_committed_drop_column() {
 fn replay_of_a_row_that_predates_a_committed_add_column() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT);").unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 2);").unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c3 VARCHAR DEFAULT 'added');")
+    e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 2);")
+        .unwrap();
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c3 VARCHAR DEFAULT 'added');")
         .unwrap();
 
     drop(e);
@@ -225,15 +234,17 @@ fn replay_of_a_row_that_predates_a_committed_add_column() {
 fn replay_of_drop_then_readd_a_column() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'test');")
         .unwrap();
-    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
+        .unwrap();
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
         .unwrap();
 
     drop(e);
@@ -266,21 +277,23 @@ fn replay_of_drop_then_readd_a_column_around_a_checkpoint() {
     for checkpoint_after_ddl in [true, false] {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'test');")
+            .unwrap();
         if !checkpoint_after_ddl {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
             .unwrap();
-        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
             .unwrap();
-        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (2, 'test2', 'x', 1.5);")
             .unwrap();
         if checkpoint_after_ddl {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
 
         drop(e);
@@ -308,19 +321,21 @@ fn replay_of_drop_then_readd_a_column_around_a_checkpoint() {
 fn replay_of_the_test_alter_complex_sequence() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
         .unwrap();
-    e.execute("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'test');")
         .unwrap();
-    e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
         .unwrap();
-    e.execute("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+        .unwrap();
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
         .unwrap();
 
     drop(e);
@@ -351,34 +366,36 @@ fn replay_of_the_test_alter_complex_sequence_around_a_checkpoint() {
     for checkpoint_after in 0..=5 {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX idx1 ON tb1 (c3) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'test');")
+            .unwrap();
         if checkpoint_after == 1 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
             .unwrap();
         if checkpoint_after == 2 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
+        e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
+            .unwrap();
         if checkpoint_after == 3 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
             .unwrap();
         if checkpoint_after == 4 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+        e.execute_blocking("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
             .unwrap();
         if checkpoint_after == 5 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c5 INT DEFAULT 0);")
             .unwrap();
 
         drop(e);
@@ -419,9 +436,10 @@ fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
     for _ in 0..50 {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
+        e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 INT, c3 VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO tb1 VALUES (1, 2, 'test');").unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (1, 2, 'test');")
+            .unwrap();
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let flusher = {
             let e = std::sync::Arc::clone(&e);
@@ -430,20 +448,21 @@ fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
                 while !stop.load(std::sync::atomic::Ordering::Relaxed) {
                     // What `PeriodicTriggerThread::Run` does each tick.
                     e.checkpoint_wal();
-                    let _ = e.flush();
+                    let _ = crate::scheduler::block_on(e.flush());
                 }
             })
         };
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c4 VARCHAR DEFAULT 'tttt');")
             .unwrap();
-        e.execute("ALTER TABLE tb1 DROP COLUMN (c2);").unwrap();
-        e.execute("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+        e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (c2);")
             .unwrap();
-        e.execute("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
+        e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (c2 FLOAT DEFAULT 0.0);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (2, 'test2', 'tttt2', 1.0);")
             .unwrap();
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
         flusher.join().unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         // The block is the only copy after a restart.
         drop(e);
@@ -464,14 +483,14 @@ fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
 fn an_update_keeps_every_index_kind() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (id INT, a INT, b VARCHAR);")
+    e.execute_blocking("CREATE TABLE t (id INT, a INT, b VARCHAR);")
         .unwrap();
-    e.execute("CREATE INDEX t_a ON t (a);").unwrap();
-    e.execute("CREATE INDEX t_b ON t (b) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX t_a ON t (a);").unwrap();
+    e.execute_blocking("CREATE INDEX t_b ON t (b) USING FULLTEXT;")
         .unwrap();
-    e.execute("INSERT INTO t VALUES (1, 10, 'alpha'), (2, 20, 'beta');")
+    e.execute_blocking("INSERT INTO t VALUES (1, 10, 'alpha'), (2, 20, 'beta');")
         .unwrap();
-    e.execute("UPDATE t SET a = 11, b = 'gamma' WHERE id = 1;")
+    e.execute_blocking("UPDATE t SET a = 11, b = 'gamma' WHERE id = 1;")
         .unwrap();
 
     assert_eq!(
@@ -505,13 +524,15 @@ fn concurrent_column_changes_leave_no_side_effect_behind() {
     for _ in 0..20 {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE tb1 (c1 INT, c2 VARCHAR);").unwrap();
-        e.execute("INSERT INTO tb1 VALUES (1, 'a');").unwrap();
+        e.execute_blocking("CREATE TABLE tb1 (c1 INT, c2 VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO tb1 VALUES (1, 'a');")
+            .unwrap();
         let mut handles = Vec::new();
         for k in 0..2 {
             let e = std::sync::Arc::clone(&e);
             handles.push(std::thread::spawn(move || {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "ALTER TABLE tb1 ADD COLUMN (c{k} INT DEFAULT {k});"
                 ))
                 .is_ok()
@@ -547,7 +568,7 @@ fn concurrent_column_changes_leave_no_side_effect_behind() {
 fn a_column_change_touches_only_its_own_files() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 INT, col3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 INT, col3 VARCHAR);")
         .unwrap();
     append_block(
         &e,
@@ -559,7 +580,7 @@ fn a_column_change_touches_only_its_own_files() {
         ],
         4,
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let block = dir.path().join("data/db_1/tbl_0/seg_0/blk_0");
     let read = |name: &str| std::fs::read(block.join(name)).unwrap();
@@ -568,9 +589,9 @@ fn a_column_change_touches_only_its_own_files() {
         .map(|n| (n.to_string(), read(n)))
         .collect();
 
-    e.execute("ALTER TABLE tb1 ADD COLUMN (col4 INT DEFAULT 7);")
+    e.execute_blocking("ALTER TABLE tb1 ADD COLUMN (col4 INT DEFAULT 7);")
         .unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     // Only the new column's file is new; every other file is unchanged.
     for (name, bytes) in &before {
         assert_eq!(&read(name), bytes, "{name} must not change on ADD COLUMN");
@@ -590,7 +611,8 @@ fn a_column_change_touches_only_its_own_files() {
 
     // DROP leaves the file in place until Cleanup, and the marker keeps the
     // column out of the schema in the meantime.
-    e.execute("ALTER TABLE tb1 DROP COLUMN (col2);").unwrap();
+    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (col2);")
+        .unwrap();
     assert!(block.join("1.col").exists());
     assert_eq!(
         columns(&e, "default_db.tb1"),
@@ -601,12 +623,12 @@ fn a_column_change_touches_only_its_own_files() {
         ]
     );
     // The file survives a checkpoint and a restart.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     drop(e);
     let e = Engine::open(dir.path()).unwrap();
     assert!(block.join("1.col").exists());
     assert_eq!(rows(&e, "SELECT col4 FROM tb1;")[0], vec!["7".to_string()]);
 
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     assert!(!block.join("1.col").exists());
 }

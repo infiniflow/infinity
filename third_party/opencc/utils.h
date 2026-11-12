@@ -34,17 +34,6 @@ extern "C" {
 #define TRUE (!(0))
 #define INFINITY_INT ((~0U) >> 1)
 
-/* One opencc_t may be converted from several threads at once (see converter.c),
- * so the error code reported by *_errno() has to be per thread as well; with a
- * shared one a failed conversion could report another thread's code. */
-#if !defined(OPENCC_THREAD_LOCAL)
-#if defined(_MSC_VER)
-#define OPENCC_THREAD_LOCAL __declspec(thread)
-#else
-#define OPENCC_THREAD_LOCAL _Thread_local
-#endif
-#endif
-
 #ifndef BIG_ENDIAN
 #define BIG_ENDIAN (0)
 #endif

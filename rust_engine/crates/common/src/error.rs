@@ -74,6 +74,11 @@ pub enum Error {
     #[error("{0}")]
     SnapshotNotFound(String),
 
+    /// C++ `Status::NotSupport` (3032). The status keeps the bare message, so
+    /// `Display` does too (`FLUSH LOG` answers "Flush log").
+    #[error("{0}")]
+    NotSupport(String),
+
     /// C++ `Status::Unknown` (3091), which renders as `Unknown {detail}` — the
     /// wording `SHOW SNAPSHOT <missing>` produces
     /// (`physical_show_snapshot_impl.cpp:39`).
@@ -108,6 +113,8 @@ impl Error {
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
             // 3048 NO_COLUMN_DEFINED.
             Error::NoColumnDefined(_) => 3048,
+            // 3032 NOT_SUPPORTED.
+            Error::NotSupport(_) => 3032,
             // 3050 EMPTY_SELECT_FIELDS.
             Error::Invalid(m) if m.starts_with("empty select fields") => 3050,
             // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the

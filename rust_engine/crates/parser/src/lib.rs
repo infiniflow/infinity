@@ -12,8 +12,8 @@ pub mod parser;
 mod corpora_ut;
 
 pub use ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
-    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, SparseStore,
-    Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, FlushKind, JoinClause,
+    JoinKind, Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem,
+    SparseStore, Statement,
 };
 pub use parser::{normalize_datetime, parse};

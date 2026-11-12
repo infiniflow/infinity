@@ -172,11 +172,11 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity
+        run: ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -208,11 +208,11 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: UBSAN_OPTIONS=log_path=restart_test_ubsan.log uv run python3 tools/run_restart_test.py --marker="ubsan" --infinity_path=cmake-build-debug-ubsan/src/infinity
+        run: UBSAN_OPTIONS=log_path=restart_test_ubsan.log uv run --python 3.13 python3 tools/run_restart_test.py --marker="ubsan" --infinity_path=cmake-build-debug-ubsan/src/infinity
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -240,7 +240,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
@@ -251,7 +251,7 @@ jobs:
       - name: Run pysdk ubsan test
         if: ${{ !cancelled() && !failure() }}
         run: |
-          uv run python3 tools/run_pysdk_remote_infinity_test.py -m ubsan
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py -m ubsan
           python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Collect infinity log
@@ -281,11 +281,11 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
-        run: uv run python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity
+        run: uv run --python 3.13 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -315,7 +315,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
@@ -326,7 +326,7 @@ jobs:
       - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
         run: |
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -446,7 +446,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
@@ -457,7 +457,7 @@ jobs:
       - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
         run: |
-          uv run python3 tools/run_pytest_parallel_continuous.py
+          uv run --python 3.13 python3 tools/run_pytest_parallel_continuous.py
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -495,11 +495,11 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+        run: uv sync --python 3.13 --frozen --extra test
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: uv run python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-reldeb/src/infinity
+        run: uv run --python 3.13 python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-reldeb/src/infinity
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}

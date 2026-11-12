@@ -177,6 +177,113 @@ pub type TermSink<'a> = dyn FnMut(&str, &[PostingEntry], &dyn Fn(u64) -> u16) + 
 /// One mini-block's decoded columns: `doc_id` deltas, frequencies, doc payloads.
 pub type DecodedDocBlock = (Vec<u32>, Vec<u32>, Vec<u16>);
 
+/// How many terms one seal batch encodes before the writer appends them.
+///
+/// Encoding is parallel, appending is sequential, and the batch bounds how much
+/// encoded output is in flight: the streaming shape's point was that sealing a
+/// large tail never holds the whole segment's postings, and a batch keeps that
+/// true while giving the pool something to do.
+const SEAL_BATCH_TERMS: usize = 256;
+
+/// One term waiting to be encoded: its name, postings and per-document payloads.
+///
+/// The payloads are resolved when the term is produced (`payload_of` borrows the
+/// caller's map) because the encoder runs later, on another thread.
+struct TermBatch {
+    term: String,
+    list: Vec<PostingEntry>,
+    payloads: Vec<u16>,
+}
+
+/// Encodes `batch` (in parallel) and appends the results to `pos` in order.
+///
+/// The per-term `TermMeta` offsets are relative to the buffer the encoder wrote
+/// into; shifting them by the position the term ends up at keeps the `.pos`
+/// slice layout identical to the serial writer's - only who did the encoding
+/// changes (plan 6.13.3).
+#[allow(clippy::too_many_arguments)] // one argument per piece of the segment being built
+fn flush_term_batch(
+    batch: &mut Vec<TermBatch>,
+    flags: TermMetaFlags,
+    base_row_id: u64,
+    doc_count: u32,
+    doc_len: std::sync::Arc<std::collections::HashMap<u64, u32>>,
+    pos: &mut Vec<u8>,
+    metas: &mut Vec<TermMeta>,
+    terms: &mut Vec<Vec<u8>>,
+) -> Result<(), FormatError> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+    // Pure encoding: each term is independent and writes only its own frame, so
+    // a term is the CPU leaf. Each becomes a tokio task under the core bound and
+    // runs on the blocking pool; the writer stays a single sequential append.
+    //
+    // The closure owns everything it reads (the term comes with the item, the
+    // doc lengths are shared by `Arc`), so each body is `'static` and a decode
+    // never borrows the caller's stack.
+    let workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .min(batch.len());
+    let items: Vec<TermBatch> = std::mem::take(batch);
+    let encode = move |item: TermBatch| -> Result<(String, Vec<u8>, TermMeta), common::Error> {
+        let fail = |e: FormatError| common::Error::Invalid(e.to_string());
+        let mut frame: Vec<u8> = Vec::new();
+        let mut writer = PostingWriter::new(flags);
+        for ((row, tf, positions), payload) in item.list.iter().zip(&item.payloads) {
+            // `docid_t` is the segment offset (`row - base_row_id`), the same
+            // subtraction the reference makes; no table and no search.
+            let Some(doc) = row
+                .checked_sub(base_row_id)
+                .filter(|offset| *offset < u64::from(doc_count))
+            else {
+                return Err(fail(FormatError::Invalid(format!(
+                    "term '{}' has a posting for row {row}, which is outside the segment \
+                     starting at {base_row_id}",
+                    item.term
+                ))));
+            };
+            let doc = doc as u32;
+            let len = doc_len.get(row).copied().unwrap_or(*tf);
+            // `PostingWriter::AddPosition` counts the frequency and writes the
+            // position stream (`posting_writer_impl.cpp:87-92`), so the two can
+            // never disagree.
+            if positions.is_empty() {
+                // Indexed without a position list: the frequency can only come
+                // from the caller (`SetCurrentTF`).
+                writer.set_current_tf(*tf);
+            } else if positions.len() == *tf as usize {
+                for p in positions {
+                    writer.add_position(*p);
+                }
+            } else {
+                return Err(fail(FormatError::Invalid(format!(
+                    "term '{}' has {} positions for document {row} but its frequency is {tf}",
+                    item.term,
+                    positions.len()
+                ))));
+            }
+            writer.end_document(doc, len, *payload);
+        }
+        let meta = writer.dump(&mut frame);
+        Ok((item.term, frame, meta))
+    };
+    let encoded: Vec<(String, Vec<u8>, TermMeta)> =
+        index::parallel::map_blocking(items, workers, encode)
+            .map_err(|e| FormatError::Invalid(e.to_string()))?;
+    for (term, frame, mut meta) in encoded {
+        let base = pos.len() as u64;
+        meta.doc_start += base;
+        meta.pos_start += base;
+        meta.pos_end += base;
+        pos.extend_from_slice(&frame);
+        metas.push(meta);
+        terms.push(term.into_bytes());
+    }
+    Ok(())
+}
+
 pub fn write_segment_index_streaming(
     index_dir: &str,
     base_name: &str,
@@ -185,6 +292,33 @@ pub fn write_segment_index_streaming(
     flags: TermMetaFlags,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
+    write_segment_index_streaming_with(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        SEAL_BATCH_TERMS,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming`] with the encode batch size stated.
+///
+/// The batch only decides how many terms are encoded together; the bytes are
+/// the same for any value, which is what `batching_does_not_change_the_bytes`
+/// pins. It exists so a test can drive the extremes (one term per batch, one
+/// batch for the whole segment) without a build-time knob.
+pub fn write_segment_index_streaming_with(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    batch_terms: usize,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    let batch_terms = batch_terms.max(1);
     fs::create_dir_all(index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
 
     // A segment covers the **contiguous** row-id range `base_row_id..base_row_id
@@ -247,59 +381,63 @@ pub fn write_segment_index_streaming(
         lengths[(row - base_row_id) as usize] = *len;
         doc_len.insert(*row, *len);
     }
+    // Shared with every encode task instead of copied per batch.
+    let doc_len = std::sync::Arc::new(doc_len);
     let len_bytes = encode_column_lengths(&lengths);
 
     let mut pos: Vec<u8> = Vec::new();
     let mut metas: Vec<TermMeta> = Vec::new();
     let mut terms: Vec<Vec<u8>> = Vec::new();
-    // An error inside the callback cannot propagate through the `dyn` signature,
-    // so it is parked here and returned once the term loop is done.
+    // Terms are encoded as tokio tasks in batches (plan 6.13.3): the CPU
+    // half - doc-list and position-list encoding - is what a large seal spends
+    // its time on, while the writer itself must stay a single sequential
+    // append. A batch bounds the memory at `batch_terms` terms' postings,
+    // which is the same bound the streaming shape was introduced for.
+    let mut batch: Vec<TermBatch> = Vec::new();
     let mut failure: Option<FormatError> = None;
     {
         let mut emit = |term: &str, list: &[PostingEntry], payload_of: &dyn Fn(u64) -> u16| {
             if failure.is_some() || list.is_empty() {
                 return;
             }
-            let mut writer = PostingWriter::new(flags);
-            for (row, tf, doc_positions) in list {
-                // `docid_t` is the segment offset (`row - base_row_id`), the same
-                // subtraction the reference makes; no table and no search.
-                let Some(doc) = row
-                    .checked_sub(base_row_id)
-                    .filter(|offset| *offset < u64::from(doc_count))
-                else {
-                    failure = Some(FormatError::Invalid(format!(
-                        "term '{term}' has a posting for row {row}, which is outside the segment \
-                         starting at {base_row_id}"
-                    )));
-                    return;
-                };
-                let doc = doc as u32;
-                let len = doc_len.get(row).copied().unwrap_or(*tf);
-                // `PostingWriter::AddPosition` counts the frequency and writes the
-                // position stream (`posting_writer_impl.cpp:87-92`), so the two can
-                // never disagree.
-                if doc_positions.is_empty() {
-                    // Indexed without a position list: the frequency can only come
-                    // from the caller (`SetCurrentTF`).
-                    writer.set_current_tf(*tf);
-                } else if doc_positions.len() == *tf as usize {
-                    for p in doc_positions {
-                        writer.add_position(*p);
-                    }
-                } else {
-                    failure = Some(FormatError::Invalid(format!(
-                        "term '{term}' has {} positions for document {row} but its frequency is {tf}",
-                        doc_positions.len()
-                    )));
-                    return;
+            // The payload closure borrows the caller's storage, so the values
+            // are taken now; encoding later must not touch it.
+            let payloads: Vec<u16> = list.iter().map(|(row, _, _)| payload_of(*row)).collect();
+            batch.push(TermBatch {
+                term: term.to_string(),
+                list: list.to_vec(),
+                payloads,
+            });
+            if batch.len() >= batch_terms {
+                if let Err(error) = flush_term_batch(
+                    &mut batch,
+                    flags,
+                    base_row_id,
+                    doc_count,
+                    std::sync::Arc::clone(&doc_len),
+                    &mut pos,
+                    &mut metas,
+                    &mut terms,
+                ) {
+                    failure = Some(error);
                 }
-                writer.end_document(doc, len, payload_of(*row));
             }
-            metas.push(writer.dump(&mut pos));
-            terms.push(term.as_bytes().to_vec());
         };
         for_each_term(&mut emit);
+    }
+    if failure.is_none() {
+        if let Err(error) = flush_term_batch(
+            &mut batch,
+            flags,
+            base_row_id,
+            doc_count,
+            std::sync::Arc::clone(&doc_len),
+            &mut pos,
+            &mut metas,
+            &mut terms,
+        ) {
+            failure = Some(error);
+        }
     }
     if let Some(failure) = failure {
         return Err(failure);
@@ -2080,5 +2218,82 @@ mod tests {
         assert_eq!(cursor.doc(), Some(49));
         assert_eq!(cursor.blocks_decoded, 1);
         assert_eq!(cursor.positions(), &[49 % 5]);
+    }
+
+    /// Terms are encoded in batches as tokio tasks (plan 6.13.3), and the
+    /// batch size only decides who encodes what: the three files must be the
+    /// same bytes for one term per batch, the production batch, and one batch
+    /// for the whole segment.
+    ///
+    /// This is the guarantee the byte gates rely on - a parallel encoder that
+    /// reordered or mis-offset the `.pos` slices would show up here first.
+    #[test]
+    fn batching_does_not_change_the_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        let (docs, postings) = many_term_sample();
+        let flags = tf_flags();
+
+        let write = |base_name: &str, batch_terms: usize| {
+            write_segment_index_streaming_with(
+                index_dir,
+                base_name,
+                0,
+                &docs,
+                flags,
+                batch_terms,
+                &mut |emit| {
+                    for (term, list) in &postings {
+                        let payload = |_row: u64| 0u16;
+                        emit(term, list, &payload);
+                    }
+                },
+            )
+            .unwrap();
+            let read =
+                |suffix: &str| std::fs::read(format!("{index_dir}/{base_name}{suffix}")).unwrap();
+            (
+                read(FULLTEXT_DICT_SUFFIX),
+                read(FULLTEXT_POSTING_SUFFIX),
+                read(FULLTEXT_LENGTH_SUFFIX),
+            )
+        };
+
+        let one_at_a_time = write("ft_one", 1);
+        let production = write("ft_batch", SEAL_BATCH_TERMS);
+        let all_at_once = write("ft_all", postings.len());
+        assert_eq!(one_at_a_time.0, production.0, "the dictionary moved");
+        assert_eq!(one_at_a_time.1, production.1, "the postings moved");
+        assert_eq!(one_at_a_time.2, production.2, "the lengths moved");
+        assert_eq!(all_at_once.0, production.0);
+        assert_eq!(all_at_once.1, production.1);
+        assert_eq!(all_at_once.2, production.2);
+
+        // And the segment still reads back what went in.
+        let reader = SegmentIndexReader::open(index_dir, "ft_batch", 0, flags).unwrap();
+        assert_eq!(reader.doc_count(), docs.len());
+        for (term, list) in &postings {
+            let got = reader.postings(term).unwrap();
+            let want: Vec<(u64, u32)> = list.iter().map(|(row, tf, _)| (*row, *tf)).collect();
+            assert_eq!(got, want, "term '{term}'");
+        }
+    }
+
+    /// Enough terms to cross several encode batches, several postings each.
+    #[allow(clippy::type_complexity)]
+    fn many_term_sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
+        let rows = 200u64;
+        let docs: Vec<(u64, u32)> = (0..rows).map(|row| (row, 4)).collect();
+        let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
+        // 600 terms, each on every third row, so the batch boundary falls inside
+        // a term's list rather than only between single-posting terms.
+        for t in 0..600u32 {
+            let list: Vec<PostingEntry> = (t as u64..rows)
+                .step_by(3)
+                .map(|row| (row, 1u32, vec![(row % 4) as u32]))
+                .collect();
+            postings.insert(format!("term{t:04}"), list);
+        }
+        (docs, postings)
     }
 }

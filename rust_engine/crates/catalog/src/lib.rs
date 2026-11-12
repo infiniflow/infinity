@@ -378,6 +378,13 @@ pub struct Catalog {
     /// path that changes a table clears this first, so a hit answers what a
     /// re-read would.
     table_cache: Mutex<std::collections::HashMap<String, TableMeta>>,
+    /// Decoded index records, keyed by qualified table name.
+    ///
+    /// The engine always opens with `catalog_only` (plan §4.1), so the native
+    /// `idx:` keys never exist and every index lookup used to re-read the whole
+    /// layout plus the whole `catalog|idx|` prefix. One bounded build per table
+    /// answers the same records; the invalidation is the table cache's.
+    index_cache: Mutex<std::collections::HashMap<String, Arc<Vec<IndexMeta>>>>,
     /// How many DDL calls are in flight. A DDL reads the table it is about to
     /// change and then writes it, so both a cache filled before the call and
     /// one filled *during* it would be stale afterwards: reads bypass the
@@ -500,6 +507,7 @@ impl Catalog {
             catalog_only: false,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
+            index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
@@ -514,6 +522,7 @@ impl Catalog {
             catalog_only: true,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
+            index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
@@ -528,8 +537,8 @@ impl Catalog {
         DdlGuard { catalog: self }
     }
 
-    /// Drops every cached table record and makes in-flight reads decline to
-    /// publish theirs.
+    /// Drops every cached table and index record and makes in-flight reads
+    /// decline to publish theirs.
     ///
     /// A DDL calls this twice: entering it (so the call does not read a record
     /// from before its own change) and again after the commit lands. The second
@@ -542,6 +551,7 @@ impl Catalog {
         self.ddl_epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         cache.clear();
+        self.index_cache.lock().unwrap().clear();
     }
 
     /// Whether this catalog persists only the C++ key space.
@@ -645,27 +655,7 @@ impl Catalog {
             // is numbered per table (1-based, as `CREATE INDEX` would) -
             // skipping the ids the other records already hold, so the fallback
             // cannot hand two indexes the same id.
-            let mut next: HashMap<String, u64> = HashMap::new();
-            let mut taken: HashMap<String, std::collections::HashSet<u64>> = HashMap::new();
-            for im in out.iter() {
-                if im.id > 0 {
-                    taken.entry(im.table.clone()).or_default().insert(im.id);
-                }
-            }
-            for im in out.iter_mut() {
-                if im.id == 0 {
-                    let used = taken.entry(im.table.clone()).or_default();
-                    let n = next.entry(im.table.clone()).or_insert(0);
-                    loop {
-                        *n += 1;
-                        if !used.contains(n) {
-                            break;
-                        }
-                    }
-                    im.id = *n;
-                    used.insert(*n);
-                }
-            }
+            Self::assign_fallback_ids(&mut out);
             // Name-only indexes — the engine does not materialise an expression
             // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name
             // lives under a supplementary table tag (`write_layout_from`).
@@ -684,6 +674,192 @@ impl Catalog {
                         out.push(IndexMeta {
                             name: name.to_string(),
                             table: format!("{}.{}", t.db_name, t.table_name),
+                            column: String::new(),
+                            index_type: String::new(),
+                            options: Vec::new(),
+                            id: 0,
+                        });
+                    }
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    /// Numbers records that arrived without an id (hand-written ones) per
+    /// table, 1-based and skipping the ids already in use.
+    fn assign_fallback_ids(out: &mut [IndexMeta]) {
+        let mut next: HashMap<String, u64> = HashMap::new();
+        let mut taken: HashMap<String, std::collections::HashSet<u64>> = HashMap::new();
+        for im in out.iter() {
+            if im.id > 0 {
+                taken.entry(im.table.clone()).or_default().insert(im.id);
+            }
+        }
+        for im in out.iter_mut() {
+            if im.id == 0 {
+                let used = taken.entry(im.table.clone()).or_default();
+                let n = next.entry(im.table.clone()).or_insert(0);
+                loop {
+                    *n += 1;
+                    if !used.contains(n) {
+                        break;
+                    }
+                }
+                im.id = *n;
+                used.insert(*n);
+            }
+        }
+    }
+
+    /// The indexes of one table, resolved with one bounded prefix scan and
+    /// cached per table.
+    ///
+    /// The engine always opens with catalog_only (plan 4.1), so the native
+    /// idx: keys do not exist and list_indexes re-reads the whole layout plus
+    /// the whole catalog|idx| prefix on every call. This resolves one table
+    /// instead: one read_table, one scan of catalog|idx|{db}|{tbl}|, then point
+    /// gets for each index. A warm lookup is a hash hit; a miss costs O(that
+    /// table's indexes), not O(all tables).
+    pub fn indexes_of_table(&self, table: &str) -> Result<Vec<IndexMeta>> {
+        let Some(qualified) = self.qualified_table_name(table)? else {
+            return Ok(Vec::new());
+        };
+        self.indexes_cached(table, &qualified)
+    }
+
+    /// The qualified name of `table`, or `None` when it does not exist.
+    ///
+    /// A qualified name resolves by its own record. A bare one may not: the
+    /// engine normally qualifies names first, but the per-row index hook is
+    /// handed whatever the statement used, and `list_indexes` callers used to
+    /// match a bare name against the short half. The fallback scan only runs
+    /// when the direct lookup misses, and the result is cached under the name
+    /// that was asked for.
+    fn qualified_table_name(&self, table: &str) -> Result<Option<String>> {
+        if let Some(meta) = self.get_table_by_name(table)? {
+            return Ok(Some(meta.name));
+        }
+        if table.contains('.') {
+            return Ok(None);
+        }
+        Ok(self
+            .list_tables()?
+            .into_iter()
+            .find(|t| t.name.rsplit('.').next() == Some(table))
+            .map(|t| t.name))
+    }
+
+    /// One index by table and name; None when the table or the index is gone.
+    pub fn index_by_name(&self, table: &str, name: &str) -> Result<Option<IndexMeta>> {
+        Ok(self
+            .indexes_of_table(table)?
+            .into_iter()
+            .find(|im| im.name == name))
+    }
+
+    fn indexes_cached(&self, key: &str, qualified: &str) -> Result<Vec<IndexMeta>> {
+        if self.capture.lock().unwrap().is_some()
+            || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
+        {
+            return self.indexes_of_table_uncached(qualified);
+        }
+        let epoch = self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst);
+        if let Some(hit) = self.index_cache.lock().unwrap().get(key) {
+            return Ok((**hit).clone());
+        }
+        let built = Arc::new(self.indexes_of_table_uncached(qualified)?);
+        let mut cache = self.index_cache.lock().unwrap();
+        if self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst) == epoch {
+            cache.insert(key.to_string(), built.clone());
+            if key != qualified {
+                // Answer the qualified spelling from the same build.
+                cache.insert(qualified.to_string(), built.clone());
+            }
+        }
+        Ok((*built).clone())
+    }
+
+    fn indexes_of_table_uncached(&self, table: &str) -> Result<Vec<IndexMeta>> {
+        let (db_name, bare) = match table.split_once('.') {
+            Some((db, t)) => (db.to_string(), t.to_string()),
+            None => (
+                self.databases()?
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "default_db".to_string()),
+                table.to_string(),
+            ),
+        };
+        self.with_view(|store| {
+            let Some(layout) = crate::layout::read_table(store, &db_name, &bare)? else {
+                return Ok(Vec::new());
+            };
+            let db_id = layout.db_id.to_string();
+            let table_id = layout.table_id.to_string();
+            let prefix = format!("catalog|idx|{db_id}|{table_id}|");
+            let mut newest: HashMap<String, (u64, String)> = HashMap::new();
+            for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+                let key = String::from_utf8_lossy(&k).to_string();
+                let fields: Vec<&str> = key.split('|').collect();
+                if fields.len() != 6 {
+                    continue;
+                }
+                let Ok(ts) = fields[5].parse::<u64>() else {
+                    continue;
+                };
+                let slot = newest
+                    .entry(fields[4].to_string())
+                    .or_insert((0, String::new()));
+                if ts >= slot.0 {
+                    *slot = (ts, String::from_utf8_lossy(&v).to_string());
+                }
+            }
+            let mut names: Vec<(String, (u64, String))> = newest.into_iter().collect();
+            names.sort_by(|a, b| a.0.cmp(&b.0));
+            let mut out: Vec<IndexMeta> = Vec::new();
+            for (name, (ts, index_id)) in names {
+                if crate::layout::is_dropped(
+                    store,
+                    &crate::layout::dropped_index_key(&db_id, &table_id, &name, ts, &index_id),
+                )? {
+                    continue;
+                }
+                let tag = storage::catalog_format::catalog_index_tag_key(
+                    &db_id,
+                    &table_id,
+                    &index_id,
+                    "index_base",
+                );
+                let Some(bytes) = store.get(tag.as_bytes())? else {
+                    continue;
+                };
+                let Some(mut def) = crate::value_format::index_def_from_bytes(&bytes) else {
+                    continue;
+                };
+                def.owner = Some((db_id.clone(), table_id.clone()));
+                def.index_id = index_id.parse().ok();
+                let Some(meta) = crate::layout::index_meta_of(&def, std::slice::from_ref(&layout))
+                else {
+                    continue;
+                };
+                out.push(meta);
+            }
+            Self::assign_fallback_ids(&mut out);
+            // A name-only index (an expression target such as c1 + 5) has no
+            // C++ IndexBase; its name lives under a per-table tag.
+            let tag = storage::catalog_format::catalog_table_tag_key(
+                &db_id,
+                &table_id,
+                "rust_name_only_indexes",
+            );
+            if let Some(bytes) = store.get(tag.as_bytes())? {
+                for name in String::from_utf8_lossy(&bytes).split(',') {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        out.push(IndexMeta {
+                            name: name.to_string(),
+                            table: format!("{}.{}", layout.db_name, layout.table_name),
                             column: String::new(),
                             index_type: String::new(),
                             options: Vec::new(),
@@ -1821,6 +1997,7 @@ impl Catalog {
         index_type: &str,
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
+        let _ddl = self.begin_ddl();
         // Per-table index ids start at 1 and are never reused.
         let id = if self.catalog_only {
             self.next_index_id(table)?
@@ -1986,6 +2163,7 @@ impl Catalog {
     /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}`; the reference's
     /// cleanup removes both.
     pub fn drop_index(&self, name: &str) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         if self.catalog_only {
             let mut staged: Vec<BatchItem> = Vec::new();
             for def in crate::layout::read_indexes(self.store.as_ref())?
@@ -2064,6 +2242,7 @@ impl Catalog {
     /// Drops `table`'s index named `name`. Two tables may own an index with the
     /// same name, so callers that know the table must use this form.
     pub fn drop_index_on(&self, table: &str, name: &str) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         let short = table.split('.').next_back().unwrap_or(table);
         if self.catalog_only {
             let mut indexes = self.indexes()?;
@@ -2188,6 +2367,114 @@ mod tests {
                 String::from_utf8_lossy(key)
             );
         }
+    }
+
+    /// The per-table lookup answers exactly what filtering list_indexes
+    /// answers, and a DDL invalidates it.
+    /// A warm per-table lookup answers without touching the store: the point
+    /// of the index cache (plan 4.1: the hot paths call this per table, per
+    /// batch, per index).
+    #[test]
+    fn a_warm_index_lookup_does_not_scan() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), true);
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INT".to_string(), "VARCHAR".to_string()],
+            &[None, None],
+        )
+        .unwrap();
+        c.create_index_typed("i1", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+
+        // Warm: the first lookup builds the table's entry.
+        assert!(c.index_by_name("db2.t", "i1").unwrap().is_some());
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i1").unwrap().is_some());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 1);
+        assert_eq!(counts.get("scans"), 0, "a warm lookup read the store");
+
+        // A miss still costs one bounded scan of that table, not a layout read.
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "nope").unwrap().is_none());
+        assert_eq!(counts.get("scans"), 0, "a warm miss should not scan either");
+
+        // After a DDL the entry is rebuilt from that table's prefix only.
+        c.create_index_typed("i2", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_some());
+        // Bounded: the database record, the table record and its columns, the
+        // table's own index prefix — never the whole `catalog|idx|` family.
+        assert_eq!(counts.get("full_index_scans"), 0);
+        assert!(
+            counts.get("scans") <= 8,
+            "a miss scanned {} prefixes",
+            counts.get("scans")
+        );
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_some());
+        assert_eq!(counts.get("scans"), 0);
+    }
+
+    #[test]
+    fn indexes_of_table_matches_list_indexes_and_follows_ddl() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let c = Catalog::with_store_catalog_only(store);
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INT".to_string(), "VARCHAR".to_string()],
+            &[None, None],
+        )
+        .unwrap();
+        c.create_table_typed(
+            "db2.other",
+            &cols(&["id"]),
+            &[None],
+            &[false],
+            &["INT".to_string()],
+            &[None],
+        )
+        .unwrap();
+        c.create_index_typed("i1", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+        c.create_index_typed("i2", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        c.create_index_typed("i1", "db2.other", "id", "SECONDARY", &[])
+            .unwrap();
+
+        let all = c.list_indexes().unwrap();
+        let mut want: Vec<IndexMeta> = all.iter().filter(|i| i.table == "db2.t").cloned().collect();
+        want.sort_by(|a, b| a.name.cmp(&b.name));
+        let mut got = c.indexes_of_table("db2.t").unwrap();
+        got.sort_by(|a, b| a.name.cmp(&b.name));
+        assert_eq!(got, want);
+
+        // A warm lookup still follows a DDL: the cache is dropped on entry.
+        assert_eq!(
+            c.index_by_name("db2.t", "i1").unwrap().unwrap().column,
+            "name"
+        );
+        c.create_index_typed("i3", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        assert!(c.index_by_name("db2.t", "i3").unwrap().is_some());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 3);
+        assert!(c.index_by_name("db2.t", "nope").unwrap().is_none());
+        assert!(c.indexes_of_table("db2.not_there").unwrap().is_empty());
+
+        // A drop makes the lookup stop returning the index.
+        assert!(c.drop_index_on("db2.t", "i2").unwrap());
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_none());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 2);
     }
 
     #[test]
@@ -2333,6 +2620,10 @@ mod tests {
         deletes: std::sync::atomic::AtomicUsize,
         batches: std::sync::atomic::AtomicUsize,
         batch_items: std::sync::atomic::AtomicUsize,
+        scans: std::sync::atomic::AtomicUsize,
+        /// Scans of the whole index family (`catalog|idx|` with no table): the
+        /// O(all tables) read the per-table directory exists to avoid.
+        full_index_scans: std::sync::atomic::AtomicUsize,
     }
 
     impl Counts {
@@ -2342,6 +2633,8 @@ mod tests {
             self.deletes.store(0, SeqCst);
             self.batches.store(0, SeqCst);
             self.batch_items.store(0, SeqCst);
+            self.scans.store(0, SeqCst);
+            self.full_index_scans.store(0, SeqCst);
         }
         fn get(&self, what: &str) -> usize {
             use std::sync::atomic::Ordering::SeqCst;
@@ -2350,6 +2643,8 @@ mod tests {
                 "deletes" => self.deletes.load(SeqCst),
                 "batches" => self.batches.load(SeqCst),
                 "items" => self.batch_items.load(SeqCst),
+                "scans" => self.scans.load(SeqCst),
+                "full_index_scans" => self.full_index_scans.load(SeqCst),
                 other => panic!("unknown counter {other}"),
             }
         }
@@ -2391,6 +2686,14 @@ mod tests {
         }
 
         fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.counts
+                .scans
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if prefix == b"catalog|idx|" {
+                self.counts
+                    .full_index_scans
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
             self.inner.scan_prefix(prefix)
         }
 
@@ -2455,6 +2758,49 @@ mod tests {
         let renamed = c.get_table_by_name("new").unwrap().unwrap();
         assert_eq!(renamed.id, created.id);
         assert_eq!(renamed.name, "new");
+    }
+
+    /// `catalog_only` never reads the native `idx:` keys, so a legacy record
+    /// cannot make an index appear twice - the read paths derive the list from
+    /// the C++ key space alone (plan §4.1 / r10 #3).
+    #[test]
+    fn catalog_only_ignores_a_legacy_index_record() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let c = Catalog::with_store_catalog_only(store);
+        c.create_table_typed(
+            "default_db.t",
+            &cols(&["doc"]),
+            &[None],
+            &[false],
+            &["VARCHAR".to_string()],
+            &[None],
+        )
+        .unwrap();
+        c.create_index_typed("idx", "default_db.t", "doc", "FULLTEXT", &[])
+            .unwrap();
+        // A stray record of the pre-scoping shape, as an older store may hold.
+        let legacy = IndexMeta {
+            name: "idx".into(),
+            table: "default_db.t".into(),
+            column: "doc".into(),
+            index_type: "FULLTEXT".into(),
+            options: vec![],
+            id: 1,
+        };
+        c.store().put(b"idx:idx", &legacy.encode()).unwrap();
+        assert_eq!(
+            c.indexes_of_table("default_db.t").unwrap().len(),
+            1,
+            "the C++ key space names the index once"
+        );
+        assert_eq!(c.list_indexes().unwrap().len(), 1);
+        // Dropping removes the index from the C++ key space; the stray native
+        // record is left where it is, because `catalog_only` never writes (or
+        // sweeps) that key space - the byte gate compares it verbatim.
+        assert!(c.drop_index("idx").unwrap());
+        assert!(c.indexes_of_table("default_db.t").unwrap().is_empty());
+        assert!(c.list_indexes().unwrap().is_empty());
     }
 
     /// `CREATE INDEX` writes the declaration and removes a legacy `idx:{name}`

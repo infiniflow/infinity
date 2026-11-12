@@ -444,6 +444,13 @@ pub enum Statement {
     Utility {
         text: String,
     },
+    /// `FLUSH DATA|CATALOG|LOG|BUFFER` (C++ `FlushStatement`,
+    /// `PhysicalFlush::flush_type_`). The statement itself has no result rows;
+    /// the executor runs the checkpoint (or the catalog flush) and answers with
+    /// an empty set, which is what the reference's operator produces too.
+    Flush {
+        kind: FlushKind,
+    },
     CreateSnapshot {
         name: String,
         table: String,
@@ -594,4 +601,13 @@ pub enum Statement {
         /// A non-literal `OFFSET` expression.
         offset_expr: Option<ExprAst>,
     },
+}
+
+/// The four `FLUSH` targets (C++ `FlushType` in `physical_flush.cppm`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlushKind {
+    Catalog,
+    Data,
+    Log,
+    Buffer,
 }

@@ -68,8 +68,17 @@ jobs:
         # ("cannot find 'ld'", then "couldn't find any valid shared libraries
         # matching: ['libclang.so']").
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold libclang-dev
+          # The runner's package mirror is occasionally unreachable ("Temporary
+          # failure resolving 'security.ubuntu.com'"), which fails this step
+          # with apt's exit 100 before any of our code runs. Retrying is the
+          # standard remedy: three attempts, backing off.
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq &&
+              sudo apt-get install -y -qq clang mold libclang-dev && break
+            echo "apt failed (attempt ${attempt}/3); retrying in $((attempt * 15))s" >&2
+            sleep $((attempt * 15))
+            if [ "${attempt}" = 3 ]; then exit 1; fi
+          done
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
           fi
@@ -118,6 +127,14 @@ jobs:
 
       - name: Install uv (ruff runs through `uvx`)
         uses: astral-sh/setup-uv@v7
+
+      - name: Install Go (the gofmt hook covers `go/`)
+        # The SDK's own job installs Go for its tests; this one needs it for
+        # the formatting hook, which runs over the changed `go/**/*.go` files.
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
 
       - name: Install clang-format-20
         if: steps.changed.outputs.has_cpp == '1'
@@ -190,9 +207,12 @@ jobs:
     name: unit (${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     env:
-      # The analyzer's parity tests compare against the Python tokenizer; the
-      # repo pins 3.11 (uv.lock) and its output differs on newer interpreters.
-      UV_PYTHON: "3.11"
+      # The analyzer's parity tests compare against the Python tokenizer, which
+      # is run through `uv run`. 3.13 produces the identical token stream for
+      # the fixture (`rag_tokenizer.py -f tokenizer_input.txt` gives the same
+      # bytes under 3.11 and 3.13), so the interpreter is the repository's
+      # modern floor rather than a pin.
+      UV_PYTHON: "3.13"
     strategy:
       fail-fast: false
       matrix:
@@ -213,8 +233,17 @@ jobs:
         # ("cannot find 'ld'", then "couldn't find any valid shared libraries
         # matching: ['libclang.so']").
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold libclang-dev
+          # The runner's package mirror is occasionally unreachable ("Temporary
+          # failure resolving 'security.ubuntu.com'"), which fails this step
+          # with apt's exit 100 before any of our code runs. Retrying is the
+          # standard remedy: three attempts, backing off.
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq &&
+              sudo apt-get install -y -qq clang mold libclang-dev && break
+            echo "apt failed (attempt ${attempt}/3); retrying in $((attempt * 15))s" >&2
+            sleep $((attempt * 15))
+            if [ "${attempt}" = 3 ]; then exit 1; fi
+          done
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
           fi
@@ -239,21 +268,80 @@ jobs:
         # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`, which
         # sentence-splits with NLTK's punkt_tab; a missing model makes the
         # script print an error and every comparison fails.
-        run: uv run python -m nltk.downloader punkt_tab
+        run: uv run --python 3.13 python -m nltk.downloader punkt_tab
       - name: test
+        # `RUST_BACKTRACE` so a failing assertion carries its call stack: a
+        # flake reports the value it compared but not which path produced it,
+        # and the stack is what separates "the code is wrong" from "the test
+        # raced another one".
+        env:
+          RUST_BACKTRACE: "1"
         run: cargo test --workspace
       - name: smoke
         run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
+
+  gate-a:
+    # Gate A on its own: `cargo test --workspace` and the slt conformance used
+    # to share one job, and the conformance - which builds a release `cli` and
+    # then parses the whole of `test/sql` - was half of that job's wall time
+    # while depending on nothing the unit tests produce. Two jobs run them side
+    # by side; `unit` keeps the smoke test because it exercises the binary the
+    # tests just built.
+    name: gate-a (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    defaults:
+      run:
+        working-directory: rust_engine
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        run: rustup toolchain install --profile minimal
+      - name: Install clang, mold and libclang
+        run: |
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq &&
+              sudo apt-get install -y -qq clang mold libclang-dev && break
+            echo "apt failed (attempt ${attempt}/3); retrying in $((attempt * 15))s" >&2
+            sleep $((attempt * 15))
+            if [ "${attempt}" = 3 ]; then exit 1; fi
+          done
+          if ! command -v ld.mold >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # The Cargo workspace lives in `rust_engine/`, one level below the
+          # repository root this job runs from.
+          workspaces: rust_engine
+      - name: Install the analyzer resources
+        run: |
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo chown -R "${USER}" /usr/share/infinity/resource
+          cp -r ../resource/. /usr/share/infinity/resource/
+      - uses: astral-sh/setup-uv@v7
       - name: Generate the .slt fixtures
         # Half of test/sql and of test/data is generated and gitignored (the
         # 20k-row index-scan CSVs, the 10M-row compaction file, the generated
         # .slt files themselves). The reference's jobs run this same script
         # before their suite; `-jc=1` generates and copies, and runs nothing.
+        #
+        # `-p 3.13`: without it `uv run` picks the highest interpreter
+        # `requires-python` allows (3.15 today), and `sqlglot[rs]` builds
+        # through PyO3, whose ceiling is 3.14 - the wheel build then fails
+        # before the suite starts.
         working-directory: .
+        env:
+          UV_PYTHON: "3.13"
         run: |
           sudo mkdir -p /var/infinity/test_data
           sudo chown -R "${USER}" /var/infinity
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
       - name: Gate A (slt conformance)
         # The reference suite (test/sql, snapshots included), parsed and
         # validated by sqllogictest-rs - the crate the reference's own runner is
@@ -282,8 +370,17 @@ jobs:
         # ("cannot find 'ld'", then "couldn't find any valid shared libraries
         # matching: ['libclang.so']").
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold libclang-dev
+          # The runner's package mirror is occasionally unreachable ("Temporary
+          # failure resolving 'security.ubuntu.com'"), which fails this step
+          # with apt's exit 100 before any of our code runs. Retrying is the
+          # standard remedy: three attempts, backing off.
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq &&
+              sudo apt-get install -y -qq clang mold libclang-dev && break
+            echo "apt failed (attempt ${attempt}/3); retrying in $((attempt * 15))s" >&2
+            sleep $((attempt * 15))
+            if [ "${attempt}" = 3 ]; then exit 1; fi
+          done
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
           fi
@@ -338,7 +435,7 @@ jobs:
           sudo chown -R "${USER}" /usr/share/infinity /var/infinity
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
-        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+        run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
       - name: Install bubblewrap
         # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
         # needs a PID namespace.
@@ -378,9 +475,23 @@ jobs:
           tail -n 200 /var/infinity/log/*.log 2>/dev/null || true
 
   parallel:
-    # Gate D on a pull request: python/parallel_test drives a live server with
+    # Gate D on a pull request: the concurrency suite drives a live server with
     # several clients at once. It used to run nightly inside `slow` with
     # continue-on-error, so a concurrency regression never failed a build.
+    #
+    # The cases are Go (`go/tests/parallel_*_test.go`, `-tags parallel`) and
+    # each is one `Test*` function, so there is nothing left to partition: one
+    # job runs them all. Their Python form spent the window building Thrift
+    # structs in the interpreter - against one server, 1 client thread reached
+    # 1 196 inserts/s, 4 reached 2 519 and 8 reached 2 712 - so it measured
+    # CPython's allocator and the GIL, not the engine. One goroutine per worker
+    # measures the engine.
+    #
+    # It also carries the many-client case, which used to be its own `clients`
+    # job: thousands of sessions open and answering **at the same instant**,
+    # held for 30 s. That is the same claim Gate D makes about one table, made
+    # about the session table - and a server that cannot register 5 000 clients
+    # is exactly the concurrency defect this gate exists for.
     name: parallel (${{ matrix.arch }})
     needs: build
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -400,33 +511,100 @@ jobs:
           sudo mkdir -p /usr/share/infinity/resource /var/infinity
           sudo cp -r resource/. /usr/share/infinity/resource/
           sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
       - uses: astral-sh/setup-uv@v7
       - name: Install the test dependencies
-        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+        run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
+      - name: Install the test data
+        # The cases import `enwiki_99.csv` and `pysdk_test_knn.csv` from
+        # `/var/infinity/test_data`; this is the same generate-and-copy step
+        # the other Go jobs run.
+        run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Start the engine
+        # `ulimit -n` is for the many-client case: it holds 5 000 sockets and
+        # the server, started here with the same limit, holds the 5 000 it
+        # accepted.
+        run: |
+          ulimit -n 65536
+          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_infinity.sh
+      - name: Concurrency suite (Gate D)
+        working-directory: go
+        # `INFINITY_PARALLEL_SECONDS` is the per-case window. Every case
+        # asserts its result afterwards, so a shorter window weakens the soak
+        # and not the correctness check.
+        env:
+          INFINITY_PARALLEL_SECONDS: "15"
+        run: go test -tags parallel ./tests/ -run TestParallel -v -count=1 -timeout 20m
+      - name: Stop the engine and show its log
+        if: always()
+        run: |
+          tail -n 200 infinity.log || true
+          # A hung suite leaves no log line: the process is alive and simply
+          # not answering. A thread dump (taken **before** the kill) is what
+          # says where it is stuck.
+          pid=$(pgrep -f "bin/infinity --config" | head -1) || true
+          if [ -n "${pid}" ]; then
+            eu-stack -p "${pid}" 2>/dev/null | head -200 || true
+          fi
+          pkill -f "bin/infinity --config" || true
+
+  # Gate B is three jobs, not one. The suite was a single job that ran the
+  # Python SDK, the Go SDK, the many-client case and the HTTP API in sequence -
+  # ~17 minutes on the amd64 runner, of which only 7 were tests. Each suite is
+  # independent (its own server, its own tables), so they run side by side and
+  # each installs only what it needs: the Go and HTTP suites read
+  # `/var/infinity/test_data`, the Python one does not, and only the Go job
+  # needs a Go toolchain. The many-client case now runs in `parallel`.
+  sdk-py:
+    name: sdk-py (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ matrix.arch }}
+          path: bin
+      - name: Prepare the resources and the data directory
+        run: |
+          chmod +x bin/infinity
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the test dependencies
+        run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-      - name: Parallel suite (Gate D)
-        # The suite's conftest reads 127.0.0.1:23817, so it runs against the
-        # engine started above. It resolves its fixtures as
-        # `os.getcwd() + "/test/data/"`, so it runs from the repository root -
-        # the way the reference's `tools/run_parallel_test.py` does.
-        # `--durations` keeps the suite's cost visible: the concurrency tests
-        # run fixed 30 s windows, so a regression shows up as one test growing
-        # while the rest stay flat.
-        run: .venv/bin/python -m pytest -q python/parallel_test --tb=short --durations=20
+      - name: Python SDK suite
+        run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
       - name: Stop the engine and show its log
         if: always()
         run: |
-          pkill -f "bin/infinity --config" || true
           tail -n 200 infinity.log || true
+          # A hung suite leaves no log line: the process is alive and simply
+          # not answering. A thread dump (taken **before** the kill) is what
+          # says where it is stuck.
+          pid=$(pgrep -f "bin/infinity --config" | head -1) || true
+          if [ -n "${pid}" ]; then
+            eu-stack -p "${pid}" 2>/dev/null | head -200 || true
+          fi
+          pkill -f "bin/infinity --config" || true
 
-  sdk:
-    # Gate B: the unmodified Python SDK, Go SDK and HTTP API. The suite is ~30
-    # files and takes tens of minutes per cell; every trigger runs it, on both
-    # architectures.
-    name: sdk (${{ matrix.arch }})
+  sdk-go:
+    name: sdk-go (${{ matrix.arch }})
     needs: build
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
@@ -453,39 +631,67 @@ jobs:
           cache-dependency-path: go/go.sum
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
-        run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+        run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
       - name: Install the test data
-        # The Go and HTTP suites read `/var/infinity/test_data/*`; this is the
-        # same generate-and-copy step the reference's jobs run (`-jc` copies
-        # without running the .slt suite).
-        run: uv run python3 tools/sqllogictest.py -jc=1
+        # The Go suite reads `/var/infinity/test_data/*`; this is the same
+        # generate-and-copy step the reference's jobs run (`-jc` copies without
+        # running the .slt suite).
+        run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-      - name: Python SDK suite
-        run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
-      - name: Restart the engine on an empty directory
-        # Each suite counts what it created - the Go one asserts exactly 1000
-        # tables with its prefix - so it has to start from a clean server, as
-        # it does in the reference's own jobs. `test_data` stays.
-        run: |
-          pkill -f "bin/infinity --config" || true
-          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
-          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
-                 /var/infinity/log /var/infinity/persistence
-          nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
-          ./scripts/wait_for_infinity.sh
       - name: Go SDK suite
-        # The same server, driven through the unmodified Go SDK.
+        # The unmodified Go SDK against the server started above, through the
+        # same `TestMain`-based suite the concurrency cases use. The many-client
+        # cases are behind the `parallel` build tag, so this run does not pick
+        # them up; they run in `parallel`.
         working-directory: go
         run: go test ./tests/... -count=1
-      - name: Restart the engine on an empty directory
+      - name: Stop the engine and show its log
+        if: always()
         run: |
+          tail -n 200 infinity.log || true
+          # A hung suite leaves no log line: the process is alive and simply
+          # not answering. A thread dump (taken **before** the kill) is what
+          # says where it is stuck.
+          pid=$(pgrep -f "bin/infinity --config" | head -1) || true
+          if [ -n "${pid}" ]; then
+            eu-stack -p "${pid}" 2>/dev/null | head -200 || true
+          fi
           pkill -f "bin/infinity --config" || true
-          for _ in $(seq 1 30); do pgrep -f "bin/infinity --config" >/dev/null || break; sleep 1; done
-          rm -rf /var/infinity/catalog /var/infinity/data /var/infinity/wal \
-                 /var/infinity/log /var/infinity/persistence
+
+  sdk-http:
+    name: sdk-http (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ matrix.arch }}
+          path: bin
+      - name: Prepare the resources and the data directory
+        run: |
+          chmod +x bin/infinity
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - uses: astral-sh/setup-uv@v7
+      - name: Install the SDK and the test dependencies
+        run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
+      - name: Install the test data
+        # The HTTP suite runs the same PySDK cases (`--http`), imports
+        # included, so it reads `/var/infinity/test_data/*` too.
+        run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Start the engine
+        run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
       - name: HTTP API suite
@@ -494,8 +700,12 @@ jobs:
       - name: Stop the engine and show its log
         if: always()
         run: |
-          pkill -f "bin/infinity --config" || true
           tail -n 200 infinity.log || true
+          pid=$(pgrep -f "bin/infinity --config" | head -1) || true
+          if [ -n "${pid}" ]; then
+            eu-stack -p "${pid}" 2>/dev/null | head -200 || true
+          fi
+          pkill -f "bin/infinity --config" || true
 
   slow:
     # slow_tests.yml runs, nightly, what a pull request never pays for:
@@ -530,8 +740,17 @@ jobs:
           rustup component add miri
       - name: Install clang, mold and libclang
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang mold libclang-dev
+          # The runner's package mirror is occasionally unreachable ("Temporary
+          # failure resolving 'security.ubuntu.com'"), which fails this step
+          # with apt's exit 100 before any of our code runs. Retrying is the
+          # standard remedy: three attempts, backing off.
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq &&
+              sudo apt-get install -y -qq clang mold libclang-dev && break
+            echo "apt failed (attempt ${attempt}/3); retrying in $((attempt * 15))s" >&2
+            sleep $((attempt * 15))
+            if [ "${attempt}" = 3 ]; then exit 1; fi
+          done
           if ! command -v ld.mold >/dev/null 2>&1; then
             sudo ln -sf "$(command -v mold)" /usr/bin/ld.mold
           fi
@@ -550,10 +769,10 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the NLTK data
         env:
-          UV_PYTHON: "3.11"
+          UV_PYTHON: "3.13"
         run: |
-          uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
-          uv run python -m nltk.downloader punkt_tab
+          uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
+          uv run --python 3.13 python -m nltk.downloader punkt_tab
       - name: Install bubblewrap
         # The amd64 image ships it; ubuntu-24.04-arm does not, and the suite
         # needs a PID namespace.
@@ -589,7 +808,7 @@ jobs:
         continue-on-error: true
         working-directory: rust_engine
         env:
-          UV_PYTHON: "3.11"
+          UV_PYTHON: "3.13"
         run: cargo test --workspace -- --ignored
       - name: Build the server
         run: (cd rust_engine && cargo build --release -p cli)

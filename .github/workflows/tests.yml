@@ -248,11 +248,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test -i https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test -i https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python3 -c "
+          uv run --python 3.13 python3 -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -354,7 +354,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -369,7 +369,7 @@ jobs:
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -438,11 +438,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -492,7 +492,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -507,7 +507,7 @@ jobs:
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -589,7 +589,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -604,7 +604,7 @@ jobs:
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -677,7 +677,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -692,7 +692,7 @@ jobs:
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -763,7 +763,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -778,7 +778,7 @@ jobs:
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -954,7 +954,7 @@ jobs:
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
 
       - name: Build release version
-        run: | 
+        run: |
           docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/x86_64-linux-v2.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=x64-linux-v2 -DCMAKE_CXX_STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
 
       - name: Show sccache stats
@@ -1013,11 +1013,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -1099,12 +1099,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1156,11 +1156,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -1197,7 +1197,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1205,7 +1205,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #        run: uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -1269,12 +1269,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -1329,12 +1329,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1375,7 +1375,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1383,7 +1383,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
+  #        run: uv run --python 3.13 python3 tools/run_parallel_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -1434,13 +1434,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1495,13 +1495,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1623,11 +1623,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -1699,12 +1699,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1756,11 +1756,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -1809,12 +1809,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1878,12 +1878,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_arm64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -1938,12 +1938,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1996,12 +1996,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2119,11 +2119,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -2195,12 +2195,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -2252,11 +2252,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -2293,7 +2293,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2301,7 +2301,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #        run: uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -2365,12 +2365,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_arm64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -2425,12 +2425,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -2471,7 +2471,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2479,7 +2479,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
+  #        run: uv run --python 3.13 python3 tools/run_parallel_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -2530,13 +2530,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2591,13 +2591,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()

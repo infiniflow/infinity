@@ -23,7 +23,7 @@ fn valid_values_are_accepted() {
         "SET CONFIG CHECKPOINT_INTERVAL 30;",
     ] {
         let (_d, e) = engine();
-        assert!(e.execute(sql).is_ok(), "should accept: {sql}");
+        assert!(e.execute_blocking(sql).is_ok(), "should accept: {sql}");
     }
 }
 
@@ -31,7 +31,8 @@ fn valid_values_are_accepted() {
 fn malformed_enum_value_is_rejected() {
     let (_d, e) = engine();
     assert!(
-        e.execute("SET CONFIG result_cache \"sometimes\";").is_err(),
+        e.execute_blocking("SET CONFIG result_cache \"sometimes\";")
+            .is_err(),
         "an unknown result_cache mode must be rejected"
     );
 }
@@ -40,18 +41,24 @@ fn malformed_enum_value_is_rejected() {
 fn out_of_range_capacity_is_rejected() {
     let (_d, e) = engine();
     // 0 is not a valid capacity (a positive integer is required)
-    assert!(e.execute("SET CONFIG cache_result_capacity 0;").is_err());
+    assert!(e
+        .execute_blocking("SET CONFIG cache_result_capacity 0;")
+        .is_err());
     // a non-numeric value is rejected too
     assert!(e
-        .execute("SET CONFIG cache_result_capacity \"big\";")
+        .execute_blocking("SET CONFIG cache_result_capacity \"big\";")
         .is_err());
     // a rejected value is not stored (it must not be silently clamped)
-    assert!(e.execute("SET CONFIG cache_result_capacity -1;").is_err());
+    assert!(e
+        .execute_blocking("SET CONFIG cache_result_capacity -1;")
+        .is_err());
 }
 
 #[test]
 fn unknown_keys_are_tolerated() {
     let (_d, e) = engine();
     // keys the engine does not model keep the historical lenient behaviour
-    assert!(e.execute("SET CONFIG some_future_knob 42;").is_ok());
+    assert!(e
+        .execute_blocking("SET CONFIG some_future_knob 42;")
+        .is_ok());
 }

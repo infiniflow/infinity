@@ -1,5 +1,4 @@
 use super::*;
-use std::sync::RwLock;
 
 /// One document's tokenised terms and the byte cost of its postings, as produced
 /// by [`prepare_doc`] before the table's write gate is taken.
@@ -403,7 +402,7 @@ impl Engine {
     /// index. Keep that invariant when touching any `tables.lock()` block;
     /// `concurrent_insert_query_seal_and_optimize_do_not_deadlock` fails instead
     /// of hanging when it is broken.
-    pub(crate) fn batch_gate(&self, table: &str) -> Arc<Mutex<()>> {
+    pub(crate) fn batch_gate(&self, table: &str) -> Arc<tokio::sync::Mutex<()>> {
         let key = self.table_key(table);
         let mut gates = self.batch_locks.lock().unwrap();
         Arc::clone(gates.entry(key).or_default())
@@ -413,7 +412,7 @@ impl Engine {
     /// normal SELECT path, maps its columns onto the target schema (by the
     /// explicit list when present, otherwise by position), casts each value to
     /// the target column's type, and appends the rows.
-    pub(crate) fn insert_from_select(
+    pub(crate) async fn insert_from_select(
         &self,
         table: &str,
         columns: Option<&[String]>,
@@ -478,7 +477,8 @@ impl Engine {
             }
             literals.push(out);
         }
-        self.insert_literals(table, None, literals)
+        self.insert_literals_inner(table, None, literals, false)
+            .await
     }
 
     /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
@@ -493,7 +493,7 @@ impl Engine {
         // The Thrift `Insert` RPC reaches this directly, so the mode gate has
         // to live here and not only in `execute` (`PhysicalInsert`).
         self.ensure_writable()?;
-        self.insert_literals_inner(table, columns, rows, false)
+        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, false))
     }
 
     /// `NewTxn::Import`: like [`Self::insert_literals`], but the batch always
@@ -505,10 +505,10 @@ impl Engine {
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
         self.ensure_writable()?;
-        self.insert_literals_inner(table, columns, rows, true)
+        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, true))
     }
 
-    pub(crate) fn insert_literals_inner(
+    pub async fn insert_literals_inner(
         &self,
         table: &str,
         columns: Option<&[String]>,
@@ -658,27 +658,36 @@ impl Engine {
         // spends one.
         let turn = self.txn.begin_write();
         let ts = turn.ts();
-        let allocated = std::cell::Cell::new(RowRange::single(0));
+        // A `std::sync::Mutex` shared with the `before_wal` callback: it only
+        // holds a `RowRange` (two integers) and is locked twice, for one
+        // assignment and one read, never across an `.await`.
+        let allocated = std::sync::Mutex::new(RowRange::single(0));
         let alloc_table = table.to_string();
         let alloc_table_id = meta.id.to_string();
         let alloc_rows = rows.len();
-        let ts = self.txn.commit_at_deferred_with(t, ts, |txn| {
-            let range = self.reserve_rows_at(&alloc_table, alloc_rows, new_segment, ts)?;
-            allocated.set(range);
-            if let Some(block) = typed {
-                txn.set_typed_commands(vec![self.append_command(
-                    &alloc_table,
-                    &alloc_table_id,
-                    range.base,
-                    alloc_rows,
-                    block,
-                )]);
-            }
-            Ok(())
-        })?;
+        let ts = self
+            .txn
+            .commit_at_deferred_with(t, ts, |txn| {
+                // Allocated **inline**: this callback runs on a runtime worker
+                // that already holds the commit turn and `commit_lock`, so it
+                // must not park (see `reserve_rows_at`).
+                let range = self.reserve_rows_at(&alloc_table, alloc_rows, new_segment, ts)?;
+                *allocated.lock().unwrap() = range;
+                if let Some(block) = typed {
+                    txn.set_typed_commands(vec![self.append_command(
+                        &alloc_table,
+                        &alloc_table_id,
+                        range.base,
+                        alloc_rows,
+                        block,
+                    )]);
+                }
+                Ok(())
+            })
+            .await?;
         let committed = phase.elapsed();
         let bottom_started = std::time::Instant::now();
-        let range = allocated.get();
+        let range = *allocated.lock().unwrap();
         let base = range.base;
         // Deferred publish: the commit becomes visible when the bottom half
         // below is done (the guard publishes, on the error path too).
@@ -689,6 +698,13 @@ impl Engine {
         // `CommitBottomAppend` does.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
+        // The append record was created while the row ids were allocated, but
+        // it carries no ts yet: stamping it there would make `committed_rows`
+        // count rows that are still in flight, and a checkpoint in that window
+        // sizes a block from ids that hold nothing. The reference keeps a
+        // block's `created_` fields and its rows in one object; here the ts is
+        // written below, right after the rows reach the buffer.
+        let append_record = range.append;
         let row_count = rows.len();
         let bottom_rows = rows;
         let bottom_encoded = encoded_rows;
@@ -700,7 +716,7 @@ impl Engine {
         // how). Optimize/compact still exclude this section, which is what the
         // gate guarantees for them.
         let gate_wait = std::time::Instant::now();
-        let _batch = gate.lock().unwrap();
+        let _batch = gate.lock().await;
         let gate_waited = gate_wait.elapsed();
         self.run_commit_bottom(&shard_key, move |engine| {
             // `AppendInBlock`: the rows land in the block before the index
@@ -748,13 +764,19 @@ impl Engine {
                 // thread (the reference's `MemIndexAppender` is a single
                 // thread, which is the one structural deviation here).
                 let schema = engine.table_schema(&index_table).unwrap_or_default();
-                for (k, (seq, _)) in index_rows.iter().enumerate() {
-                    // `index_rows` is `bottom_rows` rendered, so the literals are
-                    // the same rows: the secondary hook needs them to tell a NULL
-                    // from an empty cell.
-                    let values = bottom_rows.get(k).map(Vec::as_slice).unwrap_or(&[]);
-                    engine.update_indexes_on_insert(&index_table, *seq, values, &schema)?;
-                }
+                // One pass for the whole batch: the per-row form resolved the
+                // table key and took the registry lock once per row.
+                //
+                // The cells come from `bottom_rows` (real `Value`s), not from
+                // the rendered text: a `NULL` must reach the index as
+                // `Value::Null`, because `value_to_tail_keys` skips it - a
+                // string form would make it an ordinary key
+                // (`SecondaryIndexInMemT::InsertInner` skips the null bit).
+                let values: Vec<Vec<Value>> = bottom_rows
+                    .iter()
+                    .map(|row| row.iter().map(Value::from_literal).collect())
+                    .collect();
+                engine.update_secondary_indexes_batch(&index_table, base, &values, &schema);
                 // One batch: the full-text terms of the whole append are
                 // tokenised without the column lock and inserted under it once.
                 let batch: Vec<(usize, &[String])> = index_rows
@@ -779,8 +801,11 @@ impl Engine {
                 // C++ `AppendMemIndex`: a segment that reached
                 // `mem_index_capacity` rows is dumped right after the batch.
                 engine.dump_hnsw_over_capacity(&index_table);
-                engine.dump_secondary_over_capacity(&index_table);
+                engine.dump_secondary_over_capacity_blocking(&index_table);
             }
+            // Fold this batch's index growth into the engine-wide total (plan
+            // 4.2): one table's delta, not a scan of every table.
+            engine.refresh_memindex_charge(&bottom_table);
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
             engine.append_row_cache(&bottom_table, base, &bottom_encoded);
@@ -796,8 +821,13 @@ impl Engine {
                 .enumerate()
                 .map(|(k, text)| (base + k, text.clone()))
                 .collect();
-            engine.publish_encoded_rows(&bottom_table, &published)
-        })?;
+            engine.publish_encoded_rows(&bottom_table, &published)?;
+            // The rows are readable now (`AppendInBlock`), so the record may
+            // carry this transaction's ts (`BlockVersion::Append(commit_ts, …)`).
+            engine.settle_append_at(&bottom_table, append_record, ts);
+            Ok(())
+        })
+        .await?;
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
         // to keep RSS flat and avoids adding milliseconds to each commit.
@@ -873,7 +903,7 @@ impl Engine {
         }
     }
 
-    pub(crate) fn commit_with_deletes(
+    pub(crate) async fn commit_with_deletes(
         &self,
         table: &str,
         deletes: &[usize],
@@ -902,24 +932,19 @@ impl Engine {
             table: table.to_string(),
             rows: deletes.iter().map(|seq| *seq as u64).collect(),
         });
-        let ts = self.txn.commit_deferred(txn)?;
+        let ts = self.txn.commit_deferred(txn).await?;
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomDelete` on the table's worker: the block's `version`
         // records the delete ts (and an UPDATE's rewritten rows' append ts).
-        self.delete_bottom(
-            table,
-            deletes,
-            AppendRecords::Last(appended),
-            extra.to_vec(),
-            ts,
-        )?;
+        self.delete_bottom(table, deletes, Some(appended), extra.to_vec(), ts)
+            .await?;
         Ok(ts)
     }
 
     /// `CommitBottomDelete`: the delete joins the table's log, the block's
     /// `version` carries both timestamps, and the rows the statement appended
     /// go into the block (`AppendInBlock`).
-    pub(crate) fn delete_bottom(
+    pub(crate) async fn delete_bottom(
         &self,
         table: &str,
         deletes: &[usize],
@@ -945,9 +970,8 @@ impl Engine {
             // transaction (`reserve_rows` already logged the create), so the
             // block's `version` has to record this ts for them as well
             // (`BlockVersion::Append`).
-            match appended {
-                AppendRecords::None => {}
-                AppendRecords::Last(count) => engine.settle_append_ts(&bottom_table, count, ts),
+            if let Some(count) = appended {
+                engine.settle_append_ts(&bottom_table, count, ts);
             }
             // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
             // deleting transaction's commit timestamp, and the block rewrite
@@ -955,6 +979,7 @@ impl Engine {
             engine.settle_delete_at(&bottom_table, first_delete, delete_count, ts);
             engine.refresh_block_mirror_extra(&bottom_table, &bottom_rows)
         })
+        .await
     }
 
     /// Commits an `UPDATE`: the reference's `DeleteV2` and `AppendV2` in one
@@ -963,7 +988,7 @@ impl Engine {
     /// `prepare` runs between the conflict check and the WAL entry, gets the
     /// base id and fills in the entry's commands; the rows themselves reach the
     /// block in the bottom half.
-    pub(crate) fn commit_rewritten_rows<F>(
+    pub(crate) async fn commit_rewritten_rows<F>(
         &self,
         table: &str,
         deletes: &[usize],
@@ -997,13 +1022,16 @@ impl Engine {
         let turn = self.txn.begin_write();
         let ts = turn.ts();
         let count = rows.len();
-        let allocated = std::cell::Cell::new(RowRange::single(0));
-        let ts = self.txn.commit_at_deferred_with(txn, ts, |txn| {
-            let range = self.reserve_rows_at(table, count, false, ts)?;
-            allocated.set(range);
-            prepare(txn, range.base)
-        })?;
-        let range = allocated.get();
+        let allocated = std::sync::Mutex::new(RowRange::single(0));
+        let ts = self
+            .txn
+            .commit_at_deferred_with(txn, ts, |txn| {
+                let range = self.reserve_rows_at(table, count, false, ts)?;
+                *allocated.lock().unwrap() = range;
+                prepare(txn, range.base)
+            })
+            .await?;
+        let range = *allocated.lock().unwrap();
         let base = range.base;
         let _visible = BottomGuard::new(&self.txn, ts);
         // One copy of the rewritten rows: the block buffer takes them as
@@ -1013,7 +1041,11 @@ impl Engine {
             .enumerate()
             .map(|(k, row)| (base + k, row.clone()))
             .collect();
-        self.delete_bottom(table, deletes, AppendRecords::None, extra, ts)?;
+        // The staged append record settles with its commit ts here, which is what
+        // `committed_rows` reads; without it a checkpoint would not see the
+        // rewritten rows (`reserve_rows_at` no longer stamps it).
+        self.delete_bottom(table, deletes, Some(count), extra, ts)
+            .await?;
         Ok(base)
     }
 
@@ -1143,6 +1175,15 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    /// `[storage] flush_dumps_mem_index`: whether `FLUSH DATA` also dumps every
+    /// memory index (see `Engine::flush_storage`). Off by default, like the
+    /// reference.
+    pub fn set_flush_dumps_mem_index(&self, on: bool) {
+        self.context
+            .flush_dumps_mem_index
+            .store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Feeds a whole batch of rows into every secondary index of `table`.
@@ -1287,7 +1328,7 @@ impl Engine {
         };
         // The table lock is only held to reach the per-segment mutexes; the
         // graph updates run under each segment's own lock.
-        let segments: Vec<(String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>)> = {
+        let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
             if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
@@ -1330,20 +1371,10 @@ impl Engine {
                         index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                     let encoding =
                         index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-                    // A MULTIVECTOR column keeps one vertex per token, all
-                    // labelled with the row id (the reference's
-                    // `MemIndexInserterIter1<MultiVectorRef>`).
-                    let multivector = self.multivector_column(table, &im.column);
                     entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                        Arc::new(RwLock::new(if multivector {
-                            crate::hnsw_mem::HnswIndexInMem::new_multivector(
-                                dims, m, efc, metric, encoding,
-                            )
-                        } else {
-                            crate::hnsw_mem::HnswIndexInMem::new_with(
-                                dims, m, efc, metric, encoding,
-                            )
-                        }))
+                        Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
+                            dims, m, efc, metric, encoding,
+                        )))
                     });
                 }
             }
@@ -1359,15 +1390,10 @@ impl Engine {
             };
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            let Ok(mut mem) = mem.write() else { continue };
-            let dims = mem.dims;
-            if mem.is_multivector() {
-                // One vertex per token; a cell whose length is not a multiple
-                // of the declared dimension indexes as a single vertex.
-                let tokens = crate::hnsw_mem::split_tokens(&v, dims);
-                mem.insert_tokens(seq, &tokens, 1);
-            } else if v.len() == dims {
-                mem.insert(seq, &v);
+            if let Ok(mut mem) = mem.lock() {
+                if v.len() == mem.dims {
+                    mem.insert(seq, &v);
+                }
             }
         }
     }
@@ -1609,7 +1635,39 @@ impl Engine {
     /// took the column's write lock once per row and ran the analyzer inside it,
     /// which serialised the most expensive part of the write path against every
     /// reader of that column.
+    /// The synchronous form, for the commit's bottom half.
+    ///
+    /// The bottom job runs on a blocking-pool thread (or inline when no pool is
+    /// attached), so the one wait it contains - the memindex quota's fallback
+    /// dump - is bridged with `block_on`; that is a blocking thread by
+    /// construction, which is exactly where a nested `block_on` is legal.
+    /// Async callers use [`Self::update_text_indexes_batch_async`] instead.
     pub(crate) fn update_text_indexes_batch(
+        &self,
+        table: &str,
+        rows: &[(usize, &[String])],
+        schema: &[String],
+        prepared: Option<&mut PreparedText>,
+    ) {
+        self.update_text_indexes_batch_inner(table, rows, schema, prepared);
+        crate::scheduler::block_on(self.enforce_memindex_quota(Some(table)));
+    }
+
+    /// [`Self::update_text_indexes_batch`] for a caller that is already a task:
+    /// the quota's fallback dump is an `.await` instead of a bridged wait.
+    pub(crate) async fn update_text_indexes_batch_async(
+        &self,
+        table: &str,
+        rows: &[(usize, &[String])],
+        schema: &[String],
+        prepared: Option<&mut PreparedText>,
+    ) {
+        self.update_text_indexes_batch_inner(table, rows, schema, prepared);
+        self.enforce_memindex_quota(Some(table)).await;
+    }
+
+    /// The batch's work, without the quota check.
+    fn update_text_indexes_batch_inner(
         &self,
         table: &str,
         rows: &[(usize, &[String])],
@@ -1626,7 +1684,6 @@ impl Engine {
             self.update_multivector_indexes(table, *seq, cells);
             self.update_sparse_indexes(table, *seq, cells);
         }
-        self.enforce_memindex_quota();
         let tkey = self.table_key(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
             .tables
@@ -1772,7 +1829,7 @@ impl Engine {
     /// Commits one `COPY` transaction: `ImportV2` per segment it wrote
     /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:378`), never the
     /// rows, which are already in the blocks the import wrote.
-    pub(crate) fn commit_import_chunk(
+    pub(crate) async fn commit_import_chunk(
         &self,
         table: &str,
         mut t: Txn,
@@ -1815,32 +1872,57 @@ impl Engine {
         let batches_owned: Vec<usize> = batches.to_vec();
         let encoded_owned: Vec<(usize, String)> = encoded_rows.to_vec();
         let table_owned = table.to_string();
-        let ts = self.txn.commit_at_deferred_with(t, ts, |_txn| {
-            let table = table_owned.as_str();
-            // Every block the import wrote carries this transaction's ts: the
-            // reference's `CommitAppend(begin_ts, commit_ts)` writes it into
-            // each block's `version`, so all of them share it.
-            for rows in &batches_owned {
-                self.note_append(table, *rows, true, Some(ts));
-            }
-            for segment in &segments_owned {
-                // The extent is what marks the segment sealed, and a sealed
-                // segment is the only one whose blocks (and segment) get a fast
-                // rough filter - so it has to be recorded **before** the block
-                // write.
-                let rows = self.segment_rows(table, *segment as usize) as u64;
-                self.note_import_rows(table, *segment, rows);
-                self.note_import_ts(table, *segment, ts);
-            }
-            // The published rows and the block they land in are one step: the
-            // block's bitmap coverage comes from the append journal, so a
-            // checkpoint between them would see a journal that already had these
-            // rows while writing a block from the buffer before them (one row
-            // off). Same gate as the binary import path.
+        // The append records are created here (the WAL frame names them) but
+        // **stamped after the rows are published**. The reference keeps a
+        // block's `created_` fields and its rows in one object, so a reader
+        // that sees the ts also sees the data; here the record would otherwise
+        // carry a commit ts while its rows were still in flight, and a
+        // checkpoint in that window sized a block from ids that held nothing
+        // ("block 3.0 holds 0 of the 99 rows committed at ts 22").
+        let mut records_owned: Vec<usize> = Vec::with_capacity(batches_owned.len());
+        let ts = self
+            .txn
+            .commit_at_deferred_with(t, ts, |_txn| {
+                let table = table_owned.as_str();
+                for rows in &batches_owned {
+                    records_owned.push(self.note_append(table, *rows, true, None));
+                }
+                for segment in &segments_owned {
+                    // The extent is what marks the segment sealed, and a sealed
+                    // segment is the only one whose blocks (and segment) get a fast
+                    // rough filter - so it has to be recorded **before** the block
+                    // write.
+                    let rows = self.segment_rows(table, *segment as usize) as u64;
+                    self.note_import_rows(table, *segment, rows);
+                    self.note_import_ts(table, *segment, ts);
+                }
+                Ok(())
+            })
+            .await?;
+        // The published rows and the block they land in are one step: the
+        // block's bitmap coverage comes from the append journal, so a
+        // checkpoint between them would see a journal that already had these
+        // rows while writing a block from the buffer before them (one row
+        // off).
+        //
+        // This runs **after** the commit and **before** `BottomGuard` (which
+        // is what publishes), so the block is still written before the
+        // transaction is visible - the reference's `CommitBottomAppend` order.
+        // It is outside `before_wal` because the gate has to be awaited: inside
+        // that callback (a synchronous `FnOnce` running on a runtime worker
+        // that already holds the commit turn and `commit_lock`) acquiring it
+        // would have to bridge with `block_on`, parking a worker that holds a
+        // `tokio::sync::Mutex` guard.
+        {
             let gate = self.bottom_gate(table);
-            let _turn = gate.lock().unwrap();
+            let _turn = gate.lock().await;
             let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
             self.publish_encoded_rows(table, &encoded_owned)?;
+            // The rows are readable now, so the records may carry this
+            // transaction's ts (`BlockVersion::Append(commit_ts, …)`).
+            for record in &records_owned {
+                self.settle_append_at(table, *record, ts);
+            }
             // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
             // block inside the import transaction, so a `COPY` leaves readable
             // block files (and `SHOW BLOCKS` sees them) without a checkpoint. A
@@ -1849,19 +1931,17 @@ impl Engine {
             if self.has_block_layout(table) {
                 self.write_blocks_commit(table, ts)?;
             }
-            drop(_held);
-            drop(_turn);
-            Ok(())
-        })?;
+        }
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
         self.run_commit_bottom(&shard_key, move |engine| {
             engine.dump_hnsw_over_capacity(&bottom_table);
-            engine.dump_secondary_over_capacity(&bottom_table);
+            engine.dump_secondary_over_capacity_blocking(&bottom_table);
             Ok(())
-        })?;
+        })
+        .await?;
         Ok(ts)
     }
 
@@ -1897,6 +1977,22 @@ impl Engine {
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
     /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
     /// keeps every row in memory until a checkpoint.
+    /// Sets the decoded-block budget (C++ `BufferManager`'s
+    /// `buffer_manager_size`).
+    ///
+    /// The port has no BufferManager - sealed blocks are mapped and evicted by
+    /// the kernel - but the same number is the ceiling on decoded HNSW chunks
+    /// and on the block map, so a deployment that sets a small value still gets
+    /// a small footprint instead of the built-in 8 GiB.
+    pub fn set_buffer_budget(&self, bytes: usize) {
+        self.context
+            .buffer_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .hnsw_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota
@@ -2020,10 +2116,6 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
-            // The reference dumps when the memory passes the quota and
-            // subtracts only what the dump released
-            // (`MemIndexTracer::IncreaseMemoryUsage`), so the charge is added
-            // before the decision and the rows above the limit stay accounted.
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
@@ -2032,49 +2124,26 @@ impl Engine {
                     .entry(im.column.clone())
                     .or_insert(0);
                 *cur += bytes;
-                *cur > quota
-            };
-            if !dump {
-                continue;
-            }
-            // Only a dump that actually wrote a chunk sealed the memory
-            // segment. `Ok(0)` means it sealed nothing - an LSG index is never
-            // dumped from the buffer at all (its graph is linked with
-            // unadjusted distances), and an empty memory segment has nothing to
-            // write - so its bytes were **not** released and the charge has to
-            // stay.
-            let sealed = matches!(
-                self.dump_hnsw_index(&im.table, &im.name),
-                Ok(written) if written > 0
-            );
-            if sealed {
-                // The dumped segment leaves memory, so the charge it held goes
-                // with it; what was above the quota was already left in the
-                // counter by the addition above.
-                let mut tables = self.tables.lock().unwrap();
-                let Some(entry) = tables.get_mut(&tkey) else {
-                    continue;
-                };
-                if let Some(cur) = entry.index_pending_bytes.get_mut(&im.column) {
-                    *cur = cur.saturating_sub(quota);
+                // The reference dumps when the memory passes the quota and
+                // subtracts only what the dump released, so the rows above
+                // the limit stay accounted and the *next* batch is what
+                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
+                if quota > 0 && *cur > quota {
+                    *cur -= quota;
+                    true
+                } else {
+                    false
                 }
-                entry.hnsw_mem.remove(&im.column);
-                entry.hnsw_probed = false;
-                continue;
-            }
-            // Nothing was sealed, so nothing was released: keep the charge and
-            // only release the buffer once it has passed twice the quota. That
-            // is what bounds a tail nothing can seal (an LSG graph is never
-            // written out incrementally) without dropping it on every batch.
-            let retained = {
-                let tables = self.tables.lock().unwrap();
-                tables
-                    .get(&tkey)
-                    .and_then(|entry| entry.index_pending_bytes.get(&im.column).copied())
-                    .unwrap_or(0)
             };
-            if retained > quota.saturating_mul(2) {
-                self.release_hnsw_tail(&tkey, &im.column);
+            if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+                // The dumped segment leaves memory. The bytes above the
+                // quota were already left in the counter, so nothing else to
+                // do here but drop the graph the dump just sealed.
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&tkey) {
+                    e.hnsw_mem.remove(&im.column);
+                    e.hnsw_probed = false;
+                }
             }
         }
     }

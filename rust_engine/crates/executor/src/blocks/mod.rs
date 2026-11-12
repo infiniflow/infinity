@@ -51,44 +51,9 @@ pub(crate) struct HnswChunkParts {
     pub(crate) enterpoint: Option<usize>,
     pub(crate) store_meta: Vec<u8>,
     pub(crate) records: Vec<u8>,
-    /// Set when the chunk is **mapped**: `records` and `graph_region` are empty
-    /// then and both regions are read out of the page cache
-    /// (`HnswIndex::from_chunk_region_mapped`).
-    pub(crate) mapped: Option<MappedChunk>,
-    /// The raw `GraphStoreInner` region, decoded straight into the compact
-    /// graph (`HnswIndex::from_chunk_region`).
-    pub(crate) graph_region: Vec<u8>,
+    pub(crate) vertices: Vec<knn_format::HnswGraphVertex>,
     pub(crate) labels: Vec<u32>,
     pub(crate) options: HnswOptions,
-}
-
-/// A chunk read through its mapping.
-///
-/// The vector payload and the neighbour lists are the two big regions of a
-/// chunk; keeping their offsets instead of their bytes is what makes a loaded
-/// segment cost only its labels.
-pub(crate) struct MappedChunk {
-    pub(crate) src: index::vector::ByteSource,
-    pub(crate) vector_off: usize,
-    /// One vector's stride in the vector region.
-    pub(crate) record_size: usize,
-    pub(crate) graph_off: usize,
-}
-
-/// Distinct rows a chunk's labels name.
-///
-/// A single-vector chunk labels node `i` with segment offset `i`, so the labels
-/// are strictly increasing and the count is `labels.len()`; a `MULTIVECTOR`
-/// chunk repeats a row once per token. The ordering test keeps the common case
-/// allocation-free.
-pub(crate) fn labelled_rows(labels: &[u32]) -> usize {
-    if labels.windows(2).all(|pair| pair[0] < pair[1]) {
-        return labels.len();
-    }
-    labels
-        .iter()
-        .collect::<std::collections::HashSet<_>>()
-        .len()
 }
 
 pub(crate) mod chunk;

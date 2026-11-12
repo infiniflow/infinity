@@ -60,6 +60,7 @@ pub mod diagnostics;
 mod dump_mem_index_ut;
 mod explain;
 mod explain_search;
+mod fanout;
 #[cfg(test)]
 mod gate_b_executor_ut;
 pub mod global_resource_usage;
@@ -100,6 +101,7 @@ mod replay_txn_ut;
 #[cfg(test)]
 mod request_ut;
 mod scheduler;
+pub use scheduler::{block_on, scheduler, sleep, TaskScheduler};
 #[cfg(test)]
 mod select_ddl_ut;
 mod snapshot;
@@ -135,4 +137,5 @@ pub use columnar::{Batch, ColumnData};
 pub use parser::Literal;
 
 mod engine;
+pub use engine::statements::{with_session_scope, with_session_sync};
 pub use engine::*;

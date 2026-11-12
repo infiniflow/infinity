@@ -2031,7 +2031,7 @@ pub fn dropped_index_key(
 }
 
 /// Whether `key` (a `drop|…` record) is present.
-fn is_dropped(store: &dyn MetaStore, key: &str) -> Result<bool> {
+pub(crate) fn is_dropped(store: &dyn MetaStore, key: &str) -> Result<bool> {
     Ok(store.get(key.as_bytes())?.is_some())
 }
 

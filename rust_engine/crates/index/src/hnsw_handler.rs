@@ -37,8 +37,8 @@ impl HnswHandler {
     /// C++: `InsertVecs(Iter, config)`.
     ///
     /// The reference stores the whole batch and then builds it in buckets
-    /// across the dense-index thread pool (`kBuildBucketSize`); `add_batch`
-    /// does the same. Returns the number of vectors inserted; vectors with the
+    /// in parallel buckets (`kBuildBucketSize`); `add_batch` does the same.
+    /// Returns the number of vectors inserted; vectors with the
     /// wrong dimension are skipped.
     pub fn insert_vecs<I>(&mut self, vectors: I) -> usize
     where
@@ -71,39 +71,6 @@ impl HnswHandler {
             Some(ef) => self.index.search_with_ef(query, k, ef),
             None => self.index.search(query, k),
         }
-    }
-
-    /// C++: `SearchIndex(q, k, option, bitmask)`.
-    ///
-    /// The predicate stands in for the reference's `BitmaskFilter`: rejected
-    /// vertices stay traversable but never enter the result heap, so the
-    /// returned `k` entries are all accepted rows (`hnsw_alg.cppm`
-    /// `SearchLayer` with `filter`).
-    pub fn search_index_filtered(
-        &self,
-        query: &[f32],
-        k: usize,
-        option: KnnSearchOption,
-        allow: &dyn Fn(usize) -> bool,
-    ) -> Vec<(usize, f32)> {
-        let ef = option.ef.unwrap_or_else(|| self.index.ef_search());
-        self.index.search_filtered(query, k, ef, allow)
-    }
-
-    /// C++: one `KnnSearch` per query token into a shared
-    /// `MultiVectorResultHandler`, unioned by row label.
-    ///
-    /// `row_of` maps a graph vertex (one token) to its row.
-    pub fn search_multivector(
-        &self,
-        queries: &[Vec<f32>],
-        k: usize,
-        option: KnnSearchOption,
-        row_of: &dyn Fn(usize) -> u64,
-        allow: Option<&dyn Fn(u64) -> bool>,
-    ) -> Vec<(u64, f32)> {
-        let ef = option.ef.unwrap_or_else(|| self.index.ef_search());
-        self.index.search_multivector(queries, k, ef, row_of, allow)
     }
 
     /// C++: `MemUsage`.

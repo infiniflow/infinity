@@ -27,9 +27,9 @@ fn test_hnsw_index_buffer_obj_shutdown() {
     e.set_buffer_memory_limit(memory_limit);
     assert_eq!(e.buffer_memory_limit(), memory_limit);
 
-    e.execute("CREATE TABLE test_hnsw (col1 EMBEDDING(FLOAT,128));")
+    e.execute_blocking("CREATE TABLE test_hnsw (col1 EMBEDDING(FLOAT,128));")
         .unwrap();
-    e.execute(
+    e.execute_blocking(
         "CREATE INDEX hnsw_index ON test_hnsw(col1) USING HNSW \
          WITH (metric='l2', encode='plain', m=16, ef_construction=200);",
     )
@@ -49,7 +49,8 @@ fn test_hnsw_index_buffer_obj_shutdown() {
     }
 
     // `txn->ListIndex` / `GetTableIndexMeta` succeed for the HNSW index.
-    e.execute("SHOW TABLE test_hnsw INDEX hnsw_index;").unwrap();
+    e.execute_blocking("SHOW TABLE test_hnsw INDEX hnsw_index;")
+        .unwrap();
 
     // `table_meta->GetSegmentIDs1() == {0}`.
     assert_eq!(e.segment_ids("test_hnsw"), vec![0]);
@@ -62,7 +63,7 @@ fn test_hnsw_index_buffer_obj_shutdown() {
 
     // Drop table + cleanup (`CleanupTask`): the table entry, memory index and
     // block metadata are released.
-    e.execute("DROP TABLE test_hnsw;").unwrap();
+    e.execute_blocking("DROP TABLE test_hnsw;").unwrap();
     assert!(!e.table_exists("default_db.test_hnsw"));
     assert_eq!(e.mem_index_len("test_hnsw", "col1"), None);
     assert!(e.block_ids("test_hnsw", 0).is_empty());
@@ -86,7 +87,8 @@ fn test_big_with_gc_and_cleanup() {
     e.set_buffer_memory_limit(memory_limit);
     assert_eq!(e.buffer_memory_limit(), memory_limit);
 
-    e.execute("CREATE TABLE table1 (col1 BIGINT);").unwrap();
+    e.execute_blocking("CREATE TABLE table1 (col1 BIGINT);")
+        .unwrap();
     for i in 0..INSERT_N {
         let rows: Vec<Vec<Literal>> = (0..IMPORT_SIZE)
             .map(|j| vec![Literal::Int((i * 1000 + j) as i64)])
@@ -98,7 +100,10 @@ fn test_big_with_gc_and_cleanup() {
     assert_eq!(e.segment_ids("table1"), vec![0]);
 
     // Materialise the C++ block layout (the reference's flushed blocks).
-    assert_eq!(e.write_blocks("table1").unwrap(), INSERT_N * IMPORT_SIZE);
+    assert_eq!(
+        crate::scheduler::block_on(e.write_blocks("table1")).unwrap(),
+        INSERT_N * IMPORT_SIZE
+    );
     let block_ids = e.block_ids("table1", 0);
     assert_eq!(
         block_ids,
@@ -147,7 +152,7 @@ fn test_big_with_gc_and_cleanup() {
     }
 
     // `DROP TABLE` then cleanup: no block metadata survives.
-    e.execute("DROP TABLE table1;").unwrap();
+    e.execute_blocking("DROP TABLE table1;").unwrap();
     assert!(!e.table_exists("default_db.table1"));
     assert!(e.block_ids("table1", 0).is_empty());
 }

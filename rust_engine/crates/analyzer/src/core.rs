@@ -1,7 +1,72 @@
 use super::*;
 
+/// rustc's FxHash, seeded per process.
+///
+/// The stem cache is looked up once per token, and SipHash on a short word cost
+/// ~11% of a bulk full-text insert (measured). The keys, though, are the
+/// **tokens of the documents being indexed** - text a client supplies - so a
+/// fixed FxHash would let a caller build ones that all land in the same initial
+/// buckets and turn every lookup into a long probe chain. The seed removes that
+/// determinism while keeping the multiply-shift mixing that made FxHash fast.
+pub(crate) struct FxHasher {
+    hash: u64,
+}
+
+/// The per-process seed every [`FxHasher`] starts from (`RandomState` gives a
+/// fresh, unpredictable value).
+fn fx_seed() -> u64 {
+    use std::hash::{BuildHasher, Hasher};
+    static SEED: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *SEED.get_or_init(|| {
+        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+        h.write_u64(0x9E37_79B9_7F4A_7C15);
+        h.finish()
+    })
+}
+
+impl Default for FxHasher {
+    fn default() -> Self {
+        Self { hash: fx_seed() }
+    }
+}
+
+impl std::hash::Hasher for FxHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
+        let mut rest = bytes;
+        while rest.len() >= 8 {
+            let word = u64::from_ne_bytes(rest[..8].try_into().unwrap());
+            self.hash = (self.hash.rotate_left(5) ^ word).wrapping_mul(SEED);
+            rest = &rest[8..];
+        }
+        for byte in rest {
+            self.hash = (self.hash.rotate_left(5) ^ u64::from(*byte)).wrapping_mul(SEED);
+        }
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+}
+
+/// [`FxHasher`] with the per-process seed, as a `BuildHasher`.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct FxBuildHasher;
+
+impl std::hash::BuildHasher for FxBuildHasher {
+    type Hasher = FxHasher;
+    fn build_hasher(&self) -> FxHasher {
+        FxHasher::default()
+    }
+}
+
+/// A map keyed by short strings with [`FxHasher`].
+type FastMap<K, V> = HashMap<K, V, FxBuildHasher>;
+
 /// `algorithm -> (word -> stem)`, one map per algorithm seen on this thread.
-type StemMemo = Vec<(rust_stemmers::Algorithm, HashMap<Box<str>, Box<str>>)>;
+type StemMemo = Vec<(rust_stemmers::Algorithm, FastMap<Box<str>, Box<str>>)>;
 
 thread_local! {
     pub(crate) static STEM_MEMO: std::cell::RefCell<StemMemo> =
@@ -181,7 +246,7 @@ pub(crate) fn memoized_stem<R>(
         let index = match maps.iter().position(|(a, _)| *a == algorithm) {
             Some(index) => index,
             None => {
-                maps.push((algorithm, HashMap::new()));
+                maps.push((algorithm, FastMap::default()));
                 maps.len() - 1
             }
         };

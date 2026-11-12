@@ -11,7 +11,7 @@ use std::path::Path;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -63,8 +63,8 @@ fn checkpoint_and_create_db() {
     // Create db, then checkpoint: the catalog is flushed.
     let dir = tempdir().unwrap();
     let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = restart_without_wal(e, dir.path());
     assert_eq!(
         db_names(&e),
@@ -75,8 +75,8 @@ fn checkpoint_and_create_db() {
     // Checkpoint first, then create db: the DDL is not durable without WAL.
     let dir = tempdir().unwrap();
     let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.flush().unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
     let e = restart_without_wal(e, dir.path());
     assert_eq!(db_names(&e), vec!["default_db".to_string()]);
 }
@@ -89,9 +89,9 @@ fn checkpoint_and_create_table() {
     // Create table, then checkpoint.
     let dir = tempdir().unwrap();
     let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = restart_without_wal(e, dir.path());
     assert!(e.table_exists("default_db.tb1"));
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 0);
@@ -100,8 +100,8 @@ fn checkpoint_and_create_table() {
     // Checkpoint first, then create table.
     let dir = tempdir().unwrap();
     let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.flush().unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    crate::scheduler::block_on(e.flush()).unwrap();
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     assert!(e.table_exists("default_db.tb1"));
     let e = restart_without_wal(e, dir.path());
@@ -117,8 +117,8 @@ fn checkpoint_and_create_table() {
 fn addcol_checkpoint_insert() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     e.insert_literals(
@@ -128,9 +128,9 @@ fn addcol_checkpoint_insert() {
     )
     .unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
         .unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     e.insert_literals(
         "db1.tb1",
@@ -170,8 +170,8 @@ fn addcol_checkpoint_insert() {
 fn checkpoint_internal_test_checkpoint0() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     append_block(
@@ -192,8 +192,8 @@ fn checkpoint_internal_test_checkpoint0() {
     );
 
     // C++ checkpoints twice before the restart.
-    e.flush().unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let e = restart(e, dir.path());
 
@@ -223,19 +223,19 @@ fn checkpoint_internal_test_checkpoint0() {
 fn checkpoint_internal_test_checkpoint1() {
     let dir = tempdir().unwrap();
     let mut e = Engine::open(dir.path()).unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     let block = [
@@ -243,49 +243,49 @@ fn checkpoint_internal_test_checkpoint1() {
         Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
     ];
     append_block(&e, "db1.tb1", &block);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     // `Import` is another 8192-row batch (the reference's physical import).
     append_block(&e, "db1.tb1", &block);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     assert!(rows(&e, "SHOW DATABASES;").iter().any(|r| r[0] == "db1"));
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.execute(
+    e.execute_blocking(
         "ALTER TABLE db1.tb1 ADD COLUMN (\
          col2 VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyz', col3 INT DEFAULT 1);",
     )
     .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.renametable;")
+    e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.renametable;")
         .unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert!(e.table_exists("db1.renametable"));
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.execute("CREATE INDEX index_name ON db1.renametable (col1, col2);")
+    e.execute_blocking("CREATE INDEX index_name ON db1.renametable (col1, col2);")
         .unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     assert!(e.table_exists("db1.renametable"));
@@ -304,8 +304,8 @@ fn checkpoint_internal_test_checkpoint1() {
 fn checkpoint_internal_test_checkpoint2() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     append_block(
@@ -317,15 +317,15 @@ fn checkpoint_internal_test_checkpoint2() {
         ],
     );
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
-    e.execute(
+    e.execute_blocking(
         "ALTER TABLE db1.tb1 ADD COLUMN (\
          col2 VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyz', col3 INT DEFAULT 1);",
     )
     .unwrap();
 
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = restart(e, dir.path());
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
@@ -351,66 +351,67 @@ fn checkpoint_internal_test_checkpoint3() {
     let dir = tempdir().unwrap();
     let mut e = Engine::open(dir.path()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 VARCHAR);")
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 VARCHAR);")
         .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
-    e.execute("CREATE INDEX index_name ON db1.tb1 (col2);")
+    e.execute_blocking("CREATE INDEX index_name ON db1.tb1 (col2);")
         .unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     // `DumpMemIndex` — the checkpoint dumps the mem index.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     // The index still references col2, so the drop is rejected.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .is_err());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     e.optimize_indexes().unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("DROP INDEX index_name ON db1.tb1;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("DROP INDEX index_name ON db1.tb1;")
+        .unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
 
     e.optimize_indexes().unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 }
 
 /// C++: `checkpoint_internal_ut.cpp:696`
@@ -423,8 +424,8 @@ fn checkpoint_internal_test_checkpoint3() {
 fn checkpoint_internal_test_checkpoint4() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     append_block(
@@ -436,16 +437,16 @@ fn checkpoint_internal_test_checkpoint4() {
         ],
     );
 
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
 
     e.compact_all_segments("db1.tb1").unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = restart(e, dir.path());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
 }
@@ -458,12 +459,12 @@ fn checkpoint_internal_test_checkpoint4() {
 fn checkpoint_internal_test_checkpoint5() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
 
-    e.execute("DROP DATABASE db1;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     // `TransactionType::kCleanup` -> `NewTxn::Cleanup`.
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 
     assert_eq!(db_names(&e), vec!["default_db".to_string()]);
     assert!(rows(&e, "SHOW DATABASES;").iter().all(|r| r[0] != "db1"));

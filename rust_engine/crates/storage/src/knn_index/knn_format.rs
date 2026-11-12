@@ -195,34 +195,15 @@ pub fn encode_hnsw_chunk_ext(
     out
 }
 
-/// Where each region of a chunk sits, and the header fields.
-///
-/// A reader that **maps** the chunk needs the offsets rather than the bytes: the
-/// vector region is the largest part of the file, and copying it into the heap is
-/// exactly what C++ avoids by pointing `PlainVecStoreInner` into the buffer.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HnswChunkRegions {
-    pub m: u64,
-    pub ef_construction: u64,
-    pub cur_vec_num: usize,
-    pub mmax0: u64,
-    pub mmax: u64,
-    pub max_layer: i32,
-    pub enterpoint: i32,
-    pub store_meta: std::ops::Range<usize>,
-    pub vectors: std::ops::Range<usize>,
-    pub graph: std::ops::Range<usize>,
-    pub labels: std::ops::Range<usize>,
-}
-
-/// Splits a chunk into its regions without copying them.
-pub fn hnsw_chunk_regions(
+/// Decodes a chunk written by [`encode_hnsw_chunk_ext`]. `store_meta_len` and
+/// `record_size` come from the index metadata (encoding, dimension, metric).
+pub fn decode_hnsw_chunk_ext(
     buf: &[u8],
     store_meta_len: usize,
     record_size: usize,
     vertex_l0_size: usize,
     vertex_lx_size: usize,
-) -> Result<HnswChunkRegions, FormatError> {
+) -> Result<HnswChunkExt, FormatError> {
     if buf.len() < 24 + store_meta_len + 24 {
         return Err(FormatError::Truncated {
             need: 24 + store_meta_len + 24,
@@ -234,6 +215,7 @@ pub fn hnsw_chunk_regions(
     let m = u64_at(0);
     let ef_construction = u64_at(8);
     let cur_vec_num = u64_at(16);
+    let store_meta = buf[24..24 + store_meta_len].to_vec();
     let mut at = 24 + store_meta_len;
     let mmax0 = u64_at(at);
     let mmax = u64_at(at + 8);
@@ -253,7 +235,7 @@ pub fn hnsw_chunk_regions(
             got: buf.len(),
         });
     }
-    let vectors = at..at + vec_len;
+    let vectors = buf[at..at + vec_len].to_vec();
     at += vec_len;
     let layer_sum = u64_at(at);
     let graph_len = graph_region_len(
@@ -268,51 +250,21 @@ pub fn hnsw_chunk_regions(
             got: buf.len(),
         });
     }
-    let graph = at..at + graph_len;
+    let graph = buf[at..at + graph_len].to_vec();
     at += graph_len;
-    Ok(HnswChunkRegions {
+    let labels = decode_labels(&buf[at..])?;
+    Ok(HnswChunkExt {
         m,
         ef_construction,
-        cur_vec_num: cur_vec_num as usize,
+        cur_vec_num,
         mmax0,
         mmax,
         max_layer,
         enterpoint,
-        store_meta: 24..24 + store_meta_len,
+        store_meta,
         vectors,
         graph,
-        labels: at..buf.len(),
-    })
-}
-
-/// Decodes a chunk written by [`encode_hnsw_chunk_ext`]. `store_meta_len` and
-/// `record_size` come from the index metadata (encoding, dimension, metric).
-pub fn decode_hnsw_chunk_ext(
-    buf: &[u8],
-    store_meta_len: usize,
-    record_size: usize,
-    vertex_l0_size: usize,
-    vertex_lx_size: usize,
-) -> Result<HnswChunkExt, FormatError> {
-    let regions = hnsw_chunk_regions(
-        buf,
-        store_meta_len,
-        record_size,
-        vertex_l0_size,
-        vertex_lx_size,
-    )?;
-    Ok(HnswChunkExt {
-        m: regions.m,
-        ef_construction: regions.ef_construction,
-        cur_vec_num: regions.cur_vec_num as u64,
-        mmax0: regions.mmax0,
-        mmax: regions.mmax,
-        max_layer: regions.max_layer,
-        enterpoint: regions.enterpoint,
-        store_meta: buf[regions.store_meta].to_vec(),
-        vectors: buf[regions.vectors].to_vec(),
-        graph: buf[regions.graph].to_vec(),
-        labels: decode_labels(&buf[regions.labels])?,
+        labels,
     })
 }
 

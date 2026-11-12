@@ -299,13 +299,7 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
 
     /// The full `Connection::SendStartupResponse` sequence.
     pub fn send_startup_ok(&mut self) -> Result<()> {
-        let mut out = Vec::new();
-        out.extend_from_slice(&authentication_frame());
-        out.extend_from_slice(&parameter_frame("server_version", "14.0"));
-        out.extend_from_slice(&parameter_frame("client_encoding", "UTF8"));
-        out.extend_from_slice(&backend_key_frame(1234, 5678));
-        out.extend_from_slice(&ready_frame());
-        self.write_frame(&out)
+        self.write_frame(&startup_response())
     }
 
     /// Reads one frontend command; `None` when the client closed the socket.
@@ -344,48 +338,7 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
     /// Runs one simple query and writes its whole response, ending with
     /// `ReadyForQuery`.
     pub fn execute_simple_query(&mut self, engine: &Engine, sql: &str) -> Result<()> {
-        let mut out = Vec::new();
-        match engine.execute(sql) {
-            Ok(results) => {
-                let mut rows_sent = 0;
-                // Rewritten per statement, so a multi statement simple query
-                // ends with the tag of its last statement, like a real server.
-                let mut tag = String::from("SELECT 0");
-                for result in results {
-                    match result {
-                        QueryResult::Rows { columns, rows } => {
-                            out.extend_from_slice(&row_description_frame(&columns));
-                            for row in &rows {
-                                let texts: Vec<String> =
-                                    row.iter().map(|v| v.to_slt_string()).collect();
-                                out.extend_from_slice(&data_row_frame(&texts));
-                            }
-                            rows_sent += rows.len();
-                            tag = format!("SELECT {rows_sent}");
-                        }
-                        QueryResult::Inserted { count } => tag = format!("INSERT 0 {count}"),
-                        QueryResult::Deleted { count } => tag = format!("DELETE {count}"),
-                        QueryResult::Updated { count } => tag = format!("UPDATE {count}"),
-                        QueryResult::CreatedTable { .. } => tag = "CREATE TABLE".to_string(),
-                        QueryResult::CreatedDatabase { .. } => tag = "CREATE DATABASE".to_string(),
-                        QueryResult::DroppedDatabase { .. } => tag = "DROP DATABASE".to_string(),
-                        QueryResult::CreatedIndex { .. } => tag = "CREATE INDEX".to_string(),
-                        QueryResult::DroppedTable { .. } => tag = "DROP TABLE".to_string(),
-                        QueryResult::DroppedIndex { .. } => tag = "DROP INDEX".to_string(),
-                    }
-                }
-                out.extend_from_slice(&command_complete_frame(&tag));
-            }
-            Err(e) => {
-                let message = e.to_string();
-                out.extend_from_slice(&error_response_frame(&[
-                    (b'S', "ERROR"),
-                    (b'C', "C00000"),
-                    (b'M', message.as_str()),
-                ]));
-            }
-        }
-        out.extend_from_slice(&ready_frame());
+        let out = simple_query_response(engine, sql);
         self.write_frame(&out)
     }
 
@@ -415,6 +368,181 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
     }
 }
 
+/// The bytes a simple query answers with: row descriptions, data rows, the
+/// command tag and `ReadyForQuery`, or an `ErrorResponse` in their place.
+///
+/// Separate from the handler so the sync harness and the async front end can
+/// share the framing while each drives the statement in its own context
+/// (plan §6.3 / §6.12.4 step 3).
+pub fn simple_query_response(engine: &Engine, sql: &str) -> Vec<u8> {
+    encode_simple_query(executor::block_on(engine.execute(sql)).map_err(|e| e.to_string()))
+}
+
+/// The async front end's counterpart of [`simple_query_response`]: the
+/// statement is awaited through `Engine::execute_async`, so the handler has
+/// no `spawn_blocking` wrapper around it.
+pub async fn simple_query_response_async(engine: &Arc<Engine>, sql: &str) -> Vec<u8> {
+    encode_simple_query(engine.execute(sql).await.map_err(|e| e.to_string()))
+}
+
+fn encode_simple_query(result: std::result::Result<Vec<QueryResult>, String>) -> Vec<u8> {
+    let mut out = Vec::new();
+    match result {
+        Ok(results) => {
+            let mut rows_sent = 0;
+            // Rewritten per statement, so a multi statement simple query
+            // ends with the tag of its last statement, like a real server.
+            let mut tag = String::from("SELECT 0");
+            for result in results {
+                match result {
+                    QueryResult::Rows { columns, rows } => {
+                        out.extend_from_slice(&row_description_frame(&columns));
+                        for row in &rows {
+                            let texts: Vec<String> =
+                                row.iter().map(|v| v.to_slt_string()).collect();
+                            out.extend_from_slice(&data_row_frame(&texts));
+                        }
+                        rows_sent += rows.len();
+                        tag = format!("SELECT {rows_sent}");
+                    }
+                    QueryResult::Inserted { count } => tag = format!("INSERT 0 {count}"),
+                    QueryResult::Deleted { count } => tag = format!("DELETE {count}"),
+                    QueryResult::Updated { count } => tag = format!("UPDATE {count}"),
+                    QueryResult::CreatedTable { .. } => tag = "CREATE TABLE".to_string(),
+                    QueryResult::CreatedDatabase { .. } => tag = "CREATE DATABASE".to_string(),
+                    QueryResult::DroppedDatabase { .. } => tag = "DROP DATABASE".to_string(),
+                    QueryResult::CreatedIndex { .. } => tag = "CREATE INDEX".to_string(),
+                    QueryResult::DroppedTable { .. } => tag = "DROP TABLE".to_string(),
+                    QueryResult::DroppedIndex { .. } => tag = "DROP INDEX".to_string(),
+                }
+            }
+            out.extend_from_slice(&command_complete_frame(&tag));
+        }
+        Err(message) => {
+            out.extend_from_slice(&error_response_frame(&[
+                (b'S', "ERROR"),
+                (b'C', "C00000"),
+                (b'M', message.as_str()),
+            ]));
+        }
+    }
+    out.extend_from_slice(&ready_frame());
+    out
+}
+
+/// Bytes for the startup handshake (`AuthenticationOk`, the parameters, the
+/// backend key and `ReadyForQuery`).
+pub fn startup_response() -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&authentication_frame());
+    out.extend_from_slice(&parameter_frame("server_version", "14.0"));
+    out.extend_from_slice(&parameter_frame("client_encoding", "UTF8"));
+    out.extend_from_slice(&backend_key_frame(1234, 5678));
+    out.extend_from_slice(&ready_frame());
+    out
+}
+
+/// Reads one frontend message off the socket; `None` when the client closed it.
+async fn read_message_async(
+    stream: &mut (impl tokio::io::AsyncRead + Unpin),
+) -> Result<Option<(u8, Vec<u8>)>> {
+    use tokio::io::AsyncReadExt;
+    let mut typ = [0u8; 1];
+    match stream.read_exact(&mut typ).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e) => return Err(Error::io("<pg>", e)),
+    }
+    let mut len = [0u8; 4];
+    stream
+        .read_exact(&mut len)
+        .await
+        .map_err(|e| Error::io("<pg>", e))?;
+    let length = i32::from_be_bytes(len);
+    if length < LENGTH_FIELD_SIZE as i32 {
+        return Err(Error::Invalid(format!("bad command length {length}")));
+    }
+    let mut body = vec![0u8; (length - LENGTH_FIELD_SIZE as i32) as usize];
+    stream
+        .read_exact(&mut body)
+        .await
+        .map_err(|e| Error::io("<pg>", e))?;
+    Ok(Some((typ[0], body)))
+}
+
+/// The async command loop: decode on the reactor, execute on the pool.
+///
+/// The wire format and every frame come from [`PGProtocolHandler`], so the
+/// synchronous tests (which drive it over a `Cursor`) still cover the bytes;
+/// this function only decides *where* the statement runs (plan §6.5).
+async fn handle_connection_async(stream: tokio::net::TcpStream, engine: Arc<Engine>) -> Result<()> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let (mut reader, mut writer) = stream.into_split();
+
+    // Startup: `len | protocol | key\0value\0…\0`. `SSLRequest` is answered with
+    // a single `N` (no SSL) and the loop waits for the real startup message.
+    loop {
+        let mut len = [0u8; 4];
+        match reader.read_exact(&mut len).await {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(()),
+            Err(e) => return Err(Error::io("<pg>", e)),
+        }
+        let length = i32::from_be_bytes(len);
+        if !(8..=10_000).contains(&length) {
+            return Err(Error::Invalid(format!("bad startup length {length}")));
+        }
+        let mut rest = vec![0u8; (length - LENGTH_FIELD_SIZE as i32) as usize];
+        reader
+            .read_exact(&mut rest)
+            .await
+            .map_err(|e| Error::io("<pg>", e))?;
+        let version = i32::from_be_bytes([rest[0], rest[1], rest[2], rest[3]]);
+        if version == SSL_REQUEST_CODE {
+            writer
+                .write_all(b"N")
+                .await
+                .map_err(|e| Error::io("<pg>", e))?;
+            writer.flush().await.map_err(|e| Error::io("<pg>", e))?;
+            continue;
+        }
+        break;
+    }
+    writer
+        .write_all(&startup_response())
+        .await
+        .map_err(|e| Error::io("<pg>", e))?;
+    writer.flush().await.map_err(|e| Error::io("<pg>", e))?;
+
+    while let Some((kind, body)) = read_message_async(&mut reader).await? {
+        match PgCommand::from_wire(kind, &body) {
+            PgCommand::SimpleQuery(sql) => {
+                let engine = Arc::clone(&engine);
+                // The statement is awaited through the engine's async entry,
+                // so no `spawn_blocking` wraps `Engine::execute` here
+                // (plan 6.12.4 step 3).
+                let out = simple_query_response_async(&engine, &sql).await;
+                writer
+                    .write_all(&out)
+                    .await
+                    .map_err(|e| Error::io("<pg>", e))?;
+                writer.flush().await.map_err(|e| Error::io("<pg>", e))?;
+            }
+            PgCommand::Terminate => return Ok(()),
+            // The extended protocol and the copy sub-protocol are framed but
+            // not executed by this stub, exactly like the synchronous handler.
+            _ => {
+                writer
+                    .write_all(&ready_frame())
+                    .await
+                    .map_err(|e| Error::io("<pg>", e))?;
+                writer.flush().await.map_err(|e| Error::io("<pg>", e))?;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// A tiny PostgreSQL-wire server. Every accepted connection is served by a
 /// [`PGProtocolHandler`].
 pub struct PgServer {
@@ -436,24 +564,27 @@ impl PgServer {
             .to_string())
     }
 
-    pub fn run(self) -> ! {
-        for stream in self.listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let _ = stream.set_nodelay(true);
-                    let Ok(reader) = stream.try_clone() else {
-                        continue;
-                    };
-                    let engine = Arc::clone(&self.engine);
-                    std::thread::spawn(move || {
-                        let mut handler = PGProtocolHandler::new(reader, stream);
-                        let _ = handler.handle_connection(&engine);
-                    });
-                }
-                Err(_) => continue,
-            }
+    /// Serves PG on the **caller's** runtime.
+    ///
+    /// One task per connection, exactly like the Thrift front end: an idle
+    /// client costs a future, not a thread. The statement itself runs on the
+    /// engine's scheduler, so a long query never pins a reactor worker.
+    pub async fn serve(self) {
+        self.listener
+            .set_nonblocking(true)
+            .expect("set the pg listener non-blocking");
+        let listener =
+            tokio::net::TcpListener::from_std(self.listener).expect("adopt the pg listener");
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                continue;
+            };
+            let _ = stream.set_nodelay(true);
+            let engine = Arc::clone(&self.engine);
+            tokio::spawn(async move {
+                let _ = handle_connection_async(stream, engine).await;
+            });
         }
-        unreachable!()
     }
 }
 
@@ -636,11 +767,23 @@ mod tests {
         use std::time::Duration;
         let dir = tempdir().unwrap();
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
-        engine.execute("INSERT INTO t VALUES (42);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (42);")
+            .unwrap();
         let server = PgServer::bind("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || server.run());
+        std::thread::spawn(move || {
+            // Each fixture gets its own runtime: the front end is a task on
+            // whichever runtime spawns it, and a test that shared the engine's
+            // would shut it down when the thread returned.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(8 * 1024 * 1024)
+                .build()
+                .expect("build the test runtime")
+                .block_on(server.serve());
+        });
 
         let mut stream = TcpStream::connect(&addr).unwrap();
         stream

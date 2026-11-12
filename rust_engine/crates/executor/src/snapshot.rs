@@ -176,7 +176,7 @@ impl Engine {
     /// Copies the table's files into `<snapshot_dir>/<name>/` and writes its
     /// metadata JSON, then logs `CREATE_TABLE_SNAPSHOT`. The reference refuses
     /// a name that already exists (`Status::SnapshotAlreadyExists`).
-    pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
+    pub async fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
         let table = if table.contains('.') {
             table.to_ascii_lowercase()
         } else {
@@ -195,7 +195,9 @@ impl Engine {
         // metadata and the WAL command carry the same number.
         let snapshot_ts = self.begin_ts();
         let dir = self.prepare_snapshot_dir(name)?;
-        let json = self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)?;
+        let json = self
+            .write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)
+            .await?;
         self.write_snapshot_json(&dir, name, &json)?;
         self.log_snapshot(WalCmd::CreateTableSnapshot {
             db_name,
@@ -203,11 +205,12 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
+        .await
     }
 
     /// `CREATE SNAPSHOT <name> ON DATABASE <db>`: every table of `db`, under
     /// one `DATABASE`-scoped metadata JSON, logged as `CREATE_DB_SNAPSHOT`.
-    pub fn create_database_snapshot(&self, name: &str, db: &str) -> Result<()> {
+    pub async fn create_database_snapshot(&self, name: &str, db: &str) -> Result<()> {
         let db_id = self.database_id(db);
         let snapshot_ts = self.begin_ts();
         let dir = self.prepare_snapshot_dir(name)?;
@@ -217,13 +220,10 @@ impl Engine {
             if !meta_db.eq_ignore_ascii_case(db) {
                 continue;
             }
-            table_snapshots.push(self.write_table_snapshot(
-                &dir,
-                name,
-                db_id,
-                &meta,
-                snapshot_ts,
-            )?);
+            table_snapshots.push(
+                self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)
+                    .await?,
+            );
         }
         let json = Json::Obj(vec![
             ("database_name".into(), Json::Str(db.to_string())),
@@ -245,11 +245,12 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
+        .await
     }
 
     /// `CREATE SNAPSHOT <name> ON SYSTEM`: every table of every database,
     /// logged as `CREATE_SYSTEM_SNAPSHOT`.
-    pub fn create_system_snapshot(&self, name: &str) -> Result<()> {
+    pub async fn create_system_snapshot(&self, name: &str) -> Result<()> {
         let databases = self.storage.catalog.list_databases()?;
         let mut db_snapshots = Vec::new();
         let snapshot_ts = self.begin_ts();
@@ -264,13 +265,10 @@ impl Engine {
                 if !meta_db.eq_ignore_ascii_case(db) {
                     continue;
                 }
-                table_snapshots.push(self.write_table_snapshot(
-                    &dir,
-                    name,
-                    db_id,
-                    &meta,
-                    snapshot_ts,
-                )?);
+                table_snapshots.push(
+                    self.write_table_snapshot(&dir, name, db_id, &meta, snapshot_ts)
+                        .await?,
+                );
             }
             db_snapshots.push(Json::Obj(vec![
                 ("database_name".into(), Json::Str(db.clone())),
@@ -299,6 +297,7 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
+        .await
     }
 
     /// `DROP SNAPSHOT <name>`: the reference renames the directory to
@@ -323,8 +322,9 @@ impl Engine {
     /// `RESTORE TABLE SNAPSHOT <name>`: recreates the table from the snapshot's
     /// metadata and copies its files back, then logs
     /// `RESTORE_TABLE_SNAPSHOT`.
-    pub fn restore_table_snapshot(&self, name: &str) -> Result<()> {
+    pub async fn restore_table_snapshot(&self, name: &str) -> Result<()> {
         self.log_snapshot(self.apply_table_snapshot(name, false)?)
+            .await
     }
 
     /// The restore itself, without the log entry.
@@ -354,8 +354,9 @@ impl Engine {
 
     /// `RESTORE DATABASE SNAPSHOT <name>`, logged as
     /// `RESTORE_DATABASE_SNAPSHOT` with one nested table command per table.
-    pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
+    pub async fn restore_database_snapshot(&self, name: &str) -> Result<()> {
         self.log_snapshot(self.apply_database_snapshot(name, false)?)
+            .await
     }
 
     /// See [`Self::apply_table_snapshot`]: the database-level restore without
@@ -395,8 +396,9 @@ impl Engine {
 
     /// `RESTORE SYSTEM SNAPSHOT <name>`, logged as `RESTORE_SYSTEM_SNAPSHOT`
     /// with one nested database command per database.
-    pub fn restore_system_snapshot(&self, name: &str) -> Result<()> {
+    pub async fn restore_system_snapshot(&self, name: &str) -> Result<()> {
         self.log_snapshot(self.apply_system_snapshot(name, false)?)
+            .await
     }
 
     /// See [`Self::apply_table_snapshot`]: the system-level restore without the
@@ -446,7 +448,7 @@ impl Engine {
     ///
     /// The files are the whole payload — the rows ride in the block columns,
     /// exactly as in the reference, so nothing else is written.
-    fn write_table_snapshot(
+    async fn write_table_snapshot(
         &self,
         dir: &Path,
         name: &str,
@@ -458,7 +460,7 @@ impl Engine {
         // (`NewTxn::CheckpointforSnapshot`), so the table's blocks exist by the
         // time the files are copied: `segments` describes them and the copies
         // carry the rows.
-        let _ = self.write_blocks(&meta.name);
+        let _ = self.write_blocks(&meta.name).await;
         let (db_name, _) = split_qualified(&meta.name);
         let json = self.table_snapshot_json(&db_name, db_id, meta, name, snapshot_ts)?;
         self.copy_table_files(db_id, meta.id, dir)?;
@@ -699,7 +701,7 @@ impl Engine {
     fn restore_table(&self, table: &Json, skip_existing: bool) -> Result<Vec<String>> {
         // Serialize against a create of the same name (and against the orphan
         // sweep), as `NewTxn::RestoreTableSnapshot` does through the catalog.
-        let _ddl = self.ddl_lock.lock().unwrap();
+        let _ddl = crate::scheduler::block_on(self.ddl_lock.lock());
         // A database or system snapshot restores its databases too: one of
         // them may have been dropped since the snapshot was taken.
         let db_name = json_str(table, "database_name");
@@ -852,7 +854,7 @@ impl Engine {
     /// reference's `CreateTableSnapshot` / `Restore*` transactions do. The
     /// transaction writes no KV pair, so the commit takes its timestamp the
     /// way a DDL statement does (`commit_at`, not `commit`).
-    fn log_snapshot(&self, cmd: WalCmd) -> Result<()> {
+    async fn log_snapshot(&self, cmd: WalCmd) -> Result<()> {
         let turn = self.txn.reserve_commit_ts();
         let commit_ts = turn.ts();
         let mut txn = self.txn.begin();
@@ -861,7 +863,7 @@ impl Engine {
         // (`new_txn_impl.cpp:4377-4534`).
         txn.set_op(snapshot_op(&cmd));
         txn.set_typed_commands(vec![cmd]);
-        self.txn.commit_at(txn, commit_ts)?;
+        self.txn.commit_at(txn, commit_ts).await?;
         Ok(())
     }
 

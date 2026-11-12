@@ -22,7 +22,7 @@ use std::sync::Barrier;
 use tempfile::tempdir;
 
 fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in e.execute(sql).unwrap() {
+    for result in e.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -93,18 +93,19 @@ fn setup_database_snapshots(e: &Engine) {
         let db = format!("db_{i}");
         let tb1 = format!("{db}_tb_1");
         let tb2 = format!("{db}_tb_2");
-        e.execute(&format!("CREATE DATABASE {db};")).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!("CREATE DATABASE {db};"))
+            .unwrap();
+        e.execute_blocking(&format!(
             "CREATE TABLE {db}.{tb1} (col1 INT, col2 VARCHAR);"
         ))
         .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "CREATE TABLE {db}.{tb2} (col1 INT, col2 VARCHAR);"
         ))
         .unwrap();
-        e.execute(&format!("CREATE INDEX idx1 ON {db}.{tb1}(col1);"))
+        e.execute_blocking(&format!("CREATE INDEX idx1 ON {db}.{tb1}(col1);"))
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "CREATE INDEX idx2 ON {db}.{tb1}(col2) USING fulltext;"
         ))
         .unwrap();
@@ -112,10 +113,12 @@ fn setup_database_snapshots(e: &Engine) {
             append_repeated(e, &format!("{db}.{tb1}"), j, 1, 5000);
             append_repeated(e, &format!("{db}.{tb2}"), j, 1, 5000);
         }
-        e.execute(&format!("CREATE SNAPSHOT snapshot_{i} ON DATABASE {db};"))
+        e.execute_blocking(&format!("CREATE SNAPSHOT snapshot_{i} ON DATABASE {db};"))
             .unwrap();
-        assert!(e.execute(&format!("SHOW SNAPSHOT snapshot_{i};")).is_ok());
-        e.execute(&format!("DROP DATABASE {db};")).unwrap();
+        assert!(e
+            .execute_blocking(&format!("SHOW SNAPSHOT snapshot_{i};"))
+            .is_ok());
+        e.execute_blocking(&format!("DROP DATABASE {db};")).unwrap();
     }
 }
 
@@ -127,7 +130,8 @@ fn database_snapshot_restore_rollback_basic() {
     let e = Engine::open(dir.path()).unwrap();
     setup_database_snapshots(&e);
 
-    e.execute("RESTORE DATABASE SNAPSHOT snapshot_0;").unwrap();
+    e.execute_blocking("RESTORE DATABASE SNAPSHOT snapshot_0;")
+        .unwrap();
     assert_restored_table(&e, "db_0.db_0_tb_1", 50_000);
     assert_restored_table(&e, "db_0.db_0_tb_2", 50_000);
     // Rows keep their values through the snapshot round trip.
@@ -137,7 +141,7 @@ fn database_snapshot_restore_rollback_basic() {
     );
     assert_eq!(sample, vec![vec!["9", "abcdefghijklmnopqrstuvwxyz"]]);
 
-    e.execute("DROP DATABASE db_0;").unwrap();
+    e.execute_blocking("DROP DATABASE db_0;").unwrap();
     assert!(!e.table_exists("db_0.db_0_tb_1"));
 
     // `RestoreDatabaseSnapshot` inside a transaction, then `Rollback`: the
@@ -167,7 +171,10 @@ fn database_snapshot_restore_create_database_multithreaded() {
         });
         s.spawn(|| {
             barrier.wait();
-            create_ok.store(e.execute("CREATE DATABASE db_0;").is_ok(), Ordering::SeqCst);
+            create_ok.store(
+                e.execute_blocking("CREATE DATABASE db_0;").is_ok(),
+                Ordering::SeqCst,
+            );
         });
     });
 
@@ -192,7 +199,8 @@ fn database_snapshot_create_same_name_multithreaded() {
     let e = Engine::open(dir.path()).unwrap();
     setup_database_snapshots(&e);
 
-    e.execute("RESTORE DATABASE SNAPSHOT snapshot_0;").unwrap();
+    e.execute_blocking("RESTORE DATABASE SNAPSHOT snapshot_0;")
+        .unwrap();
     assert_restored_table(&e, "db_0.db_0_tb_1", 50_000);
 
     let barrier = Barrier::new(2);
@@ -201,7 +209,7 @@ fn database_snapshot_create_same_name_multithreaded() {
         for _ in 0..2 {
             s.spawn(|| {
                 barrier.wait();
-                if e.execute("CREATE SNAPSHOT conflict_snapshot ON DATABASE db_0;")
+                if e.execute_blocking("CREATE SNAPSHOT conflict_snapshot ON DATABASE db_0;")
                     .is_ok()
                 {
                     succeeded.fetch_add(1, Ordering::SeqCst);
@@ -216,8 +224,9 @@ fn database_snapshot_create_same_name_multithreaded() {
         .iter()
         .any(|n| n == "conflict_snapshot"));
 
-    assert!(e.execute("SHOW SNAPSHOTS;").is_ok());
-    e.execute("DROP SNAPSHOT conflict_snapshot;").unwrap();
+    assert!(e.execute_blocking("SHOW SNAPSHOTS;").is_ok());
+    e.execute_blocking("DROP SNAPSHOT conflict_snapshot;")
+        .unwrap();
     assert!(!e
         .snapshot_names()
         .unwrap()
@@ -233,7 +242,8 @@ fn database_snapshot_sql_parser() {
     let e = Engine::open(dir.path()).unwrap();
     setup_database_snapshots(&e);
 
-    e.execute("RESTORE DATABASE SNAPSHOT snapshot_0;").unwrap();
+    e.execute_blocking("RESTORE DATABASE SNAPSHOT snapshot_0;")
+        .unwrap();
     assert_restored_table(&e, "db_0.db_0_tb_1", 50_000);
     assert_restored_table(&e, "db_0.db_0_tb_2", 50_000);
 }
@@ -246,18 +256,19 @@ fn setup_system_snapshot(e: &Engine) {
         let db = format!("db{i}");
         let tb1 = format!("{db}_tb1");
         let tb2 = format!("{db}_tb2");
-        e.execute(&format!("CREATE DATABASE {db};")).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!("CREATE DATABASE {db};"))
+            .unwrap();
+        e.execute_blocking(&format!(
             "CREATE TABLE {db}.{tb1} (col1 INT, col2 VARCHAR);"
         ))
         .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "CREATE TABLE {db}.{tb2} (col1 INT, col2 VARCHAR);"
         ))
         .unwrap();
-        e.execute(&format!("CREATE INDEX idx1 ON {db}.{tb1}(col1);"))
+        e.execute_blocking(&format!("CREATE INDEX idx1 ON {db}.{tb1}(col1);"))
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "CREATE INDEX idx2 ON {db}.{tb2}(col2) USING fulltext;"
         ))
         .unwrap();
@@ -266,11 +277,11 @@ fn setup_system_snapshot(e: &Engine) {
             append_repeated(e, &format!("{db}.{tb2}"), j, 1, 5000);
         }
     }
-    e.execute("CREATE SNAPSHOT system_snapshot ON SYSTEM;")
+    e.execute_blocking("CREATE SNAPSHOT system_snapshot ON SYSTEM;")
         .unwrap();
-    assert!(e.execute("SHOW SNAPSHOT system_snapshot;").is_ok());
+    assert!(e.execute_blocking("SHOW SNAPSHOT system_snapshot;").is_ok());
     for db in ["db0", "db1"] {
-        e.execute(&format!("DROP DATABASE {db};")).unwrap();
+        e.execute_blocking(&format!("DROP DATABASE {db};")).unwrap();
     }
 }
 
@@ -287,7 +298,7 @@ fn system_snapshot_restore_rollback_basic() {
         assert!(!e.table_exists(&format!("{db}.{db}_tb1")));
     }
 
-    e.execute("RESTORE SYSTEM SNAPSHOT system_snapshot;")
+    e.execute_blocking("RESTORE SYSTEM SNAPSHOT system_snapshot;")
         .unwrap();
     for db in ["db0", "db1"] {
         assert_restored_table(&e, &format!("{db}.{db}_tb1"), 50_000);
@@ -296,12 +307,12 @@ fn system_snapshot_restore_rollback_basic() {
     let listed = databases(&e);
     assert!(listed.iter().any(|d| d == "db0"));
     assert!(listed.iter().any(|d| d == "db1"));
-    assert!(e.execute("SHOW DATABASES;").is_ok());
+    assert!(e.execute_blocking("SHOW DATABASES;").is_ok());
     // `select count(*) from db0.<first table>` in the reference fixture.
     assert_eq!(count(&e, "db0.db0_tb1"), 50_000);
 
     for db in ["db0", "db1"] {
-        e.execute(&format!("DROP DATABASE {db};")).unwrap();
+        e.execute_blocking(&format!("DROP DATABASE {db};")).unwrap();
     }
 
     let pending = e.begin_restore_system_snapshot("system_snapshot").unwrap();
@@ -331,7 +342,10 @@ fn system_snapshot_restore_create_database_multithreaded() {
         });
         s.spawn(|| {
             barrier.wait();
-            create_ok.store(e.execute("CREATE DATABASE db0;").is_ok(), Ordering::SeqCst);
+            create_ok.store(
+                e.execute_blocking("CREATE DATABASE db0;").is_ok(),
+                Ordering::SeqCst,
+            );
         });
     });
 
@@ -359,33 +373,35 @@ fn system_snapshot_sql_parser() {
     let e = Engine::open(dir.path()).unwrap();
     setup_system_snapshot(&e);
 
-    e.execute("CREATE SNAPSHOT sql_snapshot ON SYSTEM;")
+    e.execute_blocking("CREATE SNAPSHOT sql_snapshot ON SYSTEM;")
         .unwrap();
     assert!(e
         .snapshot_names()
         .unwrap()
         .iter()
         .any(|n| n == "sql_snapshot"));
-    e.execute("RESTORE SYSTEM SNAPSHOT sql_snapshot;").unwrap();
+    e.execute_blocking("RESTORE SYSTEM SNAPSHOT sql_snapshot;")
+        .unwrap();
 }
 
 /// C++ `TableSnapshotTest::SetupTestTable`: `default_db.tb1` with a secondary
 /// and a fulltext index, twenty 5000-row appends, one table snapshot, then the
 /// table is dropped and the WAL checkpointed.
 fn setup_table_snapshot(e: &Engine) {
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
-    e.execute("CREATE INDEX idx1 ON tb1(col1);").unwrap();
-    e.execute("CREATE INDEX idx2 ON tb1(col2) USING fulltext;")
+    e.execute_blocking("CREATE INDEX idx1 ON tb1(col1);")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idx2 ON tb1(col2) USING fulltext;")
         .unwrap();
     for j in 0..20 {
         append_repeated(e, "default_db.tb1", j, 1, 5000);
     }
-    e.execute("CREATE SNAPSHOT tb1_snapshot ON TABLE tb1;")
+    e.execute_blocking("CREATE SNAPSHOT tb1_snapshot ON TABLE tb1;")
         .unwrap();
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
     e.checkpoint_wal();
-    assert!(e.execute("SHOW SNAPSHOT tb1_snapshot;").is_ok());
+    assert!(e.execute_blocking("SHOW SNAPSHOT tb1_snapshot;").is_ok());
 }
 
 /// C++ `src/unit_test/storage/txn/table_snapshot_ut.cpp:156`
@@ -402,7 +418,7 @@ fn table_snapshot_restore_rollback_basic() {
     let sample = rows(&e, "SELECT col1, col2 FROM tb1 WHERE col1 = 19 LIMIT 1;");
     assert_eq!(sample, vec![vec!["19", "abcdefghijklmnopqrstuvwxyz"]]);
 
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
 
     // `RestoreTableSnapshot` inside a transaction, then `Rollback`.
     let pending = e.begin_restore_table_snapshot("tb1_snapshot").unwrap();
@@ -425,14 +441,15 @@ fn table_snapshot_restore_create_table_multithreaded() {
         s.spawn(|| {
             barrier.wait();
             restore_ok.store(
-                e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").is_ok(),
+                e.execute_blocking("RESTORE TABLE SNAPSHOT tb1_snapshot;")
+                    .is_ok(),
                 Ordering::SeqCst,
             );
         });
         s.spawn(|| {
             barrier.wait();
             create_ok.store(
-                e.execute("CREATE TABLE tb1(col1 int, col2 varchar);")
+                e.execute_blocking("CREATE TABLE tb1(col1 int, col2 varchar);")
                     .is_ok(),
                 Ordering::SeqCst,
             );
@@ -460,9 +477,9 @@ fn table_snapshot_create_same_name_multithreaded() {
     let e = Engine::open(dir.path()).unwrap();
     setup_table_snapshot(&e);
 
-    e.execute("CREATE TABLE tb1(col1 int, col2 varchar);")
+    e.execute_blocking("CREATE TABLE tb1(col1 int, col2 varchar);")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 'abc'), (2, 'def'), (3, 'ghi');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 'abc'), (2, 'def'), (3, 'ghi');")
         .unwrap();
 
     let barrier = Barrier::new(2);
@@ -471,7 +488,7 @@ fn table_snapshot_create_same_name_multithreaded() {
         for _ in 0..2 {
             s.spawn(|| {
                 barrier.wait();
-                if e.execute("CREATE SNAPSHOT conflict_snapshot ON TABLE tb1;")
+                if e.execute_blocking("CREATE SNAPSHOT conflict_snapshot ON TABLE tb1;")
                     .is_ok()
                 {
                     succeeded.fetch_add(1, Ordering::SeqCst);
@@ -495,33 +512,34 @@ fn table_snapshot_show_multithreaded() {
     let e = Engine::open(dir.path()).unwrap();
     setup_table_snapshot(&e);
 
-    e.execute("CREATE TABLE tb1(col1 int, col2 varchar);")
+    e.execute_blocking("CREATE TABLE tb1(col1 int, col2 varchar);")
         .unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1, 'abc'), (2, 'def'), (3, 'ghi');")
+    e.execute_blocking("INSERT INTO tb1 VALUES (1, 'abc'), (2, 'def'), (3, 'ghi');")
         .unwrap();
 
     let created = AtomicBool::new(false);
     std::thread::scope(|s| {
         s.spawn(|| {
             created.store(
-                e.execute("CREATE SNAPSHOT conflict_snapshot ON TABLE tb1;")
+                e.execute_blocking("CREATE SNAPSHOT conflict_snapshot ON TABLE tb1;")
                     .is_ok(),
                 Ordering::SeqCst,
             );
         });
         s.spawn(|| {
-            assert!(e.execute("SHOW SNAPSHOTS;").is_ok());
+            assert!(e.execute_blocking("SHOW SNAPSHOTS;").is_ok());
         });
     });
     assert!(created.load(Ordering::SeqCst));
-    assert!(e.execute("SHOW SNAPSHOTS;").is_ok());
+    assert!(e.execute_blocking("SHOW SNAPSHOTS;").is_ok());
     assert!(e
         .snapshot_names()
         .unwrap()
         .iter()
         .any(|n| n == "conflict_snapshot"));
 
-    e.execute("DROP SNAPSHOT conflict_snapshot;").unwrap();
+    e.execute_blocking("DROP SNAPSHOT conflict_snapshot;")
+        .unwrap();
     assert!(!e
         .snapshot_names()
         .unwrap()
@@ -543,7 +561,9 @@ fn table_snapshot_restore_same_snapshot_multithreaded() {
         for _ in 0..2 {
             s.spawn(|| {
                 barrier.wait();
-                if e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").is_ok() {
+                if e.execute_blocking("RESTORE TABLE SNAPSHOT tb1_snapshot;")
+                    .is_ok()
+                {
                     succeeded.fetch_add(1, Ordering::SeqCst);
                 }
             });
@@ -566,7 +586,8 @@ fn table_snapshot_create_snapshot_delete_data() {
     let e = Engine::open(dir.path()).unwrap();
     setup_table_snapshot(&e);
 
-    e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT tb1_snapshot;")
+        .unwrap();
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
 
     // `txn1->Delete(RowID(0, 1000..3000))`, not committed yet.
@@ -601,8 +622,9 @@ fn table_snapshot_create_snapshot_delete_data() {
     // Committed deletes are now visible.
     assert_eq!(count(&e, "default_db.tb1"), 97_000);
 
-    e.execute("DROP TABLE tb1;").unwrap();
-    e.execute("RESTORE TABLE SNAPSHOT test_delete;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT test_delete;")
+        .unwrap();
 
     // The restored snapshot holds the state before the uncommitted deletes.
     let restored = e.fetch_rows_with_ids("default_db.tb1").unwrap();
@@ -629,7 +651,8 @@ fn table_snapshot_create_snapshot_insert_data() {
     let e = Engine::open(dir.path()).unwrap();
     setup_table_snapshot(&e);
 
-    e.execute("RESTORE TABLE SNAPSHOT tb1_snapshot;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT tb1_snapshot;")
+        .unwrap();
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
 
     // `MakeInputBlock(999, "abcdefghijklmnopqrstuvwxyz", 900)`.
@@ -660,8 +683,9 @@ fn table_snapshot_create_snapshot_insert_data() {
     assert!(matches!(txn1.commit(), Err(Error::TxnConflict(_))));
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
 
-    e.execute("DROP TABLE tb1;").unwrap();
-    e.execute("RESTORE TABLE SNAPSHOT test_insert;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT test_insert;")
+        .unwrap();
 
     // The uncommitted append was excluded from the snapshot.
     assert_eq!(count(&e, "default_db.tb1"), 100_000);
@@ -679,14 +703,16 @@ fn secondary_index_high_cardinality_txn() {
     let e = Engine::open(dir.path()).unwrap();
 
     // BeginTxn(kCreateTable) -> CreateTable -> CommitTxn.
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     // BeginTxn(kCreateIndex) -> CreateIndex -> CommitTxn.
-    e.execute("CREATE INDEX second_idx ON tb1(col1);").unwrap();
+    e.execute_blocking("CREATE INDEX second_idx ON tb1(col1);")
+        .unwrap();
 
     // Committed DDL is visible.
     assert!(e.table_exists("default_db.tb1"));
-    e.execute("SHOW TABLE tb1 INDEX second_idx;").unwrap();
+    e.execute_blocking("SHOW TABLE tb1 INDEX second_idx;")
+        .unwrap();
 
     // "Just for coverage": insert into a high-cardinality chunk.
     let mut index = HighCardinalityIndex::new();

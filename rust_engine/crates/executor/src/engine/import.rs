@@ -8,7 +8,7 @@ impl Engine {
     /// Loads a CSV file into `table` (`COPY t FROM …`). The path may be absolute
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
-    pub(crate) fn copy_from(
+    pub(crate) async fn copy_from(
         &self,
         table: &str,
         path: &str,
@@ -18,14 +18,14 @@ impl Engine {
         // commits once. The extent each segment ends up with is what decides
         // how many index chunks the mirror publishes for it.
         let before = self.segment_row_counts(table);
-        let result = self.copy_from_inner(table, path, opts);
+        let result = self.copy_from_inner(table, path, opts).await;
         if result.is_ok() {
             self.settle_import_extent(table, &before);
         }
         result
     }
 
-    pub(crate) fn copy_from_inner(
+    pub(crate) async fn copy_from_inner(
         &self,
         table: &str,
         path: &str,
@@ -34,7 +34,7 @@ impl Engine {
         // The import writes its blocks inside its own commit, so a background
         // compaction must not run between the commit and the write.
         let gate = self.batch_gate(table);
-        let _batch = gate.lock().unwrap();
+        let _batch = gate.lock().await;
         if self.storage.catalog.get_table_by_name(table)?.is_none() {
             return Err(Error::NotFound(format!("table '{table}'")));
         }
@@ -61,7 +61,7 @@ impl Engine {
             _ => None,
         };
         if let Some(rows) = rows {
-            return self.import_literal_rows(table, rows, t_read);
+            return self.import_literal_rows(table, rows, t_read).await;
         }
         let delim = opts
             .iter()
@@ -79,9 +79,13 @@ impl Engine {
         if format_of("JSONL") || format_of("JSON") {
             let text = String::from_utf8_lossy(&bytes_in).into_owned();
             if format_of("JSONL") {
-                return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
+                return self
+                    .copy_from_jsonl(table, &text, &types_for_scan, &defaults)
+                    .await;
             }
-            return self.copy_from_json(table, &text, &types_for_scan, &defaults);
+            return self
+                .copy_from_json(table, &text, &types_for_scan, &defaults)
+                .await;
         }
         // CSV: read line by line and commit in blocks, so an 8-million-row
         // import does not hold the file and its parsed rows in memory.
@@ -185,10 +189,10 @@ impl Engine {
                     });
                     let take = (batch.len() - start).min(room);
                     let (range, next_cursor) = match current {
-                        Some(cursor) => self.reserve_import_rows(table, take, cursor)?,
+                        Some(cursor) => self.reserve_import_rows(table, take, cursor).await?,
                         None => {
-                            let opened = self.begin_import(table)?;
-                            self.reserve_import_rows(table, take, opened)?
+                            let opened = self.begin_import(table).await?;
+                            self.reserve_import_rows(table, take, opened).await?
                         }
                     };
                     let base = range.base;
@@ -217,7 +221,8 @@ impl Engine {
                         .iter()
                         .map(|(seq, cells)| (*seq, cells.as_slice()))
                         .collect();
-                    self.update_text_indexes_batch(table, &text_batch, &schema, None);
+                    self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                        .await;
                     for (seq, texts) in &texts_by_row {
                         self.update_vector_caches(table, *seq, texts);
                     }
@@ -233,7 +238,8 @@ impl Engine {
         if staged > 0 {
             // One `create` boundary per staged batch, across every segment this
             // statement opened.
-            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)?;
+            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)
+                .await?;
         } else {
             drop(t);
         }
@@ -243,7 +249,7 @@ impl Engine {
     /// Loads a `FORMAT JSONL` copy: one JSON object per line, keyed by column
     /// name. Sparse columns come as `{index: value}` objects (float) or index
     /// arrays (bit); everything else is a scalar.
-    pub(crate) fn copy_from_jsonl(
+    pub(crate) async fn copy_from_jsonl(
         &self,
         table: &str,
         text: &str,
@@ -262,11 +268,12 @@ impl Engine {
             }
         }
         self.insert_json_objects(table, &objects, types, defaults)
+            .await
     }
 
     /// Loads a `FORMAT JSON` copy: the whole file is one JSON array whose
     /// elements are objects keyed by column name.
-    pub(crate) fn copy_from_json(
+    pub(crate) async fn copy_from_json(
         &self,
         table: &str,
         text: &str,
@@ -283,12 +290,13 @@ impl Engine {
             }
         }
         self.insert_json_objects(table, &objects, types, defaults)
+            .await
     }
 
     /// Inserts one row per JSON object (keyed by column name). Sparse columns
     /// come as `{index: value}` objects (float) or index arrays (bit);
     /// everything else is a scalar.
-    pub(crate) fn insert_json_objects(
+    pub(crate) async fn insert_json_objects(
         &self,
         table: &str,
         objects: &[Vec<(String, expression::json::Json)>],
@@ -354,8 +362,8 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let opened = self.begin_import(table)?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
+        let opened = self.begin_import(table).await?;
+        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
@@ -366,7 +374,7 @@ impl Engine {
         // block as part of the transaction, after it commits.
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        let _ts = self.txn.commit_at_deferred(t, ts)?;
+        let _ts = self.txn.commit_at_deferred(t, ts).await?;
         let _visible = BottomGuard::new(&self.txn, _ts);
         self.note_append(table, rows.len(), true, Some(_ts));
         self.note_import_ts(table, (base >> 32) as u32, _ts);
@@ -381,12 +389,13 @@ impl Engine {
             .iter()
             .map(|(seq, cells)| (*seq, cells.as_slice()))
             .collect();
-        self.update_text_indexes_batch(table, &text_batch, &schema, None);
+        self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+            .await;
         for (seq, texts) in &texts_by_row {
             self.update_vector_caches(table, *seq, texts);
         }
         self.dump_hnsw_over_capacity(table);
-        self.dump_secondary_over_capacity(table);
+        self.dump_secondary_over_capacity(table).await;
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -396,7 +405,7 @@ impl Engine {
     /// `ApplySegmentIDs`, the `ImportV2` frame, the block write and the
     /// published rows. Every import format parses into the same literals and
     /// lands here.
-    fn import_literal_rows(
+    async fn import_literal_rows(
         &self,
         table: &str,
         rows: Vec<Vec<Literal>>,
@@ -406,8 +415,8 @@ impl Engine {
         let t1 = std::time::Instant::now();
         // `ApplySegmentIDs`: a segment of the statement's own, with no append
         // record yet - the records are written when it commits.
-        let opened = self.begin_import(table)?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
+        let opened = self.begin_import(table).await?;
+        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
@@ -422,7 +431,7 @@ impl Engine {
         // it commits - a statement that loses its commit leaves neither behind.
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        let ts = self.txn.commit_at_deferred(t, ts)?;
+        let ts = self.txn.commit_at_deferred(t, ts).await?;
         let t_commit = t2.elapsed();
         let t3 = std::time::Instant::now();
         let _visible = BottomGuard::new(&self.txn, ts);
@@ -438,7 +447,7 @@ impl Engine {
         // bottom gate (and mark the thread as its bottom, so the block writer
         // does not re-enter it).
         let gate = self.bottom_gate(table);
-        let _turn = gate.lock().unwrap();
+        let _turn = gate.lock().await;
         let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
         self.publish_rows(table, base, &rows)?;
         // `AppendInBlock`: the import's block is readable as soon as the

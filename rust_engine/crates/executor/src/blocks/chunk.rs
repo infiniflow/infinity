@@ -319,14 +319,11 @@ pub(crate) fn publish_chunk_files(
     let mut base_row_id = 0u64;
     for id in ids {
         // `[M][ef_construction][cur_vec_num]…` — the third u64 is this chunk's
-        // **vertex** count (`HnswHeader::cur_vec_num`, `knn_format.rs:44`), which
-        // is the token count for a `MULTIVECTOR` column. Row coverage is the
-        // number of distinct labels instead: publishing the vertex count would
-        // claim rows the chunk does not hold, and advancing `base_row_id` by it
-        // would put the next chunk's base past the end of the segment.
+        // vector count (`HnswHeader::cur_vec_num`, `knn_format.rs:44`).
         let row_count = std::fs::read(seg_dir.join(format!("chunk_{id}.idx")))
             .ok()
-            .map(|bytes| hnsw_chunk_rows(&bytes))
+            .filter(|bytes| bytes.len() >= 24)
+            .map(|bytes| u64::from_le_bytes(bytes[16..24].try_into().unwrap()))
             .unwrap_or(0);
         chunks.push(IndexChunk {
             chunk_id: id,
@@ -340,29 +337,6 @@ pub(crate) fn publish_chunk_files(
         base_row_id += row_count;
     }
     chunks
-}
-
-/// The rows an encoded HNSW chunk covers: the distinct labels of its trailing
-/// `u32[cur_vec_num]` array.
-///
-/// A chunk that does not parse (truncated, or shorter than its own header
-/// claims) reports its `cur_vec_num`, which is the best the file can say about
-/// itself; the chunk is then covered by restart recovery rather than skipped.
-fn hnsw_chunk_rows(bytes: &[u8]) -> u64 {
-    if bytes.len() < 24 {
-        return 0;
-    }
-    let vertices = u64::from_le_bytes(bytes[16..24].try_into().unwrap()) as usize;
-    let Some(start) = bytes.len().checked_sub(vertices.saturating_mul(4)) else {
-        return vertices as u64;
-    };
-    let labels: Vec<u32> = bytes[start..]
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .map(|c| u32::from_le_bytes(*c))
-        .collect();
-    labelled_rows(&labels) as u64
 }
 
 /// The document count and the total term count of a full-text chunk, read

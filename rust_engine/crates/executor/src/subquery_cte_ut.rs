@@ -10,14 +10,15 @@ use tempfile::tempdir;
 fn engine() -> (tempfile::TempDir, Engine) {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE t (a INT);").unwrap();
-    e.execute("INSERT INTO t VALUES (1), (2), (3);").unwrap();
+    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+    e.execute_blocking("INSERT INTO t VALUES (1), (2), (3);")
+        .unwrap();
     (dir, e)
 }
 
 fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
     let r = e
-        .execute(sql)
+        .execute_blocking(sql)
         .unwrap()
         .into_iter()
         .next()
@@ -64,13 +65,13 @@ fn scalar_subquery_is_null_when_empty() {
 fn scalar_subquery_rejects_multiple_rows_or_columns() {
     let (_d, e) = engine();
     let err = e
-        .execute("SELECT (SELECT a FROM t);")
+        .execute_blocking("SELECT (SELECT a FROM t);")
         .unwrap_err()
         .to_string();
     assert!(err.contains("more than one row"), "unexpected error: {err}");
 
     let err = e
-        .execute("SELECT (SELECT a, a FROM t WHERE a = 1);")
+        .execute_blocking("SELECT (SELECT a, a FROM t WHERE a = 1);")
         .unwrap_err()
         .to_string();
     assert!(err.contains("one column"), "unexpected error: {err}");
@@ -177,7 +178,7 @@ fn cte_alias_list_renames_output_columns() {
     );
 
     let err = e
-        .execute("WITH x (b, c) AS (SELECT a FROM t) SELECT * FROM x;")
+        .execute_blocking("WITH x (b, c) AS (SELECT a FROM t) SELECT * FROM x;")
         .unwrap_err()
         .to_string();
     assert!(
@@ -192,7 +193,7 @@ fn delete_and_update_filters_accept_subqueries() {
 
     let (_d, e) = engine();
     assert_eq!(
-        e.execute("UPDATE t SET a = 10 WHERE a = (SELECT 1);")
+        e.execute_blocking("UPDATE t SET a = 10 WHERE a = (SELECT 1);")
             .unwrap()
             .into_iter()
             .next(),
@@ -204,7 +205,7 @@ fn delete_and_update_filters_accept_subqueries() {
     );
 
     assert_eq!(
-        e.execute("DELETE FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 10);")
+        e.execute_blocking("DELETE FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 10);")
             .unwrap()
             .into_iter()
             .next(),
@@ -262,7 +263,7 @@ fn constant_limit_and_offset_expressions_apply() {
 fn non_constant_limit_is_an_explicit_error() {
     let (_d, e) = engine();
     let err = e
-        .execute("SELECT a FROM t LIMIT (SELECT 1);")
+        .execute_blocking("SELECT a FROM t LIMIT (SELECT 1);")
         .unwrap_err()
         .to_string();
     assert!(
@@ -271,7 +272,7 @@ fn non_constant_limit_is_an_explicit_error() {
     );
 
     let err = e
-        .execute("SELECT a FROM t LIMIT 0-1;")
+        .execute_blocking("SELECT a FROM t LIMIT 0-1;")
         .unwrap_err()
         .to_string();
     assert!(

@@ -78,7 +78,7 @@ fn assert_compacted(e: &Engine, segment: u32) {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(h::count(e, "db1.tb1"), 32768);
     assert_eq!(e.segment_ids("db1.tb1"), vec![segment]);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", segment), vec![0, 1, 2, 3]);
     for block in 0..4u16 {
         assert_eq!(e.block_row_count("db1.tb1", segment, block), Some(8192));
@@ -149,8 +149,10 @@ fn compact_then_drop_database() {
     e.compact_all_segments("db1.tb1").unwrap();
 
     h::ok(&e, "DROP DATABASE db1;");
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
-    assert!(e.execute("INSERT INTO db1.tb1 VALUES (1, 'x');").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e
+        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:602`
@@ -165,7 +167,7 @@ fn compact_then_drop_table() {
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:749`
@@ -268,13 +270,13 @@ fn compaction_needs_four_segments_in_one_layer() {
     .unwrap();
     assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
     // The mirror is what a compaction leaves behind on disk, so write it first.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e.compact_table("db1.tb1").unwrap();
     assert_eq!(e.segment_ids("db1.tb1"), vec![4]);
     assert_eq!(h::count(&e, "db1.tb1"), 4 * 8192);
     // The source segments stay on disk, deprecated: a reader at a later ts
     // ignores them, and `Cleanup` is what reclaims them.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let mut dirs: Vec<String> = Vec::new();
     for entry in walkdir(&dir.path().join("data")) {
         if entry.starts_with("seg_") {
@@ -309,7 +311,7 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     }
     assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3, 4, 5]);
     // The mirror is what a compaction leaves behind on disk, so write it first.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     e.compact_table("db1.tb1").unwrap();
     assert_eq!(
@@ -334,7 +336,7 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     // merged segment holds the four source blocks, the two it did not pick keep
     // their single block each, and the four deprecated segments keep their
     // files until `Cleanup`).
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let table_dir = {
         let mut found = None;
         for db in std::fs::read_dir(dir.path().join("data"))
@@ -473,7 +475,7 @@ fn internal_compact_skips_deleted_offsets() {
     e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768 - 4096);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 1), vec![0, 1, 2, 3]);
     // The reference keeps the block's stored row count (8192) and hides the
     // tombstones from the visible range; the engine reports the same stored
@@ -564,7 +566,7 @@ fn replay_compact_rollback() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 32768);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let blocks: usize = e
         .segment_ids("db1.tb1")
         .into_iter()

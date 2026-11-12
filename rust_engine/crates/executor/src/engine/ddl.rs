@@ -59,7 +59,12 @@ impl Engine {
         // would otherwise reopen the dropped one's chunks and score those
         // documents a second time.
         let fulltext_columns = self.table_schema(&key).unwrap_or_default();
+        // Dropping the entry drops its charge with it, so the engine-wide
+        // total has to be rebuilt once (a DDL is rare; the scan is not on a
+        // hot path).
         self.tables.lock().unwrap().remove(&key);
+        crate::blocks::misc::forget_mirror_write_lock(&key);
+        self.recompute_memindex_total();
         // A dropped table's blocks are gone: so are the mappings of them.
         if let Some(id) = table_id {
             self.drop_block_maps(id);
@@ -97,10 +102,8 @@ impl Engine {
             }
         }
         // The table entry (index registries included) was removed above.
-        for im in self.storage.catalog.list_indexes()? {
-            if im.table == name {
-                let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
-            }
+        for im in self.storage.catalog.indexes_of_table(name)? {
+            let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
         }
         Ok(existed)
     }

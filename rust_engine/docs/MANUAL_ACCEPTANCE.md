@@ -309,7 +309,7 @@ find .scratch/manual/ft33/cpp/data -name '*.dic' | wc -l
 - [ ] 两端二进制都是 release/RelWithDebInfo，时间戳是本次构建。
 - [ ] 同一份数据文件、同一行数、同一列类型、同一索引参数。
 - [ ] 同一配置：`optimize/cleanup/compact/checkpoint` 全 `0s`，`result_cache=off`，`memindex_memory_quota` 相同。
-- [ ] 同一 `MALLOC_ARENA_MAX`、同一 `buffer_manager_size`、同一 `mem_index_capacity`。
+- [ ] 同一 `MALLOC_ARENA_MAX`、同一 `mem_index_capacity`；Rust 侧忽略 `buffer_manager_size`（内置 8 GiB），对比时 C++ 侧也设成 8 GiB。
 - [ ] 同一时间只跑一个引擎；没有别的会话在同一端口/同一目录跑。
 - [ ] 同一页缓存状态（都冷或都热），记录 `free -g`。
 - [ ] 记录 `git rev-parse HEAD`、二进制大小和时间、`nproc`、内存总量、磁盘型号。

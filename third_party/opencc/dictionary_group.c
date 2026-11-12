@@ -26,7 +26,7 @@ struct _dictionary_group {
 };
 typedef struct _dictionary_group dictionary_group_desc;
 
-static OPENCC_THREAD_LOCAL dictionary_error errnum = DICTIONARY_ERROR_VOID;
+static dictionary_error errnum = DICTIONARY_ERROR_VOID;
 
 dictionary_group_t dictionary_group_open(void) {
     dictionary_group_desc *dictionary_group = (dictionary_group_desc *)malloc(sizeof(dictionary_group_desc));

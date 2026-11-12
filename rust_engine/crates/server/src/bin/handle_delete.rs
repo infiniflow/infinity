@@ -12,12 +12,12 @@ fn main() {
     let engine = Engine::open(&dir).expect("open engine");
     let (seq, req) = read_delete_call(&mut std::io::stdin()).expect("decode Delete call");
     let t = &req.table_name;
-    let _ = engine.execute(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
-    let _ = engine.execute(&format!(
+    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
+    let _ = engine.execute_blocking(&format!(
         "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
     ));
 
-    let deleted = match engine.execute(&req.to_sql()) {
+    let deleted = match engine.execute_blocking(&req.to_sql()) {
         Ok(rs) => rs
             .into_iter()
             .map(|r| {

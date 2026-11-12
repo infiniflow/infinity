@@ -607,9 +607,9 @@ func TestMapSQLTypeToDataType(t *testing.T) {
 // TestCastPhysicalType tests that PhysicalType is correctly set in CAST expressions
 func TestCastPhysicalType(t *testing.T) {
 	tests := []struct {
-		sqlType      string
-		logicType    thriftapi.LogicType
-		hasNumberType bool
+		sqlType        string
+		logicType      thriftapi.LogicType
+		hasNumberType  bool
 		hasVarcharType bool
 	}{
 		// Numeric types - should have NumberType

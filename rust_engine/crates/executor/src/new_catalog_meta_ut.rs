@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -76,8 +76,8 @@ impl Engine {
 fn table_meta() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     let batch: Vec<Vec<Literal>> = (0..8192)
@@ -91,7 +91,10 @@ fn table_meta() {
     e.insert_literals("db1.tb1", None, batch).unwrap();
 
     // Materialise the C++ block layout (the reference's flushed block 0).
-    assert_eq!(e.write_blocks("db1.tb1").unwrap(), 8192);
+    assert_eq!(
+        crate::scheduler::block_on(e.write_blocks("db1.tb1")).unwrap(),
+        8192
+    );
 
     // `GetSegmentIDs1` / `GetBlockIDs1` / `GetRowCnt1`.
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
@@ -136,8 +139,8 @@ fn table_meta() {
     // `GetColumnDefs` / `GetColumnIDByColumnName`: two columns, in order.
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2"]);
 
-    e.execute("DROP TABLE db1.tb1;").unwrap();
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 // ---------------------------------------------------------------------------
