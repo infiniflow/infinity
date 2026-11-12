@@ -61,7 +61,11 @@ Status TraditionalChineseAnalyzer::Load() {
 
 void TraditionalChineseAnalyzer::Parse(const std::string &input) {
     std::string out;
-    opencc_->convert(input, out);
+    // The converter may be shared with other analyzer copies, so a failed
+    // conversion is possible; fall back to the input instead of indexing nothing.
+    if (opencc_ == nullptr || opencc_->convert(input, out) < 0) {
+        out = input;
+    }
     ChineseAnalyzer::Parse(out);
 }
 

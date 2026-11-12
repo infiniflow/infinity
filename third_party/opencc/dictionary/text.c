@@ -27,9 +27,33 @@ struct _text_dictionary {
     size_t entry_count;
     size_t max_length;
     entry *lexicon;
-    ucs4_t *word_buff;
 };
 typedef struct _text_dictionary text_dictionary_desc;
+
+/* Lookup keys are built in a per-call buffer: the dictionary is shared by every
+ * thread converting with the same opencc_t, and a cached key buffer made
+ * concurrent lookups overwrite each other's ucs4ncpy()/bsearch() input. */
+#define TEXT_DICTIONARY_KEY_STACK_SIZE 64
+
+/* Returns the buffer holding `len` code points of `word`, NUL terminated, or
+ * NULL when the heap fallback cannot be allocated. `stack` must hold at least
+ * TEXT_DICTIONARY_KEY_STACK_SIZE code points; *heap_block is set when the
+ * caller has to free the result with free(). */
+static ucs4_t *text_dictionary_make_key(ucs4_t *stack, ucs4_t **heap_block, size_t key_size, const ucs4_t *word, size_t len) {
+    ucs4_t *key = stack;
+    *heap_block = NULL;
+
+    if (key_size > TEXT_DICTIONARY_KEY_STACK_SIZE) {
+        *heap_block = (ucs4_t *)malloc(sizeof(ucs4_t) * key_size);
+        if (*heap_block == NULL)
+            return NULL;
+        key = *heap_block;
+    }
+
+    ucs4ncpy(key, word, len);
+    key[len] = L'\0';
+    return key;
+}
 
 int qsort_entry_cmp(const void *a, const void *b) { return ucs4cmp(((entry *)a)->key, ((entry *)b)->key); }
 
@@ -93,9 +117,9 @@ dictionary_t dictionary_text_open(const char *filename) {
     text_dictionary->entry_count = INITIAL_DICTIONARY_SIZE;
     text_dictionary->max_length = 0;
     text_dictionary->lexicon = (entry *)malloc(sizeof(entry) * text_dictionary->entry_count);
-    text_dictionary->word_buff = NULL;
 
-    static char buff[ENTRY_BUFF_SIZE];
+    /* Per-call line buffer: two dictionaries may be opened concurrently. */
+    char buff[ENTRY_BUFF_SIZE];
 
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
@@ -127,7 +151,6 @@ dictionary_t dictionary_text_open(const char *filename) {
 
     text_dictionary->entry_count = i;
     text_dictionary->lexicon = (entry *)realloc(text_dictionary->lexicon, sizeof(entry) * text_dictionary->entry_count);
-    text_dictionary->word_buff = (ucs4_t *)malloc(sizeof(ucs4_t) * (text_dictionary->max_length + 1));
 
     qsort(text_dictionary->lexicon, text_dictionary->entry_count, sizeof(text_dictionary->lexicon[0]), qsort_entry_cmp);
 
@@ -149,7 +172,6 @@ void dictionary_text_close(dictionary_t t_dictionary) {
     }
 
     free(text_dictionary->lexicon);
-    free(text_dictionary->word_buff);
     free(text_dictionary);
 }
 
@@ -165,24 +187,31 @@ const ucs4_t *const *dictionary_text_match_longest(dictionary_t t_dictionary, co
     if (maxlen < len)
         len = maxlen;
 
-    ucs4ncpy(text_dictionary->word_buff, word, len);
-    text_dictionary->word_buff[len] = L'\0';
+    ucs4_t stack_key[TEXT_DICTIONARY_KEY_STACK_SIZE];
+    ucs4_t *heap_key;
+    ucs4_t *key = text_dictionary_make_key(stack_key, &heap_key, text_dictionary->max_length + 1, word, len);
+    if (key == NULL)
+        goto not_found;
 
     entry buff;
-    buff.key = text_dictionary->word_buff;
+    buff.key = key;
 
     for (; len > 0; len--) {
-        text_dictionary->word_buff[len] = L'\0';
+        key[len] = L'\0';
         entry *brs =
             (entry *)bsearch(&buff, text_dictionary->lexicon, text_dictionary->entry_count, sizeof(text_dictionary->lexicon[0]), qsort_entry_cmp);
 
         if (brs != NULL) {
             if (match_length != NULL)
                 *match_length = len;
+            free(heap_key);
             return (const ucs4_t *const *)brs->value;
         }
     }
 
+    free(heap_key);
+
+not_found:
     if (match_length != NULL)
         *match_length = 0;
     return NULL;
@@ -201,14 +230,17 @@ size_t dictionary_text_get_all_match_lengths(dictionary_t t_dictionary, const uc
     if (length < len)
         len = length;
 
-    ucs4ncpy(text_dictionary->word_buff, word, len);
-    text_dictionary->word_buff[len] = L'\0';
+    ucs4_t stack_key[TEXT_DICTIONARY_KEY_STACK_SIZE];
+    ucs4_t *heap_key;
+    ucs4_t *key = text_dictionary_make_key(stack_key, &heap_key, text_dictionary->max_length + 1, word, len);
+    if (key == NULL)
+        return rscnt;
 
     entry buff;
-    buff.key = text_dictionary->word_buff;
+    buff.key = key;
 
     for (; len > 0; len--) {
-        text_dictionary->word_buff[len] = L'\0';
+        key[len] = L'\0';
         entry *brs =
             (entry *)bsearch(&buff, text_dictionary->lexicon, text_dictionary->entry_count, sizeof(text_dictionary->lexicon[0]), qsort_entry_cmp);
 
@@ -216,6 +248,7 @@ size_t dictionary_text_get_all_match_lengths(dictionary_t t_dictionary, const uc
             match_length[rscnt++] = len;
     }
 
+    free(heap_key);
     return rscnt;
 }
 
