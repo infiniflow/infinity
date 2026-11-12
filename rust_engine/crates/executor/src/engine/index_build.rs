@@ -14,6 +14,54 @@ struct SecondarySnapshot {
     sealing: Vec<Arc<index::SealedTail>>,
 }
 
+/// Whether `value`'s **key** is the key of `value` itself.
+///
+/// The chunk and tail keys hold the *stored* value (`i8`, `i16`, `i32`, `i64`,
+/// `f32`, `f64`, a temporal count, a hash), so a conversion that rounds or
+/// saturates names a different value: `TINYINT 300` becomes `44`, `FLOAT
+/// 1.00000003` becomes `1.0`. Probing such a key answers another predicate, so
+/// an equality has no answer and a strict range must not subtract that key from
+/// its boundary.
+///
+/// Text keys are exact by construction: a temporal bound is a parsed day
+/// count (a text that does not parse has no key at all, which the range read
+/// already reports as unanswerable) and a varchar bound is a hash of the text.
+pub(crate) fn key_is_exact(declared: &str, value: &expression::Value) -> bool {
+    use expression::Value as V;
+    use storage::secondary_segment::KeyKind;
+    let kind = secondary_key_kind(declared);
+    match (key_domain(declared), value) {
+        (KeyDomain::Integer, V::Int(i)) => {
+            // `i as f64` rounds for magnitudes above 2^53, which only makes the
+            // test stricter: a bound that close to the edge declines.
+            let f = *i as f64;
+            let (low, high) = integer_key_bounds(declared);
+            f >= low && f < high
+        }
+        (KeyDomain::Integer, V::Float(f)) => {
+            // The same rule `float_lookup_literal` applies: only an integral
+            // value inside the key's own width has an integer key.
+            let (low, high) = integer_key_bounds(declared);
+            f.fract() == 0.0 && *f >= low && *f < high
+        }
+        (KeyDomain::Float, V::Float(f)) => match kind {
+            // The chunk and tail keys hold the narrowed `f32`, so the f64
+            // survives the conversion only when it lies on the f32 grid.
+            KeyKind::F32 => f64::from(*f as f32) == *f,
+            _ => true,
+        },
+        (KeyDomain::Float, V::Int(i)) => match kind {
+            KeyKind::F32 => f64::from(*i as f32) == *i as f64,
+            _ => *i as f64 as i64 == *i,
+        },
+        (KeyDomain::Temporal, V::Str(text)) => temporal_key(declared, text).is_some(),
+        (KeyDomain::Hashed, V::Str(_)) => true,
+        // A numeric literal on a text column, or a temporal literal that is not
+        // text, has no key in that column's space.
+        _ => false,
+    }
+}
+
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
@@ -163,16 +211,31 @@ impl Engine {
             }
             if kind.eq_ignore_ascii_case("HNSW") {
                 let segments = self.hnsw_mem_segments(&table, &meta.column)?;
+                let workers = self.hnsw_build_workers();
                 for mem in segments {
                     let Ok(mut mem) = mem.write() else { continue };
-                    for (seq, cells) in &gap {
-                        let Some(value) = cells.get(ci) else { continue };
-                        let text = value.to_slt_string();
-                        let vector: Vec<f32> =
-                            parse_vec_str(&text).iter().map(|x| *x as f32).collect();
-                        if vector.len() == mem.dims {
-                            mem.insert(*seq as u64, &vector);
-                        }
+                    let dims = mem.dims;
+                    // One vertex per `dims`-sized token, labelled with its row,
+                    // exactly as the write path inserts a multi-vector cell
+                    // (`split_tokens` + `insert_token_batch`). Keeping only
+                    // cells whose flattened length *equalled* `dims` dropped
+                    // every multi-token row from the recovered graph, and the
+                    // next dump then sealed a graph that had never held them.
+                    let recovered: Vec<(u64, Vec<Vec<f32>>)> = gap
+                        .iter()
+                        .filter_map(|(seq, cells)| {
+                            let text = cells.get(ci)?.to_slt_string();
+                            let flat: Vec<f32> =
+                                parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+                            let tokens = crate::hnsw_mem::split_tokens(&flat, dims);
+                            // A cell that is not a whole number of tokens has no
+                            // vertex width this graph can hold, which
+                            // `insert_token_batch` reports by rejecting.
+                            (!tokens.is_empty()).then_some((*seq as u64, tokens))
+                        })
+                        .collect();
+                    if !recovered.is_empty() {
+                        mem.insert_token_batch(&recovered, workers);
                     }
                 }
             } else if kind.eq_ignore_ascii_case("IVF") {
@@ -1772,11 +1835,13 @@ impl Engine {
         if key_domain(&declared) != KeyDomain::Integer {
             return Some(Literal::Float(f));
         }
-        // `i64`'s exact range as `f64`: `i64::MAX as f64` rounds up to 2^63, so
-        // the upper end is exclusive.
-        const I64_LOW: f64 = -9_223_372_036_854_775_808.0;
-        const I64_HIGH: f64 = 9_223_372_036_854_775_808.0;
-        if f.fract() != 0.0 || !(I64_LOW..I64_HIGH).contains(&f) {
+        // The column's key width decides which integers it can hold, so the
+        // bounds come from its key kind rather than from `i64` alone:
+        // `tinyint_col = 300.0` matches no key, and truncating it to `44` would
+        // answer the wrong predicate. Both probes (sealed chunks and the memory
+        // tail) are then declined together.
+        let (low, high) = integer_key_bounds(&declared);
+        if f.fract() != 0.0 || !(low..high).contains(&f) {
             return None;
         }
         Some(Literal::Int(f as i64))
@@ -2099,6 +2164,15 @@ impl Engine {
         self.index_rows_for(table, column, op, value)
     }
 
+    /// One conjunct's admitted rows, or `None` when the index cannot answer it
+    /// *exactly*.
+    ///
+    /// Unlike [`Self::index_lookup`] and [`Self::index_range_lookup`], whose
+    /// results are re-checked against the fetched rows, this answer is final:
+    /// `predicate_rows_from_indexes` hands it to the indexed KNN path as the
+    /// predicate's own result, and that path cannot re-evaluate it (its rows are
+    /// a vector projection). A lossy key therefore declines the shortcut instead
+    /// of approximating it - see [`key_is_exact`].
     fn index_rows_for(
         &self,
         table: &str,
@@ -2114,20 +2188,55 @@ impl Engine {
             _ => return None,
         };
         let set = |rows: Vec<u64>| rows.into_iter().map(|row| row as usize).collect();
+        let declared = self.index_declared_type(table, column).unwrap_or_default();
+        let exact = key_is_exact(&declared, value);
+        let float_column = key_domain(&declared) == KeyDomain::Float;
         match op {
-            CmpOp::Eq => Some(set(self.index_lookup(table, column, &literal)?)),
+            CmpOp::Eq => Some(set(self
+                .index_lookup(table, column, &literal)
+                .filter(|_| exact)?)),
             CmpOp::Ge | CmpOp::Le | CmpOp::Gt | CmpOp::Lt => {
-                // The range read takes closed bounds; an open end is the
-                // planner's `i64::MIN`/`i64::MAX` (`bound_key` clamps it).
+                // A saturating bound (`i8` key for `300`, `i32` key for `5e9`)
+                // widens the interval over rows the predicate rejects, so an
+                // integer column only answers a bound it can hold. A `FLOAT`
+                // one rounds its bounds *inwards* (see `tail_bound`) and keeps
+                // them as `f64` in the chunks, which stays exact.
+                if !float_column && !exact {
+                    return None;
+                }
+                // The range read takes closed bounds. An open end is a sentinel
+                // `i64` for an integer key, and an infinity for a floating-point
+                // one: `i64::MAX` is a *finite* 9.22e18 on the number line a
+                // `FLOAT` index orders, so `f >= 0.0` would omit an indexed
+                // `1e20` and the re-scoring pass could never recover it.
+                let (low, high) = if float_column {
+                    (
+                        expression::Value::Float(f64::NEG_INFINITY),
+                        expression::Value::Float(f64::INFINITY),
+                    )
+                } else {
+                    (
+                        expression::Value::Int(i64::MIN),
+                        expression::Value::Int(i64::MAX),
+                    )
+                };
                 let (lo, hi) = match op {
-                    CmpOp::Ge | CmpOp::Gt => (value.clone(), expression::Value::Int(i64::MAX)),
-                    _ => (expression::Value::Int(i64::MIN), value.clone()),
+                    CmpOp::Ge | CmpOp::Gt => (value.clone(), high),
+                    _ => (low, value.clone()),
                 };
                 let mut rows: std::collections::HashSet<usize> =
                     set(self.index_range_lookup(table, column, &[(lo, hi)])?);
                 if matches!(op, CmpOp::Gt | CmpOp::Lt) {
-                    // A strict bound is the closed range minus its boundary.
-                    if let Some(equal) = self.index_lookup(table, column, &literal) {
+                    // A strict bound is the closed range minus its boundary, and
+                    // that subtraction is only sound while the boundary's key is
+                    // the boundary value: the rounded key of `1.00000003` is
+                    // `f32 1.0`, so removing "the equals rows" would delete rows
+                    // the predicate admits. Off the key grid on a `FLOAT` column
+                    // no stored key can equal the value at all, which makes the
+                    // closed range strict on its own; everywhere else the bound
+                    // was rejected above.
+                    if exact {
+                        let equal = self.index_lookup(table, column, &literal)?;
                         for row in equal {
                             rows.remove(&(row as usize));
                         }
@@ -2283,6 +2392,15 @@ impl Engine {
         for (start, end) in &keys {
             let lo = tail_bound(kind, *start, RangeBound::Lower);
             let hi = tail_bound(kind, *end, RangeBound::Upper);
+            // Narrowing a `FLOAT` bound to the chunk's `f32` moves it *inwards*
+            // (the smallest `f32` that is still `>= lo`, the largest that is
+            // still `<= hi`), so a pair that was ordered as `f64` can come out
+            // inverted - `[1.0000001, 1.0000001)` narrows to `[1.0000002,
+            // 1.0)`. That range is empty: querying it would either ask the tail
+            // for `hi..lo` or make it answer with a reversed slice.
+            if lo > hi {
+                continue;
+            }
             if let Some(index) = &tail {
                 for (_, ids) in index.range(Some(&lo), Some(&hi)) {
                     candidates.extend_from_slice(&ids);
@@ -2808,18 +2926,32 @@ impl Engine {
             if !same_table {
                 continue;
             }
-            // `Ok(0)`: nothing was sealed (an LSG index never dumps from the
-            // buffer), so the memory segment must survive.
-            if matches!(
+            let sealed = matches!(
                 self.dump_hnsw_index(&im.table, &im.name),
                 Ok(written) if written > 0
-            ) {
+            );
+            if sealed {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
                     e.index_pending_bytes.insert(im.column.clone(), 0);
                     e.hnsw_probed = false;
                 }
+                continue;
+            }
+            // `Ok(0)`: nothing was sealed, so the segment still holds these
+            // rows and must survive the dump. It must not grow without limit
+            // either - a capacity that is crossed every batch and never
+            // satisfied is an unbounded tail, which is exactly what the row
+            // bound exists to prevent. Past twice the capacity the tail is
+            // released: memory really goes down, and the rows no chunk holds
+            // fall back to the exact scan until the full mirror write or an
+            // optimize merge folds them into a chunk.
+            if self
+                .hnsw_tail_len(&tkey, &im.column)
+                .is_some_and(|len| len >= capacity.saturating_mul(2))
+            {
+                self.release_hnsw_tail(&tkey, &im.column);
             }
         }
     }

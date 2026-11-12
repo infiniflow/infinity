@@ -3218,6 +3218,50 @@ impl Engine {
         Some(out)
     }
 
+    /// Every live row id, with no column decoded.
+    ///
+    /// The KNN probe asks this to decide whether the index covers the table;
+    /// the rows themselves are a deferred vector projection at that point, so
+    /// the ids come from the block versions plus the buffered appends, exactly
+    /// as `row_ids_in_bounds` reads them but without a bounds scan.
+    pub(crate) fn live_row_ids(&self, table: &str) -> Vec<usize> {
+        let table = self.qualified_table(table);
+        let root = self.blocks_root();
+        let read_ts = crate::read_ts();
+        let mut out: Vec<usize> = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok(block) = self.block_map(&table, &root, id) else {
+                break;
+            };
+            let version = block.version();
+            let row_count: usize = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count as usize)
+                .unwrap_or(0);
+            let created_at = Self::created_at(version, read_ts);
+            for slot in 0..row_count {
+                if !Self::slot_visible(version, slot, created_at, read_ts) {
+                    continue;
+                }
+                out.push(
+                    ((id.segment_id as usize) << 32)
+                        | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot),
+                );
+            }
+        }
+        // Rows above the last checkpoint live in the append buffer.
+        let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
+        for (seq, _) in self.pending_rows_of(&table) {
+            if !dead.contains(&(seq as u64)) {
+                out.push(seq);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     /// The rows whose `bounds` column falls in range, read straight out of the
     /// blocks: a `DELETE`/`UPDATE` needs the row ids, not the rows, and
     /// materialising 100k `Value` rows to find 5k of them was most of the
@@ -4123,7 +4167,7 @@ impl Engine {
         column: &str,
         options: &HnswOptions,
         segment: Option<u32>,
-    ) -> Result<Option<(usize, Vec<u8>)>> {
+    ) -> Result<Option<(HnswChunkCover, Vec<u8>)>> {
         let tokens = self.column_tokens(table, column, segment)?;
         let total: usize = tokens.iter().map(|(_, t)| t.len()).sum();
         let Some(dim) = tokens
@@ -4282,6 +4326,31 @@ impl Engine {
         }
     }
 
+    /// The HNSW memory segment of `column`, if one is loaded.
+    pub(crate) fn hnsw_tail_len(&self, tkey: &str, column: &str) -> Option<usize> {
+        let tables = self.tables.lock().unwrap();
+        let mem = tables.get(tkey)?.hnsw_mem.get(column)?.clone();
+        mem.read().ok().map(|graph| graph.len())
+    }
+
+    /// Releases an HNSW memory segment nothing can seal, with its charge.
+    ///
+    /// A dump that reported `Ok(0)` wrote nothing - an LSG index links its graph
+    /// with unadjusted distances, so the memory segment is never sealed
+    /// incrementally - and the bytes it holds are therefore still resident.
+    /// Releasing keeps the footprint bounded; the rows are still answered, from
+    /// whichever chunks do hold them plus the exact scan for the rest
+    /// (`knn_candidates` → `uncovered_candidates`), so this costs speed and
+    /// never correctness.
+    pub(crate) fn release_hnsw_tail(&self, tkey: &str, column: &str) {
+        let mut tables = self.tables.lock().unwrap();
+        if let Some(entry) = tables.get_mut(tkey) {
+            entry.hnsw_mem.remove(column);
+            entry.index_pending_bytes.insert(column.to_string(), 0);
+            entry.hnsw_probed = false;
+        }
+    }
+
     /// Writes `table`'s index as a C++ HNSW chunk file under
     /// `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_{n}.idx`,
     /// returning how many vectors were written (task #70).
@@ -4415,7 +4484,7 @@ impl Engine {
                 continue;
             }
             let built = match &from_memory {
-                Some((count, chunk)) => Some((*count, chunk.clone())),
+                Some((cover, chunk)) => Some((*cover, chunk.clone())),
                 None => {
                     if *rows == 0 {
                         None
@@ -4428,7 +4497,7 @@ impl Engine {
                     }
                 }
             };
-            let Some((count, chunk)) = built else {
+            let Some((cover, chunk)) = built else {
                 continue;
             };
             let name = format!(
@@ -4447,14 +4516,17 @@ impl Engine {
                     source: e,
                 }
             })?;
-            written += count;
+            written += cover.vertices;
             // The chunks this one supersedes: the reference's
             // `deprecate_chunks_`, which its optimize transaction removes from
-            // the segment's chunk list.
+            // the segment's chunk list. The rewrite publishes *row* coverage:
+            // a `MULTIVECTOR` chunk labels one row per token, and claiming the
+            // vertex count would let restart recovery skip a tail that the
+            // chunk does not cover.
             rewrites.push(ChunkRewrite {
                 segment: *segment,
                 chunk_id,
-                row_count: count as u32,
+                row_count: cover.rows as u32,
                 deprecate_ids: chunks.iter().map(|(id, _)| *id as u32).collect(),
             });
         }
@@ -4843,16 +4915,23 @@ impl Engine {
         Ok(())
     }
 
-    /// The directory holding `table`'s HNSW mirror, if the table exists.
-    pub(crate) fn hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
+    /// The directory holding `table`'s index mirror (`db_{db}/tbl_{t}/idx_{id}`),
+    /// whose `seg_{n}` subdirectories hold the per-segment chunks, if the table
+    /// and the index exist.
+    pub(crate) fn index_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let index_id = self.index_position(&table, index_name).ok()?;
         let db_id = self.database_id_of(&table);
         Some(
             self.blocks_root()
-                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id)),
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
         )
+    }
+
+    /// The directory holding `table`'s HNSW mirror, if the table exists.
+    pub(crate) fn hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
+        Some(self.index_dir(table, index_name)?.join("seg_0"))
     }
 
     /// The chunk ids of one segment index that an optimize deprecated and
@@ -5818,67 +5897,92 @@ impl Engine {
         Ok(written)
     }
 
-    /// Reads back a mirror written by [`Self::write_ivf_index`], returning
-    /// the IVF chunks so a query can probe them (plan #89).
-    pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<index::ivf::IvfSegment> {
-        let Some(dir) = self.hnsw_dir(table, index_name) else {
+    /// Reads back the mirror written by [`Self::write_ivf_index`]: every
+    /// segment's chunk, so a query can probe all of them (plan #89).
+    ///
+    /// The reference trains and dumps one chunk per segment
+    /// (`PopulateIvfIndexInner` takes a `SegmentMeta`) into
+    /// `idx_{id}/seg_{segment}/chunk_{n}.idx`, and the offsets inside a chunk
+    /// are **in-segment**. Reading only `seg_0` - which is all this used to do -
+    /// left every row of the other segments unfindable, and made their probe
+    /// results collide on the offsets of segment 0. The segment number is
+    /// therefore part of what is returned, not a detail of the path.
+    pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<LoadedIvfIndex> {
+        let Some(dir) = self.index_dir(table, index_name) else {
             return Vec::new();
         };
         let options = self.ivf_storage_option(table, index_name);
+        let mut segment_dirs: Vec<(u32, PathBuf)> = std::fs::read_dir(&dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .filter_map(|entry| {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        let segment = name.strip_prefix("seg_")?.parse::<u32>().ok()?;
+                        Some((segment, entry.path()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        segment_dirs.sort_by_key(|(segment, _)| *segment);
         let mut out = Vec::new();
-        for (_, path) in hnsw_chunks(&dir) {
-            let Ok(bytes) = std::fs::read(&path) else {
-                continue;
-            };
-            if options.storage.eq_ignore_ascii_case("scalar_quantization") {
-                if let Some(segment) = Self::decode_ivf_sq_chunk(&bytes, options.sq_bits) {
-                    out.push(segment);
+        for (segment, seg_dir) in segment_dirs {
+            for (_, path) in hnsw_chunks(&seg_dir) {
+                let Ok(bytes) = std::fs::read(&path) else {
+                    continue;
+                };
+                let decoded = if options.storage.eq_ignore_ascii_case("scalar_quantization") {
+                    Self::decode_ivf_sq_chunk(&bytes, options.sq_bits)
+                } else if options.storage.eq_ignore_ascii_case("product_quantization") {
+                    Self::decode_ivf_pq_chunk(&bytes, &options)
+                } else {
+                    Self::decode_ivf_plain_chunk(&bytes)
+                };
+                if let Some(index) = decoded {
+                    out.push(LoadedIvfIndex {
+                        segment,
+                        index,
+                        path,
+                    });
                 }
-                continue;
             }
-            if options.storage.eq_ignore_ascii_case("product_quantization") {
-                if let Some(segment) = Self::decode_ivf_pq_chunk(&bytes, &options) {
-                    out.push(segment);
-                }
-                continue;
-            }
-            let Ok((header, flat, parts)) = knn_format::decode_ivf_plain_chunk(&bytes, 4) else {
-                continue;
-            };
-            let dims = header.dimension as usize;
-            if dims == 0 {
-                continue;
-            }
-            let parts: Vec<Vec<(u32, Vec<f32>)>> = parts
-                .into_iter()
-                .map(|part| {
-                    part.segment_offsets
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, offset)| {
-                            let at = i * dims * 4;
-                            let vector = (0..dims)
-                                .map(|d| {
-                                    f32::from_le_bytes(
-                                        part.vectors[at + d * 4..at + d * 4 + 4]
-                                            .try_into()
-                                            .unwrap(),
-                                    )
-                                })
-                                .collect();
-                            (offset, vector)
-                        })
-                        .collect()
-                })
-                .collect();
-            out.push(index::ivf::IvfSegment::Plain(index::ivf::IvfIndex::new(
-                dims,
-                header.centroid_count as usize,
-                flat,
-                parts,
-            )));
         }
         out
+    }
+
+    /// Decodes one `kPlain` IVF chunk (`IVF_Parts_Storage_Info<kPlain>`).
+    fn decode_ivf_plain_chunk(bytes: &[u8]) -> Option<index::ivf::IvfSegment> {
+        let (header, flat, parts) = knn_format::decode_ivf_plain_chunk(bytes, 4).ok()?;
+        let dims = header.dimension as usize;
+        if dims == 0 {
+            return None;
+        }
+        let parts: Vec<Vec<(u32, Vec<f32>)>> = parts
+            .into_iter()
+            .map(|part| {
+                part.segment_offsets
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, offset)| {
+                        let at = i * dims * 4;
+                        let vector = (0..dims)
+                            .map(|d| {
+                                f32::from_le_bytes(
+                                    part.vectors[at + d * 4..at + d * 4 + 4].try_into().unwrap(),
+                                )
+                            })
+                            .collect();
+                        (offset, vector)
+                    })
+                    .collect()
+            })
+            .collect();
+        Some(index::ivf::IvfSegment::Plain(index::ivf::IvfIndex::new(
+            dims,
+            header.centroid_count as usize,
+            flat,
+            parts,
+        )))
     }
 
     /// The index's IVF options (`IndexIVFStorageOption` + the centroid option),

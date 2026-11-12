@@ -371,9 +371,15 @@ impl GraphStore {
         // stores 50 bytes). C++ reads such a file through pointers that tolerate
         // the misalignment, so the bytes are legal; a `u32` slice is not, and
         // `u32s_at` would refuse every slot read and silently empty the graph.
-        // Copy the (comparatively small) graph region instead - the same decode
-        // the unaligned writer would have forced.
-        if base % 4 != 0 || l0 % 4 != 0 || lx % 4 != 0 {
+        // The *buffer* has to be word aligned as well: `u32s_at` casts the
+        // slice it is handed, and a slice-backed `ByteSource` makes no such
+        // promise. Copy the (comparatively small) graph region instead - the
+        // same decode the unaligned writer would have forced.
+        if base % 4 != 0
+            || l0 % 4 != 0
+            || lx % 4 != 0
+            || !(bytes.as_ptr() as usize).is_multiple_of(4)
+        {
             return Self::from_cpp_region(&bytes[base..upper_end], n, m0, m);
         }
         // Validate every vertex record, exactly as `from_cpp_region` does. The

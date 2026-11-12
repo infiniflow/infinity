@@ -2020,6 +2020,10 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
+            // The reference dumps when the memory passes the quota and
+            // subtracts only what the dump released
+            // (`MemIndexTracer::IncreaseMemoryUsage`), so the charge is added
+            // before the decision and the rows above the limit stay accounted.
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
@@ -2028,36 +2032,49 @@ impl Engine {
                     .entry(im.column.clone())
                     .or_insert(0);
                 *cur += bytes;
-                // The reference dumps when the memory passes the quota and
-                // subtracts only what the dump released, so the rows above
-                // the limit stay accounted and the *next* batch is what
-                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
-                if quota > 0 && *cur > quota {
-                    *cur -= quota;
-                    true
-                } else {
-                    false
-                }
+                *cur > quota
             };
+            if !dump {
+                continue;
+            }
             // Only a dump that actually wrote a chunk sealed the memory
-            // segment. `Ok(0)` means there was nothing to seal - an LSG index
-            // is never dumped from the buffer at all (its graph is linked with
-            // unadjusted distances), so dropping `hnsw_mem` here would throw
-            // away the only copy of the rows written since the last full build.
-            if dump
-                && matches!(
-                    self.dump_hnsw_index(&im.table, &im.name),
-                    Ok(written) if written > 0
-                )
-            {
-                // The dumped segment leaves memory. The bytes above the
-                // quota were already left in the counter, so nothing else to
-                // do here but drop the graph the dump just sealed.
+            // segment. `Ok(0)` means it sealed nothing - an LSG index is never
+            // dumped from the buffer at all (its graph is linked with
+            // unadjusted distances), and an empty memory segment has nothing to
+            // write - so its bytes were **not** released and the charge has to
+            // stay.
+            let sealed = matches!(
+                self.dump_hnsw_index(&im.table, &im.name),
+                Ok(written) if written > 0
+            );
+            if sealed {
+                // The dumped segment leaves memory, so the charge it held goes
+                // with it; what was above the quota was already left in the
+                // counter by the addition above.
                 let mut tables = self.tables.lock().unwrap();
-                if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.remove(&im.column);
-                    e.hnsw_probed = false;
+                let Some(entry) = tables.get_mut(&tkey) else {
+                    continue;
+                };
+                if let Some(cur) = entry.index_pending_bytes.get_mut(&im.column) {
+                    *cur = cur.saturating_sub(quota);
                 }
+                entry.hnsw_mem.remove(&im.column);
+                entry.hnsw_probed = false;
+                continue;
+            }
+            // Nothing was sealed, so nothing was released: keep the charge and
+            // only release the buffer once it has passed twice the quota. That
+            // is what bounds a tail nothing can seal (an LSG graph is never
+            // written out incrementally) without dropping it on every batch.
+            let retained = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.index_pending_bytes.get(&im.column).copied())
+                    .unwrap_or(0)
+            };
+            if retained > quota.saturating_mul(2) {
+                self.release_hnsw_tail(&tkey, &im.column);
             }
         }
     }

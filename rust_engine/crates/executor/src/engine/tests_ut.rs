@@ -5345,6 +5345,84 @@ mod tests {
         }
     }
 
+    /// Only a value whose key *is* the value itself may take the index
+    /// shortcut: the indexed KNN path treats a lookup's rows as the predicate's
+    /// final answer, so a rounded key (`TINYINT 300` → `44`, `FLOAT 1.00000003`
+    /// → `1.0`) has to decline instead of matching another value.
+    #[test]
+    fn a_lossy_key_value_is_not_exact() {
+        use crate::engine::index_build::key_is_exact;
+        let int = |i: i64| Value::Int(i);
+        let float = |f: f64| Value::Float(f);
+        assert!(key_is_exact("TINYINT", &int(127)));
+        assert!(!key_is_exact("TINYINT", &int(300)));
+        assert!(!key_is_exact("TINYINT", &int(-129)));
+        // `INTEGER` keys are `i32`; `BIGINT` keeps the raw `i64`.
+        assert!(!key_is_exact("INTEGER", &int(5_000_000_000)));
+        assert!(key_is_exact("BIGINT", &int(5_000_000_000)));
+        assert!(!key_is_exact("INTEGER", &float(3.5)));
+        assert!(key_is_exact("INTEGER", &float(3.0)));
+        // A `FLOAT` key holds the narrowed `f32`; a `DOUBLE` one holds the f64.
+        assert!(key_is_exact("FLOAT", &float(1.0)));
+        assert!(!key_is_exact("FLOAT", &float(1.000_000_03)));
+        assert!(key_is_exact("DOUBLE", &float(1.000_000_03)));
+        // Text keys are derived, not rounded.
+        assert!(key_is_exact("VARCHAR", &Value::Str("a".into())));
+    }
+
+    /// Both ends of a `FLOAT` range can fall between the same two `f32` values,
+    /// and the two narrowings then move in *opposite* directions: the inclusive
+    /// lower bound up, the inclusive upper bound down. The pair comes out
+    /// inverted, which is an empty range - asking the tail for it used to panic
+    /// inside `BTreeMap::range` (`start > end`).
+    #[test]
+    fn a_float_range_that_inverts_when_narrowed_is_empty() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fr (f FLOAT, id INT);").unwrap();
+        e.execute("INSERT INTO fr VALUES (1.0, 1), (2.0, 2);")
+            .unwrap();
+        e.execute("CREATE INDEX frf ON fr (f);").unwrap();
+        // 30% of the way from `1.0` to the next `f32`: `>= v` narrows up to the
+        // next `f32`, `<= v` narrows down to `1.0`.
+        let low = 1.0f32;
+        let high = f32::from_bits(1.0f32.to_bits() + 1);
+        let v = f64::from(low) + 0.3 * (f64::from(high) - f64::from(low));
+        assert_eq!(
+            e.index_range_lookup("fr", "f", &[(Value::Float(v), Value::Float(v))]),
+            Some(Vec::new())
+        );
+    }
+
+    /// The key width decides which floats an integer column can answer. `v = 300`
+    /// on a `TINYINT` matches no key (the column holds -128..=127), and encoding
+    /// the truncated `44` would answer a *different* predicate, so both probes -
+    /// the sealed chunks and the memory tail - decline and the predicate is
+    /// evaluated against the decoded rows instead.
+    #[test]
+    fn an_out_of_range_float_equality_declines_on_a_narrow_key() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE nk (id INT, v TINYINT);").unwrap();
+        e.execute("INSERT INTO nk VALUES (1, 44), (2, 100);")
+            .unwrap();
+        e.execute("CREATE INDEX nkv ON nk (v);").unwrap();
+        assert_eq!(
+            e.index_lookup("nk", "v", &Literal::Float(100.0))
+                .expect("100 fits a tinyint")
+                .len(),
+            1
+        );
+        assert!(e.index_lookup("nk", "v", &Literal::Float(300.0)).is_none());
+        assert!(e.index_lookup("nk", "v", &Literal::Float(-129.0)).is_none());
+        // `300 as i8` is `44`, so a truncated probe would return this row.
+        assert!(rows(&e, "SELECT id FROM nk WHERE v = 300.0;").is_empty());
+        assert_eq!(
+            rows(&e, "SELECT id FROM nk WHERE v = 44.0;"),
+            vec![vec!["1".to_string()]]
+        );
+    }
+
     /// `CREATE INDEX` reads the table without excluding writers (the reference
     /// leans on its transaction conflict detection, which this port does not
     /// have yet). A row committed after the scan had read the table is in
@@ -6464,6 +6542,50 @@ mod tests {
         );
     }
 
+    /// A filtered IVF query probes every segment's chunk.
+    ///
+    /// The mirror writes one chunk per segment and the offsets inside a chunk
+    /// are in-segment (`RowID(segment, offset)`). Reading only `seg_0`, or
+    /// resolving an offset without putting the segment in the high bits, left
+    /// every other segment's rows unfindable and made their offsets collide
+    /// with segment 0's; each segment here holds the same four vectors, so the
+    /// filtered top-3 is that segment's `c1 = 6` row three times over.
+    #[test]
+    fn ivf_filtered_probe_covers_every_segment() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ivm (c1 INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        // `COPY` seals the segment it filled, so three imports make three
+        // segments - each with its own IVF chunk.
+        let csv = dir.path().join("ivm.csv");
+        std::fs::write(
+            &csv,
+            "2,\"[0.1,0.2,0.3,-0.2]\"\n4,\"[0.2,0.1,0.3,0.4]\"\n\
+             6,\"[0.3,0.2,0.1,0.4]\"\n8,\"[0.4,0.3,0.2,0.1]\"\n",
+        )
+        .unwrap();
+        for _ in 0..3 {
+            e.execute(&format!(
+                "COPY ivm FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+        }
+        e.execute("CREATE INDEX ivm_idx ON ivm (v) USING IVF WITH (metric = ip);")
+            .unwrap();
+        e.flush().unwrap();
+        let chunks = e.load_ivf_indexes("ivm", "ivm_idx");
+        assert_eq!(chunks.len(), 3, "one chunk per segment");
+        assert_eq!(
+            chunks.iter().map(|c| c.segment).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        let q = "SELECT c1 FROM ivm SEARCH MATCH VECTOR \
+                 (v, [0.3,0.3,0.2,0.2], 'float', 'ip', 3) WITH (nprobe = 10) WHERE c1 < 7;";
+        assert_eq!(rows(&e, q), vec![vec!["6".to_string()]; 3]);
+    }
+
     /// `CREATE INDEX` materialises the index (C++ `IndexBuilder`); the first
     /// query must not be what builds it.
     #[test]
@@ -6529,6 +6651,125 @@ mod tests {
         assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
     }
 
+    /// A buffer that cannot be sealed must still be bounded. An LSG index is
+    /// never dumped from the memory segment (its graph is linked with unadjusted
+    /// distances), so a crossing dump returns `Ok(0)` and released nothing: the
+    /// charge stays - the graph it accounts for is still held - and the graph is
+    /// released only once the retained charge passes twice the quota, which caps
+    /// what a write path can pin. Releasing is genuine: memory goes down and the
+    /// rows no chunk holds are answered by the exact scan.
+    #[test]
+    fn an_unsealable_memindex_keeps_its_charge_and_is_bounded() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1024);
+        e.execute("CREATE TABLE lg (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let row = "(2,[0.1,0.2,0.3,-0.2])";
+        e.execute(&format!(
+            "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
+        ))
+        .unwrap();
+        e.execute(
+            "CREATE INDEX lgx ON lg (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
+             metric = l2, build_type = lsg);",
+        )
+        .unwrap();
+        // Six batches of six rows: 1008 bytes each, so the charge crosses the
+        // quota twice over and the fallback has to fire.
+        for _ in 0..6 {
+            e.execute(&format!(
+                "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
+            ))
+            .unwrap();
+        }
+        let charge = |e: &Engine| -> usize {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get("default_db.lg")
+                .and_then(|entry| entry.index_pending_bytes.get("c2").copied())
+                .unwrap_or(0)
+        };
+        // Six batches of 1008 bytes against a 1 KB quota: the charge crosses,
+        // the dump seals nothing, and the third crossing (3024 bytes, past twice
+        // the quota) releases the graph, so nothing accumulates.
+        assert_eq!(charge(&e), 0, "the unsealable buffer was not released");
+        // The write path re-creates the segment for the rows it takes after a
+        // drop, so drive the accounting directly to observe the release.
+        for _ in 0..2 {
+            e.note_index_insert("default_db.lg", 6);
+        }
+        // Two batches of 1008 bytes: the charge stays at 2016 rather than
+        // dropping to `2016 - quota`, because a dump that sealed nothing
+        // released nothing.
+        assert_eq!(
+            charge(&e),
+            2016,
+            "a crossing that sealed nothing keeps its charge"
+        );
+        e.note_index_insert("default_db.lg", 6);
+        let graph_held = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get("default_db.lg")
+                .is_some_and(|entry| entry.hnsw_mem.contains_key("c2"))
+        };
+        assert_eq!(charge(&e), 0, "the released graph's charge is gone");
+        assert!(
+            !graph_held,
+            "a buffer nothing can seal has to be released, not pinned"
+        );
+        // The rows are still answerable: the exact scan covers what no chunk
+        // holds.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM lg;"),
+            vec![vec!["42".to_string()]]
+        );
+        let hits = rows(
+            &e,
+            "SELECT c1 FROM lg SEARCH MATCH VECTOR \
+             (c2, [0.1,0.2,0.3,-0.2], 'float', 'l2', 3);",
+        );
+        assert_eq!(hits.len(), 3, "{hits:?}");
+    }
+
+    /// A deleted row still occupies graph slots until a chunk rewrite drops it,
+    /// so a probe that admits deleted labels answers short - or nothing at all
+    /// when the nearest vertices are all gone. Liveness is part of admission,
+    /// and a probe that still cannot fill `topn` falls back to the exact scan.
+    #[test]
+    fn a_knn_probe_skips_deleted_vertices_and_still_answers() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE kd (c1 INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        let mut values = String::new();
+        for i in 0..200 {
+            if i > 0 {
+                values.push(',');
+            }
+            values.push_str(&format!("({i},[{},0.0])", i as f32 / 100.0));
+        }
+        e.execute(&format!("INSERT INTO kd VALUES {values};"))
+            .unwrap();
+        e.execute(
+            "CREATE INDEX kdx ON kd (v) USING HNSW WITH (M = 16, ef_construction = 40, \
+             metric = l2);",
+        )
+        .unwrap();
+        // The 70 rows nearest the query are deleted: more than the probe's
+        // candidate budget, so admitting them leaves nothing to score.
+        e.execute("DELETE FROM kd WHERE c1 < 70;").unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT c1 FROM kd SEARCH MATCH VECTOR \
+                 (v, [0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["70".to_string()]]
+        );
+    }
+
     /// A write that reaches the engine through the Thrift/import primitives
     /// rather than SQL still has to invalidate cached `SELECT` results: the
     /// memidx restart suite counts rows after an SDK insert and must see it.
@@ -6582,8 +6823,12 @@ mod tests {
         e.flush().unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
-            matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
-            "expected one PQ segment"
+            matches!(
+                segments.as_slice(),
+                [chunk] if chunk.segment == 0
+                    && matches!(chunk.index, index::ivf::IvfSegment::Product(_))
+            ),
+            "expected one PQ segment in segment 0"
         );
         let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
                  (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
@@ -6614,8 +6859,12 @@ mod tests {
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
-            matches!(segments.as_slice(), [index::ivf::IvfSegment::Scalar(_)]),
-            "expected one SQ segment"
+            matches!(
+                segments.as_slice(),
+                [chunk] if chunk.segment == 0
+                    && matches!(chunk.index, index::ivf::IvfSegment::Scalar(_))
+            ),
+            "expected one SQ segment in segment 0"
         );
         // Candidates come from the quantized codes; the executor then scores
         // them exactly, so the top-1 is the same as an exhaustive scan.

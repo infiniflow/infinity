@@ -4591,8 +4591,9 @@ pub(crate) struct TableEntry {
     /// HNSW chunks loaded from the C++ block mirror, per column (the
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
     pub(crate) vector: HashMap<String, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
-    /// IVF chunks loaded from the C++ mirror, per column.
-    pub(crate) ivf: HashMap<String, Vec<Arc<index::ivf::IvfSegment>>>,
+    /// IVF chunks loaded from the C++ mirror, per column, each with the
+    /// segment whose in-segment offsets it holds.
+    pub(crate) ivf: HashMap<String, Vec<Arc<crate::blocks::LoadedIvfIndex>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged
     /// with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
@@ -5987,6 +5988,28 @@ pub(crate) fn secondary_key_kind(declared: &str) -> storage::secondary_segment::
     }
 }
 
+/// The half-open `[low, high)` range of the integers an **integer** column's
+/// chunk key can hold, as `f64`.
+///
+/// A key's width is the storage width, so a value outside it can never equal a
+/// stored key: `tinyint_col = 300` has no answer at all, and encoding the
+/// truncated `44` would answer a different predicate. The upper end is
+/// exclusive on every width because the next power of two is exactly
+/// representable in `f64` while the largest integer of the width (e.g.
+/// `i64::MAX`) is not - `i64::MAX as f64` rounds up to `2^63`.
+pub(crate) fn integer_key_bounds(declared: &str) -> (f64, f64) {
+    use storage::secondary_segment::KeyKind;
+    match secondary_key_kind(declared) {
+        KeyKind::I8 => (-128.0, 128.0),
+        KeyKind::I16 => (-32_768.0, 32_768.0),
+        KeyKind::I32 => (-2_147_483_648.0, 2_147_483_648.0),
+        KeyKind::I64 => (-9_223_372_036_854_775_808.0, 9_223_372_036_854_775_808.0),
+        // `UINT` keys are `u64`, but a probe value is a `Literal::Int` (`i64`):
+        // only the representable half can be asked for.
+        _ => (0.0, 9_223_372_036_854_775_808.0),
+    }
+}
+
 /// How a stored cell becomes a chunk's ordered key (`ConvertToOrdered`,
 /// `secondary_index_data.cppm:37-72`).
 ///
@@ -7101,7 +7124,11 @@ pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
 /// bit character is decoded into its own 0/1 coordinate instead.
 pub(crate) fn parse_vector_cell(text: &str, bit: bool) -> std::result::Result<Vec<f32>, String> {
     let trimmed = text.trim();
-    if trimmed.is_empty() {
+    // A NULL cell is stored as the literal `null` (that is how the column and
+    // value encoders write it, and every reader reads it back as SQL NULL). It
+    // carries no coordinates, so it is empty rather than a parse failure: an
+    // index build skips it like the sparse builder does.
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
         return Ok(Vec::new());
     }
     if bit {

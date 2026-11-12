@@ -1655,11 +1655,46 @@ mod tests {
             crate::parse_vector_cell("", false).unwrap(),
             Vec::<f32>::new()
         );
+        // The stored NULL marker has no coordinates either, so an index build
+        // skips the row instead of failing on it.
+        assert_eq!(
+            crate::parse_vector_cell("null", false).unwrap(),
+            Vec::<f32>::new()
+        );
+        assert_eq!(
+            crate::parse_vector_cell(" NULL ", true).unwrap(),
+            Vec::<f32>::new()
+        );
         // A leaf the parser cannot read is an error: `parse_vec_str` drops it,
         // which shifts every coordinate after it (and changes the dimension).
         assert!(crate::parse_vector_cell("[1,2,bad,4]", false).is_err());
         assert_eq!(crate::parse_vec_str("[1,2,bad,4]"), vec![1.0, 2.0, 4.0]);
         assert!(crate::parse_vector_cell("[1,0,2,1]", true).is_err());
+    }
+
+    /// A `MULTIVECTOR` chunk labels one row per token, so its header's
+    /// `cur_vec_num` is a *token* count. What a publisher claims - and what
+    /// restart recovery uses to decide which rows are sealed - is the distinct
+    /// label count: claiming 200 rows for 100 two-token rows would let recovery
+    /// skip a tail that the chunk never held.
+    #[test]
+    fn a_multivector_chunk_publishes_its_row_coverage() {
+        let dir = tempfile::tempdir().unwrap();
+        // `[M][ef_construction][cur_vec_num]` header, then the labels.
+        let mut bytes = vec![0u8; 24];
+        bytes[16..24].copy_from_slice(&3u64.to_le_bytes());
+        for label in [7u32, 7, 9] {
+            bytes.extend_from_slice(&label.to_le_bytes());
+        }
+        std::fs::write(dir.path().join("chunk_0.idx"), &bytes).unwrap();
+        let published =
+            crate::blocks::chunk::publish_chunk_files(dir.path(), 2, true, 0, &Default::default());
+        assert_eq!(published.len(), 1);
+        assert_eq!(
+            published[0].row_count, 2,
+            "three vertices, two distinct rows"
+        );
+        assert_eq!(published[0].base_row_id, 0, "segment 0 starts at row 0");
     }
 
     #[test]

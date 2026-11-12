@@ -212,8 +212,12 @@ impl<'a> Builder<'a> {
         for nb in list.iter() {
             cands.push((self.distance_nodes(target, nb as usize), nb as usize));
         }
-        let kept = self.select_neighbors(&cands, max_m, select).to_vec();
-        self.graph.set_neighbors(layer, target, &kept);
+        // The kept list already lives in the reusable scratch buffer and
+        // `set_neighbors` copies it into the slab, so an intermediate `to_vec`
+        // would be a heap allocation plus a second copy per pruned reverse link -
+        // the hot path of a build.
+        let kept = self.select_neighbors(&cands, max_m, select);
+        self.graph.set_neighbors(layer, target, kept);
     }
 
     /// `SelectNeighborsHeuristic`: closer-than-a-kept-neighbour candidates are

@@ -3166,6 +3166,15 @@ impl Engine {
         let (dim, bit) = crate::blocks::engine::vector_column_shape(&decl);
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
+            // A NULL cell reads as the literal `null` out of the blocks and has
+            // no vector, so it is skipped before the strict parse (which would
+            // otherwise report `'null' is not a number`): a nullable vector
+            // column with a NULL row is still a valid index build. This is the
+            // same rule `column_tokens` applies on the rebuild path.
+            let trimmed = text.trim();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
+                continue;
+            }
             // Strict, and validated against the declared dimension: a cell the
             // parser cannot read in full (`[1,2,bad,4]`) or that is not a whole
             // number of `dim`-sized tokens has no place in a graph whose every
@@ -7918,6 +7927,19 @@ impl Engine {
                 options: &knn_opts,
             })
         })();
+        // A filtered query whose predicate could not be answered as a set (no
+        // secondary index, an `OR`, an unindexed column) has no bitmask to push
+        // into the probe. An index can still appear between `has_vector_index`
+        // and this probe - a concurrent `CREATE INDEX`, or the memory segment
+        // the first insert after a restart creates - and the candidates it then
+        // returns would be scored with the residual predicate disabled (the rows
+        // are a vector-only projection, so `keep` cannot run on them). Decline
+        // them: the exact scan decodes the table and applies the predicate.
+        let vector_candidates = if has_filter && allow_rows.is_none() {
+            None
+        } else {
+            vector_candidates
+        };
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
