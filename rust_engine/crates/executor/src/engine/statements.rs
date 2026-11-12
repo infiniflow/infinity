@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 impl QueryResult {
     /// This result's rows as display text (what a `.slt` file or the CLI shows).
@@ -3155,23 +3156,86 @@ impl Engine {
         // `InsertVecs` builds it in buckets across the dense-index pool. Feeding
         // the rows one at a time made `CREATE INDEX` a serial point-by-point
         // build.
+        // The column's declared shape drives the parsing: a `BIT` column stores
+        // a bit string rather than a list of numbers.
+        let decl = self
+            .column_types(table)
+            .ok()
+            .and_then(|t| t.get(ci).cloned())
+            .unwrap_or_default();
+        let (dim, bit) = crate::blocks::engine::vector_column_shape(&decl);
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+            // A NULL cell reads as the literal `null` out of the blocks and has
+            // no vector, so it is skipped before the strict parse (which would
+            // otherwise report `'null' is not a number`): a nullable vector
+            // column with a NULL row is still a valid index build. This is the
+            // same rule `column_tokens` applies on the rebuild path.
+            let trimmed = text.trim();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
+                continue;
+            }
+            // Strict, and validated against the declared dimension: a cell the
+            // parser cannot read in full (`[1,2,bad,4]`) or that is not a whole
+            // number of `dim`-sized tokens has no place in a graph whose every
+            // vertex is `dim` wide, so it fails the build instead of being
+            // indexed as something else.
+            let v = parse_vector_cell(&text, bit)
+                .map_err(|e| Error::Invalid(format!("'{table}.{column}' row {seq}: {e}")))?;
+            if let Some(dim) = dim {
+                if !v.is_empty() && v.len() % dim != 0 {
+                    return Err(Error::Invalid(format!(
+                        "'{table}.{column}' row {seq}: {} coordinates is not a whole number of {dim}-dimensional tokens",
+                        v.len()
+                    )));
+                }
+            }
+            if v.is_empty() {
+                continue;
+            }
             rows.push((seq as u64, v));
         }
         let read = t_read.elapsed();
         let segments = self.hnsw_mem_segments(table, column)?;
         let t_build = std::time::Instant::now();
+        let workers = self.hnsw_build_workers();
         for mem in segments {
-            if let Ok(mut mem) = mem.lock() {
-                let batch: Vec<(u64, Vec<f32>)> = rows
-                    .iter()
-                    .filter(|(_, v)| v.len() == mem.dims)
-                    .map(|(seq, v)| (*seq, v.clone()))
-                    .collect();
-                if !batch.is_empty() {
-                    mem.insert_batch(&batch, self.hnsw_build_workers());
+            if let Ok(mut mem) = mem.write() {
+                if mem.is_multivector() {
+                    // One vertex per token, all labelled with the row id: the
+                    // single-vector filter below would drop every cell holding
+                    // more than one token and index a whole multi-vector cell
+                    // as a single vertex. A cell whose tokens are not all
+                    // `mem.dims` wide is one of those invalid rows and is left
+                    // out rather than reshaping the whole batch.
+                    let tokens: Vec<(u64, Vec<Vec<f32>>)> = rows
+                        .iter()
+                        .filter_map(|(seq, v)| {
+                            let tokens = crate::hnsw_mem::split_tokens(v, mem.dims);
+                            tokens
+                                .iter()
+                                .all(|t| t.len() == mem.dims)
+                                .then_some((*seq, tokens))
+                        })
+                        .collect();
+                    if !tokens.is_empty() && !mem.insert_token_batch(&tokens, workers) {
+                        return Err(Error::Invalid(format!(
+                            "'{table}.{column}': the multi-vector index rejected a batch of {} rows",
+                            tokens.len()
+                        )));
+                    }
+                } else {
+                    let batch: Vec<(u64, Vec<f32>)> = rows
+                        .iter()
+                        .filter(|(_, v)| v.len() == mem.dims)
+                        .map(|(seq, v)| (*seq, v.clone()))
+                        .collect();
+                    if !batch.is_empty() && !mem.insert_batch(&batch, workers) {
+                        return Err(Error::Invalid(format!(
+                            "'{table}.{column}': the index rejected a batch of {} rows",
+                            batch.len()
+                        )));
+                    }
                 }
             }
         }
@@ -3189,7 +3253,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
+    ) -> Result<Vec<Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>> {
         let key = self.table_key(table);
         let schema = self.table_schema(table)?;
         let mut tables = self.tables.lock().unwrap();
@@ -3229,10 +3293,23 @@ impl Engine {
                     index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                 let encoding =
                     index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                // A MULTIVECTOR column keeps one vertex per token, all labelled
+                // with the row id (the reference's `MemIndexInserterIter1<
+                // MultiVectorRef>`). The segment has to know that from the
+                // moment it is created: whichever of the query path (here) and
+                // the write path (`dml::insert_vector_indexes`) wins the
+                // `or_insert_with` race decides, and a plain segment silently
+                // drops every multi-token cell and reports token counts where
+                // the coverage check expects row counts.
+                let multivector = self.multivector_column(table, &im.column);
                 entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                    Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                        dims, m, efc, metric, encoding,
-                    )))
+                    Arc::new(RwLock::new(if multivector {
+                        crate::hnsw_mem::HnswIndexInMem::new_multivector(
+                            dims, m, efc, metric, encoding,
+                        )
+                    } else {
+                        crate::hnsw_mem::HnswIndexInMem::new_with(dims, m, efc, metric, encoding)
+                    }))
                 });
             }
         }
@@ -4222,7 +4299,7 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables.get(&key)?.hnsw_mem.get(column)?.clone()
         };
-        let len = mem.lock().unwrap().len();
+        let len = mem.read().unwrap().len();
         Some(len)
     }
 
@@ -4962,6 +5039,55 @@ impl Engine {
                         return Err(Error::Invalid(format!(
                             "invalid index parameter: unsupported HNSW option '{k}'"
                         )));
+                    }
+                    // An index is a persisted artefact, so a typo or an
+                    // out-of-range number is rejected here rather than silently
+                    // defaulted: `M = 0` builds a graph with no neighbour slots
+                    // at all, and `metric = 'l1'` would quietly become `l2`.
+                    match k.as_str() {
+                        "M" | "EF_CONSTRUCTION" => {
+                            let n: usize = v.trim().parse().map_err(|_| {
+                                Error::Invalid(format!(
+                                    "invalid index parameter: {k} expects an integer, got '{v}'"
+                                ))
+                            })?;
+                            let (lo, hi) = if k == "M" {
+                                (2usize, 2048usize)
+                            } else {
+                                (2usize, 65_536usize)
+                            };
+                            if !(lo..=hi).contains(&n) {
+                                return Err(Error::Invalid(format!(
+                                    "invalid index parameter: {k} must be in [{lo}, {hi}], got {n}"
+                                )));
+                            }
+                        }
+                        "METRIC" => {
+                            if !matches!(
+                                v.trim().to_ascii_lowercase().as_str(),
+                                "l2" | "ip"
+                                    | "inner_product"
+                                    | "innerproduct"
+                                    | "cosine"
+                                    | "cos"
+                                    | "hamming"
+                            ) {
+                                return Err(Error::Invalid(format!(
+                                    "invalid index parameter: unknown metric '{v}'"
+                                )));
+                            }
+                        }
+                        "ENCODE"
+                            if !matches!(
+                                v.trim().to_ascii_lowercase().as_str(),
+                                "plain" | "lvq" | "rabitq"
+                            ) =>
+                        {
+                            return Err(Error::Invalid(format!(
+                                "invalid index parameter: unknown encoding '{v}'"
+                            )));
+                        }
+                        _ => {}
                     }
                     if k == "ENCODE" && v.eq_ignore_ascii_case("lvq") && int_elem {
                         return Err(Error::Invalid(
@@ -7688,6 +7814,14 @@ impl Engine {
         // the table. `rows` therefore starts empty and is filled once the
         // candidate set is known.
         let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
+        // Every predicate the scan applies (C++ `PhysicalKnnScan`'s block
+        // filter): one closure, so pushing it into the graph and applying it
+        // during scoring cannot drift apart.
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
         // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
@@ -7697,14 +7831,70 @@ impl Engine {
         // below, so the ranking equals the exhaustive scan whenever the graph
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
+        // Filter pushdown: a filtered query can still use the index when the
+        // rows the predicate admits are known. The reference compiles each
+        // block's predicate into a `BitmaskFilter` and hands it to the graph
+        // (`CalculateFilterBitmask` -> `SearchIndex(..., bitmask)`), so the
+        // graph returns `topn` accepted rows instead of the exact scan walking
+        // the table. Reading the rows once here is that bitmask's cost.
+        let allow_rows: Option<std::collections::HashSet<usize>> = if has_filter && cache.is_none()
+        {
+            let indexed_column = match_columns(&m.column)
+                .first()
+                .cloned()
+                .unwrap_or_default();
+            // The reference answers a filter from the secondary indexes and hands
+            // the bitmask to the graph (`CommonQueryFilter::filter_result_`).
+            // Only a plain conjunction is answerable that way; an `IN` list or a
+            // text search keeps the decode path.
+            let from_indexes = match (pred, in_filter.as_ref(), search_filter.as_ref()) {
+                (Some(pred), None, None) => self.predicate_rows_from_indexes(table, pred),
+                _ => None,
+            };
+            if !self.has_vector_index(table, &indexed_column) {
+                // Nothing to push the bitmask into: the exact scan decodes the
+                // table once and applies `keep` itself.
+                None
+            } else if from_indexes.is_some() {
+                from_indexes
+            } else {
+                // Only the columns the predicate names are decoded: the bitmask
+                // is a property of the filter columns, and the vector payload is
+                // the largest column in the table. Every other cell comes back
+                // `NULL`, which is why the rows are *not* reused for scoring.
+                let mut cols: Vec<usize> = [pred, in_filter.as_ref(), search_filter.as_ref()]
+                    .into_iter()
+                    .flatten()
+                    .flat_map(expression::Expr::referenced_columns)
+                    .collect();
+                cols.sort_unstable();
+                cols.dedup();
+                Some(
+                    self.read_blocks_values(table, Some(&cols), &[], Some(&keep), None)?
+                        .1
+                        .into_iter()
+                        .map(|(seq, _)| seq)
+                        .collect(),
+                )
+            }
+        } else {
+            None
+        };
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
-            if is_sparse || is_tensor {
+            if is_sparse {
                 return None;
             }
             let col_name = match_columns(&m.column).first()?.clone();
             let col_type = types.get(col_idx)?.to_ascii_uppercase();
-            if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
-                return None; // a single-vector index
+            if is_bit_type(&col_type) {
+                return None;
+            }
+            // A `MULTIVECTOR` column indexes one vertex per token, so the query
+            // row's tokens are the query set; any other tensor column has no
+            // single-vector graph.
+            let multivector = col_type.starts_with("MULTIVECTOR");
+            if is_tensor && !multivector {
+                return None;
             }
             let qv: Vec<f32> = query_items
                 .iter()
@@ -7714,16 +7904,21 @@ impl Engine {
             if qv.is_empty() {
                 return None;
             }
-            // A predicate can exclude rows the graph returned, so the graph alone
-            // cannot decide the top-k: the reference re-scores every row the
-            // filter admits. Keep the exact scan for filtered queries.
-            if has_filter {
-                return None;
-            }
+            let queries: Vec<Vec<f32>> = if multivector {
+                let dims = type_dim(&col_type).filter(|d| *d > 0)?;
+                if !qv.len().is_multiple_of(dims) {
+                    return None;
+                }
+                qv.chunks_exact(dims).map(<[f32]>::to_vec).collect()
+            } else {
+                vec![qv]
+            };
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 column: &col_name,
-                query: &qv,
+                queries: &queries,
+                multivector,
+                allow: allow_rows.as_ref(),
                 rows: &rows,
                 live_rows: None,
                 cache: cache.as_ref(),
@@ -7732,17 +7927,26 @@ impl Engine {
                 options: &knn_opts,
             })
         })();
+        // A filtered query whose predicate could not be answered as a set (no
+        // secondary index, an `OR`, an unindexed column) has no bitmask to push
+        // into the probe. An index can still appear between `has_vector_index`
+        // and this probe - a concurrent `CREATE INDEX`, or the memory segment
+        // the first insert after a restart creates - and the candidates it then
+        // returns would be scored with the residual predicate disabled (the rows
+        // are a vector-only projection, so `keep` cannot run on them). Decline
+        // them: the exact scan decodes the table and applies the predicate.
+        let vector_candidates = if has_filter && allow_rows.is_none() {
+            None
+        } else {
+            vector_candidates
+        };
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
-                // A predicate reads other columns, so a filtered query needs the
-                // whole row; an unfiltered one is scored from the vector column
-                // alone and gets its output rows from the block pass below.
                 Some(cands) if !cands.is_empty() => {
-                    let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
-                    let (_, got) = self.read_blocks_candidates_values(table, wanted, cands)?;
-                    got
+                    self.read_blocks_candidates_values(table, &[col_idx], cands)?
+                        .1
                 }
                 Some(_) => Vec::new(),
                 None => self.fetch_rows_with_ids(table)?,
@@ -7879,16 +8083,12 @@ impl Engine {
         // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
         // (filters live in the filter-scan base; the index probe above is
         // `KnnCandidateScan`).
-        let keep = |row: &[Value]| {
-            pred.is_none_or(|p| p.eval_predicate(row))
-                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-        };
         let column_decl = types
             .get(col_idx)
             .map(|t| t.to_ascii_uppercase())
             .unwrap_or_default();
         let query_elem_arg = arg_str(m.args.get(1));
+        let indexed = vector_candidates.is_some();
         let scan = knn_scan::PhysicalKnnScan {
             column_index: col_idx,
             column_type: &column_decl,
@@ -7907,7 +8107,15 @@ impl Engine {
         // Scoring only ever reads the vector column, so the rows it decoded are
         // projections of it. The result rows are read separately (all columns),
         // which is why this scan cannot reuse them.
-        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
+        //
+        // An indexed query's rows carry that projection alone: every other cell
+        // is `NULL`, so re-evaluating the predicate here would reject every row.
+        // The predicate is already in the candidate set instead - `allow_rows`
+        // holds every row it admits, and `KnnCandidateScan` intersects the rows
+        // the graph did not label with it.
+        let admitted = |_: &[Value]| true;
+        let row_filter: &dyn Fn(&[Value]) -> bool = if indexed { &admitted } else { &keep };
+        let state = scan.finish(scan.execute(row_filter, &bmp_scores, &mv_scores)?);
         let use_sim = state.use_sim;
         let scored = state.scored;
 
@@ -8469,7 +8677,7 @@ impl Engine {
         /// read once the table lock is released (a scan holds one of these
         /// guards while it waits for `tables`).
         enum Handle {
-            Hnsw(Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>),
+            Hnsw(Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>),
             Text(SharedTextIndex),
             Sparse(Arc<std::sync::RwLock<SparseIndex>>),
             Mv(Arc<std::sync::RwLock<MultiVectorIndex>>),
@@ -8506,7 +8714,7 @@ impl Engine {
             };
             let (row_count, mem_used) = match handle {
                 Some(Handle::Hnsw(h)) => {
-                    let h = h.lock().unwrap();
+                    let h = h.read().unwrap();
                     (h.len(), h.mem_usage())
                 }
                 Some(Handle::Text(t)) => {

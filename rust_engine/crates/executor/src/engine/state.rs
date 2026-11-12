@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 #[cfg(test)]
 thread_local! {
@@ -4574,7 +4575,7 @@ pub(crate) struct TableEntry {
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
     /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).
-    pub(crate) hnsw_mem: HashMap<String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+    pub(crate) hnsw_mem: HashMap<String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>,
     /// HNSW bytes buffered per column since its last dump (memindex quota).
     pub(crate) index_pending_bytes: HashMap<String, usize>,
     /// Whether this table's HNSW indexes were probed since the last dump.
@@ -4590,8 +4591,9 @@ pub(crate) struct TableEntry {
     /// HNSW chunks loaded from the C++ block mirror, per column (the
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
     pub(crate) vector: HashMap<String, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
-    /// IVF chunks loaded from the C++ mirror, per column.
-    pub(crate) ivf: HashMap<String, Vec<Arc<index::ivf::IvfSegment>>>,
+    /// IVF chunks loaded from the C++ mirror, per column, each with the
+    /// segment whose in-segment offsets it holds.
+    pub(crate) ivf: HashMap<String, Vec<Arc<crate::blocks::LoadedIvfIndex>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged
     /// with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
@@ -5986,6 +5988,28 @@ pub(crate) fn secondary_key_kind(declared: &str) -> storage::secondary_segment::
     }
 }
 
+/// The half-open `[low, high)` range of the integers an **integer** column's
+/// chunk key can hold, as `f64`.
+///
+/// A key's width is the storage width, so a value outside it can never equal a
+/// stored key: `tinyint_col = 300` has no answer at all, and encoding the
+/// truncated `44` would answer a different predicate. The upper end is
+/// exclusive on every width because the next power of two is exactly
+/// representable in `f64` while the largest integer of the width (e.g.
+/// `i64::MAX`) is not - `i64::MAX as f64` rounds up to `2^63`.
+pub(crate) fn integer_key_bounds(declared: &str) -> (f64, f64) {
+    use storage::secondary_segment::KeyKind;
+    match secondary_key_kind(declared) {
+        KeyKind::I8 => (-128.0, 128.0),
+        KeyKind::I16 => (-32_768.0, 32_768.0),
+        KeyKind::I32 => (-2_147_483_648.0, 2_147_483_648.0),
+        KeyKind::I64 => (-9_223_372_036_854_775_808.0, 9_223_372_036_854_775_808.0),
+        // `UINT` keys are `u64`, but a probe value is a `Literal::Int` (`i64`):
+        // only the representable half can be asked for.
+        _ => (0.0, 9_223_372_036_854_775_808.0),
+    }
+}
+
 /// How a stored cell becomes a chunk's ordered key (`ConvertToOrdered`,
 /// `secondary_index_data.cppm:37-72`).
 ///
@@ -6332,22 +6356,76 @@ pub(crate) fn bound_key(
     }
 }
 
+/// Which end of an inclusive range a bound is.
+///
+/// It decides which way a bound steps when the tail's width cannot represent it:
+/// the interval must keep every stored value the predicate admits and nothing it
+/// rejects, so the lower end rounds *up* to the first representable value inside
+/// the interval and the upper end rounds *down*.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum RangeBound {
+    Lower,
+    Upper,
+}
+
 /// A query bound as the memory tail's ordered bytes.
 ///
 /// [`bound_key`] widens a float bound to `f64` so that a chunk's `f32`
 /// comparison cannot clip a boundary row; the tail stores the column's own
-/// width, so the bound is narrowed back here. Narrowing rounds monotonically, so
-/// a row that satisfies the bound still falls inside the narrowed interval —
-/// any extra candidates the rounding adds are removed by the residual filter.
+/// width, so the bound is narrowed back here.
+///
+/// The narrowing is not a plain cast. `0.1 as f32` is `0.09999999`, so
+/// round-to-nearest can start `f >= 0.1` *below* the bound and admit a row the
+/// predicate rejects - and that is only harmless while something later re-checks
+/// the row. The indexed KNN path has no such filter (its rows are a vector
+/// projection, so the predicate is never re-evaluated), so the interval has to
+/// be exactly the set of stored `f32`s the predicate admits: step to the
+/// adjacent representable value whenever the nearest one falls outside.
 pub(crate) fn tail_bound(
     kind: storage::secondary_segment::KeyKind,
     key: storage::secondary_segment::Key,
+    side: RangeBound,
 ) -> Vec<u8> {
     use storage::secondary_segment::{Key, KeyKind};
     match (kind, key) {
-        (KeyKind::F32, Key::F64(v)) => Key::F32(v as f32).ordered_bytes(),
+        (KeyKind::F32, Key::F64(v)) => {
+            let narrowed = v as f32;
+            let narrowed = match side {
+                // The smallest `f32` that is still `>= v`.
+                RangeBound::Lower if f64::from(narrowed) < v => next_up_f32(narrowed),
+                // The largest `f32` that is still `<= v`.
+                RangeBound::Upper if f64::from(narrowed) > v => next_down_f32(narrowed),
+                _ => narrowed,
+            };
+            Key::F32(narrowed).ordered_bytes()
+        }
         _ => key.ordered_bytes(),
     }
+}
+
+/// `std::nextafter(x, +inf)`: a positive magnitude grows, a negative one shrinks,
+/// and `±0` steps to the smallest positive subnormal.
+fn next_up_f32(x: f32) -> f32 {
+    if x.is_nan() || x == f32::INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f32::from_bits(1);
+    }
+    let bits = x.to_bits();
+    f32::from_bits(if x > 0.0 { bits + 1 } else { bits - 1 })
+}
+
+/// `std::nextafter(x, -inf)`.
+fn next_down_f32(x: f32) -> f32 {
+    if x.is_nan() || x == f32::NEG_INFINITY {
+        return x;
+    }
+    if x == 0.0 {
+        return f32::from_bits(0x8000_0001);
+    }
+    let bits = x.to_bits();
+    f32::from_bits(if x > 0.0 { bits - 1 } else { bits + 1 })
 }
 
 /// A date/time bound: the planner passes the literal's text for a finite bound
@@ -7020,11 +7098,63 @@ pub(crate) fn arg_int(e: &ExprAst) -> Option<i64> {
 }
 
 pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
-    let t = s.trim().trim_start_matches('[').trim_end_matches(']');
-    t.split([',', ' '])
+    // The brackets of a nested literal are *separators*, not payload: a
+    // `MULTIVECTOR` cell is stored as `[[a,b],[c,d]]`, and keeping the inner
+    // brackets makes `b]` and `[c` fail the parse, so the flat value silently
+    // loses every coordinate but the first and the last. Every caller wants the
+    // flattened coordinates (one vertex per `dim`-sized token), so both kinds of
+    // bracket are split on.
+    s.split([',', ' ', '[', ']'])
         .filter(|x| !x.is_empty())
         .filter_map(|x| x.parse::<f64>().ok())
         .collect()
+}
+
+/// Parses a stored vector cell strictly, for a caller about to index it.
+///
+/// [`parse_vec_str`] drops every leaf it cannot parse, which is right for a
+/// best-effort display path but wrong for a build: `[1,2,bad,4]` silently
+/// becomes three coordinates, so a row ends up with a token count (and hence a
+/// vertex dimension) the column never declared. Here an unparseable leaf is an
+/// error, and the caller turns it into the build failure it is.
+///
+/// A `BIT` column stores its value in the display form (`[10110001]`, or the
+/// comma-separated variant), one character per coordinate;
+/// [`parse_vec_str`] would read that as the single number `10110001`, so each
+/// bit character is decoded into its own 0/1 coordinate instead.
+pub(crate) fn parse_vector_cell(text: &str, bit: bool) -> std::result::Result<Vec<f32>, String> {
+    let trimmed = text.trim();
+    // A NULL cell is stored as the literal `null` (that is how the column and
+    // value encoders write it, and every reader reads it back as SQL NULL). It
+    // carries no coordinates, so it is empty rather than a parse failure: an
+    // index build skips it like the sparse builder does.
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
+        return Ok(Vec::new());
+    }
+    if bit {
+        let mut out = Vec::with_capacity(trimmed.len());
+        for c in trimmed.chars() {
+            match c {
+                '0' => out.push(0.0),
+                '1' => out.push(1.0),
+                // A literal's brackets, separators and padding are not payload.
+                '[' | ']' | ',' | ' ' | '\t' | '\n' | '\r' => {}
+                other => return Err(format!("'{other}' is not a bit")),
+            }
+        }
+        return Ok(out);
+    }
+    let mut out = Vec::new();
+    for leaf in trimmed
+        .split([',', ' ', '[', ']', '\t', '\n', '\r'])
+        .filter(|x| !x.is_empty())
+    {
+        match leaf.parse::<f32>() {
+            Ok(v) => out.push(v),
+            Err(_) => return Err(format!("'{leaf}' is not a number")),
+        }
+    }
+    Ok(out)
 }
 
 /// Splits a stored multi-vector value into `dims`-sized token rows. Bit
@@ -8399,5 +8529,26 @@ mod float_format_ut {
     #[allow(clippy::excessive_precision)]
     fn a_decimal_tie_rounds_like_ryu() {
         assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
+    }
+}
+
+#[cfg(test)]
+mod literal_tests {
+    use super::parse_vec_str;
+
+    /// A nested literal flattens to every one of its coordinates. The
+    /// multi-vector write paths split the flat value into `dim`-sized tokens,
+    /// so treating the inner brackets as payload silently reduced a two-token
+    /// cell to a single malformed token (`[a, d]` out of `[[a,b],[c,d]]`).
+    #[test]
+    fn a_nested_literal_flattens_to_all_of_its_coordinates() {
+        assert_eq!(
+            parse_vec_str("[[0.3,0.7],[0.9,0.9]]"),
+            vec![0.3, 0.7, 0.9, 0.9]
+        );
+        assert_eq!(parse_vec_str("[[1,2]]"), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("[1,2]"), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("  [ 1 , 2 ] "), vec![1.0, 2.0]);
+        assert_eq!(parse_vec_str("[]"), Vec::<f64>::new());
     }
 }

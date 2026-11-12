@@ -14,6 +14,81 @@ struct SecondarySnapshot {
     sealing: Vec<Arc<index::SealedTail>>,
 }
 
+/// The largest integer magnitude at which `f64` still orders the integers.
+///
+/// The evaluator compares numerics as `f64` (`Value::partial_cmp_value`), so
+/// from `2^53` up two distinct integers are one value to the predicate while the
+/// index keeps one key each: `9007199254740992 = 9007199254740993` admits both
+/// rows there but probes a single key, and `> 9007199254740992` admits neither
+/// while the closed range minus its boundary keeps the second. A bound at this
+/// magnitude is not the predicate's answer, so it declines.
+const EXACT_INTEGER_LIMIT: f64 = 9_007_199_254_740_992.0;
+
+/// Whether `value`'s **key** is the key of `value` itself, *and* comparing that
+/// key orders the stored rows the way the evaluator does.
+///
+/// The chunk and tail keys hold the *stored* value (`i8`, `i16`, `i32`, `i64`,
+/// `f32`, `f64`, a temporal count, a hash), so a conversion that rounds,
+/// saturates or truncates names a different value: `TINYINT 300` becomes `44`,
+/// `FLOAT 1.00000003` becomes `1.0`, and `TIME '12:34:56.1'` becomes `45296`.
+/// Probing such a key answers another predicate, so an equality has no answer
+/// and a strict range must not subtract that key from its boundary.
+///
+/// This gates the indexed KNN path alone (`index_rows_for`), which treats the
+/// answer as final because its rows are a vector projection and nothing
+/// re-evaluates the predicate. Whatever this declines is decoded and evaluated
+/// row by row instead.
+pub(crate) fn key_is_exact(declared: &str, value: &expression::Value) -> bool {
+    use expression::Value as V;
+    use storage::secondary_segment::KeyKind;
+    let kind = secondary_key_kind(declared);
+    match (key_domain(declared), value) {
+        (KeyDomain::Integer, V::Int(i)) => {
+            // Representable in the key's width *and* orderable by the
+            // evaluator: from 2^53 up `f64` folds neighbours together.
+            let f = *i as f64;
+            let (low, high) = integer_key_bounds(declared);
+            f >= low && f < high && f.abs() < EXACT_INTEGER_LIMIT
+        }
+        (KeyDomain::Integer, V::Float(f)) => {
+            // The same rule `float_lookup_literal` applies: only an integral
+            // value inside the key's own width has an integer key.
+            let (low, high) = integer_key_bounds(declared);
+            f.fract() == 0.0 && *f >= low && *f < high && f.abs() < EXACT_INTEGER_LIMIT
+        }
+        // A floating-point key is not the predicate's answer yet. A `FLOAT`
+        // chunk narrows the key to `f32`, so `1.0` and `1.00000003` share one
+        // key, and the tail and equality probes are built from
+        // `to_slt_string`, six decimals, so `1.0000004` is probed as `1.0`.
+        // Either way an equality can admit a row the predicate rejects and the
+        // strict-bound subtraction can remove one it admits, and filtered KNN
+        // never re-evaluates what it is handed.
+        (KeyDomain::Float, _) => false,
+        // A temporal key is a truncated count - the reference's `DateT`/`TimeT`
+        // value, seconds since midnight with the fraction dropped - while the
+        // evaluator compares the text: `t < '12:34:56.1'` admits `12:34:56`,
+        // but the bound and that row share the key `45296`, so the strict bound
+        // would subtract it - and `12:34:56.9`, which the predicate rejects,
+        // shares it as well.
+        (KeyDomain::Temporal, _) => false,
+        (KeyDomain::Hashed, V::Str(text)) => {
+            // A `BOOL` key is `0`/`1` (`BooleanT`) while the evaluator compares
+            // the exact text (`"true".cmp("TRUE")` is not equal), so only the
+            // two lowercase spellings are exact: `flag = '1'` rejects every row
+            // although the key would read `true`. No trimming, no case folding,
+            // no numeric aliases.
+            //
+            // The other hashed keys are not predicate answers at all: a varchar
+            // key is a 64-bit hash (two texts can collide), and a JSON key is a
+            // term, not a document, so a document equality has no key here.
+            kind == KeyKind::Bool && matches!(text.as_str(), "true" | "false")
+        }
+        // A numeric literal on a text column, or a temporal literal that is not
+        // text, has no key in that column's space.
+        _ => false,
+    }
+}
+
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
@@ -163,16 +238,36 @@ impl Engine {
             }
             if kind.eq_ignore_ascii_case("HNSW") {
                 let segments = self.hnsw_mem_segments(&table, &meta.column)?;
+                let workers = self.hnsw_build_workers();
                 for mem in segments {
-                    let Ok(mut mem) = mem.lock() else { continue };
-                    for (seq, cells) in &gap {
-                        let Some(value) = cells.get(ci) else { continue };
-                        let text = value.to_slt_string();
-                        let vector: Vec<f32> =
-                            parse_vec_str(&text).iter().map(|x| *x as f32).collect();
-                        if vector.len() == mem.dims {
-                            mem.insert(*seq as u64, &vector);
-                        }
+                    let Ok(mut mem) = mem.write() else { continue };
+                    let dims = mem.dims;
+                    // One vertex per `dims`-sized token, labelled with its row,
+                    // exactly as the write path inserts a multi-vector cell
+                    // (`split_tokens` + `insert_token_batch`). Keeping only
+                    // cells whose flattened length *equalled* `dims` dropped
+                    // every multi-token row from the recovered graph, and the
+                    // next dump then sealed a graph that had never held them.
+                    let recovered: Vec<(u64, Vec<Vec<f32>>)> = gap
+                        .iter()
+                        .filter_map(|(seq, cells)| {
+                            let text = cells.get(ci)?.to_slt_string();
+                            let flat: Vec<f32> =
+                                parse_vec_str(&text).iter().map(|x| *x as f32).collect();
+                            let tokens = crate::hnsw_mem::split_tokens(&flat, dims);
+                            // `insert_token_batch` rejects the *whole* batch when
+                            // one token does not match `dims`, so a single
+                            // malformed cell would drop every valid row behind
+                            // it. A cell that is not a whole number of tokens has
+                            // no vertex width this graph can hold; leave it to
+                            // the exact scan.
+                            let usable =
+                                !tokens.is_empty() && tokens.iter().all(|t| t.len() == dims);
+                            usable.then_some((*seq as u64, tokens))
+                        })
+                        .collect();
+                    if !recovered.is_empty() {
+                        mem.insert_token_batch(&recovered, workers);
                     }
                 }
             } else if kind.eq_ignore_ascii_case("IVF") {
@@ -529,7 +624,9 @@ impl Engine {
                         .vector
                         .entry(im.column.clone())
                         .or_default();
-                    list.sort_by_key(|s| std::cmp::Reverse(s.bytes));
+                    // Ascending, so `pop` takes the largest: evicting the
+                    // biggest graph frees the most with one query left cold.
+                    list.sort_by_key(|s| s.bytes);
                     while total > budget && list.len() > 1 {
                         let gone = list.pop().unwrap();
                         total = total.saturating_sub(gone.bytes);
@@ -607,7 +704,7 @@ impl Engine {
                     .and_then(|e| e.hnsw_mem.get(&meta.column).cloned())
             };
             return mem
-                .and_then(|m| m.lock().ok().map(|g| !g.is_empty()))
+                .and_then(|m| m.read().ok().map(|g| !g.is_empty()))
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("IVF") {
@@ -886,7 +983,13 @@ impl Engine {
         } else if meta.index_type.eq_ignore_ascii_case("BMP") {
             self.seal_sparse_index(&table, &meta.column);
         } else if meta.index_type.eq_ignore_ascii_case("HNSW") {
-            if self.dump_hnsw_index(&table, &meta.name).is_ok() {
+            // `Ok(0)` wrote no chunk: an LSG index is never dumped from the
+            // buffer, so its memory segment is still the only copy of the rows
+            // written since the last full build and must be kept.
+            if matches!(
+                self.dump_hnsw_index(&table, &meta.name),
+                Ok(written) if written > 0
+            ) {
                 let key = self.table_key(&table);
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&key) {
@@ -1727,8 +1830,67 @@ impl Engine {
         })
     }
 
+    /// The declared type the secondary index's keys were encoded with.
+    ///
+    /// The registry's `declared_types` comes first: it is what the writer used,
+    /// while the catalog lookup is keyed by a qualified table name and so can
+    /// miss a bare one.
+    fn index_declared_type(&self, table: &str, column: &str) -> Option<String> {
+        let tkey = self.table_key(table);
+        let from_registry = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.secondary.declared_types.get(column).cloned())
+        };
+        from_registry.or_else(|| {
+            let schema = self.table_schema(table).ok()?;
+            let ci = schema.iter().position(|c| c == column)?;
+            self.column_types(table).ok()?.get(ci).cloned()
+        })
+    }
+
+    /// A float equality value as the literal its column's keys actually use.
+    ///
+    /// `col = 3.0` and `col = 3` are the same predicate (`Expr` compares
+    /// numerically), but the index answered them differently: the float branch of
+    /// [`Self::index_lookup_one`] only probes float chunks, so a float on an
+    /// integer column found nothing in a sealed chunk, and the memory tail could
+    /// not parse an integer key out of `"3.000000"` either - the equality
+    /// silently matched no row at all. An integer column therefore gets the value
+    /// converted, and only when the conversion is exact: `col = 3.5` cannot equal
+    /// any integer key, and probing a truncated key would answer a different
+    /// question, so it declines (`None`) and the caller evaluates the predicate
+    /// against the decoded columns instead.
+    fn float_lookup_literal(&self, table: &str, column: &str, f: f64) -> Option<Literal> {
+        let declared = self.index_declared_type(table, column).unwrap_or_default();
+        if key_domain(&declared) != KeyDomain::Integer {
+            return Some(Literal::Float(f));
+        }
+        // The column's key width decides which integers it can hold, so the
+        // bounds come from its key kind rather than from `i64` alone:
+        // `tinyint_col = 300.0` matches no key, and truncating it to `44` would
+        // answer the wrong predicate. Both probes (sealed chunks and the memory
+        // tail) are then declined together.
+        let (low, high) = integer_key_bounds(&declared);
+        if f.fract() != 0.0 || !(low..high).contains(&f) {
+            return None;
+        }
+        Some(Literal::Int(f as i64))
+    }
+
     /// One column's (or one functional expression's) rows whose key is `value`.
     fn index_lookup_one(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
+        // A float equality value reaches the probe as the key type its column
+        // stores; see [`Self::float_lookup_literal`].
+        let converted;
+        let value: &Literal = match value {
+            Literal::Float(f) => {
+                converted = self.float_lookup_literal(table, column, *f)?;
+                &converted
+            }
+            other => other,
+        };
         let tkey = self.table_key(table);
         let want = value.to_slt_string();
         // Snapshot the readers (cheap `Arc` clones) and the memory tail so the
@@ -1985,6 +2147,130 @@ impl Engine {
         self.index_range_lookup_one(table, column, ranges)
     }
 
+    /// Rows a predicate admits, answered by the secondary indexes alone.
+    ///
+    /// The reference compiles a filter into a bitmask from whichever index can
+    /// answer it (`CommonQueryFilter::filter_result_`) and hands that bitmask to
+    /// the vector index. Answering the same predicate from the secondary indexes
+    /// keeps a filtered KNN probe from decoding the predicate's own columns.
+    ///
+    /// Only a conjunction of indexed comparisons is answerable. An `OR`, an
+    /// unindexed column, `LIKE` or a function of two columns returns `None`, and
+    /// the caller decodes the columns as it did before.
+    pub(crate) fn predicate_rows_from_indexes(
+        &self,
+        table: &str,
+        pred: &expression::Expr,
+    ) -> Option<std::collections::HashSet<usize>> {
+        let schema = self.table_schema(table).ok()?;
+        let mut conjuncts = Vec::new();
+        flatten_and(pred, &mut conjuncts);
+        let mut rows: Option<std::collections::HashSet<usize>> = None;
+        for conjunct in conjuncts {
+            let admitted = self.conjunct_rows(table, &schema, conjunct)?;
+            rows = Some(match rows {
+                Some(previous) => previous.intersection(&admitted).copied().collect(),
+                None => admitted,
+            });
+        }
+        rows
+    }
+
+    fn conjunct_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        expr: &expression::Expr,
+    ) -> Option<std::collections::HashSet<usize>> {
+        let expression::Expr::Cmp(left, op, right) = expr else {
+            return None;
+        };
+        // `column <op> literal`, or the literal on the left with the operator
+        // mirrored (`7 > column` is `column < 7`).
+        let (index, value, op) = match (&**left, &**right) {
+            (expression::Expr::Column(i), expression::Expr::Literal(v)) => (*i, v, *op),
+            (expression::Expr::Literal(v), expression::Expr::Column(i)) => (*i, v, mirror_cmp(*op)),
+            _ => return None,
+        };
+        let column = schema.get(index)?;
+        self.index_rows_for(table, column, op, value)
+    }
+
+    /// One conjunct's admitted rows, or `None` when the index cannot answer it
+    /// *exactly*.
+    ///
+    /// Unlike [`Self::index_lookup`] and [`Self::index_range_lookup`], whose
+    /// results are re-checked against the fetched rows, this answer is final:
+    /// `predicate_rows_from_indexes` hands it to the indexed KNN path as the
+    /// predicate's own result, and that path cannot re-evaluate it (its rows are
+    /// a vector projection). A lossy key therefore declines the shortcut instead
+    /// of approximating it - see [`key_is_exact`].
+    fn index_rows_for(
+        &self,
+        table: &str,
+        column: &str,
+        op: parser::CmpOp,
+        value: &expression::Value,
+    ) -> Option<std::collections::HashSet<usize>> {
+        use parser::{CmpOp, Literal};
+        let literal = match value {
+            expression::Value::Int(i) => Literal::Int(*i),
+            expression::Value::Float(f) => Literal::Float(*f),
+            expression::Value::Str(s) => Literal::Str(s.clone()),
+            _ => return None,
+        };
+        let set = |rows: Vec<u64>| rows.into_iter().map(|row| row as usize).collect();
+        let declared = self.index_declared_type(table, column).unwrap_or_default();
+        let exact = key_is_exact(&declared, value);
+        match op {
+            CmpOp::Eq => Some(set(self
+                .index_lookup(table, column, &literal)
+                .filter(|_| exact)?)),
+            CmpOp::Ge | CmpOp::Le | CmpOp::Gt | CmpOp::Lt => {
+                // A bound whose key is not the bound value - a saturated
+                // `TINYINT` key, a rounded `FLOAT` one, a truncated
+                // `TIME`/`DATETIME` count, an integer past `2^53`, a hashed
+                // text - makes both the closed range and the strict-bound
+                // subtraction answer another predicate.
+                if !exact {
+                    return None;
+                }
+                // The range read takes closed bounds, so an open end is a
+                // sentinel outside every key of the column. `i64::MIN`/`i64::MAX`
+                // are outside the integers and the temporal counts, but a `BOOL`
+                // key is `false`/`true` and *both* of those sentinels convert to
+                // `true` (`BooleanT(i != 0)`): `flag <= 'true'` would then start
+                // at `true` and drop every `false` row, and `flag < 'true'`
+                // would come out empty.
+                let (low, high) = if secondary_key_kind(&declared) == KeyKind::Bool {
+                    (expression::Value::Int(0), expression::Value::Int(1))
+                } else {
+                    (
+                        expression::Value::Int(i64::MIN),
+                        expression::Value::Int(i64::MAX),
+                    )
+                };
+                let (lo, hi) = match op {
+                    CmpOp::Ge | CmpOp::Gt => (value.clone(), high),
+                    _ => (low, value.clone()),
+                };
+                let mut rows: std::collections::HashSet<usize> =
+                    set(self.index_range_lookup(table, column, &[(lo, hi)])?);
+                if matches!(op, CmpOp::Gt | CmpOp::Lt) {
+                    // A strict bound is the closed range minus its boundary,
+                    // which is sound because `exact` just said the boundary's
+                    // key *is* the boundary value.
+                    let equal = self.index_lookup(table, column, &literal)?;
+                    for row in equal {
+                        rows.remove(&(row as usize));
+                    }
+                }
+                Some(rows)
+            }
+            _ => None,
+        }
+    }
+
     /// The functional index the evaluator's expression names, if the registry
     /// carries one.
     ///
@@ -2127,8 +2413,17 @@ impl Engine {
         // applies to it directly: one ordered slice per range, with no key
         // decoded and compared.
         for (start, end) in &keys {
-            let lo = tail_bound(kind, *start);
-            let hi = tail_bound(kind, *end);
+            let lo = tail_bound(kind, *start, RangeBound::Lower);
+            let hi = tail_bound(kind, *end, RangeBound::Upper);
+            // Narrowing a `FLOAT` bound to the chunk's `f32` moves it *inwards*
+            // (the smallest `f32` that is still `>= lo`, the largest that is
+            // still `<= hi`), so a pair that was ordered as `f64` can come out
+            // inverted - `[1.0000001, 1.0000001)` narrows to `[1.0000002,
+            // 1.0)`. That range is empty: querying it would either ask the tail
+            // for `hi..lo` or make it answer with a reversed slice.
+            if lo > hi {
+                continue;
+            }
             if let Some(index) = &tail {
                 for (_, ids) in index.range(Some(&lo), Some(&hi)) {
                     candidates.extend_from_slice(&ids);
@@ -2632,7 +2927,7 @@ impl Engine {
                 .map(|e| {
                     e.hnsw_mem
                         .iter()
-                        .filter(|(_, m)| m.lock().map(|g| g.len() >= capacity).unwrap_or(false))
+                        .filter(|(_, m)| m.read().map(|g| g.len() >= capacity).unwrap_or(false))
                         .map(|(c, _)| c.clone())
                         .collect()
                 })
@@ -2654,13 +2949,32 @@ impl Engine {
             if !same_table {
                 continue;
             }
-            if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+            let sealed = matches!(
+                self.dump_hnsw_index(&im.table, &im.name),
+                Ok(written) if written > 0
+            );
+            if sealed {
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.column);
                     e.index_pending_bytes.insert(im.column.clone(), 0);
                     e.hnsw_probed = false;
                 }
+                continue;
+            }
+            // `Ok(0)`: nothing was sealed, so the segment still holds these
+            // rows and must survive the dump. It must not grow without limit
+            // either - a capacity that is crossed every batch and never
+            // satisfied is an unbounded tail, which is exactly what the row
+            // bound exists to prevent. Past twice the capacity the tail is
+            // released: memory really goes down, and the rows no chunk holds
+            // fall back to the exact scan until the full mirror write or an
+            // optimize merge folds them into a chunk.
+            if self
+                .hnsw_tail_len(&tkey, &im.column)
+                .is_some_and(|len| len >= capacity.saturating_mul(2))
+            {
+                self.release_hnsw_tail(&tkey, &im.column);
             }
         }
     }
@@ -2719,4 +3033,27 @@ fn merge_covered_ranges(chunks: &[catalog::layout::SegmentIndex]) -> Vec<(u64, u
         }
     }
     merged
+}
+
+/// The conjuncts of an `AND` tree, in order.
+fn flatten_and<'a>(expr: &'a expression::Expr, out: &mut Vec<&'a expression::Expr>) {
+    match expr {
+        expression::Expr::And(a, b) => {
+            flatten_and(a, out);
+            flatten_and(b, out);
+        }
+        other => out.push(other),
+    }
+}
+
+/// `op` with its operands swapped (`a < b` is `b > a`).
+fn mirror_cmp(op: parser::CmpOp) -> parser::CmpOp {
+    use parser::CmpOp;
+    match op {
+        CmpOp::Lt => CmpOp::Gt,
+        CmpOp::Le => CmpOp::Ge,
+        CmpOp::Gt => CmpOp::Lt,
+        CmpOp::Ge => CmpOp::Le,
+        other => other,
+    }
 }

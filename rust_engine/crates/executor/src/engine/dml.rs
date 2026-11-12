@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 /// One document's tokenised terms and the byte cost of its postings, as produced
 /// by [`prepare_doc`] before the table's write gate is taken.
@@ -1286,7 +1287,7 @@ impl Engine {
         };
         // The table lock is only held to reach the per-segment mutexes; the
         // graph updates run under each segment's own lock.
-        let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
+        let segments: Vec<(String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
             if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
@@ -1329,10 +1330,20 @@ impl Engine {
                         index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                     let encoding =
                         index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                    // A MULTIVECTOR column keeps one vertex per token, all
+                    // labelled with the row id (the reference's
+                    // `MemIndexInserterIter1<MultiVectorRef>`).
+                    let multivector = self.multivector_column(table, &im.column);
                     entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                        Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                            dims, m, efc, metric, encoding,
-                        )))
+                        Arc::new(RwLock::new(if multivector {
+                            crate::hnsw_mem::HnswIndexInMem::new_multivector(
+                                dims, m, efc, metric, encoding,
+                            )
+                        } else {
+                            crate::hnsw_mem::HnswIndexInMem::new_with(
+                                dims, m, efc, metric, encoding,
+                            )
+                        }))
                     });
                 }
             }
@@ -1348,10 +1359,15 @@ impl Engine {
             };
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            if let Ok(mut mem) = mem.lock() {
-                if v.len() == mem.dims {
-                    mem.insert(seq, &v);
-                }
+            let Ok(mut mem) = mem.write() else { continue };
+            let dims = mem.dims;
+            if mem.is_multivector() {
+                // One vertex per token; a cell whose length is not a multiple
+                // of the declared dimension indexes as a single vertex.
+                let tokens = crate::hnsw_mem::split_tokens(&v, dims);
+                mem.insert_tokens(seq, &tokens, 1);
+            } else if v.len() == dims {
+                mem.insert(seq, &v);
             }
         }
     }
@@ -2004,6 +2020,10 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
+            // The reference dumps when the memory passes the quota and
+            // subtracts only what the dump released
+            // (`MemIndexTracer::IncreaseMemoryUsage`), so the charge is added
+            // before the decision and the rows above the limit stay accounted.
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
@@ -2012,26 +2032,49 @@ impl Engine {
                     .entry(im.column.clone())
                     .or_insert(0);
                 *cur += bytes;
-                // The reference dumps when the memory passes the quota and
-                // subtracts only what the dump released, so the rows above
-                // the limit stay accounted and the *next* batch is what
-                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
-                if quota > 0 && *cur > quota {
-                    *cur -= quota;
-                    true
-                } else {
-                    false
-                }
+                *cur > quota
             };
-            if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
-                // The dumped segment leaves memory. The bytes above the
-                // quota were already left in the counter, so nothing else to
-                // do here but drop the graph the dump just sealed.
+            if !dump {
+                continue;
+            }
+            // Only a dump that actually wrote a chunk sealed the memory
+            // segment. `Ok(0)` means it sealed nothing - an LSG index is never
+            // dumped from the buffer at all (its graph is linked with
+            // unadjusted distances), and an empty memory segment has nothing to
+            // write - so its bytes were **not** released and the charge has to
+            // stay.
+            let sealed = matches!(
+                self.dump_hnsw_index(&im.table, &im.name),
+                Ok(written) if written > 0
+            );
+            if sealed {
+                // The dumped segment leaves memory, so the charge it held goes
+                // with it; what was above the quota was already left in the
+                // counter by the addition above.
                 let mut tables = self.tables.lock().unwrap();
-                if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.remove(&im.column);
-                    e.hnsw_probed = false;
+                let Some(entry) = tables.get_mut(&tkey) else {
+                    continue;
+                };
+                if let Some(cur) = entry.index_pending_bytes.get_mut(&im.column) {
+                    *cur = cur.saturating_sub(quota);
                 }
+                entry.hnsw_mem.remove(&im.column);
+                entry.hnsw_probed = false;
+                continue;
+            }
+            // Nothing was sealed, so nothing was released: keep the charge and
+            // only release the buffer once it has passed twice the quota. That
+            // is what bounds a tail nothing can seal (an LSG graph is never
+            // written out incrementally) without dropping it on every batch.
+            let retained = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.index_pending_bytes.get(&im.column).copied())
+                    .unwrap_or(0)
+            };
+            if retained > quota.saturating_mul(2) {
+                self.release_hnsw_tail(&tkey, &im.column);
             }
         }
     }

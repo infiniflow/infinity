@@ -3473,6 +3473,434 @@ mod tests {
         }
     }
 
+    /// A bad HNSW option is a DDL error, not a silent default: `M = 0` builds a
+    /// graph with no neighbour slots at all and `metric = 'l1'` would quietly
+    /// become `l2`, and both are persisted into the catalog.
+    #[test]
+    fn hnsw_rejects_invalid_index_options() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE io (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for (i, opt) in [
+            "M=0",
+            "M=abc",
+            "M=99999",
+            "EF_CONSTRUCTION=1",
+            "METRIC='l1'",
+            "ENCODE='foo'",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let sql = format!("CREATE INDEX io_{i} ON io (v) USING HNSW WITH ({opt});");
+            assert!(e.execute(&sql).is_err(), "{opt} must be rejected");
+        }
+        // The valid spellings still work.
+        e.execute(
+            "CREATE INDEX io_ok ON io (v) USING HNSW              WITH (M=8, EF_CONSTRUCTION=100, METRIC='cosine', ENCODE='plain');",
+        )
+        .unwrap();
+    }
+
+    /// One `DELETE` must not send every later KNN query to the exact scan: the
+    /// coverage check asks whether every *live* row is labelled, not whether the
+    /// counts match (the graph still labels the deleted row).
+    #[test]
+    fn a_deleted_row_leaves_the_graph_in_charge() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dv (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO dv VALUES ");
+        for i in 0..200 {
+            sql.push_str(&format!("({i}, [{i}.0,0.0,0.0,0.0])"));
+            if i < 199 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.execute("CREATE INDEX dv_i ON dv (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        e.flush().unwrap();
+        e.execute("DELETE FROM dv WHERE id = 7;").unwrap();
+        // The deleted row is gone and the nearest survivor answers.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.4,0.0,0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["8".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.0,0.0,0.0,0.0], 'float', 'l2', 3);"
+            )
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
+            vec!["6".to_string(), "8".to_string(), "5".to_string()]
+        );
+    }
+
+    /// A filtered KNN answered from a secondary index must rank exactly like the
+    /// same filter evaluated over decoded columns: the bitmask comes from the
+    /// index (`CommonQueryFilter::filter_result_`), the answers must not.
+    #[test]
+    fn an_index_answered_filter_matches_the_decoded_one() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // `fvi` indexes `tag`; `fvd` does not, so the same predicate is answered
+        // from the index in one table and by decoding it in the other.
+        for t in ["fvi", "fvd"] {
+            e.execute(&format!(
+                "CREATE TABLE {t} (id INT, tag INT, v EMBEDDING(FLOAT,4));"
+            ))
+            .unwrap();
+            let mut sql = format!("INSERT INTO {t} VALUES ");
+            for i in 0..200 {
+                sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 7));
+                if i < 199 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
+            ))
+            .unwrap();
+        }
+        e.execute("CREATE INDEX fvi_tag ON fvi (tag);").unwrap();
+        e.flush().unwrap();
+
+        for filter in [
+            "tag = 3",
+            "tag >= 5",
+            "tag <= 1",
+            "tag > 4",
+            "tag < 2",
+            "tag >= 2 AND tag <= 3",
+            "3 = tag",
+        ] {
+            let query = |t: &str| {
+                format!(
+                    "SELECT id FROM {t} SEARCH MATCH VECTOR                      (v, [97.4,0.0,0.0,0.0], 'float', 'l2', 5) WHERE {filter};"
+                )
+            };
+            let indexed = rows(&e, &query("fvi"));
+            let decoded = rows(&e, &query("fvd"));
+            assert_eq!(indexed, decoded, "filter `{filter}`");
+            assert!(!indexed.is_empty(), "filter `{filter}` admits rows");
+            // Every answer satisfies the filter.
+            let tags: Vec<i64> = indexed
+                .iter()
+                .map(|r| r[0].parse::<i64>().unwrap() % 7)
+                .collect();
+            assert_eq!(tags.len(), indexed.len(), "filter `{filter}`");
+        }
+    }
+
+    /// A `BOOL`/`INT`/`DOUBLE`/`TIME`/`VARCHAR`/`JSON` index and a filter on
+    /// each of its columns, so the shortcut has something to decline.
+    fn lossy_key_table(e: &Engine, t: &str) {
+        e.execute(&format!(
+            "CREATE TABLE {t} (id INT, big BIGINT, db DOUBLE, tm TIME, flag BOOL, \
+             vc VARCHAR, js JSON, v EMBEDDING(FLOAT,4));"
+        ))
+        .unwrap();
+        e.execute(&format!(
+            "INSERT INTO {t} VALUES \
+             (0, 9007199254740992, 1.0, '12:34:56', true, '123', '{{\"a\":1}}', [0.0,0.0,0.0,0.0]), \
+             (1, 9007199254740993, 1.0000004, '12:34:57', false, '0123', '{{\"a\":2}}', [1.0,0.0,0.0,0.0]), \
+             (2, 5, 2.0, '10:00:00', true, 'x', '{{\"a\":1}}', [2.0,0.0,0.0,0.0]), \
+             (3, 6, 3.0, '09:00:00', false, 'y', 'null', [3.0,0.0,0.0,0.0]);"
+        ))
+        .unwrap();
+        e.execute(&format!(
+            "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
+        ))
+        .unwrap();
+    }
+
+    /// An indexed KNN answer is final (its rows are a vector projection, so
+    /// nothing re-evaluates the predicate), so the shortcut may only take a
+    /// predicate whose key comparison *is* the evaluator's:
+    ///
+    /// * from `2^53` up the evaluator's `f64` comparison folds neighbouring
+    ///   integers together while the index keeps one key each;
+    /// * a float chunk narrows the key to `f32` and a probe is built from six
+    ///   decimals, so `db = 1.0000004` probes `1.000000`;
+    /// * a temporal key drops the fraction while the evaluator keeps it;
+    /// * a varchar key is a hash and the evaluator coerces numeric text, so
+    ///   `vc = '0123'` matches a stored `123` whose hash differs;
+    /// * a `BOOL` key is `0`/`1` while the evaluator compares the text, so
+    ///   `flag = '1'` admits nothing there and `flag = 'TRUE'` admits nothing
+    ///   either;
+    /// * a JSON key is a term, not a document.
+    #[test]
+    fn a_filter_the_keys_cannot_answer_declines_the_shortcut() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        lossy_key_table(&e, "lk");
+        for c in ["big", "db", "tm", "flag", "vc", "js"] {
+            e.execute(&format!("CREATE INDEX lk_{c} ON lk ({c});"))
+                .unwrap();
+        }
+        let t = "default_db.lk";
+        let schema = e.table_schema(t).unwrap();
+        let cmp = |column: &str, op, value| {
+            let i = schema.iter().position(|c| c == column).unwrap();
+            expression::Expr::Cmp(
+                Box::new(expression::Expr::Column(i)),
+                op,
+                Box::new(expression::Expr::Literal(value)),
+            )
+        };
+        // The indexes answer these columns: the declines below come from the
+        // comparison, not from a missing index.
+        for (column, literal) in [
+            ("big", parser::Literal::Int(9007199254740992)),
+            ("db", parser::Literal::Float(1.0)),
+            ("tm", parser::Literal::Str("12:34:56".into())),
+            ("flag", parser::Literal::Str("true".into())),
+            ("vc", parser::Literal::Str("123".into())),
+            ("js", parser::Literal::Str("{\"a\":1}".into())),
+        ] {
+            assert!(
+                e.index_lookup(t, column, &literal).is_some(),
+                "no index on `{column}`"
+            );
+        }
+
+        for (column, op, value) in [
+            // `2^53 = 2^53 + 1` and `2^53 > 2^53` are both `f64` comparisons
+            // that the i64 keys answer differently.
+            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_992)),
+            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_993)),
+            ("big", parser::CmpOp::Ge, Value::Int(9_007_199_254_740_993)),
+            ("big", parser::CmpOp::Gt, Value::Int(9_007_199_254_740_992)),
+            // The probe is built from six decimals.
+            ("db", parser::CmpOp::Eq, Value::Float(1.000_000_4)),
+            ("db", parser::CmpOp::Lt, Value::Float(1.000_000_4)),
+            ("db", parser::CmpOp::Eq, Value::Float(1.0)),
+            // The key truncates the fraction.
+            ("tm", parser::CmpOp::Lt, Value::Str("12:34:56.1".into())),
+            ("tm", parser::CmpOp::Eq, Value::Str("12:34:56".into())),
+            // The key is `0`/`1`, the comparison is on the text. (The canonical
+            // spellings keep the index path: see the `BOOL` range test.)
+            ("flag", parser::CmpOp::Eq, Value::Str("1".into())),
+            ("flag", parser::CmpOp::Eq, Value::Str("TRUE".into())),
+            // The key is a hash, the comparison coerces numeric text.
+            ("vc", parser::CmpOp::Eq, Value::Str("0123".into())),
+            ("vc", parser::CmpOp::Eq, Value::Str("123".into())),
+            // A JSON key is a term, not a document.
+            ("js", parser::CmpOp::Eq, Value::Str("{\"a\":1}".into())),
+        ] {
+            assert!(
+                e.predicate_rows_from_indexes(t, &cmp(column, op, value.clone()))
+                    .is_none(),
+                "`{column} {op:?} {value:?}` must be decoded, not answered from the keys"
+            );
+        }
+
+        // The keys that *are* the values still answer, so the shortcut keeps
+        // working where it can.
+        assert!(e
+            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Ge, Value::Int(5)))
+            .is_some());
+        assert!(e
+            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Eq, Value::Int(5)))
+            .is_some());
+        assert!(e
+            .predicate_rows_from_indexes(
+                t,
+                &cmp("flag", parser::CmpOp::Eq, Value::Str("true".into()))
+            )
+            .is_some());
+    }
+
+    /// The declined shortcut is what makes the *answer* right: `flag <= 'true'`
+    /// admits both `false` and `true` rows, while a `BOOL` range whose open end
+    /// is `i64::MAX`/`i64::MIN` converts both sentinels to `true` and hands back
+    /// the `true` rows alone.
+    #[test]
+    fn a_bool_range_does_not_drop_the_false_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        lossy_key_table(&e, "brk");
+        e.execute("CREATE INDEX brk_flag ON brk (flag);").unwrap();
+        e.flush().unwrap();
+        for (filter, want) in [
+            ("flag <= 'true'", vec!["3", "2"]),
+            ("flag < 'true'", vec!["3", "1"]),
+            ("flag >= 'false'", vec!["3", "2"]),
+            ("flag > 'false'", vec!["2", "0"]),
+            ("flag = '1'", vec![]),
+        ] {
+            assert_eq!(
+                rows(
+                    &e,
+                    &format!(
+                        "SELECT id FROM brk SEARCH MATCH VECTOR \
+                         (v, [9.0,0.0,0.0,0.0], 'float', 'l2', 2) WHERE {filter};"
+                    )
+                )
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+                want,
+                "filter `{filter}`"
+            );
+        }
+    }
+
+    /// A filter that admits very few rows still returns a full `topn`: the probe
+    /// widens its beam instead of handing back a short answer, and the rows it
+    /// finds are the nearest admitted ones.
+    #[test]
+    fn a_selective_filter_still_returns_topn() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO sf VALUES ");
+        for i in 0..400 {
+            sql.push_str(&format!(
+                "({i}, {}, [{i}.0,0.0,0.0,0.0])",
+                if i % 200 == 7 { 1 } else { 0 }
+            ));
+            if i < 399 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        // Two admitted rows out of four hundred, both far from the query.
+        e.execute("CREATE INDEX sf_i ON sf (v) USING HNSW WITH (metric='l2', M=8);")
+            .unwrap();
+        e.flush().unwrap();
+        let got = rows(
+            &e,
+            "SELECT id FROM sf SEARCH MATCH VECTOR (v, [399.0,0.0,0.0,0.0], 'float', 'l2', 2)              WHERE tag = 1;",
+        );
+        assert_eq!(
+            got,
+            vec![vec!["207".to_string()], vec!["7".to_string()]],
+            "both admitted rows come back, nearest first"
+        );
+    }
+
+    /// A sealed HNSW chunk is **mapped**, not read: its vector payload stays in
+    /// the page cache and a loaded segment's heap is its graph, which is the
+    /// reference's shape (`PlainVecStoreInner` points into the buffer).
+    #[test]
+    fn a_sealed_hnsw_chunk_maps_its_vectors() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE mp (id INT, v EMBEDDING(FLOAT,8));")
+                .unwrap();
+            let mut sql = String::from("INSERT INTO mp VALUES ");
+            for i in 0..300 {
+                let parts: Vec<String> = (0..8).map(|j| format!("{}", i + j)).collect();
+                sql.push_str(&format!("({i}, [{}])", parts.join(",")));
+                if i < 299 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute("CREATE INDEX mp_i ON mp (v) USING HNSW WITH (metric='l2');")
+                .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let loaded = e.load_vector_index("mp", "mp_i").unwrap();
+        let index = loaded.index.index();
+        assert!(
+            index.vectors_are_mapped(),
+            "the payload must be borrowed from the mapping"
+        );
+        assert_eq!(
+            index.store_mem_bytes(),
+            0,
+            "a mapped store keeps no vectors"
+        );
+        assert!(
+            index.neighbors_are_mapped(),
+            "the neighbour lists must be read out of the mapping too"
+        );
+        assert_eq!(index.mem_usage(), 0, "a loaded chunk costs no heap");
+        assert_eq!(index.len(), 300);
+        // The mapped payload is what answers: this engine has no memory segment.
+        // Row 42's own vector: [42, 43, …, 49].
+        let query: Vec<String> = (0..8).map(|j| format!("{}", 42 + j)).collect();
+        assert_eq!(
+            rows(
+                &e,
+                &format!(
+                    "SELECT id FROM mp SEARCH MATCH VECTOR (v, [{}], 'float', 'l2', 1);",
+                    query.join(",")
+                )
+            ),
+            vec![vec!["42".to_string()]]
+        );
+    }
+
+    /// A filtered query on an indexed column evaluates its predicate on the
+    /// columns it names and pushes the result into the graph as a bitmask
+    /// (`CalculateFilterBitmask`): the answer is the nearest *admitted* row, not
+    /// the nearest row that then gets discarded.
+    #[test]
+    fn a_filtered_hnsw_query_answers_only_admitted_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fv (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO fv VALUES ");
+        for i in 0..200 {
+            sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 2));
+            if i < 199 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.execute("CREATE INDEX fv_i ON fv (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        e.flush().unwrap();
+
+        // 49 is the nearest row and is odd; only the even rows are admitted, so
+        // the answer is the nearest of those.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1) \
+                 WHERE tag = 0;"
+            ),
+            vec![vec!["48".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["49".to_string()]]
+        );
+        // More results than the graph would return unfiltered: every one of them
+        // still satisfies the predicate.
+        let got = rows(
+            &e,
+            "SELECT id, tag FROM fv SEARCH MATCH VECTOR (v, [49.0,0.0,0.0,0.0], 'float', 'l2', 5) \
+             WHERE tag = 0;",
+        );
+        assert_eq!(got.len(), 5);
+        assert!(got.iter().all(|r| r[1] == "0"), "{got:?}");
+    }
+
     /// C++ `test_lsg_build_ut.cpp::test1`: an LSG-built HNSW keeps >= 95%
     /// recall@1 for self-queries.
     #[test]
@@ -3586,7 +4014,7 @@ mod tests {
             .unwrap()
             .values()
             .flat_map(|t| t.hnsw_mem.values())
-            .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+            .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
             .sum();
         assert_eq!(
             indexed, 0,
@@ -4460,6 +4888,50 @@ mod tests {
         );
     }
 
+    /// A `MULTIVECTOR` column's HNSW graph is one vertex per token, and it stays
+    /// that way across the restart boundary. The query path materialises the
+    /// memory segment from the catalog before any write touches it
+    /// (`hnsw_mem_segments`), so whichever path creates the segment decides
+    /// whether multi-token cells are indexed at all
+    /// (`MemIndexInserterIter1<MultiVectorRef>`).
+    ///
+    /// The answers alone cannot prove the graph holds the tokens — the coverage
+    /// check folds unlabelled rows back in (`include_uncovered`) — so the token
+    /// accounting is pinned by `hnsw_mem::tests` instead.
+    #[test]
+    fn multivector_hnsw_indexes_every_token_after_a_restart() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE mvt (id INT, v MULTIVECTOR(FLOAT,2));")
+                .unwrap();
+            e.execute("INSERT INTO mvt VALUES (1, [[0.0,1.0],[1.0,0.0]]), (2, [[0.0,0.5]]);")
+                .unwrap();
+            e.execute("CREATE INDEX mvt_i ON mvt (v) USING HNSW WITH (metric='l2');")
+                .unwrap();
+            e.flush().unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        // The first query is what creates the reopened engine's memory segment.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.0,1.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["1".to_string()]]
+        );
+        // A cell with two tokens: the single-vector path would drop it whole.
+        e.execute("INSERT INTO mvt VALUES (3, [[0.3,0.7],[0.9,0.9]]);")
+            .unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mvt SEARCH MATCH VECTOR (v, [0.3,0.7], 'float', 'l2', 1);"
+            ),
+            vec![vec!["3".to_string()]]
+        );
+    }
+
     /// The sparse BMP index is built once, appended at write time, and dumped
     /// by `flush()`; queries read the chunk files instead of rebuilding.
     #[test]
@@ -4958,6 +5430,175 @@ mod tests {
                 "index returned the ghost row {id} for v = {value}"
             );
         }
+    }
+
+    /// `v = 3.0` is the same predicate as `v = 3` for an integer column, but the
+    /// index used to answer neither side of it: the float probe only reads float
+    /// keys (so every sealed chunk returned nothing) and the memory tail cannot
+    /// parse `"3.000000"` as an integer key either. The value is converted to the
+    /// column's key exactly; a value that is not integral declines, so the
+    /// predicate is evaluated against the decoded rows instead of a truncated
+    /// probe answering a different question.
+    #[test]
+    fn an_integral_float_equality_reads_the_integer_keys() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fq (id INT, v INT);").unwrap();
+        e.execute("INSERT INTO fq VALUES (1, 3), (2, 4);").unwrap();
+        e.execute("CREATE INDEX fqv ON fq (v);").unwrap();
+        // The memory tail answers first, then the sealed chunk.
+        let hits = e
+            .index_lookup("fq", "v", &Literal::Float(3.0))
+            .expect("an integral float is answerable");
+        assert_eq!(hits.len(), 1);
+        e.dump_index_transaction("fq", "fqv").unwrap();
+        let hits = e
+            .index_lookup("fq", "v", &Literal::Float(3.0))
+            .expect("an integral float is answerable from a chunk");
+        assert_eq!(hits.len(), 1);
+        assert!(e.index_lookup("fq", "v", &Literal::Float(3.5)).is_none());
+        assert_eq!(
+            rows(&e, "SELECT id FROM fq WHERE v = 3.0;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert!(rows(&e, "SELECT id FROM fq WHERE v = 3.5;").is_empty());
+    }
+
+    /// The memory tail's `FLOAT` keys are `f32` while a bound arrives as `f64`,
+    /// and the nearest `f32` can sit on the wrong side of the bound. The indexed
+    /// KNN path never re-checks the predicate (its rows are a vector projection),
+    /// so the narrowed interval has to be exact: a lower bound rounds up to the
+    /// first representable value inside it, an upper bound rounds down.
+    #[test]
+    fn a_float_tail_bound_never_widens_the_interval() {
+        use crate::RangeBound;
+        use storage::secondary_segment::{Key, KeyKind};
+        let low = 1.0f32;
+        let high = f32::from_bits(1.0f32.to_bits() + 1);
+        let gap = f64::from(high) - f64::from(low);
+        // 30% of the way up: the nearest `f32` is `low`, which is *below* the
+        // bound, so `>= bound` must start at `high`.
+        let lower = f64::from(low) + 0.3 * gap;
+        assert_eq!(
+            tail_bound(KeyKind::F32, Key::F64(lower), RangeBound::Lower),
+            Key::F32(high).ordered_bytes()
+        );
+        // 70% of the way up: the nearest `f32` is `high`, which is *above* the
+        // bound, so `<= bound` must stop at `low`.
+        let upper = f64::from(low) + 0.7 * gap;
+        assert_eq!(
+            tail_bound(KeyKind::F32, Key::F64(upper), RangeBound::Upper),
+            Key::F32(low).ordered_bytes()
+        );
+        // A bound the `f32` grid holds exactly is used as it is.
+        for side in [RangeBound::Lower, RangeBound::Upper] {
+            assert_eq!(
+                tail_bound(KeyKind::F32, Key::F64(1.0), side),
+                Key::F32(1.0).ordered_bytes()
+            );
+        }
+    }
+
+    /// Only a value whose key *is* the value itself may take the index
+    /// shortcut: the indexed KNN path treats a lookup's rows as the predicate's
+    /// final answer, so a rounded key (`TINYINT 300` → `44`, `FLOAT 1.00000003`
+    /// → `1.0`) has to decline instead of matching another value.
+    #[test]
+    fn a_lossy_key_value_is_not_exact() {
+        use crate::engine::index_build::key_is_exact;
+        let int = |i: i64| Value::Int(i);
+        let float = |f: f64| Value::Float(f);
+        assert!(key_is_exact("TINYINT", &int(127)));
+        assert!(!key_is_exact("TINYINT", &int(300)));
+        assert!(!key_is_exact("TINYINT", &int(-129)));
+        // `INTEGER` keys are `i32`; `BIGINT` keeps the raw `i64`.
+        assert!(!key_is_exact("INTEGER", &int(5_000_000_000)));
+        assert!(key_is_exact("BIGINT", &int(5_000_000_000)));
+        assert!(!key_is_exact("INTEGER", &float(3.5)));
+        assert!(key_is_exact("INTEGER", &float(3.0)));
+        // The key is lossless but the comparison is not: from 2^53 up the
+        // evaluator's `f64` comparison folds neighbours together
+        // (`2^53 = 2^53 + 1` admits both rows) while the index keeps one key
+        // each, so a bound that high declines.
+        assert!(key_is_exact("BIGINT", &int(9_007_199_254_740_991)));
+        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_992)));
+        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_993)));
+        // A floating-point key is lossy on both sides of the comparison: the
+        // chunk narrows to `f32` and the probe is built from six decimals, so
+        // no floating column takes the shortcut at all.
+        assert!(!key_is_exact("FLOAT", &float(1.0)));
+        assert!(!key_is_exact("FLOAT", &float(1.000_000_03)));
+        assert!(!key_is_exact("DOUBLE", &float(1.000_000_03)));
+        assert!(!key_is_exact("DOUBLE", &float(1.0)));
+        // A temporal key drops the fraction (`'12:34:56.1'` → `45296`) while the
+        // evaluator compares the text, so the bound and its neighbours share a
+        // key.
+        assert!(!key_is_exact("TIME", &Value::Str("12:34:56".into())));
+        assert!(!key_is_exact("TIME", &Value::Str("12:34:56.1".into())));
+        assert!(!key_is_exact("DATE", &Value::Str("2024-01-01".into())));
+        // A varchar key is a hash and a JSON one a term, not a document: neither
+        // is the predicate's answer. A `BOOL` key is `0`/`1` and the evaluator
+        // compares the text, so only the two lowercase spellings are exact.
+        assert!(!key_is_exact("VARCHAR", &Value::Str("a".into())));
+        assert!(!key_is_exact("JSON", &Value::Str("{\"a\":1}".into())));
+        assert!(key_is_exact("BOOL", &Value::Str("true".into())));
+        assert!(key_is_exact("BOOL", &Value::Str("false".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str("TRUE".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str("1".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str(" true".into())));
+    }
+
+    /// Both ends of a `FLOAT` range can fall between the same two `f32` values,
+    /// and the two narrowings then move in *opposite* directions: the inclusive
+    /// lower bound up, the inclusive upper bound down. The pair comes out
+    /// inverted, which is an empty range - asking the tail for it used to panic
+    /// inside `BTreeMap::range` (`start > end`).
+    #[test]
+    fn a_float_range_that_inverts_when_narrowed_is_empty() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE fr (f FLOAT, id INT);").unwrap();
+        e.execute("INSERT INTO fr VALUES (1.0, 1), (2.0, 2);")
+            .unwrap();
+        e.execute("CREATE INDEX frf ON fr (f);").unwrap();
+        // 30% of the way from `1.0` to the next `f32`: `>= v` narrows up to the
+        // next `f32`, `<= v` narrows down to `1.0`.
+        let low = 1.0f32;
+        let high = f32::from_bits(1.0f32.to_bits() + 1);
+        let v = f64::from(low) + 0.3 * (f64::from(high) - f64::from(low));
+        assert_eq!(
+            e.index_range_lookup("fr", "f", &[(Value::Float(v), Value::Float(v))]),
+            Some(Vec::new())
+        );
+    }
+
+    /// The key width decides which floats an integer column can answer. `v = 300`
+    /// on a `TINYINT` matches no key (the column holds -128..=127), and encoding
+    /// the truncated `44` would answer a *different* predicate, so both probes -
+    /// the sealed chunks and the memory tail - decline and the predicate is
+    /// evaluated against the decoded rows instead.
+    #[test]
+    fn an_out_of_range_float_equality_declines_on_a_narrow_key() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE nk (id INT, v TINYINT);").unwrap();
+        e.execute("INSERT INTO nk VALUES (1, 44), (2, 100);")
+            .unwrap();
+        e.execute("CREATE INDEX nkv ON nk (v);").unwrap();
+        assert_eq!(
+            e.index_lookup("nk", "v", &Literal::Float(100.0))
+                .expect("100 fits a tinyint")
+                .len(),
+            1
+        );
+        assert!(e.index_lookup("nk", "v", &Literal::Float(300.0)).is_none());
+        assert!(e.index_lookup("nk", "v", &Literal::Float(-129.0)).is_none());
+        // `300 as i8` is `44`, so a truncated probe would return this row.
+        assert!(rows(&e, "SELECT id FROM nk WHERE v = 300.0;").is_empty());
+        assert_eq!(
+            rows(&e, "SELECT id FROM nk WHERE v = 44.0;"),
+            vec![vec!["1".to_string()]]
+        );
     }
 
     /// `CREATE INDEX` reads the table without excluding writers (the reference
@@ -6079,6 +6720,50 @@ mod tests {
         );
     }
 
+    /// A filtered IVF query probes every segment's chunk.
+    ///
+    /// The mirror writes one chunk per segment and the offsets inside a chunk
+    /// are in-segment (`RowID(segment, offset)`). Reading only `seg_0`, or
+    /// resolving an offset without putting the segment in the high bits, left
+    /// every other segment's rows unfindable and made their offsets collide
+    /// with segment 0's; each segment here holds the same four vectors, so the
+    /// filtered top-3 is that segment's `c1 = 6` row three times over.
+    #[test]
+    fn ivf_filtered_probe_covers_every_segment() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ivm (c1 INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        // `COPY` seals the segment it filled, so three imports make three
+        // segments - each with its own IVF chunk.
+        let csv = dir.path().join("ivm.csv");
+        std::fs::write(
+            &csv,
+            "2,\"[0.1,0.2,0.3,-0.2]\"\n4,\"[0.2,0.1,0.3,0.4]\"\n\
+             6,\"[0.3,0.2,0.1,0.4]\"\n8,\"[0.4,0.3,0.2,0.1]\"\n",
+        )
+        .unwrap();
+        for _ in 0..3 {
+            e.execute(&format!(
+                "COPY ivm FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+        }
+        e.execute("CREATE INDEX ivm_idx ON ivm (v) USING IVF WITH (metric = ip);")
+            .unwrap();
+        e.flush().unwrap();
+        let chunks = e.load_ivf_indexes("ivm", "ivm_idx");
+        assert_eq!(chunks.len(), 3, "one chunk per segment");
+        assert_eq!(
+            chunks.iter().map(|c| c.segment).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        let q = "SELECT c1 FROM ivm SEARCH MATCH VECTOR \
+                 (v, [0.3,0.3,0.2,0.2], 'float', 'ip', 3) WITH (nprobe = 10) WHERE c1 < 7;";
+        assert_eq!(rows(&e, q), vec![vec!["6".to_string()]; 3]);
+    }
+
     /// `CREATE INDEX` materialises the index (C++ `IndexBuilder`); the first
     /// query must not be what builds it.
     #[test]
@@ -6106,7 +6791,7 @@ mod tests {
         let text = entry.text.get("body").unwrap().read().unwrap();
         assert_eq!(text.total_docs(), 3);
         drop(text);
-        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
+        let mem = entry.hnsw_mem.get("v").unwrap().read().unwrap();
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
@@ -6142,6 +6827,125 @@ mod tests {
         // crosses the quota, and the bytes above the quota stay accounted so
         // the third crosses again.
         assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
+    }
+
+    /// A buffer that cannot be sealed must still be bounded. An LSG index is
+    /// never dumped from the memory segment (its graph is linked with unadjusted
+    /// distances), so a crossing dump returns `Ok(0)` and released nothing: the
+    /// charge stays - the graph it accounts for is still held - and the graph is
+    /// released only once the retained charge passes twice the quota, which caps
+    /// what a write path can pin. Releasing is genuine: memory goes down and the
+    /// rows no chunk holds are answered by the exact scan.
+    #[test]
+    fn an_unsealable_memindex_keeps_its_charge_and_is_bounded() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1024);
+        e.execute("CREATE TABLE lg (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let row = "(2,[0.1,0.2,0.3,-0.2])";
+        e.execute(&format!(
+            "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
+        ))
+        .unwrap();
+        e.execute(
+            "CREATE INDEX lgx ON lg (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
+             metric = l2, build_type = lsg);",
+        )
+        .unwrap();
+        // Six batches of six rows: 1008 bytes each, so the charge crosses the
+        // quota twice over and the fallback has to fire.
+        for _ in 0..6 {
+            e.execute(&format!(
+                "INSERT INTO lg VALUES {row},{row},{row},{row},{row},{row};"
+            ))
+            .unwrap();
+        }
+        let charge = |e: &Engine| -> usize {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get("default_db.lg")
+                .and_then(|entry| entry.index_pending_bytes.get("c2").copied())
+                .unwrap_or(0)
+        };
+        // Six batches of 1008 bytes against a 1 KB quota: the charge crosses,
+        // the dump seals nothing, and the third crossing (3024 bytes, past twice
+        // the quota) releases the graph, so nothing accumulates.
+        assert_eq!(charge(&e), 0, "the unsealable buffer was not released");
+        // The write path re-creates the segment for the rows it takes after a
+        // drop, so drive the accounting directly to observe the release.
+        for _ in 0..2 {
+            e.note_index_insert("default_db.lg", 6);
+        }
+        // Two batches of 1008 bytes: the charge stays at 2016 rather than
+        // dropping to `2016 - quota`, because a dump that sealed nothing
+        // released nothing.
+        assert_eq!(
+            charge(&e),
+            2016,
+            "a crossing that sealed nothing keeps its charge"
+        );
+        e.note_index_insert("default_db.lg", 6);
+        let graph_held = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get("default_db.lg")
+                .is_some_and(|entry| entry.hnsw_mem.contains_key("c2"))
+        };
+        assert_eq!(charge(&e), 0, "the released graph's charge is gone");
+        assert!(
+            !graph_held,
+            "a buffer nothing can seal has to be released, not pinned"
+        );
+        // The rows are still answerable: the exact scan covers what no chunk
+        // holds.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM lg;"),
+            vec![vec!["42".to_string()]]
+        );
+        let hits = rows(
+            &e,
+            "SELECT c1 FROM lg SEARCH MATCH VECTOR \
+             (c2, [0.1,0.2,0.3,-0.2], 'float', 'l2', 3);",
+        );
+        assert_eq!(hits.len(), 3, "{hits:?}");
+    }
+
+    /// A deleted row still occupies graph slots until a chunk rewrite drops it,
+    /// so a probe that admits deleted labels answers short - or nothing at all
+    /// when the nearest vertices are all gone. Liveness is part of admission,
+    /// and a probe that still cannot fill `topn` falls back to the exact scan.
+    #[test]
+    fn a_knn_probe_skips_deleted_vertices_and_still_answers() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE kd (c1 INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        let mut values = String::new();
+        for i in 0..200 {
+            if i > 0 {
+                values.push(',');
+            }
+            values.push_str(&format!("({i},[{},0.0])", i as f32 / 100.0));
+        }
+        e.execute(&format!("INSERT INTO kd VALUES {values};"))
+            .unwrap();
+        e.execute(
+            "CREATE INDEX kdx ON kd (v) USING HNSW WITH (M = 16, ef_construction = 40, \
+             metric = l2);",
+        )
+        .unwrap();
+        // The 70 rows nearest the query are deleted: more than the probe's
+        // candidate budget, so admitting them leaves nothing to score.
+        e.execute("DELETE FROM kd WHERE c1 < 70;").unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT c1 FROM kd SEARCH MATCH VECTOR \
+                 (v, [0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["70".to_string()]]
+        );
     }
 
     /// A write that reaches the engine through the Thrift/import primitives
@@ -6197,8 +7001,12 @@ mod tests {
         e.flush().unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
-            matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
-            "expected one PQ segment"
+            matches!(
+                segments.as_slice(),
+                [chunk] if chunk.segment == 0
+                    && matches!(chunk.index, index::ivf::IvfSegment::Product(_))
+            ),
+            "expected one PQ segment in segment 0"
         );
         let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
                  (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
@@ -6229,8 +7037,12 @@ mod tests {
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
-            matches!(segments.as_slice(), [index::ivf::IvfSegment::Scalar(_)]),
-            "expected one SQ segment"
+            matches!(
+                segments.as_slice(),
+                [chunk] if chunk.segment == 0
+                    && matches!(chunk.index, index::ivf::IvfSegment::Scalar(_))
+            ),
+            "expected one SQ segment in segment 0"
         );
         // Candidates come from the quantized codes; the executor then scores
         // them exactly, so the top-1 is the same as an exhaustive scan.
@@ -7903,7 +8715,7 @@ mod tests {
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 10);
@@ -7913,7 +8725,7 @@ mod tests {
             e.tables.lock().unwrap().values().all(|t| t
                 .hnsw_mem
                 .values()
-                .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
+                .all(|m| m.read().map(|m| m.is_empty()).unwrap_or(true))),
             "the dump empties the HNSW memory segment"
         );
 
@@ -7964,7 +8776,7 @@ mod tests {
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");

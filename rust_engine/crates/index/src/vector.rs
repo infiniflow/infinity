@@ -16,6 +16,8 @@ use std::path::Path;
 
 use common::{Error, Result};
 
+use crate::graph::{GraphStore, Neighbors};
+
 /// One `(distance, vertex)` entry. The total order is the reference's
 /// `CompareMax`: farther is "greater"; ties break on the **larger** vertex id
 /// (`(a > b) || (a == b && i > j)`), so a heap built on it keeps the worst
@@ -269,10 +271,14 @@ impl SearchScratch {
 }
 
 thread_local! {
-    /// One scratch buffer per thread. `HnswIndex::search_layer_filtered`
-    /// takes `&self` (the reference's `SearchLayer` is `const` too)
-    /// and searches never nest, so a thread-local keeps the O(n) buffer out of
-    /// the per-insert cost without changing that signature.
+    /// One scratch buffer per thread. `HnswIndex::search_layer_filtered` and
+    /// `HnswIndex::search_labeled` take `&self` (the reference's `SearchLayer`
+    /// is `const` too) and searches never nest, so a thread-local keeps the
+    /// O(n) buffer out of the per-call cost without changing that signature.
+    ///
+    /// Both traversals are hot per call, not per build: the first runs once per
+    /// vertex per layer while building, the second once per query token in
+    /// `search_multivector`.
     static SCRATCH: std::cell::RefCell<SearchScratch> =
         const { std::cell::RefCell::new(SearchScratch::new()) };
 }
@@ -287,6 +293,52 @@ thread_local! {
 pub struct PlainVecs {
     dims: usize,
     data: Vec<f32>,
+    /// Set when the floats are a sealed chunk's vector region, which is mapped
+    /// rather than copied: `data` then stays empty and reads come straight out
+    /// of the page cache.
+    mapped: Option<MappedVecs>,
+}
+
+/// A chunk's vector region, held by the mapping.
+///
+/// C++ `PlainVecStoreInner` points into the buffer manager's chunk; a loaded
+/// chunk here reinterprets the mapped bytes in place, so `mem_usage()` is the
+/// page cache's business, not the heap's.
+#[derive(Clone)]
+struct MappedVecs {
+    src: ByteSource,
+    /// Byte offset of vertex 0 inside `src`.
+    off: usize,
+    /// Vertices the region holds.
+    n: usize,
+}
+
+impl std::fmt::Debug for MappedVecs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MappedVecs")
+            .field("off", &self.off)
+            .field("n", &self.n)
+            .finish()
+    }
+}
+
+/// The bytes a loaded index reads through: a sealed file mapped read-only.
+pub type ByteSource = std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>;
+
+/// Reinterprets `bytes` as `f32`s, or `None` when the region cannot be read as
+/// `f32`s (a mapping's base is page aligned and every vector starts on a
+/// `dims * 4` boundary, so this only guards a malformed header).
+#[allow(unsafe_code)]
+fn floats_at(bytes: &[u8]) -> Option<&[f32]> {
+    if !bytes.len().is_multiple_of(4) {
+        return None;
+    }
+    // SAFETY: `f32` has the alignment of a four-byte word and every bit pattern
+    // is a valid `f32`; `bytes` is a multiple of four long, and `PlainVecs::mapped`
+    // rejected an unaligned base or offset before storing the region. The result
+    // borrows the mapping, which outlives every index that reads through it.
+    let (head, mid, tail) = unsafe { bytes.align_to::<f32>() };
+    (head.is_empty() && tail.is_empty()).then_some(mid)
 }
 
 impl PlainVecs {
@@ -294,6 +346,7 @@ impl PlainVecs {
         Self {
             dims,
             data: Vec::new(),
+            mapped: None,
         }
     }
 
@@ -302,10 +355,37 @@ impl PlainVecs {
         for row in rows {
             data.extend_from_slice(&row);
         }
-        Self { dims, data }
+        Self {
+            dims,
+            data,
+            mapped: None,
+        }
+    }
+
+    /// Borrows `n` `dims`-sized vectors that live at byte `off` of `src`.
+    ///
+    /// Returns `None` when the region does not fit or its address cannot be read
+    /// as `f32`, so the caller can fall back to a copy.
+    pub fn mapped(dims: usize, src: ByteSource, off: usize, n: usize) -> Option<Self> {
+        if dims == 0 || n == 0 {
+            return None;
+        }
+        let base = src.as_ref().as_ref();
+        let need = off.checked_add(n.checked_mul(dims)?.checked_mul(4)?)?;
+        if need > base.len() || off % 4 != 0 || (base.as_ptr() as usize) % 4 != 0 {
+            return None;
+        }
+        Some(Self {
+            dims,
+            data: Vec::new(),
+            mapped: Some(MappedVecs { src, off, n }),
+        })
     }
 
     fn len(&self) -> usize {
+        if let Some(m) = &self.mapped {
+            return m.n;
+        }
         if self.dims == 0 {
             0
         } else {
@@ -315,11 +395,49 @@ impl PlainVecs {
 
     fn push(&mut self, v: &[f32]) {
         debug_assert_eq!(v.len(), self.dims);
+        assert!(
+            self.mapped.is_none(),
+            "a mapped vector region is read-only; build into an owned store"
+        );
         self.data.extend_from_slice(v);
+    }
+
+    /// The vector region as the chunk layout holds it: `dims` little-endian
+    /// `f32`s per vertex, contiguous.
+    ///
+    /// A mapped region is copied straight out of the mapping it borrows: its
+    /// `data` is empty by construction, so serializing only the owned buffer
+    /// would write a zero-length region for a loaded chunk.
+    fn records_bytes(&self) -> Vec<u8> {
+        if let Some(m) = &self.mapped {
+            let start = m.off;
+            let len = m.n.saturating_mul(self.dims).saturating_mul(4);
+            if let Some(slice) = start
+                .checked_add(len)
+                .and_then(|end| m.src.as_ref().as_ref().get(start..end))
+            {
+                return slice.to_vec();
+            }
+        }
+        let mut out = Vec::with_capacity(self.data.len() * 4);
+        for x in &self.data {
+            out.extend_from_slice(&x.to_le_bytes());
+        }
+        out
     }
 
     /// `GetVec`: the `dims` floats of vertex `i`, or `None` past the end.
     fn get(&self, i: usize) -> Option<&[f32]> {
+        if let Some(m) = &self.mapped {
+            if i >= m.n {
+                return None;
+            }
+            let start = m
+                .off
+                .checked_add(i.checked_mul(self.dims)?.checked_mul(4)?)?;
+            let bytes = m.src.as_ref().as_ref().get(start..start + self.dims * 4)?;
+            return floats_at(bytes);
+        }
         let start = i.checked_mul(self.dims)?;
         self.data.get(start..start + self.dims)
     }
@@ -404,6 +522,22 @@ impl Store {
             }
             Store::SparseIp { .. } => panic!("dense insert into a sparse store"),
         }
+    }
+
+    /// A plain store over a **mapped** chunk region: the reference's
+    /// `PlainVecStoreInner` pointing into the buffer manager's chunk, so a
+    /// loaded segment costs no vector heap at all.
+    pub fn plain_mapped(
+        dims: usize,
+        metric: Metric,
+        src: ByteSource,
+        off: usize,
+        n: usize,
+    ) -> Option<Self> {
+        Some(Store::Plain {
+            metric,
+            data: PlainVecs::mapped(dims, src, off, n)?,
+        })
     }
 
     /// Appends one sparse document. `C++: SparseVecStoreInner::AddVector`.
@@ -578,9 +712,10 @@ pub struct HnswIndex {
     store: Store,
     /// Per-row LSG scaling factors, when the index was built with `build_type=lsg`.
     lsg: Option<crate::lsg::LsgIndex>,
-    levels: Vec<usize>,
-    /// `links[layer][node]` = neighbor node ids.
-    links: Vec<Vec<Vec<usize>>>,
+    /// Neighbour lists in the reference's compact layout: `u32` ids, a fixed
+    /// `2M`-slot slab for layer 0 and one block per vertex only on the layers
+    /// the vertex reaches (`crate::graph`).
+    graph: GraphStore,
     entry: Option<usize>,
     max_level: usize,
     rng: Rng,
@@ -644,8 +779,7 @@ impl HnswIndex {
             ml: 1.0 / (m as f64).ln(),
             store,
             lsg: None,
-            levels: Vec::new(),
-            links: Vec::new(),
+            graph: GraphStore::new(m),
             entry: None,
             max_level: 0,
             rng: Rng::new(0x9E37_79B9_7F4A_7C15),
@@ -688,6 +822,11 @@ impl HnswIndex {
         self.dims
     }
 
+    /// `IndexHnsw::ef_search_`: the default candidate list size.
+    pub fn ef_search(&self) -> usize {
+        self.ef_search
+    }
+
     /// Neighbour limit for layers ≥ 1 (`M`).
     pub fn m(&self) -> usize {
         self.m
@@ -695,16 +834,12 @@ impl HnswIndex {
 
     /// How many layers above level 0 `node` appears in.
     pub fn level_of(&self, node: usize) -> usize {
-        self.levels.get(node).copied().unwrap_or(0)
+        self.graph.level_of(node)
     }
 
     /// Neighbours of `node` on `layer` (empty when absent).
-    pub fn neighbors(&self, layer: usize, node: usize) -> &[usize] {
-        self.links
-            .get(layer)
-            .and_then(|l| l.get(node))
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+    pub fn neighbors(&self, layer: usize, node: usize) -> Neighbors<'_> {
+        self.graph.neighbors(layer, node)
     }
 
     /// The stored (decompressed) vector of `node`.
@@ -729,10 +864,12 @@ impl HnswIndex {
                 return Err(Error::Invalid(format!("entry {entry} outside 0..{n}")));
             }
         }
-        for (layer, nodes) in self.links.iter().enumerate() {
-            for (node, neighbors) in nodes.iter().enumerate() {
+        for node in 0..n {
+            for layer in 0..=self.level_of(node) {
+                let neighbors = self.graph.neighbors(layer, node);
                 let mut seen = HashSet::with_capacity(neighbors.len());
-                for &neighbor in neighbors {
+                for neighbor in neighbors.iter() {
+                    let neighbor = neighbor as usize;
                     if neighbor >= n {
                         return Err(Error::Invalid(format!(
                             "layer {layer} node {node} links to {neighbor} outside 0..{n}"
@@ -758,7 +895,7 @@ impl HnswIndex {
     pub fn dump(&self, out: &mut impl Write) -> std::io::Result<()> {
         for node in 0..self.store.len() {
             write!(out, "{node} {}", self.level_of(node))?;
-            for &neighbor in self.neighbors(0, node) {
+            for neighbor in self.neighbors(0, node).iter() {
                 write!(out, " {neighbor}")?;
             }
             writeln!(out)?;
@@ -796,13 +933,19 @@ impl HnswIndex {
             put_u64(&mut out, self.level_of(node) as u64);
         }
         put_u64(&mut out, self.entry.map_or(u64::MAX, |entry| entry as u64));
-        put_u64(&mut out, self.links.len() as u64);
-        for layer in &self.links {
-            put_u64(&mut out, layer.len() as u64);
-            for neighbors in layer {
+        let layers = (0..data.len())
+            .map(|node| self.level_of(node))
+            .max()
+            .unwrap_or(0)
+            + 1;
+        put_u64(&mut out, layers as u64);
+        for layer in 0..layers {
+            put_u64(&mut out, data.len() as u64);
+            for node in 0..data.len() {
+                let neighbors = self.neighbors(layer, node);
                 put_u64(&mut out, neighbors.len() as u64);
-                for &neighbor in neighbors {
-                    out.extend_from_slice(&(neighbor as u32).to_le_bytes());
+                for neighbor in neighbors.iter() {
+                    out.extend_from_slice(&neighbor.to_le_bytes());
                 }
             }
         }
@@ -852,8 +995,7 @@ impl HnswIndex {
                 let len = reader.u64()? as usize;
                 let mut neighbors = Vec::with_capacity(len);
                 for _ in 0..len {
-                    neighbors
-                        .push(u32::from_le_bytes(reader.take(4)?.try_into().unwrap()) as usize);
+                    neighbors.push(u32::from_le_bytes(reader.take(4)?.try_into().unwrap()));
                 }
                 layer.push(neighbors);
             }
@@ -910,7 +1052,7 @@ impl HnswIndex {
         ef_search: usize,
         data: Vec<Vec<f32>>,
         levels: Vec<usize>,
-        links: Vec<Vec<Vec<usize>>>,
+        links: Vec<Vec<Vec<u32>>>,
         entry: Option<usize>,
         max_level: usize,
     ) -> Self {
@@ -939,20 +1081,12 @@ impl HnswIndex {
         store: Store,
         lsg: Option<crate::lsg::LsgIndex>,
         levels: Vec<usize>,
-        mut links: Vec<Vec<Vec<usize>>>,
+        links: Vec<Vec<Vec<u32>>>,
         entry: Option<usize>,
         max_level: usize,
     ) -> Self {
-        for (node, level) in levels.iter().enumerate() {
-            for layer in 0..=*level {
-                while links.len() <= layer {
-                    links.push(Vec::new());
-                }
-                while links[layer].len() <= node {
-                    links[layer].push(Vec::new());
-                }
-            }
-        }
+        let levels32: Vec<u32> = levels.iter().map(|&level| level as u32).collect();
+        let graph = GraphStore::from_layers(m, &levels32, &links);
         Self {
             dims,
             m,
@@ -961,8 +1095,7 @@ impl HnswIndex {
             ml: 1.0 / (m as f64).ln(),
             store,
             lsg,
-            levels,
-            links,
+            graph,
             entry,
             max_level,
             rng: Rng::new(0x9E37_79B9_7F4A_7C15),
@@ -1029,12 +1162,9 @@ impl HnswIndex {
             Store::Plain { data, .. } => {
                 // The buffer is already `dims` little-endian `f32`s per vertex,
                 // so the chunk's vector region is its bytes verbatim (C++
-                // `PlainVecStoreInner::Save` is one `Append` of the same span).
-                let mut out = Vec::with_capacity(data.data.len() * 4);
-                for x in &data.data {
-                    out.extend_from_slice(&x.to_le_bytes());
-                }
-                out
+                // `PlainVecStoreInner::Save` is one `Append` of the same span) -
+                // owned or mapped, which is why `PlainVecs` owns the encoding.
+                data.records_bytes()
             }
             Store::Lvq(store) => store.records_bytes(),
             Store::Rabitq(store) => store.records_bytes(),
@@ -1072,19 +1202,8 @@ impl HnswIndex {
         let store_meta = self.store_meta_bytes().len();
         let vectors = self.store_record_size() * self.len();
         let labels = self.len() * std::mem::size_of::<u64>();
-        let levels = self.levels.len() * std::mem::size_of::<usize>();
-        let graph: usize = self
-            .links
-            .iter()
-            .map(|layer| {
-                layer
-                    .iter()
-                    .map(|neighbors| {
-                        std::mem::size_of::<u32>() + neighbors.len() * std::mem::size_of::<u32>()
-                    })
-                    .sum::<usize>()
-            })
-            .sum();
+        let levels = self.len() * std::mem::size_of::<u32>();
+        let graph = self.graph.serialized_size();
         header + store_meta + vectors + labels + levels + graph
     }
 
@@ -1100,11 +1219,133 @@ impl HnswIndex {
         records: &[u8],
         n: usize,
         levels: Vec<usize>,
-        links: Vec<Vec<Vec<usize>>>,
+        links: Vec<Vec<Vec<u32>>>,
+        entry: Option<usize>,
+        max_level: usize,
+    ) -> Option<Self> {
+        let store = Self::store_from_chunk_parts(dims, metric, encoding, meta, records, n)?;
+        Some(Self::from_store_parts(
+            dims, m, ef_search, store, None, levels, links, entry, max_level,
+        ))
+    }
+
+    /// Rebuilds an index from the chunk's meta/records and its raw
+    /// `GraphStoreInner` region, filling the compact graph directly.
+    ///
+    /// This is the path a sealed chunk takes: the neighbour lists go from the
+    /// chunk bytes into the flat slabs without a `Vec<Vec<Vec<_>>>` in between.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_chunk_region(
+        dims: usize,
+        m: usize,
+        ef_search: usize,
+        metric: Metric,
+        encoding: HnswEncoding,
+        meta: &[u8],
+        records: &[u8],
+        n: usize,
+        graph_region: &[u8],
+        entry: Option<usize>,
+        max_level: usize,
+    ) -> Option<Self> {
+        let store = Self::store_from_chunk_parts(dims, metric, encoding, meta, records, n)?;
+        let graph = GraphStore::from_cpp_region(graph_region, n, m * 2, m).ok()?;
+        Some(Self {
+            dims,
+            m,
+            ef_construction: m * 2,
+            ef_search,
+            ml: 1.0 / (m as f64).ln(),
+            store,
+            lsg: None,
+            graph,
+            entry,
+            max_level,
+            rng: Rng::new(0x9E37_79B9_7F4A_7C15),
+        })
+    }
+
+    /// Rebuilds an index from a **mapped** chunk, borrowing its vector region.
+    ///
+    /// A sealed chunk is immutable, so its payload does not have to enter the
+    /// heap: the plain store reads `n * dims` floats straight out of `src` at
+    /// `vector_off`, and only the graph (which the builder mutates in place) is
+    /// decoded into owned slabs.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_chunk_region_mapped(
+        dims: usize,
+        m: usize,
+        ef_search: usize,
+        metric: Metric,
+        encoding: HnswEncoding,
+        meta: &[u8],
+        src: ByteSource,
+        vector_off: usize,
+        record_size: usize,
+        n: usize,
+        graph_off: usize,
         entry: Option<usize>,
         max_level: usize,
     ) -> Option<Self> {
         let store = match encoding {
+            HnswEncoding::Plain => Store::plain_mapped(dims, metric, src.clone(), vector_off, n)?,
+            _ => {
+                // A quantized region is a fraction of the plain payload and its
+                // decode is how it is read, so it keeps the copy.
+                let base = src.as_ref().as_ref();
+                let end = vector_off.checked_add(record_size.checked_mul(n)?)?;
+                let records = base.get(vector_off..end)?;
+                Self::store_from_chunk_parts(dims, metric, encoding, meta, records, n)?
+            }
+        };
+        let graph = GraphStore::from_cpp_region_mapped(src, graph_off, n, m).ok()?;
+        Some(Self {
+            dims,
+            m,
+            ef_construction: m * 2,
+            ef_search,
+            ml: 1.0 / (m as f64).ln(),
+            store,
+            lsg: None,
+            graph,
+            entry,
+            max_level,
+            rng: Rng::new(0x9E37_79B9_7F4A_7C15),
+        })
+    }
+
+    /// Whether the neighbour lists are read out of the mapping rather than heap
+    /// slabs.
+    pub fn neighbors_are_mapped(&self) -> bool {
+        self.graph.is_mapped()
+    }
+
+    /// Total bytes of vector payload the store keeps **in the heap**; a mapped
+    /// region contributes nothing, which is what makes a loaded chunk's
+    /// footprint the graph's.
+    pub fn store_mem_bytes(&self) -> usize {
+        self.store.mem_bytes()
+    }
+
+    /// Whether the vector payload is read out of a mapping rather than the heap.
+    pub fn vectors_are_mapped(&self) -> bool {
+        matches!(&self.store, Store::Plain { data, .. } if data.mapped.is_some())
+    }
+
+    /// Encodes the neighbour lists as the chunk's `GraphStoreInner` region.
+    pub fn encode_graph_region(&self) -> Vec<u8> {
+        self.graph.to_cpp_region()
+    }
+
+    fn store_from_chunk_parts(
+        dims: usize,
+        metric: Metric,
+        encoding: HnswEncoding,
+        meta: &[u8],
+        records: &[u8],
+        n: usize,
+    ) -> Option<Store> {
+        Some(match encoding {
             HnswEncoding::Plain => {
                 if records.len() < n * dims * 4 {
                     return None;
@@ -1115,7 +1356,11 @@ impl HnswIndex {
                 }
                 Store::Plain {
                     metric,
-                    data: PlainVecs { dims, data: flat },
+                    data: PlainVecs {
+                        dims,
+                        data: flat,
+                        mapped: None,
+                    },
                 }
             }
             HnswEncoding::Lvq => {
@@ -1145,30 +1390,12 @@ impl HnswIndex {
                     n,
                 )?)
             }
-        };
-        Some(Self::from_store_parts(
-            dims, m, ef_search, store, None, levels, links, entry, max_level,
-        ))
+        })
     }
 
     fn random_level(&mut self) -> usize {
         let u = self.rng.unit().max(1e-12);
         (-u.ln() * self.ml) as usize
-    }
-
-    fn ensure(&mut self, layer: usize, node: usize) {
-        while self.links.len() <= layer {
-            self.links.push(Vec::new());
-        }
-        // The reference stores each vertex's links in one fixed-stride slab
-        // (`GraphStoreMeta::level0_size_ = 8 + 4 * Mmax0`), so a vertex never
-        // reallocates as it fills. Reserving the same capacity up front keeps
-        // one allocation per vertex instead of a doubling chain per vertex —
-        // the bottom layer is where every insert does up to `2M` reverse links.
-        let cap = if layer == 0 { self.m * 2 } else { self.m };
-        while self.links[layer].len() <= node {
-            self.links[layer].push(Vec::with_capacity(cap));
-        }
     }
 
     /// `SelectNeighborsHeuristic`: candidates closer than an already-kept
@@ -1203,24 +1430,27 @@ impl HnswIndex {
     }
 
     fn connect_neighbors(&mut self, target: usize, node: usize, layer: usize) {
-        self.ensure(layer, target);
-        let max_m = if layer == 0 { self.m * 2 } else { self.m };
-        if self.links[layer][target].len() < max_m {
-            self.links[layer][target].push(node);
+        // A vertex only owns slots on the layers it reaches; the reference's
+        // `GetNeighborsMut` would trip its own assert here.
+        if layer > self.graph.level_of(target) {
             return;
         }
-        let mut cands: Vec<(f32, usize)> = Vec::with_capacity(self.links[layer][target].len() + 1);
+        let max_m = self.graph.max_degree(layer);
+        if self.graph.push_neighbor(layer, target, node as u32) {
+            return;
+        }
+        let existing = self.graph.neighbors(layer, target).to_vec();
+        let mut cands: Vec<(f32, usize)> = Vec::with_capacity(existing.len() + 1);
         cands.push((self.distance_nodes(target, node), node));
-        for &nb in &self.links[layer][target] {
+        for nb in existing {
+            let nb = nb as usize;
             cands.push((self.distance_nodes(target, nb), nb));
         }
         let kept = self.select_neighbors_heuristic(&cands, max_m);
-        // Rewrite in place: `ensure` reserved `2M`/`M` slots, so replacing the
-        // vector (as the reference's in-slab write does not) would throw that
-        // capacity away and reallocate on the next prune.
-        let list = &mut self.links[layer][target];
-        list.clear();
-        list.extend(kept.into_iter().map(|(_, n)| n));
+        let list: Vec<u32> = kept.into_iter().map(|(_, n)| n as u32).collect();
+        // Rewrite in place: the slab keeps a fixed `2M`/`M` slots per vertex, so
+        // a pruned list never reallocates.
+        self.graph.set_neighbors(layer, target, &list);
     }
 
     /// `Build`: insert one vector into the graph.
@@ -1266,32 +1496,24 @@ impl HnswIndex {
         }
 
         // 1. Levels, in insertion order, from the same generator add() uses.
-        let mut levels = std::mem::take(&mut self.levels);
-        levels.reserve(vectors.len());
+        let mut new_levels = Vec::with_capacity(vectors.len());
         let mut max_level = self.max_level;
         for _ in 0..vectors.len() {
             let level = self.random_level();
-            levels.push(level);
+            new_levels.push(level as u32);
             if level > max_level {
                 max_level = level;
             }
         }
 
-        // 2. A locked graph covering the whole batch.
-        let mut links: Vec<Vec<std::sync::RwLock<Vec<usize>>>> = std::mem::take(&mut self.links)
-            .into_iter()
-            .map(|layer| layer.into_iter().map(std::sync::RwLock::new).collect())
-            .collect();
-        while links.len() <= max_level {
-            links.push(Vec::new());
-        }
-        let n = levels.len();
-        for (layer, slots) in links.iter_mut().enumerate() {
-            let cap = if layer == 0 { self.m * 2 } else { self.m };
-            if slots.len() < n {
-                slots.resize_with(n, || std::sync::RwLock::new(Vec::with_capacity(cap)));
-            }
-        }
+        // 2. The graph gains every slot the batch needs before a thread starts
+        //    writing: layer-0 slabs for all vertices and upper-layer blocks only
+        //    for the vertices that reach them. The builder then only fills them,
+        //    so no thread ever grows (or reallocates) the store.
+        self.graph.push_levels(&new_levels);
+        let n = self.graph.len();
+        let locks: Vec<std::sync::RwLock<()>> =
+            (0..n).map(|_| std::sync::RwLock::new(())).collect();
 
         // 3. The entry point is the vertex with the highest level, which is
         //    what `TryUpdateEnterPoint` maintains. It is built first, with the
@@ -1304,8 +1526,9 @@ impl HnswIndex {
         let existing_entry = self.entry;
         let from = existing_entry.unwrap_or(base);
         let mut top = from;
-        let mut top_level = levels.get(from).copied().unwrap_or(0);
-        for (node, &level) in levels.iter().enumerate().take(n).skip(base) {
+        let mut top_level = self.graph.level_of(from);
+        for node in base..n {
+            let level = self.graph.level_of(node);
             if level > top_level {
                 top = node;
                 top_level = level;
@@ -1323,8 +1546,8 @@ impl HnswIndex {
                 self.lsg.as_ref(),
                 self.m,
                 self.ef_construction,
-                &levels,
-                &links,
+                &self.graph,
+                &locks,
                 from,
                 top_level,
             );
@@ -1337,8 +1560,8 @@ impl HnswIndex {
             self.lsg.as_ref(),
             self.m,
             self.ef_construction,
-            &levels,
-            &links,
+            &self.graph,
+            &locks,
             entry,
             top_level,
         );
@@ -1347,16 +1570,6 @@ impl HnswIndex {
                 crate::parallel_build::build_parallel_range(&builder, lo, hi, threads);
             }
         }
-        self.links = links
-            .into_iter()
-            .map(|layer| {
-                layer
-                    .into_iter()
-                    .map(|cell| cell.into_inner().unwrap_or_else(|e| e.into_inner()))
-                    .collect()
-            })
-            .collect();
-        self.levels = levels;
         self.max_level = max_level;
         vectors.len()
     }
@@ -1376,18 +1589,17 @@ impl HnswIndex {
     }
 
     fn insert_node(&mut self, query: HnswQuery, push: impl FnOnce(&mut Store)) -> usize {
-        let node = self.store.len();
         push(&mut self.store);
         let q_layer = self.random_level();
+        // The vertex's layer slots exist before any traversal touches it: the
+        // compact store fixes a vertex's layers when it is appended, so the
+        // search below can already visit `node`.
+        let node = self.graph.push_level(q_layer);
 
         let (max_layer, mut ep) = match self.entry {
             None => {
-                self.levels.push(q_layer);
                 self.entry = Some(node);
                 self.max_level = q_layer;
-                for l in 0..=q_layer {
-                    self.ensure(l, node);
-                }
                 return node;
             }
             Some(old_ep) => {
@@ -1401,11 +1613,6 @@ impl HnswIndex {
                 }
             }
         };
-
-        self.levels.push(q_layer);
-        for l in 0..=q_layer {
-            self.ensure(l, node);
-        }
 
         let mut cur = max_layer as i64;
         while cur > q_layer as i64 {
@@ -1421,7 +1628,8 @@ impl HnswIndex {
                 continue;
             }
             ep = neighbors[0].1;
-            self.links[l as usize][node] = neighbors.iter().map(|(_, n)| *n).collect();
+            let list: Vec<u32> = neighbors.iter().map(|(_, n)| *n as u32).collect();
+            self.graph.set_neighbors(l as usize, node, &list);
             for (_, nb) in &neighbors {
                 self.connect_neighbors(*nb, node, l as usize);
             }
@@ -1441,14 +1649,14 @@ impl HnswIndex {
         let mut cur_d = self.distance_query(q, self_id, cur);
         loop {
             let mut changed = false;
-            if let Some(list) = self.links.get(layer).and_then(|l| l.get(cur)) {
-                for &nb in list.iter().rev() {
-                    let d = self.distance_query(q, self_id, nb);
-                    if d < cur_d {
-                        cur = nb;
-                        cur_d = d;
-                        changed = true;
-                    }
+            let list = self.graph.neighbors(layer, cur);
+            for index in (0..list.len()).rev() {
+                let nb = list.get(index).unwrap() as usize;
+                let d = self.distance_query(q, self_id, nb);
+                if d < cur_d {
+                    cur = nb;
+                    cur_d = d;
+                    changed = true;
                 }
             }
             if !changed {
@@ -1546,10 +1754,9 @@ impl HnswIndex {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            let Some(list) = self.links.get(layer).and_then(|l| l.get(c)) else {
-                continue;
-            };
-            for &nb in list {
+            let list = self.graph.neighbors(layer, c);
+            for index in 0..list.len() {
+                let nb = list.get(index).unwrap() as usize;
                 if nb >= nodes || !visited.visit(nb) {
                     continue;
                 }
@@ -1579,17 +1786,7 @@ impl HnswIndex {
 
     /// Approximate heap bytes held by the graph, for the memindex budget.
     pub fn mem_usage(&self) -> usize {
-        let data = self.store.mem_bytes();
-        let levels = self.levels.capacity() * std::mem::size_of::<usize>();
-        let links: usize = self
-            .links
-            .iter()
-            .map(|layer| {
-                layer.capacity() * std::mem::size_of::<Vec<usize>>()
-                    + layer.iter().map(|l| l.capacity() * 8).sum::<usize>()
-            })
-            .sum();
-        data + levels + links
+        self.store.mem_bytes() + self.graph.mem_bytes()
     }
 
     /// Returns `(node, distance)` for the `k` approximate nearest, ascending.
@@ -1623,6 +1820,13 @@ impl HnswIndex {
         res
     }
 
+    /// The beam, bounded by the vertex count: `WITH (ef = 100000000)` on a small
+    /// graph must not allocate a hundred million candidate slots, and a beam
+    /// larger than the graph cannot find anything more anyway.
+    fn beam(&self, ef: usize) -> usize {
+        ef.max(1).min(self.store.len().max(1))
+    }
+
     fn search_query_candidates(&self, query: HnswQuery, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
@@ -1633,7 +1837,7 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let mut res = self.search_layer(&query, cur, ef.max(1), 0, None);
+        let mut res = self.search_layer(&query, cur, self.beam(ef), 0, None);
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.into_iter().map(|(d, i)| (i, d)).collect()
     }
@@ -1657,11 +1861,239 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let ef = ef.max(k);
+        let ef = self.beam(ef.max(k));
         let mut res = self.search_layer_filtered(&query, cur, ef, 0, None, Some(allow));
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
+    }
+
+    /// Multi-vector `KnnSearch`: every graph vertex is one *token* vector and
+    /// `row_of` maps a vertex to the row it belongs to.
+    ///
+    /// For each query token the bottom layer is searched with the reference's
+    /// `MultiVectorResultHandler` semantics (`hnsw_alg.cppm:114-152`): the beam
+    /// keeps at most `ef` **rows** (not vertices), a row's score is the best
+    /// distance over its tokens, and a row enters the candidate set once. The
+    /// per-token results are then unioned by row, keeping the best distance —
+    /// the same shape as the reference's `query_count_` loop into one
+    /// `MergeKnn`, which is what the executor's exact MaxSim re-scoring then
+    /// consumes.
+    ///
+    /// Returns `(row, best distance)`, ascending, at most `k` rows.
+    pub fn search_multivector(
+        &self,
+        queries: &[Vec<f32>],
+        k: usize,
+        ef: usize,
+        row_of: &dyn Fn(usize) -> u64,
+        allow: Option<&dyn Fn(u64) -> bool>,
+    ) -> Vec<(u64, f32)> {
+        if queries.is_empty() || k == 0 {
+            return vec![];
+        }
+        // Each token contributes the whole `ef`-row beam, not just its best `k`:
+        // the reference hands every per-token result (`result_n == ef`) to
+        // `MergeKnn` and only that merge applies `topk`
+        // (`physical_knn_scan_impl.cpp:887-955`).
+        //
+        // A row's score is the **sum** over the query tokens of its cheapest
+        // token distance — the shape the exact re-scoring maximises. Ranking by
+        // the single best token instead puts a row that is perfect on one token
+        // and far on the rest ahead of one that is uniformly close, which is not
+        // what `MaxSim` says, and at 8k rows it cost two thirds of recall@10.
+        //
+        // A row that is missing from a token's beam is charged that beam's worst
+        // distance: the beam is exactly the statement that it is no better than
+        // that. A token whose search returned nothing is dropped rather than
+        // charging every row `f32::MAX` (which would tie the whole table).
+        let beam = ef.max(k).max(1);
+        let per_token: Vec<(std::collections::HashMap<u64, f32>, f32)> = queries
+            .iter()
+            .filter_map(|q| {
+                let hits = self.search_labeled(&self.store.make_query(q), beam, row_of, allow);
+                let worst = hits.last().map(|(_, d)| *d)?;
+                Some((hits.into_iter().collect(), worst))
+            })
+            .collect();
+        if per_token.is_empty() {
+            return vec![];
+        }
+        let mut acc: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
+        for (hits, _) in &per_token {
+            for row in hits.keys() {
+                acc.entry(*row).or_insert(0.0);
+            }
+        }
+        for (hits, worst) in &per_token {
+            for (row, sum) in acc.iter_mut() {
+                *sum += hits.get(row).copied().unwrap_or(*worst);
+            }
+        }
+        let mut out: Vec<(u64, f32)> = acc.into_iter().collect();
+        out.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+        out.truncate(k);
+        out
+    }
+
+    /// One query token's bottom-layer search with the row-level beam.
+    ///
+    /// `beam` is the reference's `result_n` — the `MultiVectorResultHandler`'s
+    /// `top_k` — so the whole beam comes back and the caller decides the
+    /// per-token cut.
+    fn search_labeled(
+        &self,
+        query: &HnswQuery,
+        beam: usize,
+        row_of: &dyn Fn(usize) -> u64,
+        allow: Option<&dyn Fn(u64) -> bool>,
+    ) -> Vec<(u64, f32)> {
+        let Some(entry) = self.entry else {
+            return vec![];
+        };
+        let mut cur = entry;
+        let mut l = self.max_level as i64;
+        while l > 0 {
+            cur = self.search_layer_nearest(query, cur, l as usize, None);
+            l -= 1;
+        }
+        let nodes = self.store.len();
+        let ef = self.beam(beam);
+        let entry_d = self.distance_query(query, None, cur);
+        let accept = |row: u64| allow.is_none_or(|f| f(row));
+        let mut rows = LabelSet::new(ef);
+        // The visited stamps and the frontier heap come from the same
+        // per-thread scratch the single-vector traversal uses.
+        // `search_multivector` reaches here once per query token, so a fresh
+        // `Visited` was one graph-sized allocation (n/4 bytes) per token.
+        SCRATCH.with(|cell| {
+            let mut scratch = cell.borrow_mut();
+            scratch.begin(nodes, cur);
+            let SearchScratch {
+                visited, candidate, ..
+            } = &mut *scratch;
+            candidate.push(Reverse(Cand(entry_d, cur)));
+            if accept(row_of(cur)) {
+                rows.add(entry_d, row_of(cur));
+            }
+            while let Some(Reverse(Cand(cd, c))) = candidate.pop() {
+                if cd > rows.bar() {
+                    break;
+                }
+                let list = self.graph.neighbors(0, c);
+                for index in 0..list.len() {
+                    let nb = list.get(index).unwrap() as usize;
+                    if nb >= nodes || !visited.visit(nb) {
+                        continue;
+                    }
+                    let d = self.distance_query(query, None, nb);
+                    if d <= rows.bar() {
+                        candidate.push(Reverse(Cand(d, nb)));
+                        let row = row_of(nb);
+                        if accept(row) {
+                            rows.add(d, row);
+                        }
+                    }
+                }
+            }
+        });
+        let mut out: Vec<(u64, f32)> = rows.best.into_iter().collect();
+        out.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+        // `LabelSet` already caps at `beam` rows, so this is the reference's
+        // `result_n` entries.
+        out
+    }
+}
+
+/// Per-row accumulator for the multi-vector search.
+///
+/// The reference's `MultiVectorResultHandler` keys results by label: the heap
+/// holds at most `top_k` labels and `AddResult` keeps the smallest distance per
+/// label. Entries are popped lazily, so a label that got a better distance
+/// during the search simply leaves its older heap entry stale.
+struct LabelSet {
+    cap: usize,
+    pub(crate) best: std::collections::HashMap<u64, f32>,
+    heap: std::collections::BinaryHeap<RowCand>,
+}
+
+#[derive(Clone, Copy)]
+struct RowCand(f32, u64);
+
+impl PartialEq for RowCand {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+impl Eq for RowCand {}
+impl PartialOrd for RowCand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for RowCand {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.total_cmp(&other.0).then(self.1.cmp(&other.1))
+    }
+}
+
+impl LabelSet {
+    fn new(cap: usize) -> Self {
+        Self {
+            cap: cap.max(1),
+            best: std::collections::HashMap::new(),
+            heap: std::collections::BinaryHeap::new(),
+        }
+    }
+
+    fn add(&mut self, dist: f32, row: u64) {
+        if let Some(&current) = self.best.get(&row) {
+            if dist >= current {
+                return;
+            }
+        }
+        self.best.insert(row, dist);
+        self.heap.push(RowCand(dist, row));
+        while self.best.len() > self.cap {
+            let Some(worst) = self.pop_worst() else {
+                break;
+            };
+            self.best.remove(&worst);
+        }
+    }
+
+    /// Pops stale entries until the heap top is the live worst kept row.
+    fn pop_worst(&mut self) -> Option<u64> {
+        loop {
+            let top = self.heap.pop()?;
+            if self
+                .best
+                .get(&top.1)
+                .is_some_and(|&d| d.total_cmp(&top.0) == Ordering::Equal)
+            {
+                return Some(top.1);
+            }
+        }
+    }
+
+    /// Pruning bound: the worst kept row once `cap` rows are held.
+    fn bar(&mut self) -> f32 {
+        if self.best.len() < self.cap {
+            return f32::INFINITY;
+        }
+        loop {
+            let Some(top) = self.heap.peek().copied() else {
+                return f32::INFINITY;
+            };
+            if self
+                .best
+                .get(&top.1)
+                .is_some_and(|&d| d.total_cmp(&top.0) == Ordering::Equal)
+            {
+                return top.0;
+            }
+            self.heap.pop();
+        }
     }
 }
 
@@ -1749,7 +2181,7 @@ pub(crate) mod chunk_file {
             for node in 0..n {
                 let neighbors = index.neighbors(layer, node);
                 put_u64(&mut out, neighbors.len() as u64);
-                for &neighbor in neighbors {
+                for neighbor in neighbors.iter() {
                     put_u64(&mut out, neighbor as u64);
                 }
             }
@@ -1818,7 +2250,7 @@ pub(crate) mod chunk_file {
         for layer in links.iter_mut() {
             for node in layer.iter_mut() {
                 let degree = reader.u64() as usize;
-                *node = (0..degree).map(|_| reader.u64() as usize).collect();
+                *node = (0..degree).map(|_| reader.u64() as u32).collect();
             }
         }
         assert_eq!(reader.pos, reader.bytes.len(), "trailing HNSW bytes");
@@ -1839,6 +2271,22 @@ mod tests {
         (0..n)
             .map(|_| (0..dims).map(|_| (rng.unit() as f32) * 10.0).collect())
             .collect()
+    }
+
+    /// A mapped chunk's vector region has to serialize back to the bytes it
+    /// borrows: `data` is empty by construction, so a `Save` that only walked
+    /// the owned buffer wrote a zero-length region for every loaded chunk.
+    #[test]
+    fn a_mapped_vector_region_serializes_back_to_its_bytes() {
+        let owned = PlainVecs::from_rows(2, vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
+        let bytes = owned.records_bytes();
+        assert_eq!(bytes.len(), 16);
+        let src: ByteSource = std::sync::Arc::new(bytes.clone());
+        let mapped = PlainVecs::mapped(2, src, 0, 2).expect("region is readable");
+        assert!(mapped.mapped.is_some(), "expected a mapped region");
+        assert!(mapped.data.is_empty(), "a mapped region owns no floats");
+        assert_eq!(mapped.records_bytes(), bytes);
+        assert_eq!(mapped.get(1), Some(&[3.0f32, 4.0][..]));
     }
 
     #[test]
@@ -1920,6 +2368,120 @@ mod tests {
         }
         let recall = hits as f64 / total as f64;
         assert!(recall >= 0.8, "recall too low: {recall}");
+    }
+    /// A multi-vector graph: every vertex is a token, `row_of` maps it to its
+    /// row, and a row scores by the best distance over its tokens
+    /// (`MultiVectorResultHandler`).
+    fn multivector_index() -> (HnswIndex, Vec<u64>) {
+        let mut index = HnswIndex::new(2, 8, 32, 32);
+        let rows: [&[[f32; 2]]; 2] = [
+            &[[1.0, 0.0], [1.1, 0.0], [0.9, 0.0]],
+            &[[0.0, 1.0], [0.0, 1.2], [0.0, 0.8]],
+        ];
+        let mut labels = Vec::new();
+        for (row, tokens) in rows.iter().enumerate() {
+            for token in tokens.iter() {
+                index.add(token);
+                labels.push(row as u64);
+            }
+        }
+        (index, labels)
+    }
+
+    #[test]
+    fn multivector_search_keeps_the_best_token_per_row() {
+        let (index, labels) = multivector_index();
+        let query = vec![1.0f32, 0.0];
+        let hits = index.search_multivector(
+            std::slice::from_ref(&query),
+            2,
+            32,
+            &|node| labels[node],
+            None,
+        );
+        assert_eq!(hits.len(), 2, "both rows are candidates: {hits:?}");
+        // Row 0 holds the near copy of the query, so it must rank first.
+        assert_eq!(hits[0].0, 0);
+        // Its score is the best over row 0's tokens, the same one the
+        // single-vector search reports for the closest of those vertices.
+        let all = index.search(&query, 6);
+        let expected = all
+            .iter()
+            .filter(|(node, _)| labels[*node] == 0)
+            .map(|(_, dist)| *dist)
+            .fold(f32::INFINITY, f32::min);
+        assert!((hits[0].1 - expected).abs() < 1e-6);
+        assert!(hits[1].0 == 1);
+    }
+
+    /// One query token per query row: a row's score is the **sum** of its best
+    /// distance to each query token, which is the shape `MaxSim` maximises and
+    /// what the exact re-scoring downstream computes.
+    #[test]
+    fn multivector_search_sums_every_query_token() {
+        let (index, labels) = multivector_index();
+        let queries = vec![vec![1.0f32, 0.0], vec![0.0f32, 1.0]];
+        let all = index.search_multivector(&queries, 2, 32, &|node| labels[node], None);
+        assert_eq!(all.len(), 2);
+        let score_of = |hits: &[(u64, f32)], row: u64| {
+            hits.iter()
+                .find(|(r, _)| *r == row)
+                .map(|(_, d)| *d)
+                .expect("row present")
+        };
+        let one =
+            |query: Vec<f32>| index.search_multivector(&[query], 2, 32, &|node| labels[node], None);
+        let a = one(queries[0].clone());
+        let b = one(queries[1].clone());
+        for row in [0u64, 1] {
+            let sum = score_of(&a, row) + score_of(&b, row);
+            assert!(
+                (score_of(&all, row) - sum).abs() < 1e-6,
+                "row {row}: {} != {sum}",
+                score_of(&all, row)
+            );
+        }
+        // Row 1's tokens are close to `[0,1]` and merely far from `[1,0]`, while
+        // row 0 is close to `[1,0]`; summing both tokens ranks row 1 first
+        // (1.64 against 1.81). Ranking by the single best token would tie them
+        // at 0.0, which is the failure this scoring fixes.
+        assert_eq!(all[0].0, 1, "{all:?}");
+    }
+
+    /// The filter is a predicate over rows, so a rejected row contributes no
+    /// candidate and the search still returns `k` accepted rows.
+    #[test]
+    fn multivector_search_applies_the_row_filter() {
+        let (index, labels) = multivector_index();
+        let hits = index.search_multivector(
+            &[vec![1.0f32, 0.0]],
+            2,
+            32,
+            &|node| labels[node],
+            Some(&|row| row == 1),
+        );
+        assert_eq!(hits.len(), 1, "row 0 is filtered out: {hits:?}");
+        assert_eq!(hits[0].0, 1);
+    }
+
+    /// The compact graph is what makes a batch build affordable: every vertex
+    /// gets `2M` layer-0 slots and upper-layer blocks only for the layers it
+    /// reaches, and no per-vertex allocation.
+    #[test]
+    fn graph_memory_stays_compact_across_a_batch_build() {
+        let data = dataset(2_000, 8);
+        let mut index = HnswIndex::new(8, 16, 64, 32);
+        index.add_batch(&data, 4);
+        index.check().unwrap();
+        let per_vertex = 8 * 16 + 12;
+        let vectors = 2_000 * 8 * 4;
+        let usage = index.mem_usage();
+        assert!(
+            usage < vectors + 2_000 * per_vertex * 3,
+            "graph used {usage} bytes for 2000 vertices"
+        );
+        // The slab is fixed-stride and exact for layer 0.
+        assert!(index.neighbors(0, 0).len() <= 32);
     }
 }
 

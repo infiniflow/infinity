@@ -3,24 +3,24 @@
 //! `InsertVecs` stores the whole batch first, then splits `[start, end)` into
 //! buckets of at least `kBuildBucketSize` vertices and pushes one `Build(j)`
 //! loop per bucket onto the dense-index thread pool. This module is that
-//! path: `HnswIndex::add_batch` stores the vectors, hands the graph to
-//! [`build_parallel`], and takes the links back.
+//! path: `HnswIndex::add_batch` stores the vectors and pre-allocates every
+//! graph slot, then hands the graph to [`build_parallel_range`].
 //!
 //! Safety comes from one lock per vertex, as in the reference's
 //! `DataStore::UniqueLock(vertex)`: a thread writes only the vertex it is
 //! building plus the reverse links of neighbours it already found, each under
 //! that neighbour's write lock. `Build` only ever links to vertices with a
 //! lower index (its search results are the ones already inserted), so the wait
-//! graph is acyclic and there is no lock-order deadlock.
+//! graph is acyclic and there is no lock-order deadlock. The neighbour arrays
+//! themselves are atomic, so a read that races with a write is defined
+//! behaviour even before the lock is taken.
 
 use std::cmp::{Ordering, Reverse};
 use std::sync::RwLock;
 
+use crate::graph::{GraphStore, Neighbors};
 use crate::lsg::LsgIndex;
 use crate::vector::{Cand, SearchScratch, Store};
-
-/// The graph with one lock per vertex, the shape a concurrent build needs.
-pub(crate) type LockedLinks = Vec<Vec<RwLock<Vec<usize>>>>;
 
 /// The query a build searches with.
 ///
@@ -50,18 +50,18 @@ pub(crate) struct SelectScratch {
     kept: Vec<(f32, usize)>,
     /// The selected neighbours, farthest first (the reference writes them
     /// straight into the vertex's list; this is the buffer it writes from).
-    out: Vec<usize>,
+    out: Vec<u32>,
 }
 
-/// What a bucket needs to build a vertex: the stored vectors, the levels the
-/// caller already sampled, and the locked graph being filled in.
+/// What a bucket needs to build a vertex: the stored vectors, the graph being
+/// filled in and the per-vertex locks that make the fill safe.
 pub(crate) struct Builder<'a> {
     store: &'a Store,
     lsg: Option<&'a LsgIndex>,
     m: usize,
     ef_construction: usize,
-    levels: &'a [usize],
-    links: &'a LockedLinks,
+    graph: &'a GraphStore,
+    locks: &'a [RwLock<()>],
     entry: usize,
     max_level: usize,
 }
@@ -73,8 +73,8 @@ impl<'a> Builder<'a> {
         lsg: Option<&'a LsgIndex>,
         m: usize,
         ef_construction: usize,
-        levels: &'a [usize],
-        links: &'a LockedLinks,
+        graph: &'a GraphStore,
+        locks: &'a [RwLock<()>],
         entry: usize,
         max_level: usize,
     ) -> Self {
@@ -83,8 +83,8 @@ impl<'a> Builder<'a> {
             lsg,
             m,
             ef_construction,
-            levels,
-            links,
+            graph,
+            locks,
             entry,
             max_level,
         }
@@ -122,26 +122,32 @@ impl<'a> Builder<'a> {
         self.adjust(d, Some(a), b)
     }
 
-    /// `GetNeighbors` with the read lock held for the span of `f`, which is
-    /// what the reference does (`shared_lock` around its neighbour loop).
+    /// `GetNeighbors` with the vertex's read lock held for the span of `f`,
+    /// which is what the reference does (`shared_lock` around its neighbour
+    /// loop).
     ///
     /// Copying the list first cost a `memmove` per vertex expanded - 10% of a
     /// 200k build under `perf`. Holding the read lock is safe because the
     /// closure only reads memory and computes distances: it takes no other
     /// lock, so a writer waiting for this vertex cannot block the holder.
-    fn with_neighbors<R>(&self, layer: usize, node: usize, f: impl FnOnce(&[usize]) -> R) -> R {
-        match self.links.get(layer).and_then(|l| l.get(node)) {
-            Some(cell) => {
-                let list = cell.read().unwrap_or_else(|e| e.into_inner());
-                f(&list)
+    fn with_neighbors<R>(
+        &self,
+        layer: usize,
+        node: usize,
+        f: impl FnOnce(Neighbors<'_>) -> R,
+    ) -> R {
+        match self.locks.get(node) {
+            Some(lock) => {
+                let _guard = lock.read().unwrap_or_else(|e| e.into_inner());
+                f(self.graph.neighbors(layer, node))
             }
-            None => f(&[]),
+            None => f(Neighbors::empty()),
         }
     }
 
     /// `Build(vertex_i)`: the vertex is already stored and levelled.
     fn build(&self, node: usize, scratch: &mut SearchScratch, select: &mut SelectScratch) {
-        let q_layer = self.levels[node];
+        let q_layer = self.graph.level_of(node);
         let query = QueryRef::for_node(self.store, node);
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
@@ -158,20 +164,16 @@ impl<'a> Builder<'a> {
                 l -= 1;
                 continue;
             }
-            ep = neighbors[0];
-            {
-                let mut own = self.links[layer][node]
-                    .write()
-                    .unwrap_or_else(|e| e.into_inner());
-                own.clear();
-                own.extend_from_slice(neighbors);
-            }
-            // A reverse-link prune runs the heuristic again, which reuses
-            // `select`'s buffers, so the loop walks its own copy of the list
-            // (the slice borrows `select` and cannot outlive that call).
+            ep = neighbors[0] as usize;
             let neighbors = neighbors.to_vec();
+            if let Some(lock) = self.locks.get(node) {
+                // The reference writes the built vertex's own list under its
+                // unique lock too: a higher bucket may already be pruning it.
+                let _guard = lock.write().unwrap_or_else(|e| e.into_inner());
+                self.graph.set_neighbors(layer, node, &neighbors);
+            }
             for nb in neighbors {
-                self.connect_neighbors(nb, node, layer, select);
+                self.connect_neighbors(nb as usize, node, layer, select);
             }
             l -= 1;
         }
@@ -185,29 +187,37 @@ impl<'a> Builder<'a> {
         layer: usize,
         select: &mut SelectScratch,
     ) {
-        let max_m = if layer == 0 { self.m * 2 } else { self.m };
-        let mut list = self.links[layer][target]
-            .write()
-            .unwrap_or_else(|e| e.into_inner());
-        if list.contains(&node) {
+        let Some(lock) = self.locks.get(target) else {
+            return;
+        };
+        if layer > self.graph.level_of(target) {
+            return;
+        }
+        let _guard = lock.write().unwrap_or_else(|e| e.into_inner());
+        let list = self.graph.neighbors(layer, target);
+        if list.iter().any(|nb| nb == node as u32) {
             // Already a neighbour. The serial path cannot see this (a vertex is
             // only ever linked once, by its own build), but in a batch the entry
             // vertex is built before its neighbours exist, so its list can
             // already hold the vertex whose build now looks at it.
             return;
         }
+        let max_m = self.graph.max_degree(layer);
         if list.len() < max_m {
-            list.push(node);
+            self.graph.push_neighbor(layer, target, node as u32);
             return;
         }
         let mut cands: Vec<(f32, usize)> = Vec::with_capacity(list.len() + 1);
         cands.push((self.distance_nodes(target, node), node));
-        for &nb in list.iter() {
-            cands.push((self.distance_nodes(target, nb), nb));
+        for nb in list.iter() {
+            cands.push((self.distance_nodes(target, nb as usize), nb as usize));
         }
+        // The kept list already lives in the reusable scratch buffer and
+        // `set_neighbors` copies it into the slab, so an intermediate `to_vec`
+        // would be a heap allocation plus a second copy per pruned reverse link -
+        // the hot path of a build.
         let kept = self.select_neighbors(&cands, max_m, select);
-        list.clear();
-        list.extend(kept);
+        self.graph.set_neighbors(layer, target, kept);
     }
 
     /// `SelectNeighborsHeuristic`: closer-than-a-kept-neighbour candidates are
@@ -221,14 +231,14 @@ impl<'a> Builder<'a> {
         cands: &[(f32, usize)],
         m: usize,
         scratch: &'s mut SelectScratch,
-    ) -> &'s [usize] {
+    ) -> &'s [u32] {
         let SelectScratch { sorted, kept, out } = scratch;
         sorted.clear();
         sorted.extend_from_slice(cands);
         out.clear();
         if sorted.len() < m {
             sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
-            out.extend(sorted.iter().map(|(_, n)| *n));
+            out.extend(sorted.iter().map(|(_, n)| *n as u32));
             return out;
         }
         sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
@@ -241,7 +251,7 @@ impl<'a> Builder<'a> {
                 kept.push((d, node));
             }
         }
-        out.extend(kept.iter().rev().map(|(_, n)| *n));
+        out.extend(kept.iter().rev().map(|(_, n)| *n as u32));
         out
     }
 
@@ -254,7 +264,8 @@ impl<'a> Builder<'a> {
             let next = self.with_neighbors(layer, cur, |list| {
                 let mut best = (cur, cur_d);
                 // Farthest first, as the reference walks its list.
-                for &nb in list.iter().rev() {
+                for index in (0..list.len()).rev() {
+                    let nb = list.get(index).unwrap() as usize;
                     if nb >= nodes {
                         continue;
                     }
@@ -313,7 +324,8 @@ impl<'a> Builder<'a> {
             // build. The closure takes no other lock, so a writer waiting on
             // this vertex cannot block the holder.
             self.with_neighbors(layer, c, |list| {
-                for &nb in list {
+                for index in 0..list.len() {
+                    let nb = list.get(index).unwrap() as usize;
                     if nb >= nodes || nb == self_id || !visited.visit(nb) {
                         continue;
                     }

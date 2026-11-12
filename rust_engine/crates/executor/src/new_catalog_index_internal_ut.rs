@@ -75,7 +75,7 @@ impl Engine {
     fn hnsw_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.hnsw_mem.get(column)?.lock().ok()?;
+        let index = tables.get(&key)?.hnsw_mem.get(column)?.read().ok()?;
         let rows = index.rows();
         Some((*rows.first()?, rows.len()))
     }

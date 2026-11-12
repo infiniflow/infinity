@@ -73,6 +73,39 @@ impl HnswHandler {
         }
     }
 
+    /// C++: `SearchIndex(q, k, option, bitmask)`.
+    ///
+    /// The predicate stands in for the reference's `BitmaskFilter`: rejected
+    /// vertices stay traversable but never enter the result heap, so the
+    /// returned `k` entries are all accepted rows (`hnsw_alg.cppm`
+    /// `SearchLayer` with `filter`).
+    pub fn search_index_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        option: KnnSearchOption,
+        allow: &dyn Fn(usize) -> bool,
+    ) -> Vec<(usize, f32)> {
+        let ef = option.ef.unwrap_or_else(|| self.index.ef_search());
+        self.index.search_filtered(query, k, ef, allow)
+    }
+
+    /// C++: one `KnnSearch` per query token into a shared
+    /// `MultiVectorResultHandler`, unioned by row label.
+    ///
+    /// `row_of` maps a graph vertex (one token) to its row.
+    pub fn search_multivector(
+        &self,
+        queries: &[Vec<f32>],
+        k: usize,
+        option: KnnSearchOption,
+        row_of: &dyn Fn(usize) -> u64,
+        allow: Option<&dyn Fn(u64) -> bool>,
+    ) -> Vec<(u64, f32)> {
+        let ef = option.ef.unwrap_or_else(|| self.index.ef_search());
+        self.index.search_multivector(queries, k, ef, row_of, allow)
+    }
+
     /// C++: `MemUsage`.
     pub fn mem_usage(&self) -> usize {
         self.index.mem_usage()
