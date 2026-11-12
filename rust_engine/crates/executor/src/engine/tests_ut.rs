@@ -3603,6 +3603,160 @@ mod tests {
         }
     }
 
+    /// A `BOOL`/`INT`/`DOUBLE`/`TIME`/`VARCHAR`/`JSON` index and a filter on
+    /// each of its columns, so the shortcut has something to decline.
+    fn lossy_key_table(e: &Engine, t: &str) {
+        e.execute(&format!(
+            "CREATE TABLE {t} (id INT, big BIGINT, db DOUBLE, tm TIME, flag BOOL, \
+             vc VARCHAR, js JSON, v EMBEDDING(FLOAT,4));"
+        ))
+        .unwrap();
+        e.execute(&format!(
+            "INSERT INTO {t} VALUES \
+             (0, 9007199254740992, 1.0, '12:34:56', true, '123', '{{\"a\":1}}', [0.0,0.0,0.0,0.0]), \
+             (1, 9007199254740993, 1.0000004, '12:34:57', false, '0123', '{{\"a\":2}}', [1.0,0.0,0.0,0.0]), \
+             (2, 5, 2.0, '10:00:00', true, 'x', '{{\"a\":1}}', [2.0,0.0,0.0,0.0]), \
+             (3, 6, 3.0, '09:00:00', false, 'y', 'null', [3.0,0.0,0.0,0.0]);"
+        ))
+        .unwrap();
+        e.execute(&format!(
+            "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
+        ))
+        .unwrap();
+    }
+
+    /// An indexed KNN answer is final (its rows are a vector projection, so
+    /// nothing re-evaluates the predicate), so the shortcut may only take a
+    /// predicate whose key comparison *is* the evaluator's:
+    ///
+    /// * from `2^53` up the evaluator's `f64` comparison folds neighbouring
+    ///   integers together while the index keeps one key each;
+    /// * a float chunk narrows the key to `f32` and a probe is built from six
+    ///   decimals, so `db = 1.0000004` probes `1.000000`;
+    /// * a temporal key drops the fraction while the evaluator keeps it;
+    /// * a varchar key is a hash and the evaluator coerces numeric text, so
+    ///   `vc = '0123'` matches a stored `123` whose hash differs;
+    /// * a `BOOL` key is `0`/`1` while the evaluator compares the text, so
+    ///   `flag = '1'` admits nothing there and `flag = 'TRUE'` admits nothing
+    ///   either;
+    /// * a JSON key is a term, not a document.
+    #[test]
+    fn a_filter_the_keys_cannot_answer_declines_the_shortcut() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        lossy_key_table(&e, "lk");
+        for c in ["big", "db", "tm", "flag", "vc", "js"] {
+            e.execute(&format!("CREATE INDEX lk_{c} ON lk ({c});"))
+                .unwrap();
+        }
+        let t = "default_db.lk";
+        let schema = e.table_schema(t).unwrap();
+        let cmp = |column: &str, op, value| {
+            let i = schema.iter().position(|c| c == column).unwrap();
+            expression::Expr::Cmp(
+                Box::new(expression::Expr::Column(i)),
+                op,
+                Box::new(expression::Expr::Literal(value)),
+            )
+        };
+        // The indexes answer these columns: the declines below come from the
+        // comparison, not from a missing index.
+        for (column, literal) in [
+            ("big", parser::Literal::Int(9007199254740992)),
+            ("db", parser::Literal::Float(1.0)),
+            ("tm", parser::Literal::Str("12:34:56".into())),
+            ("flag", parser::Literal::Str("true".into())),
+            ("vc", parser::Literal::Str("123".into())),
+            ("js", parser::Literal::Str("{\"a\":1}".into())),
+        ] {
+            assert!(
+                e.index_lookup(t, column, &literal).is_some(),
+                "no index on `{column}`"
+            );
+        }
+
+        for (column, op, value) in [
+            // `2^53 = 2^53 + 1` and `2^53 > 2^53` are both `f64` comparisons
+            // that the i64 keys answer differently.
+            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_992)),
+            ("big", parser::CmpOp::Eq, Value::Int(9_007_199_254_740_993)),
+            ("big", parser::CmpOp::Ge, Value::Int(9_007_199_254_740_993)),
+            ("big", parser::CmpOp::Gt, Value::Int(9_007_199_254_740_992)),
+            // The probe is built from six decimals.
+            ("db", parser::CmpOp::Eq, Value::Float(1.000_000_4)),
+            ("db", parser::CmpOp::Lt, Value::Float(1.000_000_4)),
+            ("db", parser::CmpOp::Eq, Value::Float(1.0)),
+            // The key truncates the fraction.
+            ("tm", parser::CmpOp::Lt, Value::Str("12:34:56.1".into())),
+            ("tm", parser::CmpOp::Eq, Value::Str("12:34:56".into())),
+            // The key is `0`/`1`, the comparison is on the text. (The canonical
+            // spellings keep the index path: see the `BOOL` range test.)
+            ("flag", parser::CmpOp::Eq, Value::Str("1".into())),
+            ("flag", parser::CmpOp::Eq, Value::Str("TRUE".into())),
+            // The key is a hash, the comparison coerces numeric text.
+            ("vc", parser::CmpOp::Eq, Value::Str("0123".into())),
+            ("vc", parser::CmpOp::Eq, Value::Str("123".into())),
+            // A JSON key is a term, not a document.
+            ("js", parser::CmpOp::Eq, Value::Str("{\"a\":1}".into())),
+        ] {
+            assert!(
+                e.predicate_rows_from_indexes(t, &cmp(column, op, value.clone()))
+                    .is_none(),
+                "`{column} {op:?} {value:?}` must be decoded, not answered from the keys"
+            );
+        }
+
+        // The keys that *are* the values still answer, so the shortcut keeps
+        // working where it can.
+        assert!(e
+            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Ge, Value::Int(5)))
+            .is_some());
+        assert!(e
+            .predicate_rows_from_indexes(t, &cmp("big", parser::CmpOp::Eq, Value::Int(5)))
+            .is_some());
+        assert!(e
+            .predicate_rows_from_indexes(
+                t,
+                &cmp("flag", parser::CmpOp::Eq, Value::Str("true".into()))
+            )
+            .is_some());
+    }
+
+    /// The declined shortcut is what makes the *answer* right: `flag <= 'true'`
+    /// admits both `false` and `true` rows, while a `BOOL` range whose open end
+    /// is `i64::MAX`/`i64::MIN` converts both sentinels to `true` and hands back
+    /// the `true` rows alone.
+    #[test]
+    fn a_bool_range_does_not_drop_the_false_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        lossy_key_table(&e, "brk");
+        e.execute("CREATE INDEX brk_flag ON brk (flag);").unwrap();
+        e.flush().unwrap();
+        for (filter, want) in [
+            ("flag <= 'true'", vec!["3", "2"]),
+            ("flag < 'true'", vec!["3", "1"]),
+            ("flag >= 'false'", vec!["3", "2"]),
+            ("flag > 'false'", vec!["2", "0"]),
+            ("flag = '1'", vec![]),
+        ] {
+            assert_eq!(
+                rows(
+                    &e,
+                    &format!(
+                        "SELECT id FROM brk SEARCH MATCH VECTOR \
+                         (v, [9.0,0.0,0.0,0.0], 'float', 'l2', 2) WHERE {filter};"
+                    )
+                )
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+                want,
+                "filter `{filter}`"
+            );
+        }
+    }
+
     /// A filter that admits very few rows still returns a full `topn`: the probe
     /// widens its beam instead of handing back a short answer, and the rows it
     /// finds are the nearest admitted ones.
@@ -5362,12 +5516,36 @@ mod tests {
         assert!(key_is_exact("BIGINT", &int(5_000_000_000)));
         assert!(!key_is_exact("INTEGER", &float(3.5)));
         assert!(key_is_exact("INTEGER", &float(3.0)));
-        // A `FLOAT` key holds the narrowed `f32`; a `DOUBLE` one holds the f64.
-        assert!(key_is_exact("FLOAT", &float(1.0)));
+        // The key is lossless but the comparison is not: from 2^53 up the
+        // evaluator's `f64` comparison folds neighbours together
+        // (`2^53 = 2^53 + 1` admits both rows) while the index keeps one key
+        // each, so a bound that high declines.
+        assert!(key_is_exact("BIGINT", &int(9_007_199_254_740_991)));
+        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_992)));
+        assert!(!key_is_exact("BIGINT", &int(9_007_199_254_740_993)));
+        // A floating-point key is lossy on both sides of the comparison: the
+        // chunk narrows to `f32` and the probe is built from six decimals, so
+        // no floating column takes the shortcut at all.
+        assert!(!key_is_exact("FLOAT", &float(1.0)));
         assert!(!key_is_exact("FLOAT", &float(1.000_000_03)));
-        assert!(key_is_exact("DOUBLE", &float(1.000_000_03)));
-        // Text keys are derived, not rounded.
-        assert!(key_is_exact("VARCHAR", &Value::Str("a".into())));
+        assert!(!key_is_exact("DOUBLE", &float(1.000_000_03)));
+        assert!(!key_is_exact("DOUBLE", &float(1.0)));
+        // A temporal key drops the fraction (`'12:34:56.1'` → `45296`) while the
+        // evaluator compares the text, so the bound and its neighbours share a
+        // key.
+        assert!(!key_is_exact("TIME", &Value::Str("12:34:56".into())));
+        assert!(!key_is_exact("TIME", &Value::Str("12:34:56.1".into())));
+        assert!(!key_is_exact("DATE", &Value::Str("2024-01-01".into())));
+        // A varchar key is a hash and a JSON one a term, not a document: neither
+        // is the predicate's answer. A `BOOL` key is `0`/`1` and the evaluator
+        // compares the text, so only the two lowercase spellings are exact.
+        assert!(!key_is_exact("VARCHAR", &Value::Str("a".into())));
+        assert!(!key_is_exact("JSON", &Value::Str("{\"a\":1}".into())));
+        assert!(key_is_exact("BOOL", &Value::Str("true".into())));
+        assert!(key_is_exact("BOOL", &Value::Str("false".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str("TRUE".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str("1".into())));
+        assert!(!key_is_exact("BOOL", &Value::Str(" true".into())));
     }
 
     /// Both ends of a `FLOAT` range can fall between the same two `f32` values,

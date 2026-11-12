@@ -14,61 +14,74 @@ struct SecondarySnapshot {
     sealing: Vec<Arc<index::SealedTail>>,
 }
 
-/// Whether `value`'s **key** is the key of `value` itself.
+/// The largest integer magnitude at which `f64` still orders the integers.
+///
+/// The evaluator compares numerics as `f64` (`Value::partial_cmp_value`), so
+/// from `2^53` up two distinct integers are one value to the predicate while the
+/// index keeps one key each: `9007199254740992 = 9007199254740993` admits both
+/// rows there but probes a single key, and `> 9007199254740992` admits neither
+/// while the closed range minus its boundary keeps the second. A bound at this
+/// magnitude is not the predicate's answer, so it declines.
+const EXACT_INTEGER_LIMIT: f64 = 9_007_199_254_740_992.0;
+
+/// Whether `value`'s **key** is the key of `value` itself, *and* comparing that
+/// key orders the stored rows the way the evaluator does.
 ///
 /// The chunk and tail keys hold the *stored* value (`i8`, `i16`, `i32`, `i64`,
-/// `f32`, `f64`, a temporal count, a hash), so a conversion that rounds or
-/// saturates names a different value: `TINYINT 300` becomes `44`, `FLOAT
-/// 1.00000003` becomes `1.0`. Probing such a key answers another predicate, so
-/// an equality has no answer and a strict range must not subtract that key from
-/// its boundary.
+/// `f32`, `f64`, a temporal count, a hash), so a conversion that rounds,
+/// saturates or truncates names a different value: `TINYINT 300` becomes `44`,
+/// `FLOAT 1.00000003` becomes `1.0`, and `TIME '12:34:56.1'` becomes `45296`.
+/// Probing such a key answers another predicate, so an equality has no answer
+/// and a strict range must not subtract that key from its boundary.
 ///
-/// Text keys are exact by construction: a temporal bound is a parsed day
-/// count (a text that does not parse has no key at all, which the range read
-/// already reports as unanswerable) and a varchar bound is a hash of the text.
+/// This gates the indexed KNN path alone (`index_rows_for`), which treats the
+/// answer as final because its rows are a vector projection and nothing
+/// re-evaluates the predicate. Whatever this declines is decoded and evaluated
+/// row by row instead.
 pub(crate) fn key_is_exact(declared: &str, value: &expression::Value) -> bool {
     use expression::Value as V;
     use storage::secondary_segment::KeyKind;
     let kind = secondary_key_kind(declared);
     match (key_domain(declared), value) {
         (KeyDomain::Integer, V::Int(i)) => {
-            // `i as f64` rounds for magnitudes above 2^53, which only makes the
-            // test stricter: a bound that close to the edge declines.
+            // Representable in the key's width *and* orderable by the
+            // evaluator: from 2^53 up `f64` folds neighbours together.
             let f = *i as f64;
             let (low, high) = integer_key_bounds(declared);
-            f >= low && f < high
+            f >= low && f < high && f.abs() < EXACT_INTEGER_LIMIT
         }
         (KeyDomain::Integer, V::Float(f)) => {
             // The same rule `float_lookup_literal` applies: only an integral
             // value inside the key's own width has an integer key.
             let (low, high) = integer_key_bounds(declared);
-            f.fract() == 0.0 && *f >= low && *f < high
+            f.fract() == 0.0 && *f >= low && *f < high && f.abs() < EXACT_INTEGER_LIMIT
         }
-        (KeyDomain::Float, V::Float(f)) => match kind {
-            // The chunk and tail keys hold the narrowed `f32`, so the f64
-            // survives the conversion only when it lies on the f32 grid.
-            KeyKind::F32 => f64::from(*f as f32) == *f,
-            _ => true,
-        },
-        (KeyDomain::Float, V::Int(i)) => match kind {
-            KeyKind::F32 => f64::from(*i as f32) == *i as f64,
-            _ => *i as f64 as i64 == *i,
-        },
-        (KeyDomain::Temporal, V::Str(text)) => temporal_key(declared, text).is_some(),
+        // A floating-point key is not the predicate's answer yet. A `FLOAT`
+        // chunk narrows the key to `f32`, so `1.0` and `1.00000003` share one
+        // key, and the tail and equality probes are built from
+        // `to_slt_string`, six decimals, so `1.0000004` is probed as `1.0`.
+        // Either way an equality can admit a row the predicate rejects and the
+        // strict-bound subtraction can remove one it admits, and filtered KNN
+        // never re-evaluates what it is handed.
+        (KeyDomain::Float, _) => false,
+        // A temporal key is a truncated count - the reference's `DateT`/`TimeT`
+        // value, seconds since midnight with the fraction dropped - while the
+        // evaluator compares the text: `t < '12:34:56.1'` admits `12:34:56`,
+        // but the bound and that row share the key `45296`, so the strict bound
+        // would subtract it - and `12:34:56.9`, which the predicate rejects,
+        // shares it as well.
+        (KeyDomain::Temporal, _) => false,
         (KeyDomain::Hashed, V::Str(text)) => {
-            // A `BOOL` column's key is `0`/`1` (`BooleanT`), and
-            // `text_to_key` reads *any* other text as `false`: `flag = 'maybe'`
-            // would then probe the `false` rows and answer a different
-            // predicate. Only the spellings the conversion keeps are exact.
-            if kind == KeyKind::Bool {
-                matches!(
-                    text.trim().to_ascii_lowercase().as_str(),
-                    "true" | "1" | "false" | "0"
-                )
-            } else {
-                // A varchar key is the hash of the text, which is lossless.
-                true
-            }
+            // A `BOOL` key is `0`/`1` (`BooleanT`) while the evaluator compares
+            // the exact text (`"true".cmp("TRUE")` is not equal), so only the
+            // two lowercase spellings are exact: `flag = '1'` rejects every row
+            // although the key would read `true`. No trimming, no case folding,
+            // no numeric aliases.
+            //
+            // The other hashed keys are not predicate answers at all: a varchar
+            // key is a 64-bit hash (two texts can collide), and a JSON key is a
+            // term, not a document, so a document equality has no key here.
+            kind == KeyKind::Bool && matches!(text.as_str(), "true" | "false")
         }
         // A numeric literal on a text column, or a temporal literal that is not
         // text, has no key in that column's space.
@@ -2209,30 +2222,28 @@ impl Engine {
         let set = |rows: Vec<u64>| rows.into_iter().map(|row| row as usize).collect();
         let declared = self.index_declared_type(table, column).unwrap_or_default();
         let exact = key_is_exact(&declared, value);
-        let float_column = key_domain(&declared) == KeyDomain::Float;
         match op {
             CmpOp::Eq => Some(set(self
                 .index_lookup(table, column, &literal)
                 .filter(|_| exact)?)),
             CmpOp::Ge | CmpOp::Le | CmpOp::Gt | CmpOp::Lt => {
-                // A saturating bound (`i8` key for `300`, `i32` key for `5e9`)
-                // widens the interval over rows the predicate rejects, so an
-                // integer column only answers a bound it can hold. A `FLOAT`
-                // one rounds its bounds *inwards* (see `tail_bound`) and keeps
-                // them as `f64` in the chunks, which stays exact.
-                if !float_column && !exact {
+                // A bound whose key is not the bound value - a saturated
+                // `TINYINT` key, a rounded `FLOAT` one, a truncated
+                // `TIME`/`DATETIME` count, an integer past `2^53`, a hashed
+                // text - makes both the closed range and the strict-bound
+                // subtraction answer another predicate.
+                if !exact {
                     return None;
                 }
-                // The range read takes closed bounds. An open end is a sentinel
-                // `i64` for an integer key, and an infinity for a floating-point
-                // one: `i64::MAX` is a *finite* 9.22e18 on the number line a
-                // `FLOAT` index orders, so `f >= 0.0` would omit an indexed
-                // `1e20` and the re-scoring pass could never recover it.
-                let (low, high) = if float_column {
-                    (
-                        expression::Value::Float(f64::NEG_INFINITY),
-                        expression::Value::Float(f64::INFINITY),
-                    )
+                // The range read takes closed bounds, so an open end is a
+                // sentinel outside every key of the column. `i64::MIN`/`i64::MAX`
+                // are outside the integers and the temporal counts, but a `BOOL`
+                // key is `false`/`true` and *both* of those sentinels convert to
+                // `true` (`BooleanT(i != 0)`): `flag <= 'true'` would then start
+                // at `true` and drop every `false` row, and `flag < 'true'`
+                // would come out empty.
+                let (low, high) = if secondary_key_kind(&declared) == KeyKind::Bool {
+                    (expression::Value::Int(0), expression::Value::Int(1))
                 } else {
                     (
                         expression::Value::Int(i64::MIN),
@@ -2246,19 +2257,12 @@ impl Engine {
                 let mut rows: std::collections::HashSet<usize> =
                     set(self.index_range_lookup(table, column, &[(lo, hi)])?);
                 if matches!(op, CmpOp::Gt | CmpOp::Lt) {
-                    // A strict bound is the closed range minus its boundary, and
-                    // that subtraction is only sound while the boundary's key is
-                    // the boundary value: the rounded key of `1.00000003` is
-                    // `f32 1.0`, so removing "the equals rows" would delete rows
-                    // the predicate admits. Off the key grid on a `FLOAT` column
-                    // no stored key can equal the value at all, which makes the
-                    // closed range strict on its own; everywhere else the bound
-                    // was rejected above.
-                    if exact {
-                        let equal = self.index_lookup(table, column, &literal)?;
-                        for row in equal {
-                            rows.remove(&(row as usize));
-                        }
+                    // A strict bound is the closed range minus its boundary,
+                    // which is sound because `exact` just said the boundary's
+                    // key *is* the boundary value.
+                    let equal = self.index_lookup(table, column, &literal)?;
+                    for row in equal {
+                        rows.remove(&(row as usize));
                     }
                 }
                 Some(rows)

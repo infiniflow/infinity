@@ -98,7 +98,23 @@ impl Engine {
                 .map(|guard| guard.live.iter().copied().collect());
         }
         if let Some(allow) = q.allow {
-            return Some(allow.iter().copied().collect());
+            // `allow` is the predicate's answer, not a live-row set: a
+            // secondary lookup keeps the ids of rows the statement deleted
+            // afterwards, and it labels no rows at all for the block scan
+            // (`uncovered_candidates` adds those). An uncovered dead row would
+            // then be scored and returned, since the probe never looks at it and
+            // so never refuses it - drop this snapshot's tombstones here, the
+            // same set [`Self::knn_candidates`] refuses.
+            let dead = self
+                .tombstone_set_at(q.table, crate::read_ts())
+                .unwrap_or_default();
+            return Some(
+                allow
+                    .iter()
+                    .copied()
+                    .filter(|row| !dead.contains(&(*row as u64)))
+                    .collect(),
+            );
         }
         if !q.rows.is_empty() {
             return Some(q.rows.iter().map(|(seq, _)| *seq).collect());
@@ -820,6 +836,42 @@ mod tests {
             [1usize, 2].into_iter().collect::<HashSet<_>>(),
             "without a filter every unlabelled row is scored"
         );
+    }
+
+    /// `allow` is the predicate's answer, not a live-row set: a secondary lookup
+    /// keeps the ids of rows the statement deleted afterwards, and the brute
+    /// force blocks behind `uncovered_candidates` carry no graph label, so
+    /// nothing downstream would refuse such a row. `live_rows` therefore drops
+    /// this snapshot's tombstones before its answer becomes the live set (HNSW
+    /// and IVF share it).
+    #[test]
+    fn a_deleted_row_the_filter_admits_is_not_live() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dl (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute("INSERT INTO dl VALUES (0, [0.0,0.0]), (1, [1.0,1.0]), (2, [2.0,2.0]);")
+            .unwrap();
+        e.execute("DELETE FROM dl WHERE id = 1;").unwrap();
+        let queries = vec![vec![0.0f32, 0.0f32]];
+        let options = KnnScanOptions::default();
+        let allow: HashSet<usize> = [0usize, 1, 2].into_iter().collect();
+        let q = KnnCandidateScan {
+            table: "dl",
+            column: "v",
+            queries: &queries,
+            multivector: false,
+            allow: Some(&allow),
+            rows: &[],
+            live_rows: None,
+            cache: None,
+            topn: 2,
+            metric: "l2",
+            options: &options,
+        };
+        let mut live = e.live_rows(&q).expect("the filter names the live rows");
+        live.sort_unstable();
+        assert_eq!(live, vec![0, 2], "row 1 is deleted");
     }
 
     fn scan(metric: &str, threshold: Option<f64>) -> PhysicalKnnScan<'_> {
