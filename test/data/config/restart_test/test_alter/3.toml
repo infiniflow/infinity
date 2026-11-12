@@ -10,12 +10,15 @@ log_level = "trace"
 [storage]
 data_dir = "/var/infinity/data"
 optimize_interval = "0s"
-cleanup_interval = "1s"
+cleanup_interval = "0s"
 compact_interval = "0s"
 persistence_dir = ""
 
 [buffer]
 [wal]
-checkpoint_interval = "1s"
+# The periodic checkpoint must stay disabled: an explicit FLUSH DATA that lands
+# while a periodic checkpoint txn is in flight is skipped (query_context_impl.cpp),
+# and test_alter_cleanup_simple asserts on the .col files the flush produces.
+checkpoint_interval = "0s"
 
 [resource]
