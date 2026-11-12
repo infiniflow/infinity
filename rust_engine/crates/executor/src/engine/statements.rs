@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 impl QueryResult {
     /// This result's rows as display text (what a `.slt` file or the CLI shows).
@@ -3165,7 +3166,7 @@ impl Engine {
         let t_build = std::time::Instant::now();
         let workers = self.hnsw_build_workers();
         for mem in segments {
-            if let Ok(mut mem) = mem.lock() {
+            if let Ok(mut mem) = mem.write() {
                 if mem.is_multivector() {
                     // One vertex per token, all labelled with the row id: the
                     // single-vector filter below would drop every cell holding
@@ -3202,7 +3203,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
+    ) -> Result<Vec<Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>> {
         let key = self.table_key(table);
         let schema = self.table_schema(table)?;
         let mut tables = self.tables.lock().unwrap();
@@ -3252,7 +3253,7 @@ impl Engine {
                 // the coverage check expects row counts.
                 let multivector = self.multivector_column(table, &im.column);
                 entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                    Arc::new(Mutex::new(if multivector {
+                    Arc::new(RwLock::new(if multivector {
                         crate::hnsw_mem::HnswIndexInMem::new_multivector(
                             dims, m, efc, metric, encoding,
                         )
@@ -4248,7 +4249,7 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables.get(&key)?.hnsw_mem.get(column)?.clone()
         };
-        let len = mem.lock().unwrap().len();
+        let len = mem.read().unwrap().len();
         Some(len)
     }
 
@@ -4988,6 +4989,55 @@ impl Engine {
                         return Err(Error::Invalid(format!(
                             "invalid index parameter: unsupported HNSW option '{k}'"
                         )));
+                    }
+                    // An index is a persisted artefact, so a typo or an
+                    // out-of-range number is rejected here rather than silently
+                    // defaulted: `M = 0` builds a graph with no neighbour slots
+                    // at all, and `metric = 'l1'` would quietly become `l2`.
+                    match k.as_str() {
+                        "M" | "EF_CONSTRUCTION" => {
+                            let n: usize = v.trim().parse().map_err(|_| {
+                                Error::Invalid(format!(
+                                    "invalid index parameter: {k} expects an integer, got '{v}'"
+                                ))
+                            })?;
+                            let (lo, hi) = if k == "M" {
+                                (2usize, 2048usize)
+                            } else {
+                                (2usize, 65_536usize)
+                            };
+                            if !(lo..=hi).contains(&n) {
+                                return Err(Error::Invalid(format!(
+                                    "invalid index parameter: {k} must be in [{lo}, {hi}], got {n}"
+                                )));
+                            }
+                        }
+                        "METRIC" => {
+                            if !matches!(
+                                v.trim().to_ascii_lowercase().as_str(),
+                                "l2" | "ip"
+                                    | "inner_product"
+                                    | "innerproduct"
+                                    | "cosine"
+                                    | "cos"
+                                    | "hamming"
+                            ) {
+                                return Err(Error::Invalid(format!(
+                                    "invalid index parameter: unknown metric '{v}'"
+                                )));
+                            }
+                        }
+                        "ENCODE" => {
+                            if !matches!(
+                                v.trim().to_ascii_lowercase().as_str(),
+                                "plain" | "lvq" | "rabitq"
+                            ) {
+                                return Err(Error::Invalid(format!(
+                                    "invalid index parameter: unknown encoding '{v}'"
+                                )));
+                            }
+                        }
+                        _ => {}
                     }
                     if k == "ENCODE" && v.eq_ignore_ascii_case("lvq") && int_elem {
                         return Err(Error::Invalid(
@@ -7743,7 +7793,21 @@ impl Engine {
                 .first()
                 .cloned()
                 .unwrap_or_default();
-            if self.has_vector_index(table, &indexed_column) {
+            // The reference answers a filter from the secondary indexes and hands
+            // the bitmask to the graph (`CommonQueryFilter::filter_result_`).
+            // Only a plain conjunction is answerable that way; an `IN` list or a
+            // text search keeps the decode path.
+            let from_indexes = match (pred, in_filter.as_ref(), search_filter.as_ref()) {
+                (Some(pred), None, None) => self.predicate_rows_from_indexes(table, pred),
+                _ => None,
+            };
+            if !self.has_vector_index(table, &indexed_column) {
+                // Nothing to push the bitmask into: the exact scan decodes the
+                // table once and applies `keep` itself.
+                None
+            } else if from_indexes.is_some() {
+                from_indexes
+            } else {
                 // Only the columns the predicate names are decoded: the bitmask
                 // is a property of the filter columns, and the vector payload is
                 // the largest column in the table. Every other cell comes back
@@ -7762,10 +7826,6 @@ impl Engine {
                         .map(|(seq, _)| seq)
                         .collect(),
                 )
-            } else {
-                // Nothing to push the bitmask into: the exact scan decodes the
-                // table once and applies `keep` itself.
-                None
             }
         } else {
             None
@@ -8554,7 +8614,7 @@ impl Engine {
         /// read once the table lock is released (a scan holds one of these
         /// guards while it waits for `tables`).
         enum Handle {
-            Hnsw(Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>),
+            Hnsw(Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>),
             Text(SharedTextIndex),
             Sparse(Arc<std::sync::RwLock<SparseIndex>>),
             Mv(Arc<std::sync::RwLock<MultiVectorIndex>>),
@@ -8591,7 +8651,7 @@ impl Engine {
             };
             let (row_count, mem_used) = match handle {
                 Some(Handle::Hnsw(h)) => {
-                    let h = h.lock().unwrap();
+                    let h = h.read().unwrap();
                     (h.len(), h.mem_usage())
                 }
                 Some(Handle::Text(t)) => {

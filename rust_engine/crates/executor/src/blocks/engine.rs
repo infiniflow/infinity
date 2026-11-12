@@ -1095,13 +1095,21 @@ impl Engine {
                     self.write_hnsw_index(&im.table, &im.name),
                     Ok(written) if written > 0
                 ) {
-                    let key = self.table_key(&im.table);
-                    let mut tables = self.tables.lock().unwrap();
-                    if let Some(e) = tables.get_mut(&key) {
-                        e.hnsw_mem.remove(&im.column);
-                        e.index_pending_bytes.insert(im.column.clone(), 0);
-                        e.hnsw_probed = false;
+                    {
+                        let key = self.table_key(&im.table);
+                        let mut tables = self.tables.lock().unwrap();
+                        if let Some(e) = tables.get_mut(&key) {
+                            e.hnsw_mem.remove(&im.column);
+                            e.index_pending_bytes.insert(im.column.clone(), 0);
+                            e.hnsw_probed = false;
+                        }
                     }
+                    // The chunk just written is the only thing holding these
+                    // rows now. Without loading it the next query finds neither a
+                    // sealed segment nor a memory segment and falls back to the
+                    // exact scan - every vector query after the first flush
+                    // decoded the whole column.
+                    self.reload_vector_indexes();
                 }
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                 let _ = self.write_fulltext_index(&im.table, &im.name);
@@ -4345,7 +4353,7 @@ impl Engine {
                 // nothing to write and must not rebuild the whole graph.
                 return Ok((0, Vec::new()));
             };
-            let Ok(mem) = mem.lock() else {
+            let Ok(mem) = mem.read() else {
                 return Ok((0, Vec::new()));
             };
             if mem.is_empty() {
@@ -5274,8 +5282,13 @@ impl Engine {
             enterpoint: (regions.enterpoint >= 0).then_some(regions.enterpoint as usize),
             store_meta: bytes[regions.store_meta].to_vec(),
             records: Vec::new(),
-            mapped: Some((src.clone(), regions.vectors.start, record_size)),
-            graph_region: bytes[regions.graph].to_vec(),
+            mapped: Some(MappedChunk {
+                src: src.clone(),
+                vector_off: regions.vectors.start,
+                record_size,
+                graph_off: regions.graph.start,
+            }),
+            graph_region: Vec::new(),
             labels: knn_format::decode_labels(&bytes[regions.labels]).ok()?,
             options,
         })
@@ -5291,31 +5304,30 @@ impl Engine {
         }
         let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
         // Only what enters the heap counts against the segment budget: a mapped
-        // chunk's vectors live in the page cache, so its footprint is the graph
-        // (plus the label bookkeeping), not the payload.
+        // chunk's payload and neighbour lists live in the page cache, so its
+        // footprint is the label bookkeeping alone.
         let bytes = parts.labels.len() * 4
             + parts.n * 4
-            + parts.graph_region.len()
             + if parts.mapped.is_some() {
                 0
             } else {
-                parts.records.len()
+                parts.records.len() + parts.graph_region.len()
             };
         // The neighbour lists go from the chunk bytes straight into the
         // compact slabs: no per-vertex `Vec` in between.
         let index = match &parts.mapped {
-            Some((src, vector_off, record_size)) => HnswIndex::from_chunk_region_mapped(
+            Some(mapped) => HnswIndex::from_chunk_region_mapped(
                 parts.dims,
                 parts.m.max(1) as usize,
                 (parts.ef as usize).max(64),
                 parts.options.metric,
                 parts.options.encoding,
                 &parts.store_meta,
-                src.clone(),
-                *vector_off,
-                *record_size,
+                mapped.src.clone(),
+                mapped.vector_off,
+                mapped.record_size,
                 parts.n,
-                &parts.graph_region,
+                mapped.graph_off,
                 entry,
                 parts.max_layer,
             )?,

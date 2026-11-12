@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 /// One document's tokenised terms and the byte cost of its postings, as produced
 /// by [`prepare_doc`] before the table's write gate is taken.
@@ -1286,7 +1287,7 @@ impl Engine {
         };
         // The table lock is only held to reach the per-segment mutexes; the
         // graph updates run under each segment's own lock.
-        let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
+        let segments: Vec<(String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
             if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
@@ -1334,7 +1335,7 @@ impl Engine {
                     // `MemIndexInserterIter1<MultiVectorRef>`).
                     let multivector = self.multivector_column(table, &im.column);
                     entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                        Arc::new(Mutex::new(if multivector {
+                        Arc::new(RwLock::new(if multivector {
                             crate::hnsw_mem::HnswIndexInMem::new_multivector(
                                 dims, m, efc, metric, encoding,
                             )
@@ -1358,7 +1359,7 @@ impl Engine {
             };
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            let Ok(mut mem) = mem.lock() else { continue };
+            let Ok(mut mem) = mem.write() else { continue };
             let dims = mem.dims;
             if mem.is_multivector() {
                 // One vertex per token; a cell whose length is not a multiple

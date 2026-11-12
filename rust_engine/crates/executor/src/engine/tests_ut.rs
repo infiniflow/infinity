@@ -3473,6 +3473,172 @@ mod tests {
         }
     }
 
+    /// A bad HNSW option is a DDL error, not a silent default: `M = 0` builds a
+    /// graph with no neighbour slots at all and `metric = 'l1'` would quietly
+    /// become `l2`, and both are persisted into the catalog.
+    #[test]
+    fn hnsw_rejects_invalid_index_options() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE io (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for (i, opt) in [
+            "M=0",
+            "M=abc",
+            "M=99999",
+            "EF_CONSTRUCTION=1",
+            "METRIC='l1'",
+            "ENCODE='foo'",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let sql = format!("CREATE INDEX io_{i} ON io (v) USING HNSW WITH ({opt});");
+            assert!(e.execute(&sql).is_err(), "{opt} must be rejected");
+        }
+        // The valid spellings still work.
+        e.execute(
+            "CREATE INDEX io_ok ON io (v) USING HNSW              WITH (M=8, EF_CONSTRUCTION=100, METRIC='cosine', ENCODE='plain');",
+        )
+        .unwrap();
+    }
+
+    /// One `DELETE` must not send every later KNN query to the exact scan: the
+    /// coverage check asks whether every *live* row is labelled, not whether the
+    /// counts match (the graph still labels the deleted row).
+    #[test]
+    fn a_deleted_row_leaves_the_graph_in_charge() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dv (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO dv VALUES ");
+        for i in 0..200 {
+            sql.push_str(&format!("({i}, [{i}.0,0.0,0.0,0.0])"));
+            if i < 199 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.execute("CREATE INDEX dv_i ON dv (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        e.flush().unwrap();
+        e.execute("DELETE FROM dv WHERE id = 7;").unwrap();
+        // The deleted row is gone and the nearest survivor answers.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.4,0.0,0.0,0.0], 'float', 'l2', 1);"
+            ),
+            vec![vec!["8".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM dv SEARCH MATCH VECTOR (v, [7.0,0.0,0.0,0.0], 'float', 'l2', 3);"
+            )
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
+            vec!["6".to_string(), "8".to_string(), "5".to_string()]
+        );
+    }
+
+    /// A filtered KNN answered from a secondary index must rank exactly like the
+    /// same filter evaluated over decoded columns: the bitmask comes from the
+    /// index (`CommonQueryFilter::filter_result_`), the answers must not.
+    #[test]
+    fn an_index_answered_filter_matches_the_decoded_one() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // `fvi` indexes `tag`; `fvd` does not, so the same predicate is answered
+        // from the index in one table and by decoding it in the other.
+        for t in ["fvi", "fvd"] {
+            e.execute(&format!(
+                "CREATE TABLE {t} (id INT, tag INT, v EMBEDDING(FLOAT,4));"
+            ))
+            .unwrap();
+            let mut sql = format!("INSERT INTO {t} VALUES ");
+            for i in 0..200 {
+                sql.push_str(&format!("({i}, {}, [{i}.0,0.0,0.0,0.0])", i % 7));
+                if i < 199 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH (metric='l2');"
+            ))
+            .unwrap();
+        }
+        e.execute("CREATE INDEX fvi_tag ON fvi (tag);").unwrap();
+        e.flush().unwrap();
+
+        for filter in [
+            "tag = 3",
+            "tag >= 5",
+            "tag <= 1",
+            "tag > 4",
+            "tag < 2",
+            "tag >= 2 AND tag <= 3",
+            "3 = tag",
+        ] {
+            let query = |t: &str| {
+                format!(
+                    "SELECT id FROM {t} SEARCH MATCH VECTOR                      (v, [97.4,0.0,0.0,0.0], 'float', 'l2', 5) WHERE {filter};"
+                )
+            };
+            let indexed = rows(&e, &query("fvi"));
+            let decoded = rows(&e, &query("fvd"));
+            assert_eq!(indexed, decoded, "filter `{filter}`");
+            assert!(!indexed.is_empty(), "filter `{filter}` admits rows");
+            // Every answer satisfies the filter.
+            let tags: Vec<i64> = indexed
+                .iter()
+                .map(|r| r[0].parse::<i64>().unwrap() % 7)
+                .collect();
+            assert_eq!(tags.len(), indexed.len(), "filter `{filter}`");
+        }
+    }
+
+    /// A filter that admits very few rows still returns a full `topn`: the probe
+    /// widens its beam instead of handing back a short answer, and the rows it
+    /// finds are the nearest admitted ones.
+    #[test]
+    fn a_selective_filter_still_returns_topn() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO sf VALUES ");
+        for i in 0..400 {
+            sql.push_str(&format!(
+                "({i}, {}, [{i}.0,0.0,0.0,0.0])",
+                if i % 200 == 7 { 1 } else { 0 }
+            ));
+            if i < 399 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        // Two admitted rows out of four hundred, both far from the query.
+        e.execute("CREATE INDEX sf_i ON sf (v) USING HNSW WITH (metric='l2', M=8);")
+            .unwrap();
+        e.flush().unwrap();
+        let got = rows(
+            &e,
+            "SELECT id FROM sf SEARCH MATCH VECTOR (v, [399.0,0.0,0.0,0.0], 'float', 'l2', 2)              WHERE tag = 1;",
+        );
+        assert_eq!(
+            got,
+            vec![vec!["207".to_string()], vec!["7".to_string()]],
+            "both admitted rows come back, nearest first"
+        );
+    }
+
     /// A sealed HNSW chunk is **mapped**, not read: its vector payload stays in
     /// the page cache and a loaded segment's heap is its graph, which is the
     /// reference's shape (`PlainVecStoreInner` points into the buffer).
@@ -3509,6 +3675,11 @@ mod tests {
             0,
             "a mapped store keeps no vectors"
         );
+        assert!(
+            index.neighbors_are_mapped(),
+            "the neighbour lists must be read out of the mapping too"
+        );
+        assert_eq!(index.mem_usage(), 0, "a loaded chunk costs no heap");
         assert_eq!(index.len(), 300);
         // The mapped payload is what answers: this engine has no memory segment.
         // Row 42's own vector: [42, 43, …, 49].
@@ -3689,7 +3860,7 @@ mod tests {
             .unwrap()
             .values()
             .flat_map(|t| t.hnsw_mem.values())
-            .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+            .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
             .sum();
         assert_eq!(
             indexed, 0,
@@ -6253,7 +6424,7 @@ mod tests {
         let text = entry.text.get("body").unwrap().read().unwrap();
         assert_eq!(text.total_docs(), 3);
         drop(text);
-        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
+        let mem = entry.hnsw_mem.get("v").unwrap().read().unwrap();
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
@@ -8050,7 +8221,7 @@ mod tests {
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 10);
@@ -8060,7 +8231,7 @@ mod tests {
             e.tables.lock().unwrap().values().all(|t| t
                 .hnsw_mem
                 .values()
-                .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
+                .all(|m| m.read().map(|m| m.is_empty()).unwrap_or(true))),
             "the dump empties the HNSW memory segment"
         );
 
@@ -8111,7 +8282,7 @@ mod tests {
                 .unwrap()
                 .values()
                 .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
+                .map(|m| m.read().map(|m| m.len()).unwrap_or(0))
                 .sum::<usize>()
         };
         assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");

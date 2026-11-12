@@ -164,7 +164,7 @@ impl Engine {
             if kind.eq_ignore_ascii_case("HNSW") {
                 let segments = self.hnsw_mem_segments(&table, &meta.column)?;
                 for mem in segments {
-                    let Ok(mut mem) = mem.lock() else { continue };
+                    let Ok(mut mem) = mem.write() else { continue };
                     for (seq, cells) in &gap {
                         let Some(value) = cells.get(ci) else { continue };
                         let text = value.to_slt_string();
@@ -529,7 +529,9 @@ impl Engine {
                         .vector
                         .entry(im.column.clone())
                         .or_default();
-                    list.sort_by_key(|s| std::cmp::Reverse(s.bytes));
+                    // Ascending, so `pop` takes the largest: evicting the
+                    // biggest graph frees the most with one query left cold.
+                    list.sort_by_key(|s| s.bytes);
                     while total > budget && list.len() > 1 {
                         let gone = list.pop().unwrap();
                         total = total.saturating_sub(gone.bytes);
@@ -607,7 +609,7 @@ impl Engine {
                     .and_then(|e| e.hnsw_mem.get(&meta.column).cloned())
             };
             return mem
-                .and_then(|m| m.lock().ok().map(|g| !g.is_empty()))
+                .and_then(|m| m.read().ok().map(|g| !g.is_empty()))
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("IVF") {
@@ -1985,6 +1987,95 @@ impl Engine {
         self.index_range_lookup_one(table, column, ranges)
     }
 
+    /// Rows a predicate admits, answered by the secondary indexes alone.
+    ///
+    /// The reference compiles a filter into a bitmask from whichever index can
+    /// answer it (`CommonQueryFilter::filter_result_`) and hands that bitmask to
+    /// the vector index. Answering the same predicate from the secondary indexes
+    /// keeps a filtered KNN probe from decoding the predicate's own columns.
+    ///
+    /// Only a conjunction of indexed comparisons is answerable. An `OR`, an
+    /// unindexed column, `LIKE` or a function of two columns returns `None`, and
+    /// the caller decodes the columns as it did before.
+    pub(crate) fn predicate_rows_from_indexes(
+        &self,
+        table: &str,
+        pred: &expression::Expr,
+    ) -> Option<std::collections::HashSet<usize>> {
+        let schema = self.table_schema(table).ok()?;
+        let mut conjuncts = Vec::new();
+        flatten_and(pred, &mut conjuncts);
+        let mut rows: Option<std::collections::HashSet<usize>> = None;
+        for conjunct in conjuncts {
+            let admitted = self.conjunct_rows(table, &schema, conjunct)?;
+            rows = Some(match rows {
+                Some(previous) => previous.intersection(&admitted).copied().collect(),
+                None => admitted,
+            });
+        }
+        rows
+    }
+
+    fn conjunct_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        expr: &expression::Expr,
+    ) -> Option<std::collections::HashSet<usize>> {
+        let expression::Expr::Cmp(left, op, right) = expr else {
+            return None;
+        };
+        // `column <op> literal`, or the literal on the left with the operator
+        // mirrored (`7 > column` is `column < 7`).
+        let (index, value, op) = match (&**left, &**right) {
+            (expression::Expr::Column(i), expression::Expr::Literal(v)) => (*i, v, *op),
+            (expression::Expr::Literal(v), expression::Expr::Column(i)) => (*i, v, mirror_cmp(*op)),
+            _ => return None,
+        };
+        let column = schema.get(index)?;
+        self.index_rows_for(table, column, op, value)
+    }
+
+    fn index_rows_for(
+        &self,
+        table: &str,
+        column: &str,
+        op: parser::CmpOp,
+        value: &expression::Value,
+    ) -> Option<std::collections::HashSet<usize>> {
+        use parser::{CmpOp, Literal};
+        let literal = match value {
+            expression::Value::Int(i) => Literal::Int(*i),
+            expression::Value::Float(f) => Literal::Float(*f),
+            expression::Value::Str(s) => Literal::Str(s.clone()),
+            _ => return None,
+        };
+        let set = |rows: Vec<u64>| rows.into_iter().map(|row| row as usize).collect();
+        match op {
+            CmpOp::Eq => Some(set(self.index_lookup(table, column, &literal)?)),
+            CmpOp::Ge | CmpOp::Le | CmpOp::Gt | CmpOp::Lt => {
+                // The range read takes closed bounds; an open end is the
+                // planner's `i64::MIN`/`i64::MAX` (`bound_key` clamps it).
+                let (lo, hi) = match op {
+                    CmpOp::Ge | CmpOp::Gt => (value.clone(), expression::Value::Int(i64::MAX)),
+                    _ => (expression::Value::Int(i64::MIN), value.clone()),
+                };
+                let mut rows: std::collections::HashSet<usize> =
+                    set(self.index_range_lookup(table, column, &[(lo, hi)])?);
+                if matches!(op, CmpOp::Gt | CmpOp::Lt) {
+                    // A strict bound is the closed range minus its boundary.
+                    if let Some(equal) = self.index_lookup(table, column, &literal) {
+                        for row in equal {
+                            rows.remove(&(row as usize));
+                        }
+                    }
+                }
+                Some(rows)
+            }
+            _ => None,
+        }
+    }
+
     /// The functional index the evaluator's expression names, if the registry
     /// carries one.
     ///
@@ -2632,7 +2723,7 @@ impl Engine {
                 .map(|e| {
                     e.hnsw_mem
                         .iter()
-                        .filter(|(_, m)| m.lock().map(|g| g.len() >= capacity).unwrap_or(false))
+                        .filter(|(_, m)| m.read().map(|g| g.len() >= capacity).unwrap_or(false))
                         .map(|(c, _)| c.clone())
                         .collect()
                 })
@@ -2719,4 +2810,27 @@ fn merge_covered_ranges(chunks: &[catalog::layout::SegmentIndex]) -> Vec<(u64, u
         }
     }
     merged
+}
+
+/// The conjuncts of an `AND` tree, in order.
+fn flatten_and<'a>(expr: &'a expression::Expr, out: &mut Vec<&'a expression::Expr>) {
+    match expr {
+        expression::Expr::And(a, b) => {
+            flatten_and(a, out);
+            flatten_and(b, out);
+        }
+        other => out.push(other),
+    }
+}
+
+/// `op` with its operands swapped (`a < b` is `b > a`).
+fn mirror_cmp(op: parser::CmpOp) -> parser::CmpOp {
+    use parser::CmpOp;
+    match op {
+        CmpOp::Lt => CmpOp::Gt,
+        CmpOp::Le => CmpOp::Ge,
+        CmpOp::Gt => CmpOp::Lt,
+        CmpOp::Ge => CmpOp::Le,
+        other => other,
+    }
 }

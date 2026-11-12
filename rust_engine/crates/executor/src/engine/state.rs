@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::RwLock;
 
 #[cfg(test)]
 thread_local! {
@@ -4574,7 +4575,7 @@ pub(crate) struct TableEntry {
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
     /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).
-    pub(crate) hnsw_mem: HashMap<String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+    pub(crate) hnsw_mem: HashMap<String, Arc<RwLock<crate::hnsw_mem::HnswIndexInMem>>>,
     /// HNSW bytes buffered per column since its last dump (memindex quota).
     pub(crate) index_pending_bytes: HashMap<String, usize>,
     /// Whether this table's HNSW indexes were probed since the last dump.

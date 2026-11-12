@@ -177,7 +177,11 @@ impl Engine {
                     candidates.insert(offset as usize);
                 }
             }
-            return Some(include_uncovered(q, candidates, &covered));
+            let live = live_row_ids(q);
+            if live.iter().all(|row| covered.contains(row)) {
+                return Some(candidates);
+            }
+            return Some(uncovered_candidates(q, candidates, &covered, &live));
         }
         // The HNSW stage over-fetches: the reference swaps `topk` for
         // `10 * topk` before the search and restores it for the exact
@@ -231,90 +235,124 @@ impl Engine {
         if segments.is_empty() && mem.is_none() {
             return None;
         }
-        let mut labelled = 0usize;
-        // `KnnSearchOption.ef_`: the candidate list size for the bottom
-        // layer (`WITH (ef = ...)`).
-        let search_option = index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
-        let dims = q.queries.first().map(Vec::len).unwrap_or(0);
-        let mut merge =
-            index::merge_knn::MergeKnn::new(1, pool, index::merge_knn::Compare::Max, None);
-        merge.begin();
-        for seg in &segments {
-            if seg.index.dims() != dims {
-                return None;
-            }
-            labelled += seg.labelled_rows;
-            let hits: Vec<(f32, u64)> = if q.multivector {
-                let labels = &seg.labels;
-                let row_of = |node: usize| labels.get(node).copied().unwrap_or(u32::MAX) as u64;
-                seg.index
-                    .search_multivector(
-                        q.queries,
-                        pool.min(seg.labelled_rows.max(1)),
-                        search_option,
-                        &row_of,
-                        Some(&allow_row),
-                    )
-                    .into_iter()
-                    .map(|(row, dist)| (dist, row))
-                    .collect()
-            } else {
-                let query = q.queries.first()?;
-                let seg_k = k.min(seg.labels.len().max(1));
-                let hits = if q.allow.is_none() {
-                    seg.index.search_index(query, seg_k, search_option)
-                } else {
-                    // The reference pushes the block's bitmask into the graph;
-                    // without a filter the plain probe is cheaper.
+        // A filtered probe hands the graph a bitmask, and the graph can then
+        // return fewer than `topn` rows even though the table holds them. The
+        // reference leaves a short answer alone; a served query cannot, so the
+        // beam is widened and the probe repeated before falling back.
+        let mut ef_override = q.options.ef;
+        let mut retries = 0usize;
+        let mut labelled;
+        // Rows the memory segment holds, kept for the coverage check below: its
+        // labels are as authoritative as a sealed chunk's.
+        let mut mem_rows: Vec<u64> = Vec::new();
+        let candidates: HashSet<usize> = loop {
+            labelled = 0usize;
+            mem_rows.clear();
+            // `KnnSearchOption.ef_`: the candidate list size for the bottom
+            // layer (`WITH (ef = ...)`).
+            let search_option = index::hnsw_handler::KnnSearchOption { ef: ef_override };
+            let dims = q.queries.first().map(Vec::len).unwrap_or(0);
+            let mut merge =
+                index::merge_knn::MergeKnn::new(1, pool, index::merge_knn::Compare::Max, None);
+            merge.begin();
+            for seg in &segments {
+                if seg.index.dims() != dims {
+                    return None;
+                }
+                labelled += seg.labelled_rows;
+                let hits: Vec<(f32, u64)> = if q.multivector {
                     let labels = &seg.labels;
-                    let accept =
-                        |node: usize| labels.get(node).is_some_and(|row| allow_row(*row as u64));
+                    let row_of = |node: usize| labels.get(node).copied().unwrap_or(u32::MAX) as u64;
                     seg.index
-                        .search_index_filtered(query, seg_k, search_option, &accept)
-                };
-                hits.into_iter()
-                    .map(|(node, dist)| (dist, seg.labels[node] as u64))
-                    .collect()
-            };
-            merge.search(0, &hits);
-        }
-        // Rows the sealed graphs hold, for the coverage check below.
-        let mut covered: std::collections::HashSet<usize> = Default::default();
-        if let Some(mem) = mem {
-            if let Ok(mem) = mem.lock() {
-                // Coverage is what the segment *holds*, not what it returned: a
-                // `topn * 4` result set can never cover a table, so adding only
-                // the hits made every indexed query declare itself incomplete and
-                // fall back to the exact scan.
-                labelled += mem.labelled_rows();
-                let hits: Vec<(u64, f32)> = if q.multivector {
-                    mem.search_multivector(q.queries, pool, q.options.ef, Some(&allow_row))
+                        .search_multivector(
+                            q.queries,
+                            pool.min(seg.labelled_rows.max(1)),
+                            search_option,
+                            &row_of,
+                            Some(&allow_row),
+                        )
+                        .into_iter()
+                        .map(|(row, dist)| (dist, row))
+                        .collect()
                 } else {
                     let query = q.queries.first()?;
-                    if q.allow.is_none() {
-                        mem.search_with_ef(query, k, q.options.ef)
+                    let seg_k = k.min(seg.labels.len().max(1));
+                    let hits = if q.allow.is_none() {
+                        seg.index.search_index(query, seg_k, search_option)
                     } else {
-                        mem.search_with_ef_filtered(query, k, q.options.ef, &allow_row)
-                    }
+                        // The reference pushes the block's bitmask into the graph;
+                        // without a filter the plain probe is cheaper.
+                        let labels = &seg.labels;
+                        let accept = |node: usize| {
+                            labels.get(node).is_some_and(|row| allow_row(*row as u64))
+                        };
+                        seg.index
+                            .search_index_filtered(query, seg_k, search_option, &accept)
+                    };
+                    hits.into_iter()
+                        .map(|(node, dist)| (dist, seg.labels[node] as u64))
+                        .collect()
                 };
-                for (row, dist) in hits {
-                    merge.add_result(0, dist, row);
+                merge.search(0, &hits);
+            }
+            if let Some(mem) = &mem {
+                if let Ok(mem) = mem.read() {
+                    // Coverage is what the segment *holds*, not what it returned: a
+                    // `topn * 4` result set can never cover a table, so adding only
+                    // the hits made every indexed query declare itself incomplete and
+                    // fall back to the exact scan.
+                    labelled += mem.labelled_rows();
+                    mem_rows.extend(mem.rows().iter().copied());
+                    let hits: Vec<(u64, f32)> = if q.multivector {
+                        mem.search_multivector(q.queries, pool, ef_override, Some(&allow_row))
+                    } else {
+                        let query = q.queries.first()?;
+                        if q.allow.is_none() {
+                            mem.search_with_ef(query, k, ef_override)
+                        } else {
+                            mem.search_with_ef_filtered(query, k, ef_override, &allow_row)
+                        }
+                    };
+                    for (row, dist) in hits {
+                        merge.add_result(0, dist, row);
+                    }
                 }
             }
-        }
-        merge.end();
-        let candidates: std::collections::HashSet<usize> = merge
-            .ids_by_idx(0)
-            .into_iter()
-            .map(|r| r as usize)
-            .collect();
+            merge.end();
+            let candidates: std::collections::HashSet<usize> = merge
+                .ids_by_idx(0)
+                .into_iter()
+                .map(|r| r as usize)
+                .collect();
+            // Too few admitted rows: widen the beam and probe again. Each pass
+            // doubles the pool, so a filter that admits a handful of rows still
+            // finds their nearest members instead of returning a short answer.
+            if q.allow.is_some() && candidates.len() < q.topn && retries < 2 {
+                retries += 1;
+                ef_override = Some(ef_override.unwrap_or(pool).saturating_mul(4).max(pool));
+                continue;
+            }
+            break candidates;
+        };
         if all_covered(q, labelled) {
             return Some(candidates);
         }
+        // A count is not a set. `labelled` also counts rows deleted since the
+        // graph was written, so one deletion made `labelled == live` false for
+        // ever and every query after it fell back to the exact scan - the whole
+        // vector column decoded per query. Ask the question directly instead:
+        // every live row has to be held by some graph. It is only paid for once
+        // the count has already failed.
+        let mut covered: HashSet<usize> = HashSet::with_capacity(labelled);
         for seg in &segments {
             covered.extend(seg.labels.iter().map(|label| *label as usize));
         }
-        Some(include_uncovered(q, candidates, &covered))
+        covered.extend(mem_rows.iter().map(|label| *label as usize));
+        let live = live_row_ids(q);
+        if live.iter().all(|row| covered.contains(row)) {
+            return Some(candidates);
+        }
+        Some(uncovered_candidates(q, candidates, &covered, &live))
     }
 }
 
@@ -331,12 +369,13 @@ impl Engine {
 /// last dump are in the memory segment; this path only matters when a segment
 /// is missing an index chunk (an index built over a partially indexed table, or
 /// one whose memory segment was dropped).
-fn include_uncovered(
+fn uncovered_candidates(
     q: &KnnCandidateScan<'_>,
     mut candidates: HashSet<usize>,
     covered: &HashSet<usize>,
+    live: &[usize],
 ) -> HashSet<usize> {
-    for row in live_row_ids(q) {
+    for &row in live {
         // A filtered query's rows are only decoded as the vector projection, so
         // the predicate cannot be re-evaluated on them afterwards; `allow` is
         // the complete result of that predicate, and intersecting here is what
@@ -716,14 +755,15 @@ mod tests {
             metric: "l2",
             options: &options,
         };
+        let live = [0usize, 1, 2];
         assert_eq!(
-            include_uncovered(&q, HashSet::new(), &covered),
+            uncovered_candidates(&q, HashSet::new(), &covered, &live),
             [2usize].into_iter().collect::<HashSet<_>>(),
             "row 1 is unlabelled but the filter refuses it"
         );
         q.allow = None;
         assert_eq!(
-            include_uncovered(&q, HashSet::new(), &covered),
+            uncovered_candidates(&q, HashSet::new(), &covered, &live),
             [1usize, 2].into_iter().collect::<HashSet<_>>(),
             "without a filter every unlabelled row is scored"
         );

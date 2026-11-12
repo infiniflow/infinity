@@ -39,29 +39,72 @@ const NO_BLOCK: u32 = u32::MAX;
 /// so it is read on demand rather than copied.
 #[derive(Clone, Copy)]
 pub struct Neighbors<'a> {
-    slots: &'a [AtomicU32],
+    slots: Slots<'a>,
+}
+
+#[derive(Clone, Copy)]
+enum Slots<'a> {
+    /// The builder's own slabs, written concurrently during construction.
+    Shared(&'a [AtomicU32]),
+    /// A sealed chunk's region: ids read straight out of the file mapping.
+    Mapped(&'a [u32]),
 }
 
 impl<'a> Neighbors<'a> {
     /// An empty list, for vertices the caller knows are absent.
     #[inline]
     pub fn empty() -> Self {
-        Self { slots: &[] }
+        Self {
+            slots: Slots::Shared(&[]),
+        }
+    }
+
+    #[inline]
+    fn shared(slots: &'a [AtomicU32]) -> Self {
+        Self {
+            slots: Slots::Shared(slots),
+        }
+    }
+
+    #[inline]
+    fn mapped(slots: &'a [u32]) -> Self {
+        Self {
+            slots: Slots::Mapped(slots),
+        }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.slots.len()
+        match self.slots {
+            Slots::Shared(s) => s.len(),
+            Slots::Mapped(s) => s.len(),
+        }
     }
 
     #[inline]
     pub fn get(&self, index: usize) -> Option<u32> {
-        self.slots.get(index).map(|s| s.load(Ordering::Relaxed))
+        match self.slots {
+            Slots::Shared(s) => s.get(index).map(|s| s.load(Ordering::Relaxed)),
+            Slots::Mapped(s) => s.get(index).copied(),
+        }
     }
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = u32> + 'a {
-        self.slots.iter().map(|s| s.load(Ordering::Relaxed))
+        // Exactly one arm is non-empty; chaining them keeps the iterator a single
+        // concrete type without an `Either` helper.
+        let shared: &'a [AtomicU32] = match self.slots {
+            Slots::Shared(s) => s,
+            Slots::Mapped(_) => &[],
+        };
+        let mapped: &'a [u32] = match self.slots {
+            Slots::Mapped(s) => s,
+            Slots::Shared(_) => &[],
+        };
+        shared
+            .iter()
+            .map(|s| s.load(Ordering::Relaxed))
+            .chain(mapped.iter().copied())
     }
 
     pub fn to_vec(&self) -> Vec<u32> {
@@ -95,6 +138,140 @@ pub(crate) struct GraphStore {
     up_start: Vec<u32>,
     /// Number of upper-layer blocks handed out so far.
     up_blocks: usize,
+    /// Set when this graph **is** a sealed chunk's `GraphStoreInner` region:
+    /// then every list reads out of the file mapping and the slabs above stay
+    /// empty. The reference's `GraphStoreInner` is a pointer into the buffer
+    /// manager's chunk, so its graph costs no heap either; decoding the region
+    /// into `l0`/`up` was the last full copy a loaded index made.
+    mapped: Option<MappedGraph>,
+}
+
+/// A graph read out of a mapped chunk.
+///
+/// Everything is derived from the region on demand — the level of a vertex, the
+/// offset of its upper-layer block, the count and the slots — so only the header
+/// is materialised here.
+#[derive(Clone)]
+struct MappedGraph {
+    src: crate::vector::ByteSource,
+    /// Offset of the `layer_sum` header inside `src`.
+    base: usize,
+    n: usize,
+    /// Level-0 record stride (`VERTEX_L0_SIZE + 4 * Mmax0`).
+    l0: usize,
+    /// Upper-layer record stride (`VERTEX_LX_SIZE + 4 * Mmax`).
+    lx: usize,
+    layer_sum: usize,
+}
+
+/// The 20-byte header of a level-0 record: level at +0, `layers_p_` at +8,
+/// `neighbor_n_` at +16, the slots from +20 (the record's trailing 4 bytes are
+/// alignment padding, which is why the slots do not start at `VERTEX_L0_SIZE`).
+const L0_SLOTS: usize = 20;
+/// The 4-byte `neighbor_n_` that opens an upper-layer record.
+const LX_SLOTS: usize = 4;
+
+/// Reinterprets mapped bytes as `u32` ids.
+#[allow(unsafe_code)]
+fn u32s_at(bytes: &[u8]) -> Option<&[u32]> {
+    if !bytes.len().is_multiple_of(4) {
+        return None;
+    }
+    // SAFETY: `u32` has four-byte alignment and accepts every bit pattern; the
+    // region's start and every slot offset are validated to be 4-byte aligned
+    // before a mapping is accepted, and a published chunk is never written, so
+    // no `&u32` here can observe a torn value.
+    let (head, mid, tail) = unsafe { bytes.align_to::<u32>() };
+    (head.is_empty() && tail.is_empty()).then_some(mid)
+}
+
+impl MappedGraph {
+    fn bytes(&self) -> &[u8] {
+        self.src.as_ref().as_ref()
+    }
+
+    /// Offset of `node`'s level-0 record.
+    fn l0_record(&self, node: usize) -> usize {
+        self.base + 8 + node * self.l0
+    }
+
+    /// Offset of the first upper-layer record.
+    fn upper_base(&self) -> usize {
+        self.base + 8 + self.n * self.l0
+    }
+
+    fn i32_at(&self, at: usize) -> Option<i32> {
+        self.bytes()
+            .get(at..at + 4)
+            .map(|b| i32::from_le_bytes(b.try_into().unwrap()))
+    }
+
+    fn u64_at(&self, at: usize) -> Option<u64> {
+        self.bytes()
+            .get(at..at + 8)
+            .map(|b| u64::from_le_bytes(b.try_into().unwrap()))
+    }
+
+    /// `mmax0`, the slot count a level-0 record was written with.
+    fn slots_l0(&self) -> usize {
+        (self.l0 - VERTEX_L0_SIZE) / 4
+    }
+
+    /// `mmax`, the slot count an upper-layer record was written with.
+    fn slots_up(&self) -> usize {
+        (self.lx - VERTEX_LX_SIZE) / 4
+    }
+
+    /// `count` slots at `at`, read out of the mapping.
+    fn slots_at(&self, at: usize, count: usize) -> Neighbors<'_> {
+        match at
+            .checked_add(count.saturating_mul(4))
+            .and_then(|end| self.bytes().get(at..end))
+            .and_then(u32s_at)
+        {
+            Some(slots) => Neighbors::mapped(slots),
+            None => Neighbors::empty(),
+        }
+    }
+
+    fn neighbors(&self, layer: usize, node: usize) -> Neighbors<'_> {
+        if node >= self.n {
+            return Neighbors::empty();
+        }
+        let record = self.l0_record(node);
+        let level = self.i32_at(record).filter(|l| *l >= 0).unwrap_or(0) as usize;
+        if layer == 0 {
+            // `neighbor_n_` sits at +16; the slots start at +20.
+            let count = self.i32_at(record + 16).unwrap_or(0);
+            let count = if count <= 0 { 0 } else { count as usize };
+            return self.slots_at(record + L0_SLOTS, count.min(self.slots_l0()));
+        }
+        if layer > level {
+            return Neighbors::empty();
+        }
+        // `layers_p_` is a byte offset into the upper region, block per layer.
+        let block = self
+            .u64_at(record + 8)
+            .unwrap_or(0)
+            .try_into()
+            .ok()
+            .and_then(|at: usize| at.checked_add((layer - 1) * self.lx))
+            .and_then(|at| at.checked_add(self.upper_base()));
+        let Some(block) = block else {
+            return Neighbors::empty();
+        };
+        let count = self.i32_at(block).unwrap_or(0);
+        let count = if count <= 0 { 0 } else { count as usize };
+        self.slots_at(block + LX_SLOTS, count.min(self.slots_up()))
+    }
+
+    /// The region as it sits in the file, for a rewrite that re-encodes it.
+    fn region(&self) -> &[u8] {
+        let len = 8 + self.n * self.l0 + self.layer_sum * self.lx;
+        self.bytes()
+            .get(self.base..self.base + len)
+            .unwrap_or_default()
+    }
 }
 
 impl GraphStore {
@@ -109,11 +286,15 @@ impl GraphStore {
             up_len: Vec::new(),
             up_start: Vec::new(),
             up_blocks: 0,
+            mapped: None,
         }
     }
 
     pub fn len(&self) -> usize {
-        self.levels.len()
+        match &self.mapped {
+            Some(mapped) => mapped.n,
+            None => self.levels.len(),
+        }
     }
 
     pub(crate) fn max_degree(&self, layer: usize) -> usize {
@@ -125,7 +306,59 @@ impl GraphStore {
     }
 
     pub(crate) fn level_of(&self, node: usize) -> usize {
+        if let Some(mapped) = &self.mapped {
+            return mapped
+                .i32_at(mapped.l0_record(node))
+                .filter(|level| *level >= 0)
+                .unwrap_or(0) as usize;
+        }
         self.levels.get(node).copied().unwrap_or(0) as usize
+    }
+
+    /// Whether the graph reads out of a mapping instead of heap slabs.
+    pub(crate) fn is_mapped(&self) -> bool {
+        self.mapped.is_some()
+    }
+
+    /// Wraps a sealed chunk's `GraphStoreInner` region without copying it.
+    ///
+    /// `base` is the region's offset inside `src`. The layout is validated the
+    /// same way [`Self::from_cpp_region`] validates it, but nothing is stored:
+    /// levels, block offsets and counts are read where they are.
+    pub fn from_cpp_region_mapped(
+        src: crate::vector::ByteSource,
+        base: usize,
+        n: usize,
+        m: usize,
+    ) -> Result<Self, String> {
+        let l0 = VERTEX_L0_SIZE + 4 * (m * 2);
+        let lx = VERTEX_LX_SIZE + 4 * m;
+        let bytes = src.as_ref().as_ref();
+        let need = 8usize
+            .checked_add(n.checked_mul(l0).ok_or("graph size overflow")?)
+            .ok_or("graph size overflow")?;
+        let end = base.checked_add(need).ok_or("graph size overflow")?;
+        if bytes.len() < end {
+            return Err(format!("graph region truncated: {} < {end}", bytes.len()));
+        }
+        let layer_sum = u64::from_le_bytes(bytes[base..base + 8].try_into().unwrap()) as usize;
+        let mut upper_end = base + need;
+        upper_end = upper_end
+            .checked_add(layer_sum.checked_mul(lx).ok_or("graph size overflow")?)
+            .ok_or("graph size overflow")?;
+        if bytes.len() < upper_end {
+            return Err("upper-layer region truncated".to_string());
+        }
+        let mut graph = Self::new(m);
+        graph.mapped = Some(MappedGraph {
+            src,
+            base,
+            n,
+            l0,
+            lx,
+            layer_sum,
+        });
+        Ok(graph)
     }
 
     /// Appends `count` vertices, taking their levels from `new_levels`.
@@ -133,6 +366,10 @@ impl GraphStore {
     /// All the storage a batch needs is reserved here, before any thread starts
     /// writing: the builder only ever fills slots.
     pub(crate) fn push_levels(&mut self, new_levels: &[u32]) {
+        assert!(
+            self.mapped.is_none(),
+            "a mapped graph is a published chunk and is read-only"
+        );
         if new_levels.is_empty() {
             return;
         }
@@ -158,6 +395,10 @@ impl GraphStore {
 
     /// Appends one vertex with `level`.
     pub(crate) fn push_level(&mut self, level: usize) -> usize {
+        assert!(
+            self.mapped.is_none(),
+            "a mapped graph is a published chunk and is read-only"
+        );
         let node = self.levels.len();
         let level = level as u32;
         self.levels.push(level);
@@ -195,30 +436,33 @@ impl GraphStore {
     /// that layer or does not exist.
     #[inline]
     pub(crate) fn neighbors(&self, layer: usize, node: usize) -> Neighbors<'_> {
+        if let Some(mapped) = &self.mapped {
+            return mapped.neighbors(layer, node);
+        }
         if layer == 0 {
             let Some(count) = self.l0_len.get(node) else {
-                return Neighbors { slots: &[] };
+                return Neighbors::empty();
             };
             let count = count.load(Ordering::Acquire) as usize;
             let start = node * self.m0;
             let end = (start + count).min(self.l0.len());
-            return Neighbors {
-                slots: &self.l0[start.min(end)..end],
-            };
+            return Neighbors::shared(&self.l0[start.min(end)..end]);
         }
         let Some(block) = self.block(node, layer) else {
-            return Neighbors { slots: &[] };
+            return Neighbors::empty();
         };
         let count = self.up_len[block].load(Ordering::Acquire) as usize;
         let start = block * self.m;
         let end = (start + count).min(self.up.len());
-        Neighbors {
-            slots: &self.up[start.min(end)..end],
-        }
+        Neighbors::shared(&self.up[start.min(end)..end])
     }
 
     /// Replaces the neighbour list of `node` on `layer`.
     pub(crate) fn set_neighbors(&self, layer: usize, node: usize, list: &[u32]) {
+        assert!(
+            self.mapped.is_none(),
+            "a mapped graph is a published chunk and is read-only"
+        );
         let (slots, count) = if layer == 0 {
             let start = node * self.m0;
             (
@@ -242,6 +486,9 @@ impl GraphStore {
     /// `GraphStoreInner::AddNeighbor`: appends when there is room.
     /// Returns `false` when the list is already full.
     pub(crate) fn push_neighbor(&self, layer: usize, node: usize, neighbor: u32) -> bool {
+        if self.mapped.is_some() {
+            return false;
+        }
         let (slots, count) = if layer == 0 {
             let start = node * self.m0;
             (
@@ -267,12 +514,19 @@ impl GraphStore {
     /// Byte size the graph occupies in a chunk: the `layer_sum` header, one
     /// level-0 record per vertex and one upper-layer record per (vertex, layer).
     pub(crate) fn serialized_size(&self) -> usize {
+        if let Some(mapped) = &self.mapped {
+            return 8 + mapped.n * mapped.l0 + mapped.layer_sum * mapped.lx;
+        }
         let layer_sum: usize = self.levels.iter().map(|&l| l as usize).sum();
         8 + self.len() * self.level0_stride() + layer_sum * self.levelx_stride()
     }
 
     /// Bytes held by the graph, for the memindex budget.
     pub(crate) fn mem_bytes(&self) -> usize {
+        if self.mapped.is_some() {
+            // The lists live in the page cache; only the mapping handle is ours.
+            return 0;
+        }
         self.levels.capacity() * 4
             + self.l0.capacity() * 4
             + self.l0_len.capacity() * 4
@@ -313,6 +567,10 @@ impl GraphStore {
     /// the in-memory pointer has no meaning in a file, which is what
     /// `graph_store.cppm` does when it saves a chunk.
     pub fn to_cpp_region(&self) -> Vec<u8> {
+        if let Some(mapped) = &self.mapped {
+            // Already in this layout: hand the region back as it is.
+            return mapped.region().to_vec();
+        }
         let n = self.len();
         let l0 = self.level0_stride();
         let lx = self.levelx_stride();
@@ -483,6 +741,43 @@ mod tests {
             }
         }
         assert_eq!(decoded.to_cpp_region(), region);
+    }
+
+    /// The region can be searched where it lies: a mapped graph answers exactly
+    /// what the decoded one answers, and keeps no heap at all.
+    #[test]
+    fn a_region_can_be_walked_in_place() {
+        let owned = small_graph();
+        let region = owned.to_cpp_region();
+        let src: crate::vector::ByteSource = std::sync::Arc::new(region.clone());
+        let mapped = GraphStore::from_cpp_region_mapped(src, 0, 3, 2).unwrap();
+        assert!(mapped.is_mapped());
+        assert_eq!(mapped.len(), owned.len());
+        assert_eq!(mapped.serialized_size(), region.len());
+        assert_eq!(mapped.mem_bytes(), 0, "a mapped graph keeps no heap");
+        for node in 0..3 {
+            assert_eq!(mapped.level_of(node), owned.level_of(node));
+            for layer in 0..=owned.level_of(node) {
+                assert_eq!(
+                    mapped.neighbors(layer, node).to_vec(),
+                    owned.neighbors(layer, node).to_vec(),
+                    "node {node} layer {layer}"
+                );
+            }
+            // A layer the vertex does not reach stays empty.
+            assert_eq!(mapped.neighbors(owned.level_of(node) + 1, node).len(), 0);
+        }
+        assert_eq!(mapped.neighbors(0, 9).len(), 0, "no vertex 9");
+        // A rewrite hands the region back unchanged.
+        assert_eq!(mapped.to_cpp_region(), region);
+    }
+
+    #[test]
+    fn a_truncated_region_is_rejected() {
+        let region = small_graph().to_cpp_region();
+        let short = region[..region.len() - 4].to_vec();
+        let src: crate::vector::ByteSource = std::sync::Arc::new(short);
+        assert!(GraphStore::from_cpp_region_mapped(src, 0, 3, 2).is_err());
     }
 
     #[test]

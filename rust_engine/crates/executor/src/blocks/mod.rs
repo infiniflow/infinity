@@ -51,16 +51,28 @@ pub(crate) struct HnswChunkParts {
     pub(crate) enterpoint: Option<usize>,
     pub(crate) store_meta: Vec<u8>,
     pub(crate) records: Vec<u8>,
-    /// Set when the chunk is **mapped**: the file, the vector region's offset and
-    /// one vector's stride. `records` is empty then — the plain store borrows the
-    /// mapping instead of copying the payload into the heap
+    /// Set when the chunk is **mapped**: `records` and `graph_region` are empty
+    /// then and both regions are read out of the page cache
     /// (`HnswIndex::from_chunk_region_mapped`).
-    pub(crate) mapped: Option<(index::vector::ByteSource, usize, usize)>,
+    pub(crate) mapped: Option<MappedChunk>,
     /// The raw `GraphStoreInner` region, decoded straight into the compact
     /// graph (`HnswIndex::from_chunk_region`).
     pub(crate) graph_region: Vec<u8>,
     pub(crate) labels: Vec<u32>,
     pub(crate) options: HnswOptions,
+}
+
+/// A chunk read through its mapping.
+///
+/// The vector payload and the neighbour lists are the two big regions of a
+/// chunk; keeping their offsets instead of their bytes is what makes a loaded
+/// segment cost only its labels.
+pub(crate) struct MappedChunk {
+    pub(crate) src: index::vector::ByteSource,
+    pub(crate) vector_off: usize,
+    /// One vector's stride in the vector region.
+    pub(crate) record_size: usize,
+    pub(crate) graph_off: usize,
 }
 
 /// Distinct rows a chunk's labels name.

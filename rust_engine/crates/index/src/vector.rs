@@ -1258,12 +1258,12 @@ impl HnswIndex {
         vector_off: usize,
         record_size: usize,
         n: usize,
-        graph_region: &[u8],
+        graph_off: usize,
         entry: Option<usize>,
         max_level: usize,
     ) -> Option<Self> {
         let store = match encoding {
-            HnswEncoding::Plain => Store::plain_mapped(dims, metric, src, vector_off, n)?,
+            HnswEncoding::Plain => Store::plain_mapped(dims, metric, src.clone(), vector_off, n)?,
             _ => {
                 // A quantized region is a fraction of the plain payload and its
                 // decode is how it is read, so it keeps the copy.
@@ -1273,7 +1273,7 @@ impl HnswIndex {
                 Self::store_from_chunk_parts(dims, metric, encoding, meta, records, n)?
             }
         };
-        let graph = GraphStore::from_cpp_region(graph_region, n, m * 2, m).ok()?;
+        let graph = GraphStore::from_cpp_region_mapped(src, graph_off, n, m).ok()?;
         Some(Self {
             dims,
             m,
@@ -1287,6 +1287,12 @@ impl HnswIndex {
             max_level,
             rng: Rng::new(0x9E37_79B9_7F4A_7C15),
         })
+    }
+
+    /// Whether the neighbour lists are read out of the mapping rather than heap
+    /// slabs.
+    pub fn neighbors_are_mapped(&self) -> bool {
+        self.graph.is_mapped()
     }
 
     /// Total bytes of vector payload the store keeps **in the heap**; a mapped
@@ -1789,6 +1795,13 @@ impl HnswIndex {
         res
     }
 
+    /// The beam, bounded by the vertex count: `WITH (ef = 100000000)` on a small
+    /// graph must not allocate a hundred million candidate slots, and a beam
+    /// larger than the graph cannot find anything more anyway.
+    fn beam(&self, ef: usize) -> usize {
+        ef.max(1).min(self.store.len().max(1))
+    }
+
     fn search_query_candidates(&self, query: HnswQuery, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
@@ -1799,7 +1812,7 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let mut res = self.search_layer(&query, cur, ef.max(1), 0, None);
+        let mut res = self.search_layer(&query, cur, self.beam(ef), 0, None);
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.into_iter().map(|(d, i)| (i, d)).collect()
     }
@@ -1823,7 +1836,7 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let ef = ef.max(k);
+        let ef = self.beam(ef.max(k));
         let mut res = self.search_layer_filtered(&query, cur, ef, 0, None, Some(allow));
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
@@ -1920,7 +1933,7 @@ impl HnswIndex {
             l -= 1;
         }
         let nodes = self.store.len();
-        let ef = beam.max(1);
+        let ef = self.beam(beam);
         let mut visited = Visited::new();
         visited.begin(nodes, cur);
         let mut candidates: std::collections::BinaryHeap<std::cmp::Reverse<Cand>> =

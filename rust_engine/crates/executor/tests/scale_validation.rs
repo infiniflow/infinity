@@ -62,6 +62,19 @@ fn flat_lit(tokens: &[Vec<f32>]) -> String {
     format!("[{}]", parts.join(","))
 }
 
+/// The vector row `i` was inserted with: the generator is replayed, so a probe
+/// does not need the 100k-vector corpus kept alive.
+fn probe_vector(row: usize, dim: usize) -> Vec<f32> {
+    let mut rng = Rng(0x1234_5678_9ABC);
+    for i in 0..=row {
+        let v = rng.vector(dim);
+        if i == row {
+            return v;
+        }
+    }
+    unreachable!()
+}
+
 /// Resident set size in KiB, from `statm` (4 KiB pages on the platforms this
 /// suite runs on).
 fn rss_kb() -> u64 {
@@ -234,16 +247,19 @@ fn lsg_scaling_is_applied_and_keeps_recall() {
     );
 }
 
-/// A large sealed index loads without copying its vectors.
+/// A large index loads without copying its vectors — and the same holds once a
+/// checkpoint has added an incremental chunk, which is what a running system
+/// looks like: one full chunk plus the deltas written since.
 ///
 /// Structural, not statistical: the plain store must borrow the mapping
-/// (`vectors_are_mapped`), its heap size must be zero, and the segment's
-/// accounted bytes must be the graph's. RSS is printed for the reader but not
-/// asserted, because mapping a page in is the OS's decision, not the engine's.
+/// (`vectors_are_mapped`), the neighbour lists must do the same
+/// (`neighbors_are_mapped`), and the accounted heap must be the labels alone.
+/// RSS is printed for the reader but not asserted, because mapping a page in is
+/// the OS's decision, not the engine's.
 #[test]
 #[ignore = "large-scale: run with --ignored"]
 fn a_large_index_loads_without_copying_its_vectors() {
-    let (n, dim) = (100_000usize, 128usize);
+    let (first, second, dim) = (60_000usize, 40_000usize, 128usize);
     let dir = tempfile::tempdir().unwrap();
     {
         let e = Engine::open(dir.path()).unwrap();
@@ -252,53 +268,78 @@ fn a_large_index_loads_without_copying_its_vectors() {
         ))
         .unwrap();
         let mut rng = Rng(0x1234_5678_9ABC);
-        for lo in (0..n).step_by(2000) {
-            let hi = (lo + 2000).min(n);
-            let body: Vec<String> = (lo..hi)
-                .map(|i| format!("({i}, {})", lit(&rng.vector(dim))))
-                .collect();
-            e.execute(&format!("INSERT INTO big VALUES {};", body.join(",")))
-                .unwrap();
-        }
+        let mut insert = |lo: usize, hi: usize| {
+            for batch in (lo..hi).step_by(2000) {
+                let end = (batch + 2000).min(hi);
+                let body: Vec<String> = (batch..end)
+                    .map(|i| format!("({i}, {})", lit(&rng.vector(dim))))
+                    .collect();
+                e.execute(&format!("INSERT INTO big VALUES {};", body.join(",")))
+                    .unwrap();
+            }
+        };
+        insert(0, first);
         e.execute("CREATE INDEX big_i ON big (v) USING HNSW WITH (metric='l2', M=16);")
             .unwrap();
+        // The first flush mirrors the whole table as `chunk_0`.
         e.flush().unwrap();
+        // Rows written afterwards go into the memory segment and are sealed into
+        // an **incremental** chunk, exactly as a checkpoint does.
+        insert(first, first + second);
+        let written = e.dump_hnsw_index("big", "big_i").unwrap();
+        assert_eq!(written, second, "the dump only carries the new rows");
     }
     let e = Engine::open(dir.path()).unwrap();
     let before = rss_kb();
-    let loaded = e.load_vector_index("big", "big_i").unwrap();
+    let segments = e.load_vector_indexes("big", "big_i");
     let after = rss_kb();
-    let index = loaded.index.index();
-    let payload = n * dim * 4;
+    assert_eq!(segments.len(), 2, "a full chunk plus one delta");
+    let payload = (first + second) * dim * 4;
+    let mut accounted = 0usize;
+    for (i, segment) in segments.iter().enumerate() {
+        let index = segment.index.index();
+        assert!(
+            index.vectors_are_mapped(),
+            "chunk {i}: the payload must be borrowed from the mapping"
+        );
+        assert!(
+            index.neighbors_are_mapped(),
+            "chunk {i}: the neighbour lists must come from the mapping too"
+        );
+        assert_eq!(
+            index.mem_usage(),
+            0,
+            "chunk {i}: a loaded chunk costs no heap"
+        );
+        accounted += segment.bytes;
+    }
     println!(
-        "memory: n={n} dim={dim} payload={} MiB, mapped={}, vector heap={} B, \
-         segment accounted={} MiB, rss delta={} MiB",
+        "memory: n={} dim={dim} payload={} MiB in 2 chunks, mapped=true, \
+         vector heap=0 B, accounted={} KiB, rss delta={} MiB",
+        first + second,
         payload / (1 << 20),
-        index.vectors_are_mapped(),
-        index.store_mem_bytes(),
-        loaded.bytes / (1 << 20),
+        accounted / 1024,
         (after.saturating_sub(before)) / 1024,
     );
-    assert_eq!(index.len(), n);
+    assert_eq!(segments[0].index.len(), first);
+    assert_eq!(segments[1].index.len(), second);
+    // A copy of either payload would be tens of MiB; a decoded graph ~10.
     assert!(
-        index.vectors_are_mapped(),
-        "the payload must be borrowed from the mapping"
+        accounted < 2 * (1 << 20),
+        "the segments account {} KiB, so something was copied",
+        accounted / 1024
     );
-    assert_eq!(index.store_mem_bytes(), 0, "no vector heap");
-    // The graph is what is left: 24 + 4*2M bytes per vertex plus the label and
-    // level bookkeeping, ~16 MiB here. A copied payload alone would be 48 MiB.
-    assert!(
-        loaded.bytes < 40 * (1 << 20),
-        "segment accounts {} MiB, so the payload was copied",
-        loaded.bytes / (1 << 20)
-    );
-    // And it still answers.
-    let query = loaded.index.search_index(
-        &(0..dim).map(|j| j as f32 * 0.01).collect::<Vec<f32>>(),
-        5,
-        index::hnsw_handler::KnnSearchOption { ef: None },
-    );
-    assert_eq!(query.len(), 5);
+    // Rows from both chunks answer.
+    for probe in [7usize, first + second - 1] {
+        let got = texts(
+            &e,
+            &format!(
+                "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 5);",
+                lit(&probe_vector(probe, dim))
+            ),
+        );
+        assert_eq!(got.len(), 5, "probe {probe}");
+    }
 }
 
 /// Searches stay correct while rows are being inserted.
@@ -443,4 +484,83 @@ fn the_exhaustive_scan_answers_a_multi_token_query() {
     );
     assert_eq!(got.len(), 2, "{got:?}");
     assert_eq!(got[0], vec!["0".to_string()]);
+}
+
+/// Searches keep answering while a checkpoint dumps the memory segment.
+///
+/// The segment is behind a read-write lock: readers share it, so the dump (which
+/// only reads the graph to serialise it) no longer stops queries, and a writer
+/// still excludes both. Four readers and one dumping thread must all make
+/// progress and every answer must be complete.
+#[test]
+#[ignore = "large-scale: run with --ignored"]
+fn searches_run_while_a_checkpoint_dumps() {
+    let (base, extra, dim) = (40_000usize, 20_000usize, 32usize);
+    let dir = tempfile::tempdir().unwrap();
+    let e = Arc::new(Engine::open(dir.path()).unwrap());
+    e.execute(&format!(
+        "CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,{dim}));"
+    ))
+    .unwrap();
+    let mut rng = Rng(0x0BAD_F00D);
+    let insert = |lo: usize, hi: usize| {
+        let mut rng = Rng(0x0BAD_F00D);
+        for batch in (lo..hi).step_by(2000) {
+            let end = (batch + 2000).min(hi);
+            let body: Vec<String> = (batch..end)
+                .map(|i| {
+                    let v = rng.vector(dim);
+                    format!("({i}, {})", lit(&v))
+                })
+                .collect();
+            e.execute(&format!("INSERT INTO cd VALUES {};", body.join(",")))
+                .unwrap();
+        }
+    };
+    insert(0, base);
+    e.execute("CREATE INDEX cd_i ON cd (v) USING HNSW WITH (metric='l2', M=16);")
+        .unwrap();
+    e.flush().unwrap();
+    // These rows sit in the memory segment, which the checkpoint will serialise.
+    insert(base, base + extra);
+
+    let probe = lit(&rng.vector(dim));
+    let readers: Vec<_> = (0..4)
+        .map(|_| {
+            let e = Arc::clone(&e);
+            let probe = probe.clone();
+            std::thread::spawn(move || {
+                let mut last = 0u128;
+                for _ in 0..20 {
+                    let started = std::time::Instant::now();
+                    let sql = format!(
+                        "SELECT id FROM cd SEARCH MATCH VECTOR (v, {probe}, 'float', 'l2', 10);"
+                    );
+                    let seen = texts(&e, &sql);
+                    assert_eq!(seen.len(), 10, "every answer is complete");
+                    last = last.max(started.elapsed().as_millis());
+                }
+                last
+            })
+        })
+        .collect();
+    let started = std::time::Instant::now();
+    let written = e.dump_hnsw_index("cd", "cd_i").unwrap();
+    let dump_ms = started.elapsed().as_millis();
+    assert_eq!(written, extra, "the checkpoint seals the new rows");
+    let worst = readers
+        .into_iter()
+        .map(|r| r.join().unwrap())
+        .max()
+        .unwrap();
+    println!(
+        "dump: {written} rows in {dump_ms} ms while 4 readers x 20 queries ran, \
+         worst query {worst} ms"
+    );
+    // Everything is still reachable after the dump.
+    let got = texts(
+        &e,
+        &format!("SELECT id FROM cd SEARCH MATCH VECTOR (v, {probe}, 'float', 'l2', 10);"),
+    );
+    assert_eq!(got.len(), 10);
 }
