@@ -44,7 +44,7 @@ struct _config_desc {
 };
 typedef struct _config_desc config_desc;
 
-static config_error errnum = CONFIG_ERROR_VOID;
+static OPENCC_THREAD_LOCAL config_error errnum = CONFIG_ERROR_VOID;
 
 static int qsort_dictionary_buffer_cmp(const void *a, const void *b) {
     if (((dictionary_buffer *)a)->index < ((dictionary_buffer *)b)->index)

@@ -672,6 +672,12 @@ RAGAnalyzer::RAGAnalyzer(const std::string &path)
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
     : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), wordnet_lemma_(other.wordnet_lemma_), stemmer_(std::make_unique<Stemmer>()),
       opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_) {
+    // The dictionary, POS table, lemmatizer and OpenCC converter are borrowed from
+    // the prototype held by AnalyzerPool and are read-only after loading, so the
+    // copies share them instead of reloading. OpenCC conversion itself is
+    // re-entrant (its scratch and error state are per call / per thread), which is
+    // what makes it safe for several indexing workers to convert through the same
+    // converter. Only per-instance state (stemmer, buffers, flags) is duplicated.
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -1831,7 +1837,11 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
     std::string processed_line = PCRE2GlobalReplace(*input, R"#(\W+)#", " ");
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
-    opencc_->convert(str1, strline);
+    if (opencc_ == nullptr || opencc_->convert(str1, strline) < 0) {
+        // Never tokenize an empty string because of a failed conversion: it would
+        // silently drop the whole field from the index. Use the unconverted text.
+        strline = str1;
+    }
 
     std::vector<std::string> res;
 
@@ -1915,7 +1925,10 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
 
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
-    opencc_->convert(str1, strline);
+    if (opencc_ == nullptr || opencc_->convert(str1, strline) < 0) {
+        // See Tokenize(): a failed conversion must not erase the field.
+        strline = str1;
+    }
     std::vector<std::string> tokens;
     std::vector<std::pair<unsigned, unsigned>> positions;
 

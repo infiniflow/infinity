@@ -28,185 +28,111 @@
 
 #if SEGMENT_METHOD == SEGMENT_SHORTEST_PATH
 
-#define OPENCC_SP_SEG_DEFAULT_BUFFER_SIZE 1024
+/* Number of UCS-4 units served by the on-stack scratch block of sp_seg(). A
+   span is one ambiguous run of a single text, so keeping the common case
+   allocation-free is worth a few KB of stack. Longer spans fall back to one
+   heap block that is freed before sp_seg() returns. */
+#define OPENCC_SP_SEG_STACK_LENGTH 128
 
+/* Scratch arrays of a single sp_seg() call.
+ *
+ * They are deliberately NOT cached in converter_desc. One opencc_t is shared by
+ * all worker threads of a fulltext indexer (RAGAnalyzer clones share the same
+ * ::OpenCC), and caching the scratch made concurrent conversions reset and
+ * reallocate each other's min_len/parent/path. The visible symptom was a wild
+ * write in the path reconstruction below, where j starts at min_len[length] and
+ * a buffer reset by another thread left it at INFINITY_INT. */
 typedef struct {
-    int initialized;
-    size_t buffer_size;
     size_t *match_length;
     size_t *min_len;
     size_t *parent;
     size_t *path;
+    size_t *heap_block;
 } spseg_buffer_desc;
 
 #endif
 
 typedef struct {
-#if SEGMENT_METHOD == SEGMENT_SHORTEST_PATH
-    spseg_buffer_desc spseg_buffer;
-#endif
     dictionary_set_t dictionary_set;
-    dictionary_group_t current_dictionary_group;
     opencc_conversion_mode conversion_mode;
 } converter_desc;
-static converter_error errnum = CONVERTER_ERROR_VOID;
+
+/* Everything mutable during a conversion now lives on the stack or in a per-call
+ * heap block, and the dictionary set is only read after open, so one opencc_t
+ * may be converted from several threads at once without external locking.
+ * The error code is per thread to keep it meaningful under that sharing. */
+static OPENCC_THREAD_LOCAL converter_error errnum = CONVERTER_ERROR_VOID;
 
 #if SEGMENT_METHOD == SEGMENT_SHORTEST_PATH
-static void sp_seg_buffer_free(spseg_buffer_desc *ossb) {
-    free(ossb->match_length);
-    free(ossb->min_len);
-    free(ossb->parent);
-    free(ossb->path);
-}
-
-static void sp_seg_set_buffer_size(spseg_buffer_desc *ossb, size_t buffer_size) {
-    if (ossb->initialized == TRUE)
-        sp_seg_buffer_free(ossb);
-
-    ossb->buffer_size = buffer_size;
-    ossb->match_length = (size_t *)malloc((buffer_size + 1) * sizeof(size_t));
-    ossb->min_len = (size_t *)malloc(buffer_size * sizeof(size_t));
-    ossb->parent = (size_t *)malloc(buffer_size * sizeof(size_t));
-    ossb->path = (size_t *)malloc(buffer_size * sizeof(size_t));
-
-    ossb->initialized = TRUE;
-}
-
-static size_t sp_seg(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left, size_t length) {
+/* Shortest-path segmentation over one ambiguous span. Takes the scratch
+ * explicitly so that no per-converter state is touched (see the note above). */
+static size_t sp_seg_convert(converter_desc *converter,
+                             dictionary_group_t group,
+                             spseg_buffer_desc *ossb,
+                             ucs4_t **inbuf,
+                             size_t *inbuf_left,
+                             ucs4_t **outbuf,
+                             size_t *outbuf_left,
+                             size_t length) {
     /* 最短路徑分詞 */
+    {
+        size_t i, j;
 
-    /* 對長度爲1時特殊優化 */
-    if (length == 1) {
-        const ucs4_t *const *match_rs = dictionary_group_match_longest(converter->current_dictionary_group, *inbuf, 1, NULL);
+        for (i = 0; i <= length; i++)
+            ossb->min_len[i] = INFINITY_INT;
 
-        size_t match_len = 1;
-        if (converter->conversion_mode == OPENCC_CONVERSION_FAST) {
-            if (match_rs == NULL) {
-                **outbuf = **inbuf;
-                (*outbuf)++, (*outbuf_left)--;
-                (*inbuf)++, (*inbuf_left)--;
-            } else {
-                const ucs4_t *result = match_rs[0];
+        ossb->min_len[0] = ossb->parent[0] = 0;
 
-                /* 輸出緩衝區剩餘空間小於分詞長度 */
-                if (ucs4len(result) > *outbuf_left) {
-                    errnum = CONVERTER_ERROR_OUTBUF;
-                    return (size_t)-1;
+        for (i = 0; i < length; i++) {
+            /* 獲取所有匹配長度 */
+            size_t match_count = dictionary_group_get_all_match_lengths(group, (*inbuf) + i, ossb->match_length);
+
+            /* match_count == 0 means no prefix of the remaining text is in the
+             * dictionary, and ossb->match_length[0] then still holds the value
+             * of an earlier call. Inspecting it used to skip the
+             * single-character fallback, leaving min_len[i + 1] at INFINITY_INT
+             * and producing the wild write guarded below. */
+            if (match_count == 0 || ossb->match_length[0] != 1)
+                ossb->match_length[match_count++] = 1;
+
+            /* 動態規劃求最短分割路徑 */
+            for (j = 0; j < match_count; j++) {
+                size_t k = ossb->match_length[j];
+                ossb->match_length[j] = 0;
+
+                if (k > 1 && ossb->min_len[i] + 1 <= ossb->min_len[i + k]) {
+                    ossb->min_len[i + k] = ossb->min_len[i] + 1;
+                    ossb->parent[i + k] = i;
+                } else if (k == 1 && ossb->min_len[i] + 1 < ossb->min_len[i + k]) {
+                    ossb->min_len[i + k] = ossb->min_len[i] + 1;
+                    ossb->parent[i + k] = i;
                 }
-
-                for (; *result; result++) {
-                    **outbuf = *result;
-                    (*outbuf)++, (*outbuf_left)--;
-                }
-
-                *inbuf += match_len;
-                *inbuf_left -= match_len;
-            }
-        } else if (converter->conversion_mode == OPENCC_CONVERSION_LIST_CANDIDATES) {
-            if (match_rs == NULL) {
-                **outbuf = **inbuf;
-                (*outbuf)++, (*outbuf_left)--;
-                (*inbuf)++, (*inbuf_left)--;
-            } else {
-                size_t i;
-                for (i = 0; match_rs[i] != NULL; i++) {
-                    const ucs4_t *result = match_rs[i];
-                    int show_delimiter = match_rs[i + 1] != NULL ? 1 : 0;
-
-                    /* 輸出緩衝區剩餘空間小於分詞長度 */
-                    if (ucs4len(result) + show_delimiter > *outbuf_left) {
-                        errnum = CONVERTER_ERROR_OUTBUF;
-                        return (size_t)-1;
-                    }
-
-                    for (; *result; result++) {
-                        **outbuf = *result;
-                        (*outbuf)++, (*outbuf_left)--;
-                    }
-
-                    if (show_delimiter) {
-                        **outbuf = DELIMITER;
-                        (*outbuf)++, (*outbuf_left)--;
-                    }
-                }
-                *inbuf += match_len;
-                *inbuf_left -= match_len;
-            }
-        } else if (converter->conversion_mode == OPENCC_CONVERSION_SEGMENT_ONLY) {
-            if (match_rs == NULL) {
-                **outbuf = **inbuf;
-                (*outbuf)++, (*outbuf_left)--;
-                (*inbuf)++, (*inbuf_left)--;
-            } else {
-                /* 輸出緩衝區剩餘空間小於分詞長度 */
-                if (match_len + 1 > *outbuf_left) {
-                    errnum = CONVERTER_ERROR_OUTBUF;
-                    return (size_t)-1;
-                }
-
-                size_t i;
-                for (i = 0; i < match_len; i++) {
-                    **outbuf = **inbuf;
-                    (*outbuf)++, (*outbuf_left)--;
-                    (*inbuf)++, (*inbuf_left)--;
-                }
-            }
-            **outbuf = DELIMITER;
-            (*outbuf)++, (*outbuf_left)--;
-        } else
-            debug_should_not_be_here();
-        /* 必須保證有一個字符空間 */
-        return match_len;
-    }
-
-    /* 設置緩衝區空間 */
-    spseg_buffer_desc *ossb = &(converter->spseg_buffer);
-    size_t buffer_size_need = length + 1;
-    if (ossb->initialized == FALSE || ossb->buffer_size < buffer_size_need)
-        sp_seg_set_buffer_size(&(converter->spseg_buffer), buffer_size_need);
-
-    size_t i, j;
-
-    for (i = 0; i <= length; i++)
-        ossb->min_len[i] = INFINITY_INT;
-
-    ossb->min_len[0] = ossb->parent[0] = 0;
-
-    for (i = 0; i < length; i++) {
-        /* 獲取所有匹配長度 */
-        size_t match_count = dictionary_group_get_all_match_lengths(converter->current_dictionary_group, (*inbuf) + i, ossb->match_length);
-
-        if (ossb->match_length[0] != 1)
-            ossb->match_length[match_count++] = 1;
-
-        /* 動態規劃求最短分割路徑 */
-        for (j = 0; j < match_count; j++) {
-            size_t k = ossb->match_length[j];
-            ossb->match_length[j] = 0;
-
-            if (k > 1 && ossb->min_len[i] + 1 <= ossb->min_len[i + k]) {
-                ossb->min_len[i + k] = ossb->min_len[i] + 1;
-                ossb->parent[i + k] = i;
-            } else if (k == 1 && ossb->min_len[i] + 1 < ossb->min_len[i + k]) {
-                ossb->min_len[i + k] = ossb->min_len[i] + 1;
-                ossb->parent[i + k] = i;
             }
         }
-    }
 
-    /* 取得最短分割路徑 */
-    for (i = length, j = ossb->min_len[length]; i != 0; i = ossb->parent[i])
-        ossb->path[--j] = i;
+        if (ossb->min_len[length] == (size_t)INFINITY_INT) {
+            /* Cannot happen while every position offers the single-character
+             * fallback. Kept as a hard stop so that a future dictionary or
+             * algorithm change fails the conversion instead of writing through
+             * path[INFINITY_INT - 1]. */
+            errnum = CONVERTER_ERROR_OUTBUF;
+            return (size_t)-1;
+        }
+
+        /* 取得最短分割路徑 */
+        for (i = length, j = ossb->min_len[length]; i != 0; i = ossb->parent[i])
+            ossb->path[--j] = i;
+    }
 
     size_t inbuf_left_start = *inbuf_left;
     size_t begin, end;
 
     /* 根據最短分割路徑轉換 */
-    for (i = begin = 0; i < ossb->min_len[length]; i++) {
+    for (size_t i = begin = 0; i < ossb->min_len[length]; i++) {
         end = ossb->path[i];
 
         size_t match_len;
-        const ucs4_t *const *match_rs = dictionary_group_match_longest(converter->current_dictionary_group, *inbuf, end - begin, &match_len);
+        const ucs4_t *const *match_rs = dictionary_group_match_longest(group, *inbuf, end - begin, &match_len);
 
         if (match_rs == NULL) {
             **outbuf = **inbuf;
@@ -302,7 +228,128 @@ static size_t sp_seg(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_le
     return inbuf_left_start - *inbuf_left;
 }
 
-static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left) {
+static size_t sp_seg(converter_desc *converter, dictionary_group_t group, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left, size_t length) {
+    /* 最短路徑分詞 */
+
+    /* 對長度爲1時特殊優化 */
+    if (length == 1) {
+        const ucs4_t *const *match_rs = dictionary_group_match_longest(group, *inbuf, 1, NULL);
+
+        size_t match_len = 1;
+        if (converter->conversion_mode == OPENCC_CONVERSION_FAST) {
+            if (match_rs == NULL) {
+                **outbuf = **inbuf;
+                (*outbuf)++, (*outbuf_left)--;
+                (*inbuf)++, (*inbuf_left)--;
+            } else {
+                const ucs4_t *result = match_rs[0];
+
+                /* 輸出緩衝區剩餘空間小於分詞長度 */
+                if (ucs4len(result) > *outbuf_left) {
+                    errnum = CONVERTER_ERROR_OUTBUF;
+                    return (size_t)-1;
+                }
+
+                for (; *result; result++) {
+                    **outbuf = *result;
+                    (*outbuf)++, (*outbuf_left)--;
+                }
+
+                *inbuf += match_len;
+                *inbuf_left -= match_len;
+            }
+        } else if (converter->conversion_mode == OPENCC_CONVERSION_LIST_CANDIDATES) {
+            if (match_rs == NULL) {
+                **outbuf = **inbuf;
+                (*outbuf)++, (*outbuf_left)--;
+                (*inbuf)++, (*inbuf_left)--;
+            } else {
+                size_t i;
+                for (i = 0; match_rs[i] != NULL; i++) {
+                    const ucs4_t *result = match_rs[i];
+                    int show_delimiter = match_rs[i + 1] != NULL ? 1 : 0;
+
+                    /* 輸出緩衝區剩餘空間小於分詞長度 */
+                    if (ucs4len(result) + show_delimiter > *outbuf_left) {
+                        errnum = CONVERTER_ERROR_OUTBUF;
+                        return (size_t)-1;
+                    }
+
+                    for (; *result; result++) {
+                        **outbuf = *result;
+                        (*outbuf)++, (*outbuf_left)--;
+                    }
+
+                    if (show_delimiter) {
+                        **outbuf = DELIMITER;
+                        (*outbuf)++, (*outbuf_left)--;
+                    }
+                }
+                *inbuf += match_len;
+                *inbuf_left -= match_len;
+            }
+        } else if (converter->conversion_mode == OPENCC_CONVERSION_SEGMENT_ONLY) {
+            if (match_rs == NULL) {
+                **outbuf = **inbuf;
+                (*outbuf)++, (*outbuf_left)--;
+                (*inbuf)++, (*inbuf_left)--;
+            } else {
+                /* 輸出緩衝區剩餘空間小於分詞長度 */
+                if (match_len + 1 > *outbuf_left) {
+                    errnum = CONVERTER_ERROR_OUTBUF;
+                    return (size_t)-1;
+                }
+
+                size_t i;
+                for (i = 0; i < match_len; i++) {
+                    **outbuf = **inbuf;
+                    (*outbuf)++, (*outbuf_left)--;
+                    (*inbuf)++, (*inbuf_left)--;
+                }
+            }
+            **outbuf = DELIMITER;
+            (*outbuf)++, (*outbuf_left)--;
+        } else
+            debug_should_not_be_here();
+        /* 必須保證有一個字符空間 */
+        return match_len;
+    }
+
+    /* Scratch is per call, never cached in the converter: it is shared between
+     * threads, so a cached buffer turns concurrent conversions into a data race
+     * on min_len/parent/path. See the note on spseg_buffer_desc. */
+    size_t stack_block[OPENCC_SP_SEG_STACK_LENGTH * 4];
+    spseg_buffer_desc ossb_desc;
+    spseg_buffer_desc *ossb = &ossb_desc;
+    ossb->heap_block = NULL;
+
+    if (length + 2 <= OPENCC_SP_SEG_STACK_LENGTH) {
+        ossb->match_length = stack_block;
+        ossb->min_len = stack_block + OPENCC_SP_SEG_STACK_LENGTH;
+        ossb->parent = stack_block + 2 * OPENCC_SP_SEG_STACK_LENGTH;
+        ossb->path = stack_block + 3 * OPENCC_SP_SEG_STACK_LENGTH;
+    } else {
+        /* One block for all four arrays: match_length needs length + 2 entries,
+         * the other three need length + 1, so the same stride is used. */
+        size_t block_len = length + 2;
+        ossb->heap_block = (size_t *)malloc(sizeof(size_t) * 4 * block_len);
+        if (ossb->heap_block == NULL) {
+            errnum = CONVERTER_ERROR_OUTBUF;
+            return (size_t)-1;
+        }
+        ossb->match_length = ossb->heap_block;
+        ossb->min_len = ossb->heap_block + block_len;
+        ossb->parent = ossb->heap_block + 2 * block_len;
+        ossb->path = ossb->heap_block + 3 * block_len;
+    }
+
+    size_t ret = sp_seg_convert(converter, group, ossb, inbuf, inbuf_left, outbuf, outbuf_left, length);
+    free(ossb->heap_block);
+    return ret;
+}
+
+static size_t
+segment(converter_desc *converter, dictionary_group_t group, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left) {
     /* 歧義分割最短路徑分詞 */
     size_t i, start, bound;
     const ucs4_t *inbuf_start = *inbuf;
@@ -314,7 +361,7 @@ static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_l
     for (i = start = 0; inbuf_start[i] && *inbuf_left > 0 && *outbuf_left > 0; i++) {
         if (i != 0 && i == bound) {
             /* 對歧義部分進行最短路徑分詞 */
-            sp_seg_length = sp_seg(converter, inbuf, inbuf_left, outbuf, outbuf_left, bound - start);
+            sp_seg_length = sp_seg(converter, group, inbuf, inbuf_left, outbuf, outbuf_left, bound - start);
             if (sp_seg_length == (size_t)-1)
                 return (size_t)-1;
             if (sp_seg_length == 0) {
@@ -328,7 +375,7 @@ static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_l
         }
 
         size_t match_len;
-        dictionary_group_match_longest(converter->current_dictionary_group, inbuf_start + i, 0, &match_len);
+        dictionary_group_match_longest(group, inbuf_start + i, 0, &match_len);
 
         if (match_len == 0)
             match_len = 1;
@@ -338,7 +385,7 @@ static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_l
     }
 
     if (*inbuf_left > 0 && *outbuf_left > 0) {
-        sp_seg_length = sp_seg(converter, inbuf, inbuf_left, outbuf, outbuf_left, bound - start);
+        sp_seg_length = sp_seg(converter, group, inbuf, inbuf_left, outbuf, outbuf_left, bound - start);
         if (sp_seg_length == (size_t)-1)
             return (size_t)-1;
         if (sp_seg_length == 0) {
@@ -361,13 +408,14 @@ static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_l
 #endif
 
 #if SEGMENT_METHOD == SEGMENT_MAXIMUM_LENGTH
-static size_t segment(converter_desc *converter, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left) {
+static size_t
+segment(converter_desc *converter, dictionary_group_t group, ucs4_t **inbuf, size_t *inbuf_left, ucs4_t **outbuf, size_t *outbuf_left) {
     /* 正向最大分詞 */
     size_t inbuf_left_start = *inbuf_left;
 
     for (; **inbuf && *inbuf_left > 0 && *outbuf_left > 0;) {
         size_t match_len;
-        const ucs4_t *const *match_rs = dictionary_group_match_longest(converter->current_dictionary_group, *inbuf, *inbuf_left, &match_len);
+        const ucs4_t *const *match_rs = dictionary_group_match_longest(group, *inbuf, *inbuf_left, &match_len);
 
         if (converter->conversion_mode == OPENCC_CONVERSION_FAST) {
             if (match_rs == NULL) {
@@ -472,7 +520,7 @@ size_t converter_convert(converter_t t_converter, ucs4_t **inbuf, size_t *inbuf_
 
     if (dictionary_set_count_group(converter->dictionary_set) == 1) {
         /* 只有一個辭典，直接輸出 */
-        return segment(converter, inbuf, inbuf_left, outbuf, outbuf_left);
+        return segment(converter, dictionary_set_get_group(converter->dictionary_set, 0), inbuf, inbuf_left, outbuf, outbuf_left);
     }
 
     // 啓用辭典轉換鏈
@@ -505,9 +553,12 @@ size_t converter_convert(converter_t t_converter, ucs4_t **inbuf, size_t *inbuf_
             }
         }
 
-        converter->current_dictionary_group = dictionary_set_get_group(converter->dictionary_set, i);
+        /* The active group is passed down instead of being stored on the
+         * converter: two threads converting the same opencc_t would otherwise
+         * overwrite each other's group and convert with the wrong dictionary. */
+        dictionary_group_t group = dictionary_set_get_group(converter->dictionary_set, i);
 
-        size_t ret = segment(converter, &cinbuf, &cinbuf_left, &coutbuf, &coutbuf_left);
+        size_t ret = segment(converter, group, &cinbuf, &cinbuf_left, &coutbuf, &coutbuf_left);
         if (ret == (size_t)-1) {
             free(tmpbuf);
             return (size_t)-1;
@@ -535,32 +586,18 @@ size_t converter_convert(converter_t t_converter, ucs4_t **inbuf, size_t *inbuf_
 void converter_assign_dictionary(converter_t t_converter, dictionary_set_t dictionary_set) {
     converter_desc *converter = (converter_desc *)t_converter;
     converter->dictionary_set = dictionary_set;
-    if (dictionary_set_count_group(converter->dictionary_set) > 0)
-        converter->current_dictionary_group = dictionary_set_get_group(converter->dictionary_set, 0);
 }
 
 converter_t converter_open(void) {
     converter_desc *converter = (converter_desc *)malloc(sizeof(converter_desc));
 
     converter->dictionary_set = NULL;
-    converter->current_dictionary_group = NULL;
-
-#if SEGMENT_METHOD == SEGMENT_SHORTEST_PATH
-    converter->spseg_buffer.initialized = FALSE;
-    converter->spseg_buffer.match_length = converter->spseg_buffer.min_len = converter->spseg_buffer.parent = converter->spseg_buffer.path = NULL;
-
-    sp_seg_set_buffer_size(&converter->spseg_buffer, OPENCC_SP_SEG_DEFAULT_BUFFER_SIZE);
-#endif
 
     return (converter_t)converter;
 }
 
 void converter_close(converter_t t_converter) {
     converter_desc *converter = (converter_desc *)t_converter;
-
-#if SEGMENT_METHOD == SEGMENT_SHORTEST_PATH
-    sp_seg_buffer_free(&(converter->spseg_buffer));
-#endif
 
     free(converter);
 }
