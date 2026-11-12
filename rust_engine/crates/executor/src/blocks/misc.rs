@@ -361,6 +361,52 @@ mod tests {
         );
     }
 
+    /// The block writer merges a rewrite from the files **on disk**, never from
+    /// the process-wide mapping.
+    ///
+    /// `Engine::block_map` does its I/O before it registers the mapping, so a
+    /// reader that opened the block *before* a write grew it can put its short
+    /// view back into the shared map after that write dropped the entries. A
+    /// rewrite merged from that view writes the block back smaller, and the
+    /// rows it did not see are already gone from the append buffer (the write
+    /// that grew the file drained them) - they would be lost for good.
+    #[test]
+    fn a_stale_block_mapping_cannot_shrink_the_writer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sb (id INT);").unwrap();
+        e.execute("INSERT INTO sb VALUES (1),(2);").unwrap();
+        e.flush().unwrap();
+        let root = e.blocks_root();
+        let id = e.visible_block_ids("default_db.sb")[0];
+        let stale = e.block_map("default_db.sb", &root, id).unwrap();
+
+        e.execute("INSERT INTO sb VALUES (3),(4);").unwrap();
+        e.flush().unwrap();
+        // The reader's `or_insert` lands after the flush dropped the maps.
+        e.context.block_maps.lock().unwrap().insert(id, stale);
+
+        let meta = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.sb")
+            .unwrap()
+            .unwrap();
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| crate::blocks::column::column_type_of(t).unwrap())
+            .collect();
+        let rows = e
+            .mirror_block_rows("default_db.sb", &meta, &types, 0, 0, 0, 4, &[])
+            .unwrap();
+        assert_eq!(
+            rows.iter().map(|(seq, _)| *seq).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3],
+            "the merge read the stale mapping instead of the file"
+        );
+    }
+
     /// Forgets the row-side keys, leaving the files under `data/` as the only
     /// copy of the table - what a directory holds once the block layout is the
     /// storage of record. `DELETE` is not the same thing: it marks the block's

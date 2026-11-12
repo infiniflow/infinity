@@ -156,14 +156,21 @@ impl Engine {
                 id.block_id,
             ))
             .join(storage::definition::format::VERSION_FILE);
-        let held = match self.block_map(table, &root, id) {
+        // Read the block **straight from disk**, not through the process-wide
+        // map (`Self::block_map`). The shared entry can be a mapping a reader
+        // took before the last write grew the file, re-registered after this
+        // write dropped the maps; a rewrite built from that short view writes
+        // the block back with the rows it did not see, and the rows the file
+        // held are already gone from the append buffer (the write that grew it
+        // drained them), so they would be lost for good.
+        let held = match MappedBlock::open(&root, id) {
             Ok(block) => Self::decode_rows_of(
                 &meta.ids,
                 &meta.types,
                 types,
                 id,
                 block.version(),
-                block.as_ref(),
+                &block,
                 None,
             )
             .ok_or_else(|| {
@@ -606,10 +613,12 @@ impl Engine {
                 let start = block_index * DEFAULT_BLOCK_CAPACITY;
                 let end = (start + DEFAULT_BLOCK_CAPACITY).min(seg_rows_total as usize);
                 let slot_base = seg_start + start;
-                // Drop the mapping of this block **before** the rows are
-                // merged: a mapped view of an older (shorter) file would make
-                // the merge miss the rows the file holds, and the rewrite
-                // would drop them.
+                // Drop the readers' mappings of this block **before** the
+                // files are rewritten, so none of them keeps serving the
+                // previous contents once the new block lands. The writer itself
+                // reads the block straight from disk (`mirror_block_rows`),
+                // because a reader can put a stale mapping back into the shared
+                // map while this write runs.
                 self.drop_block_maps(meta.id);
                 let chunk = self.mirror_block_rows(
                     &table,
@@ -624,9 +633,9 @@ impl Engine {
                 // A block is addressed by slot: row *n* of block *b* is id
                 // `segment << 32 | b * capacity + n`. The window is the
                 // committed prefix, and ids are handed out in commit-ts order
-                // (`SubmitForAllocation`), so the chunk must tile it exactly;
-                // anything else means the row buffer lost a row, which must not
-                // be written to disk as a shifted block.
+                // (`SubmitForAllocation`), so the chunk has to reach the end of
+                // it; falling short means the row buffer lost a row, which must
+                // not be written to disk as a shifted block.
                 let first_id = ((segment_id as usize) << 32) | start;
                 // Every id from `first_id` on has to be the next slot - a hole
                 // means the row buffer lost a row, which must not reach disk as
@@ -639,8 +648,14 @@ impl Engine {
                     .iter()
                     .enumerate()
                     .all(|(slot, (seq, _))| *seq == first_id + slot);
+                // A checkpoint that queued behind a later one reads an older
+                // bound, so its window can stop short of what the block file
+                // already holds. Those rows are committed and on disk and the
+                // append buffer has drained them, so the rewrite keeps them
+                // (they are the dense prefix `contiguous` just checked) instead
+                // of failing the whole flush.
                 let short_tail_is_a_race = checkpoint_ts == u64::MAX;
-                if !contiguous || (chunk.len() != end - start && !short_tail_is_a_race) {
+                if !contiguous || (chunk.len() < end - start && !short_tail_is_a_race) {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
                          committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
