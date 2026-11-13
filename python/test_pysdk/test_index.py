@@ -1529,7 +1529,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
 @pytest.mark.parametrize("sdk", ["embedded", "thrift"])
-def test_index_info_eq_and_hash(sdk):
+def test_index_info_eq_and_hash(request, sdk):
     """
     Regression test: IndexInfo equality and hashing must work.
     The embedded SDK's IndexInfo.__eq__ compared against a nonexistent
@@ -1538,6 +1538,8 @@ def test_index_info_eq_and_hash(sdk):
     (TypeError: unhashable type: 'dict').
     """
     if sdk == "embedded":
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
         from infinity_embedded.index import IndexInfo, IndexType
     else:
         from infinity.index import IndexInfo, IndexType
