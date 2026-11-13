@@ -128,7 +128,7 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 	resp, err := d.conn.client.CreateTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create table: %v", err),
 		)
 	}
@@ -175,7 +175,7 @@ func (d *Database) DropTable(tableName string, conflictType ConflictType) (inter
 	resp, err := d.conn.client.DropTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to drop table: %v", err),
 		)
 	}
@@ -207,7 +207,7 @@ func (d *Database) ListTables() (interface{}, error) {
 	resp, err := d.conn.client.ListTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to list tables: %v", err),
 		)
 	}
@@ -240,7 +240,7 @@ func (d *Database) ShowTable(tableName string) (interface{}, error) {
 	resp, err := d.conn.client.ShowTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show table: %v", err),
 		)
 	}
@@ -273,7 +273,7 @@ func (d *Database) GetTable(tableName string) (*Table, error) {
 	resp, err := d.conn.client.GetTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to get table: %v", err),
 		)
 	}
@@ -311,7 +311,7 @@ func (d *Database) CreateTableSnapshot(snapshotName string, tableName string) (i
 	resp, err := d.conn.client.CreateTableSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create table snapshot: %v", err),
 		)
 	}
@@ -348,7 +348,7 @@ func (d *Database) RestoreTableSnapshot(snapshotName string) (interface{}, error
 	resp, err := d.conn.client.RestoreSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to restore table snapshot: %v", err),
 		)
 	}

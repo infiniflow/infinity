@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include "common/utility/sparse_gram.h"
+
 export module infinity_core:column_index_reader;
 
 import :segment_posting;
@@ -87,9 +91,36 @@ struct Hash {
 } // namespace detail
 
 export struct IndexReader {
+    // The index an unqualified full-text predicate on a column goes to.
+    //
+    // A column may carry more than one full-text index -- typically a regular
+    // analyzer for searching and a sparse gram analyzer for `regex()` filters.
+    // A predicate that names no index is written in the tokens of the regular
+    // analyzer, so that is the index it uses; a sparse gram index only answers
+    // for a column that has no other. The analyzer that parses the query text
+    // follows the same rule, so it and the reader never disagree.
+    std::string GetDefaultIndexName(const std::string &column_name) const {
+        const auto column_index_map = column_index_readers_.find(column_name);
+        if (column_index_map == column_index_readers_.end() || column_index_map->second.empty()) {
+            return {};
+        }
+        std::string first_index_name;
+        for (const auto &[index_name, reader] : column_index_map->second) {
+            SparseGramParams params;
+            if (!ParseSparseGramAnalyzerName(reader->GetAnalyzer(), params)) {
+                return index_name;
+            }
+            if (first_index_name.empty()) {
+                first_index_name = index_name;
+            }
+        }
+        return first_index_name;
+    }
+
     // Get a index reader on a column based on hints.
     // If no such column exists, return nullptr.
-    // If column exists, but no index with a hint name is found, return a random one.
+    // If column exists, but no index with a hint name is found, return nullptr.
+    // A hint without a name resolves to the default index of the column.
     ColumnIndexReader *GetColumnIndexReader(const std::string &column_name, const std::string &index_name = "") const {
         const auto &column_index_map = column_index_readers_.find(column_name);
         // if no fulltext index exists, or the map is empty.
@@ -102,8 +133,11 @@ export struct IndexReader {
             return nullptr;
         }
         if (index_name.length() == 0) {
-            auto it = indices_map.begin();
-            return it->second.get();
+            auto it = indices_map.find(GetDefaultIndexName(column_name));
+            if (it != indices_map.end()) {
+                return it->second.get();
+            }
+            return nullptr;
         } else {
             auto it = indices_map.find(index_name);
             if (it != indices_map.end()) {

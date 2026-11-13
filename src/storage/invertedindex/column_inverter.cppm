@@ -56,6 +56,8 @@ public:
 
     u32 GetDocCount() { return doc_count_; }
 
+    u32 GetBeginDocID() const { return begin_doc_id_; }
+
     u32 GetMerged() { return merged_; }
 
     struct PosInfo {

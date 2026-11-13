@@ -28,6 +28,7 @@ from infinity.common import (
     NetworkAddress,
 )
 from infinity.errors import ErrorCode
+from infinity.filter_utils import quote_string_literal, regex_filter
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
@@ -40,7 +41,9 @@ __all__ = [
     "InfinityException",
     "NetworkAddress",
     "RemoteThriftInfinityConnection",
-    "connect"
+    "connect",
+    "quote_string_literal",
+    "regex_filter"
 ]
 
 

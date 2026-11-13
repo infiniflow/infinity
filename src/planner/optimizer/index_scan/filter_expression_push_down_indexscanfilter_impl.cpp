@@ -866,12 +866,14 @@ private:
                         early_term_algo = EarlyTermAlgo::kBatch;
                     } else if (iter->second == "false") {
                         early_term_algo = EarlyTermAlgo::kNaive;
+                    } else if (iter->second == "heap_bmw" || iter->second == "heap") {
+                        early_term_algo = EarlyTermAlgo::kHeapBMW;
                     } else if (iter->second == "true" || iter->second == "bmw") {
                         early_term_algo = EarlyTermAlgo::kBMW;
                     } else if (iter->second == "compare") {
                         early_term_algo = EarlyTermAlgo::kCompare;
                     } else {
-                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, batch, false, true, bmw, or compare"));
+                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, heap_bmw, batch, false, true, bmw, or compare"));
                     }
 
                     // option: top n

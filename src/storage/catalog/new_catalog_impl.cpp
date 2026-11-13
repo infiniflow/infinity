@@ -159,6 +159,15 @@ std::shared_ptr<MemIndex> NewCatalog::PopMemIndex(const std::string &mem_index_k
     return nullptr;
 }
 
+bool NewCatalog::TrySetMemIndex(const std::string &mem_index_key, const std::shared_ptr<MemIndex> &mem_index) {
+    if (mem_index == nullptr) {
+        return false;
+    }
+    std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
+    auto [iter, inserted] = mem_index_map_.emplace(mem_index_key, mem_index);
+    return inserted;
+}
+
 Status NewCatalog::DropMemIndexByMemIndexKey(const std::string &mem_index_key) {
     bool delete_success = false;
     {

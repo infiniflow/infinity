@@ -20,6 +20,7 @@ import :or_iterator;
 import :term_doc_iterator;
 import :phrase_doc_iterator;
 import :blockmax_wand_iterator;
+import :heap_blockmax_wand_iterator;
 import :minimum_should_match_iterator;
 import :parse_fulltext_options;
 import :keyword_iterator;
@@ -627,8 +628,8 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         switch (params.early_term_algo) {
             case EarlyTermAlgo::kAuto: {
                 if (params.topn) {
-                    // always prefer BMW
-                    choose_algo = EarlyTermAlgo::kBMW;
+                    // always prefer block-max WAND (heap variant, no per-round full sort)
+                    choose_algo = EarlyTermAlgo::kHeapBMW;
                 } else if (term_children_need_batch()) {
                     // topn == 0, case of filter
                     choose_algo = EarlyTermAlgo::kBatch;
@@ -647,6 +648,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 break;
             }
             case EarlyTermAlgo::kBMW:
+            case EarlyTermAlgo::kHeapBMW:
             case EarlyTermAlgo::kBatch:
             case EarlyTermAlgo::kNaive: {
                 choose_algo = params.early_term_algo;
@@ -658,7 +660,13 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
             }
         }
         switch (choose_algo) {
+            case EarlyTermAlgo::kHeapBMW: {
+                // Heap-based Block-Max WAND: same pruning semantics as the sort-based one, but
+                // without re-sorting all sub-iterators every pivot round.
+                return GetIterResultT.template operator()<HeapBlockMaxWandIterator>();
+            }
             case EarlyTermAlgo::kBMW: {
+                // Legacy sort-based implementation, kept for A/B diffing
                 return GetIterResultT.template operator()<BlockMaxWandIterator>();
             }
             case EarlyTermAlgo::kNaive: {

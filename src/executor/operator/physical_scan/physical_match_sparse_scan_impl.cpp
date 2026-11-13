@@ -434,6 +434,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         Bitmask bitmask;
 
         BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+        if (block_meta == nullptr) [[unlikely]] {
+            UnrecoverableError(fmt::format("MatchSparseScan: block not found. segment_id: {}, block_id: {}", segment_id, block_id));
+        }
         LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
 
         std::tie(row_cnt, status) = block_meta->GetRowCnt1();
@@ -494,9 +497,46 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         }
         SegmentIndexMeta *segment_index_meta = iter->second.get();
 
-        auto segment_it = block_index->new_segment_block_index_.find(segment_id);
+        // The index's segment id and the data's segment id are two independent
+        // id spaces: the dump task numbers the table's data and each of its
+        // indexes separately (`DumpMemIndexTask::segment_id_`), and only one
+        // non-EMVB index is dumped per trigger (`MemIndexTracer::MakeDumpTask`),
+        // so an index's segment 0 is not necessarily the data's segment 0.
+        // The chunk knows which data segment it covers
+        // (`ChunkIndexMetaInfo::base_row_id_`), so take the data segment from
+        // there; looking the *index's* segment id up in the table's block index
+        // missed as soon as the two id spaces diverged and aborted the scan.
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta->GetChunkIDs1();
+        if (!chunk_status.ok()) {
+            UnrecoverableError(chunk_status.message());
+        }
+        SegmentID data_segment_id = INVALID_SEGMENT_ID;
+        for (ChunkID chunk_id : *chunk_ids_ptr) {
+            ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status info_status = chunk_index_meta.GetChunkInfo(chunk_info);
+            if (!info_status.ok()) {
+                UnrecoverableError(info_status.message());
+            }
+            data_segment_id = chunk_info->base_row_id_.segment_id_;
+            break;
+        }
+
+        if (data_segment_id == INVALID_SEGMENT_ID) {
+            // Nothing dumped yet (realtime): no chunk names a data segment, so
+            // the index segment and the data segment are still numbered alike.
+            data_segment_id = segment_id;
+        }
+
+        auto segment_it = block_index->new_segment_block_index_.find(data_segment_id);
         if (segment_it == block_index->new_segment_block_index_.end()) {
-            UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+            // The rows this index segment covers are still in the table's memory
+            // index, and the loop above already scanned them.
+            LOG_DEBUG(fmt::format("MatchSparseScan: data segment {} not dumped yet, skipped", data_segment_id));
+            // The loop body handles one segment per call (the operator is
+            // re-invoked), so leaving it here is the same as finishing this
+            // segment - `segment_ids_idx` has already moved on.
+            break;
         }
         size_t segment_row_count = segment_it->second.segment_offset();
 
@@ -507,7 +547,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
         } else {
-            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(data_segment_id); it != common_query_filter_->filter_result_.end()) {
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
@@ -522,7 +562,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             auto query = get_ele(query_vector, query_id);
             BmpSearchOptions options = BMPUtil::ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
             options.use_lock_ = with_lock;
-            bmp_handler->template SearchIndex<ResultType, DistFunc>(query, topn, options, filter, query_id, segment_id, merge_heap);
+            bmp_handler->template SearchIndex<ResultType, DistFunc>(query, topn, options, filter, query_id, data_segment_id, merge_heap);
         };
         auto bmp_scan = [&](const auto &filter) {
             auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
