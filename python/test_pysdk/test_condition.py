@@ -1,11 +1,10 @@
 import infinity
 import pytest
+from common import common_values
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from infinity.remote_thrift.table import traverse_conditions
 from sqlglot import condition
-
-from common import common_values
 
 
 @pytest.mark.usefixtures("http")
@@ -46,3 +45,44 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+
+@pytest.mark.parametrize("output_str,expected_func", [
+    ("trim(name)", "trim"),
+    ("trim(both from name)", "trim"),
+    ("trim(leading from name)", "ltrim"),
+    ("trim(trailing from name)", "rtrim"),
+    ("ltrim(name)", "ltrim"),
+    ("rtrim(name)", "rtrim"),
+])
+def test_output_trim_embedded(request, output_str, expected_func):
+    """Whitespace trim variants preserve the function and column argument."""
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
+    from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
+    from sqlglot import parse_one
+
+    res = embedded_parse_expr(parse_one(output_str))
+    assert res.function_expr.func_name == expected_func
+    assert len(res.function_expr.arguments) == 1
+    assert res.function_expr.arguments[0].column_expr.names == ["name"]
+
+
+@pytest.mark.parametrize("output_str", [
+    "trim(leading 'x' from name)",
+    "trim(trailing 'xy' from name)",
+    "trim(both ' ' from name)",
+    "trim('' from name)",
+])
+def test_output_trim_embedded_rejects_characters(request, output_str):
+    """Explicit trim characters fail instead of silently changing semantics."""
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
+    from infinity_embedded.common import InfinityException
+    from infinity_embedded.errors import ErrorCode
+    from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
+    from sqlglot import parse_one
+
+    with pytest.raises(InfinityException, match="explicit characters") as exc_info:
+        embedded_parse_expr(parse_one(output_str))
+    assert exc_info.value.error_code == ErrorCode.INVALID_EXPRESSION

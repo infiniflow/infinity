@@ -171,6 +171,31 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = func_expr
         return parsed_expr
+    elif isinstance(cons, exp.Trim):
+        # TRIM variants (incl. LTRIM/RTRIM, which sqlglot folds into Trim
+        # with a position flag) carry non-expression args ('position' is a
+        # plain string) that the generic Func arm feeds to parse_expr and
+        # crashes on. Map to the server's trim/ltrim/rtrim like the thrift
+        # SDK does.
+        if cons.args.get('expression') is not None:
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                "TRIM with explicit characters is not supported; only whitespace trimming is supported.",
+            )
+        position = cons.args.get('position')
+        if position == 'LEADING':
+            func_name = "ltrim"
+        elif position == 'TRAILING':
+            func_name = "rtrim"
+        else:
+            func_name = "trim"
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = func_name
+        func_expr.arguments = [parse_expr(cons.args['this'])]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
+
     elif isinstance(cons, exp.Func):
         arguments = []
         for arg in cons.args.values():
@@ -244,6 +269,8 @@ def traverse_conditions(cons, fn=None):
 def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
+    except InfinityException:
+        raise
     except Exception:
         if isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
