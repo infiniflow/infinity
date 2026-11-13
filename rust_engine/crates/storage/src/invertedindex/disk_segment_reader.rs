@@ -601,7 +601,7 @@ impl SegmentIndexReader {
         // carries; a truncated write loses it.
         dic_fst(&dic)?;
         let pos = map(FULLTEXT_POSTING_SUFFIX)?;
-        if let Some(manifest) = ChunkManifest::read(dir, base_name) {
+        if let Some(manifest) = ChunkManifest::read(dir, base_name)? {
             if !manifest.matches_files(dic.len() as u64, pos.len() as u64, len.len() as u64) {
                 return Err(FormatError::Invalid(format!(
                     "chunk '{base_name}': the files are {} / {} / {} bytes, but its marker \
@@ -1787,7 +1787,8 @@ mod tests {
             index_dir,
             "ft_0000000000000000",
         )
-        .expect("the chunk is published with a marker");
+        .expect("the chunk is published with a marker")
+        .expect("the marker is well formed");
         let size = |suffix: &str| -> u64 {
             std::fs::metadata(crate::invertedindex::format::fulltext_chunk_file(
                 index_dir,

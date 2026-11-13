@@ -1497,7 +1497,8 @@ mod tests {
         assert_eq!(sealed.len(), 1);
         let base = sealed[0].trim_end_matches(".ok");
         let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
-            .expect("the seal publishes a marker");
+            .expect("the seal publishes a marker")
+            .expect("the marker is well formed");
         assert_eq!(manifest.live_docs, 2);
         assert_eq!(manifest.total_len, 3);
         let mut reopened = TextIndex::new(d.to_string(), TextTokenizer::default());
@@ -1591,7 +1592,8 @@ mod tests {
         write_chunk(d, 0, 2, "a");
         let base = "ft_0000000000000000";
         let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
-            .expect("a freshly written chunk has a marker");
+            .expect("a freshly written chunk has a marker")
+            .expect("the marker is well formed");
         // Rewrite the marker as the *previous* generation would have: one byte
         // shorter in `.dic` than what is on the disk.
         storage::invertedindex::chunk_manifest::ChunkManifest {
@@ -10486,13 +10488,20 @@ mod tests {
                         ids.push(id);
                         values.push(format!("({id}, 'alpha{id} beta')"));
                     }
+                    // Recorded **before** the insert commits: a reader may see a
+                    // committed row the instant `execute_blocking` returns, so
+                    // accounting for it afterwards leaves a window in which the
+                    // row is in the table and not yet in `inserted` - which the
+                    // readers below would report as a ghost. The insert below
+                    // unwraps, so a failure cannot leave a stale id behind
+                    // unnoticed.
+                    inserted.lock().unwrap().extend(ids);
                     engine
                         .execute_blocking(&format!(
                             "INSERT INTO stress VALUES {};",
                             values.join(",")
                         ))
                         .unwrap();
-                    inserted.lock().unwrap().extend(ids);
                 }
             }));
         }

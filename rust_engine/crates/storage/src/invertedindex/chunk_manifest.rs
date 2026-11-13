@@ -146,15 +146,27 @@ impl ChunkManifest {
             .map_err(|error| FormatError::Io(error.to_string()))
     }
 
-    /// Reads the marker, `None` when it is absent, truncated, of another
-    /// version or not a manifest at all. A chunk without one is a chunk the
-    /// reference wrote (or an older build of this port), not an error.
-    pub fn read(index_dir: &str, base_name: &str) -> Option<Self> {
-        let bytes = crate::chunk_store::chunk_store()
-            .read(&Self::path(index_dir, base_name))
-            .ok()?;
+    /// Reads the marker: `Ok(None)` when it is absent - a chunk the reference
+    /// wrote (or an older build of this port) has none - and an error for
+    /// anything else.
+    ///
+    /// Only `NotFound` selects the legacy path. A read that failed for another
+    /// reason, or a marker that is truncated, of another version or not a
+    /// manifest at all, must not look like "no marker": the caller would then
+    /// fall back to `matches_files`' structural check and rebuild a chunk whose
+    /// published lengths it could not actually compare.
+    pub fn read(index_dir: &str, base_name: &str) -> Result<Option<Self>, FormatError> {
+        let bytes = match crate::chunk_store::chunk_store().read(&Self::path(index_dir, base_name))
+        {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(FormatError::Io(error.to_string())),
+        };
         if bytes.len() != MANIFEST_BYTES {
-            return None;
+            return Err(FormatError::Invalid(format!(
+                "chunk manifest {base_name}.ok is {} bytes, not {MANIFEST_BYTES}",
+                bytes.len()
+            )));
         }
         let u32_at = |at: usize| -> u32 {
             u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap_or([0; 4]))
@@ -162,17 +174,25 @@ impl ChunkManifest {
         let u64_at = |at: usize| -> u64 {
             u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap_or([0; 8]))
         };
-        if u32_at(0) != MAGIC || u32_at(4) != MANIFEST_VERSION {
-            return None;
+        if u32_at(0) != MAGIC {
+            return Err(FormatError::Invalid(format!(
+                "chunk manifest {base_name}.ok does not start with its magic"
+            )));
         }
-        Some(Self {
+        if u32_at(4) != MANIFEST_VERSION {
+            return Err(FormatError::Invalid(format!(
+                "chunk manifest {base_name}.ok is version {}, not {MANIFEST_VERSION}",
+                u32_at(4)
+            )));
+        }
+        Ok(Some(Self {
             span_docs: u32_at(8),
             live_docs: u32_at(12),
             total_len: u64_at(20),
             dic_len: u64_at(28),
             pos_len: u64_at(36),
             len_len: u64_at(44),
-        })
+        }))
     }
 
     /// Whether the three files on the disk are exactly the ones this marker

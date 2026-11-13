@@ -35,8 +35,9 @@
 //! installed store the local backend is used, so a test that never opens an
 //! object directory behaves exactly as before.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use crate::mapped::MappedFile;
 use crate::persistence::PersistenceManager;
@@ -156,6 +157,14 @@ pub struct PersistentChunkStore {
     manager: Arc<PersistenceManager>,
     /// The root the persistence keys are relative to (the engine directory).
     root: PathBuf,
+    /// One lock per logical path, held across the cache write **and** the
+    /// publication.
+    ///
+    /// Two writers of one path must not interleave: the publish reads the bytes
+    /// it was handed and records the object, so a write that lands between
+    /// another's cache replacement and its publication would leave the cache
+    /// holding one value and the object the other.
+    path_locks: Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>,
 }
 
 impl PersistentChunkStore {
@@ -163,7 +172,17 @@ impl PersistentChunkStore {
         Self {
             manager,
             root: root.as_ref().to_path_buf(),
+            path_locks: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The lock serialising the writers of `path`.
+    fn path_lock(&self, path: &Path) -> Arc<Mutex<()>> {
+        let mut locks = self
+            .path_locks
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Arc::clone(locks.entry(path.to_path_buf()).or_default())
     }
 
     /// `pm|object|<rel>` key of a logical path.
@@ -240,12 +259,18 @@ impl ChunkStore for PersistentChunkStore {
     fn write(&self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         // The local file is the cache the port enumerates; the object is what
         // survives a crash or a wiped cache. Both are written before the call
-        // returns, so "published" and "durable" never disagree for long.
+        // returns, so "published" and "durable" never disagree - and the lock
+        // covers both halves, so two writers of one path cannot leave the cache
+        // and the object holding different values.
+        let lock = self.path_lock(path);
+        let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::format::write_synced_direct(path, bytes)?;
         self.publish(path, bytes, true)
     }
 
     fn write_dedicated(&self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        let lock = self.path_lock(path);
+        let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::format::write_synced_direct(path, bytes)?;
         self.publish(path, bytes, false)
     }
@@ -505,6 +530,34 @@ pub fn install_chunk_store_for(root: impl AsRef<Path>, store: Arc<dyn ChunkStore
         registry.default = Arc::clone(&store);
         registry.roots.retain(|(installed, _)| installed != &root);
         registry.roots.push((root, store));
+    });
+}
+
+/// Forgets the backend of `root`, so nothing in the process still refers to it.
+///
+/// An engine calls this when it drops: the registry entry is what keeps its
+/// store - and the persistence manager behind it - alive, and a manager that is
+/// still referenced keeps the object directory (its catalog) from being opened
+/// again in this process. The default is reset only when it is that very store;
+/// another engine's backend is left in place.
+pub fn uninstall_chunk_store_for(root: impl AsRef<Path>) {
+    let root = root.as_ref().to_path_buf();
+    update(|registry| {
+        let mut released: Vec<Arc<dyn ChunkStore>> = Vec::new();
+        registry.roots.retain(|(installed, store)| {
+            if installed == &root {
+                released.push(Arc::clone(store));
+                false
+            } else {
+                true
+            }
+        });
+        if released
+            .iter()
+            .any(|store| Arc::ptr_eq(store, &registry.default))
+        {
+            registry.default = Arc::new(LocalChunkStore);
+        }
     });
 }
 

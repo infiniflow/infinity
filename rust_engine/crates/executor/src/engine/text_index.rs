@@ -1684,14 +1684,22 @@ impl TextIndex {
             // rows deleted before it, the span (and therefore `docs`) still
             // covers them while BM25's `N` and `sum(dl)` do not.
             let (live_docs, total_len) = match ChunkManifest::read(&self.dir, base) {
-                Some(manifest) => (manifest.live_docs, manifest.total_len),
-                None => (
+                Ok(Some(manifest)) => (manifest.live_docs, manifest.total_len),
+                Ok(None) => (
                     docs as u32,
                     (0..docs as u32)
                         .filter_map(|doc| reader.doc_len(doc))
                         .map(u64::from)
                         .sum(),
                 ),
+                // The reader above loads and validates the same marker, so a
+                // failure here is a chunk that changed under us: refuse it
+                // instead of reconstructing `N`/`sum(dl)` from span it could not
+                // verify.
+                Err(_) => {
+                    broken = true;
+                    break;
+                }
             };
             if let Some((_, last)) = reader.row_range() {
                 next = next.max(last + 1);

@@ -3619,10 +3619,39 @@ impl Engine {
                 }
             }
         }
-        let Some(im) = indexes
+        // A column may carry several FULLTEXT indexes (a sparse-gram one beside a
+        // regular one), and `indexes_of_table` lists them **by name**, so taking
+        // the first match would return chunks another analyzer wrote. The chunks
+        // have to belong to the index `text_index_for` built the tokenizer from,
+        // i.e. the analyzer `column_analyzer_name` resolves - the same rule as
+        // C++ `SearchDriver::GetAnalyzerName` (a regular analyzer wins over a
+        // sparse-gram one regardless of name order).
+        let wanted = self.column_analyzer_name(table, column);
+        let im = indexes
             .into_iter()
-            .find(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.column == *column)
-        else {
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.column == *column)
+            .min_by_key(|im| {
+                let analyzer = im
+                    .options
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("analyzer"))
+                    .map(|(_, v)| v.clone())
+                    .unwrap_or_else(|| "standard".to_string());
+                let sparsegram = matches!(
+                    analyzer::parse_analyzer_name(&analyzer),
+                    Ok(analyzer::AnalyzerName::SparseGram { .. })
+                );
+                // 0: the analyzer the column's tokenizer uses, 1: another
+                // regular one, 2: a sparse-gram one.
+                if Some(&analyzer) == wanted.as_ref() {
+                    0
+                } else if sparsegram {
+                    2
+                } else {
+                    1
+                }
+            });
+        let Some(im) = im else {
             return Ok(Vec::new());
         };
         let index_id = if im.id > 0 {

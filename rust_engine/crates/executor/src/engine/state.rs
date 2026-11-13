@@ -5010,6 +5010,19 @@ pub struct Engine {
     pub(crate) profile_enabled: std::sync::atomic::AtomicBool,
 }
 
+impl Drop for Engine {
+    fn drop(&mut self) {
+        // The chunk-store registry holds the engine's store, and through it the
+        // persistence manager - which is the only thing keeping the object
+        // catalog open. An engine that leaves its root registered therefore
+        // leaks both, and the same object directory cannot be opened again in
+        // this process (a reopened engine, or the next test in a suite).
+        if self.persistence.is_some() {
+            storage::chunk_store::uninstall_chunk_store_for(&self.dir);
+        }
+    }
+}
+
 /// A `cpu_usage` sample: the process's utime+stime ticks and when they were
 /// read.
 #[derive(Debug, Clone, Copy)]
