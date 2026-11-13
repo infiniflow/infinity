@@ -5786,11 +5786,10 @@ mod tests {
     ///
     /// No catalog record names that tail, so the index-selection step of a
     /// pressure drain cannot find it - but `memindex_bytes_of` charges it all
-    /// the same. Without a release step the engine would stay over budget
-    /// forever: every insert the quota would fire, and every drain would free
-    /// nothing it was allowed to see.
+    /// the same. The explicit drain is what releases it: it walks the
+    /// registries rather than the catalog, so it sees the column too.
     #[test]
-    fn pressure_seals_the_tail_of_a_sparse_column_with_no_index() {
+    fn a_full_drain_seals_the_tail_of_a_sparse_column_with_no_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_quota(1 << 30);
@@ -5823,16 +5822,18 @@ mod tests {
             "and no index record names it"
         );
 
-        // The pressure path itself, not the explicit full drain: the latter
-        // dumps every index and would seal the orphan tail anyway, which is
-        // exactly what this test must not rely on.
+        // Sealing an orphan tail writes a chunk, so it belongs to the explicit
+        // dump - the same step that publishes the files - and not to the
+        // pressure path, whose job is to free what it can without changing the
+        // chunk layout a checkpoint is about to produce. `test_mem_bmp` in the
+        // restart suite pins that layout.
         e.set_memindex_quota(1);
-        crate::scheduler::block_on(e.dump_under_pressure(Some("osp")));
+        crate::scheduler::block_on(e.enforce_memindex_quota(None));
 
         assert_eq!(
             tail(&e),
             0,
-            "the pressure path seals a tail the catalog does not name"
+            "the explicit drain seals a tail the catalog does not name"
         );
         // Sealed, not dropped: the rows still answer.
         assert!(!rows(

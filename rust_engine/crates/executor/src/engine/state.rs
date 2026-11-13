@@ -8749,36 +8749,17 @@ impl BgTask for DumpMemIndexTask {
     fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
         Box::pin(async move {
             if let Some(engine) = self.engine.upgrade() {
-                // The flag carries the strength of what is owed, and a later
-                // request may have raised it while this task sat in the queue, so
-                // the strength is read here rather than taken from the value the
-                // task was built with.
-                //
-                // The quota covers both the in-memory index tails and the rows
-                // still in the append buffer, so the task releases both: the
-                // rows go to their block files, then the largest tail is
-                // sealed. It runs here rather than on the writer's thread
-                // because the block write takes the table's bottom gate, which
-                // the caller of `enforce_memindex_quota` may already hold.
-                loop {
-                    let owed = self.pending.load(std::sync::atomic::Ordering::Acquire);
-                    if owed == 0 {
-                        break;
-                    }
-                    if owed >= 2 {
-                        engine.dump_all_memory_indexes().await;
-                        engine.dump_all_sealed_blocks(None).await;
-                    } else {
-                        engine.dump_under_pressure(None).await;
-                    }
-                    // Clear only what was just done: a request that arrived
-                    // meanwhile raised the flag again and gets another round.
-                    let _ = self.pending.compare_exchange(
-                        owed,
-                        0,
-                        std::sync::atomic::Ordering::AcqRel,
-                        std::sync::atomic::Ordering::Acquire,
-                    );
+                // A dump sees a whole write batch: the dump transaction
+                // conflicts with an append or update that already took its
+                // commit ts on the same segment and is retried, as the
+                // reference's `DoDump` is. Every step inside is an `.await`;
+                // the segment files it seals are written on the blocking pool,
+                // leaf by leaf.
+                if self.drain_all {
+                    engine.dump_all_memory_indexes().await;
+                    engine.dump_all_sealed_blocks(None).await;
+                } else {
+                    engine.dump_under_pressure(None).await;
                 }
             }
             self.pending.store(0, std::sync::atomic::Ordering::Relaxed);

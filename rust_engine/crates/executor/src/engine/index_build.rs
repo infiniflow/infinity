@@ -2854,17 +2854,16 @@ impl Engine {
     pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
         self.dump_all_sealed_blocks(only).await;
         self.dump_largest_memory_index().await;
-        // Sparse and multi-vector columns get an in-memory tail without a
-        // `CREATE INDEX`, so no catalog record names them and
-        // `dump_largest_memory_index` cannot pick them - yet `memindex_bytes_of`
-        // charges them, which would leave the engine permanently over budget
-        // with nothing here that could release it. They are sealed (not
-        // dumped): the checkpoint publishes their files with the rest of the
-        // mirror, which is what `dump_all_memory_indexes` relies on too.
+        // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
+        // are **not** sealed here. `seal_sparse_index` is only half a dump: it
+        // calls `SealedTail::take`, which removes the entries and hands them
+        // back, and the chunk writer that persists them is the dump transaction
+        // (`seal_index_tail` -> `publish_index_chunks`). Calling it from here
+        // discarded the returned tail and lost those rows - `test_mem_bmp` in
+        // the restart suite caught it. What the quota can release here is
+        // therefore the rows in the append buffer and the named indexes; the
+        // rest waits for the next checkpoint, which is what makes their files.
         //
-        // Safe from a commit's bottom half: each seal takes only the index's
-        // own write lock, and reads `tables` before it, never under it.
-        self.seal_orphan_memory_tails();
         // The dump released tails: fold that into the engine-wide total so the
         // next quota check sees it without a second scan of every table.
         self.recompute_memindex_total();

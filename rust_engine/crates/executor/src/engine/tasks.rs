@@ -9,6 +9,9 @@ use super::*;
 pub struct DumpMemIndexTask {
     pub(crate) engine: std::sync::Weak<Engine>,
     pub(crate) pending: Arc<std::sync::atomic::AtomicUsize>,
+    /// Whether every tail must go, or only the largest one: an explicit quota
+    /// check asks for everything, a write-triggered one takes the largest.
+    pub(crate) drain_all: bool,
 }
 
 /// Background `CleanupTask` (`src/storage/bg_task/bg_task.cppm:107-114`).
