@@ -4480,25 +4480,23 @@ impl TableEntry {
         if batch.is_empty() {
             return;
         }
-        // Appending does not touch the map: its entries would all be new and
-        // are only read by a point lookup, which searches the sorted buffer
-        // anyway. A bulk `COPY` appends 8.4 M rows and never looks one up, and
-        // keeping the map in step was 30% of its profile.
-        //
-        // The append is only taken when the batch is itself id-ordered: two
-        // writers interleaving their commits hand over a batch whose first id
-        // is past the buffer's last while the rest of it is not, and extending
-        // that would leave `pending_rows` unsorted - which silently breaks the
-        // binary search `buffered_row` relies on (a row then reads as absent,
-        // and a full-text query loses it).
-        let batch_ordered = batch.windows(2).all(|w| w[0].0 < w[1].0);
-        if batch_ordered
-            && self
-                .pending_rows
-                .last()
-                .is_none_or(|(last, _)| *last < batch[0].0)
+        // The map is kept in step on every path. Leaving it alone on an append
+        // was worth ~8 s on an 8 M-row `COPY`, but the buffer has to stay both
+        // sorted and addressable under concurrent writers, and the append fast
+        // path could not promise the first: two writers interleaving their
+        // commits hand over a batch whose head is past the buffer's last id
+        // and whose tail is not, and extending it left `pending_rows` unsorted.
+        // A binary search over that answers "absent" for rows that are there.
+        if self
+            .pending_rows
+            .last()
+            .is_none_or(|(last, _)| *last < batch[0].0)
         {
-            self.pending_rows.extend(batch);
+            self.pending_rows.reserve(batch.len());
+            for (seq, values) in batch {
+                self.pending_pos.insert(seq, self.pending_rows.len());
+                self.pending_rows.push((seq, values));
+            }
             return;
         }
         batch.sort_by_key(|(seq, _)| *seq);
@@ -4508,9 +4506,10 @@ impl TableEntry {
                 .partition_point(|(buffered, _)| *buffered < seq);
             self.pending_rows.insert(at, (seq, values));
         }
-        // The positions after an out-of-order insert all shift, so the map is
-        // dropped rather than rebuilt; `buffered_row` notices and searches.
         self.pending_pos.clear();
+        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
+            self.pending_pos.insert(*seq, at);
+        }
     }
 
     /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
