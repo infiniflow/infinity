@@ -30,6 +30,8 @@ import :segment_posting;
 import :posting_iterator;
 import :vector_with_lock;
 import :infinity_context;
+import :virtual_store;
+import :byte_slice;
 
 import data_type;
 import internal_types;
@@ -107,4 +109,41 @@ TEST_P(PostingWriterTest, test1) {
             ASSERT_EQ(doc_id, 10);
         }
     }
+}
+
+TEST_P(PostingWriterTest, tf_after_skip_to_across_segments) {
+    VectorWithLock<u32> column_length_array(2000, 10);
+    std::vector<std::vector<u8>> storage;
+    auto seg_postings = std::make_shared<std::vector<SegmentPosting>>();
+    for (u32 seg = 0; seg < 2; ++seg) {
+        std::string path = file_ + "_seg" + std::to_string(seg);
+        auto posting = std::make_shared<PostingWriter>(posting_format_, column_length_array);
+        for (docid_t d = 1; d <= 300; ++d) {
+            posting->AddPosition(1);
+            posting->EndDocument(d, 0);
+        }
+        TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+        {
+            auto file_writer = std::make_shared<FileWriter>(path, 128000);
+            posting->Dump(file_writer, term_meta);
+            file_writer->Sync();
+        }
+        size_t size = VirtualStore::GetFileSize(path);
+        storage.emplace_back(size);
+        FileReader file_reader(path, 128000);
+        file_reader.Read((char *)storage.back().data(), size);
+        auto slice_list = std::make_shared<ByteSliceList>(ByteSlice::NewSlice(storage.back().data(), size));
+        SegmentPosting seg_posting;
+        seg_posting.Init(slice_list, RowID(seg, 0), term_meta.doc_freq_, term_meta);
+        seg_postings->push_back(seg_posting);
+    }
+    PostingIterator iter(flag_);
+    iter.Init(seg_postings, 0);
+
+    ASSERT_EQ(iter.SeekDoc(RowID(0, 0)), RowID(0, 1));
+    ASSERT_EQ(iter.GetCurrentTF(), 1u);
+    ASSERT_TRUE(iter.SkipTo(RowID(1, 10)));
+    ASSERT_EQ(iter.GetCurrentTF(), 0u);
+    ASSERT_EQ(iter.SeekDoc(RowID(1, 10)), RowID(1, 10));
+    ASSERT_EQ(iter.GetCurrentTF(), 1u);
 }

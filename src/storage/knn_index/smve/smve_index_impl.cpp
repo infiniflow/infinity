@@ -117,9 +117,12 @@ void SMVEIndexInMem::BuildFromColumn(const ColumnVector &col, SegmentOffset bloc
         if (nulls_ptr && !nulls_ptr->IsTrue(offset + i)) {
             continue;
         }
-        auto [tensor_span, tensor_size] = col.GetTensorRaw(offset + i);
+        // `GetTensorRaw` returns the raw bytes plus the number of embeddings
+        // (tokens) they hold - not a byte count (`ColumnVector::GetTensorRaw`,
+        // `column_vector_impl.cpp:2831`; the caller names it `embedding_num`).
+        auto [tensor_span, n_tokens_raw] = col.GetTensorRaw(offset + i);
         const f32 *tensor_ptr = reinterpret_cast<const f32 *>(tensor_span.data());
-        u32 n_tokens = static_cast<u32>(tensor_size) / (embedding_dim_ * sizeof(f32));
+        u32 n_tokens = static_cast<u32>(n_tokens_raw);
 
         SMVEResult smve = SMVETransform(tensor_ptr, n_tokens, embedding_dim_, projection_matrix_.get(), width_, topk_, false);
 

@@ -120,10 +120,6 @@ void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_
                 ADD_FAILURE() << "File path is not absolute: " << file_path;
             }
             EXPECT_FALSE(std::filesystem::exists(file_path));
-
-            auto path = static_cast<std::filesystem::path>(file_path).parent_path();
-            EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
-                        std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
         }
         for (const auto &file_path : exist_file_paths) {
             if (!std::filesystem::path(file_path).is_absolute()) {

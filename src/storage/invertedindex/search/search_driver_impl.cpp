@@ -16,6 +16,8 @@ module;
 
 #include <cassert>
 
+#include "common/utility/sparse_gram.h"
+
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
@@ -70,6 +72,22 @@ void ParseFields(const std::string &fields_str, std::vector<std::pair<std::strin
             begin_idx = comma_idx + 1;
         }
     }
+}
+
+// `column@index` names one full-text index of a column, which is how the regex
+// rewrite searches the gram index of a column that carries a regular one too.
+// Every path that turns a field string into query nodes splits it the same way,
+// including the analyzer path taken when the operator option is `and` or `or`
+// instead of the query syntax.
+inline void SplitFieldIndex(const std::string &field_index, std::string &field, std::string &index) {
+    const auto alt_idx = field_index.find('@');
+    if (alt_idx == std::string::npos) {
+        field = field_index;
+        index.clear();
+        return;
+    }
+    field = field_index.substr(0, alt_idx);
+    index = field_index.substr(alt_idx + 1);
 }
 
 std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string &fields_str, const std::string &query) const {
@@ -156,7 +174,20 @@ GetAnalyzerName(const std::string &field, const std::string &index, const std::m
             if (index2analyzer.empty())
                 return "standard";
             if (index.length() == 0) {
-                return index2analyzer.begin()->second;
+                // Mirrors IndexReader::GetDefaultIndexName: a query that names no
+                // index is written in the tokens of a regular analyzer, so a
+                // sparse gram index only parses it when the column has no other.
+                std::string first_analyzer_name;
+                for (const auto &index_analyzer : index2analyzer) {
+                    SparseGramParams params;
+                    if (!ParseSparseGramAnalyzerName(index_analyzer.second, params)) {
+                        return index_analyzer.second;
+                    }
+                    if (first_analyzer_name.empty()) {
+                        first_analyzer_name = index_analyzer.second;
+                    }
+                }
+                return first_analyzer_name;
             }
             const auto it2 = index2analyzer.find(index);
             if (it2 != index2analyzer.end()) {
@@ -178,8 +209,10 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     if (!default_field_ptr) {
         default_field_ptr = &default_field_;
     }
-    const auto &default_field = *default_field_ptr;
-    const auto default_analyzer_name = GetAnalyzerName(default_field, "", field2analyzer_);
+    std::string default_field;
+    std::string default_index;
+    SplitFieldIndex(*default_field_ptr, default_field, default_index);
+    const auto default_analyzer_name = GetAnalyzerName(default_field, default_index, field2analyzer_);
     if (const auto default_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(default_analyzer_name.c_str());
         default_analyzer_name_int != keyword_analyzer_name_int && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
         // use parser
@@ -204,6 +237,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
             auto q = std::make_unique<TermQueryNode>();
             q->term_ = terms.front().text_;
             q->column_ = default_field;
+            q->index_ = default_index;
             return q;
         }
         std::unique_ptr<MultiQueryNode> multi_query;
@@ -218,6 +252,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
             auto subquery = std::make_unique<TermQueryNode>();
             subquery->term_ = term.text_;
             subquery->column_ = default_field;
+            subquery->index_ = default_index;
             multi_query->Add(std::move(subquery));
         }
         return multi_query;
@@ -234,14 +269,9 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         return nullptr;
     }
     // 1. analyze
-    std::string field, index;
-    auto alt_idx = field_index.find('@');
-    if (alt_idx == std::string::npos) {
-        field = field_index;
-    } else {
-        field = field_index.substr(0, alt_idx);
-        index = field_index.substr(alt_idx + 1, field_index.length() - alt_idx - 1);
-    }
+    std::string field;
+    std::string index;
+    SplitFieldIndex(field_index, field, index);
     const auto analyzer_name = GetAnalyzerName(field, index, field2analyzer_);
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if (!status.ok()) {

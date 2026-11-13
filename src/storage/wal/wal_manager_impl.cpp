@@ -20,6 +20,7 @@ import :new_txn_manager;
 import :new_txn;
 import :storage;
 import :virtual_store;
+import :local_file_handle;
 import :infinity_context;
 import :data_access_state;
 import :status;
@@ -79,10 +80,11 @@ void WalManager::Start() {
         VirtualStore::MakeDirectory(wal_dir_);
     }
     // TODO: recovery from wal checkpoint
-    ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
-    if (!ofs_.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
+    auto [wal_handle, open_status] = VirtualStore::Open(wal_path_, FileAccessMode::kAppend);
+    if (!open_status.ok()) {
+        UnrecoverableError(fmt::format("Failed to open wal file {}: {}", wal_path_, open_status.message()));
     }
+    wal_handle_ = std::move(wal_handle);
     LOG_INFO(fmt::format("Open wal file: {}", wal_path_));
 
     wal_size_ = 0;
@@ -120,7 +122,7 @@ void WalManager::Stop() {
         UnrecoverableError("WAL manager stop failed: txn manager is nullptr");
     }
 
-    ofs_.close();
+    wal_handle_.reset();
     LOG_INFO("WAL manager is stopped.");
 }
 
@@ -142,6 +144,13 @@ void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
         last_ckp_ts_ = new_last_ckp_ts;
     }
     return;
+}
+
+void WalManager::RecycleWalFile(TxnTimeStamp ckp_ts) {
+    if (ckp_ts == 0 || ckp_ts == UNCOMMIT_TS) {
+        UnrecoverableError(fmt::format("Unexpected checkpoint ts to recycle wal files: {}", ckp_ts));
+    }
+    WalFile::Recycle(ckp_ts, wal_dir_);
 }
 
 std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
@@ -260,6 +269,9 @@ void WalManager::NewFlush() {
 
         LOG_TRACE(fmt::format("Attempt to write {} logs", txn_batch.size()));
 
+        // Begin ts of the checkpoint written by this batch (0: none), assigned after the swap so that it
+        // names the file the checkpoint entry was really written to.
+        TxnTimeStamp last_ckp_begin_ts{0};
         for (const auto &txn : txn_batch) {
             if (txn == nullptr) {
                 // terminate entry
@@ -291,6 +303,13 @@ void WalManager::NewFlush() {
                                      txn->CommitTS(),
                                      txn->TxnID()));
                 this->SwapWalFile(max_commit_ts_, true);
+                if (txn->BeginTS() > last_ckp_begin_ts) {
+                    last_ckp_begin_ts = txn->BeginTS();
+                } else {
+                    LOG_WARN(fmt::format("Checkpoint begin ts {} is not newer than the recorded {}, keep the recorded ts",
+                                         txn->BeginTS(),
+                                         last_ckp_begin_ts));
+                }
             }
 
             for (const std::shared_ptr<WalCmd> &cmd : entry->cmds_) {
@@ -308,7 +327,7 @@ void WalManager::NewFlush() {
                                                act_size,
                                                entry->ToString()));
             }
-            ofs_.write(buf->data(), ptr - buf->data());
+            wal_handle_->Append(buf->data(), ptr - buf->data());
 
             if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
                 if (cluster_manager == nullptr) {
@@ -326,19 +345,11 @@ void WalManager::NewFlush() {
             break;
         }
 
-        switch (flush_option_) {
-            case FlushOptionType::kFlushAtOnce: {
-                ofs_.flush();
-                break;
-            }
-            case FlushOptionType::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
-                break;
-            }
-            case FlushOptionType::kFlushPerSecond: {
-                ofs_.flush(); // FIXME: not flush, flush per second
-                break;
-            }
+        // Appends reach the kernel during the loop above, so this fsync makes the whole batch durable.
+        // It syncs the current file; a mid-batch swap syncs the rotated one before renaming it away.
+        Status status = wal_handle_->Sync();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to sync wal file {}: {}", wal_path_, status.message()));
         }
 
         if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
@@ -351,6 +362,10 @@ void WalManager::NewFlush() {
             // TODO: if txn is checkpoint, swap WAL file
         }
         txn_batch.clear();
+
+        if (last_ckp_begin_ts != 0) {
+            RecycleWalFile(last_ckp_begin_ts);
+        }
 
         if (!VirtualStore::Exists(wal_path_)) {
             LOG_ERROR(fmt::format("WAL file: {} does not exist", wal_path_));
@@ -433,9 +448,8 @@ void WalManager::FlushLogByReplication(const std::vector<std::string> &synced_lo
     }
 
     for (const std::string &synced_log : synced_logs) {
-        ofs_.write(synced_log.c_str(), synced_log.size());
+        wal_handle_->Append(synced_log.c_str(), synced_log.size());
     }
-    ofs_.flush();
 }
 
 bool WalManager::SetCheckpointing() {
@@ -503,13 +517,14 @@ i64 WalManager::GetLastCkpWalSize() {
  * current wal file.
  */
 void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
+    Status status = wal_handle_->Sync();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to sync wal file {}: {}", wal_path_, status.message()));
+    }
+
     if (max_commit_ts <= last_swap_wal_ts_) {
         LOG_WARN(fmt::format("Skip swap wal file, max_commit_ts: {} <= last_swap_wal_ts_: {}", max_commit_ts, last_swap_wal_ts_));
         return;
-    }
-
-    if (ofs_.is_open()) {
-        ofs_.close();
     }
 
     std::string new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));
@@ -534,10 +549,11 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
     }
 
     // Create a new wal file with the original name.
-    ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
-    if (!ofs_.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
+    auto [new_handle, open_status] = VirtualStore::Open(wal_path_, FileAccessMode::kAppend);
+    if (!open_status.ok()) {
+        UnrecoverableError(fmt::format("Failed to open wal file {}: {}", wal_path_, open_status.message()));
     }
+    wal_handle_ = std::move(new_handle);
 
     last_swap_wal_ts_ = max_commit_ts;
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));

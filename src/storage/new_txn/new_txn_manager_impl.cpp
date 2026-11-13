@@ -112,21 +112,27 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
+    // Checkpoint and cleanup txns are mutually exclusive with themselves: the corresponding member holds the
+    // begin ts of the txn currently in progress, or UNCOMMIT_TS when none is running.
     if (txn_type == TransactionType::kNewCheckpoint || txn_type == TransactionType::kCleanup) {
-        auto &begin_ts_ref = (txn_type == TransactionType::kNewCheckpoint) ? ckp_begin_ts_ : cleanup_begin_ts_;
-        const char *txn_name = (txn_type == TransactionType::kNewCheckpoint) ? "checkpoint" : "cleanup";
+        const bool is_checkpoint = txn_type == TransactionType::kNewCheckpoint;
+        const char *txn_name = is_checkpoint ? "checkpoint" : "cleanup";
+        const TxnTimeStamp running_ts = is_checkpoint ? ckp_begin_ts_ : cleanup_begin_ts_;
 
-        if (begin_ts_ref == UNCOMMIT_TS) {
-            LOG_DEBUG(fmt::format("{} txn is started in {}", txn_name, begin_ts));
-            begin_ts_ref = begin_ts;
-        } else {
+        if (running_ts != UNCOMMIT_TS) {
             LOG_WARN(fmt::format("Another {} txn is started in {}, new txn: {} {} start at {} will do nothing, not start this txn",
                                  txn_name,
-                                 begin_ts_ref,
+                                 running_ts,
                                  new_txn_id,
                                  txn_name,
                                  begin_ts));
             return nullptr;
+        }
+
+        if (is_checkpoint) {
+            ckp_begin_ts_ = begin_ts;
+        } else {
+            cleanup_begin_ts_ = begin_ts;
         }
     }
 
