@@ -79,8 +79,10 @@ def test_condition_embedded(request):
     assert args[1].constant_expr.i64_value == 1
 
 
-def test_condition_embedded_parenthesized_output():
+def test_condition_embedded_parenthesized_output(request):
     """Parentheses preserve the output parser callback, including star."""
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
     import sqlglot.expressions as exp
     from infinity_embedded.local_infinity.utils import parse_expr
 
