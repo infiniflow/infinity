@@ -45,6 +45,32 @@ from infinity_embedded.local_infinity.types import build_result, logic_type_to_d
 from infinity_embedded.utils import binary_exp_to_paser_exp
 
 
+def _json_operator_path(path):
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    if isinstance(path, exp.Literal) and path.is_string:
+        key = path.this
+        if key and not any(char in key for char in ".[]"):
+            return "$." + key
+    elif isinstance(path, exp.JSONPath):
+        result = ""
+        for part in path.expressions:
+            if isinstance(part, exp.JSONPathRoot):
+                result += "$"
+            elif isinstance(part, exp.JSONPathKey):
+                key = part.this
+                if not isinstance(key, str) or not key or any(char in key for char in ".[]"):
+                    break
+                result += "." + key
+            elif isinstance(part, exp.JSONPathSubscript) and type(part.this) is int and part.this >= 0:
+                result += f"[{part.this}]"
+            else:
+                break
+        else:
+            if result.startswith("$"):
+                return result
+    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path")
+
+
 def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
@@ -59,9 +85,7 @@ def traverse_conditions(cons, fn=None):
             'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
 
         json_expr = parse_expr(cons.args['this'])
-        path_sql = cons.args['expression'].sql()
-        if len(path_sql) >= 2 and path_sql.startswith("'") and path_sql.endswith("'"):
-            path_sql = path_sql[1:-1]
+        path_sql = _json_operator_path(cons.args['expression'])
         path_constant = WrapConstantExpr()
         path_constant.literal_type = LiteralType.kString
         path_constant.str_value = path_sql

@@ -283,6 +283,32 @@ def _parse_not_like(like_node, escape_char=None):
     return parsed_expr
 
 
+def _json_operator_path(path):
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    if isinstance(path, exp.Literal) and path.is_string:
+        key = path.this
+        if key and not any(char in key for char in ".[]"):
+            return "$." + key
+    elif isinstance(path, exp.JSONPath):
+        result = ""
+        for part in path.expressions:
+            if isinstance(part, exp.JSONPathRoot):
+                result += "$"
+            elif isinstance(part, exp.JSONPathKey):
+                key = part.this
+                if not isinstance(key, str) or not key or any(char in key for char in ".[]"):
+                    break
+                result += "." + key
+            elif isinstance(part, exp.JSONPathSubscript) and type(part.this) is int and part.this >= 0:
+                result += f"[{part.this}]"
+            else:
+                break
+        else:
+            if result.startswith("$"):
+                return result
+    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path")
+
+
 def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
@@ -357,9 +383,7 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
             'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
 
         json_expr = parse_expr(cons.args['this'])
-        path_sql = cons.args['expression'].sql()
-        if len(path_sql) >= 2 and path_sql.startswith("'") and path_sql.endswith("'"):
-            path_sql = path_sql[1:-1]
+        path_sql = _json_operator_path(cons.args['expression'])
         path_expr = ttypes.ParsedExpr()
         path_constant = ttypes.ConstantExpr()
         path_constant.literal_type = ttypes.LiteralType.String
