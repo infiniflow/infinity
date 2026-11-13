@@ -43,25 +43,42 @@ impl Engine {
             .iter()
             .find(|(k, _)| k == "FORMAT")
             .map(|(_, v)| v.to_ascii_uppercase());
-        // Read raw bytes: `FORMAT FVECS` is binary, everything else is text.
+        // The whole file is only read for the formats that need it in one
+        // piece (binary vectors, the JSON forms). CSV streams, and reading the
+        // 326 MB file into a `Vec` first only to open it again was a full extra
+        // pass over the input.
+        let whole_file = |path: &std::path::Path| -> Option<Vec<u8>> { std::fs::read(path).ok() };
         // Missing fixtures stay a statement-level success with no rows.
-        let t_read0 = std::time::Instant::now();
-        let bytes_in = match std::fs::read(&resolved) {
-            Ok(b) => b,
-            Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
-        };
-        let t_read = t_read0.elapsed();
         // The binary formats parse into the same literal rows the CSV path
         // builds, then commit them the same way.
         let rows = match format.as_deref() {
-            Some("FVECS") => Some(self.binary_vector_rows(table, &bytes_in, 4)?),
-            Some("BVECS") => Some(self.binary_vector_rows(table, &bytes_in, 1)?),
-            Some("CSR") => Some(self.csr_sparse_rows(table, &bytes_in)?),
+            Some("FVECS") => Some(self.binary_vector_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+                4,
+            )?),
+            Some("BVECS") => Some(self.binary_vector_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+                1,
+            )?),
+            Some("CSR") => Some(self.csr_sparse_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+            )?),
             Some("PARQUET") => Some(self.parquet_rows(table, &resolved)?),
             _ => None,
         };
         if let Some(rows) = rows {
-            return self.import_literal_rows(table, rows, t_read).await;
+            return self
+                .import_literal_rows(table, rows, std::time::Duration::ZERO)
+                .await;
         }
         let delim = opts
             .iter()
@@ -77,6 +94,9 @@ impl Engine {
         // `FORMAT JSONL` (one object per line) and `FORMAT JSON` (one array)
         // are small in practice; the CSV path streams.
         if format_of("JSONL") || format_of("JSON") {
+            let Some(bytes_in) = whole_file(&resolved) else {
+                return Ok(QueryResult::Inserted { count: 0 });
+            };
             let text = String::from_utf8_lossy(&bytes_in).into_owned();
             if format_of("JSONL") {
                 return self
@@ -131,7 +151,16 @@ impl Engine {
                     continue;
                 }
                 let fields: Vec<String> = csv_fields(line, delim);
-                let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+                // One allocation per cell, not two: `normalize_cell` hands back
+                // the field unchanged for the plain numeric/text cells that
+                // make up most of a `COPY`.
+                let mut cells: Vec<String> = fields
+                    .into_iter()
+                    .map(|f| match normalize_cell_cow(&f) {
+                        std::borrow::Cow::Borrowed(_) => f,
+                        std::borrow::Cow::Owned(o) => o,
+                    })
+                    .collect();
                 if cells.len() > types_for_scan.len() {
                     return Err(Error::Invalid(format!(
                         "import: the file has {} columns but the table has {}",
@@ -209,22 +238,35 @@ impl Engine {
                     if !segments.contains(&segment) {
                         segments.push(segment);
                     }
+                    // Both hooks take a lock and allocate per row; on a table
+                    // with no secondary index or no text/vector index they find
+                    // nothing eight million times over.
+                    let secondary_targets = if self.has_secondary_indexes(table) {
+                        self.secondary_targets(table, &schema)
+                    } else {
+                        Vec::new()
+                    };
+                    let needs_texts = self.has_text_or_vector_indexes(table);
                     let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(take);
                     for (k, row) in batch[start..start + take].iter().enumerate() {
-                        self.update_indexes_on_insert(table, base + k, row, &schema)?;
-                        texts_by_row
-                            .push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                        self.insert_secondary_keys(&secondary_targets, base + k, row)?;
+                        if needs_texts {
+                            texts_by_row
+                                .push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                        }
                     }
-                    // One batch for the full-text columns: tokenise without the
-                    // column lock, insert under it once.
-                    let text_batch: Vec<(usize, &[String])> = texts_by_row
-                        .iter()
-                        .map(|(seq, cells)| (*seq, cells.as_slice()))
-                        .collect();
-                    self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
-                        .await;
-                    for (seq, texts) in &texts_by_row {
-                        self.update_vector_caches(table, *seq, texts);
+                    if needs_texts {
+                        // One batch for the full-text columns: tokenise without
+                        // the column lock, insert under it once.
+                        let text_batch: Vec<(usize, &[String])> = texts_by_row
+                            .iter()
+                            .map(|(seq, cells)| (*seq, cells.as_slice()))
+                            .collect();
+                        self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                            .await;
+                        for (seq, texts) in &texts_by_row {
+                            self.update_vector_caches(table, *seq, texts);
+                        }
                     }
                     total += take;
                     staged += take;

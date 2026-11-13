@@ -320,6 +320,22 @@ pub(crate) fn encode_value(
     column_type: i32,
     value: &str,
 ) -> Result<Option<Vec<u8>>> {
+    encode_value_with_shape(type_text, embedding_shape(type_text), column_type, value)
+}
+
+/// [`encode_value`] with the column's embedding shape already resolved.
+///
+/// `embedding_shape` upper-cases the whole type string, so calling it per cell
+/// allocated a `String` per value - 16.7 M of them on an 8 M-row, two-column
+/// `COPY`, which was most of the remaining time once the row lookup stopped
+/// scanning the buffer. A block encodes one column at a time, so the shape is
+/// the same for every cell in it.
+pub(crate) fn encode_value_with_shape(
+    type_text: &str,
+    shape: Option<(usize, i32)>,
+    column_type: i32,
+    value: &str,
+) -> Result<Option<Vec<u8>>> {
     if value.eq_ignore_ascii_case("null") {
         return Ok(None);
     }
@@ -328,7 +344,7 @@ pub(crate) fn encode_value(
             "value '{value}' is not valid for column type {column_type}"
         ))
     };
-    if let Some((dim, elem)) = embedding_shape(type_text) {
+    if let Some((dim, elem)) = shape {
         let inner = value.trim().trim_start_matches('[').trim_end_matches(']');
         if elem == 0 {
             // BIT: the engine (and the C++ `ToString`, `embedding_type.h:253-262`)

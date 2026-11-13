@@ -26,11 +26,17 @@ impl Engine {
                 return Err(Error::Invalid(message));
             }
         }
-        if self.storage.catalog.get_table_by_name(name)?.is_none() {
+        // One lookup serves both: whether a crashed `DROP TABLE` left orphans
+        // and whether the name is already taken. Inside a capture each
+        // `get_table_by_name` re-reads the store (the cache is bypassed by
+        // design there), so the second one was a repeated catalog read.
+        let existing = self.storage.catalog.get_table_by_name(name)?;
+        if existing.is_none() {
             self.clear_orphan_rows(name)?;
         }
-        let meta = self.storage.catalog.create_table_typed_with_sparse_stores(
+        let meta = self.storage.catalog.create_table_typed_existing(
             name,
+            existing.as_ref(),
             columns,
             defaults,
             not_nulls,
@@ -52,24 +58,42 @@ impl Engine {
     /// engine's own state: the row keys are the port's, and the in-memory
     /// registry must forget a dropped table at once.
     pub(crate) fn drop_table_all(&self, name: &str) -> Result<bool> {
-        let table_id = self.storage.catalog.get_table_by_name(name)?.map(|m| m.id);
+        // One lookup for the whole drop: the id and the column list both come
+        // from it, and inside a capture every `get_table_by_name` re-resolves
+        // the name against the store (the cache is bypassed there, because the
+        // statement's own uncommitted DDL has to be visible). The reference's
+        // `DropTable` resolves once (`DBMeta::GetTableMeta`) and uses that.
+        let meta = self.storage.catalog.get_table_by_name(name)?;
+        let table_id = meta.as_ref().map(|m| m.id);
         let key = self.table_key(name);
         // Full-text chunks live in `<dir>/fulltext/<db>.<table>.<column>`, keyed by
         // name rather than by table id: a table recreated under the same name
         // would otherwise reopen the dropped one's chunks and score those
         // documents a second time.
-        let fulltext_columns = self.table_schema(&key).unwrap_or_default();
-        // Dropping the entry drops its charge with it, so the engine-wide
-        // total has to be rebuilt once (a DDL is rare; the scan is not on a
-        // hot path).
-        self.tables.lock().unwrap().remove(&key);
+        let meta_ref = meta;
+        let fulltext_columns = meta_ref
+            .as_ref()
+            .map(|m| m.columns.clone())
+            .unwrap_or_default();
+        // Take this table's charge out of the engine-wide total instead of
+        // walking every table: a run of `DROP TABLE`s is otherwise quadratic.
+        let released = self
+            .tables
+            .lock()
+            .unwrap()
+            .remove(&key)
+            .map(|entry| entry.memindex_bytes)
+            .unwrap_or(0);
         crate::blocks::misc::forget_mirror_write_lock(&key);
-        self.recompute_memindex_total();
+        self.release_memindex_bytes(released);
         // A dropped table's blocks are gone: so are the mappings of them.
         if let Some(id) = table_id {
             self.drop_block_maps(id);
         }
-        let existed = self.storage.catalog.drop_table(name)?;
+        let existed = self
+            .storage
+            .catalog
+            .drop_table_meta(name, meta_ref.as_ref())?;
         // Rows are the port's own key space (`row:`/`del:`), not the
         // reference's, so nothing else would ever remove them.
         self.clear_orphan_rows(name)?;
@@ -268,7 +292,28 @@ impl Engine {
         } else {
             "default_db".to_string()
         };
-        for (k, v) in self.storage.catalog.store().scan_prefix(b"catalog|tbl|")? {
+        // Scoped to this database: `catalog|tbl|` for every table in the engine
+        // makes a run of `DROP TABLE`s walk the whole catalog once per drop
+        // (0.44 ms each against the reference's 0.1). `catalog|db|{name}|` is
+        // one record per database.
+        let db_id_of_name = self
+            .storage
+            .catalog
+            .store()
+            .scan_prefix(storage::catalog_format::catalog_db_prefix(&db_name).as_bytes())?
+            .into_iter()
+            .next()
+            .map(|(_, v)| String::from_utf8_lossy(&v).into_owned());
+        let scan_prefix = match &db_id_of_name {
+            Some(id) => format!("catalog|tbl|{id}|{bare}|"),
+            None => "catalog|tbl|".to_string(),
+        };
+        for (k, v) in self
+            .storage
+            .catalog
+            .store()
+            .scan_prefix(scan_prefix.as_bytes())?
+        {
             let key = String::from_utf8_lossy(&k).into_owned();
             let parts: Vec<&str> = key.split('|').collect();
             if parts.len() >= 5 && parts[3] == bare {

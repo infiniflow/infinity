@@ -893,73 +893,82 @@ pub(crate) fn prune_conditions(
 pub(crate) fn encode_row(row: &[Literal], types: &[String]) -> String {
     row.iter()
         .enumerate()
-        .map(|(i, v)| {
-            let s = v.to_slt_string();
-            match types.get(i) {
-                // Rows are stored as text, but the reference stores the typed
-                // value, so the text has to round-trip exactly: `to_slt_string`
-                // renders six decimals for `.slt` *display* and would round a
-                // value such as `1.0 / 3.0` at insert time. Display still goes
-                // through `to_slt_string`; only storage takes this path.
-                Some(t) if is_float_type(t) => match v {
-                    Literal::Float(f) => exact_float(*f),
-                    // A value that arrived as text keeps its own digits, but is
-                    // normalised through `f64` so `1` and `1.0` store alike.
-                    _ => match s.trim().parse::<f64>() {
-                        Ok(f) => exact_float(f),
-                        Err(_) => s,
-                    },
-                },
-                Some(t) if is_array_type(t) => {
-                    let rendered = brace_render(&s);
-                    if array_elem_is_int(t) {
-                        truncate_numbers(&rendered)
-                    } else {
-                        rendered
-                    }
-                }
-                // JSON columns are stored compactly (sorted keys, no spaces)
-                Some(t) if is_json_type(t) => match expression::json::parse(&s) {
-                    Some(j) => j.compact(),
-                    None => s,
-                },
-                Some(t) if is_datetime_type(t) => {
-                    parser::normalize_datetime(&t.to_ascii_uppercase(), &s)
-                }
-                Some(t) if is_sparse_type(t) => {
-                    let float = t.to_ascii_uppercase().contains("FLOAT")
-                        || t.to_ascii_uppercase().contains("DOUBLE");
-                    match reshape_sparse(&s, float) {
-                        Some(v) => v,
-                        None => s,
-                    }
-                }
-                Some(t) if is_embedding_type(t) => {
-                    if is_bit_type(t) {
-                        pack_bit_vector(&s)
-                    } else if declared_elem_is_int(t) {
-                        // an integer element type truncates the stored values
-                        truncate_numbers(&s)
-                    } else {
-                        s
-                    }
-                }
-                Some(t) if is_tensor_type(t) => {
-                    let d = type_dim(t).unwrap_or(0);
-                    if is_bit_type(t) {
-                        // `pack_bit_leaves` preserves the literal's nesting, so a
-                        // `TENSORARRAY` (whose literal is already triple-nested)
-                        // needs no extra wrapper.
-                        reshape_bit_tensor(&s, d)
-                    } else {
-                        reshape_tensor(&s, d)
-                    }
-                }
-                _ => s,
-            }
-        })
+        .map(|(i, v)| encode_cell_stored(v, types.get(i)))
         .collect::<Vec<_>>()
         .join("\t")
+}
+
+/// The stored text of one cell, normalised by its declared type.
+///
+/// Split out of [`encode_row`] so a bulk `COPY` can render the text the block
+/// writer needs and the value the append buffer needs in one pass: it used to
+/// join the row into text and then parse that text back into `Value`s.
+pub(crate) fn encode_cell_stored(v: &Literal, ty: Option<&String>) -> String {
+    {
+        let s = v.to_slt_string();
+        match ty {
+            // Rows are stored as text, but the reference stores the typed
+            // value, so the text has to round-trip exactly: `to_slt_string`
+            // renders six decimals for `.slt` *display* and would round a
+            // value such as `1.0 / 3.0` at insert time. Display still goes
+            // through `to_slt_string`; only storage takes this path.
+            Some(t) if is_float_type(t) => match v {
+                Literal::Float(f) => exact_float(*f),
+                // A value that arrived as text keeps its own digits, but is
+                // normalised through `f64` so `1` and `1.0` store alike.
+                _ => match s.trim().parse::<f64>() {
+                    Ok(f) => exact_float(f),
+                    Err(_) => s,
+                },
+            },
+            Some(t) if is_array_type(t) => {
+                let rendered = brace_render(&s);
+                if array_elem_is_int(t) {
+                    truncate_numbers(&rendered)
+                } else {
+                    rendered
+                }
+            }
+            // JSON columns are stored compactly (sorted keys, no spaces)
+            Some(t) if is_json_type(t) => match expression::json::parse(&s) {
+                Some(j) => j.compact(),
+                None => s,
+            },
+            Some(t) if is_datetime_type(t) => {
+                parser::normalize_datetime(&t.to_ascii_uppercase(), &s)
+            }
+            Some(t) if is_sparse_type(t) => {
+                let float = t.to_ascii_uppercase().contains("FLOAT")
+                    || t.to_ascii_uppercase().contains("DOUBLE");
+                match reshape_sparse(&s, float) {
+                    Some(v) => v,
+                    None => s,
+                }
+            }
+            Some(t) if is_embedding_type(t) => {
+                if is_bit_type(t) {
+                    pack_bit_vector(&s)
+                } else if declared_elem_is_int(t) {
+                    // an integer element type truncates the stored values
+                    truncate_numbers(&s)
+                } else {
+                    s
+                }
+            }
+            Some(t) if is_tensor_type(t) => {
+                let d = type_dim(t).unwrap_or(0);
+                if is_bit_type(t) {
+                    // `pack_bit_leaves` preserves the literal's nesting, so a
+                    // `TENSORARRAY` (whose literal is already triple-nested)
+                    // needs no extra wrapper.
+                    reshape_bit_tensor(&s, d)
+                } else {
+                    reshape_tensor(&s, d)
+                }
+            }
+            _ => s,
+        }
+    }
 }
 
 /// The reference's CSV cell parser for integer columns:
@@ -4471,15 +4480,25 @@ impl TableEntry {
         if batch.is_empty() {
             return;
         }
-        if self
-            .pending_rows
-            .last()
-            .is_none_or(|(last, _)| *last < batch[0].0)
+        // Appending does not touch the map: its entries would all be new and
+        // are only read by a point lookup, which searches the sorted buffer
+        // anyway. A bulk `COPY` appends 8.4 M rows and never looks one up, and
+        // keeping the map in step was 30% of its profile.
+        //
+        // The append is only taken when the batch is itself id-ordered: two
+        // writers interleaving their commits hand over a batch whose first id
+        // is past the buffer's last while the rest of it is not, and extending
+        // that would leave `pending_rows` unsorted - which silently breaks the
+        // binary search `buffered_row` relies on (a row then reads as absent,
+        // and a full-text query loses it).
+        let batch_ordered = batch.windows(2).all(|w| w[0].0 < w[1].0);
+        if batch_ordered
+            && self
+                .pending_rows
+                .last()
+                .is_none_or(|(last, _)| *last < batch[0].0)
         {
-            for (seq, values) in batch {
-                self.pending_pos.insert(seq, self.pending_rows.len());
-                self.pending_rows.push((seq, values));
-            }
+            self.pending_rows.extend(batch);
             return;
         }
         batch.sort_by_key(|(seq, _)| *seq);
@@ -4489,10 +4508,9 @@ impl TableEntry {
                 .partition_point(|(buffered, _)| *buffered < seq);
             self.pending_rows.insert(at, (seq, values));
         }
+        // The positions after an out-of-order insert all shift, so the map is
+        // dropped rather than rebuilt; `buffered_row` notices and searches.
         self.pending_pos.clear();
-        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
-            self.pending_pos.insert(*seq, at);
-        }
     }
 
     /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
@@ -4507,9 +4525,33 @@ impl TableEntry {
     /// The buffered row `seq`, if the commit that appended it is still above
     /// the last checkpoint.
     pub(crate) fn buffered_row(&self, seq: usize) -> Option<&Vec<Value>> {
-        self.pending_pos
-            .get(&seq)
-            .and_then(|at| self.pending_rows.get(*at))
+        // The map is only a fast path, and it is allowed to be stale: an append
+        // does not update it (a bulk `COPY` appends and never looks a row up),
+        // so every position past the append point is off. A hit is therefore
+        // only trusted when the row at that position really is `seq`.
+        if let Some(at) = self.pending_pos.get(&seq) {
+            if let Some((buffered, values)) = self.pending_rows.get(*at) {
+                if *buffered == seq {
+                    return Some(values);
+                }
+            }
+        }
+        // The buffer is sorted by id, so the search answers every case: a miss
+        // in the map, and a position the map has not caught up with. A linear
+        // fallback covers a buffer that lost its order anyway (an append that
+        // raced another writer): answering "absent" for a row that is there
+        // loses it from the reader, which is worse than the scan.
+        let at = self
+            .pending_rows
+            .partition_point(|(buffered, _)| *buffered < seq);
+        if let Some((buffered, values)) = self.pending_rows.get(at) {
+            if *buffered == seq {
+                return Some(values);
+            }
+        }
+        self.pending_rows
+            .iter()
+            .find(|(buffered, _)| *buffered == seq)
             .map(|(_, values)| values)
     }
 }
@@ -6896,6 +6938,14 @@ pub(crate) fn find_file(dir: &Path, name: &std::ffi::OsStr) -> Option<PathBuf> {
 
 /// Splits one CSV line, honouring double-quoted fields (with `""` escapes).
 pub(crate) fn csv_fields(line: &str, delim: char) -> Vec<String> {
+    // Fast path: no quote anywhere means every field is a plain slice of the
+    // line, so nothing has to be re-encoded character by character. A
+    // `COPY` of a numeric/text file hits this for all 8.4 M rows.
+    if !line.as_bytes().contains(&b'"') {
+        // Exactly what the character loop below produces for this input: the
+        // field text is copied verbatim (the loop only trims around a quote).
+        return line.split(delim).map(|f| f.to_string()).collect();
+    }
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_q = false;
@@ -6930,7 +6980,12 @@ pub(crate) fn csv_fields(line: &str, delim: char) -> Vec<String> {
 
 /// Normalises a CSV cell: vector-looking values are re-joined compactly
 /// (`[0.1, 0.2]` → `[0.1,0.2]`) so vector rendering is stable.
-pub(crate) fn normalize_cell(s: &str) -> String {
+/// [`normalize_cell`] without the copy when nothing changes.
+///
+/// A `COPY` of a plain numeric/text file leaves every cell untouched, so the
+/// import can borrow the field straight out of the line instead of allocating
+/// a `String` per cell - 16.7 M allocations on 8.4 M two-column rows.
+pub(crate) fn normalize_cell_cow(s: &str) -> std::borrow::Cow<'_, str> {
     let t = s.trim();
     if t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
         // Split on commas/spaces, but peel any bracket characters off each token
@@ -6961,9 +7016,13 @@ pub(crate) fn normalize_cell(s: &str) -> String {
             }
         }
         out.push(']');
-        return out;
+        return std::borrow::Cow::Owned(out);
     }
-    t.to_string()
+    if t.len() == s.len() {
+        std::borrow::Cow::Borrowed(s)
+    } else {
+        std::borrow::Cow::Owned(t.to_string())
+    }
 }
 
 /// Decodes a COPY `DELIMITER` option (`\t`, `\n`, … or a literal char).
@@ -7218,34 +7277,53 @@ pub(crate) fn parse_sparse_str(s: &str) -> Vec<(usize, f64)> {
 }
 
 /// Recursively extracts the leaf vectors of a (nested) tensor literal.
+///
+/// One pass over the bytes rather than a `split_top_level` per level: a
+/// `tensorarray,100,float` cell is `100` tensors of `100 x 100` numbers, so the
+/// recursive form allocated a `Vec<&str>` per group - a million of them - and
+/// that was 96% of a five-row tensor scan.
 pub(crate) fn parse_tensor_leaves(text: &str) -> Vec<Vec<f64>> {
-    let t = text.trim();
-    let inner = t
-        .strip_prefix('[')
-        .unwrap_or(t)
-        .strip_suffix(']')
-        .unwrap_or(t);
-    if inner.trim().is_empty() {
-        return Vec::new();
-    }
-    if inner.trim_start().starts_with('[') {
-        let mut out = Vec::new();
-        for g in split_top_level(inner) {
-            out.extend(parse_tensor_leaves(&g));
+    let bytes = text.as_bytes();
+    let mut out: Vec<Vec<f64>> = Vec::new();
+    let mut current: Vec<f64> = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'[' => {
+                i += 1;
+            }
+            b']' => {
+                // A leaf is one innermost `[…]` group: its numbers end here.
+                // The outer closers find `current` already empty, so they are
+                // no-ops - which is what keeps the grouping of a
+                // `[[[…]]]` cell intact without a `split_top_level` per level.
+                if !current.is_empty() {
+                    out.push(std::mem::take(&mut current));
+                }
+                i += 1;
+            }
+            b',' | b' ' | b'\t' | b'\n' => {
+                i += 1;
+            }
+            _ => {
+                // A number runs to the next bracket or separator; it belongs to
+                // the innermost group that is still open.
+                let start = i;
+                while i < bytes.len()
+                    && !matches!(bytes[i], b'[' | b']' | b',' | b' ' | b'\t' | b'\n')
+                {
+                    i += 1;
+                }
+                if let Ok(v) = text[start..i].parse::<f64>() {
+                    current.push(v);
+                }
+            }
         }
-        out
-    } else {
-        let v: Vec<f64> = inner
-            .split([',', ' '])
-            .filter(|x| !x.trim().is_empty())
-            .filter_map(|x| x.trim().parse::<f64>().ok())
-            .collect();
-        if v.is_empty() {
-            Vec::new()
-        } else {
-            vec![v]
-        }
     }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
 }
 
 /// Parses a stored bit tensor (`[[01110111],[11011011]]`) into per-embedding
@@ -7310,6 +7388,21 @@ pub(crate) fn split_top_level(s: &str) -> Vec<String> {
 /// accumulated in `f32`, mirroring the C++ engine's aligned-`f32` arithmetic.
 /// For a `bit` column the query dot is an inner product over the set bits.
 pub(crate) fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: ElemType) -> f64 {
+    // Everything but a bit column is scored in `f32`, and the doc side is
+    // reused by every query vector, so it is narrowed once here instead of
+    // inside each of the `q.len() * d.len()` dot products. A
+    // `tensorarray,100,float` scan runs 10 000 of those per tensor.
+    if col != ElemType::Bit {
+        let narrowed: Vec<Vec<f32>> = d
+            .iter()
+            .map(|dv| dv.iter().map(|v| quantize_elem(*v, col)).collect())
+            .collect();
+        let query: Vec<Vec<f32>> = q
+            .iter()
+            .map(|qv| qv.iter().map(|v| quantize_elem(*v, qry)).collect())
+            .collect();
+        return maxsim_f32(&query, &narrowed);
+    }
     let mut sum = 0f32;
     for qv in q {
         let width = qv.len();
@@ -7347,10 +7440,116 @@ pub(crate) fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: 
                         acc
                     }
                 } else {
-                    // Width-4 `f64 -> f32` conversion + multiply-add; see
-                    // `dot_quantized` for why `Float16`/`BFloat16` stay scalar.
-                    dot_quantized(qv, piece, qry, col)
+                    // Unreachable: a non-bit column took the `f32` path above.
+                    // Kept as a defensive zero rather than a panic so a future
+                    // element type cannot take the process down mid-scan.
+                    0.0
                 };
+                if score > best {
+                    best = score;
+                }
+            }
+        }
+        if best.is_finite() {
+            sum += best;
+        }
+    }
+    sum as f64
+}
+
+/// MaxSim over two already-narrowed operands.
+///
+/// Split from [`tensor_maxsim`] so the narrowing happens once per tensor: the
+/// doc side is compared against every query vector, and a
+/// `tensorarray,100,float` scan narrows 10 000 vectors per tensor otherwise.
+fn maxsim_f32(q: &[Vec<f32>], d: &[Vec<f32>]) -> f64 {
+    use std::simd::{f32x8, num::SimdFloat};
+
+    // Flattened: a `Vec<Vec<f32>>` costs one pointer hop per row, and this runs
+    // 10 000 dot products per tensor. The rows are all `width` wide for the
+    // shapes this scores, so a flat buffer with `width`-sized windows is the
+    // same data without the indirection.
+    let width = q.first().map(|v| v.len()).unwrap_or(0);
+    if width == 0 {
+        return 0.0;
+    }
+    let q_flat: Vec<f32> = q.iter().flat_map(|v| v.iter().copied()).collect();
+    let d_flat: Vec<f32> = d.iter().flat_map(|v| v.iter().copied()).collect();
+    let q_rows = q_flat.len() / width;
+    let d_rows = d_flat.len() / width;
+    // The fast path is only valid when every row is exactly one `width`-sized
+    // window: a stored tensor row may concatenate several of them (the C++
+    // writer emits one flat list), and those have to go through `chunks`.
+    let uniform = q.iter().all(|v| v.len() == width) && d.iter().all(|v| v.len() == width);
+    if !uniform || d_rows == 0 {
+        return maxsim_f32_ragged(q, d);
+    }
+
+    let dot = |a: &[f32], b: &[f32]| -> f32 {
+        let mut acc = f32x8::splat(0.0);
+        let mut i = 0usize;
+        while i + 8 <= width {
+            acc += f32x8::from_slice(&a[i..i + 8]) * f32x8::from_slice(&b[i..i + 8]);
+            i += 8;
+        }
+        let mut sum = acc.reduce_sum();
+        while i < width {
+            sum += a[i] * b[i];
+            i += 1;
+        }
+        sum
+    };
+
+    let mut sum = 0f32;
+    for qi in 0..q_rows {
+        let qv = &q_flat[qi * width..(qi + 1) * width];
+        let mut best = f32::NEG_INFINITY;
+        for di in 0..d_rows {
+            let dv = &d_flat[di * width..(di + 1) * width];
+            let score = dot(qv, dv);
+            if score > best {
+                best = score;
+            }
+        }
+        if best.is_finite() {
+            sum += best;
+        }
+    }
+    sum as f64
+}
+
+/// [`maxsim_f32`] for a doc side whose rows are not all `width` wide.
+fn maxsim_f32_ragged(q: &[Vec<f32>], d: &[Vec<f32>]) -> f64 {
+    use std::simd::{f32x8, num::SimdFloat};
+
+    let dot = |a: &[f32], b: &[f32]| -> f32 {
+        let n = a.len().min(b.len());
+        let mut acc = f32x8::splat(0.0);
+        let mut i = 0usize;
+        while i + 8 <= n {
+            acc += f32x8::from_slice(&a[i..i + 8]) * f32x8::from_slice(&b[i..i + 8]);
+            i += 8;
+        }
+        let mut sum = acc.reduce_sum();
+        while i < n {
+            sum += a[i] * b[i];
+            i += 1;
+        }
+        sum
+    };
+    let mut sum = 0f32;
+    for qv in q {
+        let w = qv.len();
+        if w == 0 {
+            continue;
+        }
+        let mut best = f32::NEG_INFINITY;
+        for dv in d {
+            if dv.len() < w || dv.len() % w != 0 {
+                continue;
+            }
+            for piece in dv.chunks(w) {
+                let score = dot(qv, piece);
                 if score > best {
                     best = score;
                 }
