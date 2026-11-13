@@ -2416,6 +2416,11 @@ impl Engine {
             cells.truncate(first);
             cells.extend(defaults.iter().cloned());
         }
+        // The cells changed shape, so the running byte total is stale: an added
+        // column with a large default would otherwise be uncharged, and the
+        // buffer could cross the quota before anything counted it. DDL is off
+        // the write path, so the extra pass is affordable.
+        entry.retain_buffered(|_| true);
     }
 
     /// The buffer half of `DropColumnsData`: a buffered row loses the cell the
@@ -2431,6 +2436,9 @@ impl Engine {
                 cells.remove(position);
             }
         }
+        // The dropped column's bytes are still in the running total, which would
+        // make the quota think the buffer is bigger than it is and drain early.
+        entry.retain_buffered(|_| true);
     }
 
     /// `Cleanup` for an `ALTER TABLE … DROP COLUMN`: removes the block column

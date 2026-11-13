@@ -4493,19 +4493,25 @@ impl TableEntry {
             .is_none_or(|(last, _)| *last < batch[0].0)
         {
             self.pending_rows.reserve(batch.len());
+            let mut bytes = 0usize;
             for (seq, values) in batch {
+                bytes += Self::row_bytes(&values);
                 self.pending_pos.insert(seq, self.pending_rows.len());
                 self.pending_rows.push((seq, values));
             }
+            self.pending_bytes += bytes;
             return;
         }
         batch.sort_by_key(|(seq, _)| *seq);
+        let mut bytes = 0usize;
         for (seq, values) in batch {
+            bytes += Self::row_bytes(&values);
             let at = self
                 .pending_rows
                 .partition_point(|(buffered, _)| *buffered < seq);
             self.pending_rows.insert(at, (seq, values));
         }
+        self.pending_bytes += bytes;
         self.pending_pos.clear();
         for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
             self.pending_pos.insert(*seq, at);
@@ -4516,9 +4522,46 @@ impl TableEntry {
     pub(crate) fn retain_buffered(&mut self, mut keep: impl FnMut(&(usize, Vec<Value>)) -> bool) {
         self.pending_rows.retain(|row| keep(row));
         self.pending_pos.clear();
+        // Rebuilt here rather than adjusted by the rows dropped: the walk is
+        // one pass over what is left, which is what `retain` and the map
+        // rebuild below already cost, and it cannot drift from the buffer.
+        self.pending_bytes = self
+            .pending_rows
+            .iter()
+            .map(|(_, values)| Self::row_bytes(values))
+            .sum();
         for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
             self.pending_pos.insert(*seq, at);
         }
+    }
+
+    /// The memory the unsealed rows of this table hold.
+    ///
+    /// The reference keeps them in the block's `BufferObject`, which its buffer
+    /// manager accounts for and evicts under pressure. The port has no buffer
+    /// manager, so this is the number that stands in for it: the rows
+    /// themselves (a `Value` per cell, plus the `String` a text cell owns) and
+    /// the `seq -> position` map that indexes them.
+    ///
+    /// A running total, not a sum over `pending_rows`: the quota reads it on
+    /// the write path, where walking a million rows would cost more than the
+    /// memory it reports. Approximate by design - it is a quota input, not a
+    /// byte-exact report.
+    pub(crate) fn unsealed_bytes(&self) -> usize {
+        // Key, value and the control byte a `HashMap` entry carries, doubled to
+        // cover the slack the table keeps for its load factor.
+        self.pending_bytes + self.pending_pos.len() * (std::mem::size_of::<usize>() * 2 + 1) * 2
+    }
+
+    /// What one buffered row costs, for the running total.
+    fn row_bytes(values: &[Value]) -> usize {
+        let mut bytes = std::mem::size_of::<(usize, Vec<Value>)>() + std::mem::size_of_val(values);
+        for value in values {
+            if let Value::Str(text) = value {
+                bytes += text.len();
+            }
+        }
+        bytes
     }
 
     /// The buffered row `seq`, if the commit that appended it is still above
@@ -4587,6 +4630,13 @@ pub(crate) struct TableEntry {
     /// holders. A sealed block needs no such buffer - it is mapped (see
     /// `Context::block_maps`).
     pub(crate) pending_rows: Vec<(usize, Vec<Value>)>,
+    /// The memory `pending_rows` holds, kept as a running total.
+    ///
+    /// The quota reads this on every write statement, and summing a million
+    /// rows' strings there would put an O(rows) walk on the insert path - the
+    /// exact cost this number exists to get rid of. Both mutators adjust it by
+    /// the rows they add or drop.
+    pub(crate) pending_bytes: usize,
     /// Bytes this table's in-memory index forms held when the process-wide
     /// total was last updated for it (see `Context::memindex_total`).
     pub(crate) memindex_bytes: usize,
@@ -8695,7 +8745,12 @@ impl BgTask for DumpMemIndexTask {
                 // reference's `DoDump` is. Every step inside is an `.await`;
                 // the segment files it seals are written on the blocking pool,
                 // leaf by leaf.
-                engine.dump_all_memory_indexes().await;
+                if self.drain_all {
+                    engine.dump_all_memory_indexes().await;
+                    engine.dump_all_sealed_blocks(None).await;
+                } else {
+                    engine.dump_under_pressure(None).await;
+                }
             }
             self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
         })

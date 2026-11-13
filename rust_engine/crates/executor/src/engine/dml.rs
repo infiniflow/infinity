@@ -850,6 +850,16 @@ impl Engine {
                 bottom_started.elapsed()
             );
         }
+        // Only a table with no index declaration checks the quota here.
+        // An indexed table already checks inside `update_text_indexes_batch`;
+        // checking again after every insert would fire a second dump per batch,
+        // which changes the number of chunks a mem-index dump produces - the
+        // restart suite pins that count. The one-batch overshoot this leaves in
+        // the append buffer is bounded, and the next write to the table closes
+        // it.
+        if !self.has_index_declaration(table) {
+            self.enforce_quota_after_append(table).await;
+        }
         Ok(QueryResult::Inserted { count: row_count })
     }
 
