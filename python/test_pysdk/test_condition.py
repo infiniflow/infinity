@@ -47,19 +47,45 @@ class TestInfinity:
             print(res)
             assert res
 
-    def test_condition_embedded_like(self, request):
-        # embedded SDK must support LIKE / NOT LIKE / ESCAPE filters; it
-        # previously raised "unknown binary expression: like/escape".
-        if not request.config.getoption("--local-infinity"):
-            pytest.skip("embedded-only regression test")
-        from infinity_embedded.local_infinity.utils import traverse_conditions as embedded_traverse
-        for cond_str, expected_func in [
-            ("c1 LIKE '%test%'", "like"),
-            ("c1 NOT LIKE '%test%'", "not_like"),
-            ("c1 LIKE '%test!%' ESCAPE '!'", "like"),
-            ("c1 NOT LIKE '%test!%' ESCAPE '!'", "not_like"),
-        ]:
-            res = embedded_traverse(condition(cond_str))
-            func_expr = res.function_expr
-            assert func_expr.func_name == expected_func, f"{cond_str}: got {func_expr.func_name}"
-            assert len(func_expr.arguments) == 3  # left, pattern, escape
+
+@pytest.mark.parametrize("cond_str,expected_func", [
+    ("c1 LIKE '%test%'", "like"),
+    ("c1 NOT LIKE '%test%'", "not_like"),
+    ("c1 LIKE '%test!%' ESCAPE '!'", "like"),
+    ("c1 NOT LIKE '%test!%' ESCAPE '!'", "not_like"),
+])
+def test_condition_embedded_like(request, cond_str, expected_func):
+    """LIKE variants produce a column, pattern and escape argument."""
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
+    from infinity_embedded.local_infinity.utils import (
+        traverse_conditions as embedded_traverse,
+    )
+
+    res = embedded_traverse(condition(cond_str))
+    assert res.function_expr.func_name == expected_func
+    assert len(res.function_expr.arguments) == 3
+    assert res.function_expr.arguments[0].column_expr.names == ["c1"]
+    assert res.function_expr.arguments[1].constant_expr.str_value == ("%test!%" if "ESCAPE" in cond_str else "%test%")
+    assert res.function_expr.arguments[2].constant_expr.str_value == ("!" if "ESCAPE" in cond_str else "\\")
+
+
+@pytest.mark.parametrize("with_escape", [False, True])
+def test_condition_embedded_wrapped_not_like(request, with_escape):
+    """Older SQLGlot Not wrappers reach the dedicated NOT LIKE handler."""
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
+    from infinity_embedded.local_infinity.utils import (
+        traverse_conditions as embedded_traverse,
+    )
+    from sqlglot import expressions as exp
+
+    node = exp.Like(this=exp.column("c1"), expression=exp.Literal.string("%test!%"))
+    if with_escape:
+        node = exp.Escape(this=node, expression=exp.Literal.string("!"))
+    res = embedded_traverse(exp.Not(this=node))
+    assert res.function_expr.func_name == "not_like"
+    assert len(res.function_expr.arguments) == 3
+    assert res.function_expr.arguments[0].column_expr.names == ["c1"]
+    assert res.function_expr.arguments[1].constant_expr.str_value == "%test!%"
+    assert res.function_expr.arguments[2].constant_expr.str_value == ("!" if with_escape else "\\")

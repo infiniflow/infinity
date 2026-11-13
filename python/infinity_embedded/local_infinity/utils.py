@@ -125,7 +125,7 @@ def traverse_conditions(cons, fn=None):
         parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
         parsed_expr.function_expr = func_expr
         return parsed_expr
-    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
+    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], (exp.In, exp.Like, exp.Escape)):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = "not"
