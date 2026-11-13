@@ -47,6 +47,12 @@ i32 IndexIVF::GetSizeInBytes() const {
 
 void IndexIVF::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
+    // One `memcpy` of the POD. Its padding is spelled out as fields
+    // (`padding_after_metric_` / `padding_after_storage_enums_`), so the blob is
+    // the same on every run and the DDL byte gate can compare it.
+    static_assert(sizeof(IndexIVFOption) == 32);
+    static_assert(sizeof(IndexIVFStorageOption) == 16);
+    static_assert(alignof(IndexIVFOption) == 4);
     WriteBufAdv(ptr, ivf_option_);
 }
 

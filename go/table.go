@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
@@ -58,7 +59,7 @@ func (t *Table) Rename(newTableName string) (interface{}, error) {
 	resp, err := t.db.conn.client.RenameTable(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to rename table: %v", err),
 		)
 	}
@@ -127,13 +128,21 @@ func (t *Table) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType
 		return nil, NewInfinityException(int(ErrorCodeInvalidIndexType), "Invalid index type")
 	}
 
-	// Build InitParameter list
+	// Build the InitParameter list in sorted key order, for the same reason the
+	// insert columns are sorted: Go randomises map iteration, and the server
+	// records these options in the index definition - so an unsorted map made
+	// two identical `CREATE INDEX` calls write different WAL bytes.
 	var initParams []*thriftapi.InitParameter
 	if indexInfo.Params != nil {
-		for key, value := range indexInfo.Params {
+		keys := make([]string, 0, len(indexInfo.Params))
+		for key := range indexInfo.Params {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
 			param := thriftapi.NewInitParameter()
 			param.ParamName = key
-			param.ParamValue = value
+			param.ParamValue = indexInfo.Params[key]
 			initParams = append(initParams, param)
 		}
 	}
@@ -172,7 +181,7 @@ func (t *Table) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType
 	resp, err := t.db.conn.client.CreateIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create index: %v", err),
 		)
 	}
@@ -223,7 +232,7 @@ func (t *Table) DropIndex(indexName string, conflictType ConflictType) (interfac
 	resp, err := t.db.conn.client.DropIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to drop index: %v", err),
 		)
 	}
@@ -261,7 +270,7 @@ func (t *Table) ShowIndex(indexName string) (interface{}, error) {
 	resp, err := t.db.conn.client.ShowIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show index: %v", err),
 		)
 	}
@@ -298,7 +307,7 @@ func (t *Table) ListIndexes() (interface{}, error) {
 	resp, err := t.db.conn.client.ListIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to list indexes: %v", err),
 		)
 	}
@@ -336,7 +345,7 @@ func (t *Table) DumpIndex(indexName string) (interface{}, error) {
 	resp, err := t.db.conn.client.DumpIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to dump index: %v", err),
 		)
 	}
@@ -373,7 +382,7 @@ func (t *Table) ShowColumns() (interface{}, error) {
 	resp, err := t.db.conn.client.ShowColumns(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show columns: %v", err),
 		)
 	}
@@ -411,7 +420,7 @@ func (t *Table) ShowSegments() (interface{}, error) {
 	resp, err := t.db.conn.client.ShowSegments(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show segments: %v", err),
 		)
 	}
@@ -450,7 +459,7 @@ func (t *Table) ShowSegment(segmentID int) (interface{}, error) {
 	resp, err := t.db.conn.client.ShowSegment(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show segment: %v", err),
 		)
 	}
@@ -488,7 +497,7 @@ func (t *Table) ShowBlocks(segmentID int) (interface{}, error) {
 	resp, err := t.db.conn.client.ShowBlocks(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show blocks: %v", err),
 		)
 	}
@@ -528,7 +537,7 @@ func (t *Table) ShowBlock(segmentID int, blockID int) (interface{}, error) {
 	resp, err := t.db.conn.client.ShowBlock(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show block: %v", err),
 		)
 	}
@@ -568,7 +577,7 @@ func (t *Table) ShowBlockColumn(segmentID int, blockID int, columnID int) (inter
 	resp, err := t.db.conn.client.ShowBlockColumn(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show block column: %v", err),
 		)
 	}
@@ -618,7 +627,19 @@ func (t *Table) Insert(data interface{}) (interface{}, error) {
 		var columnNames []string
 		var parseExprs []*thriftapi.ParsedExpr
 
-		for columnName, value := range row {
+		// Sorted, not map order: Go randomises map iteration, so a batch built
+		// row by row would carry a different column order per row. The server
+		// merges consecutive rows that share a column list into one INSERT, so
+		// unsorted names turned a 1000-row batch into ~1000 single-row
+		// statements (measured: 4313 statements for 20k rows, and 1.7 s against
+		// the 0.9 s a Python client took for the same workload).
+		keys := make([]string, 0, len(row))
+		for columnName := range row {
+			keys = append(keys, columnName)
+		}
+		sort.Strings(keys)
+		for _, columnName := range keys {
+			value := row[columnName]
 			columnNames = append(columnNames, columnName)
 
 			var parsedExpr *thriftapi.ParsedExpr
@@ -663,7 +684,7 @@ func (t *Table) Insert(data interface{}) (interface{}, error) {
 	resp, err := t.db.conn.client.Insert(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to insert data: %v", err),
 		)
 	}
@@ -732,7 +753,7 @@ func (t *Table) ImportData(filePath string, importOptions *ImportOption) (interf
 	resp, err := t.db.conn.client.Import(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to import data: %v", err),
 		)
 	}
@@ -805,7 +826,7 @@ func (t *Table) ExportData(filePath string, exportOptions *ExportOption, columns
 	resp, err := t.db.conn.client.Export(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to export data: %v", err),
 		)
 	}
@@ -852,7 +873,7 @@ func (t *Table) Delete(cond string) (*thriftapi.DeleteResponse, error) {
 	resp, err := t.db.conn.client.Delete(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to delete rows: %v", err),
 		)
 	}
@@ -887,9 +908,20 @@ func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, e
 		}
 	}
 
-	// Build update expressions
+	// Build update expressions, in sorted column order.
+	//
+	// Not map order: Go randomises it, so the same logical UPDATE produced a
+	// different expression array on every call. The statement still applied
+	// correctly, but the bytes it sent (and therefore the WAL frame the server
+	// wrote) differed run to run, which defeats byte-level comparison.
 	var updateExprArray []*thriftapi.UpdateExpr
-	for columnName, value := range data {
+	columns := make([]string, 0, len(data))
+	for columnName := range data {
+		columns = append(columns, columnName)
+	}
+	sort.Strings(columns)
+	for _, columnName := range columns {
+		value := data[columnName]
 		// Create constant expression for the value
 		constantExpr, err := ParseConstantValue(value)
 		if err != nil {
@@ -923,7 +955,7 @@ func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, e
 	resp, err := t.db.conn.client.Update(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to update rows: %v", err),
 		)
 	}
@@ -1320,7 +1352,7 @@ func (t *Table) ToResult() (interface{}, error) {
 	resp, err := t.db.conn.client.Select(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to execute query: %v", err),
 		)
 	}
@@ -1339,10 +1371,10 @@ func (t *Table) ToResult() (interface{}, error) {
 
 // DataFrame represents query results in a row-oriented format similar to pandas DataFrame
 type DataFrame struct {
-	Columns    []string               // Column names
+	Columns    []string                 // Column names
 	ColumnData map[string][]interface{} // Column name -> slice of values
-	RowCount   int                    // Number of rows
-	ExtraInfo  string                 // Extra info from query (e.g., total_hits_count)
+	RowCount   int                      // Number of rows
+	ExtraInfo  string                   // Extra info from query (e.g., total_hits_count)
 }
 
 // ToDataFrame executes query and returns results as a DataFrame-like structure
@@ -1429,7 +1461,7 @@ func (t *Table) ToDataFrame() (*DataFrame, error) {
 	resp, err := t.db.conn.client.Select(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to execute query: %v", err),
 		)
 	}
@@ -1465,7 +1497,7 @@ func buildDataFrame(resp *thriftapi.SelectResponse) (*DataFrame, error) {
 
 		// Parse column vectors based on column type, joining all vectors first
 		// to handle concatenated VARCHAR data (similar to Python's to_df())
-		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors)
+		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors, colField.Bitmasks)
 		df.ColumnData[columnName] = values
 	}
 
@@ -1488,7 +1520,7 @@ func buildDataFrame(resp *thriftapi.SelectResponse) (*DataFrame, error) {
 // parseColumnVectorsJoined parses column vectors by first joining all byte slices
 // This handles the case where Infinity returns all VARCHAR rows concatenated
 // into a single byte slice (like Python's column_vector_to_list does)
-func parseColumnVectorsJoined(columnType thriftapi.ColumnType, physicalType *thriftapi.PhysicalType, columnVectors [][]byte) []interface{} {
+func parseColumnVectorsJoined(columnType thriftapi.ColumnType, physicalType *thriftapi.PhysicalType, columnVectors [][]byte, bitmasks []bool) []interface{} {
 	if len(columnVectors) == 0 {
 		return []interface{}{}
 	}
@@ -1595,6 +1627,17 @@ func parseColumnVectorsJoined(columnType thriftapi.ColumnType, physicalType *thr
 		values = append(values, allBytes)
 	}
 
+	// A false bit means "this slot is not valid", i.e. NULL. The bytes at that
+	// position are a placeholder the decoder still produces (0 for an integer,
+	// "null" for a string), so they have to be replaced with a real nil or the
+	// caller cannot tell a NULL from a stored zero.
+	if len(bitmasks) == len(values) {
+		for i, valid := range bitmasks {
+			if !valid {
+				values[i] = nil
+			}
+		}
+	}
 	return values
 }
 
@@ -1701,7 +1744,7 @@ func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
 	resp, err := t.db.conn.client.Explain(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to execute explain: %v", err),
 		)
 	}
@@ -1738,7 +1781,7 @@ func (t *Table) Optimize() (interface{}, error) {
 	resp, err := t.db.conn.client.Optimize(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to optimize table: %v", err),
 		)
 	}
@@ -1786,7 +1829,7 @@ func (t *Table) AlterIndex(indexName string, optParams map[string]string) (inter
 	resp, err := t.db.conn.client.AlterIndex(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to alter index: %v", err),
 		)
 	}
@@ -1867,7 +1910,7 @@ func (t *Table) AddColumns(columnDefs TableSchema) (interface{}, error) {
 	resp, err := t.db.conn.client.AddColumns(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to add columns: %v", err),
 		)
 	}
@@ -1912,7 +1955,7 @@ func (t *Table) DropColumns(columnNames interface{}) (interface{}, error) {
 	resp, err := t.db.conn.client.DropColumns(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to drop columns: %v", err),
 		)
 	}
@@ -1945,7 +1988,7 @@ func (t *Table) Compact() (interface{}, error) {
 	resp, err := t.db.conn.client.Compact(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to compact table: %v", err),
 		)
 	}
@@ -1990,7 +2033,7 @@ func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
 
 		// Parse column vectors based on column type
 		// Use parseColumnVectorsJoined to handle concatenated VARCHAR columns
-		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors)
+		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors, colField.Bitmasks)
 		result.Data[columnName] = values
 	}
 
@@ -2463,9 +2506,22 @@ func parseTensorVector(data []byte, embeddingType *thriftapi.EmbeddingType) []in
 		tensorData := data[offset : offset+length]
 		offset += length
 
+		// One slot per row, always: an empty body is how a NULL tensor is
+		// written, and skipping it would shorten the result and shift every
+		// later row onto the wrong bitmask bit (`rowsFromColumnVectors` pairs
+		// the two by position, and a mismatch makes it drop the mask).
+		//
+		// The cell is the whole 2-D tensor, not its first sub-vector:
+		// `parseEmbeddingVector` splits the body into `dimension`-sized
+		// sub-vectors, and a `tensor,4,float` holding three rows arrives as
+		// three of them. Keeping only `embeddings[0]` silently dropped rows
+		// two and three - a written `[[a],[b],[c]]` read back as `[[a]]`,
+		// while the engine and the Python SDK both returned all three.
 		embeddings := parseEmbeddingVector(tensorData, embeddingType)
 		if len(embeddings) > 0 {
-			result = append(result, embeddings[0])
+			result = append(result, embeddings)
+		} else {
+			result = append(result, nil)
 		}
 	}
 

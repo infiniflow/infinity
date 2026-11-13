@@ -153,6 +153,50 @@ func main() {
 }
 ```
 
+## Regular expression search
+
+A full-text index built with the sparse gram analyzer answers `RegexFilter`: the literals a pattern proves mandatory become gram lookups in the index, and the regular expression then verifies the candidates that survive, so a pattern with literals only reads a fraction of the table. A full-text index only sees the rows that exist when it is built, so insert first.
+
+```go
+table, err := db.CreateTable("documents", infinity.TableSchema{
+    {Name: "id", DataType: "int"},
+    {Name: "doc", DataType: "varchar"},
+}, infinity.ConflictTypeError)
+if err != nil {
+    return err
+}
+
+if _, err = table.Insert([]map[string]interface{}{
+    {"id": 1, "doc": "harmful chemical reaction"},
+    {"id": 2, "doc": "chemical processes are harmful"},
+}); err != nil {
+    return err
+}
+
+// A regular analyzer for keyword search, a sparse gram one for `regex()`.
+keywordIndex := infinity.NewIndexInfo("doc", infinity.IndexTypeFullText, map[string]string{"analyzer": "standard"})
+if _, err = table.CreateIndex("idx_doc", keywordIndex, infinity.ConflictTypeError, ""); err != nil {
+    return err
+}
+// foldCase stores the lowercased form of every gram, which `(?i)` needs.
+regexIndex, err := infinity.NewSparsegramIndexInfo("doc", 3, 12, true)
+if err != nil {
+    return err
+}
+if _, err = table.CreateIndex("idx_doc_sg", regexIndex, infinity.ConflictTypeError, ""); err != nil {
+    return err
+}
+
+// The pattern's mandatory literals narrow the scan through the gram index.
+result, err := table.Output([]string{"id", "doc"}).
+    Filter(infinity.RegexFilter("doc", `(?i)chemical (reaction|processes)`)).
+    ToResult()
+```
+
+A column without such an index keeps a plain scan, and a pattern that requires no literal (for example `[0-9]+`) does too.
+
+When a column carries more than one full-text index, the choice is made per predicate: a `Filter("filter_fulltext('doc', ...)")` or a `MatchText` that names no index uses the column's regular analyzer index, while the narrowing `RegexFilter` adds goes to the sparse gram index. An index can be named explicitly, as in `filter_fulltext('doc@idx_doc_sg', 'harmful chemical', 'operator=and')`.
+
 ## Implementation Status
 
 ### Completed (Interface Layer)

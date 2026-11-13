@@ -1,0 +1,3 @@
+Total cost : 0.290944 s
+Total cost : 0.009105 s
+Total cost : 0.001152 s

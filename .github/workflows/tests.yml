@@ -228,7 +228,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download debug unit test build artifacts
         uses: actions/download-artifact@v8
@@ -248,11 +248,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test -i https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test -i https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python3 -c "
+          uv run --python 3.13 python3 -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -263,9 +263,12 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for minio and run unit test
@@ -351,19 +354,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -432,11 +438,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -486,19 +492,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -580,19 +589,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -665,19 +677,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -748,19 +763,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          # apt.llvm.org publishes no llvm-toolchain-20 archive for Ubuntu 26.04
+          # (resolute), so llvm.sh adds a repo whose Release file is a 404.
+          # The Ubuntu archive itself ships LLVM 20, including llvm-cov and
+          # llvm-profdata under /usr/lib/llvm-20/bin.
+          sudo apt-get update
+          sudo apt-get install -y llvm-20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -936,7 +954,7 @@ jobs:
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
 
       - name: Build release version
-        run: | 
+        run: |
           docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/x86_64-linux-v2.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=x64-linux-v2 -DCMAKE_CXX_STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
 
       - name: Show sccache stats
@@ -984,7 +1002,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -995,11 +1013,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -1081,12 +1099,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1138,11 +1156,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -1179,7 +1197,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1187,7 +1205,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #        run: uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -1251,12 +1269,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -1311,12 +1329,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1357,7 +1375,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1365,7 +1383,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
+  #        run: uv run --python 3.13 python3 tools/run_parallel_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -1395,7 +1413,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -1416,13 +1434,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1456,7 +1474,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -1477,13 +1495,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1594,7 +1612,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download debug build artifacts
         uses: actions/download-artifact@v8
@@ -1605,11 +1623,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -1681,12 +1699,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1738,11 +1756,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -1791,12 +1809,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1860,12 +1878,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_arm64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -1920,12 +1938,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1978,12 +1996,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2090,7 +2108,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -2101,11 +2119,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
-          uv run python -c "
+          uv run --python 3.13 python -c "
           import os
           import nltk
           local_dir = os.path.abspath('nltk_data')
@@ -2177,12 +2195,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
+          uv run --python 3.13 python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -2234,11 +2252,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+          uv run --python 3.13 python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -2275,7 +2293,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2283,7 +2301,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #        run: uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -2347,12 +2365,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
+          uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_arm64_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
@@ -2407,12 +2425,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
+          uv run --python 3.13 python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -2453,7 +2471,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2461,7 +2479,7 @@ jobs:
   #          ./scripts/wait_for_infinity.sh
   #
   #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
+  #        run: uv run --python 3.13 python3 tools/run_parallel_test.py
   #
   #      - name: Collect infinity log
   #        if: always()
@@ -2491,7 +2509,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -2512,13 +2530,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run --python 3.13 python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2552,7 +2570,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -2573,13 +2591,13 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
           ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
+          uv run --python 3.13 python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2634,6 +2652,7 @@ jobs:
           echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          mkdir -p ${ARTIFACTS_DIR}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
 
       - name: Start builder container
@@ -2655,6 +2674,7 @@ jobs:
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() && steps.build.outcome == 'success' }}
         run: |
+          mkdir -p ${ARTIFACTS_DIR}
           tar -cf - cmake-build-reldeb/src/infinity cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
 
       - name: Remove build container
@@ -2675,6 +2695,7 @@ jobs:
           echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          mkdir -p ${ARTIFACTS_DIR}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -xf -
 

@@ -1,0 +1,9 @@
+[package]
+name = "crash-consistency"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+fjall = "3"
+tempfile = "3"
+crc32fast = "1"

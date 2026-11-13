@@ -22,19 +22,19 @@ type SearchExpr struct {
 
 // MatchExpr represents a match expression
 type MatchExpr struct {
-	Fields        []string
-	MatchingText  string
-	OptionsText   string
+	Fields       []string
+	MatchingText string
+	OptionsText  string
 }
 
 // MatchDenseExpr represents a dense vector match expression
 type MatchDenseExpr struct {
-	ColumnName       string
-	EmbeddingData    VEC
+	ColumnName        string
+	EmbeddingData     VEC
 	EmbeddingDataType string
-	DistanceType     string
-	TopN             int
-	Options          map[string]string
+	DistanceType      string
+	TopN              int
+	Options           map[string]string
 }
 
 // MatchSparseExpr represents a sparse vector match expression
@@ -57,8 +57,8 @@ type MatchTensorExpr struct {
 
 // FusionExpr represents a fusion expression
 type FusionExpr struct {
-	Method      string
-	TopN        int
+	Method       string
+	TopN         int
 	FusionParams map[string]interface{}
 }
 
@@ -75,16 +75,16 @@ type ParsedExpr struct {
 
 // Query represents a query structure
 type Query struct {
-	Columns          []interface{}
-	Highlight        []interface{}
-	Search           *SearchExpr
-	Filter           interface{}
-	GroupBy          []interface{}
-	Having           interface{}
-	Limit            interface{}
-	Offset           interface{}
-	Sort             []*OrderByExpr
-	TotalHitsCount   bool
+	Columns        []interface{}
+	Highlight      []interface{}
+	Search         *SearchExpr
+	Filter         interface{}
+	GroupBy        []interface{}
+	Having         interface{}
+	Limit          interface{}
+	Offset         interface{}
+	Sort           []*OrderByExpr
+	TotalHitsCount bool
 }
 
 // ExplainQuery represents an explain query structure

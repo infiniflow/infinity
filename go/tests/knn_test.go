@@ -4152,3 +4152,97 @@ func TestMultivectorBit(t *testing.T) {
 		})
 	}
 }
+
+// TestTensorCellKeepsEverySubVector is a regression case for the SDK's tensor
+// decoding: a cell of `tensor,4,float` is a 2-D array, and the decoder used to
+// keep only its first sub-vector. A table written with three rows of four
+// floats read back as one row of four - the round trip silently lost two
+// thirds of the value, while the engine's own `select` (and the Python SDK)
+// returned all three.
+//
+// Nothing in the SDK suite compared a tensor cell's *shape* before this, which
+// is why the defect survived: the existing cases only send tensors to
+// `match_tensor` and log the result.
+func TestTensorCellKeepsEverySubVector(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_tensor_cell_shape"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	table, err := db.CreateTable(tableName, infinity.TableSchema{
+		{Name: "id", DataType: "int"},
+		{Name: "tensor_col", DataType: "tensor,4,float"},
+		{Name: "mv_col", DataType: "multivector,4,float"},
+	}, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	want := [][]float64{
+		{0.5, 1.5, 2.5, 3.5},
+		{1.5, 2.5, 3.5, 4.5},
+		{2.5, 3.5, 4.5, 5.5},
+	}
+	if _, err := table.Insert([]map[string]interface{}{
+		{"id": 1, "tensor_col": want, "mv_col": want},
+	}); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	result, err := table.Output([]string{"tensor_col", "mv_col"}).ToResult()
+	if err != nil {
+		t.Fatalf("Failed to read the row back: %v", err)
+	}
+	qr, ok := result.(*infinity.QueryResult)
+	if !ok {
+		t.Fatalf("result is %T, want *infinity.QueryResult", result)
+	}
+
+	for _, column := range []string{"tensor_col", "mv_col"} {
+		rows := qr.Data[column]
+		if len(rows) != 1 {
+			t.Fatalf("%s: got %d cells, want 1", column, len(rows))
+		}
+		subVectors, ok := rows[0].([]interface{})
+		if !ok {
+			t.Fatalf("%s: cell is %T, want a 2-D array", column, rows[0])
+		}
+		if len(subVectors) != len(want) {
+			t.Fatalf("%s: cell holds %d sub-vectors, want %d (%v)",
+				column, len(subVectors), len(want), subVectors)
+		}
+		for i, sub := range subVectors {
+			floats, ok := sub.([]interface{})
+			if !ok {
+				t.Fatalf("%s[%d]: sub-vector is %T, want an array", column, i, sub)
+			}
+			if len(floats) != len(want[i]) {
+				t.Fatalf("%s[%d]: %d floats, want %d", column, i, len(floats), len(want[i]))
+			}
+			for j, v := range floats {
+				f, ok := v.(float32)
+				if !ok {
+					if f64, ok64 := v.(float64); ok64 {
+						f, ok = float32(f64), true
+					}
+				}
+				if !ok {
+					t.Fatalf("%s[%d][%d]: %T, want a float", column, i, j, v)
+				}
+				if diff := float64(f) - want[i][j]; diff > 1e-3 || diff < -1e-3 {
+					t.Fatalf("%s[%d][%d] = %v, want %v", column, i, j, f, want[i][j])
+				}
+			}
+		}
+	}
+
+	if _, err := db.DropTable(tableName, infinity.ConflictTypeError); err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}

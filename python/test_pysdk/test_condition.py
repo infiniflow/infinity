@@ -63,8 +63,7 @@ def test_condition_like_function_names():
         function = res.type.function_expr
         assert function.arguments[0].type.column_expr.column_name == ["c1"]
         assert function.arguments[1].type.constant_expr.str_value == "%test%"
-        assert len(function.arguments) == (3 if "ESCAPE" in cond_str else 2)
-        if "ESCAPE" in cond_str:
-            assert function.arguments[2].type.constant_expr.str_value == "!"
+        assert len(function.arguments) == 3
+        assert function.arguments[2].type.constant_expr.str_value == ("!" if "ESCAPE" in cond_str else "\\")
         func_name = function.function_name
         assert func_name == expected_func, f"{cond_str}: got {func_name}, want {expected_func}"
