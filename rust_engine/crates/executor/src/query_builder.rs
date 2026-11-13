@@ -661,12 +661,53 @@ impl DocIterator for TermDocIterator {
     }
 }
 
+/// One query term's postings in the phrase iterator: the documents, ascending,
+/// with their positions in a single arena.
+///
+/// A `Vec<(u64, Vec<u32>)>` costs one allocation per posting - 10M allocations
+/// for a term every document carries - which dominated a 10M-row phrase query's
+/// time and memory. The arena makes it two allocations per term and halves the
+/// footprint (`u32` positions instead of a `Vec` header each).
+#[derive(Default)]
+pub struct PhrasePostings {
+    /// `(doc id, first position in `positions`, position count)`, ascending.
+    docs: Vec<(u64, u32, u32)>,
+    positions: Vec<u32>,
+}
+
+impl PhrasePostings {
+    /// Appends one document with its positions.
+    pub fn push(&mut self, doc: u64, positions: &[u32]) {
+        let start = self.positions.len() as u32;
+        self.positions.extend_from_slice(positions);
+        self.docs.push((doc, start, positions.len() as u32));
+    }
+
+    pub fn len(&self) -> usize {
+        self.docs.len()
+    }
+
+    fn doc(&self, at: usize) -> Option<u64> {
+        self.docs.get(at).map(|(doc, _, _)| *doc)
+    }
+
+    pub fn positions(&self, at: usize) -> &[u32] {
+        match self.docs.get(at) {
+            Some((_, start, count)) => self
+                .positions
+                .get(*start as usize..(*start + *count) as usize)
+                .unwrap_or(&[]),
+            None => &[],
+        }
+    }
+}
+
 /// A phrase leaf's iterator (`PhraseDocIterator`): only documents where the
 /// analysed terms occur in order within `slop` positions.
 pub struct PhraseDocIterator {
     terms: Vec<String>,
-    /// Per query term: `(doc id, positions)`, ascending by doc id.
-    postings: Vec<Vec<(u64, Vec<u32>)>>,
+    /// Per query term: the documents and their positions in one arena.
+    postings: Vec<PhrasePostings>,
     cursors: Vec<usize>,
     doc_id: u64,
     doc_freq: u32,
@@ -689,7 +730,7 @@ impl PhraseDocIterator {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         terms: Vec<String>,
-        postings: Vec<Vec<(u64, Vec<u32>)>>,
+        postings: Vec<PhrasePostings>,
         slop: u32,
         doc_lens: std::collections::HashMap<u64, u32>,
         n_docs: usize,
@@ -772,22 +813,28 @@ impl PhraseDocIterator {
     fn seek_term(&mut self, term: usize, target: u64) -> Option<u64> {
         let list = &self.postings[term];
         let mut cursor = self.cursors[term];
-        while cursor < list.len() && list[cursor].0 < target {
+        while cursor < list.len() && list.doc(cursor).unwrap_or(u64::MAX) < target {
             cursor += 1;
         }
         self.cursors[term] = cursor;
-        list.get(cursor).map(|(doc, _)| *doc)
+        list.doc(cursor)
     }
 
     /// `GetExactPhraseMatchData`.
     fn exact_match(&mut self) -> bool {
-        let starts: Vec<u32> = self.postings[0][self.cursors[0]].1.clone();
+        // Both sides are arena slices: no allocation per candidate document.
+        let head = self.postings[0].positions(self.cursors[0]);
+        let rest: Vec<&[u32]> = (1..self.postings.len())
+            .map(|i| self.postings[i].positions(self.cursors[i]))
+            .collect();
         let mut matched = 0u32;
-        for start in starts {
+        for start in head {
             let mut found = true;
-            for i in 1..self.postings.len() {
-                let doc_positions = &self.postings[i][self.cursors[i]].1;
-                if doc_positions.binary_search(&(start + i as u32)).is_err() {
+            for (i, doc_positions) in rest.iter().enumerate() {
+                if doc_positions
+                    .binary_search(&(start + i as u32 + 1))
+                    .is_err()
+                {
                     found = false;
                     break;
                 }
@@ -820,8 +867,7 @@ impl PhraseDocIterator {
             .iter()
             .enumerate()
             .map(|(i, list)| {
-                list[self.cursors[i]]
-                    .1
+                list.positions(self.cursors[i])
                     .iter()
                     .map(|position| *position as i32)
                     .collect()
@@ -922,7 +968,7 @@ impl DocIterator for PhraseDocIterator {
                     }
                 }
             }
-            if target == self.postings[0][self.cursors[0]].0 {
+            if Some(target) == self.postings[0].doc(self.cursors[0]) {
                 if self.exact_or_sloppy_match() {
                     self.doc_id = target;
                     return true;

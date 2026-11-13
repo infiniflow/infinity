@@ -491,6 +491,18 @@ pub fn write_block_column(root: &Path, id: BlockId, col: &BlockColumn) -> std::i
     Ok(dir)
 }
 
+/// Publishes one data file: [`write_synced_direct`] plus, on a persistence
+/// profile, the object the manager publishes it as.
+///
+/// This is the write half of the reference's rule that **every** data file goes
+/// through the persistence manager (`FileWorker::WriteToFile` →
+/// `pm->Persist`, `file_worker_impl.cpp:170`; the full-text and index writers do
+/// the same). With no manager installed the store is the direct-disk one and
+/// this is exactly the old behaviour.
+pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    crate::chunk_store::chunk_store().write(path, bytes)
+}
+
 /// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it before
 /// returning (no directory fsync — the reference does not fsync directories).
 ///
@@ -509,7 +521,7 @@ pub fn write_block_column(root: &Path, id: BlockId, col: &BlockColumn) -> std::i
 /// old file keeps a valid inode (measured: the periodic checkpoint died with
 /// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
 /// truncated `blk_0/0.col`).
-pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
@@ -524,14 +536,47 @@ pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let write = || -> std::io::Result<()> {
         let mut file = std::fs::File::create(&tmp)?;
         file.write_all(bytes)?;
+        // The bytes have to reach the disk before the rename publishes them:
+        // a rename is only ordered against data that is already durable.
         file.sync_all()?;
-        std::fs::rename(&tmp, path)
+        std::fs::rename(&tmp, path)?;
+        // The rename itself is a directory update, and it is what the readers
+        // discover. Without this fsync a power cut can leave the old entry (or
+        // no entry) pointing at a file whose contents are on the disk, which is
+        // how a "complete" chunk disappears or a half-published one survives.
+        sync_parent(path)
     };
     let out = write();
     if out.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
     out
+}
+
+/// `fsync`s the directory holding `path`, so a rename (or an unlink) in it is
+/// durable.
+///
+/// Not every platform allows opening a directory for that; the call is then a
+/// no-op rather than an error, because the data file itself is already synced
+/// and failing here would turn "the write worked" into an error the caller
+/// cannot act on.
+fn sync_parent(path: &Path) -> std::io::Result<()> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    let dir = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    match std::fs::File::open(dir) {
+        Ok(handle) => {
+            let _ = handle.sync_all();
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) => Ok(()),
+    }
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).

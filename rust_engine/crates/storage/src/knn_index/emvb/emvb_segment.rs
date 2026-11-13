@@ -29,11 +29,9 @@
 //! `EMVBIndex` always builds an OPQ (`emvb_index_impl.cpp:62`), never a plain
 //! PQ, so an identity rotation here would make the chunk unscorable.
 
-use std::fs::File;
 use std::path::Path;
 
 use crate::mapped::MappedFile;
-use memmap2::Mmap;
 
 use index::emvb::OpqRotation;
 
@@ -649,12 +647,11 @@ pub struct EmvbReader {
 impl EmvbReader {
     #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
-        let file =
-            File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
-        // SAFETY: read-only mapping of an immutable chunk file.
-        let map = MappedFile::from_mmap(
-            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
-        );
+        // The chunk store owns the bytes: a persistence profile may hold this
+        // file only as an object part.
+        let map = crate::chunk_store::chunk_store()
+            .open(path)
+            .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         if map.len() < 16 {
             return Err(FormatError::Truncated {
                 need: 16,

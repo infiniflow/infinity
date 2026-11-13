@@ -48,10 +48,10 @@
 //! `PositionListEncoder` (see `docs/CPP_FORMAT_SPEC.md` §9.3.5).
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs;
 
+use crate::invertedindex::chunk_manifest::{ChunkManifest, LiveStats};
 use crate::mapped::MappedFile;
-use memmap2::Mmap;
 
 use crate::format::FormatError;
 use crate::invertedindex::format::position_list::decode_position_list;
@@ -292,13 +292,42 @@ pub fn write_segment_index_streaming(
     flags: TermMetaFlags,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
-    write_segment_index_streaming_with(
+    write_segment_index_streaming_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming`] with the chunk's live statistics stated.
+///
+/// `docs` still describes every row the chunk spans (the `.len` slots are
+/// addressed by `row - base_row_id`, so they cannot be compacted), while
+/// `live` is what a predicate still sees: the token count of the documents the
+/// caller kept (`sum(dl)`) and how many of them there are (BM25 `N`). `None`
+/// means the chunk holds every document it lists, which is the seal path's
+/// answer once deleted rows are filtered out of `docs`.
+pub fn write_segment_index_streaming_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    live: Option<LiveStats>,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
         index_dir,
         base_name,
         base_row_id,
         docs,
         flags,
         SEAL_BATCH_TERMS,
+        live,
         for_each_term,
     )
 }
@@ -316,6 +345,30 @@ pub fn write_segment_index_streaming_with(
     docs: &[(u64, u32)],
     flags: TermMetaFlags,
     batch_terms: usize,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        batch_terms,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming_with`] with the live statistics and the
+/// publish marker of the chunk.
+pub fn write_segment_index_streaming_with_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    batch_terms: usize,
+    live: Option<LiveStats>,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
     let batch_terms = batch_terms.max(1);
@@ -448,14 +501,34 @@ pub fn write_segment_index_streaming_with(
     let fst = build_fst(&entries);
     let dic = encode_dic(&meta_region, &fst);
 
+    // Every file goes through the chunk store, dedicated (`try_compose = false`
+    // like the reference's full-text writer): a persistence profile publishes it
+    // as an object of its own at the same moment, instead of a checkpoint-time
+    // sweep finding it later.
+    let store = crate::chunk_store::chunk_store();
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        crate::format::write_synced(std::path::Path::new(&path), bytes)
+        store
+            .write_dedicated(std::path::Path::new(&path), bytes)
             .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
+    // The publish marker goes last: it is what makes "all three files are on
+    // the disk at these sizes" a fact the loader can check. Without it a crash
+    // between the writes above leaves a `.dic` that `load_sealed` would find
+    // beside the previous generation's `.pos`/`.len`.
+    let live = live.unwrap_or_else(|| LiveStats::of(docs));
+    ChunkManifest {
+        span_docs: doc_count,
+        live_docs: live.docs.min(doc_count),
+        total_len: live.total_len,
+        dic_len: dic.len() as u64,
+        pos_len: pos.len() as u64,
+        len_len: len_bytes.len() as u64,
+    }
+    .write(index_dir, base_name)?;
     Ok(())
 }
 
@@ -477,32 +550,79 @@ pub struct SegmentIndexReader {
 }
 
 impl SegmentIndexReader {
-    /// Opens `{dir}/{base_name}.{dic,pos,len}`. Fails if any file is missing;
-    /// an empty segment (`len` file of zero bytes) is allowed.
+    /// Opens `{dir}/{base_name}.{dic,pos,len}` and validates the set.
     ///
     /// The mapping is the only `unsafe` operation in this crate: a segment is
     /// immutable once sealed, so the mapped region cannot change underneath the
     /// reader (rebuilds write a new base name instead of overwriting).
-    #[allow(unsafe_code)]
+    ///
+    /// Validation, in the order it costs:
+    ///
+    /// * `.len` must be a whole number of `u32` slots — a truncated write
+    ///   leaves a partial slot, and `doc_count` is derived from that length;
+    /// * `.dic` must carry a parseable FST region — a truncated dictionary
+    ///   would otherwise be read as a shorter one with valid-looking offsets;
+    /// * when the chunk's [`ChunkManifest`] is present, the three files must be
+    ///   the exact bytes it recorded. That is what rejects a file set published
+    ///   in two generations (`.dic` from a retried seal, `.pos`/`.len` left from
+    ///   the previous one), which decodes into wrong rows rather than failing.
+    ///
+    /// A chunk with no manifest (written by the reference, or by this port
+    /// before the marker existed) passes on the structural checks alone, so old
+    /// data stays readable.
     pub fn open(
         dir: &str,
         base_name: &str,
         base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
+        // `chunk_store().open` is the resolution step of the reference's
+        // `pm->GetObjCache` + `MmapFile(pm->GetObjPath(...))`: the local copy is
+        // used when it is there, and the object's part is mapped when the file
+        // set was only ever published to the persistence manager.
+        let store = crate::chunk_store::chunk_store();
         let map = |suffix: &str| -> Result<MappedFile, FormatError> {
             let path = fulltext_chunk_file(dir, base_name, suffix);
-            let file = File::open(&path).map_err(|e| FormatError::Io(e.to_string()))?;
-            // SAFETY: the file is read-only for the lifetime of the mapping and
-            // does not change while it is mapped (a segment is immutable once
-            // sealed).
-            let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
-            Ok(MappedFile::from_mmap(map))
+            store
+                .open(std::path::Path::new(&path))
+                .map_err(|e| FormatError::Io(e.to_string()))
         };
         let len = map(FULLTEXT_LENGTH_SUFFIX)?;
+        if len.len() % 4 != 0 {
+            return Err(FormatError::Invalid(format!(
+                "chunk '{base_name}': the .len file is {} bytes, not a whole number of u32 slots",
+                len.len()
+            )));
+        }
+        let dic = map(FULLTEXT_DICT_SUFFIX)?;
+        // The FST region's own trailer is the only structural check a `.dic`
+        // carries; a truncated write loses it.
+        dic_fst(&dic)?;
+        let pos = map(FULLTEXT_POSTING_SUFFIX)?;
+        if let Some(manifest) = ChunkManifest::read(dir, base_name) {
+            if !manifest.matches_files(dic.len() as u64, pos.len() as u64, len.len() as u64) {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the files are {} / {} / {} bytes, but its marker \
+                     records {} / {} / {}",
+                    dic.len(),
+                    pos.len(),
+                    len.len(),
+                    manifest.dic_len,
+                    manifest.pos_len,
+                    manifest.len_len
+                )));
+            }
+            if manifest.span_docs as usize != len.len() / 4 {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the marker records {} documents but .len holds {}",
+                    manifest.span_docs,
+                    len.len() / 4
+                )));
+            }
+        }
         Ok(Self {
-            dic: map(FULLTEXT_DICT_SUFFIX)?,
-            pos: map(FULLTEXT_POSTING_SUFFIX)?,
+            dic,
+            pos,
             len,
             base_row_id,
             flags,
@@ -1508,10 +1628,15 @@ mod tests {
         assert_eq!(meta.total_tf, 300);
     }
 
-    /// A segment is exactly the reference's three files: `.dic`, `.pos`, `.len`.
+    /// A segment is exactly the reference's three files (`.dic`, `.pos`, `.len`)
+    /// plus the publish marker.
+    ///
     /// The port used to add a `.row` sidecar (a `u64[]` row-id table); the row
-    /// of a document is now `base_row_id + docid_t`, so nothing else may be
-    /// written - an extra file in the chunk directory is a format deviation.
+    /// of a document is `base_row_id + docid_t`, so no fourth *data* file may be
+    /// written. `.ok` is not data: it names the three files' lengths and the
+    /// chunk's live statistics, is written last, and is what tells a complete
+    /// chunk from one whose publish was interrupted between the three writes.
+    /// An engine that does not know it ignores it.
     #[test]
     fn a_segment_is_exactly_the_reference_file_family() {
         let dir = tempfile::tempdir().unwrap();
@@ -1539,9 +1664,34 @@ mod tests {
             vec![
                 "ft_0000000000000000.dic".to_string(),
                 "ft_0000000000000000.len".to_string(),
+                "ft_0000000000000000.ok".to_string(),
                 "ft_0000000000000000.pos".to_string(),
             ]
         );
+        // The marker describes the files that were just written, and every
+        // document of a fresh chunk is live.
+        let manifest = crate::invertedindex::chunk_manifest::ChunkManifest::read(
+            index_dir,
+            "ft_0000000000000000",
+        )
+        .expect("the chunk is published with a marker");
+        let size = |suffix: &str| -> u64 {
+            std::fs::metadata(crate::invertedindex::format::fulltext_chunk_file(
+                index_dir,
+                "ft_0000000000000000",
+                suffix,
+            ))
+            .unwrap()
+            .len()
+        };
+        assert!(manifest.matches_files(
+            size(FULLTEXT_DICT_SUFFIX),
+            size(FULLTEXT_POSTING_SUFFIX),
+            size(FULLTEXT_LENGTH_SUFFIX)
+        ));
+        assert_eq!(manifest.span_docs, 2);
+        assert_eq!(manifest.live_docs, 2);
+        assert_eq!(manifest.total_len, 16);
     }
 
     /// A row with no text (the reference's `InsertGap`) keeps its `docid_t`: the

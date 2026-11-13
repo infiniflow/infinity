@@ -22,8 +22,8 @@
 use std::collections::HashMap;
 
 use crate::query_builder::{
-    DocIterator, PhraseDocIterator, PhraseQueryNode, QueryNode, TermDocIterator, TermLookup,
-    TermQueryNode,
+    DocIterator, PhraseDocIterator, PhrasePostings, PhraseQueryNode, QueryNode, TermDocIterator,
+    TermLookup, TermQueryNode,
 };
 use crate::tokenize_index_positions;
 use crate::TextTokenizer;
@@ -909,12 +909,11 @@ impl TermLookup for MemoryColumnIndex {
                 // `PhraseQueryNode::CreateSearch` fails when a term is absent.
                 return None;
             }
-            per_term.push(
-                postings
-                    .into_iter()
-                    .map(|(doc, _, positions)| (doc, positions))
-                    .collect(),
-            );
+            let mut term_postings = PhrasePostings::default();
+            for (doc, _, positions) in postings {
+                term_postings.push(doc, &positions);
+            }
+            per_term.push(term_postings);
         }
         Some(Box::new(PhraseDocIterator::new(
             terms.to_vec(),

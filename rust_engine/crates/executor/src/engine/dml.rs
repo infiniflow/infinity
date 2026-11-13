@@ -94,7 +94,7 @@ impl Engine {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 if entry.path().extension().is_some_and(|e| e == "idx") {
-                    let _ = std::fs::remove_file(entry.path());
+                    let _ = storage::chunk_store::remove_file(entry.path());
                 }
             }
         }

@@ -117,9 +117,8 @@ pub(crate) fn plaid_coverage(sizes: &[(u32, u32)]) -> (u32, u32) {
 /// `n_docs`. Reading the count from the header avoids decoding a chunk that
 /// cleanup only has to look at.
 pub(crate) fn plaid_chunk_doc_num(path: &std::path::Path) -> Option<u32> {
-    use std::io::Read;
-    let mut head = [0u8; 24];
-    std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+    let bytes = storage::chunk_store::read_file(path).ok()?;
+    let head = bytes.get(..24)?;
     Some(u32::from_le_bytes(head[20..24].try_into().ok()?))
 }
 

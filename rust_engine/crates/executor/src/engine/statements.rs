@@ -190,10 +190,25 @@ impl Engine {
                     storage::persistence::DEFAULT_OBJECT_SIZE_LIMIT,
                 )?;
                 pm.restore_missing_files()?;
-                Some(pm)
+                Some(Arc::new(pm))
             }
             None => None,
         };
+        // `InfinityContext::instance().persistence_manager()`: once the engine
+        // has a manager, **every** data file it writes is published through it
+        // and every mapping is resolved through it - blocks, index chunks and
+        // the full-text chunk cache alike, exactly as the reference's file
+        // workers do. Without one the direct-disk store stays installed, so a
+        // plain directory behaves as before.
+        match persistence.as_ref() {
+            Some(pm) => storage::chunk_store::install_chunk_store(Arc::new(
+                storage::chunk_store::PersistentChunkStore::new(Arc::clone(pm), &dir),
+            )),
+            // A plain open never undoes a manager another open installed: one
+            // engine per process makes this a no-op, and a process with several
+            // (a test suite) keeps the object profile while it is in use.
+            None => storage::chunk_store::install_local_chunk_store_unless_persistent(),
+        }
         // The row/meta store, on the same substrate as the catalog.
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
@@ -3509,11 +3524,29 @@ impl Engine {
             .join(key.replace('/', "_"))
             .to_string_lossy()
             .into_owned();
+        // The `ROW_ID` segments the catalog still lists. A chunk of any other
+        // segment belongs to rows a compaction moved: loading it would map its
+        // postings onto row ids that name nothing (or, worse, another row), so
+        // the loader retires it and the rows are re-indexed under their new ids.
+        // An empty set is "nothing to go by", not "every chunk is stale".
+        let live_segments: Option<std::collections::HashSet<u32>> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .map(|entry| entry.segments.keys().copied().collect())
+            .filter(|segments: &std::collections::HashSet<u32>| !segments.is_empty());
+        // The chunk list the catalog holds, in the reference's layout. It is
+        // the only way to find the chunks of a directory the reference wrote:
+        // the reference never scans for `ft_*.dic`, it reads `idx_chunk|…`.
+        let catalog_chunks = self
+            .fulltext_catalog_chunks(table, column)
+            .unwrap_or_default();
         let mut index = TextIndex::new(dir, tokenizer);
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed() as usize;
+        let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
@@ -3532,6 +3565,86 @@ impl Engine {
             .text
             .insert(column.to_string(), shared.clone());
         Ok(shared)
+    }
+
+    /// The sealed chunks the catalog lists for a table's full-text index on
+    /// `column`, in the reference's layout.
+    ///
+    /// C++: `ColumnIndexReader::Open` (`column_index_reader_impl.cpp:71-105`)
+    /// walks `TableIndexMeta` → segment ids → chunk ids → `ChunkIndexMetaInfo`,
+    /// and the segment's directory comes from `SegmentIndexMeta::
+    /// GetSegmentIndexDir()` (`db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}`). This is
+    /// that walk: it is how a directory the reference wrote is read at all, and
+    /// it is also the authoritative list for a directory the port wrote.
+    pub(crate) fn fulltext_catalog_chunks(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> Result<Vec<CatalogChunk>> {
+        // The catalog accepts both spellings depending on which record wrote it
+        // (`im.table` is the bare name for an index created without a database,
+        // the qualified one for the mirror), so both are tried.
+        let qualified = self.qualified_table(table);
+        let mut meta = self.storage.catalog.get_table_by_name(&qualified)?;
+        if meta.is_none() && qualified != table {
+            meta = self.storage.catalog.get_table_by_name(table)?;
+        }
+        let Some(meta) = meta else {
+            return Ok(Vec::new());
+        };
+        let mut indexes = self.storage.catalog.indexes_of_table(&qualified)?;
+        if qualified != table {
+            for im in self.storage.catalog.indexes_of_table(table)? {
+                if !indexes.iter().any(|known| known.name == im.name) {
+                    indexes.push(im);
+                }
+            }
+        }
+        let Some(im) = indexes
+            .into_iter()
+            .find(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.column == *column)
+        else {
+            return Ok(Vec::new());
+        };
+        let index_id = if im.id > 0 {
+            im.id
+        } else {
+            match self.index_position(&qualified, &im.name) {
+                Ok(id) => id as u64,
+                Err(_) => return Ok(Vec::new()),
+            }
+        };
+        let db_id = self.database_id_of(&qualified);
+        let layers = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+        )?;
+        let mut chunks = Vec::new();
+        for (segment, entries) in layers {
+            let dir = self
+                .blocks_root()
+                .join(format!(
+                    "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                    meta.id
+                ))
+                .to_string_lossy()
+                .into_owned();
+            for (_, info) in entries {
+                if info.base_name.is_empty() {
+                    continue;
+                }
+                chunks.push(CatalogChunk {
+                    dir: dir.clone(),
+                    base_name: info.base_name,
+                    base_row_id: info.base_row_id,
+                });
+            }
+        }
+        // Chunk-id order is dump order; the loader wants row order.
+        chunks.sort_by_key(|chunk| chunk.base_row_id);
+        Ok(chunks)
     }
 
     /// Builds (once) the multi-vector index of a column from its rows: every
@@ -3628,7 +3741,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                    let _ = std::fs::remove_file(p);
+                    let _ = storage::chunk_store::remove_file(p);
                 }
             }
         }
@@ -3951,7 +4064,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.extension().is_some_and(|x| x == "bmp") {
-                    let _ = std::fs::remove_file(p);
+                    let _ = storage::chunk_store::remove_file(p);
                 }
             }
         }
@@ -4673,7 +4786,7 @@ impl Engine {
                         )
                         .as_bytes(),
                     )?;
-                    let _ = std::fs::remove_dir_all(root.join(format!(
+                    let _ = storage::chunk_store::remove_tree(root.join(format!(
                         "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                         meta.id
                     )));
@@ -4686,7 +4799,7 @@ impl Engine {
                     )
                     .as_bytes(),
                 )?;
-                let _ = std::fs::remove_dir_all(
+                let _ = storage::chunk_store::remove_tree(
                     root.join(format!("db_{db_id}/tbl_{}/seg_{segment}", meta.id)),
                 );
             }
@@ -4719,7 +4832,7 @@ impl Engine {
                         continue;
                     };
                     if !live.contains(&(db_id.to_string(), table_id.to_string())) {
-                        let _ = std::fs::remove_dir_all(tbl.path());
+                        let _ = storage::chunk_store::remove_tree(tbl.path());
                     }
                 }
             }
@@ -4787,7 +4900,7 @@ impl Engine {
                     .into_bytes(),
             );
             delete_all(keys)?;
-            let _ = std::fs::remove_dir_all(root.join(format!("db_{db_id}")));
+            let _ = storage::chunk_store::remove_tree(root.join(format!("db_{db_id}")));
         }
 
         // `drop|tbl|{db_id}/{name}/{create_ts}/{table_id}`
@@ -4813,7 +4926,8 @@ impl Engine {
                 .into_bytes(),
             );
             delete_all(keys)?;
-            let _ = std::fs::remove_dir_all(root.join(format!("db_{db_id}/tbl_{table_id}")));
+            let _ =
+                storage::chunk_store::remove_tree(root.join(format!("db_{db_id}/tbl_{table_id}")));
         }
 
         // `drop|idx|{db_id}/{table_id}/{name}/{create_ts}/{index_id}`
@@ -4830,7 +4944,7 @@ impl Engine {
                 (parts[0], parts[1], parts[2], parts[3], parts[4]);
             self.purge_index_records(&store, db_id, table_id, name, create_ts, index_id)?;
             delete_all(vec![key])?;
-            let _ = std::fs::remove_dir_all(
+            let _ = storage::chunk_store::remove_tree(
                 root.join(format!("db_{db_id}/tbl_{table_id}/idx_{index_id}")),
             );
         }

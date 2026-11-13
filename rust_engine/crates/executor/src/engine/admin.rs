@@ -75,15 +75,19 @@ impl Engine {
     /// that owns the gate can only finish on that same worker - the optimizer
     /// then waits for itself (observed as a background optimize that never
     /// returns, with every client of the table stuck behind it).
-    pub(crate) async fn optimize_fulltext_async(&self, table: &str) -> Result<usize> {
+    /// Public for embedders and the scale probe. **Await it inside the
+    /// runtime**: it takes the table's batch gate, which an insert may hold
+    /// across its own awaits, so bridging it from a runtime worker with
+    /// `block_on` deadlocks (see the note above).
+    pub async fn optimize_fulltext_async(&self, table: &str) -> Result<usize> {
         self.ensure_writable()?;
         let gate = self.batch_gate(table);
         let _batch = gate.lock().await;
-        self.optimize_fulltext_locked(table)
+        self.optimize_fulltext_locked(table).await
     }
 
     /// The body [`Self::optimize_fulltext_async`] runs: the gate is held.
-    fn optimize_fulltext_locked(&self, table: &str) -> Result<usize> {
+    async fn optimize_fulltext_locked(&self, table: &str) -> Result<usize> {
         let key = self.table_key(table);
         // Clone the handles while the `tables` guard is held, then drop it before
         // taking any index write lock. `text_index_for` takes `tables` first and
@@ -96,11 +100,25 @@ impl Engine {
             };
             entry.text.values().cloned().collect()
         };
+        if indexes.is_empty() {
+            return Ok(0);
+        }
+        // A merge is the only point at which the postings of a deleted row can
+        // be reclaimed (a chunk is immutable once published), so it takes the
+        // table's deleted rows with it.
+        let deleted = self.tombstone_set(table)?;
         let mut merges = 0;
         for index in indexes {
-            // The merge rewrites whole chunks: keep its I/O out of the column's
-            // write lock so queries and inserts are not held behind it.
-            merges += crate::engine::state::optimize_text_index_unlocked(&index)?;
+            // The merge rewrites whole chunks and fsyncs every file it writes:
+            // it is a blocking leaf, so it runs on the blocking pool. Running it
+            // here would hold a runtime worker for the duration of the rewrite,
+            // stalling every other task scheduled on it.
+            merges += crate::scheduler::scheduler()
+                .spawn_blocking({
+                    let deleted = deleted.clone();
+                    move || crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
+                })
+                .await?;
         }
         Ok(merges)
     }

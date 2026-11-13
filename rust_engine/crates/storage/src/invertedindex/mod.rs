@@ -5,6 +5,7 @@
 //! Only the parts the engine reaches are here; the reference's fst/, ring and
 //! in-memory indexer live elsewhere (see docs/STRUCTURE.md).
 
+pub mod chunk_manifest;
 pub mod common;
 pub mod disk_segment_reader;
 pub mod format;

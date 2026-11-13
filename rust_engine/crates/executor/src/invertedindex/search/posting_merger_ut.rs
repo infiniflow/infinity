@@ -69,7 +69,7 @@ fn basic() {
         })
         .collect();
     let merge_base_rowid = 0;
-    merger.merge(&mut postings, merge_base_rowid).unwrap();
+    merger.merge(&mut postings, merge_base_rowid, None).unwrap();
 
     assert_eq!(merger.df(), 2);
     assert_eq!(merger.total_tf(), 3);

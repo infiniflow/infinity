@@ -408,6 +408,10 @@ impl SecondaryIndex {
     /// Loads a previously flushed index.
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
+        // `index` cannot reach the chunk store (`storage` depends on this
+        // crate), so the port keeps every data file it writes in the local
+        // cache this reads; an object-only directory is materialised at open by
+        // `PersistenceManager::restore_missing_files`.
         let buf = fs::read(path).map_err(|e| Error::io(path, e))?;
         let bad = || Error::Invalid("corrupt secondary index".into());
         let mut p = 0usize;

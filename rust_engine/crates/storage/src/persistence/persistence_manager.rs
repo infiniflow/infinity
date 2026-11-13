@@ -34,6 +34,15 @@ pub const PM_OBJECT_STAT_PREFIX: &str = "pm|object_stat|";
 /// `DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT` (`default_values.cppm:218`).
 pub const DEFAULT_OBJECT_SIZE_LIMIT: usize = 128 * 1024 * 1024;
 
+/// Key prefixes that are relative to the engine root rather than to `data/`.
+///
+/// The reference only persists files under `data/`, so every key it writes is
+/// relative to that directory. The port also keeps its full-text chunk cache
+/// beside `data/` (`<root>/fulltext/…`, deliberately outside the tree the
+/// reference enumerates); those keys start with this prefix so a record lands
+/// back where it was written.
+pub const STORAGE_ROOT_KEYS: &[&str] = &["fulltext/"];
+
 fn align_up(value: usize) -> usize {
     (value + OBJ_ALIGNMENT - 1) & !(OBJ_ALIGNMENT - 1)
 }
@@ -314,6 +323,24 @@ impl PersistenceManager {
         Ok(())
     }
 
+    /// The local path a record's key names.
+    ///
+    /// The reference keeps every key relative to `data/`, so that is the
+    /// default. The port also persists one tree that lives **beside** `data/`
+    /// (its full-text chunk cache, `STORAGE_ROOT_KEYS`), and a record for it
+    /// has to come back where it was written rather than under `data/`.
+    fn local_path_of(&self, rel: &str) -> PathBuf {
+        if STORAGE_ROOT_KEYS
+            .iter()
+            .any(|prefix| rel.starts_with(prefix))
+        {
+            if let Some(root) = self.local_data_dir.parent() {
+                return root.join(rel);
+            }
+        }
+        self.local_data_dir.join(rel)
+    }
+
     /// C++ `RemovePrefix`: strip the data-dir prefix, keep relative paths, and
     /// return an empty string for an absolute path outside the data dir.
     fn remove_prefix(&self, path: &Path) -> String {
@@ -332,7 +359,22 @@ impl PersistenceManager {
         file_path: &Path,
         tmp_file_path: impl AsRef<Path>,
     ) -> Result<PersistWriteResult> {
-        let tmp_file_path = tmp_file_path.as_ref();
+        self.persist_with(file_path, tmp_file_path, true)
+    }
+
+    /// [`Self::persist`] with the reference's `try_compose` switch.
+    ///
+    /// `try_compose = false` gives the file an object of its own instead of a
+    /// part of the shared current object. The reference's full-text writer uses
+    /// that (`memory_indexer_impl.cpp:679`): a chunk file is then exactly one
+    /// object file, so a reader can map it whole instead of mapping an object
+    /// and slicing one part out of it.
+    pub fn persist_with(
+        &self,
+        file_path: &Path,
+        tmp_file_path: impl AsRef<Path>,
+        try_compose: bool,
+    ) -> Result<PersistWriteResult> {
         let local_path = self.remove_prefix(file_path);
         if local_path.is_empty() {
             return Err(Error::Unrecoverable(format!(
@@ -340,6 +382,26 @@ impl PersistenceManager {
                 file_path.display()
             )));
         }
+        self.persist_keyed(&local_path, tmp_file_path, try_compose)
+    }
+
+    /// [`Self::persist`] for a key the caller already knows.
+    ///
+    /// C++ derives the key with `RemovePrefix`, which only covers paths below
+    /// the data dir. The port also persists files it keeps beside the data dir
+    /// (the full-text chunk cache), so it accepts the key directly; the mapping
+    /// is the same `pm|object|` namespace, just with another prefix inside it.
+    pub fn persist_keyed(
+        &self,
+        local_path: &str,
+        tmp_file_path: impl AsRef<Path>,
+        try_compose: bool,
+    ) -> Result<PersistWriteResult> {
+        if local_path.is_empty() {
+            return Err(Error::Unrecoverable("Empty persistence key".to_string()));
+        }
+        let local_path = local_path.to_string();
+        let tmp_file_path = tmp_file_path.as_ref();
         let src_size = fs::metadata(tmp_file_path)
             .map_err(|e| Error::io(tmp_file_path, e))?
             .len() as usize;
@@ -359,10 +421,13 @@ impl PersistenceManager {
             inner.files.insert(local_path, obj_addr.clone());
             result.persist_keys.push(KEY_EMPTY.to_string());
             result.obj_addr = obj_addr;
-        } else if src_size >= self.object_size_limit {
+        } else if !try_compose || src_size >= self.object_size_limit {
             let obj_key = unique_key();
             let dst_path = self.get_obj_path(&obj_key);
             fs::rename(tmp_file_path, &dst_path).map_err(|e| Error::io(&dst_path, e))?;
+            // The object is what a reader will map after a crash, so it has to
+            // reach the disk before the mapping that names it is published.
+            sync_file(&dst_path)?;
             let obj_addr = ObjAddr {
                 obj_key: obj_key.clone(),
                 part_offset: 0,
@@ -386,6 +451,7 @@ impl PersistenceManager {
                 part_size: src_size,
             };
             self.append_locked(&mut inner, tmp_file_path, src_size)?;
+            sync_file(&self.get_obj_path(&obj_addr.obj_key))?;
             fs::remove_file(tmp_file_path).map_err(|e| Error::io(tmp_file_path, e))?;
             let stat = ObjStat::new(
                 inner.current_object_size,
@@ -409,6 +475,52 @@ impl PersistenceManager {
                 false,
             )?;
         }
+        Ok(result)
+    }
+
+    /// The address of a key, without taking a reference (`GetObjCache` without
+    /// the cache accounting).
+    pub fn lookup_key(&self, key: &str) -> Option<ObjAddr> {
+        self.inner.lock().unwrap().files.get(key).cloned()
+    }
+
+    /// The persistence key of a path below the data dir (`RemovePrefix`).
+    pub fn key_of(&self, file_path: &Path) -> Option<String> {
+        let key = self.remove_prefix(file_path);
+        (!key.is_empty()).then_some(key)
+    }
+
+    /// Every key that starts with `prefix` (a directory's worth of files).
+    pub fn keys_under(&self, prefix: &str) -> Vec<String> {
+        let inner = self.inner.lock().unwrap();
+        let mut keys: Vec<String> = inner
+            .files
+            .keys()
+            .filter(|key| key.starts_with(prefix))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// [`Self::cleanup`] for a key the caller already knows.
+    pub fn cleanup_key(&self, key: &str) -> Result<PersistWriteResult> {
+        if key.is_empty() {
+            return Ok(PersistWriteResult::default());
+        }
+        let mut result = PersistWriteResult::default();
+        let mut inner = self.inner.lock().unwrap();
+        let Some(obj_addr) = inner.files.remove(key) else {
+            return Ok(result);
+        };
+        self.forget_file(key);
+        self.cleanup_locked(
+            &mut inner,
+            &obj_addr,
+            &mut result.persist_keys,
+            &mut result.drop_from_remote_keys,
+            true,
+        )?;
         Ok(result)
     }
 
@@ -578,6 +690,7 @@ impl PersistenceManager {
                 .expect("failed to open composed object for the footer");
             out.write_all(&1u32.to_le_bytes())
                 .expect("failed to write composed object footer");
+            let _ = out.sync_all();
         }
         let stat = ObjStat::new(
             inner.current_object_size,
@@ -702,7 +815,7 @@ impl PersistenceManager {
                 .collect()
         };
         for (rel, addr) in files {
-            let target = self.local_data_dir.join(&rel);
+            let target = self.local_path_of(&rel);
             if target.exists() {
                 continue;
             }
@@ -735,6 +848,13 @@ impl PersistenceManager {
 
     /// The port's checkpoint step: publish every file under the data directory
     /// (`try_compose = true`, in path order) and seal the current object.
+    ///
+    /// A file the engine already published when it wrote it (the write path goes
+    /// through [`crate::chunk_store`], so it does) is skipped when its recorded
+    /// part has the size on the disk: re-persisting it would allocate a second
+    /// object for identical bytes and drop the first. The sweep is therefore
+    /// only about files that appeared some other way - a directory copied in, a
+    /// build that predates the store - and about sealing the current object.
     pub fn persist_directory(&self) -> Result<usize> {
         let root = self.local_data_dir.clone();
         let mut files: Vec<PathBuf> = Vec::new();
@@ -762,6 +882,16 @@ impl PersistenceManager {
         let mut written = 0usize;
         for path in &files {
             let key = path.to_string_lossy().to_string();
+            let size = fs::metadata(path).map(|meta| meta.len() as usize).ok();
+            // Already published by the write path with these bytes.
+            if let (Some(size), Some(rel)) = (size, self.key_of(path)) {
+                if self
+                    .lookup_key(&rel)
+                    .is_some_and(|addr| addr.part_size == size || size == 0)
+                {
+                    continue;
+                }
+            }
             let tmp = spool.join(unique_key());
             fs::copy(path, &tmp).map_err(|e| Error::io(&tmp, e))?;
             let result = self.persist(Path::new(&key), &tmp)?;
@@ -799,6 +929,17 @@ impl PersistenceManager {
     pub fn resolve_read(&self, result: PersistReadResult) -> ObjAddr {
         result.obj_addr
     }
+}
+
+/// `fsync`s a file the manager just wrote into, so the object's bytes are on
+/// the disk before the `pm|object|` record that names them is.
+fn sync_file(path: &Path) -> Result<()> {
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|e| Error::io(path, e))?;
+    file.sync_all().map_err(|e| Error::io(path, e))
 }
 
 /// A unique object key. The reference uses a UUID; a process-local counter is

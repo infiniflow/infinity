@@ -4867,7 +4867,7 @@ pub struct Engine {
     /// The persistence layer (`PersistenceManager`), when this engine publishes
     /// its data files through `pm|object|` instead of leaving `data/` private
     /// (`EngineOptions::object_dir`).
-    pub(crate) persistence: Option<storage::persistence::PersistenceManager>,
+    pub(crate) persistence: Option<std::sync::Arc<storage::persistence::PersistenceManager>>,
     /// Bumped when `optimize_indexes` runs: a `DumpMemIndex` staged before the
     /// optimize cannot commit after it (the reference's index meta version).
     pub(crate) index_epoch: std::sync::atomic::AtomicU64,
@@ -5876,10 +5876,13 @@ pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
 /// appended a chunk, another optimize replaced one) is left alone and the merged
 /// files are dropped, so a long merge never blocks a query or a writer and never
 /// loses a chunk that arrived meanwhile.
-pub(crate) fn optimize_text_index_unlocked(shared: &SharedTextIndex) -> crate::Result<usize> {
+pub(crate) fn optimize_text_index_unlocked(
+    shared: &SharedTextIndex,
+    deleted: &std::collections::HashSet<u64>,
+) -> crate::Result<usize> {
     let (plan, dir) = {
         let index = shared.read().unwrap();
-        let Some(plan) = index.plan_merge()? else {
+        let Some(plan) = index.plan_merge(deleted)? else {
             return Ok(0);
         };
         (plan, index.dir.clone())

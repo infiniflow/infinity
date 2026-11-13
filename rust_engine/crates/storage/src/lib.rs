@@ -109,7 +109,7 @@ pub use definition::format;
 pub use fast_rough_filter::binary_fuse_filter;
 pub use invertedindex::common::external_sort;
 pub use invertedindex::fst::registry as fst_registry;
-pub use io::{s3, virtual_store};
+pub use io::{chunk_store, s3, virtual_store};
 pub use knn_index::emvb::emvb_segment;
 pub use knn_index::knn_format;
 pub use knn_index::multivector::multivector_segment;
