@@ -4521,16 +4521,6 @@ impl TableEntry {
     /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
     pub(crate) fn retain_buffered(&mut self, mut keep: impl FnMut(&(usize, Vec<Value>)) -> bool) {
         self.pending_rows.retain(|row| keep(row));
-        if self.pending_rows.is_empty() {
-            // A full drain: `retain` and `clear` keep their backing storage, so
-            // the emptied buffer would still hold `capacity` row slots and
-            // `capacity` map buckets - memory the quota has just stopped
-            // charging. Release it with the rows.
-            self.pending_rows = Vec::new();
-            self.pending_pos = std::collections::HashMap::new();
-            self.pending_bytes = 0;
-            return;
-        }
         self.pending_pos.clear();
         // Rebuilt here rather than adjusted by the rows dropped: the walk is
         // one pass over what is left, which is what `retain` and the map
