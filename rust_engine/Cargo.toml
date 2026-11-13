@@ -1,0 +1,78 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common",
+    "crates/storage",
+    "crates/catalog",
+    "crates/txn",
+    "crates/parser",
+    "crates/expression",
+    "crates/analyzer",
+    "crates/analyzer-ffi",
+    "crates/planner",
+    "crates/index",
+    "crates/executor",
+    "crates/server",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+# A compiler warning is a defect: every crate inherits this with
+# `[lints] workspace = true`, so `cargo build` / `cargo test` (and every CI
+# job that compiles the workspace) fails on one. A warning a crate genuinely
+# cannot fix is allowed at the site with `#[allow(..., reason = "...")]`, never
+# silently in the manifest.
+[workspace.lints.rust]
+warnings = "deny"
+
+[workspace.dependencies]
+rust-stemmers = "1.2"
+# block_on for the synchronous Engine::execute adapter (tests / cli / bin tools)
+futures-executor = "0.3"
+tokio = { version = "1", default-features = false, features = [
+    "rt",
+    "rt-multi-thread",
+    "net",
+    "sync",
+    "time",
+    "io-util",
+] }
+common = { path = "crates/common" }
+storage = { path = "crates/storage" }
+catalog = { path = "crates/catalog" }
+txn = { path = "crates/txn" }
+parser = { path = "crates/parser" }
+expression = { path = "crates/expression" }
+analyzer = { path = "crates/analyzer" }
+planner = { path = "crates/planner" }
+index = { path = "crates/index" }
+executor = { path = "crates/executor" }
+server = { path = "crates/server" }
+lz4_flex = "0.13"
+mimalloc = "0.1"
+arrow-array = "56"
+arrow-buffer = "56"
+arrow-schema = "56"
+parquet = { version = "56", default-features = false, features = ["arrow", "snap", "flate2-rust_backened", "zstd", "lz4", "brotli"] }
+hmac = "0.12"
+sha2 = "0.10"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
+crc32fast = "1"
+memmap2 = "0.9"
+thiserror = "1"
+tempfile = "3"
+roaring = "0.11"
+serde = "1"
+serde_json = "1"
+
+# The fork carries two patches needed by the generated Thrift service (A3):
+# the parser accepts the IDL's reference fields ("&") and the protocols bound
+# container sizes before the generated decode reserves a Vec for them.
+[patch.crates-io]
+pilota = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }
+pilota-thrift-parser = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }

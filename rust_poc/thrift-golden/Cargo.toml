@@ -1,0 +1,7 @@
+[package]
+name = "thrift-golden"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thrift = "0.17"

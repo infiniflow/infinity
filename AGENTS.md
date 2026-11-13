@@ -7,7 +7,7 @@ It is structured to follow GitHub Copilot's [customization guidelines](https://d
 Infinity is an AI-native database built for LLM applications, providing incredibly fast hybrid search of dense embedding, sparse embedding, tensor, and full-text.
 
 - **Core**: C++23 (requires Clang 20+)
-- **SDK**: Python 3.11+
+- **SDK**: Python 3.13+
 
 - **Architecture**: Single-binary.
   - `src/parser`, `src/planner`, `src/executor`: Query pipeline.
@@ -56,7 +56,7 @@ Located in `python/`. Use `uv` to manage the environment.
 
 1. **Setup Environment**:
    ```bash
-   uv sync --python 3.11 --frozen --all-extras
+   uv sync --python 3.13 --frozen --all-extras
    source .venv/bin/activate
    # uv pip install python/infinity_sdk # This is handled by uv sync if infinity_sdk is in workspace
    ```

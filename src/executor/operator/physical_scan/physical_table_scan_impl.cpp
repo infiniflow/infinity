@@ -135,6 +135,9 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
 
         std::optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
+        if (current_block_meta == nullptr) [[unlikely]] {
+            UnrecoverableError(fmt::format("TableScan: block not found. segment_id: {}, block_id: {}", segment_id, block_id));
+        }
         if (!range_state) {
             // TODO
             range_state = NewTxnGetVisibleRangeState();
@@ -153,6 +156,9 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                                           block_ids_idx,
                                           block_ids_count));
                     ++block_ids_idx;
+                    // Drop the range state of the skipped block, otherwise the next block would be
+                    // read with this block's visible ranges (the state is only rebuilt when empty).
+                    range_state.reset();
                     continue;
                 } else {
                     LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",

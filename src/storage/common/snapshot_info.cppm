@@ -34,6 +34,10 @@ export struct SnapshotInfo {
     std::string snapshot_name_;
     SnapshotScope scope_;
     size_t version_{1}; // version 1, start from 0.6.0
+    // The transaction timestamp the snapshot was taken at. It is written to the
+    // metadata (`max_commit_ts`) so `SHOW SNAPSHOTS` can report it; before, the
+    // field was left unset and the column printed uninitialized memory.
+    TxnTimeStamp max_commit_ts_{};
     Status RestoreSnapshotFiles(const std::string &snapshot_dir,
                                 const std::string &snapshot_name,
                                 const std::vector<std::string> &files_to_restore,
@@ -123,7 +127,6 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     // TODO: remove these two fields and figure out why they are here in the first place
     // TxnTimeStamp begin_ts_{};
     // TxnTimeStamp commit_ts_{};
-    TxnTimeStamp max_commit_ts_{};
     TxnTimeStamp create_ts_{};
     std::string table_entry_dir_{}; // no longer in use
     ColumnID next_column_id_{};
