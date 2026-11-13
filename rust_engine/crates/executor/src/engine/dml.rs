@@ -1147,10 +1147,22 @@ impl Engine {
         values: &[Literal],
         schema: &[String],
     ) -> Result<()> {
+        let targets = self.secondary_targets(table, schema);
+        self.insert_secondary_keys(&targets, seq, values)
+    }
+
+    /// [`Self::update_indexes_on_insert`] with the targets already resolved, for
+    /// a bulk load that resolves them once per batch.
+    pub(crate) fn insert_secondary_keys(
+        &self,
+        targets: &[SecondaryTarget],
+        seq: usize,
+        values: &[Literal],
+    ) -> Result<()> {
         // The evaluated row is only built when a functional index needs it: a
         // plain index reads its cell's text and pays nothing.
         let mut row_values: Option<Vec<Value>> = None;
-        for target in self.secondary_targets(table, schema) {
+        for target in targets {
             let Some(value) = values.get(target.pos) else {
                 continue;
             };
@@ -1241,7 +1253,78 @@ impl Engine {
     /// The tail is an `Arc` (the registry only borrows it while building this
     /// list), so the rows go into it without excluding any other table - the
     /// reference writes into each `SecondaryIndexInMemT` the same way.
-    fn secondary_targets(&self, table: &str, schema: &[String]) -> Vec<SecondaryTarget> {
+    /// Whether `table` has any secondary index at all.
+    ///
+    /// A per-row `secondary_targets` takes the table lock, walks the index map
+    /// and allocates a `Vec` - for eight million rows on a table with no
+    /// secondary index that is eight million locks spent to find nothing.
+    pub(crate) fn has_secondary_indexes(&self, table: &str) -> bool {
+        let tkey = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .is_some_and(|entry| !entry.secondary.indexes.is_empty())
+    }
+
+    /// Whether `table` has any index the per-row write hook maintains.
+    ///
+    /// The hook (`update_text_indexes_batch_async`) also carries the sparse and
+    /// multi-vector indexes - it is the one place every write path (SQL
+    /// INSERT/UPDATE, `COPY`, the thrift insert) goes through - so a table with
+    /// only a sparse (BMP) index needs it as much as one with a full-text
+    /// index. Gating on full-text and vector alone dropped every row of a
+    /// sparse column, which `SEARCH MATCH SPARSE` then could not see.
+    ///
+    /// On a table with none of them the hook is a lock plus an allocation that
+    /// finds nothing, eight million times over a bulk `COPY`.
+    ///
+    /// Read-only: the `hnsw_probed` short-circuit belongs to
+    /// `hnsw_mem_segments`, and setting it here would make that skip its probe.
+    pub(crate) fn has_text_or_vector_indexes(&self, table: &str) -> bool {
+        let key = self.table_key(table);
+        let has_mem = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&key).is_some_and(|entry| {
+                !entry.hnsw_mem.is_empty()
+                    || !entry.ivf_mem.is_empty()
+                    || !entry.sparse.is_empty()
+                    || !entry.mv.is_empty()
+                    || !entry.text.is_empty()
+            })
+        };
+        if has_mem {
+            return true;
+        }
+        let prefix = format!("{table}.");
+        if self
+            .vector_cache
+            .lock()
+            .unwrap()
+            .keys()
+            .any(|k| k.starts_with(&prefix))
+        {
+            return true;
+        }
+        // An index the registries have not opened yet (a fresh directory, or a
+        // column this table entry has not seen): the catalog record decides.
+        self.storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .iter()
+            .any(|im| {
+                (im.table == table || im.table == self.qualified_table(table))
+                    && (im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                        || im.index_type.eq_ignore_ascii_case("HNSW")
+                        || im.index_type.eq_ignore_ascii_case("IVF")
+                        || im.index_type.eq_ignore_ascii_case("BMP")
+                        || im.index_type.eq_ignore_ascii_case("SPARSE")
+                        || im.index_type.eq_ignore_ascii_case("EMVB"))
+            })
+    }
+
+    pub(crate) fn secondary_targets(&self, table: &str, schema: &[String]) -> Vec<SecondaryTarget> {
         let tkey = self.table_key(table);
         let tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get(&tkey) else {
@@ -1918,6 +2001,9 @@ impl Engine {
             let _turn = gate.lock().await;
             let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
             self.publish_encoded_rows(table, &encoded_owned)?;
+            // The buffer holds the values now; the stored text of the whole
+            // file (hundreds of MB) has no reader left.
+            drop(encoded_owned);
             // The rows are readable now, so the records may carry this
             // transaction's ts (`BlockVersion::Append(commit_ts, …)`).
             for record in &records_owned {
@@ -1929,7 +2015,7 @@ impl Engine {
             // table whose columns the block format cannot express has no mirror
             // - it keeps its rows in the store.
             if self.has_block_layout(table) {
-                self.write_blocks_commit(table, ts)?;
+                self.write_blocks_import(table, ts)?;
             }
         }
         let _visible = BottomGuard::new(&self.txn, ts);

@@ -71,6 +71,63 @@ fn reorder_row_text(
     out.join("\t")
 }
 
+/// One row's cells, either owned (decoded from a block, or a replayed journal
+/// entry) or borrowed from the write's row set.
+///
+/// The mirror copies nothing it does not have to: a bulk `COPY` publishes its
+/// rows and mirrors them straight after, so every cell is already in `extra`
+/// and borrowing is the whole win (18% of the profile was `Vec<Value>::clone`).
+pub(crate) enum RowCells<'a> {
+    Borrowed(&'a Vec<Value>),
+    Owned(Vec<Value>),
+}
+
+impl std::ops::Deref for RowCells<'_> {
+    type Target = Vec<Value>;
+    fn deref(&self) -> &Vec<Value> {
+        match self {
+            RowCells::Borrowed(values) => values,
+            RowCells::Owned(values) => values,
+        }
+    }
+}
+
+/// Calls `each` for every row of `rows` whose id falls in `[first, last)`.
+///
+/// `rows` is the write's whole row set, sorted by row id (the append buffer is,
+/// and it is what a checkpoint passes), so a block's window is a contiguous
+/// slice found by two binary searches - no scan, no per-row range check.
+///
+/// `ordered` is the caller's verdict on the whole slice, computed **once** per
+/// write rather than per block: verifying it here walked each 8192-row window
+/// again, and the block loop runs 1024 times on an 8 M-row `COPY`.
+fn for_rows_in_window<'a>(
+    rows: &'a [(usize, Vec<Value>)],
+    first: usize,
+    last: usize,
+    ordered: bool,
+    each: impl FnMut(&'a (usize, Vec<Value>)),
+) {
+    if rows.is_empty() {
+        return;
+    }
+    if ordered {
+        let start = rows.partition_point(|(seq, _)| *seq < first);
+        let end = rows.partition_point(|(seq, _)| *seq < last);
+        rows[start..end].iter().for_each(each);
+    } else {
+        rows.iter()
+            .filter(|(seq, _)| *seq >= first && *seq < last)
+            .for_each(each);
+    }
+}
+
+/// Whether `rows` is sorted by row id, i.e. whether the window lookup is a
+/// binary search rather than a filter.
+fn is_id_ordered(rows: &[(usize, Vec<Value>)]) -> bool {
+    rows.windows(2).all(|w| w[0].0 <= w[1].0)
+}
+
 /// The stored text form of a column default: the same value `AddColumnsData`
 /// writes into the block, so the buffered row and the block agree.
 fn default_cell_text(default: Option<&str>) -> String {
@@ -113,7 +170,7 @@ impl Engine {
     /// memory: a table is mirrored block by block, the way the reference streams
     /// the rows through its buffer manager.
     #[allow(clippy::too_many_arguments)] // one argument per piece of the block layout it mirrors
-    pub(crate) fn mirror_block_rows(
+    pub(crate) fn mirror_block_rows<'a>(
         &self,
         table: &str,
         meta: &catalog::TableMeta,
@@ -122,12 +179,23 @@ impl Engine {
         block_index: u16,
         start: u64,
         end: u64,
-        extra: &[(usize, Vec<Value>)],
-    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        extra: &'a [(usize, Vec<Value>)],
+        extra_ordered: bool,
+    ) -> Result<Vec<(usize, RowCells<'a>)>> {
         let first = ((segment_id as usize) << 32) | start as usize;
         let last = ((segment_id as usize) << 32) | end as usize;
-        let mut journal: std::collections::BTreeMap<usize, Vec<Value>> =
-            self.pending_range(table, first, last).into_iter().collect();
+        // The write's row set already carries the append buffer: `extra` is
+        // `merged`, which is `pending_rows` merged with the caller's rows. So a
+        // block's rows are a window of `extra`, and asking `pending_range` for
+        // them as well copied the same cells a second time - the profile showed
+        // `Vec<Value>::clone` at 18%, and half of it was this second copy.
+        // The window as an ordered `Vec`, not a `BTreeMap`: `extra_ordered`
+        // says the rows already come sorted, so a map only adds one tree insert
+        // per row (14% of the profile on an 8 M-row import, 1024 blocks over).
+        let mut journal: Vec<(usize, &'a Vec<Value>)> = Vec::new();
+        for_rows_in_window(extra, first, last, extra_ordered, |(seq, values)| {
+            journal.push((*seq, values));
+        });
         // The mirror is the authoritative copy of the rows it already holds
         // (`try_rows` prefers it for the same reason): a re-mirror must not
         // copy a lossy journal back over cells the blocks already have.
@@ -176,20 +244,25 @@ impl Engine {
             }
             Err(_) => Vec::new(),
         };
-        let mut out = Vec::with_capacity(held.len().max(journal.len()));
+        let mut out: Vec<(usize, RowCells<'a>)> = Vec::with_capacity(held.len().max(journal.len()));
+        // The block wins for the ids it already holds (a re-mirror must not copy
+        // a journal back over cells the block has), so its rows go in first and
+        // the window skips them.
+        let from_block: std::collections::HashSet<usize> =
+            held.iter().map(|(seq, _)| *seq).collect();
         for (seq, cells) in held {
-            journal.remove(&seq);
-            out.push((seq, cells.iter().map(|cell| parse_value(cell)).collect()));
+            out.push((
+                seq,
+                RowCells::Owned(cells.iter().map(|cell| parse_value(cell)).collect()),
+            ));
         }
-        // Rows the block does not hold yet: what a replay put in the journal,
-        // and what this commit is publishing (`AppendInBlock`).
-        out.extend(journal);
-        let held_ids: std::collections::HashSet<usize> = out.iter().map(|(seq, _)| *seq).collect();
-        for (seq, values) in extra {
-            if *seq >= first && *seq < last && !held_ids.contains(seq) {
-                out.push((*seq, values.clone()));
-            }
-        }
+        // Everything else in the window: the rows this write is publishing.
+        out.extend(
+            journal
+                .into_iter()
+                .filter(|(seq, _)| !from_block.contains(seq))
+                .map(|(seq, cells)| (seq, RowCells::Borrowed(cells))),
+        );
         out.sort_unstable_by_key(|(seq, _)| *seq);
         Ok(out)
     }
@@ -260,6 +333,15 @@ impl Engine {
         self.write_blocks_mode(table, &[], false, ts)
     }
 
+    /// [`Self::write_blocks_commit`] for an **import**, whose blocks the
+    /// reference keeps in memory: the files are written (so `SHOW BLOCKS` and a
+    /// reader see them) but not fsynced, and the next checkpoint is what makes
+    /// them durable. Matches `WalCmdImportV2`, which carries the extent and
+    /// no rows.
+    pub(crate) fn write_blocks_import(&self, table: &str, ts: u64) -> Result<usize> {
+        self.write_blocks_mode_with(table, &[], false, ts, false)
+    }
+
     /// `full` rewrites every block; otherwise only the blocks this commit
     /// touched - the ones `extra`'s row ids land in and the ones that hold a
     /// slot the table's delete log marks (`AppendInBlock` / `DeleteInBlock`,
@@ -270,6 +352,23 @@ impl Engine {
         extra: &[(usize, Vec<Value>)],
         full: bool,
         checkpoint_ts: u64,
+    ) -> Result<usize> {
+        self.write_blocks_mode_with(table, extra, full, checkpoint_ts, true)
+    }
+
+    /// [`Self::write_blocks_mode`] with control over the file sync.
+    ///
+    /// A commit that is an import passes `false`: the reference leaves those
+    /// blocks in memory and its `IMPORT_V2` frame carries only the extent, so
+    /// the checkpoint is what puts them on disk. Every other caller - a
+    /// checkpoint, a compaction, a column rewrite - passes `true`.
+    pub(crate) fn write_blocks_mode_with(
+        &self,
+        table: &str,
+        extra: &[(usize, Vec<Value>)],
+        full: bool,
+        checkpoint_ts: u64,
+        sync_files: bool,
     ) -> Result<usize> {
         // The block writer runs under the **table's bottom gate**: the reference
         // writes a block's rows inside the table's bottom half (`AppendInBlock`),
@@ -440,6 +539,7 @@ impl Engine {
                 merged.iter().map(|(seq, _)| *seq).collect();
             merged.extend(buffered.into_iter().filter(|(seq, _)| !have.contains(seq)));
         }
+        let extra_ordered = is_id_ordered(&merged);
         let extra: &[(usize, Vec<Value>)] = &merged;
         let mut written = 0usize;
         // A row id carries its segment in the high 32 bits (`segment_id << 32 |
@@ -657,7 +757,12 @@ impl Engine {
                 // merged: a mapped view of an older (shorter) file would make
                 // the merge miss the rows the file holds, and the rewrite
                 // would drop them.
-                self.drop_block_maps(meta.id);
+                self.drop_block_map(BlockId {
+                    db_id,
+                    table_id: meta.id,
+                    segment_id,
+                    block_id: block_index as u16,
+                });
                 let chunk = self.mirror_block_rows(
                     &table,
                     &encode_meta,
@@ -667,6 +772,7 @@ impl Engine {
                     start as u64,
                     end as u64,
                     extra,
+                    extra_ordered,
                 )?;
                 // A block is addressed by slot: row *n* of block *b* is id
                 // `segment << 32 | b * capacity + n`. The window is the
@@ -713,9 +819,7 @@ impl Engine {
                 );
                 let texts: Vec<Vec<String>> = chunk
                     .iter()
-                    .map(|(_, row): &(usize, Vec<Value>)| {
-                        row.iter().map(mirror_cell_text).collect()
-                    })
+                    .map(|(_, row): &(usize, RowCells)| row.iter().map(mirror_cell_text).collect())
                     .collect();
                 // A block opened by `COPY` keeps the reference's import-time
                 // bitmap coverage (see `ColumnBody::build_with`).
@@ -751,7 +855,9 @@ impl Engine {
                     segment_id,
                     block_id: block_index as u16,
                 };
-                self.drop_block_maps(meta.id);
+                // Only this block's file is about to be rewritten: its mapping
+                // is stale, the rest of the table's are still good.
+                self.drop_block_map(id);
                 let block_dir =
                     storage::definition::format::block_dir(db_id, meta.id, segment_id, id.block_id);
                 // A rewrite replaces the block's contents; a file the schema no
@@ -781,11 +887,17 @@ impl Engine {
                         }
                     }
                 }
-                storage::definition::format::write_block(&root, id, &block_columns, &version)
-                    .map_err(|e| Error::Io {
-                        path: root.join(&block_dir),
-                        source: e,
-                    })?;
+                storage::definition::format::write_block_synced(
+                    &root,
+                    id,
+                    &block_columns,
+                    &version,
+                    sync_files,
+                )
+                .map_err(|e| Error::Io {
+                    path: root.join(&block_dir),
+                    source: e,
+                })?;
                 // The reference opens an outline file for every variable-length
                 // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
                 // kVarBuffer type) and aborts the whole read when it is missing,
@@ -1018,6 +1130,10 @@ impl Engine {
         let mut block_columns = Vec::with_capacity(types.len());
         for (col, column_type) in types.iter().enumerate() {
             let kind = outline_kind(&declared[col]);
+            // Resolved once per column, not once per cell: `embedding_shape`
+            // upper-cases the type string, so the per-cell call allocated
+            // 16.7 M `String`s on an 8 M-row `COPY`.
+            let shape = embedding_shape(&declared[col]);
             let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
             // Self-outlining columns build their own outline; the generic
             // packer produces one for varchar/json.
@@ -1039,9 +1155,12 @@ impl Engine {
                     OutlineKind::Array => {
                         slots.push(encode_array_slot(&declared[col], text, &mut self_outline)?)
                     }
-                    OutlineKind::None => {
-                        slots.push(encode_value(&declared[col], *column_type, text)?)
-                    }
+                    OutlineKind::None => slots.push(encode_value_with_shape(
+                        &declared[col],
+                        shape,
+                        *column_type,
+                        text,
+                    )?),
                 }
             }
             let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
@@ -1111,9 +1230,10 @@ impl Engine {
         // Keeping the raw value would leave text the block writer cannot encode
         // and, later, a read that fails its own type check.
         let types = self.column_types(&table)?;
+        let coercions: Vec<Coercion> = types.iter().map(|ty| coercion_of(ty)).collect();
         let rows: Vec<(usize, Vec<Value>)> = extra
             .iter()
-            .map(|(seq, row)| (*seq, coerce_row(row, &types)))
+            .map(|(seq, row)| (*seq, coerce_row(row, &coercions)))
             .collect();
         {
             let mut tables = self.tables.lock().unwrap();
@@ -2724,6 +2844,19 @@ impl Engine {
             .retain(|id, _| id.table_id != table_id);
     }
 
+    /// Drops the mapping of one block, for a rewrite that only touches that
+    /// block.
+    ///
+    /// [`Self::drop_block_maps`] drops the whole table's, which is what a
+    /// compaction needs (it rewrites every block). A block-at-a-time write must
+    /// not: the loop re-maps the next block anyway, so dropping the table's
+    /// mappings turns one `COPY` into "unmap everything, map one, unmap
+    /// everything, …". Measured on an 8 M-row import that was the remaining
+    /// 76% of the profile after the row lookup was made a slice.
+    pub(crate) fn drop_block_map(&self, id: BlockId) {
+        self.context.block_maps.lock().unwrap().remove(&id);
+    }
+
     /// The append/delete/import journals a table's block files record.
     ///
     /// The reference keeps this history in the files themselves: one `create`
@@ -3316,30 +3449,6 @@ impl Engine {
 
     /// [`Self::pending_rows_of`] restricted to the id window `[first, last)`,
     /// in row-id order.
-    pub(crate) fn pending_range(
-        &self,
-        table: &str,
-        first: usize,
-        last: usize,
-    ) -> Vec<(usize, Vec<Value>)> {
-        let key = self.table_key(table);
-        let mut rows: Vec<(usize, Vec<Value>)> = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .map(|e| {
-                e.pending_rows
-                    .iter()
-                    .filter(|(seq, _)| *seq >= first && *seq < last)
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
-        rows.sort_by_key(|(seq, _)| *seq);
-        rows
-    }
-
     /// How many rows sit in the append buffer - the rows written since the
     /// last checkpoint, which the block files do not hold yet.
     ///
@@ -6583,44 +6692,76 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
     f32::from_bits(sign | ((exp + 112) << 23) | (frac << 13))
 }
 
-fn coerce_row(row: &[Value], types: &[String]) -> Vec<Value> {
+/// What `coerce_row` does to one column, decided once per column.
+///
+/// The type text is only read to find the column's head (`INT8`, `BIGINT`, …)
+/// and whether it is a 16-bit float. Deriving that per cell upper-cased the
+/// whole declared type twice per value - 16.7 M `String`s on an 8 M-row,
+/// two-column `COPY`.
+#[derive(Clone, Copy)]
+enum Coercion {
+    None,
+    Narrow(fn(i64) -> i64),
+    RoundHalf { bf16: bool },
+}
+
+fn coercion_of(ty: &str) -> Coercion {
+    let upper = ty.trim().to_ascii_uppercase();
+    let head = upper
+        .split('(')
+        .next()
+        .unwrap_or("")
+        .split(',')
+        .next()
+        .unwrap_or("")
+        .trim();
+    // A 16-bit float column rounds every element to the half it can represent;
+    // the block writer does that on encode, so the append buffer has to as well
+    // or a read before the next checkpoint shows more precision than the
+    // column can hold.
+    if head == "EMBEDDING" && (upper.contains("FLOAT16") || upper.contains("BFLOAT16")) {
+        return Coercion::RoundHalf {
+            bf16: upper.contains("BFLOAT16"),
+        };
+    }
+    match head {
+        "TINYINT" | "INT8" => Coercion::Narrow(|n| (n as i8) as i64),
+        "SMALLINT" | "INT16" => Coercion::Narrow(|n| (n as i16) as i64),
+        "INT" | "INTEGER" | "INT32" => Coercion::Narrow(|n| (n as i32) as i64),
+        _ => Coercion::None,
+    }
+}
+
+fn coerce_row(row: &[Value], coercions: &[Coercion]) -> Vec<Value> {
+    // A row whose columns all pass through is handed over as it is: this runs
+    // for every row of every `COPY`, and the clone is the only cost.
+    if coercions.iter().all(|c| matches!(c, Coercion::None)) {
+        return row.to_vec();
+    }
     let mut out = row.to_vec();
     for (i, v) in out.iter_mut().enumerate() {
-        let Some(ty) = types.get(i) else { continue };
-        let upper = ty.trim().to_ascii_uppercase();
-        let head = upper
-            .split('(')
-            .next()
-            .unwrap_or("")
-            .split(',')
-            .next()
-            .unwrap_or("")
-            .trim();
-        let widened = match v {
-            Value::Int(n) => Some(*n),
-            Value::Float(f) => Some(*f as i64),
-            Value::Str(s) => s.trim().parse::<f64>().ok().map(|f| f as i64),
-            _ => None,
-        };
-        // A 16-bit float column rounds every element to the half it can
-        // represent; the block writer does that on encode, so the append buffer
-        // has to as well or a read before the next checkpoint shows more
-        // precision than the column can hold.
-        if head == "EMBEDDING" && (upper.contains("FLOAT16") || upper.contains("BFLOAT16")) {
-            if let Value::Str(text) = v {
-                let bf16 = upper.contains("BFLOAT16");
-                *v = Value::Str(round_half_elements(text, bf16));
-            }
+        let Some(coercion) = coercions.get(i) else {
             continue;
-        }
-        let Some(n) = widened else { continue };
-        *v = match head {
-            "TINYINT" | "INT8" => Value::Int((n as i8) as i64),
-            "SMALLINT" | "INT16" => Value::Int((n as i16) as i64),
-            "INT" | "INTEGER" | "INT32" => Value::Int((n as i32) as i64),
-            "BIGINT" | "INT64" => Value::Int(n),
-            _ => continue,
         };
+        match coercion {
+            Coercion::None => {}
+            Coercion::RoundHalf { bf16 } => {
+                if let Value::Str(text) = v {
+                    *v = Value::Str(round_half_elements(text, *bf16));
+                }
+            }
+            Coercion::Narrow(narrow) => {
+                let widened = match v {
+                    Value::Int(n) => Some(*n),
+                    Value::Float(f) => Some(*f as i64),
+                    Value::Str(s) => s.trim().parse::<f64>().ok().map(|f| f as i64),
+                    _ => None,
+                };
+                if let Some(n) = widened {
+                    *v = Value::Int(narrow(n));
+                }
+            }
+        }
     }
     out
 }
