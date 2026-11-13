@@ -101,6 +101,9 @@ void FragmentTask::OnExecute() {
         } catch (UnrecoverableException &e) {
             LOG_CRITICAL(e.what());
             throw e;
+        } catch (std::exception &e) {
+            LOG_ERROR(e.what());
+            operator_status = Status::UnexpectedError(e.what());
         }
 
         profiler.End();

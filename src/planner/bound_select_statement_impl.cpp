@@ -168,6 +168,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                     iter = search_ops.options_.find("block_max");
                     if (iter == search_ops.options_.end() || iter->second == "auto") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kAuto;
+                    } else if (iter->second == "heap_bmw" || iter->second == "heap") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kHeapBMW;
                     } else if (iter->second == "true" || iter->second == "bmw") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
                     } else if (iter->second == "batch") {
@@ -177,7 +179,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                     } else if (iter->second == "compare") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
                     } else {
-                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, bmw, true, batch, false, or compare"));
+                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, heap_bmw, bmw, true, batch, false, or compare"));
                     }
 
                     // option: top n

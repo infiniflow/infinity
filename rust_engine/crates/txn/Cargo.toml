@@ -1,0 +1,25 @@
+[package]
+name = "txn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+common.workspace = true
+storage.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# `block_on` for the synchronous tests that call the async commit API.
+futures-executor.workspace = true
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
+# This crate cannot inherit [workspace.lints] (Cargo forbids mixing the
+# inheritance with an override), so it restates the workspace rule plus its own
+# `loom` cfg, which is only built under `--cfg loom`.
+[lints.rust]
+warnings = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
