@@ -276,13 +276,30 @@ impl Engine {
                     entry.secondary.indexes.clear();
                     entry.secondary.declared_types.clear();
                     entry.secondary.disk.clear();
-                    entry.text.clear();
-                    // A build that is running right now is reading the ids this
-                    // compaction renumbers: publishing it later would leave the
-                    // table's `MATCH` postings pointing at segments the merge
-                    // just dropped. The bump makes the publish a no-op.
-                    entry.text_built.clear();
+                    // The full-text caches stay. Dropping them handed the next
+                    // `MATCH` a full rebuild of the column, and a table that keeps
+                    // taking writes is compacted every couple of minutes: on tens
+                    // of thousands of rows that build outlives the next compaction,
+                    // so its publish was refused and the build retried - one query
+                    // blocked for the whole 20 minute gate
+                    // (`TestParallelFulltextIndexReadWrite`, on the query after
+                    // its writers stopped). `reindex_compacted_text` below adds
+                    // the rows this merge moved under their new ids and marks the
+                    // ids they left as overridden, which the sealed read paths
+                    // skip before the top-n cut.
                     entry.text_epoch = entry.text_epoch.wrapping_add(1);
+                    // A build that is running right now read the ids this
+                    // compaction renumbers: publishing it later would leave the
+                    // table's `MATCH` postings pointing at segments the merge just
+                    // dropped, so the bump makes its publish a no-op. The caches
+                    // kept above are re-stamped on the new epoch: their postings
+                    // still name rows a reader below `compact_ts` can fetch, and
+                    // `reindex_compacted_text` moves them before this commit is
+                    // published.
+                    let epoch = entry.text_epoch;
+                    for built in entry.text_built.values_mut() {
+                        built.0 = epoch;
+                    }
                     entry.sparse.clear();
                     entry.mv.clear();
                     entry.hnsw_mem.clear();
@@ -387,6 +404,10 @@ impl Engine {
                 // whose bitmap coverage came from a journal without these rows.
                 let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
                 self.publish_encoded_rows(table, &merged)?;
+                // The moved rows are published under their new ids now: add them
+                // to the full-text caches the merge kept (see the note where the
+                // caches are no longer dropped).
+                self.reindex_compacted_text(table, &rows, base, compact_ts);
                 // `PrepareCommitCompact`: the merged segment's blocks and
                 // records belong to the compaction transaction; writing them here
                 // (before the frame) is what makes a kill harmless - the

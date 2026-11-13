@@ -2286,6 +2286,36 @@ impl TextIndex {
         (sources, segment_from)
     }
 
+    /// Drops the sealed segments every slot of which is an overridden row.
+    ///
+    /// A compaction renumbers the rows it merges: their new text lands in the
+    /// tail and their old sealed copies are overridden, so a segment that a
+    /// merge took whole can never answer again. Keeping it would still count its
+    /// documents in BM25's `N` and its tokens in the corpus length (no query can
+    /// return them), so `N` would grow with every compaction the table takes.
+    /// Only a segment whose rows are **all** retired goes: a partial merge
+    /// leaves the live rows of a mixed segment in place.
+    pub(crate) fn retire_fully_overridden_segments(&mut self) {
+        if self.overridden.is_empty() || self.reader.segments.is_empty() {
+            return;
+        }
+        let mut retired: Vec<u64> = Vec::new();
+        let overridden = &self.overridden;
+        self.reader.segments.retain(|segment| {
+            let rows = segment.reader.rows();
+            if rows.iter().any(|row| !overridden.contains(row)) {
+                return true;
+            }
+            retired.extend(rows);
+            false
+        });
+        // Their ids can never come back (a row id is never reused), so nothing
+        // has to remember the overrides any more.
+        for row in retired {
+            self.overridden.remove(&row);
+        }
+    }
+
     /// Postings and corpus statistics for `terms`, merging every sealed segment
     /// with the unsealed one. Stale copies of re-indexed rows are dropped.
     pub(crate) fn merge(&self, terms: &[String]) -> MergedIndex {

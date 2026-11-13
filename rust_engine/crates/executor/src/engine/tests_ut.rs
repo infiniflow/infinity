@@ -623,14 +623,126 @@ mod tests {
             (stale, entry.text_epoch)
         };
         e.compact_all_segments("default_db.cr").unwrap();
-        assert!(
-            !e.publish_text_index(&tkey, "body", epoch, stale),
+        assert_eq!(
+            e.publish_text_index(&tkey, "body", epoch, stale),
+            crate::engine::statements::TextPublish::Renumbered,
             "a build from the pre-compaction layout must not publish"
         );
         assert_eq!(
             rows(&e, q).len(),
             40,
             "and the query after the merge still answers"
+        );
+    }
+
+    /// A merge that lands **inside** a build renumbers every row the build just
+    /// read, so its postings name ids nothing owns. The tokenizer/scan window is
+    /// too narrow to hit by chance here, so the test drives it deterministically
+    /// (`TEXT_BUILD_HOOK`, which fires between the scan and the publish).
+    #[test]
+    fn a_compaction_inside_a_build_still_answers_the_query() {
+        let q = "SELECT doctitle FROM raced SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced_body ON raced (body) USING FULLTEXT")
+            .unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        // Make the cache one row short of the table: that is the cold path a bulk
+        // load which bypassed the DML hooks takes, and it is what puts a rebuild
+        // on the query path while a cache is still in place.
+        {
+            let tkey = e.table_key("raced");
+            let shared = {
+                let tables = e.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.text.get("body"))
+                    .cloned()
+                    .expect("the index is cached")
+            };
+            let mut index = shared.write().unwrap();
+            crate::engine::state::index_delete_row(&mut index, 0);
+            assert!(
+                index.total_docs() < 30,
+                "the cache has to look short of the table"
+            );
+        }
+        let compacting = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            compacting
+                .compact_all_segments("raced")
+                .expect("the merge inside the build");
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the merge inside the build lost the rows: {hits:?}"
+        );
+    }
+
+    /// The worst schedule: every attempt is both renumbered *and* left without a
+    /// cache to read. Answering from such a build returns rows no fetch can
+    /// resolve (an empty `MATCH` on a table full of matches), so the statement
+    /// has to fail instead.
+    #[test]
+    fn a_build_that_can_never_publish_fails_instead_of_answering() {
+        let q = "SELECT doctitle FROM raced2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced2 VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced2_body ON raced2 (body) USING FULLTEXT")
+            .unwrap();
+        {
+            let tkey = e.table_key("raced2");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&tkey).expect("the table is cached");
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let racing = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            racing
+                .compact_all_segments("raced2")
+                .expect("the merge inside the build");
+            // A compaction keeps its caches (`reindex_compacted_text`); this is
+            // the extreme where nothing usable is left for the retry either.
+            let tkey = racing.table_key("raced2");
+            let mut tables = racing.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.text.clear();
+                entry.text_built.clear();
+            }
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        assert!(
+            result.is_err(),
+            "the query answered from an index nothing can resolve: {result:?}"
         );
     }
 
@@ -682,6 +794,139 @@ mod tests {
             );
         }
         assert_eq!(rows(&engine, q).len(), 120);
+    }
+
+    /// `MATCH` asks for a handful of rows (`topn=3`, as the parallel gate does).
+    /// A compaction retires every row id it renumbers; a retired id that is
+    /// still in the postings takes a `topn` slot the fetch cannot resolve, so
+    /// three such hits answer "the column is empty" on a table full of matches.
+    #[test]
+    fn a_compaction_never_answers_a_small_top_n_with_retired_rows() {
+        let q = "SELECT doctitle FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE churn (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX churn_body ON churn (body) USING FULLTEXT")
+            .unwrap();
+        let mut next = 0usize;
+        for _ in 0..120 {
+            e.execute_blocking(&format!(
+                "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+            ))
+            .unwrap();
+            next += 1;
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3, "before the churn");
+
+        for round in 0..6 {
+            // Writes land in the unsealed tail, then the merge renumbers every
+            // sealed row under it.
+            for _ in 0..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+                ))
+                .unwrap();
+                next += 1;
+            }
+            e.compact_all_segments("default_db.churn").unwrap();
+            assert_eq!(
+                rows(&e, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+            // The segments the merge took are gone with their overrides: keeping
+            // them would count their documents in BM25's `N` a second time.
+            let stats = e.fulltext_stats("churn");
+            assert_eq!(
+                stats[0].overridden_rows, 0,
+                "round {round}: the retired segments stayed in the corpus"
+            );
+        }
+        // The whole corpus still answers when the cut is wide enough.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 1000);"
+            )
+            .len(),
+            next
+        );
+    }
+
+    /// The parallel gate's shape: writers keep appending while the optimizer
+    /// compacts, and the reader asks for three rows only. Every query must
+    /// return three fetchable rows - a retired id in the postings eats a slot.
+    #[test]
+    fn concurrent_churn_never_empties_a_small_top_n() {
+        let q = "SELECT doctitle FROM churn2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE churn2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX churn2_body ON churn2 (body) USING FULLTEXT")
+            .unwrap();
+        let next = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut seed = 0usize;
+        for _ in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO churn2 VALUES ({seed}, 'title{seed}', 'harmful chemical row{seed}');"
+                ))
+                .unwrap();
+            seed += 1;
+        }
+        next.store(seed, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3);
+
+        let writers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                let next = std::sync::Arc::clone(&next);
+                std::thread::spawn(move || {
+                    for _ in 0..20 {
+                        let base = next.fetch_add(4, std::sync::atomic::Ordering::Relaxed);
+                        let values: Vec<String> = (0..4)
+                            .map(|i| {
+                                let id = base + i;
+                                format!("({id}, 'title{id}', 'harmful chemical row{id}')")
+                            })
+                            .collect();
+                        engine
+                            .execute_blocking(&format!(
+                                "INSERT INTO churn2 VALUES {};",
+                                values.join(",")
+                            ))
+                            .unwrap();
+                    }
+                })
+            })
+            .collect();
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                for _ in 0..8 {
+                    engine.compact_all_segments("default_db.churn2").unwrap();
+                    crate::scheduler::block_on(engine.flush()).unwrap();
+                }
+            })
+        };
+        for round in 0..40 {
+            assert_eq!(
+                rows(&engine, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+        }
+        for writer in writers {
+            writer.join().expect("a writer panicked");
+        }
+        compactor.join().expect("the compactor panicked");
+        assert_eq!(rows(&engine, q).len(), 3, "after the churn");
     }
 
     /// A query that spans several sealed segments plus the memory tail must

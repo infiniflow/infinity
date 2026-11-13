@@ -33,6 +33,44 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
+thread_local! {
+    /// Runs inside a full-text build, right after the rows are read and before
+    /// the index is published. The tests use it to land a compaction in exactly
+    /// that window: the schedule that breaks a build is otherwise a race, and a
+    /// compaction cannot be driven from the thread that is building.
+    static TEXT_BUILD_HOOK: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Installs [`TEXT_BUILD_HOOK`] for this thread; `None` removes it.
+#[cfg(test)]
+pub(crate) fn set_text_build_hook(hook: Option<Box<dyn FnMut()>>) {
+    TEXT_BUILD_HOOK.with(|slot| *slot.borrow_mut() = hook);
+}
+
+#[cfg(test)]
+fn run_text_build_hook() {
+    TEXT_BUILD_HOOK.with(|slot| {
+        if let Some(hook) = slot.borrow_mut().as_mut() {
+            hook();
+        }
+    });
+}
+
+/// What [`Engine::publish_text_index`] did with a freshly built index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextPublish {
+    /// Stored in the table's cache: later statements reuse it.
+    Cached,
+    /// The rows were renumbered under the build, so its postings name ids of a
+    /// layout that is gone. The build is worthless for every reader.
+    Renumbered,
+    /// A compaction committed after the build read: the postings still describe
+    /// what this statement sees, but a statement above the merge would resolve
+    /// the ids it left behind. Answer this one from it, cache nothing.
+    ReadTooOld,
+}
+
 /// Marks one table's bottom as running on this thread for as long as it lives.
 pub(crate) struct HeldBottom(String);
 
@@ -3693,44 +3731,186 @@ impl Engine {
             index.maybe_seal(self.memindex_capacity());
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
-        if self.publish_text_index(&tkey, column, epoch, shared.clone()) {
-            return Ok(shared);
+        #[cfg(test)]
+        run_text_build_hook();
+        match self.publish_text_index(&tkey, column, epoch, shared.clone()) {
+            TextPublish::Cached => return Ok(shared),
+            // The build read exactly the layout this statement sees, so its
+            // postings resolve; a compaction committed after that read, which
+            // only means no later statement may reuse it.
+            TextPublish::ReadTooOld => return Ok(shared),
+            TextPublish::Renumbered => {}
         }
         // The rows were renumbered while this build ran: its postings name the
-        // ids of a layout a compaction dropped. Publish nothing and read the new
-        // layout - the cache is empty, so the next attempt rebuilds from it.
-        if attempt >= 8 {
-            // Compaction keeps landing inside the rebuild. Answer this query
-            // from what was just built rather than failing it; nothing was
-            // published, so the next query still rebuilds.
-            return Ok(shared);
+        // ids of a layout a compaction dropped, and every hit would be a row
+        // `fetch_some_rows_with_ids` cannot find - `MATCH` then answers "column
+        // is empty" on a table full of matches, which is what
+        // `TestParallelFulltextIndexReadWrite` reported. Never answer from such a
+        // build: retry, and if a merge lands inside every attempt, fail the
+        // statement instead.
+        if attempt >= 3 {
+            return Err(Error::Unexpected(format!(
+                "the full-text index of '{table}.{column}' could not be published: \
+                 a compaction renumbered the table during every attempt"
+            )));
         }
         self.text_index_build(table, column, tokenizer.clone(), attempt + 1)
     }
 
     /// Publishes a freshly built full-text index for `column`, unless the table's
-    /// cached indexes were dropped while the build ran (`TableEntry::text_epoch`).
-    ///
-    /// Returns whether it published: `false` means the build read a layout that
-    /// is gone and has to be thrown away.
+    /// cached indexes were dropped (or a merge committed after the build's read)
+    /// while it ran. See [`TextPublish`] for what the caller may do with it.
     pub(crate) fn publish_text_index(
         &self,
         tkey: &str,
         column: &str,
         epoch: u64,
         index: SharedTextIndex,
-    ) -> bool {
+    ) -> TextPublish {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
+        // The layout changed under the build: `TableEntry::text_epoch` is bumped
+        // by the compaction that renumbers the rows, so the build read ids that
+        // now name nothing.
+        if entry.text_epoch != epoch {
+            return TextPublish::Renumbered;
+        }
         let read_ts = crate::read_ts();
-        if entry.text_epoch != epoch || read_ts < entry.text_min_ts {
-            return false;
+        // A compaction committed after the build's read: the build still
+        // describes the segments this statement sees, but a later statement, at
+        // a ts above the merge, would resolve the ids it left behind.
+        if read_ts < entry.text_min_ts {
+            return TextPublish::ReadTooOld;
         }
         entry.text.insert(column.to_string(), index);
         entry
             .text_built
             .insert(column.to_string(), (epoch, read_ts));
-        true
+        TextPublish::Cached
+    }
+
+    /// Moves a table's full-text caches onto the row ids a compaction just
+    /// assigned.
+    ///
+    /// A merge renumbers every row it takes, so the postings of the kept caches
+    /// stop naming live rows the moment it lands. The rows it moved are indexed
+    /// here under their new ids - from the row bytes the merge already read, not
+    /// from a scan - and the ids they left are marked overridden
+    /// (`index_delete_row`). Overridden ids are what the sealed read paths skip
+    /// while they iterate (`MergeCursor`), i.e. **before** the top-n cut: leaving
+    /// them in the postings made `MATCH` fill its top-n with rows no fetch can
+    /// resolve and answer "column is empty" on a table full of matches.
+    ///
+    /// The caches are not dropped for this. Doing that put a full rebuild of the
+    /// column on the query path, and a table that keeps taking writes is
+    /// compacted every couple of minutes - the rebuild outlived the next
+    /// compaction, its publish was refused and it retried, which is what blocked
+    /// one `MATCH` for the whole gate timeout
+    /// (`TestParallelFulltextIndexReadWrite`).
+    ///
+    /// `built_ts` is the merge's commit ts: the caller raises
+    /// `TableEntry::text_min_ts` to it, so the cache has to claim it.
+    pub(crate) fn reindex_compacted_text(
+        &self,
+        table: &str,
+        rows: &[(usize, Vec<u8>)],
+        base: usize,
+        built_ts: u64,
+    ) {
+        let tkey = self.table_key(table);
+        // Clone the handles and let go of `tables` before an index is locked: a
+        // query holds the index's read guard while it fetches rows, and that
+        // fetch needs `tables`. Waiting for the write lock under it is the
+        // reverse order and deadlocks the query.
+        let (indexes, epoch) = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey) {
+                Some(entry) if !entry.text.is_empty() => (
+                    entry
+                        .text
+                        .iter()
+                        .map(|(column, index)| (column.clone(), index.clone()))
+                        .collect::<Vec<_>>(),
+                    entry.text_epoch,
+                ),
+                // Nothing cached: the next query builds the merged layout.
+                _ => return,
+            }
+        };
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        let types = self.column_types(table).unwrap_or_default();
+        let segment = (base as u64) >> 32;
+        for (column, shared) in &indexes {
+            let Some(col) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            // Tokenise with no lock held: the analyzer is the expensive half of a
+            // write (the DML path is split the same way).
+            let prepared: Vec<PreparedDoc> = {
+                let tokenizer = shared.read().unwrap().tokenizer.clone();
+                rows.iter()
+                    .enumerate()
+                    .filter_map(|(i, (_, bytes))| {
+                        let cell = std::str::from_utf8(bytes).ok()?.split('\t').nth(col)?;
+                        let text = match self.decode_cell(table, &types, col, cell) {
+                            Ok(Value::Str(text)) => text,
+                            Ok(other) => other.to_slt_string(),
+                            Err(_) => return None,
+                        };
+                        Some(crate::engine::text_index::prepare_doc(
+                            (base + i) as u64,
+                            &text,
+                            &tokenizer,
+                        ))
+                    })
+                    .collect()
+            };
+            // A tail spans one `ROW_ID` segment; the merged rows are a new one, so
+            // write out whatever else is still unsealed first (no lock held).
+            if rows.is_empty()
+                || shared
+                    .read()
+                    .unwrap()
+                    .unsealed_segment()
+                    .is_some_and(|held| held != segment)
+            {
+                crate::engine::state::seal_text_index_unlocked(shared);
+            }
+            {
+                let mut index = shared.write().unwrap();
+                // The new ids first, the overrides last: the reverse order leaves a
+                // moment where the row is in neither. A query already running below
+                // `compact_ts` resolves the old ids only, so it may miss the moved
+                // rows until it ends; every query at `compact_ts` or above resolves
+                // the new ones.
+                crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                for (seq, _) in rows {
+                    crate::engine::state::index_delete_row(&mut index, *seq as u64);
+                }
+                // The segments this merge took are now overridden row for row:
+                // dropping them keeps BM25's `N` at the live population instead
+                // of growing it by a table per compaction.
+                index.retire_fully_overridden_segments();
+            }
+            // Persist the moved rows: the chunk names the new ids, so the next
+            // build maps it instead of re-reading the column, and the chunks of the
+            // retired segments are dropped at load (`live_segments`).
+            crate::engine::state::seal_text_index_unlocked(shared);
+        }
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        if entry.text_epoch != epoch {
+            // Another compaction renumbered the table while this ran; its own
+            // pass owns the stamp.
+            return;
+        }
+        for (column, _) in &indexes {
+            entry.text_built.insert(column.clone(), (epoch, built_ts));
+        }
     }
 
     /// The sealed chunks the catalog lists for a table's full-text index on
