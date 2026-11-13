@@ -17,6 +17,7 @@ from functools import wraps
 
 from readerwriterlock import rwlock
 from thrift.protocol import TBinaryProtocol
+from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 from thrift.transport.TTransport import TTransportException
 
@@ -85,8 +86,14 @@ TRY_TIMES = 10
 
 
 class ThriftInfinityClient:
-    def __init__(self, uri: URI, *, try_times: int = TRY_TIMES, logger: logging.Logger = None):
-        self.lock = rwlock.RWLockRead()
+    def __init__(
+        self, uri: URI, *, try_times: int = TRY_TIMES, logger: logging.Logger = None
+    ):
+        # Every call shares one transport/protocol pair, so calls must be
+        # exclusive: with a reader lock two threads interleave
+        # `readMessageBegin` and split each other's replies (seen as
+        # "unknown result" or a client that waits forever).
+        self.lock = rwlock.RWLockWrite()
 
         self.session_id = -1
         self.uri = uri
@@ -105,14 +112,16 @@ class ThriftInfinityClient:
         self.logger = logging.getLogger("ThriftInfinityClient")
         self.logger.setLevel(logging.DEBUG)
         if not self.logger.handlers:
-            formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter(
+                "%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
+            )
             ch = logging.StreamHandler()
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
 
     def __del__(self):
         try:
-            if hasattr(self, '_is_connected') and self._is_connected:
+            if hasattr(self, "_is_connected") and self._is_connected:
                 self.disconnect()
         except Exception:
             pass  # Ignore errors in destructor
@@ -123,7 +132,8 @@ class ThriftInfinityClient:
             self.transport = None
         # self.transport = TTransport.TFramedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # async
         self.transport = TTransport.TBufferedTransport(
-            TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
+            TSocket.TSocket(self.uri.ip, self.uri.port)
+        )  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
@@ -165,8 +175,15 @@ class ThriftInfinityClient:
         # version: 0.6.13, client_version: 34
         # version: 0.6.15, client_version: 35
         # version: 0.7.0, 0.7.1, 0.7.2, client_version: 36
-        # version: 0.7.3, client_version: 37
-        res = self.client.Connect(ConnectRequest(client_version=37))  # 0.7.3
+        # version: 0.7.3, 0.7.4, 0.7.5, client_version: 37
+        try:
+            res = self.client.Connect(ConnectRequest(client_version=37))  # 0.7.5
+        except TApplicationException as e:
+            # `Connect` bypasses `retry_wrapper`, so the mapping lives here too.
+            raise InfinityException(
+                ErrorCode.PROTOCOL_ERROR,
+                f"protocol error from server: {e.message or e}",
+            ) from e
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -176,7 +193,7 @@ class ThriftInfinityClient:
         def wrapper(self, *args, **kwargs):
             for i in range(self.try_times):
                 try:
-                    with self.lock.gen_rlock():
+                    with self.lock.gen_wlock():
                         old_session_i = self.session_i
                         ret = func(self, *args, **kwargs)
                         break
@@ -186,33 +203,61 @@ class ThriftInfinityClient:
                             self._reconnect()
                             self.session_i += 1
                             self.logger.debug(
-                                f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {e!s}")
+                                f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {e!s}"
+                            )
+                except TApplicationException as e:
+                    # The server could not decode the request or does not know
+                    # the method: a protocol failure, not an application one.
+                    # Retrying the same bytes cannot succeed, and the statement
+                    # may already have run, so surface it as `InfinityException`
+                    # and stop (`PARALLEL_ASYNC.md` §6.4 / O12).
+                    raise InfinityException(
+                        ErrorCode.PROTOCOL_ERROR,
+                        f"protocol error from server: {e.message or e}",
+                    ) from e
                 except Exception:
                     raise
             else:
-                return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, f"Try {self.try_times} times, but still failed")
+                return CommonResponse(
+                    ErrorCode.TOO_MANY_CONNECTIONS,
+                    f"Try {self.try_times} times, but still failed",
+                )
             return ret
 
         return wrapper
 
     @retry_wrapper
-    def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error, comment: str = None):
+    def create_database(
+        self,
+        db_name: str,
+        conflict_type: CreateConflict = CreateConflict.Error,
+        comment: str = None,
+    ):
         db_comment: str
         if comment is None:
             db_comment = ""
         else:
             db_comment = comment
-        return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
-                                                                db_name=db_name,
-                                                                db_comment=db_comment,
-                                                                create_option=CreateOption(
-                                                                    conflict_type=conflict_type)))
+        return self.client.CreateDatabase(
+            CreateDatabaseRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                db_comment=db_comment,
+                create_option=CreateOption(conflict_type=conflict_type),
+            )
+        )
 
     @retry_wrapper
-    def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
-        return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
-                                                            db_name=db_name,
-                                                            drop_option=DropOption(conflict_type=conflict_type)))
+    def drop_database(
+        self, db_name: str, conflict_type: DropConflict = DropConflict.Error
+    ):
+        return self.client.DropDatabase(
+            DropDatabaseRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                drop_option=DropOption(conflict_type=conflict_type),
+            )
+        )
 
     @retry_wrapper
     def list_databases(self):
@@ -220,93 +265,152 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def show_database(self, db_name: str):
-        return self.client.ShowDatabase(ShowDatabaseRequest(session_id=self.session_id,
-                                                            db_name=db_name))
+        return self.client.ShowDatabase(
+            ShowDatabaseRequest(session_id=self.session_id, db_name=db_name)
+        )
 
     @retry_wrapper
     def get_database(self, db_name: str):
-        return self.client.GetDatabase(GetDatabaseRequest(session_id=self.session_id,
-                                                          db_name=db_name))
+        return self.client.GetDatabase(
+            GetDatabaseRequest(session_id=self.session_id, db_name=db_name)
+        )
 
     @retry_wrapper
-    def create_table(self, db_name: str, table_name: str, column_defs,
-                     conflict_type: CreateConflict = CreateConflict.Error, properties: list = None):
-        return self.client.CreateTable(CreateTableRequest(session_id=self.session_id,
-                                                          db_name=db_name,
-                                                          table_name=table_name,
-                                                          column_defs=column_defs,
-                                                          create_option=CreateOption(conflict_type=conflict_type,
-                                                                                     properties=properties)))
+    def create_table(
+        self,
+        db_name: str,
+        table_name: str,
+        column_defs,
+        conflict_type: CreateConflict = CreateConflict.Error,
+        properties: list = None,
+    ):
+        return self.client.CreateTable(
+            CreateTableRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                column_defs=column_defs,
+                create_option=CreateOption(
+                    conflict_type=conflict_type, properties=properties
+                ),
+            )
+        )
 
     @retry_wrapper
-    def drop_table(self, db_name: str, table_name: str, conflict_type: DropConflict = DropConflict.Error):
-        return self.client.DropTable(DropTableRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name,
-                                                      drop_option=DropOption(conflict_type=conflict_type)))
+    def drop_table(
+        self,
+        db_name: str,
+        table_name: str,
+        conflict_type: DropConflict = DropConflict.Error,
+    ):
+        return self.client.DropTable(
+            DropTableRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                drop_option=DropOption(conflict_type=conflict_type),
+            )
+        )
 
     @retry_wrapper
     def rename_table(self, db_name: str, table_name: str, new_table_name: str):
-        return self.client.RenameTable(RenameTableRequest(session_id=self.session_id,
-                                                          db_name=db_name,
-                                                          table_name=table_name,
-                                                          new_table_name=new_table_name))
+        return self.client.RenameTable(
+            RenameTableRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                new_table_name=new_table_name,
+            )
+        )
 
     @retry_wrapper
     def list_tables(self, db_name: str):
-        return self.client.ListTable(ListTableRequest(session_id=self.session_id,
-                                                      db_name=db_name))
+        return self.client.ListTable(
+            ListTableRequest(session_id=self.session_id, db_name=db_name)
+        )
 
     @retry_wrapper
     def show_table(self, db_name: str, table_name: str):
-        return self.client.ShowTable(ShowTableRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name))
+        return self.client.ShowTable(
+            ShowTableRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
     def show_columns(self, db_name: str, table_name: str):
-        return self.client.ShowColumns(ShowColumnsRequest(session_id=self.session_id,
-                                                          db_name=db_name,
-                                                          table_name=table_name))
+        return self.client.ShowColumns(
+            ShowColumnsRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
     def get_table(self, db_name: str, table_name: str):
-        return self.client.GetTable(GetTableRequest(session_id=self.session_id,
-                                                    db_name=db_name,
-                                                    table_name=table_name))
+        return self.client.GetTable(
+            GetTableRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
-    def create_index(self, db_name: str, table_name: str, index_name: str, index_info: IndexInfo,
-                     conflict_type: CreateConflict = CreateConflict.Error, index_comment: str = ""):
-        return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
-                                                          db_name=db_name,
-                                                          table_name=table_name,
-                                                          index_name=index_name,
-                                                          index_comment=index_comment,
-                                                          index_info=index_info,
-                                                          create_option=CreateOption(conflict_type=conflict_type)))
+    def create_index(
+        self,
+        db_name: str,
+        table_name: str,
+        index_name: str,
+        index_info: IndexInfo,
+        conflict_type: CreateConflict = CreateConflict.Error,
+        index_comment: str = "",
+    ):
+        return self.client.CreateIndex(
+            CreateIndexRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                index_name=index_name,
+                index_comment=index_comment,
+                index_info=index_info,
+                create_option=CreateOption(conflict_type=conflict_type),
+            )
+        )
 
     @retry_wrapper
-    def drop_index(self, db_name: str, table_name: str, index_name: str,
-                   conflict_type: DropConflict = DropConflict.Error):
-        return self.client.DropIndex(DropIndexRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name,
-                                                      index_name=index_name,
-                                                      drop_option=DropOption(conflict_type=conflict_type)))
+    def drop_index(
+        self,
+        db_name: str,
+        table_name: str,
+        index_name: str,
+        conflict_type: DropConflict = DropConflict.Error,
+    ):
+        return self.client.DropIndex(
+            DropIndexRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                index_name=index_name,
+                drop_option=DropOption(conflict_type=conflict_type),
+            )
+        )
 
     @retry_wrapper
     def show_index(self, db_name: str, table_name: str, index_name: str):
-        return self.client.ShowIndex(ShowIndexRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name,
-                                                      index_name=index_name))
+        return self.client.ShowIndex(
+            ShowIndexRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                index_name=index_name,
+            )
+        )
 
     @retry_wrapper
     def list_indexes(self, db_name: str, table_name: str):
-        return self.client.ListIndex(ListIndexRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name))
+        return self.client.ListIndex(
+            ListIndexRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
     def insert(self, db_name: str, table_name: str, fields: list[Field]):
@@ -320,71 +424,127 @@ class ThriftInfinityClient:
         )
 
     @retry_wrapper
-    def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
-        return self.client.Import(ImportRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                file_name=file_name,
-                                                import_option=import_options))
+    def import_data(
+        self, db_name: str, table_name: str, file_name: str, import_options
+    ):
+        return self.client.Import(
+            ImportRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                file_name=file_name,
+                import_option=import_options,
+            )
+        )
 
     @retry_wrapper
-    def export_data(self, db_name: str, table_name: str, file_name: str, export_options: dict, columns: list[str]):
-        return self.client.Export(ExportRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                columns=columns,
-                                                file_name=file_name,
-                                                export_option=export_options))
+    def export_data(
+        self,
+        db_name: str,
+        table_name: str,
+        file_name: str,
+        export_options: dict,
+        columns: list[str],
+    ):
+        return self.client.Export(
+            ExportRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                columns=columns,
+                file_name=file_name,
+                export_option=export_options,
+            )
+        )
 
     @retry_wrapper
-    def select(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
-               where_expr, group_by_list, having_expr, limit_expr, offset_expr, order_by_list, total_hits_count):
-        return self.client.Select(SelectRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                select_list=select_list,
-                                                highlight_list=highlight_list,
-                                                search_expr=search_expr,
-                                                where_expr=where_expr,
-                                                group_by_list=group_by_list,
-                                                having_expr=having_expr,
-                                                limit_expr=limit_expr,
-                                                offset_expr=offset_expr,
-                                                order_by_list=order_by_list,
-                                                total_hits_count=total_hits_count
-                                                ))
+    def select(
+        self,
+        db_name: str,
+        table_name: str,
+        select_list,
+        highlight_list,
+        search_expr,
+        where_expr,
+        group_by_list,
+        having_expr,
+        limit_expr,
+        offset_expr,
+        order_by_list,
+        total_hits_count,
+    ):
+        return self.client.Select(
+            SelectRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                select_list=select_list,
+                highlight_list=highlight_list,
+                search_expr=search_expr,
+                where_expr=where_expr,
+                group_by_list=group_by_list,
+                having_expr=having_expr,
+                limit_expr=limit_expr,
+                offset_expr=offset_expr,
+                order_by_list=order_by_list,
+                total_hits_count=total_hits_count,
+            )
+        )
 
     @retry_wrapper
-    def explain(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
-                where_expr, group_by_list, limit_expr, offset_expr, sort_list, explain_type):
-        return self.client.Explain(ExplainRequest(session_id=self.session_id,
-                                                  db_name=db_name,
-                                                  table_name=table_name,
-                                                  select_list=select_list,
-                                                  highlight_list=highlight_list,
-                                                  search_expr=search_expr,
-                                                  where_expr=where_expr,
-                                                  group_by_list=group_by_list,
-                                                  limit_expr=limit_expr,
-                                                  offset_expr=offset_expr,
-                                                  order_by_list=sort_list,
-                                                  explain_type=explain_type
-                                                  ))
+    def explain(
+        self,
+        db_name: str,
+        table_name: str,
+        select_list,
+        highlight_list,
+        search_expr,
+        where_expr,
+        group_by_list,
+        limit_expr,
+        offset_expr,
+        sort_list,
+        explain_type,
+    ):
+        return self.client.Explain(
+            ExplainRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                select_list=select_list,
+                highlight_list=highlight_list,
+                search_expr=search_expr,
+                where_expr=where_expr,
+                group_by_list=group_by_list,
+                limit_expr=limit_expr,
+                offset_expr=offset_expr,
+                order_by_list=sort_list,
+                explain_type=explain_type,
+            )
+        )
 
     @retry_wrapper
     def delete(self, db_name: str, table_name: str, where_expr):
-        return self.client.Delete(DeleteRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                where_expr=where_expr))
+        return self.client.Delete(
+            DeleteRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                where_expr=where_expr,
+            )
+        )
 
     @retry_wrapper
     def update(self, db_name: str, table_name: str, where_expr, update_expr_array):
-        return self.client.Update(UpdateRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                where_expr=where_expr,
-                                                update_expr_array=update_expr_array))
+        return self.client.Update(
+            UpdateRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                where_expr=where_expr,
+                update_expr_array=update_expr_array,
+            )
+        )
 
     @retry_wrapper
     def disconnect(self):
@@ -402,57 +562,113 @@ class ThriftInfinityClient:
     @retry_wrapper
     def show_segments(self, db_name: str, table_name: str):
         return self.client.ShowSegments(
-            ShowSegmentsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+            ShowSegmentsRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
     def show_segment(self, db_name: str, table_name: str, segment_id: int):
         return self.client.ShowSegment(
-            ShowSegmentRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                               segment_id=segment_id))
+            ShowSegmentRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                segment_id=segment_id,
+            )
+        )
 
     @retry_wrapper
     def show_blocks(self, db_name: str, table_name: str, segment_id: int):
         return self.client.ShowBlocks(
-            ShowBlocksRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                              segment_id=segment_id))
+            ShowBlocksRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                segment_id=segment_id,
+            )
+        )
 
     @retry_wrapper
     def show_block(self, db_name: str, table_name: str, segment_id: int, block_id: int):
         return self.client.ShowBlock(
-            ShowBlockRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                             segment_id=segment_id, block_id=block_id))
+            ShowBlockRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                segment_id=segment_id,
+                block_id=block_id,
+            )
+        )
 
     @retry_wrapper
-    def show_block_column(self, db_name: str, table_name: str, segment_id: int, block_id: int, column_id: int):
+    def show_block_column(
+        self,
+        db_name: str,
+        table_name: str,
+        segment_id: int,
+        block_id: int,
+        column_id: int,
+    ):
         return self.client.ShowBlockColumn(
-            ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                                   segment_id=segment_id, block_id=block_id, column_id=column_id))
+            ShowBlockColumnRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                segment_id=segment_id,
+                block_id=block_id,
+                column_id=column_id,
+            )
+        )
 
     @retry_wrapper
     def show_current_node(self):
-        return self.client.ShowCurrentNode(ShowCurrentNodeRequest(session_id=self.session_id))
+        return self.client.ShowCurrentNode(
+            ShowCurrentNodeRequest(session_id=self.session_id)
+        )
 
     @retry_wrapper
     def optimize(self, db_name: str, table_name: str):
-        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+        return self.client.Optimize(
+            OptimizeRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
-    def alter_index(self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions):
+    def alter_index(
+        self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions
+    ):
         return self.client.AlterIndex(
-            AlterIndexRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                              alter_index_options=alter_index_opt))
+            AlterIndexRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                alter_index_options=alter_index_opt,
+            )
+        )
 
     @retry_wrapper
     def add_columns(self, db_name: str, table_name: str, column_defs: list):
         return self.client.AddColumns(
-            AddColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                              column_defs=column_defs))
+            AddColumnsRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                column_defs=column_defs,
+            )
+        )
 
     @retry_wrapper
     def drop_columns(self, db_name: str, table_name: str, column_names: list):
         return self.client.DropColumns(
-            DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                               column_names=column_names))
+            DropColumnsRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                column_names=column_names,
+            )
+        )
 
     @retry_wrapper
     def cleanup(self):
@@ -460,10 +676,14 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def dump_index(self, db_name: str, table_name: str, index_name: str):
-        return self.client.DumpIndex(DumpIndexRequest(session_id=self.session_id,
-                                                      db_name=db_name,
-                                                      table_name=table_name,
-                                                      index_name=index_name))
+        return self.client.DumpIndex(
+            DumpIndexRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                index_name=index_name,
+            )
+        )
 
     # @retry_wrapper
     # def restore_table_snapshot(self, db_name: str, snapshot_name: str):
@@ -473,10 +693,14 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def create_table_snapshot(self, db_name: str, table_name: str, snapshot_name: str):
-        return self.client.CreateTableSnapshot(CreateTableSnapshotRequest(session_id=self.session_id,
-                                                                          db_name=db_name,
-                                                                          table_name=table_name,
-                                                                          snapshot_name=snapshot_name))
+        return self.client.CreateTableSnapshot(
+            CreateTableSnapshotRequest(
+                session_id=self.session_id,
+                db_name=db_name,
+                table_name=table_name,
+                snapshot_name=snapshot_name,
+            )
+        )
 
     @retry_wrapper
     def command(self, command: ttypes.CommandRequest):
@@ -490,38 +714,53 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def compact(self, db_name: str, table_name: str):
-        return self.client.Compact(CompactRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+        return self.client.Compact(
+            CompactRequest(
+                session_id=self.session_id, db_name=db_name, table_name=table_name
+            )
+        )
 
     @retry_wrapper
     def create_database_snapshot(self, db_name: str, snapshot_name: str):
-        return self.client.CreateDatabaseSnapshot(CreateDatabaseSnapshotRequest(session_id=self.session_id,
-                                                                                db_name=db_name,
-                                                                                snapshot_name=snapshot_name))
+        return self.client.CreateDatabaseSnapshot(
+            CreateDatabaseSnapshotRequest(
+                session_id=self.session_id, db_name=db_name, snapshot_name=snapshot_name
+            )
+        )
 
     @retry_wrapper
     def create_system_snapshot(self, snapshot_name: str):
-        return self.client.CreateSystemSnapshot(CreateSystemSnapshotRequest(session_id=self.session_id,
-                                                                            snapshot_name=snapshot_name))
+        return self.client.CreateSystemSnapshot(
+            CreateSystemSnapshotRequest(
+                session_id=self.session_id, snapshot_name=snapshot_name
+            )
+        )
 
     @retry_wrapper
     def restore_snapshot(self, snapshot_name: str, scope: str):
-        return self.client.RestoreSnapshot(RestoreSnapshotRequest(session_id=self.session_id,
-                                                                  snapshot_name=snapshot_name,
-                                                                  scope=scope))
+        return self.client.RestoreSnapshot(
+            RestoreSnapshotRequest(
+                session_id=self.session_id, snapshot_name=snapshot_name, scope=scope
+            )
+        )
 
     @retry_wrapper
     def list_snapshots(self):
-        return self.client.ListSnapshots(ListSnapshotsRequest(session_id=self.session_id))
+        return self.client.ListSnapshots(
+            ListSnapshotsRequest(session_id=self.session_id)
+        )
 
     @retry_wrapper
     def show_snapshot(self, snapshot_name: str):
-        return self.client.ShowSnapshot(ShowSnapshotRequest(session_id=self.session_id,
-                                                            snapshot_name=snapshot_name))
+        return self.client.ShowSnapshot(
+            ShowSnapshotRequest(session_id=self.session_id, snapshot_name=snapshot_name)
+        )
 
     @retry_wrapper
     def drop_snapshot(self, snapshot_name: str):
-        return self.client.DropSnapshot(DropSnapshotRequest(session_id=self.session_id,
-                                                            snapshot_name=snapshot_name))
+        return self.client.DropSnapshot(
+            DropSnapshotRequest(session_id=self.session_id, snapshot_name=snapshot_name)
+        )
 
     @retry_wrapper
     def set_config(self, config_name: str, config_value: any):
@@ -536,11 +775,14 @@ class ThriftInfinityClient:
         else:
             raise ValueError(f"Unsupported type: {type(config_value)}")
 
-        return self.client.SetConfig(SetConfigRequest(session_id=self.session_id,
-                                                      config_name=config_name,
-                                                      config_value=value))
+        return self.client.SetConfig(
+            SetConfigRequest(
+                session_id=self.session_id, config_name=config_name, config_value=value
+            )
+        )
 
     @retry_wrapper
     def show_config(self, config_name: str):
-        return self.client.ShowConfig(ShowConfigRequest(session_id=self.session_id,
-                                                        config_name=config_name))
+        return self.client.ShowConfig(
+            ShowConfigRequest(session_id=self.session_id, config_name=config_name)
+        )

@@ -66,9 +66,10 @@ functions = [
     "ltrim",
     "rtrim",
     "reverse",
+    "regex",
 ]
 
-bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
+bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not", "regex"]
 
 
 def function_return_type(function_name, param_type):
@@ -79,7 +80,7 @@ def function_return_type(function_name, param_type):
             return param_type
         else:
             return 'Float64'
-    elif function_name in ["filter_text", "filter_fulltext", "or", "and", "not"]:
+    elif function_name in ["filter_text", "filter_fulltext", "or", "and", "not", "regex"]:
         return 'boolean'
     elif function_name == "trunc":
         return 'string'

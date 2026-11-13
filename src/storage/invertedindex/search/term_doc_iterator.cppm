@@ -63,7 +63,14 @@ public:
 
     bool Next(RowID doc_id) override;
 
+    // Seeks to the target doc only, without the threshold_-driven per-doc loop (saves tf / column
+    // length decoding)
+    bool NextNoSkip(RowID doc_id) override;
+
     float BM25Score() override;
+
+    // True when the posting reader is decoded on doc_id_ (see BlockMaxLeafIterator).
+    bool IsCurrentDocDecoded() const override { return iter_->DocID() == doc_id_; }
 
     float Score() override {
         switch (ft_similarity_) {

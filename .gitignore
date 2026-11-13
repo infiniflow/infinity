@@ -149,6 +149,11 @@ python/benchmark/datasets/
 .venv*/
 tmp*/
 
+# Scratch space for anything a run leaves behind: benchmark data dirs, unit
+# and functional test fixtures, engine logs, result files. Kept inside the
+# checkout so a run is reproducible from the tree alone, never in /tmp.
+.scratch/
+
 dist/
 python/infinity_sdk/infinity_sdk.egg-info/
 minio/
@@ -157,3 +162,8 @@ minio/
 !Dockerfile*
 
 vcpkg_installed/
+
+# The pysdk suite generates its fixtures under python/test/data (a copy of
+# test/data); the C++ CI copies it the same way.
+python/test/data/
+.scratch/

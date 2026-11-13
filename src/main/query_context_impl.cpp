@@ -33,6 +33,8 @@ import :new_txn_manager;
 import :admin_executor;
 import :utility;
 import :explain_logical_plan;
+import :data_table;
+import :logical_node_type;
 
 import std.compat;
 
@@ -182,6 +184,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
     //    BaseProfiler profiler;
     //    profiler.Begin();
     try {
+        this->BeginTxn(base_statement);
 
         if (global_config_->RecordRunningQuery()) {
             bool add_record_flag = false;
@@ -202,26 +205,6 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
                                                  StatementType2Str(base_statement->type_),
                                                  base_statement->ToString());
             }
-        }
-
-        this->BeginTxn(base_statement);
-        // Check if cleanup was skipped (BeginTxn returns false for skipped cleanup)
-        NewTxn *new_txn = this->GetNewTxn();
-        if (new_txn == nullptr) {
-            // Only cleanup statement is allowed to be skipped
-            bool is_cleanup = false;
-            if (base_statement->type_ == StatementType::kCommand) {
-                const CommandStatement *cmd = static_cast<const CommandStatement *>(base_statement);
-                is_cleanup = (cmd->command_info_->type() == CommandType::kCleanup);
-            }
-            if (is_cleanup) {
-                // Cleanup was skipped because another cleanup is in progress
-                query_result.result_table_ = nullptr;
-                query_result.status_ = Status::OK();
-                return query_result;
-            }
-            // Other statements should not have null transaction
-            UnrecoverableError("Unexpected null transaction after BeginTxn");
         }
         // LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
         //                 session_ptr_->GetNewTxn()->TxnID(),
@@ -284,20 +267,32 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         StopProfile(QueryPhase::kCommit);
 
     } catch (RecoverableException &e) {
-
-        // If txn has been rollbacked, do not rollback again here.
-        NewTxn *new_txn = this->GetNewTxn();
-        if (new_txn != nullptr) {
-            StopProfile();
-            StartProfile(QueryPhase::kRollback);
-            TxnState txn_state = new_txn->GetTxnState();
-            if (txn_state == TxnState::kRollbacking or txn_state == TxnState::kStarted) {
-                this->RollbackTxn();
+        if (e.ErrorCode() == ErrorCode::kFailToStartTxn) {
+            // kFailToStartTxn is only raised by BeginTxn for a skipped FLUSH DATA / CLEAN DATA.
+            if (base_statement->type_ != StatementType::kFlush && base_statement->type_ != StatementType::kCommand) {
+                UnrecoverableError(fmt::format("Unexpected kFailToStartTxn for statement: {}", StatementType2Str(base_statement->type_)));
             }
-            StopProfile(QueryPhase::kRollback);
+
+            // Report the skip as a successful no-op: the in-flight checkpoint / cleanup does the work.
+            query_result.result_table_ = DataTable::MakeEmptyResultTable();
+            query_result.result_table_->SetResultMsg(std::make_unique<std::string>(std::string(GetErrorMsg(e.what()))));
+            query_result.root_operator_type_ = base_statement->type_ == StatementType::kFlush ? LogicalNodeType::kFlush : LogicalNodeType::kCommand;
+            query_result.status_ = Status::OK();
+        } else {
+            // If txn has been rollbacked, do not rollback again here.
+            NewTxn *new_txn = this->GetNewTxn();
+            if (new_txn != nullptr) {
+                StopProfile();
+                StartProfile(QueryPhase::kRollback);
+                TxnState txn_state = new_txn->GetTxnState();
+                if (txn_state == TxnState::kRollbacking or txn_state == TxnState::kStarted) {
+                    this->RollbackTxn();
+                }
+                StopProfile(QueryPhase::kRollback);
+            }
+            query_result.result_table_ = nullptr;
+            query_result.status_.Init(e.ErrorCode(), e.what());
         }
-        query_result.result_table_ = nullptr;
-        query_result.status_.Init(e.ErrorCode(), e.what());
 
     } catch (ParserException &e) {
 
@@ -379,7 +374,7 @@ void QueryContext::StopProfile() {
 
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
-bool QueryContext::BeginTxn(const BaseStatement *base_statement) {
+void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     auto *txn_manager = storage_->new_txn_manager();
     auto txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
@@ -598,34 +593,27 @@ bool QueryContext::BeginTxn(const BaseStatement *base_statement) {
         }
     }
 
-    if (transaction_type == TransactionType::kNewCheckpoint || transaction_type == TransactionType::kCleanup) {
-        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
-        if (new_txn == nullptr) {
-            // For cleanup transactions, if another cleanup is in progress, just skip this one
-            if (transaction_type == TransactionType::kCleanup) {
-                LOG_INFO("System is cleaning up, skip this cleanup.");
-                return false;
-            }
-            RecoverableError(Status::FailToStartTxn(
-                fmt::format("System is {}", transaction_type == TransactionType::kNewCheckpoint ? "checkpointing" : "cleaning up")));
-        }
-    } else {
-        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
-    }
-
+    new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
     if (new_txn == nullptr) {
-        UnrecoverableError("Cannot get new transaction.");
+        // For cleanup / checkpoint (FLUSH DATA) statements, if another cleanup / checkpoint is in progress,
+        // just skip this one; the in-flight transaction will do the work.
+        if (transaction_type == TransactionType::kNewCheckpoint || transaction_type == TransactionType::kCleanup) {
+            RecoverableError(Status::FailToStartTxn(transaction_type == TransactionType::kCleanup
+                                                        ? "System is cleaning up, skip this cleanup."
+                                                        : "System is checkpointing, skip this checkpoint."));
+        } else {
+            UnrecoverableError("Cannot begin new transaction.");
+        }
     }
 
     session_ptr_->SetNewTxn(new_txn);
-    return true;
 }
 
 void QueryContext::CommitTxn() {
     auto *new_txn = session_ptr_->GetNewTxn();
     if (new_txn == nullptr) {
-        // This should not happen under normal circumstances.
-        // Cleanup skipped case is handled in QueryStatementInternal before reaching here.
+        // This should not happen under normal circumstances. A skipped checkpoint / cleanup never reaches here:
+        // BeginTxn throws before the txn is set on the session.
         UnrecoverableError("CommitTxn called with null transaction.");
     }
     if (auto status = storage_->new_txn_manager()->CommitTxn(new_txn); !status.ok()) {
