@@ -84,8 +84,14 @@ def traverse_conditions(cons, fn=None):
         func_expr.func_name = (
             'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
 
-        json_expr = parse_expr(cons.args['this'])
         path_sql = _json_operator_path(cons.args['expression'])
+        json_source = cons.args['this']
+        while isinstance(json_source, exp.JSONExtract) and not isinstance(json_source, exp.JSONExtractScalar):
+            path_sql = _json_operator_path(json_source.args['expression']) + path_sql[1:]
+            json_source = json_source.args['this']
+        if isinstance(json_source, exp.JSONExtractScalar):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Cannot extract JSON from a scalar result")
+        json_expr = parse_expr(json_source)
         path_constant = WrapConstantExpr()
         path_constant.literal_type = LiteralType.kString
         path_constant.str_value = path_sql
