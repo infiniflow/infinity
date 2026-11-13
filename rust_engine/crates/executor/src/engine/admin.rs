@@ -277,6 +277,12 @@ impl Engine {
                     entry.secondary.declared_types.clear();
                     entry.secondary.disk.clear();
                     entry.text.clear();
+                    // A build that is running right now is reading the ids this
+                    // compaction renumbers: publishing it later would leave the
+                    // table's `MATCH` postings pointing at segments the merge
+                    // just dropped. The bump makes the publish a no-op.
+                    entry.text_built.clear();
+                    entry.text_epoch = entry.text_epoch.wrapping_add(1);
                     entry.sparse.clear();
                     entry.mv.clear();
                     entry.hnsw_mem.clear();
@@ -411,6 +417,29 @@ impl Engine {
         self.populate_secondary_indexes(table);
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
+        // The commit is published only when `_visible` drops (end of scope), and
+        // until then a query reads at a ts below `compact_ts` - it still sees the
+        // source segments (`visible_block_ids`) and can publish an index of the
+        // row ids this merge retires. Retire those: from `compact_ts` on, only an
+        // index built against the merged layout may be served. The rebuild above
+        // runs at `u64::MAX`, so it survives; a build a query started during the
+        // merge is refused by `publish_text_index`.
+        {
+            let tkey = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey).or_default();
+            entry.text_min_ts = entry.text_min_ts.max(compact_ts);
+            let stale: Vec<String> = entry
+                .text_built
+                .iter()
+                .filter(|(_, (_, built_ts))| *built_ts < entry.text_min_ts)
+                .map(|(column, _)| column.clone())
+                .collect();
+            for column in stale {
+                entry.text.remove(&column);
+                entry.text_built.remove(&column);
+            }
+        }
         Ok(())
     }
 

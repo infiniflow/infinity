@@ -402,6 +402,9 @@ impl Engine {
         // indexes are read.
         let indexes: Vec<SharedTextIndex> = match self.tables.lock().unwrap().get_mut(&tkey) {
             Some(entry) => {
+                // A build that is running right now targets the index being
+                // dropped; the bump keeps it from publishing after the fact.
+                entry.text_epoch = entry.text_epoch.wrapping_add(1);
                 let columns: Vec<String> = match column {
                     Some(c) => vec![c.to_string()],
                     None => entry.text.keys().cloned().collect(),

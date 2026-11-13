@@ -4653,6 +4653,25 @@ pub(crate) struct TableEntry {
     pub(crate) mv: HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>,
     /// Full-text inverted indexes per column.
     pub(crate) text: HashMap<String, SharedTextIndex>,
+    /// Bumped whenever cached full-text indexes are dropped: a compaction that
+    /// renumbers every row, or `drop_text_index_storage`.
+    ///
+    /// A build reads the rows one batch at a time and publishes when it is done,
+    /// so it can straddle one of those and end up with postings that name row
+    /// ids nothing owns any more. The epoch a build started at is what
+    /// `Engine::publish_text_index` checks it against.
+    pub(crate) text_epoch: u64,
+    /// The `(text_epoch, read_ts)` each cached index was published at, per
+    /// column.
+    ///
+    /// A cached index is only reusable when both agree: the entry that survives
+    /// a bump was built from the layout that bump retired, and one built at an
+    /// older `read_ts` names rows a later merge moved.
+    pub(crate) text_built: HashMap<String, (u64, u64)>,
+    /// The commit ts of the last compaction whose drops are visible. A build
+    /// that read at an older ts saw the source segments, so its postings name
+    /// rows the merge retired; publishing it is refused.
+    pub(crate) text_min_ts: u64,
     /// Secondary indexes per column with their sealed chunk readers.
     pub(crate) secondary: SecondaryIndexes,
     /// HNSW chunks loaded from the C++ block mirror, per column (the
@@ -5334,13 +5353,14 @@ pub(crate) async fn run_bottom(
         // row, and the port keeps no row journal either: such a table's rows
         // stay in the append buffer (see `has_block_layout`).
         let defaults = engine.table_defaults(table).unwrap_or_default();
+        let stored_types = engine.column_types(table).unwrap_or_default();
         let mut published: Vec<(usize, Vec<Value>)> = Vec::new();
         for append in appends.iter().filter(|append| append.table == table) {
             for (k, text) in append.encoded.iter().enumerate() {
                 // Never drop a row because its text form would not parse: the
                 // commit has already published it, and the block is the only
                 // place its values can come from.
-                match engine.parse_stored_row(table, &defaults, text.as_bytes()) {
+                match engine.parse_stored_row(table, &defaults, &stored_types, text.as_bytes()) {
                     Ok(row) => published.push((append.base + k, row)),
                     Err(_) => published.push((
                         append.base + k,

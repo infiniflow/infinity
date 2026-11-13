@@ -2030,6 +2030,7 @@ impl Engine {
             });
             let frame_ids = ids_at(timeline, append.commit_ts, &current_ids);
             let defaults = self.table_defaults(&table).unwrap_or_default();
+            let types = meta.types.clone();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
             // (a DDL rewrite logs its rows and then writes them), and buffering
@@ -2053,7 +2054,7 @@ impl Engine {
                 // buffered: the append buffer is the only place a row the block
                 // files do not hold can live, and the port keeps no row journal
                 // to hold its text instead.
-                if let Ok(row) = self.parse_stored_row(&table, &defaults, text.as_bytes()) {
+                if let Ok(row) = self.parse_stored_row(&table, &defaults, &types, text.as_bytes()) {
                     batch.push((*seq as usize, row));
                 }
             }
@@ -2581,11 +2582,24 @@ impl Engine {
         // Through the catalog, not the raw store: a compaction marks the
         // source segments inside its transaction, and a read afterwards must
         // see those marks even before the checkpoint writes them through.
-        let dropped = self
+        //
+        // A mark only hides its segment from readers that started after it. A
+        // compaction records the drops with its commit ts and publishes the
+        // merged blocks afterwards, so a reader at an older ts - a query that was
+        // already running - must keep the source segments: its full-text index
+        // still names their rows, and hiding them turned every hit into a row
+        // that could not be fetched (`0` rows on a table full of matches).
+        // `u64::MAX` (a checkpoint, an index rebuild, `Cleanup`) applies them all.
+        let read_ts = crate::read_ts();
+        let dropped: std::collections::HashSet<u32> = self
             .storage
             .catalog
-            .dropped_segments(&db_id.to_string(), &meta.id.to_string())
-            .unwrap_or_default();
+            .dropped_segments_with_ts(&db_id.to_string(), &meta.id.to_string())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, ts)| *ts <= read_ts)
+            .map(|(segment, _)| segment)
+            .collect();
         let Some(index) = self.block_index_for(&table) else {
             return Vec::new();
         };
@@ -3363,16 +3377,17 @@ impl Engine {
                                     .unwrap_or(Value::Null),
                                 }
                             }
-                            ColumnLayout::VarLen(_) => decode_value_shaped(
-                                &type_text[col],
+                            ColumnLayout::VarLen(_) => decoded_text_value(
+                                decode_value_shaped(
+                                    &type_text[col],
+                                    *column_type,
+                                    body_data,
+                                    row,
+                                    outline,
+                                    column.shape,
+                                ),
                                 *column_type,
-                                body_data,
-                                row,
-                                outline,
-                                column.shape,
-                            )
-                            .map(parse_owned_value)
-                            .unwrap_or(Value::Null),
+                            ),
                         }
                     } else {
                         // Tensor / sparse / array slots point into the column's
@@ -4158,16 +4173,17 @@ impl Engine {
                             .unwrap_or(Value::Null),
                         }
                     }
-                    ColumnLayout::VarLen(_) => decode_value_shaped(
-                        &type_text[pos],
+                    ColumnLayout::VarLen(_) => decoded_text_value(
+                        decode_value_shaped(
+                            &type_text[pos],
+                            *column_type,
+                            &body.data,
+                            row,
+                            raw_outline,
+                            shape,
+                        ),
                         *column_type,
-                        &body.data,
-                        row,
-                        raw_outline,
-                        shape,
-                    )
-                    .map(parse_owned_value)
-                    .unwrap_or(Value::Null),
+                    ),
                 },
                 _ => return None,
             };

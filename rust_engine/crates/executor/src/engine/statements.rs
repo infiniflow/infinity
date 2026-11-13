@@ -124,6 +124,41 @@ pub fn with_session_sync<T>(id: i64, f: impl FnOnce() -> T) -> T {
     crate::scheduler::block_on(with_session_scope(id, async { f() }))
 }
 
+/// Takes back the chunk-store registration when `open` fails after installing it.
+///
+/// The registration happens before the WAL directory is created and before
+/// `TxnManager::open`, and both can fail; without this guard every `?` in
+/// between would leave a store registered for a directory no engine has open -
+/// and the manager behind it never drops, so the same object directory could not
+/// be opened again in this process. Once the engine exists, [`Engine::drop`]
+/// owns the cleanup and the guard is disarmed.
+struct StoreRegistration {
+    root: PathBuf,
+    armed: bool,
+}
+
+impl StoreRegistration {
+    fn new(root: &Path) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            armed: true,
+        }
+    }
+
+    /// The constructed engine owns the cleanup from here on.
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for StoreRegistration {
+    fn drop(&mut self) {
+        if self.armed {
+            storage::chunk_store::uninstall_chunk_store_for(&self.root);
+        }
+    }
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_options(dir, EngineOptions::default())
@@ -204,14 +239,21 @@ impl Engine {
         // process may hold several engines, each with its own manager and its
         // own directory, and the one opened last must not serve the earlier
         // ones' reads, writes and cleanups.
+        // The registration is undone by the guard if anything below fails
+        // (the WAL directory, `TxnManager::open`, the replay, the startup
+        // checkpoint); once the engine is built, its `Drop` takes over.
+        let mut registration = None;
         match persistence.as_ref() {
-            Some(pm) => storage::chunk_store::install_chunk_store_for(
-                &dir,
-                Arc::new(storage::chunk_store::PersistentChunkStore::new(
-                    Arc::clone(pm),
+            Some(pm) => {
+                storage::chunk_store::install_chunk_store_for(
                     &dir,
-                )),
-            ),
+                    Arc::new(storage::chunk_store::PersistentChunkStore::new(
+                        Arc::clone(pm),
+                        &dir,
+                    )),
+                );
+                registration = Some(StoreRegistration::new(&dir));
+            }
             // A plain open never undoes a manager another open installed: one
             // engine per process makes this a no-op, and a process with several
             // (a test suite) keeps the object profile while it is in use.
@@ -410,6 +452,11 @@ impl Engine {
         engine.recover_mem_index()?;
         // The in-memory indexes were just rebuilt; the quota reads this total.
         engine.recompute_memindex_total();
+        // The engine is complete: its `Drop` releases the registration, and the
+        // guard must not undo it under a live engine.
+        if let Some(registration) = registration.as_mut() {
+            registration.disarm();
+        }
         Ok(engine)
     }
 
@@ -606,9 +653,10 @@ impl Engine {
 
     pub(crate) fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         let mut rows = Vec::new();
         for (_, v) in self.row_texts(table, ids)? {
-            rows.push(self.parse_stored_row(table, &defaults, &v)?);
+            rows.push(self.parse_stored_row(table, &defaults, &types, &v)?);
         }
         Ok(rows)
     }
@@ -1856,7 +1904,7 @@ impl Engine {
             // the reader agree on: an array literal's `{…}` is normalized to
             // the stored `[…]` only on that path.
             let text = self.encode_row_stored(table, row, &types)?;
-            if let Ok(values) = self.parse_stored_row(table, &defaults, text.as_bytes()) {
+            if let Ok(values) = self.parse_stored_row(table, &defaults, &types, text.as_bytes()) {
                 published.push((base + k, values));
             }
         }
@@ -1877,13 +1925,14 @@ impl Engine {
             return Ok(());
         }
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         // Batch by batch: holding the parsed values of the whole file next to
         // its stored text doubled the peak (4.6 GB resident for a 326 MB
         // import). Each batch is parsed, appended to the buffer and dropped.
         const CHUNK: usize = 8192;
         let mut published: Vec<(usize, Vec<Value>)> = Vec::with_capacity(CHUNK.min(rows.len()));
         for (seq, text) in rows {
-            match self.parse_stored_row(table, &defaults, text.as_ref()) {
+            match self.parse_stored_row(table, &defaults, &types, text.as_ref()) {
                 Ok(values) => published.push((*seq, values)),
                 // Never drop a row because its text form would not parse: the
                 // cells are simply that text, which is what the writer stores.
@@ -3263,8 +3312,30 @@ impl Engine {
         }
     }
 
-    /// Decodes one stored cell.
-    pub(crate) fn decode_cell(&self, _table: &str, cell: &str) -> Result<Value> {
+    /// Decodes one stored cell of column `col`.
+    ///
+    /// A cell of a text column (`VARCHAR`/`JSON`) is returned as the text it
+    /// was stored as; only the other columns go through [`parse_value`], whose
+    /// inference would otherwise re-read `iNF` as the float `inf`.
+    pub(crate) fn decode_cell(
+        &self,
+        _table: &str,
+        types: &[String],
+        col: usize,
+        cell: &str,
+    ) -> Result<Value> {
+        if types
+            .get(col)
+            .map(|t| crate::blocks::keeps_cell_text(t))
+            .unwrap_or(false)
+        {
+            // The stored form spells a NULL cell `null` and has no other way to
+            // say it, so that one spelling still decodes as NULL.
+            if cell.eq_ignore_ascii_case("null") {
+                return Ok(Value::Null);
+            }
+            return Ok(Value::Str(cell.to_string()));
+        }
         Ok(parse_value(cell))
     }
 
@@ -3320,10 +3391,11 @@ impl Engine {
             return cursor.rows(ids);
         }
         // A table whose columns have no block layout lives in the buffer only.
+        let types = self.column_types(table).unwrap_or_default();
         for &id in ids {
             let seq = id as usize;
             if let Some(text) = self.pending_row_text(table, seq)? {
-                out.push((seq, self.parse_stored_row(table, &defaults, &text)?));
+                out.push((seq, self.parse_stored_row(table, &defaults, &types, &text)?));
             }
         }
         Ok(out)
@@ -3492,11 +3564,33 @@ impl Engine {
     }
 
     /// Builds (once) the inverted index for a text column from its live rows.
+    ///
+    /// The build walks the rows one batch at a time, so it can straddle a
+    /// compaction - which renumbers every row and drops the cached indexes at a
+    /// new `TableEntry::text_epoch`. A build therefore only publishes at the
+    /// epoch it started at, and a cached index is only reused when it was
+    /// published at the current one (see [`Self::publish_text_index`]). Without
+    /// that, a build that read the pre-compaction ids could land *after* the
+    /// compaction rebuilt the index: every hit would then name a row the merge
+    /// moved, `fetch_some_rows_with_ids` drops those, and `MATCH` answers
+    /// nothing on a table full of matches (`TestParallelFulltextIndexReadWrite`,
+    /// on the query that runs after its writers stopped).
     pub(crate) fn text_index_for(
         &self,
         table: &str,
         column: &str,
         tokenizer: TextTokenizer,
+    ) -> Result<SharedTextIndex> {
+        self.text_index_build(table, column, tokenizer, 0)
+    }
+
+    /// One attempt of [`Self::text_index_for`], `attempt` deep.
+    fn text_index_build(
+        &self,
+        table: &str,
+        column: &str,
+        tokenizer: TextTokenizer,
+        attempt: usize,
     ) -> Result<SharedTextIndex> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
@@ -3522,9 +3616,31 @@ impl Engine {
         // under `tables` here closes a cycle as soon as a writer (the appender)
         // is pending: nobody can make progress, and every later statement
         // queues behind the frozen `tables`.
-        let cached = {
+        let (cached, epoch) = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&tkey).and_then(|e| e.text.get(column)).cloned()
+            match tables.get(&tkey) {
+                // A cached index built before the last bump belongs to the
+                // layout that bump retired, and one built before the last
+                // visible compaction read the source segments: both name row
+                // ids nothing owns any more.
+                Some(entry) => (
+                    entry
+                        .text
+                        .get(column)
+                        .filter(|_| {
+                            entry
+                                .text_built
+                                .get(column)
+                                .is_some_and(|(built_epoch, built_ts)| {
+                                    *built_epoch == entry.text_epoch
+                                        && *built_ts >= entry.text_min_ts
+                                })
+                        })
+                        .cloned(),
+                    entry.text_epoch,
+                ),
+                None => (None, 0),
+            }
         };
         if let Some(idx) = cached {
             let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
@@ -3561,7 +3677,8 @@ impl Engine {
         let catalog_chunks = self
             .fulltext_catalog_chunks(table, column)
             .unwrap_or_default();
-        let mut index = TextIndex::new(dir, tokenizer);
+        // Cloned because a rejected publish retries the whole build.
+        let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
@@ -3576,14 +3693,44 @@ impl Engine {
             index.maybe_seal(self.memindex_capacity());
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(tkey)
-            .or_default()
-            .text
-            .insert(column.to_string(), shared.clone());
-        Ok(shared)
+        if self.publish_text_index(&tkey, column, epoch, shared.clone()) {
+            return Ok(shared);
+        }
+        // The rows were renumbered while this build ran: its postings name the
+        // ids of a layout a compaction dropped. Publish nothing and read the new
+        // layout - the cache is empty, so the next attempt rebuilds from it.
+        if attempt >= 8 {
+            // Compaction keeps landing inside the rebuild. Answer this query
+            // from what was just built rather than failing it; nothing was
+            // published, so the next query still rebuilds.
+            return Ok(shared);
+        }
+        self.text_index_build(table, column, tokenizer.clone(), attempt + 1)
+    }
+
+    /// Publishes a freshly built full-text index for `column`, unless the table's
+    /// cached indexes were dropped while the build ran (`TableEntry::text_epoch`).
+    ///
+    /// Returns whether it published: `false` means the build read a layout that
+    /// is gone and has to be thrown away.
+    pub(crate) fn publish_text_index(
+        &self,
+        tkey: &str,
+        column: &str,
+        epoch: u64,
+        index: SharedTextIndex,
+    ) -> bool {
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.to_string()).or_default();
+        let read_ts = crate::read_ts();
+        if entry.text_epoch != epoch || read_ts < entry.text_min_ts {
+            return false;
+        }
+        entry.text.insert(column.to_string(), index);
+        entry
+            .text_built
+            .insert(column.to_string(), (epoch, read_ts));
+        true
     }
 
     /// The sealed chunks the catalog lists for a table's full-text index on
@@ -4290,10 +4437,17 @@ impl Engine {
     }
 
     /// Parses a stored row, padding trailing cells from the column defaults.
+    ///
+    /// `types` are the table's declared column types: the stored text is
+    /// re-read with them so a text column's cell stays text. Inferring the cell
+    /// type instead rewrote the value - `str::parse::<f64>` accepts `inf`,
+    /// `infinity` and `nan` in any case, so a stored `iNF` came back as `inf`
+    /// (and `007` as `7`, `1.50` as `1.5`).
     pub(crate) fn parse_stored_row(
         &self,
         table: &str,
         defaults: &[Option<String>],
+        types: &[String],
         v: &[u8],
     ) -> Result<Vec<Value>> {
         // The stored form is written from a `String` and read straight back, so
@@ -4301,11 +4455,11 @@ impl Engine {
         // a `Cow` per row for 8.4 M rows.
         let text = match std::str::from_utf8(v) {
             Ok(t) => t,
-            Err(_) => return self.parse_stored_row_lossy(table, defaults, v),
+            Err(_) => return self.parse_stored_row_lossy(table, defaults, types, v),
         };
         let mut cells: Vec<Value> = Vec::new();
         for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, cell)?);
+            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
         }
         while cells.len() < defaults.len() {
             let i = cells.len();
@@ -4323,12 +4477,13 @@ impl Engine {
         &self,
         table: &str,
         defaults: &[Option<String>],
+        types: &[String],
         v: &[u8],
     ) -> Result<Vec<Value>> {
         let text = String::from_utf8_lossy(v);
         let mut cells: Vec<Value> = Vec::new();
         for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, cell)?);
+            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
         }
         while cells.len() < defaults.len() {
             let i = cells.len();
@@ -6641,6 +6796,7 @@ impl Engine {
             .unwrap_or(1);
         let topn = parse_topn_param(params).unwrap_or(10);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let stored_types = self.column_types(table).unwrap_or_default();
         // The index decides which documents can hold one of the group's terms;
         // only those rows are read and tokenised. This syntax has no negation
         // (`parse_field_query` keeps a `-term` as a literal term), so the union
@@ -6670,7 +6826,7 @@ impl Engine {
         // One cursor over the blocks: a candidate the index still lists but the
         // table no longer shows (a tombstoned row) simply has no text.
         for (seq, v) in self.row_texts(table, &candidate_ids)? {
-            let mut row = self.parse_stored_row(table, &defaults, &v)?;
+            let mut row = self.parse_stored_row(table, &defaults, &stored_types, &v)?;
             while row.len() < defaults.len() {
                 let i = row.len();
                 row.push(match defaults.get(i).and_then(|d| d.as_deref()) {

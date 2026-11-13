@@ -547,6 +547,143 @@ mod tests {
         assert_eq!(rows(&reopened, query), before);
     }
 
+    /// A compaction renumbers every row, so the full-text index has to be
+    /// rebuilt with the new ids. The query after the merge must still answer,
+    /// both from the in-memory rebuild and from the chunks a reopen maps.
+    #[test]
+    fn a_compaction_keeps_the_fulltext_index_answering() {
+        let q = "SELECT doctitle FROM ct SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE ct (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX ct_body ON ct (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..20 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            crate::scheduler::block_on(e.flush()).unwrap();
+            for i in 20..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+            e.compact_all_segments("default_db.ct").unwrap();
+            assert_eq!(rows(&e, q).len(), 40, "after the compaction");
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q).len(), 40, "after a reopen");
+    }
+
+    /// A full-text build reads the rows one batch at a time, so a compaction can
+    /// renumber every row while it runs. Such a build must not publish: its
+    /// postings name the segments the merge dropped, every hit is then a row
+    /// `fetch_some_rows_with_ids` cannot find, and `MATCH` answers nothing on a
+    /// table full of matches - which is what
+    /// `TestParallelFulltextIndexReadWrite` reported as `column "doctitle" is
+    /// empty` on the query that runs after its writers stopped.
+    #[test]
+    fn a_fulltext_build_does_not_publish_across_a_compaction() {
+        let q = "SELECT doctitle FROM cr SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cr (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cr_body ON cr (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        for i in 20..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+
+        // The index (and the epoch) a build that started before the merge still
+        // holds when it finishes.
+        let tkey = e.table_key("cr");
+        let (stale, epoch) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            let stale = entry.text.get("body").expect("the index is cached").clone();
+            (stale, entry.text_epoch)
+        };
+        e.compact_all_segments("default_db.cr").unwrap();
+        assert!(
+            !e.publish_text_index(&tkey, "body", epoch, stale),
+            "a build from the pre-compaction layout must not publish"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            40,
+            "and the query after the merge still answers"
+        );
+    }
+
+    /// The caches a compaction drops are read by every query and written by
+    /// every rebuild, so the two race in production. Churn them from several
+    /// threads: a query may answer from a build that a merge invalidated, but a
+    /// build may not land in the cache, so no hit may go missing.
+    #[test]
+    fn concurrent_compactions_never_lose_fulltext_hits() {
+        let q = "SELECT id FROM ch SEARCH MATCH TEXT (body, 'harmful chemical', 500);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 120);
+
+        let readers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                std::thread::spawn(move || {
+                    let mut worst = usize::MAX;
+                    for _ in 0..20 {
+                        worst = worst.min(rows(&engine, q).len());
+                    }
+                    worst
+                })
+            })
+            .collect();
+        for _ in 0..4 {
+            engine.compact_all_segments("default_db.ch").unwrap();
+        }
+        for reader in readers {
+            assert_eq!(
+                reader.join().expect("a concurrent query panicked"),
+                120,
+                "a query lost hits across a compaction"
+            );
+        }
+        assert_eq!(rows(&engine, q).len(), 120);
+    }
+
     /// A query that spans several sealed segments plus the memory tail must
     /// return exactly what one unsealed segment returns: same rows, same order.
     /// That is the concat path's contract (the segments' row ranges are

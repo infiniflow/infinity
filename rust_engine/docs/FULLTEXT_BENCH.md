@@ -235,6 +235,33 @@ range 判断）→ `Source` → `TermDocCursor`（`ensure` + 块内扫描），�
 但这个负载上参考自己 97k 轮只做了 2,247 次块级 seek——两个实现都在逐条推进，跳表省不到东西；
 它只对「跳很远」的稀疏词有用，不在多词查询的路径上。
 
+> **这条结论的适用范围**：只对「advance 跨度 ≤ 1~2 个块」的 WAND 多词负载成立，不能推广。
+> 大跨度场景（高选择性 filter 下推、范围/前缀过滤、稀疏词与高频词求交、大 df 词的尾部跳过）
+> 是数量级的差距：每跳过一个 128-posting 块就少解一次三列 SIMD 块。
+>
+> 因此 `TermDocCursor::advance` **已接上 doc skip list**（`SkipListReader::SkipTo`）：
+> 块内仍是线性步进（同参考 `PostingIterator::SkipTo` 的短路），跨块直接落到目标块。
+> `advance_hops_blocks_with_the_skip_list` 断言 600 篇的 term 跳到最后一篇只解 2 个块（而非 5 个），
+> `advance_lands_where_a_linear_walk_does` 对 700 个 target 逐一核对落点与块数。
+>
+> WAND 走的是 `TermStream::advance`（`Cursor::seek` → `WandStream::seek_block`），它原来逐块
+> `load`，根本不经过存储层的 `advance`，所以只改存储层对 WAND 没有收益。现在
+> `TermStream::advance` 在 `target > 块尾` 时改为 `merge.advance(target)` 再重填一块
+> （参考的 `TermDocIterator::NextShallow` → `PostingIterator::SkipTo`），块内仍线性。
+> `a_shallow_seek_on_a_sealed_segment_hops_blocks` 断言 5000 篇的 sealed 段上跳到 4900 只重填一次。
+> **注意**：seek 后块起点不再是 128 对齐（是第一个 ≥ target 的 posting），块上界仍只覆盖自己那
+> 128 条，剪枝 sound，但覆盖范围与参考的固定 128 文档块不同。
+>
+> **filter 下推**：`WHERE` / `MATCH TEXT (…, WHERE …)` / `filter=…` 过去是"全表求值 → 失败行塞进
+> `dead` 集合 → 打分后丢弃"，每个被拒的候选仍要解码块上界并打分一次。现在求值结果是一次性的
+> 升序行列表（`DocFilter`），WAND 在 pivot 落在被拒行时把**所有**低于下一个允许行的游标 seek 过去
+> （`skip_to`），streaming 路径对每个 merge cursor `advance`；`next()` 的 target 也先 `lift` 到
+> 下一个允许行。`filter_pushdown_scores_only_admitted_rows` 断言 2000 篇里每 20 篇放行时打分次数
+> ≤ 100（无下推是 2000），`filter_pushdown_matches_a_post_filtered_scan` 逐条比对"带下推"与
+> "全量跑完再过滤"的文档序与分数。
+>
+> 仍未接的是「读 `block_max_tf` 当块上界」那一半，理由见 §4.9（合并流的块边界与段内块不对齐）。
+
 ## 4. 这一轮改了什么
 
 ### 4.1 posting list 改成迭代器（核心）
@@ -437,9 +464,16 @@ set_memindex_capacity(2) 把 20 行切成约 10 个段，断言四条查询（�
 ### 4.9 试过但没走通的两条路
 
 - **从 doc skip list 直接读块上界**：格式里确实有 block_max_tf /
-  block_max_percentage，但参考在这套配置下写的是空 skip list——解析真实 .pos 的前
-  200 个 term，doc_skip_len 全为 0（我们的文件与参考逐字节相同）。所以块上界只能像
-  现在这样从 doc list 块现场算。
+  block_max_percentage。当时的观察是「参考在这套配置下写的是空 skip list（前 200 个 term 的
+  doc_skip_len 全为 0）」，但这条与现有证据冲突、需复核：真实参考文件
+  `ft_0000000000000000.pos`（8192 篇）的 doc region 夹具里含 **64 个 skip item**，
+  而编码器在 `Dump` 前会 flush 掉不满一块的尾部，2 篇的 term 也会写出 1 个 item。
+  最终**改成读存下来的上界**：sealed 段与 spill run 走 `GetBlockMaxInfo`
+  （`SkipListReader` 的 `block_max_tf` / `block_max_percentage`），内存尾按自己那 128 条现场算；
+  合并流取「最小块尾 + 覆盖它的源里最大 tf/pct」（参考 `MultiPostingDecoder`
+  的 `GetBlockLastDocID` / `GetBlockMaxInfo`）。只有不满一个块、没有 skip item 的列表才回退到
+  现场算。WAND 的上界直接用存下来的 `u16` percentage，与参考逐位一致。
+  注意：这与**跳表 seek** 是两条独立收益——seek 只看 offset，不受块边界对齐影响，也已接上（§3.3）。
 - **把长度取用改成懒解析**（Lens::Map/Segment，用时才按序号读 .len）：块上界本身就要
   遍历块内每一条 posting，把取用从 load() 挪到 block_stats() 只是换位置，实测反而慢
   3–4%（多一次 enum 匹配），已回退。
@@ -499,13 +533,17 @@ catalog 的写入带 `disableWAL`（对齐 `KVStore::Put` 的默认值，`kv_sto
 
 | 改动 | 内容 |
 |---|---|
-| checkpoint dump 全文内存尾段 | `flush_storage` 里新增 `seal_text_indexes()`，与 secondary / IVF / HNSW / sparse 一致（参考由后台 `DumpMemIndexTask` 做）：把 `ft_{首行:016x}.{dic,pos,len,row}` 落盘并 fsync（`fulltext_segment::write_segment_index` 走 `storage::definition::format::write_synced`） |
+| 段由 `DumpMemIndex` 事务落盘 | `dump_index_transaction` → `seal_index_tail`（`index_build.rs`）：把 `ft_{首行:016x}.{dic,pos,len,row}` 落盘并 fsync（`write_segment_index_streaming` 走 `storage::definition::format::write_synced`）。**checkpoint（`flush`/`flush_storage`）不 dump 内存索引**，这一点照参考的 `NewTxn::CheckpointTable`（只刷块）；尾段在下次打开时从 chunk gap 之后重新分词建索引 |
+| 容量/配额也会触发 | `should_seal`（`memindex_capacity` 行数或 `TEXT_INDEX_BUDGET_BYTES` 字节）在写路径上直接封存；超过统一 memindex 配额时排 `DumpMemIndexTask` |
 | 打开时映射已有 chunk | `TextIndex::load_sealed()` 扫 `fulltext/<key>/ft_*.dic`，逐段 `SegmentIndexReader::open`（mmap），返回第一个未被覆盖的行号；`text_index_for` 只从那一行往后建索引 |
 | 尾部只读增量 | `fetch_rows_with_ids_projected_from` → `read_blocks_including_deleted_from`：行号 `segment<<32 | block*8192` 之外的块整块跳过，不解码 |
 
-实测（20k 文档，checkpoint 后重开）：第一条查询 **2.41 s → 29 ms**，第二条 0.73 ms，
-命中行数与重启前一致。映射不成功的 chunk（崩溃时的半截写）会让 `load_sealed` 退回 0，
-即整表重建——「一半来自磁盘、一半重建」会把同一批文档数两次。
+实测（20k 文档，重开）：第一条查询 **2.41 s → 29 ms**，第二条 0.73 ms，命中行数与重启前
+一致。这个读数只对「大部分行已封存、只有尾部要重建」的形状成立——封存由容量/配额触发，
+**不是 checkpoint 做的**（当时记录的切分比例没有留存）。尾部越大第一条查询越贵，整表都
+没封存时就是 2.41 s 那一档。
+映射不成功的 chunk（崩溃时的半截写）会让 `load_sealed` 退回 0，即整表重建——「一半来自
+磁盘、一半重建」会把同一批文档数两次。
 
 回归测试：`a_reopened_engine_indexes_only_the_unsealed_tail`（重开后 sealed 段覆盖 12
 行、内存尾 0 行）；`new_catalog_index_internal_ut::test_index` / `test_populate_index0`
@@ -704,3 +742,273 @@ A/B 用临时开关 `INF_FT_NO_STREAM`（已移除）关掉流式：
 另一半是块循环的常数因子。块循环与参考同构（skip list 为空，两边都现场算块上界），
 要继续压只能动「每块每 cursor 解 128 条 posting」这条路径，收益上限不大。
 
+
+## 12. 段清单、目录无关的 chunk 发现、IO 由持久化管理器接管
+
+这一节记录「参考写出的全文索引能被本端口直接读」这条路的形状，以及三个决定它成立的改动。
+
+### 12.1 三个问题的答案
+
+| 问题 | 结论 |
+|---|---|
+| 参考没有 `.ok` 清单，怎么读它的 chunk | `.ok` 是**可选**的：只有 `NotFound` 才算「没有清单」，此时只做结构校验（`.len % 4 == 0`、`.dic` 的 FST 尾部可解析），`live_docs`/`total_len` 从 `.len` 现场算（全部视为存活）。参考不因删除重写 chunk，所以这个回退与它的评分口径一致，不是妥协。其它读错误、截断、magic/版本不符**不是**「没有清单」：`ChunkManifest::read` 返回错误，`SegmentIndexReader::open` 随之失败，chunk 被判坏而不是绕过校验重建 |
+| 参考的 chunk 在哪、怎么发现 | 清单在 catalog（`TableIndexMeta → segment → chunk → ChunkIndexMetaInfo`），文件在 `db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}/ft_{…}.{dic,pos,len}`。本端口运行时索引在 `<root>/fulltext/<db>.<table>.<column>/`，所以打开一个参考写出的目录时**没有任何 chunk 可扫**：`text_index_for` 先按 catalog 走一遍，把那些 chunk 拷贝进自己的目录（`TextIndex::adopt`），再走原来的加载路径 |
+| 谁做 IO | 持久化管理器。`format::write_synced` 与 `MappedFile::open` 是仅有的两个收口点，它们都经 `storage::chunk_store`：装了管理器（`object_dir`）就发布对象 / 从对象区间映射，否则是直接落盘 |
+
+### 12.2 实现
+
+| 位置 | 内容 |
+|---|---|
+| `storage/src/io/chunk_store.rs` | `ChunkStore` 门面：`LocalChunkStore`（`write_synced_direct` / `MappedFile::open_path`）与 `PersistentChunkStore`（`pm.persist_keyed` + `MappedFile::open_range`）。两种发布：`write` 是参考的默认 `try_compose=true`（块列等小文件共用一个有界对象），`write_dedicated` 是 `try_compose=false`（全文 chunk 文件，与参考的 `memory_indexer_impl.cpp:679` / `column_index_merger_impl.cpp:162` 一致，一个文件一个对象），两者都在**同一把 per-path 锁**内做完本地替换与对象发布。管理器的键：`data/` 下的文件用参考的 `RemovePrefix` 规则（`db_1/tbl_2/…`），`fulltext/` 缓存用相对引擎根的键，同一个 `pm|object|` 命名空间 |
+| `storage/src/buffer/mapped.rs` | `open_path`（裸文件）+ `open`（走 store）+ `open_range(obj, offset, len)`：组合对象里的一段按区间映射；零长文件仍是空映射 |
+| `storage/src/persistence/persistence_manager.rs` | `persist_with(.., try_compose)`、`persist_keyed`/`lookup_key`/`cleanup_key`/`keys_under`；对象写完后 `fsync` 文件**与 workspace 目录项**（rename 本身是目录更新），`current_obj_finalize` 写 footer 后同样处理；`persist_directory` 只在**内容比对**确认已发布的字节与磁盘一致时跳过（大小相同不算证据：原地改写不改长度、截断成 0 也会留下记录） |
+| `executor/src/engine/text_index.rs` | `CatalogChunk` + `TextIndex::adopt`；`load_sealed_scoped(live_segments, catalog)` 先扫自己的目录，空了才采纳 catalog 的 chunk。合并/坏段/弃用段的处理不变 |
+| `executor/src/engine/statements.rs` | `fulltext_catalog_chunks(table, column)`：参考的 `ColumnIndexReader::Open` 那条路（catalog 走 chunk 记录 + 段目录）。两种表名拼写都试（索引记录里的 `table` 可能是裸名） |
+| `executor/src/engine/admin.rs` | `optimize_fulltext_locked` 改 `async` + `spawn_blocking`，并把 `tombstone_set` 传给合并（死行过滤） |
+| `executor/src/blocks/engine.rs` / `ddl.rs` / `statements.rs` | 删目录改走 `chunk_store::remove_tree`，被删文件的对象部分一并从 `pm|object|` 里去掉 |
+
+`.ok` 只出现在端口自己的 `fulltext/<key>/` 里；给参考读的 `idx_{id}/seg_{s}/` 永远只写三个文件（`write_fulltext_index` 只写 `.dic/.pos/.len`），所以跨引擎的字节与文件清单对比不受它影响；`python/restart_test/fulltext_common.py::merged_files` 显式跳过 `.ok`。
+
+**偏差（有意）**：`object_dir` 模式下端口保留本地副本作为缓存，参考会把临时文件移进对象、不留逻辑路径文件。代价是对象的字节与本地文件各一份；换来的是目录枚举、`restore_missing_files` 与 mmap 的局部性都照旧工作，读路径不必每次都从对象里拷一段。
+
+### 12.3 验证
+
+单测（`cargo test -p executor`，762 通过 / 38 ignored；`cargo test -p storage` 495 通过）：
+
+| 用例 | 断言 |
+|---|---|
+| `a_chunk_written_in_the_reference_layout_is_adopted` | `flush` + `dump_index_transaction` 之后删掉端口自己的 `fulltext/` 目录，重开引擎查询仍然命中；端口目录里重新出现**同名**的 chunk（采纳，而不是重新分词） |
+| `the_persistent_manager_publishes_every_data_file` | `data/` 下每个文件都有 `pm|object|` 记录、对象长度覆盖 `part_offset + part_size`；删掉块列文件与 chunk 的 `.dic` 之后 `MappedFile::open` 仍返回同样的字节（从对象区间映射） |
+| `a_chunk_with_an_empty_length_array_maps` | `.pos`/`.len` 都是 0 字节时不报 `EINVAL`，`doc_count()==0`，`load_sealed` 跳过而不是当作缺口覆盖 |
+| `a_sparse_chunk_keeps_its_span_and_merges_with_its_neighbour` | chunk 内部有洞（0,1,5,6）时 `docs` 是跨度 7、`live_docs` 是 4；与 7..9 的邻居仍可合并，合并后跨度 9、存活 6 |
+| `a_seal_leaves_out_the_rows_deleted_before_it` / `a_merge_reclaims_the_postings_of_a_deleted_row` | 封段与合并都按 tombstone 过滤，`.ok` 记的 `live_docs/total_len` 与实际 posting 一致 |
+| `writers_readers_deletes_and_merges_stay_consistent` | 8 写 × 20 批 × 100 行 = 16 000 行、6 读 × 持续查询、1 删（16 轮）、8 轮 dump+OPTIMIZE+flush 并发跑：读者看到的每个 id 都在已插入集合内；`count(*)` + 墓碑 = 16 000；全文查询行集合 == `SELECT id` 行集合；重开引擎后同一答案（参数与读数见 §12.6） |
+
+跨引擎字节门禁仍由 `python/restart_test/test_cross_engine_fulltext_{scale,production}.py` 守。端口侧需要 `rust_engine/target/release/infinity`（本轮已构建），但门禁还要同一台机器上的**参考二进制**，本机没有，故仍未跑；10M 那一档改用进程内示例跑通（§13.5）。本轮没有改动任何编码器：`.dic/.pos/.len` 的字节只经过 IO 门面，内容不变。
+
+### 12.4 IO 收口的完整清单
+
+「持久化管理器接管所有 IO」在端口里落到三个收口点，其余全部经由它们：
+
+| 收口点 | 覆盖 | 说明 |
+|---|---|---|
+| `definition::format::write_synced` | `version`、全部分块与索引 chunk（全文 `.dic/.pos/.len`、BMP/EMVB/multivector/PLAID/HNSW/IVF、二级索引 `.idx`） | 发布时写本地副本（缓存）+ 对象；全文 chunk 用 `write_dedicated`（`try_compose=false`，与参考的全文写入器一致），其余用 `write`（参考的默认，多个小文件共用有界对象） |
+| `definition::format::write_synced_parts` / `write_parts_no_sync` | 块列 `{id}.col`、`col_{id}_out`（`write_block_column_synced`） | **不经 store**，直接落盘：`parts` 版本省掉一次整体拷贝，`no_sync` 版本给 import（参考的 `COPY` 也不 fsync 块，靠随后的 checkpoint）。`object_dir` 下这些文件的对象由 checkpoint 的 `persist_directory` 发布（内容比对后才跳过），不是写的时候就发布 |
+| `MappedFile::open` / `open_range` | 块列、全文 chunk、BMP/EMVB/multivector、PLAID | 本地文件优先；只有对象时按 `ObjAddr` 映射区间 |
+| `chunk_store::{read_file, write_file, open_file, remove_tree}` | 块 `version`、各索引 chunk 的探针读取（HNSW/IVF/PLAID 覆盖度、chunk 行数）、删表/删索引 | 上一轮还有 15 处直接 `std::fs` 的 chunk 读取，本轮全部改走 store |
+
+**WAL / catalog / 导入源文件不在此列**，与参考一致（参考的 `NewTxn` 走 `VirtualStore` 与 KVStore，不经 `Persist`；`COPY` 的源文件是用户输入）。
+
+**唯一未接的**：`index` crate 自己的 `SecondaryIndex::load` / `HnswIndex::load_sparse` / `chunk_file::load`。`storage` 依赖 `index`，反向加依赖会成环，所以这三处仍是 `std::fs::read`；但它们的调用者**全在 `#[cfg(test)]` 里**（见 §12.7 的核实），生产路径是 `HnswIndex::from_chunk_parts` 加上 executor 从 store 读出的字节，所以生产 IO 已经全部经 store，这条缝只影响该 crate 自己的测试。要彻底消除，得把「读字节」上移到 executor（`index` 只接受 `&[u8]`）。
+
+### 12.5 跨引擎门禁（本轮实跑）
+
+| 用例 | 结果 |
+|---|---|
+| `test_realtime_concurrent_inserts_and_reads_agree` | 通过（8.2 s） |
+| `test_offline_build_writes_the_reference_bytes` | 通过（15.9 s）：端口 spill + `OfflineDump` 的产物与参考逐字节相同 |
+| `test_repeated_fulltext_merges_stay_byte_identical` | 通过（31.5 s）：3 轮 × 3 chunk × 4000 行，每轮合并产物与参考逐字节相同 |
+| `test_the_port_reads_an_index_the_reference_wrote`（本轮新增） | 通过（4.8 s）：**参考写 + dump 的同一目录，端口只查询、不 dump**；断言端口自己的 `fulltext/<table>` 目录出现在查询之后，且其中的 `.dic/.pos/.len` 与参考的逐字节相同 —— 采纳（拷贝），不是重新分词 |
+| `test_restart_after_dump_and_merge_keeps_the_answers`（8 个变体） | 通过（9 min 47 s） |
+| `test_deletes_and_updates_leave_the_index_consistent` | 通过（17.7 s） |
+| `test_writers_readers_and_maintenance_share_the_index` | 通过（13.0 s） |
+| `test_kill_during_the_build_recovers_the_index`（3 个变体） | 通过（4 min 19 s）：spill / seal / merge 中途 `kill -9` 后重开仍一致 |
+
+（`test_a_long_build_keeps_the_index_memory_flat` 未跑：16 万行 × 两档规模的匿名内存采样，本机 available 内存约 7 G，起服务有 OOM 风险。）
+
+### 12.6 大规模并发（`cargo test`，debug 构建，约 55 s）
+
+`writers_readers_deletes_and_merges_stay_consistent`：**8 写 × 20 批 × 100 行 = 16 000 行**，6 个读线程持续查询，1 个删除线程 16 轮（每 17 行删 1），主线程 8 轮 `dump_index → OPTIMIZE → flush` 与上面全部并发。不变量是「表里有什么」而不是「删线程请求了什么」（一个落在一个尚未提交的事务上的 DELETE 什么都不删，请求列表看不见）：
+
+| 断言 | 结果 |
+|---|---|
+| 读线程看到的每个 id 都在已插入集合内 | 通过（无幽灵行） |
+
+> 「无幽灵行」这一条曾偶发失败并报 `reader saw the ghost id`，原因在**测试自己的记账顺序**：写线程先 `INSERT`（提交即对其他线程可见）再把 id 写进 `inserted`，而读线程是查询**之后**才 clone 这份集合，于是「刚提交、还没记账」的那一批会短暂地不在集合里。修法是把 `inserted.extend(ids)` 挪到 `INSERT` 之前——记账失败不会发生（`INSERT` 本身 `unwrap`），而「可见即已记账」变成了构造性事实。索引侧没有返回过未提交的行。
+| `SELECT count(*)` + 墓碑数 = 16 000 | 通过 |
+| 全文查询（`beta`，topn=100000）的行集合 == `SELECT id FROM stress` | 通过（0 missing / 0 extra） |
+| 删除真的发生了 | 通过（断言 live < 16 000） |
+| flush 后重开引擎，同一问题同一答案 | 通过 |
+
+### 12.7 删除与恢复也归管理器（本轮补齐）
+
+前一轮只把「写」和「读」收进了 store，**删除**仍是 `std::fs::remove_file`。在 `object_dir` 模式下这留下两件事：`pm|object|` 记录不清、对象字节不回收，而且 `restore_missing_files` 会在下次打开时把已删除的文件**复活**。本轮：
+
+| 改动 | 内容 |
+|---|---|
+| 删除走 store | `chunk_store::remove_file` / `remove_tree`；`blocks/engine.rs`（块列、镜像 chunk、deprecated chunk）、`engine/ddl.rs`（DROP INDEX 的存储）、`engine/dml.rs`（spill 集合重写）、`engine/statements.rs`（multivector/bmp 重建前的清理）、`engine/index_build.rs`（HNSW/IVF 旧文件）全部改走它。`ChunkStore::remove` 与 `remove_file` 现在返回 `Result`：两个后端都把「文件不存在」当成功（保持旧行为），其它失败向上传播，所以弃用 chunk 的标记只在磁盘与对象都真的删掉之后才清 |
+| 恢复的目标路径 | 参考的键都相对 `data/`；端口的全文 chunk 缓存在 `data/` 旁边的 `<root>/fulltext/`，所以 `PersistenceManager::local_path_of` 对 `STORAGE_ROOT_KEYS`（当前只有 `fulltext/`）用引擎根解析，其余仍用 `data/`。修之前恢复会把缓存写到 `<root>/data/fulltext/…`（`a_data_directory_comes_back_from_the_objects_alone` 抓到的真实缺陷） |
+| `index` crate 的三处直读 | 核实过：`SecondaryIndex::load` / `HnswIndex::load_sparse` / `chunk_file::load` 的调用者**全在 `#[cfg(test)]` 里**（`index/src/lib.rs:605`、`vector.rs:2502`、两个 `file_roundtrip` 辅助），生产路径走的是 `HnswIndex::from_chunk_parts` + executor 从 store 读出的字节。所以生产 IO 已经 100% 经 store，这条缝只影响该 crate 自己的测试 |
+
+新增/更新的验证：
+
+| 用例 | 断言 |
+|---|---|
+| `a_data_directory_comes_back_from_the_objects_alone`（Rust） | `object_dir` 下 400 行 + 2 次 dump + merge：删掉 `data/` 与 `fulltext/` 两棵树后 `restore_missing_files` 把 **10 + 4** 个文件按原字节恢复，且查询答案与删除前一致 |
+| `test_the_port_comes_back_from_its_objects_alone`（Python，新） | `persistence_format = "reference"`：写 → dump → 杀进程 → **删掉 `data/` 与 `fulltext/`** → 新进程重建两棵树并用 `uniq{i}`/`bucket{b}` 全量校验（6.4 s） |
+
+## 13. 10M 规模实测（本机，debug 构建）
+
+`python/restart_test/fulltext_scale_gate.py --rows 10000000`：一个进程里插 10 000 000 行
+（`body` = 12 个词：共享词表 + `bucket{i%7}` + `uniq{i}`），flush → dump → 查询 → OPTIMIZE →
+删 1% → OPTIMIZE → 重启，期间用「不变量」校验（`uniq{i}` 只能返回 `[i]`，
+`bucket{b}` 的 `filter_fulltext` 计数必须精确）。
+
+### 13.1 读数
+
+| 阶段 | 结果 |
+|---|---|
+| 插入 10M（5000 行/语句） | **1231 s = 8123 行/s** |
+| flush（块落盘） | 879.5 s |
+| dump（封段成 chunk） | 1.5 s（13 个 chunk/100 万行，共 100+ 个 → 3 文件 each） |
+| 首次校验（7 个 `uniq` 探针 + 3 个桶的 top-10 与精确计数 + 三词 top-10） | 全部通过，约 10 min |
+| `OPTIMIZE`（把 100+ chunk 合成 1 个） | **363 s** |
+| 引擎 RSS | 插入后 2.5 GB，校验时峰值 4.1 GB（可用内存 7 GB） |
+| 磁盘 | `data/` 2.6 GB + `wal/` 1.3 GB + `fulltext/` 1.3 GB；合并峰值另需 ~1.3 GB（本机 7.4 GB 余量，勉强够） |
+
+10 万行同脚本的对照（用来外推）：插入 11.5 s（8668 行/s）、flush 6.2 s、dump 0.6 s、
+optimize 2.6 s、`data/` 27 MB、`fulltext/` 13 MB、RSS 0.19 GB。
+
+> 上表是 **debug 构建 + 门禁脚本（5000 行/语句）** 的读数；同一份数据用 release 构建走进程内
+> 示例（§13.5）是插入 63–72k 行/s、flush 406–455 s、merge 70–79 s。差别在构建类型，不在索引
+> 路径——下面 §13.2 那个「合并后 3 小时」的悬崖与构建类型无关，它在 release 下同样会发作。
+
+### 13.2 发现的性能悬崖（已修：位置流的 seek 重放了整个前缀）
+
+合并成**一个** 10M 行的 chunk 之后，同一组校验跑了 3 小时仍未结束（CPU 104%，单线程、
+非死锁）。根因不在内存表示，而在**跨块 seek 时的位置流**：
+
+`TermDocCursor::seek_block_of` 用文档 skip list 跳到目标块之后，原来调
+`reset_positions(prev_ttf)`——把位置流**倒回起点**、再把跳过的那些 occurrence 一条条丢掉
+（`disk_segment_reader.rs` 的 `reset_positions` / `next_delta` 里的 `pos_skip`）。于是
+**一次 seek 的代价 ∝ 该 term 在段内已走过的 occurrence 数**，整表扫描就退化成
+`O(N² / (2·块大小·tf))`。参考实现不是这样的：它写 `.pos` 时就为每个 128 位置记录写了
+位置 skip list（`[u32 total_pos][u32 offset]`，`SkipListWriter::add_item_2`），
+`PositionIterator::SkipTo` 直接定位到记录；本移植写了这份 skip list 却没有任何读取代码用它。
+
+后果与「合并」的关系：合并把 k 个短列表拼成一个长列表，这份前缀重放的成本正好乘以 k。
+300k 行（`mem_index_capacity` 65536 → 5 个 chunk）上的实测：
+
+| 状态 | 修复前 | 修复后 |
+|---|---|---|
+| dump 后（新进程，5 chunk） | 10 398 ms | 222 ms |
+| optimize 后（新进程，1 chunk） | 40 073 ms | 177 ms |
+
+同一时刻三词 `alpha beta gamma` 前后都是 620-627 ms，`(id, SCORE())` 逐位相同
+→ 数据与答案都没变，纯粹是读侧代价。外推 10M：合并前 ≈6 min，合并后 ≈十几小时，
+正好对上 §13.1 的「首次校验 10 min」与这次的「3 小时未完」。
+
+修复（纯读侧，写出的字节不变）：`TermDocCursor` 增加 `pos_skiplist`，`seek_positions`
+用 `SkipTo(prev_ttf + 1)` 拿到记录起始 offset 与该记录之前的 occurrence 数，
+`pos_skip` 只剩**一个记录内**的前缀。回归测试
+`a_hop_lands_on_the_position_record_it_needs` 断言一次跳到 2000 篇列表末尾只解 ≤8 个位置
+记录（`pos_records_decoded` 计数器），而不是 46 个。
+
+顺带纠正：门禁里的 `"alpha beta"` 走的是 **WAND + `PhraseCursor`** 快路径
+（`has_query_syntax` 明确把引号留给快路径），不是 `PhraseDocIterator` 那条全量物化路径，
+所以早期把它归因到 `PhraseDocIterator` 是错的（§13.4 讲的是另一条路径的改进）。
+
+### 13.3 10M 的字节兼容与持久化
+
+- **字节兼容**：已在本机跑过并通过的是 10000 / 40000 / 36000 行三档（offline 构建、
+  两轮反复 merge）与「参考写、端口读」的采纳门禁；10M 这一档的 `--compare-cpp` 需要在同一台
+  机器上先跑参考再跑端口（各 ~3 GB 数据），本机 7.4 GB 余量下**尚未跑完**，脚本已按
+  「顺序构建、构建完即删」实现，换一台磁盘宽裕的机器可直接跑。
+- **持久化**：10M 这一轮跑的是本地 profile；`object_dir` profile 的门禁（`data/` 与
+  `fulltext/` 全删后从对象重建）在 30 万行以内已验证通过（§12.7）。10M + 对象 profile 会把
+  磁盘占用翻倍（本地副本 + 对象），本机放不下，属于同一脚本的 `--persistence reference`
+  加更大磁盘即可覆盖。
+
+### 13.4 短语查询的内存表示已改（查询串语法那条路径）
+
+> 注意：这条路径只在查询串语法（`a AND "b c"`、`col:term`、`a OR b`）时才会走到；
+> 门禁里的 `'"alpha beta"'` 走的是 `PhraseCursor` 快路径，10M 的问题不在它（见 §13.2）。
+
+`PhraseDocIterator` 的每条 posting 原来是 `(u64, Vec<u32>)`：一个文档一次堆分配。
+10M 行 × 2 个词 ≈ 2000 万次分配，debug 下光构造就要几十分钟，常驻堆约 1 GB。
+
+改成 `PhrasePostings`（`crates/executor/src/query_builder.rs`）：
+
+```rust
+pub struct PhrasePostings {
+    docs: Vec<(u64, u32, u32)>, // (doc id, 位置起点, 位置个数)，升序
+    positions: Vec<u32>,        // 一个词一块 arena
+}
+```
+
+- 每个词两次分配（`docs` + `positions`）；位置仍全部在内存（精确短语匹配需要），但内存
+  从「每文档 24 字节头 + 独立分配」降到「每文档 16 字节 + 每位置 4 字节」，10M × 2 词大约
+  480 MB 而不是 1 GB，也不再触发 2000 万次 `malloc`。
+- `exact_match` 直接对着 arena 切片做二分（原来每文档 clone 一次头词的 `Vec<u32>`，现在零拷贝）；
+  `sloppy_match` 只在匹配到的文档上建临时 `Vec<i32>`。
+- 语义不变：`phrase` / `sloppy_phrase_frequency_matches_the_reference` /
+  `phrase_boost_scales_the_phrase_score` / `a_phrase_match_answers_from_the_index` /
+  `search_honours_the_phrase_slop` 等 7 个用例全绿；`cargo test -p executor --lib`
+  762 passed / 38 ignored。
+
+仍未做的是把它变成**流式** positional cursor（按文档前进时解码当前位置，不再一次性物化整列）：
+那需要让 `TermStream` 跨 chunk 持有解码状态，属于下一步。
+
+### 13.5 进程内大规模探针（不占端口）
+
+`crates/executor/examples/fulltext_scale.rs`：直接用 `Engine` 驱动，不经过服务、不占端口，
+所以可以和占着固定 Thrift 端口的门禁并存。位置参数是行数与目录，开关是
+`--probes <n>`（探针数）、`--no-phrase`（跳过短语）、`--delete-pct <p>`（删除比例，默认 1）；
+同名的 `FT_SCALE_PROBES` / `FT_SCALE_PHRASE` / `FT_SCALE_DELETE_PCT` 在缺省开关时仍生效。
+
+| 规模 | 阶段 | 结果 |
+|---|---|---|
+| 100k | 插入 6.8 s（14 610 行/s）、dump、optimize、删 1%、再 merge、重启 | 全部不变量通过 |
+| 300k | 同上（含短语） | 全部不变量通过；`uniq` 计数 1.73 s、三词 top-10 663 ms、短语 top-10 39.5 s → **修复位置 seek 后 0.08–0.22 s**（§13.2，dump 后 / 合并后分别为 222 / 177 ms） |
+| 1M | 同上（`FT_SCALE_PHRASE=0`，`FT_SCALE_PROBES=2`） | **全部不变量通过**；optimize 30.5 s、`uniq` 计数 5.3 s、桶计数 6.8 s、三词 top-10 2.19 s、删 1%（1 万行）**406 s**、重开 13.9 s、RSS 309 MB |
+| 10M | `--probes 2 --delete-pct 0`（release 二进制，含短语） | **全部不变量通过**；插入 157.9 s（63 314 行/s）、flush 406.5 s、dump 0.3 s、`uniq` 计数 5.0 / 9.8 s、桶计数 7.0–7.2 s、三词 top-10 2.92 s → 合并后 1.84 s、**短语 top-10 1.70 s → 合并后 1.76 s**、optimize 79.1 s、重开 20.5 s、RSS 2.2 GB（重开后 3.6 GB）、目录 5.1 GB |
+
+> 读数取自合并 `upstream/main` **之前**的 release 构建。合并在 IO 原语上做的改动（块列改走
+> `write_synced_parts`、省掉一次整体拷贝）只会让 flush 更快；review 之后的 per-path 锁只加在
+> 对象 profile 的写路径上，marker 读取改成传播错误也只影响失败分支。所以上表对这条
+> 「直接落盘 + 合并 + 查询」的路径仍然成立，没有被后续改动拉慢。
+
+三条与规模相关的结论（都能从上面的读数直接读出来）：
+
+1. **短语查询曾经是超线性的，原因是位置流的 seek 重放了整个前缀（已修）**：110k → 300k 行，
+   `"alpha beta"` top-10 从 2.58 s 涨到 39.5 s（数据 3×，时间 15×），而三词严格线性
+   （0.22 → 0.66 → 2.19 s）。根因与修法见 §13.2：`seek_block_of` 每次跨块都把位置流倒回
+   起点再逐条丢弃（`reset_positions` + `pos_skip`），代价 ∝ 已走过的 occurrence 数，
+   合并把短列表变长列表正好乘以 chunk 数。修好后 300k 短语 80–222 ms，与三词同量级，
+   也不再随合并放大。**这条原来被误记为「必须改成流式 positional cursor」**——`PhraseCursor`
+   本来就是流式的，缺的是位置 skip list 的 seek。
+2. **`filter_fulltext` 是谓词、按行求值**：`SELECT count(*) … WHERE filter_fulltext(…)`
+   在 100k / 300k / 1M 上是 0.58 / 1.73 / 5.3-5.7 s，与行数成正比而与命中数无关。
+   门禁拿它做「精确计数」是对的，但它测的不是索引的检索延迟；要测检索延迟得看
+   `SEARCH MATCH TEXT … topn`（上面三词那一行才是索引路径）。
+3. **无索引上的 `DELETE … WHERE id IN (…)` 也是全表扫描**：删 1 万行在 1M 表上 406 s
+   （100k 表上删 1 千行 4.4 s），因为 `id` 上没有二级索引，规划器只能扫。生产里这类删除
+   应当走 `_row_id` 或带二级索引的列——这不是全文索引的问题，但会决定「删除 + merge」
+   这条链在大表上的吞吐。
+
+> **10M 复跑（已完成，进程内）**：上一轮的 10M 进程是人工 kill 的——它卡在合并后的短语校验
+> 上（3h17m，单线程 CPU 100%，`engine.log` 无 panic、内核无 OOM 记录），原因即 §13.2 的
+> 位置 seek。修复后 300k 已复测通过（dump 222 ms / 合并 177 ms，`(id, SCORE())` 与修复前
+> 逐位相同），10M 这一档现在也跑通了（release 二进制，两轮，上表最后一行）：
+>
+> - **短语不再随合并放大**：dump 后 1.70 s、合并成一个 chunk 后 1.67 s，与 300k 的
+>   0.08–0.22 s 只差数据量本身的常数；三词 2.9–3.2 s → 合并后 1.8 s；`uniq` 探针 5–8 s、
+>   桶精确计数 7–8 s（这两个是 `filter_fulltext` 逐行谓词，O(行数)，不是索引延迟）。
+> - **删除**：第二轮带 `--delete-pct 0.001`（100 行，一条 `DELETE … WHERE id IN (…)`）通过，
+>   删除语句本身 14.5 s（`id` 无二级索引 → 全表扫描），删除后的全部不变量（含短语）通过；
+>   紧随的 `optimize after delete` 是 0 ms——删除只改 tombstones，没有新 chunk 被封，没有可
+>   合并的段，所以 10M 上「删除 → merge」这条链本身没有被这一轮覆盖（300k / 1M 上覆盖过）。
+> - 开销：merge 69.5 s、flush 406–455 s、重开 20–22 s、RSS 2.2–2.5 GB、目录 5.1 GB。
+>
+> 仍缺的口径只有两个，都需要环境而不是代码：
+>
+> ```bash
+> cargo build --release -p cli --bin infinity -j 4
+> .venv/bin/python python/restart_test/fulltext_scale_gate.py --rows 10000000 --compare-cpp
+> .venv/bin/python python/restart_test/fulltext_scale_gate.py --rows 1000000 --persistence reference
+> # 进程内（不占端口，上面两轮就是这个）：
+> rust_engine/target/release/examples/fulltext_scale 10000000 /tmp/ft-10m --probes 2 --delete-pct 0
+> ```
+>
+> 即 **10M 的 `--compare-cpp` 字节门禁**（要先在同一台机器上构建并跑参考，各约 3 GB 数据，
+> 本机 C++ 构建产物不存在）与 **10M + `object_dir` profile**（磁盘占用翻倍）。
