@@ -484,40 +484,90 @@ impl Engine {
                 self.recompute_memindex_total();
             }
         }
-        if self.memindex_bytes() <= quota {
+        if self.budget_bytes() <= quota {
             return;
         }
-        if let Some(processor) = self.bg_processor.lock().unwrap().clone() {
-            // One proposed dump at a time, like `proposed_dump_`.
-            if self
-                .context
+        if self.bg_processor.lock().unwrap().is_some() {
+            self.propose_dump(table.is_none());
+            return;
+        }
+        // No background processor (a test, or shutdown): do the same work
+        // inline. An explicit check (`table == None`) is a caller asking for
+        // everything to be released, so it drains every tail; the per-write
+        // path takes the largest one.
+        if table.is_none() {
+            self.dump_all_memory_indexes().await;
+            self.dump_all_sealed_blocks().await;
+            // The block drain released rows after the index dump had already
+            // folded its own result in, so the total is restated once more.
+            self.recompute_memindex_total();
+        } else {
+            self.dump_under_pressure().await;
+        }
+    }
+
+    /// The quota check for a table whose rows just grew, without the per-row
+    /// gate.
+    ///
+    /// [`Self::enforce_memindex_quota`] is driven by the **index** write path,
+    /// so a table with no index never reached it - and that is exactly the
+    /// table whose append buffer grows unbounded. This runs at the end of a
+    /// commit instead: it folds in this table's new charge and, if the engine
+    /// is over budget, proposes the same background drain. Cheap enough for the
+    /// commit path because it reads one table's running totals and one atomic.
+    pub(crate) async fn enforce_quota_after_append(&self, table: &str) {
+        let quota = self
+            .context
+            .memindex_quota
+            .load(std::sync::atomic::Ordering::Relaxed) as usize;
+        if quota == 0 {
+            return;
+        }
+        self.refresh_memindex_charge(table);
+        if self.budget_bytes() <= quota {
+            return;
+        }
+        if self.bg_processor.lock().unwrap().is_some() {
+            self.propose_dump(false);
+            return;
+        }
+        self.dump_under_pressure().await;
+    }
+
+    /// Queues the background drain. The caller has already established that a
+    /// processor is attached; one proposal is in flight at a time
+    /// (`proposed_dump_`).
+    fn propose_dump(&self, drain_all: bool) {
+        let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
+            return;
+        };
+        if self
+            .context
+            .memindex_pending
+            .compare_exchange(
+                0,
+                1,
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+            .is_err()
+        {
+            return;
+        }
+        let engine = self.self_weak.lock().unwrap().clone();
+        let queued = processor.submit(Box::new(DumpMemIndexTask {
+            engine,
+            pending: Arc::clone(&self.context.memindex_pending),
+            drain_all,
+        }));
+        if !queued {
+            // The processor is shutting down and dropped the task, so no worker
+            // will clear the proposed-dump flag: clear it here or the quota
+            // never proposes another dump.
+            self.context
                 .memindex_pending
-                .compare_exchange(
-                    0,
-                    1,
-                    std::sync::atomic::Ordering::AcqRel,
-                    std::sync::atomic::Ordering::Relaxed,
-                )
-                .is_err()
-            {
-                return;
-            }
-            let engine = self.self_weak.lock().unwrap().clone();
-            let queued = processor.submit(Box::new(DumpMemIndexTask {
-                engine,
-                pending: Arc::clone(&self.context.memindex_pending),
-            }));
-            if !queued {
-                // The processor is shutting down and dropped the task, so no
-                // worker will clear the proposed-dump flag: clear it here or
-                // the quota never proposes another dump.
-                self.context
-                    .memindex_pending
-                    .store(0, std::sync::atomic::Ordering::Relaxed);
-            }
-            return;
+                .store(0, std::sync::atomic::Ordering::Relaxed);
         }
-        self.dump_all_memory_indexes().await;
     }
 
     /// The rows an indexed predicate names, for the columnar select.

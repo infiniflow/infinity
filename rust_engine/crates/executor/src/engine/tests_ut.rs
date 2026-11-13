@@ -5810,6 +5810,9 @@ mod tests {
              (2, [0.0,1.0], [1:3.0], 7);",
         )
         .unwrap();
+        // A write releases the largest tail; the explicit check releases every
+        // one of them (`enforce_memindex_quota(None)` is "enforce it now").
+        crate::scheduler::block_on(e.enforce_memindex_quota(None));
 
         let mv = e
             .tables
@@ -5854,6 +5857,53 @@ mod tests {
             "SELECT id FROM q SEARCH MATCH TENSOR (m, [1.0,0.0], 'float', 'maxsim', 'topn=2');"
         )
         .is_empty());
+    }
+
+    /// The append buffer is part of the memory budget, and a breach drains it.
+    ///
+    /// The quota used to cover the in-memory indexes only, so a table with no
+    /// index kept every appended row resident until a checkpoint - a day by
+    /// default. `refresh_block_mirror_extra` now folds the buffer into the
+    /// charge, and the drain writes those rows to their block files.
+    #[test]
+    fn quota_drains_the_append_buffer_of_an_unindexed_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE b (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (1,'one'),(2,'two'),(3,'three'),(4,'four');")
+            .unwrap();
+        let key = e.table_key("b");
+        let buffered = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|t| (t.pending_rows.len(), t.unsealed_bytes()))
+                .unwrap_or((0, 0))
+        };
+        let (rows_before, bytes_before) = buffered(&e);
+        assert_eq!(rows_before, 4, "the rows are in the buffer before a drain");
+        assert!(bytes_before > 0, "the buffer is charged to the budget");
+
+        // A budget below what is resident forces the next check to drain.
+        e.set_memindex_quota(1);
+        crate::scheduler::block_on(e.enforce_quota_after_append(&key));
+
+        let (rows_after, bytes_after) = buffered(&e);
+        assert_eq!(rows_after, 0, "the drain sealed every buffered row");
+        assert_eq!(bytes_after, 0, "and released the charge with them");
+
+        // The rows are still readable: the block files are the mirror.
+        assert_eq!(
+            rows(&e, "SELECT id, body FROM b;"),
+            vec![
+                vec!["1".to_string(), "one".to_string()],
+                vec!["2".to_string(), "two".to_string()],
+                vec!["3".to_string(), "three".to_string()],
+                vec!["4".to_string(), "four".to_string()],
+            ]
+        );
     }
 
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
@@ -6393,10 +6443,17 @@ mod tests {
             ))
             .unwrap();
         }
-        // Two chunks for three batches: the first batch fits, the second
-        // crosses the quota, and the bytes above the quota stay accounted so
-        // the third crosses again.
-        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
+        // At most one chunk per batch: the quota releases one index per breach,
+        // so three batches can seal at most three. The floor is two - the quota
+        // is crossed partway through - and where exactly it lands depends on how
+        // much of the batch is resident when the check runs (the append buffer is
+        // part of the budget now, which is what makes the first batch able to
+        // cross on its own).
+        let chunks = e.hnsw_chunk_ids("hc", "hx").len();
+        assert!(
+            (2..=3).contains(&chunks),
+            "three batches seal one chunk each at most, got {chunks}"
+        );
     }
 
     /// The budget is one number for the whole engine, not one per index.

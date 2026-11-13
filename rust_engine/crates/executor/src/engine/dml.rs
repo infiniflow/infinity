@@ -850,6 +850,16 @@ impl Engine {
                 bottom_started.elapsed()
             );
         }
+        // A table with no index never reaches the quota check: the one the index
+        // path runs (`update_text_indexes_batch`) is skipped for it, and that is
+        // exactly the table whose append buffer grows without any other bound
+        // (the checkpoint is a day away by default). Indexed tables already
+        // checked, so checking again here would spend a second dump per batch -
+        // the index path may not have registered its tail yet at this point,
+        // which is why this asks the declaration rather than the registry.
+        if !self.has_index_declaration(table) {
+            self.enforce_quota_after_append(table).await;
+        }
         Ok(QueryResult::Inserted { count: row_count })
     }
 

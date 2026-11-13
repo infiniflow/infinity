@@ -1421,6 +1421,20 @@ impl Engine {
         total + charged
     }
 
+    /// The engine-wide figure the quota compares against: the in-memory indexes
+    /// **plus** the rows still in the append buffers.
+    ///
+    /// [`Self::memindex_bytes`] stays the index total - it is what the dumps
+    /// report and what the existing accounting checks expect - and the rows are
+    /// added here, where the budget is decided.
+    pub(crate) fn budget_bytes(&self) -> usize {
+        let unsealed: usize = {
+            let tables = self.tables.lock().unwrap();
+            tables.values().map(|entry| entry.unsealed_bytes()).sum()
+        };
+        self.memindex_bytes() + unsealed
+    }
+
     /// Moves the process-wide total by `table`'s change and remembers the new
     /// charge on the table. Call it after anything that grows or shrinks this
     /// table's memory indexes.
@@ -2809,6 +2823,168 @@ impl Engine {
             });
         }
         Ok(out)
+    }
+
+    /// Releases memory in the order that gives the most back per unit of work.
+    ///
+    /// Two things hold rows in memory here, and the reference bounds both with
+    /// one budget: the append buffer (its `BufferObject`s) and the in-memory
+    /// index tails. The port's quota covered the second only, and the append
+    /// buffer had no other limiter at all, so the rows a write-heavy table
+    /// appended stayed resident until a checkpoint - a day by default.
+    ///
+    /// A breach therefore does both:
+    ///
+    /// 1. **Every table's unsealed rows go to their block files.** That is the
+    ///    per-table step of a checkpoint (`write_blocks_bounded`), not a
+    ///    checkpoint: no timestamp moves, no WAL entry is written, and the rows
+    ///    stay readable because those files *are* the mirror. It is what the
+    ///    reference's buffer manager does when it evicts a block.
+    /// 2. **The largest memory index is dumped** - the unit the reference's
+    ///    `DumpIndexProcessor` works in when one step cannot free the whole
+    ///    budget. Dumping all of them would spend a transaction per index on
+    ///    every breach; the next check picks the next largest if it is still
+    ///    over.
+    pub(crate) async fn dump_under_pressure(&self) {
+        self.dump_all_sealed_blocks().await;
+        self.dump_largest_memory_index().await;
+        // The dump released tails: fold that into the engine-wide total so the
+        // next quota check sees it without a second scan of every table.
+        self.recompute_memindex_total();
+    }
+
+    /// Writes every table's unsealed rows into its block files.
+    ///
+    /// Each write takes the table's bottom gate, so this cannot simply await
+    /// one: the quota is proposed from **inside** a commit's bottom half
+    /// (`update_text_indexes_batch`, which the bottom calls while holding the
+    /// gate), and re-entering it there self-locks. `run_commit_bottom` is the
+    /// entry that knows this - it runs the work inline when the gate is already
+    /// held on this thread, and on the table's bottom worker otherwise.
+    pub(crate) async fn dump_all_sealed_blocks(&self) {
+        let tables: Vec<String> = self
+            .tables
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, entry)| !entry.pending_rows.is_empty())
+            .map(|(key, _)| key.clone())
+            .collect();
+        let checkpoint_ts = self.checkpoint_ts();
+        for table in tables {
+            let key = self.table_key(&table);
+            // `ivf_mem` is deliberately left alone: a checkpoint clears it after
+            // its own block write because its bound covers every row it wrote,
+            // but the rows a transaction still in flight holds are not in these
+            // files and their vectors must stay searchable. The IVF tail is
+            // released by the index dump that follows.
+            let work_table = table.clone();
+            let _ = self
+                .run_commit_bottom(&key, move |engine| {
+                    engine
+                        .write_blocks_bounded_locked(&work_table, checkpoint_ts)
+                        .map(|_| ())
+                })
+                .await;
+        }
+    }
+
+    /// Dumps the in-memory index that holds the most bytes.
+    ///
+    /// **One** index, not all of them: this runs on every quota breach, and a
+    /// table with several indexes would spend a transaction per index on each
+    /// one. The largest gives the most memory back for that single unit of
+    /// work, which is the choice the reference's `DumpIndexProcessor` makes.
+    /// The next breach picks the next largest, so a table with several tails
+    /// drains over consecutive checks rather than in one stall.
+    ///
+    /// The rows are the part that has to go now: they are what grows without
+    /// any other bound, and [`Self::dump_all_sealed_blocks`] has just released
+    /// them.
+    async fn dump_largest_memory_index(&self) {
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        let mut largest: Option<(usize, &IndexMeta)> = None;
+        for im in &indexes {
+            if !self.index_has_memory_tail(&im.table, im) {
+                continue;
+            }
+            let bytes = self.index_memory_bytes(&im.table, &im.column, &im.index_type);
+            if bytes > 0 && largest.is_none_or(|(seen, _)| bytes > seen) {
+                largest = Some((bytes, im));
+            }
+        }
+        let Some((_, im)) = largest else {
+            return;
+        };
+        let _ = self.dump_index_transaction(&im.table, &im.name).await;
+    }
+
+    /// One index's in-memory footprint, for picking the largest to dump.
+    ///
+    /// Narrower than [`Self::memindex_bytes_of`] on purpose: that one also
+    /// counts the unsealed rows and the secondary/IVF tails, which this dump
+    /// cannot release.
+    fn index_memory_bytes(&self, table: &str, column: &str, index_type: &str) -> usize {
+        let tkey = self.table_key(table);
+        let kind = index_type.trim();
+        if is_secondary_kind(kind) {
+            let tables = self.tables.lock().unwrap();
+            return tables
+                .get(&tkey)
+                .and_then(|entry| entry.secondary.indexes.get(column))
+                .map(|index| index.approx_bytes())
+                .unwrap_or(0);
+        }
+        if kind.eq_ignore_ascii_case("HNSW") {
+            // Q8-quantised vectors, the same figure `note_hnsw_insert` charges
+            // through `index_pending_bytes`.
+            let pending = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.index_pending_bytes.get(column).copied())
+                    .unwrap_or(0)
+            };
+            return pending;
+        }
+        if kind.eq_ignore_ascii_case("IVF") {
+            let tables = self.tables.lock().unwrap();
+            return tables
+                .get(&tkey)
+                .and_then(|entry| entry.ivf_mem.get(column))
+                .map(|rows| {
+                    rows.first()
+                        .map(|(_, v)| rows.len() * v.len() * std::mem::size_of::<f32>())
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+        }
+        // The handles are cloned out before any index lock is taken: holding a
+        // read guard while fetching would close the `tables` -> index cycle
+        // `Engine::text_index_for` documents.
+        let (text, sparse, mv) = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&tkey) else {
+                return 0;
+            };
+            (
+                entry.text.get(column).cloned(),
+                entry.sparse.get(column).cloned(),
+                entry.mv.get(column).cloned(),
+            )
+        };
+        if kind.eq_ignore_ascii_case("fulltext") {
+            return text
+                .and_then(|index| index.read().ok().map(|guard| guard.mem.mem_used()))
+                .unwrap_or(0);
+        }
+        if kind.eq_ignore_ascii_case("bmp") || kind.eq_ignore_ascii_case("sparse") {
+            return sparse
+                .and_then(|index| index.read().ok().map(|guard| guard.tail_bytes))
+                .unwrap_or(0);
+        }
+        mv.and_then(|index| index.read().ok().map(|guard| guard.tail_bytes))
+            .unwrap_or(0)
     }
 
     /// Dumps every in-memory index (the body of the reference's dump task).
