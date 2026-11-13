@@ -5196,7 +5196,12 @@ impl Engine {
         let mut gone = Vec::new();
         for id in deprecated {
             let path = dir.join(format!("chunk_{id}.idx"));
-            if !path.exists() || storage::chunk_store::remove_file(&path).is_ok() {
+            // Always ask the store, never `path.exists()`: on an object profile
+            // the bytes live in an object and the logical path may be absent
+            // while the chunk is still there. The id joins `gone` - and its
+            // deprecation marker is cleared - only when the store reports the
+            // bytes as removed (a missing local file alone is that success).
+            if storage::chunk_store::remove_file(&path).is_ok() {
                 gone.push(id);
             }
         }

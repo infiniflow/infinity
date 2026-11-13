@@ -190,6 +190,10 @@ impl ChunkManifest {
 pub fn remove_chunk(index_dir: &str, base_name: &str) {
     let store = crate::chunk_store::chunk_store();
     for suffix in [".dic", ".pos", ".len", ".ok"] {
-        store.remove(&Path::new(index_dir).join(format!("{base_name}{suffix}")));
+        // Best effort by design: this drops a chunk nothing references any
+        // more, and a retry costs nothing. The flow that decides whether a
+        // **live** chunk may be forgotten is `reclaim_deprecated_chunks`, which
+        // does check the store's answer.
+        let _ = store.remove(&Path::new(index_dir).join(format!("{base_name}{suffix}")));
     }
 }

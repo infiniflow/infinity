@@ -200,10 +200,18 @@ impl Engine {
         // the full-text chunk cache alike, exactly as the reference's file
         // workers do. Without one the direct-disk store stays installed, so a
         // plain directory behaves as before.
+        // Installed **for this engine's root**, not as the process default: a
+        // process may hold several engines, each with its own manager and its
+        // own directory, and the one opened last must not serve the earlier
+        // ones' reads, writes and cleanups.
         match persistence.as_ref() {
-            Some(pm) => storage::chunk_store::install_chunk_store(Arc::new(
-                storage::chunk_store::PersistentChunkStore::new(Arc::clone(pm), &dir),
-            )),
+            Some(pm) => storage::chunk_store::install_chunk_store_for(
+                &dir,
+                Arc::new(storage::chunk_store::PersistentChunkStore::new(
+                    Arc::clone(pm),
+                    &dir,
+                )),
+            ),
             // A plain open never undoes a manager another open installed: one
             // engine per process makes this a no-op, and a process with several
             // (a test suite) keeps the object profile while it is in use.

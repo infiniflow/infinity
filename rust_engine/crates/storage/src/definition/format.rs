@@ -556,11 +556,15 @@ pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// `fsync`s the directory holding `path`, so a rename (or an unlink) in it is
 /// durable.
 ///
-/// Not every platform allows opening a directory for that; the call is then a
-/// no-op rather than an error, because the data file itself is already synced
-/// and failing here would turn "the write worked" into an error the caller
-/// cannot act on.
-fn sync_parent(path: &Path) -> std::io::Result<()> {
+/// The barrier is what makes "the file is on the disk" mean "the entry naming
+/// it is on the disk too", so a failure here is reported: a caller that cannot
+/// sync the directory has not reached durability, and pretending otherwise is
+/// how a chunk that never got its directory entry survives a power cut as a
+/// published one. Two cases are genuinely not a barrier: a directory that does
+/// not exist (`NotFound` - nothing to sync), and a platform that cannot open a
+/// directory for `fsync` at all (Windows reports `PermissionDenied`), where the
+/// rename is journaled by the filesystem itself.
+pub fn sync_parent(path: &Path) -> std::io::Result<()> {
     let Some(parent) = path.parent() else {
         return Ok(());
     };
@@ -569,14 +573,14 @@ fn sync_parent(path: &Path) -> std::io::Result<()> {
     } else {
         parent
     };
-    match std::fs::File::open(dir) {
-        Ok(handle) => {
-            let _ = handle.sync_all();
-            Ok(())
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(_) => Ok(()),
-    }
+    let handle = match std::fs::File::open(dir) {
+        Ok(handle) => handle,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        #[cfg(windows)]
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    handle.sync_all()
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).

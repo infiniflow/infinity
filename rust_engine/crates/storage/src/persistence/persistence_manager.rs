@@ -12,7 +12,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -255,6 +255,15 @@ impl PersistenceManager {
         self.workspace.join(obj_key)
     }
 
+    /// The object workspace itself.
+    ///
+    /// A caller that spools bytes for [`Self::persist_keyed`] has to spool them
+    /// **here**: the publication renames the spool file into this directory, and
+    /// a rename across filesystems fails with `EXDEV`.
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
+    }
+
     /// Writes `pm|object|<rel>`; the in-memory map stays authoritative.
     fn record_file(&self, rel: &str, addr: &ObjAddr) {
         if let Some(store) = self.store.as_ref() {
@@ -426,8 +435,10 @@ impl PersistenceManager {
             let dst_path = self.get_obj_path(&obj_key);
             fs::rename(tmp_file_path, &dst_path).map_err(|e| Error::io(&dst_path, e))?;
             // The object is what a reader will map after a crash, so it has to
-            // reach the disk before the mapping that names it is published.
+            // reach the disk before the mapping that names it is published -
+            // the bytes *and* the directory entry that finds them again.
             sync_file(&dst_path)?;
+            crate::format::sync_parent(&dst_path).map_err(|e| Error::io(&dst_path, e))?;
             let obj_addr = ObjAddr {
                 obj_key: obj_key.clone(),
                 part_offset: 0,
@@ -451,7 +462,12 @@ impl PersistenceManager {
                 part_size: src_size,
             };
             self.append_locked(&mut inner, tmp_file_path, src_size)?;
-            sync_file(&self.get_obj_path(&obj_addr.obj_key))?;
+            // Same barrier as the dedicated path: `append_locked` may have just
+            // created the composed object, and the part is only findable once
+            // its directory entry is durable.
+            let object = self.get_obj_path(&obj_addr.obj_key);
+            sync_file(&object)?;
+            crate::format::sync_parent(&object).map_err(|e| Error::io(&object, e))?;
             fs::remove_file(tmp_file_path).map_err(|e| Error::io(tmp_file_path, e))?;
             let stat = ObjStat::new(
                 inner.current_object_size,
@@ -882,13 +898,12 @@ impl PersistenceManager {
         let mut written = 0usize;
         for path in &files {
             let key = path.to_string_lossy().to_string();
-            let size = fs::metadata(path).map(|meta| meta.len() as usize).ok();
-            // Already published by the write path with these bytes.
-            if let (Some(size), Some(rel)) = (size, self.key_of(path)) {
-                if self
-                    .lookup_key(&rel)
-                    .is_some_and(|addr| addr.part_size == size || size == 0)
-                {
+            // Already published by the write path with **these** bytes. A
+            // matching part size is not proof on its own - an in-place rewrite
+            // keeps the length and a truncated file keeps its record - so the
+            // published range is compared with what is on the disk now.
+            if let Some(rel) = self.key_of(path) {
+                if self.published_bytes_match(&rel, path)? {
                     continue;
                 }
             }
@@ -901,6 +916,67 @@ impl PersistenceManager {
         let result = self.current_obj_finalize();
         self.apply_write_result(&result)?;
         Ok(written)
+    }
+
+    /// Whether the object recorded for `key` already holds exactly the bytes at
+    /// `path`.
+    ///
+    /// [`Self::persist_directory`] uses this to skip files the write path
+    /// published: a size that matches says nothing about the *content* (an
+    /// in-place rewrite keeps the length, a truncation keeps the record), so the
+    /// recorded range is read back and compared. The comparison streams in
+    /// chunks, so a large data file never has to fit in memory; any IO problem
+    /// answers "no", which makes the caller publish instead of skipping.
+    fn published_bytes_match(&self, key: &str, path: &Path) -> Result<bool> {
+        let Some(addr) = self.lookup_key(key) else {
+            return Ok(false);
+        };
+        let size = match fs::metadata(path) {
+            Ok(meta) => meta.len() as usize,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(Error::io(path, error)),
+        };
+        if addr.part_size != size {
+            return Ok(false);
+        }
+        if size == 0 {
+            // An empty file owns no bytes; the reference records `KEY_EMPTY`.
+            return Ok(addr.obj_key == KEY_EMPTY);
+        }
+        if addr.obj_key == KEY_EMPTY {
+            return Ok(false);
+        }
+        let object = self.get_obj_path(&addr.obj_key);
+        let mut published = match fs::File::open(&object) {
+            Ok(file) => file,
+            Err(_) => return Ok(false),
+        };
+        if published
+            .seek(SeekFrom::Start(addr.part_offset as u64))
+            .is_err()
+        {
+            return Ok(false);
+        }
+        let mut local = match fs::File::open(path) {
+            Ok(file) => file,
+            Err(_) => return Ok(false),
+        };
+        let mut left = size;
+        let mut theirs = vec![0u8; 64 * 1024];
+        let mut ours = vec![0u8; 64 * 1024];
+        while left > 0 {
+            let want = left.min(theirs.len());
+            if published.read_exact(&mut theirs[..want]).is_err()
+                || local.read_exact(&mut ours[..want]).is_err()
+            {
+                return Ok(false);
+            }
+            if theirs[..want] != ours[..want] {
+                return Ok(false);
+            }
+            left -= want;
+        }
+        Ok(true)
     }
 }
 

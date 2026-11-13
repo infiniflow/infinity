@@ -49,13 +49,16 @@ pub(crate) fn remove_run_files(dir: &str, base_name: &str) {
         storage::invertedindex::format::FULLTEXT_POSTING_SUFFIX,
         storage::invertedindex::format::FULLTEXT_LENGTH_SUFFIX,
     ] {
-        store.remove(std::path::Path::new(
+        // Best effort: a spill run nothing references any more, and the next
+        // attempt removes whatever this one missed.
+        let _ = store.remove(std::path::Path::new(
             &storage::invertedindex::format::fulltext_chunk_file(dir, base_name, suffix),
         ));
     }
     // The publish marker goes with them, or a later chunk that reuses this base
     // name would be validated against the lengths of the one just removed.
-    store.remove(&storage::invertedindex::chunk_manifest::ChunkManifest::path(dir, base_name));
+    let _ =
+        store.remove(&storage::invertedindex::chunk_manifest::ChunkManifest::path(dir, base_name));
 }
 
 /// One spilled sorted run: the memory tail written as the regular segment file

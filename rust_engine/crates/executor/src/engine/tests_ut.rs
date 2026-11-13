@@ -10155,6 +10155,14 @@ mod tests {
         );
     }
 
+    /// Serializes the tests that install or depend on the process-wide chunk
+    /// store.
+    ///
+    /// Two of them running at once would each install a backend for its own
+    /// temporary directory, and the engine parts that resolve paths through the
+    /// slot would then read the other test's manager.
+    static CHUNK_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// Every data file the engine writes is published through the persistence
     /// manager, and a read resolves the object when the local copy is gone.
     ///
@@ -10165,6 +10173,11 @@ mod tests {
     /// full-text index: the block columns are checked too.
     #[test]
     fn the_persistent_manager_publishes_every_data_file() {
+        // Declared before `LocalStore` so the locals drop in the other order:
+        // the reset to the local backend happens while the lock is still held.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         /// The backend is process-wide, so a panicking test must not leave a
         /// manager from its own temporary directory installed.
         struct LocalStore(());
@@ -10257,6 +10270,11 @@ mod tests {
     /// must not see them.
     #[test]
     fn a_data_directory_comes_back_from_the_objects_alone() {
+        // See `the_persistent_manager_publishes_every_data_file`: same global
+        // slot, same lock, and the guard declared before `LocalStore`.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         /// See `the_persistent_manager_publishes_every_data_file`.
         struct LocalStore(());
         impl Drop for LocalStore {

@@ -10,8 +10,12 @@
 //! own content: `uniq{i}` appears in exactly one document, `bucket{b}` covers
 //! exactly the rows with `i % 7 == b`.
 //!
-//! Env: `FT_SCALE_PHRASE=0` skips the phrase query (it materialises every
-//! matching document's positions - see docs/FULLTEXT_BENCH.md §13).
+//! Flags: `--probes <n>` (default 5, one `filter_fulltext` probe per sampled
+//! row), `--no-phrase` (skip the phrase query, which materialises every matching
+//! document's positions - see docs/FULLTEXT_BENCH.md §13), `--delete-pct <p>`
+//! (default 1; the delete stage scans the table once per statement, so a 10M run
+//! uses 0). The same knobs are also read from `FT_SCALE_PROBES`,
+//! `FT_SCALE_PHRASE` and `FT_SCALE_DELETE_PCT` when a flag is absent.
 
 use std::collections::BTreeSet;
 use std::time::Instant;
@@ -88,22 +92,52 @@ fn timed<T>(label: &str, run: impl FnOnce() -> T) -> T {
 }
 
 fn main() {
+    // Positional: `<rows> [dir]`. Flags overrule the environment (and exist
+    // because a run at a large scale needs different knobs than the default
+    // gate: the delete stage is a full table scan per statement, so at 10M it
+    // costs hours and is not what a query-latency run is measuring).
     let mut args = std::env::args().skip(1);
-    let rows: usize = args.next().and_then(|v| v.parse().ok()).unwrap_or(300_000);
-    let dir = match args.next() {
+    let mut positional: Vec<String> = Vec::new();
+    let mut probes_flag: Option<usize> = None;
+    let mut phrase_flag: Option<bool> = None;
+    let mut delete_pct_flag: Option<f64> = None;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--probes" => probes_flag = args.next().and_then(|v| v.parse().ok()),
+            "--no-phrase" => phrase_flag = Some(false),
+            "--delete-pct" => delete_pct_flag = args.next().and_then(|v| v.parse().ok()),
+            other => positional.push(other.to_string()),
+        }
+    }
+    let mut positional = positional.into_iter();
+    let rows: usize = positional
+        .next()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(300_000);
+    let dir = match positional.next() {
         Some(path) => std::path::PathBuf::from(path),
         None => tempfile::tempdir().unwrap().keep(),
     };
-    let phrase = std::env::var("FT_SCALE_PHRASE")
-        .map(|v| v != "0")
-        .unwrap_or(true);
+    let delete_pct: f64 = delete_pct_flag.unwrap_or_else(|| {
+        std::env::var("FT_SCALE_DELETE_PCT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1.0)
+    });
+    let phrase = phrase_flag.unwrap_or_else(|| {
+        std::env::var("FT_SCALE_PHRASE")
+            .map(|v| v != "0")
+            .unwrap_or(true)
+    });
     // `filter_fulltext` is a predicate the planner evaluates per row (it is
     // O(rows), not O(matches)), so a probe costs milliseconds per 100k rows;
     // fewer probes keeps a large run's check phase bounded.
-    let probes: usize = std::env::var("FT_SCALE_PROBES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
+    let probes: usize = probes_flag.unwrap_or_else(|| {
+        std::env::var("FT_SCALE_PROBES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5)
+    });
     std::fs::create_dir_all(&dir).unwrap();
     println!("{rows} rows under {}", dir.display());
 
@@ -200,25 +234,33 @@ fn main() {
     });
     check(&e, "after optimize", &none);
 
-    let victims: Vec<i64> = (0..(rows / 100).max(1)).map(|i| i as i64).collect();
-    timed("delete 1%", || {
-        for chunk in victims.chunks(5000) {
-            let list = chunk
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            e.execute_blocking(&format!("DELETE FROM t WHERE id IN ({list});"))
-                .unwrap();
-        }
-    });
-    let deleted: BTreeSet<i64> = victims.iter().copied().collect();
-    check(&e, "after delete", &deleted);
+    // `id` has no secondary index, so every `DELETE … WHERE id IN (…)` scans the
+    // whole table: at 10M rows the 1% stage is hours. `--delete-pct 0` runs the
+    // query half only, which is what a latency run is measuring.
+    let victims: Vec<i64> = (0..((rows as f64 * delete_pct / 100.0) as usize))
+        .map(|i| i as i64)
+        .collect();
+    let mut deleted: BTreeSet<i64> = BTreeSet::new();
+    if !victims.is_empty() {
+        timed(&format!("delete {delete_pct}%"), || {
+            for chunk in victims.chunks(5000) {
+                let list = chunk
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                e.execute_blocking(&format!("DELETE FROM t WHERE id IN ({list});"))
+                    .unwrap();
+            }
+        });
+        deleted = victims.iter().copied().collect();
+        check(&e, "after delete", &deleted);
 
-    timed("optimize after delete", || {
-        executor::block_on(e.optimize_fulltext_async("t")).unwrap()
-    });
-    check(&e, "after merge", &deleted);
+        timed("optimize after delete", || {
+            executor::block_on(e.optimize_fulltext_async("t")).unwrap()
+        });
+        check(&e, "after merge", &deleted);
+    }
 
     println!(
         "rss {:.0} MB, data {} MB, fulltext {} MB",

@@ -41,6 +41,9 @@ use std::sync::{Arc, OnceLock, RwLock};
 use crate::mapped::MappedFile;
 use crate::persistence::PersistenceManager;
 
+/// Distinguishes the spool files of two writes of the same path.
+static SPOOL_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// One chunk's byte storage.
 pub trait ChunkStore: Send + Sync + std::fmt::Debug {
     /// Publishes `bytes` at `path`, durably.
@@ -67,7 +70,12 @@ pub trait ChunkStore: Send + Sync + std::fmt::Debug {
     fn open(&self, path: &Path) -> std::io::Result<MappedFile>;
 
     /// Removes the value at `path`; a missing one is not an error.
-    fn remove(&self, path: &Path);
+    ///
+    /// A real failure is returned instead of being swallowed: the caller that
+    /// reclaims a deprecated chunk clears the deprecation marker only when the
+    /// bytes are gone, and a marker cleared over a surviving object would leak
+    /// the chunk for good.
+    fn remove(&self, path: &Path) -> std::io::Result<()>;
 
     /// Removes a whole directory tree and every value recorded below it.
     ///
@@ -113,8 +121,8 @@ impl ChunkStore for LocalChunkStore {
         MappedFile::open_path(path)
     }
 
-    fn remove(&self, path: &Path) {
-        let _ = std::fs::remove_file(path);
+    fn remove(&self, path: &Path) -> std::io::Result<()> {
+        remove_local_file(path)
     }
 
     fn remove_tree(&self, dir: &Path) {
@@ -204,10 +212,18 @@ impl PersistentChunkStore {
             }
             return Ok(());
         }
-        // `.pmtmp` rather than `set_extension`: `.dic`/`.pos`/`.len` of the same
-        // chunk share a stem, so the spool name has to extend the whole file
-        // name.
-        let tmp = PathBuf::from(format!("{}.pmtmp", path.to_string_lossy()));
+        // The spool lives **inside the object workspace**: `persist_keyed`
+        // renames it into place, and a rename across filesystems fails with
+        // `EXDEV`. The name carries the file's own name so a leftover spool is
+        // identifiable, and a counter so concurrent writes of one path (a
+        // rewrite racing a checkpoint) never share a spool file.
+        let spool = self.manager.workspace().join(".spool");
+        std::fs::create_dir_all(&spool)?;
+        let seq = SPOOL_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp = spool.join(format!(
+            "{}-{seq}.pmtmp",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        ));
         crate::format::write_synced_direct(&tmp, bytes)?;
         let result = self
             .manager
@@ -275,13 +291,22 @@ impl ChunkStore for PersistentChunkStore {
         }
     }
 
-    fn remove(&self, path: &Path) {
+    fn remove(&self, path: &Path) -> std::io::Result<()> {
+        // Both halves have to succeed before the caller may forget the chunk:
+        // the local file is the cache, the object is the durable copy, and a
+        // failure in either leaves bytes behind that a later cleanup still has
+        // to find.
+        remove_local_file(path)?;
         if let Some(key) = self.key(path) {
-            if let Ok(result) = self.manager.cleanup_key(&key) {
-                let _ = self.manager.apply_write_result(&result);
-            }
+            let result = self
+                .manager
+                .cleanup_key(&key)
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+            self.manager
+                .apply_write_result(&result)
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
         }
-        let _ = std::fs::remove_file(path);
+        Ok(())
     }
 
     fn remove_tree(&self, dir: &Path) {
@@ -317,11 +342,112 @@ impl std::fmt::Debug for PersistentChunkStore {
     }
 }
 
-type Slot = RwLock<Arc<dyn ChunkStore>>;
+/// Removes a local file; a missing one is the caller's success case.
+///
+/// Every backend bottoms out here, so "the file was already gone" means the
+/// same thing on both profiles and a real `EPERM`/`EBUSY` still reaches the
+/// caller that decides whether a deprecation marker may be cleared.
+fn remove_local_file(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+/// The process-wide slot's value: one backend per engine root, plus a default
+/// for paths that belong to no installed root.
+///
+/// A process may open several engines (a test suite does, and so does an
+/// embedder with two directories), each with its own persistence manager. A
+/// single global backend would make the engine opened last serve every earlier
+/// engine's reads, writes and cleanups - and those paths are not in its
+/// workspace. Routing by root keeps each engine on its own manager while paths
+/// outside every root (the direct-disk case, a unit test) keep using the
+/// default, exactly as a one-engine process did before.
+#[derive(Clone, Debug)]
+struct RoutingStore {
+    default: Arc<dyn ChunkStore>,
+    /// Installed engine roots; the longest matching prefix wins.
+    roots: Vec<(PathBuf, Arc<dyn ChunkStore>)>,
+}
+
+impl RoutingStore {
+    fn local() -> Self {
+        Self {
+            default: Arc::new(LocalChunkStore),
+            roots: Vec::new(),
+        }
+    }
+
+    /// The backend that owns `path`.
+    fn pick(&self, path: &Path) -> &Arc<dyn ChunkStore> {
+        self.roots
+            .iter()
+            .filter(|(root, _)| path.starts_with(root))
+            .max_by_key(|(root, _)| root.as_os_str().len())
+            .map(|(_, store)| store)
+            .unwrap_or(&self.default)
+    }
+}
+
+impl ChunkStore for RoutingStore {
+    fn write(&self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        self.pick(path).write(path, bytes)
+    }
+
+    fn write_dedicated(&self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        self.pick(path).write_dedicated(path, bytes)
+    }
+
+    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
+        self.pick(path).read(path)
+    }
+
+    fn open(&self, path: &Path) -> std::io::Result<MappedFile> {
+        self.pick(path).open(path)
+    }
+
+    fn remove(&self, path: &Path) -> std::io::Result<()> {
+        self.pick(path).remove(path)
+    }
+
+    fn remove_tree(&self, dir: &Path) {
+        self.pick(dir).remove_tree(dir);
+    }
+
+    fn length(&self, path: &Path) -> Option<u64> {
+        self.pick(path).length(path)
+    }
+
+    fn list(&self, dir: &Path, prefix: &str) -> Vec<String> {
+        self.pick(dir).list(dir, prefix)
+    }
+
+    fn is_local(&self) -> bool {
+        self.roots.is_empty() && self.default.is_local()
+    }
+}
+
+type Slot = RwLock<Arc<RoutingStore>>;
 
 fn slot() -> &'static Slot {
     static SLOT: OnceLock<Slot> = OnceLock::new();
-    SLOT.get_or_init(|| RwLock::new(Arc::new(LocalChunkStore)))
+    SLOT.get_or_init(|| RwLock::new(Arc::new(RoutingStore::local())))
+}
+
+/// Rewrites the slot's registry.
+///
+/// The value is an `Arc`, so a reader keeps the snapshot it cloned: an install
+/// while a write is in flight never swaps the backend under that write.
+fn update(f: impl FnOnce(&mut RoutingStore)) {
+    let mut guard = match slot().write() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let mut next = RoutingStore::clone(&guard);
+    f(&mut next);
+    *guard = Arc::new(next);
 }
 
 /// [`ChunkStore::read`] for a caller holding anything path-like.
@@ -343,56 +469,62 @@ pub fn open_file(path: impl AsRef<Path>) -> std::io::Result<MappedFile> {
 ///
 /// Deleting a data file has to go through the store as well: a direct
 /// `std::fs::remove_file` keeps the `pm|object|` record and the object's bytes
-/// alive, and `restore_missing_files` then brings the deleted file back.
+/// alive, and `restore_missing_files` then brings the deleted file back. The
+/// store's answer is passed on, so a chunk whose bytes are still there is not
+/// reported as reclaimed.
 pub fn remove_file(path: impl AsRef<Path>) -> std::io::Result<()> {
-    chunk_store().remove(path.as_ref());
-    Ok(())
+    chunk_store().remove(path.as_ref())
 }
 
 /// The store every chunk reader and writer uses.
 pub fn chunk_store() -> Arc<dyn ChunkStore> {
-    match slot().read() {
+    let registry: Arc<RoutingStore> = match slot().read() {
         Ok(guard) => Arc::clone(&guard),
         Err(poisoned) => Arc::clone(&poisoned.into_inner()),
-    }
+    };
+    registry
 }
 
 /// Installs the backend for this process (`InfinityContext`'s persistence
 /// manager, which the reference looks up the same way).
+///
+/// This is the default for paths that belong to no installed root; an engine
+/// installs its own with [`install_chunk_store_for`].
 pub fn install_chunk_store(store: Arc<dyn ChunkStore>) {
-    match slot().write() {
-        Ok(mut guard) => *guard = store,
-        Err(poisoned) => *poisoned.into_inner() = store,
-    }
+    update(|registry| registry.default = store);
 }
 
-/// Goes back to the direct-disk backend.
+/// Installs `store` as the backend of every path below `root`.
+///
+/// Each engine owns its own persistence manager and its own directory, so a
+/// later open must not take over an earlier one's reads, writes and cleanups:
+/// the registry keeps one entry per root and routes by path.
+pub fn install_chunk_store_for(root: impl AsRef<Path>, store: Arc<dyn ChunkStore>) {
+    let root = root.as_ref().to_path_buf();
+    update(|registry| {
+        registry.default = Arc::clone(&store);
+        registry.roots.retain(|(installed, _)| installed != &root);
+        registry.roots.push((root, store));
+    });
+}
+
+/// Goes back to the direct-disk backend and forgets every installed root.
 pub fn install_local_chunk_store() {
-    install_chunk_store(Arc::new(LocalChunkStore));
+    update(|registry| *registry = RoutingStore::local());
 }
 
-/// Installs the direct-disk backend unless a persistence profile already owns
-/// the slot.
+/// Installs the direct-disk backend unless a persistence profile owns the slot.
 ///
 /// The engine calls this on every open. One engine per process never notices;
 /// a process that opens several (a test suite) must not have a plain open undo
-/// the object profile another open installed, so a manager always wins and the
-/// local backend is only ever installed over another local one.
+/// the object profile another open installed, so the roots of other engines
+/// stay registered and only the default is (re)installed as local.
 pub fn install_local_chunk_store_unless_persistent() {
-    match slot().write() {
-        Ok(mut guard) => {
-            if !guard.is_local() {
-                return;
-            }
-            *guard = Arc::new(LocalChunkStore);
+    update(|registry| {
+        if registry.is_local() {
+            registry.default = Arc::new(LocalChunkStore);
         }
-        Err(poisoned) => {
-            let mut guard = poisoned.into_inner();
-            if guard.is_local() {
-                *guard = Arc::new(LocalChunkStore);
-            }
-        }
-    }
+    });
 }
 
 /// Removes a data directory and forgets every value recorded below it.
