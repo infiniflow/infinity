@@ -113,6 +113,11 @@ pub(crate) fn quantize_elem(x: f64, e: ElemType) -> f32 {
 ///
 /// Below one vector the scalar loop runs instead, which keeps small tensors (the
 /// shape most callers and tests use) bit-identical to the previous code.
+/// Only the tests use this now: the tensor scan narrows both operands once and
+/// runs [`crate::engine::state`]'s `maxsim_f32` over them, so the per-pair
+/// kernel has no production caller. Kept (and tested) as the scalar reference
+/// the vectorised path is checked against.
+#[cfg(test)]
 pub(crate) fn dot_quantized(a: &[f64], b: &[f64], qa: ElemType, qb: ElemType) -> f32 {
     use std::simd::{f32x4, f64x4, num::SimdFloat};
 

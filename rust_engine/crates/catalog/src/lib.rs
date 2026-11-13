@@ -951,7 +951,19 @@ impl Catalog {
         // `tbl|col|` and `catalog|idx|`), so mirror it inside this capture.
         // C++-only mode already rewrote it inside `f`; a checkpoint mirrors it
         // too, which is what covers a directory no DDL touched.
-        if out.is_ok() && !self.catalog_only {
+        // `f` wrote nothing in the native key space, so it changed no table,
+        // column or index: the C++ layout it would produce is the one already
+        // there. `DROP TABLE IF EXISTS <missing>` is exactly this case, and a
+        // test that drops a thousand absent tables spent a full layout rewrite
+        // (list everything, sweep every key, then compare every key against the
+        // store to decide the statement was a no-op) on each of them.
+        let wrote_nothing = self
+            .capture
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|capture| capture.batch.is_empty());
+        if out.is_ok() && !self.catalog_only && !wrote_nothing {
             // Best effort, like the checkpoint's: a column type the C++ encoding
             // does not cover yet leaves the previous layout in place rather than
             // failing the DDL (the next checkpoint reports it).
@@ -1220,13 +1232,74 @@ impl Catalog {
         comments: &[Option<String>],
         sparse_stores: &[Option<SparseStore>],
     ) -> Result<TableMeta> {
+        let existing = self.get_table_by_name(name)?;
+        self.create_table_typed_resolved(
+            name,
+            existing.as_ref(),
+            false,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            sparse_stores,
+        )
+    }
+
+    /// [`Self::create_table_typed_with_sparse_stores`] with the name already
+    /// resolved.
+    ///
+    /// Inside a capture `get_table_by_name` re-reads the store (the cache is
+    /// bypassed there), and the caller has just done that lookup to decide
+    /// whether a crashed `DROP TABLE` left orphans behind - one resolution is
+    /// enough for both.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_table_typed_existing(
+        &self,
+        name: &str,
+        existing: Option<&TableMeta>,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
+        self.create_table_typed_resolved(
+            name,
+            existing,
+            true,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            sparse_stores,
+        )
+    }
+
+    /// The body of both entries: `resolved` says the caller already looked the
+    /// name up, so a duplicate is decided from `existing` alone.
+    #[allow(clippy::too_many_arguments)]
+    fn create_table_typed_resolved(
+        &self,
+        name: &str,
+        existing: Option<&TableMeta>,
+        resolved: bool,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
         let _ddl = self.begin_ddl();
         // The `CREATE TABLE … PROPERTIES (bloom_filter_columns = …)` flag is
         // **not** recorded here: the reference's `ColumnDef::ToJson` omits
         // `build_bloom_filter_`, so the catalog it writes reads back as
         // all-false. The flag survives only in the WAL's `CreateTableV2`.
 
-        if self.get_table_by_name(name)?.is_some() {
+        if existing.is_some() || (!resolved && self.get_table_by_name(name)?.is_some()) {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
         }
         // The counter is committed in the same batch as the table, so its lock
@@ -1568,7 +1641,33 @@ impl Catalog {
                 let found = self.with_view(|store| crate::layout::read_table(store, db, table))?;
                 return Ok(found.as_ref().map(crate::layout::table_meta_of));
             }
-            return Ok(self.tables()?.into_iter().find(|t| t.name == name));
+            // A bare name is looked up in `default_db` first: that is the
+            // database every unqualified statement resolves against, and the
+            // point read is a couple of keys. Reading every table and filtering
+            // - which is what this did - made a `DROP TABLE` of a bare name cost
+            // O(tables) per statement (0.22 ms against the reference's 0.07 on
+            // a 1000-table directory). Only a name that is not in `default_db`
+            // pays for the scan, and there the database list bounds it.
+            if let Some(found) =
+                self.with_view(|store| crate::layout::read_table(store, "default_db", name))?
+            {
+                return Ok(Some(crate::layout::table_meta_of(&found)));
+            }
+            // Not in the default database: try the others by name, still as a
+            // point read each. Listing every table and filtering turned a miss
+            // into a full catalog scan, which `DROP TABLE IF EXISTS <missing>`
+            // paid on every call.
+            for db in self.database_records()? {
+                if db == "default_db" {
+                    continue;
+                }
+                if let Some(found) =
+                    self.with_view(|store| crate::layout::read_table(store, &db, name))?
+                {
+                    return Ok(Some(crate::layout::table_meta_of(&found)));
+                }
+            }
+            return Ok(None);
         }
         match self.store.get(&name_key(name))? {
             Some(b) => {
@@ -1598,11 +1697,21 @@ impl Catalog {
     /// `Cleanup` walks them, and the name stops resolving because
     /// `get_table_by_name` refuses a record with a marker.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
+        let meta = self.get_table_by_name(name)?;
+        self.drop_table_meta(name, meta.as_ref())
+    }
+
+    /// [`Self::drop_table`] with the record the caller already resolved.
+    ///
+    /// Inside a capture every `get_table_by_name` re-reads the store (the cache
+    /// is bypassed so the statement's own uncommitted DDL is visible), so the
+    /// caller's lookup is worth handing over instead of repeating.
+    pub fn drop_table_meta(&self, name: &str, meta: Option<&TableMeta>) -> Result<bool> {
         let _ddl = self.begin_ddl();
         if self.catalog_only {
             // A name that already has a marker is gone: `DROP TABLE` reports it
             // as absent, exactly as `CatalogMeta::GetTableMeta` does.
-            if self.get_table_by_name(name)?.is_none() {
+            if meta.is_none() && self.get_table_by_name(name)?.is_none() {
                 return Ok(false);
             }
             let (db_id, bare) = self.db_and_bare_name(name)?;

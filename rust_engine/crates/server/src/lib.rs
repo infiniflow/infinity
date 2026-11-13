@@ -836,24 +836,11 @@ async fn dispatch_arm(
                 }
                 "DropTable" if !name2.is_empty() => {
                     let full = qualify(&name2);
-                    let exists = engine
-                        .as_ref()
-                        .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
-                        .is_some();
-                    if !exists && conflict != Some(0) {
-                        CommonResponse {
-                            error_code: 3022,
-                            error_msg: format!("table '{name2}' does not exist"),
-                            session_id: sid,
-                        }
-                    } else {
-                        let sql = if conflict == Some(0) {
-                            format!("DROP TABLE IF EXISTS {full}")
-                        } else {
-                            format!("DROP TABLE {full}")
-                        };
-                        run_common(engine.as_ref(), &sql, sid).await
-                    }
+                    let if_exists = conflict == Some(0);
+                    // Straight to the executor: the statement is already fully
+                    // described here, and formatting it back into SQL only to
+                    // parse it again cost every drop a parse plus a plan.
+                    run_drop_table(engine.as_ref(), &full, if_exists, sid).await
                 }
                 "DropIndex" if !name3.is_empty() && conflict == Some(0) => {
                     run_common(
@@ -6767,6 +6754,37 @@ fn full_table_name(db: &str, table: &str) -> String {
 /// workers of its own (the WAL reply, the allocator, the bottom half). Under
 /// concurrent DDL and inserts that parked every worker and the server sat at
 /// 8% CPU with all threads asleep while the client timed out.
+/// Runs `DROP TABLE` on the engine without an SQL round trip.
+///
+/// A missing name is `TABLE_NOT_EXIST` unless the request said `IF EXISTS`,
+/// which is the pair the reference's handler produces.
+async fn run_drop_table(
+    engine: Option<&Arc<Engine>>,
+    name: &str,
+    if_exists: bool,
+    session_id: i64,
+) -> CommonResponse {
+    let Some(eng) = engine else {
+        return CommonResponse {
+            error_code: 1,
+            error_msg: "no engine bound".into(),
+            session_id,
+        };
+    };
+    match eng.drop_table_direct(name, if_exists).await {
+        Ok(_) => CommonResponse {
+            error_code: OK,
+            error_msg: "OK".into(),
+            session_id,
+        },
+        Err(e) => CommonResponse {
+            error_code: e.status_code(),
+            error_msg: e.to_string(),
+            session_id,
+        },
+    }
+}
+
 async fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
     match engine {
         Some(eng) => match eng.execute(sql).await {

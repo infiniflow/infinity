@@ -1469,6 +1469,20 @@ impl Engine {
         total
     }
 
+    /// Subtracts one table's charge from the engine-wide total.
+    ///
+    /// [`Self::recompute_memindex_total`] walks every table, which is what
+    /// dropping a table used to do - a thousand `DROP TABLE`s against a
+    /// thousand tables is a thousand full walks. The table's own charge is
+    /// already accounted for, so dropping it only has to take it back out.
+    pub(crate) fn release_memindex_bytes(&self, bytes: usize) {
+        if bytes > 0 {
+            self.context
+                .memindex_total
+                .fetch_sub(bytes, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// The engine-wide total: one atomic load. It is what the quota compares
     /// against, and it never takes the table lock or an index lock.
     pub(crate) fn memindex_bytes(&self) -> usize {
