@@ -1528,7 +1528,8 @@ class TestInfinity:
         res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-def test_index_info_eq_and_hash():
+@pytest.mark.parametrize("sdk", ["embedded", "thrift"])
+def test_index_info_eq_and_hash(sdk):
     """
     Regression test: IndexInfo equality and hashing must work.
     The embedded SDK's IndexInfo.__eq__ compared against a nonexistent
@@ -1536,7 +1537,10 @@ def test_index_info_eq_and_hash():
     packages' __hash__ included the params dict directly
     (TypeError: unhashable type: 'dict').
     """
-    from infinity.index import IndexInfo, IndexType
+    if sdk == "embedded":
+        from infinity_embedded.index import IndexInfo, IndexType
+    else:
+        from infinity.index import IndexInfo, IndexType
 
     a = IndexInfo("c1", IndexType.Hnsw, {"M": "16", "ef": "200"})
     b = IndexInfo("c1", IndexType.Hnsw, {"ef": "200", "M": "16"})
