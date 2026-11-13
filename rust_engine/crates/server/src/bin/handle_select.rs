@@ -21,7 +21,9 @@ fn main() {
     let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (1, 'a');"));
     let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (2, 'b');"));
 
-    let resp = match engine.execute_blocking(&req.to_sql()) {
+    let display = req.to_sql();
+    let resp = match executor::block_on(engine.execute_parsed(vec![req.into_statement()], &display))
+    {
         Ok(rs) => match rs.into_iter().next() {
             Some(QueryResult::Rows { columns, rows }) => {
                 let text: Vec<Vec<String>> = rows

@@ -471,9 +471,26 @@ impl Engine {
     }
 
     pub async fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
-        let __q_p = parse(sql)?;
+        self.execute_parsed(parse(sql)?, sql).await
+    }
+
+    /// Runs statements the caller has **already parsed**.
+    ///
+    /// A front end that receives structured input (the REST handlers, the
+    /// Thrift RPCs) builds the statement as an AST and calls this, so a value it
+    /// holds never makes a round trip through SQL text. That round trip was
+    /// where a client-supplied `filter` used to reach the parser verbatim: a
+    /// `;` in it ran a second statement the request never mentioned.
+    ///
+    /// `text` is the display text `SHOW QUERIES` records; an empty string means
+    /// "there is none" and the AST's own rendering is used.
+    pub async fn execute_parsed(
+        &self,
+        stmts: Vec<Statement>,
+        text: &str,
+    ) -> Result<Vec<QueryResult>> {
         let mut out = Vec::new();
-        for s in __q_p {
+        for s in stmts {
             // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
             // ones included; the id lands in the WAL frame of a write. An RPC
             // that already took one for its statement keeps it.
@@ -536,7 +553,7 @@ impl Engine {
                     self.txn.end_statement();
                     continue;
                 }
-                let res = self.execute_stmt_retrying(&qualified, sql).await?;
+                let res = self.execute_stmt_retrying(&qualified, text).await?;
                 // Only small results are worth caching: retaining (and later
                 // cloning on a hit) a whole-table `SELECT *` keeps hundreds of
                 // megabytes to gigabytes alive.
@@ -557,7 +574,7 @@ impl Engine {
                 self.result_cache.lock().unwrap().clear();
                 self.plan_cache.clear();
             }
-            out.push(self.execute_stmt_retrying(&qualified, sql).await?);
+            out.push(self.execute_stmt_retrying(&qualified, text).await?);
             // No per-statement durability step: the reference's commit appends
             // its frame with `ofs_.write` (userspace, no fsync,
             // `wal_manager_impl.cpp:311`) and writes the catalog with
@@ -581,7 +598,12 @@ impl Engine {
         if statements.len() != 1 {
             return Ok(None);
         }
-        let statement = &statements[0];
+        self.select_columns_of(&statements[0], sql)
+    }
+
+    /// [`Self::select_columns`] for a statement the caller already holds.
+    /// `text` is the display text `SHOW QUERIES` records (empty means none).
+    pub fn select_columns_of(&self, statement: &Statement, text: &str) -> Result<Option<Batch>> {
         let Statement::Select {
             items,
             from: Some(from),
@@ -774,7 +796,7 @@ impl Engine {
         self.context
             .query_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let _query = self.begin_query(statement, sql);
+        let _query = self.begin_query(statement, text);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
         // A predicate the secondary index can answer already names its rows:
         // decoding the whole table first made every indexed lookup cost the
@@ -2611,8 +2633,15 @@ impl Engine {
                             }
                         }
                     }
-                    // An array value cannot be stored in a scalar column.
-                    if matches!(e, parser::ExprAst::Literal(parser::Literal::Array(_))) {
+                    // An array value cannot be stored in a scalar column. A
+                    // numeric vector literal is an array the same way a textual
+                    // one is: both only fit a structured column.
+                    if matches!(
+                        e,
+                        parser::ExprAst::Literal(
+                            parser::Literal::Array(_) | parser::Literal::Vector(_)
+                        )
+                    ) {
                         let structured = ty.starts_with("ARRAY")
                             || ty.starts_with("VECTOR")
                             || ty.starts_with("EMBEDDING")

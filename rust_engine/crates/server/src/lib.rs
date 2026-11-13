@@ -33,6 +33,7 @@ use common::{Error, Result};
 
 use crate::peer::PeerManager;
 use executor::{Batch, ColumnData, Engine, QueryResult, Value};
+use parser::{ExprAst, MatchClause, OrderKey, Predicate, SearchClause, SelectItem, Statement};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -43,6 +44,18 @@ use thrift::protocol::{
 pub const CURRENT_VERSION_INDEX: i64 = 37;
 
 const OK: i64 = 0;
+
+/// The catalog name a request's `db_name` / `table_name` pair refers to.
+///
+/// The pair arrives as two client strings and becomes one name here, so the
+/// statement carries a name rather than statement text.
+fn qualify(db: &str, table: &str) -> String {
+    if db.is_empty() || table.contains('.') {
+        table.to_string()
+    } else {
+        format!("{db}.{table}")
+    }
+}
 const VERSION_MISMATCH: i64 = 9001;
 
 fn tw(e: thrift::Error) -> Error {
@@ -568,23 +581,25 @@ async fn dispatch_arm(
                 read_delete_args(&mut ip)?
             };
             let (code, msg, deleted) = match &engine {
-                Some(eng) => match eng.execute(&req.to_sql()).await {
-                    Ok(rs) => {
-                        let deleted = rs
-                            .into_iter()
-                            .map(|r| {
-                                if let QueryResult::Deleted { count } = r {
-                                    count as i64
-                                } else {
-                                    0
-                                }
-                            })
-                            .sum::<i64>();
-                        (OK, "OK".to_string(), deleted.max(0))
+                Some(eng) => {
+                    match eng.execute_parsed(vec![req.into_statement()], "").await {
+                        Ok(rs) => {
+                            let deleted = rs
+                                .into_iter()
+                                .map(|r| {
+                                    if let QueryResult::Deleted { count } = r {
+                                        count as i64
+                                    } else {
+                                        0
+                                    }
+                                })
+                                .sum::<i64>();
+                            (OK, "OK".to_string(), deleted.max(0))
+                        }
+                        // A missing table is a request error, not `0 rows`.
+                        Err(e) => (e.status_code(), e.to_string(), 0),
                     }
-                    // A missing table is a request error, not `0 rows`.
-                    Err(e) => (e.status_code(), e.to_string(), 0),
-                },
+                }
                 None => (1, "no engine bound".to_string(), 0),
             };
             Ok(ArmResponse::Delete {
@@ -598,30 +613,25 @@ async fn dispatch_arm(
                 let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                 read_update_args(&mut ip)?
             };
-            let resp = if req.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
-                CommonResponse {
-                    error_code: 7012,
-                    error_msg: "parser: the filter must be a boolean expression".into(),
-                    session_id: req.session_id,
-                }
-            } else {
+            let resp = {
+                let sid = req.session_id;
                 match &engine {
-                    Some(eng) => match eng.execute(&req.to_sql()).await {
+                    Some(eng) => match eng.execute_parsed(vec![req.into_statement()], "").await {
                         Ok(_) => CommonResponse {
                             error_code: OK,
                             error_msg: "OK".into(),
-                            session_id: req.session_id,
+                            session_id: sid,
                         },
                         Err(e) => CommonResponse {
                             error_code: e.status_code(),
                             error_msg: e.to_string(),
-                            session_id: req.session_id,
+                            session_id: sid,
                         },
                     },
                     None => CommonResponse {
                         error_code: 1,
                         error_msg: "no engine bound".into(),
-                        session_id: req.session_id,
+                        session_id: sid,
                     },
                 }
             };
@@ -779,12 +789,15 @@ async fn dispatch_arm(
                     }
                 }
                 "CreateDatabase" if !db.is_empty() => {
-                    let sql = if conflict == Some(0) {
-                        format!("CREATE DATABASE IF NOT EXISTS {db}")
-                    } else {
-                        format!("CREATE DATABASE {db}")
-                    };
-                    run_common(engine.as_ref(), &sql, sid).await
+                    run_statement(
+                        engine.as_ref(),
+                        Statement::CreateDatabase {
+                            name: db.clone(),
+                            if_not_exists: conflict == Some(0),
+                        },
+                        sid,
+                    )
+                    .await
                 }
                 "GetDatabase" if !db.is_empty() => {
                     let exists = engine
@@ -807,12 +820,15 @@ async fn dispatch_arm(
                     }
                 }
                 "DropDatabase" if !db.is_empty() => {
-                    let sql = if conflict == Some(0) {
-                        format!("DROP DATABASE IF EXISTS {db}")
-                    } else {
-                        format!("DROP DATABASE {db}")
-                    };
-                    run_common(engine.as_ref(), &sql, sid).await
+                    run_statement(
+                        engine.as_ref(),
+                        Statement::DropDatabase {
+                            name: db.clone(),
+                            if_exists: conflict == Some(0),
+                        },
+                        sid,
+                    )
+                    .await
                 }
                 "GetTable" if !name2.is_empty() => {
                     let full = qualify(&name2);
@@ -842,18 +858,11 @@ async fn dispatch_arm(
                     // parse it again cost every drop a parse plus a plan.
                     run_drop_table(engine.as_ref(), &full, if_exists, sid).await
                 }
-                "DropIndex" if !name3.is_empty() && conflict == Some(0) => {
-                    run_common(
-                        engine.as_ref(),
-                        &format!("DROP INDEX IF EXISTS {}", name3.to_ascii_lowercase()),
-                        sid,
-                    )
-                    .await
-                }
                 "DropIndex" if !name3.is_empty() => {
-                    run_common(
+                    run_drop_index(
                         engine.as_ref(),
-                        &format!("DROP INDEX {}", name3.to_ascii_lowercase()),
+                        &name3.to_ascii_lowercase(),
+                        conflict == Some(0),
                         sid,
                     )
                     .await
@@ -900,78 +909,26 @@ async fn dispatch_arm(
                     error_msg: "Insert batch row limit shouldn't more than 8193".into(),
                     session_id: sid,
                 };
+            } else if req.rows.iter().any(|(cols, _)| cols.is_empty()) {
+                // An empty row object has no column list: the reference reports
+                // a syntax error (the REST handler checks the same thing).
+                resp = CommonResponse {
+                    error_code: 3013,
+                    error_msg: "syntax error: insert row must name a column".into(),
+                    session_id: sid,
+                };
             }
-            // A scalar batch goes straight to the executor: rendering
-            // 1000 rows to SQL and re-parsing them cost ~13 ms per
-            // batch, more than the insert itself. Values that need the
-            // parser (arrays, tensors, sparse vectors) keep the SQL path.
-            let direct = req.rows.iter().all(|(_, vals)| {
-                !vals.is_empty()
-                    && vals.iter().all(|v| {
-                        matches!(
-                            v,
-                            ValueLit::Int(_)
-                                | ValueLit::Float(_)
-                                | ValueLit::Str(_)
-                                | ValueLit::Null
-                                | ValueLit::Bool(_)
-                                | ValueLit::IntArray(_)
-                                | ValueLit::FloatArray(_)
-                                | ValueLit::IntTensor(_)
-                                | ValueLit::FloatTensor(_)
-                                | ValueLit::Sparse { .. }
-                        )
-                    })
-            });
-            if direct {
+            // The batch goes straight to the executor: rendering 1000 rows to
+            // SQL and re-parsing them cost ~13 ms per batch, more than the
+            // insert itself - and a rendered literal had to be escaped for the
+            // parser rather than being a value.
+            if resp.error_code == OK {
                 let mut i = 0usize;
                 while resp.error_code == OK && i < req.rows.len() {
                     let cols = req.rows[i].0.clone();
                     let mut rows_lit: Vec<Vec<parser::Literal>> = Vec::new();
                     while i < req.rows.len() && req.rows[i].0 == cols {
-                        rows_lit.push(
-                            req.rows[i]
-                                .1
-                                .iter()
-                                .map(|v| match v {
-                                    ValueLit::Int(n) => parser::Literal::Int(*n),
-                                    ValueLit::Float(f) => parser::Literal::Float(*f),
-                                    ValueLit::Str(t) => parser::Literal::Str(t.clone()),
-                                    ValueLit::Null => parser::Literal::Null,
-                                    ValueLit::Bool(b) => parser::Literal::Str(b.to_string()),
-                                    ValueLit::IntArray(v) => parser::Literal::Vector(
-                                        v.iter().map(|x| *x as f64).collect(),
-                                    ),
-                                    ValueLit::FloatArray(v) => parser::Literal::Vector(v.clone()),
-                                    ValueLit::IntTensor(rows) => parser::Literal::Vector(
-                                        rows.iter().flatten().map(|x| *x as f64).collect(),
-                                    ),
-                                    ValueLit::FloatTensor(rows) => parser::Literal::Vector(
-                                        rows.iter().flatten().copied().collect(),
-                                    ),
-                                    ValueLit::Sparse {
-                                        indices,
-                                        ints,
-                                        floats,
-                                        is_float,
-                                    } => {
-                                        let items: Vec<String> = indices
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(k, i)| {
-                                                if *is_float {
-                                                    format!("{i}:{}", floats[k])
-                                                } else {
-                                                    format!("{i}:{}", ints[k])
-                                                }
-                                            })
-                                            .collect();
-                                        parser::Literal::Array(items)
-                                    }
-                                    _ => parser::Literal::Null,
-                                })
-                                .collect(),
-                        );
+                        rows_lit.push(req.rows[i].1.iter().map(ValueLit::to_literal).collect());
                         i += 1;
                     }
                     let cols_opt = if cols.is_empty() {
@@ -991,7 +948,7 @@ async fn dispatch_arm(
                     let cols_owned: Option<Vec<String>> = cols_opt.map(|c| c.to_vec());
                     resp = match engine.as_ref() {
                         Some(eng) => match eng
-                            .insert_literals_inner(&table, cols_owned.as_deref(), rows_lit, false)
+                            .insert_literals_retrying(&table, cols_owned.as_deref(), rows_lit)
                             .await
                         {
                             Ok(_) => CommonResponse {
@@ -1011,48 +968,6 @@ async fn dispatch_arm(
                             session_id: sid,
                         },
                     };
-                }
-            }
-            let mut i = 0usize;
-            while !direct && resp.error_code == OK && i < req.rows.len() {
-                let (cols, _) = &req.rows[i];
-                let mut batch: Vec<String> = Vec::new();
-                while i < req.rows.len() && &req.rows[i].0 == cols {
-                    batch.push(format!(
-                        "({})",
-                        req.rows[i]
-                            .1
-                            .iter()
-                            .map(|v| v.to_sql())
-                            .collect::<Vec<_>>()
-                            .join(",")
-                    ));
-                    i += 1;
-                }
-                let sql = if cols.is_empty() {
-                    format!("INSERT INTO {table} VALUES {};", batch.join(","))
-                } else {
-                    format!(
-                        "INSERT INTO {table} ({}) VALUES {};",
-                        cols.join(","),
-                        batch.join(",")
-                    )
-                };
-                if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                    eprintln!("[INSERT] {sql}");
-                }
-                let t0 = std::time::Instant::now();
-                resp = run_common(engine.as_ref(), &sql, sid).await;
-                if std::env::var_os("INF_DEBUG_INS").is_some() {
-                    eprintln!(
-                        "[INS] rpc rows={} sql={}B exec={:?}",
-                        batch.len(),
-                        sql.len(),
-                        t0.elapsed()
-                    );
-                }
-                if resp.error_code != OK {
-                    break;
                 }
             }
             Ok(ArmResponse::Common(resp))
@@ -1099,17 +1014,23 @@ async fn dispatch_arm(
                 column_fields: Vec::new(),
                 extra_result: String::new(),
             };
+            // The display text `SHOW QUERIES` records; the statement itself
+            // is executed as a tree (`into_statement`), never as this text.
+            let display = req.to_sql();
             if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                eprintln!("[SELECT] {}", req.to_sql());
+                eprintln!("[SELECT] {display}");
             }
             let exec_started = std::time::Instant::now();
             let srv_started = exec_started;
             // Plain projection over one table with no other clause: the
             // engine hands back typed column buffers and the writer packs
             // them without a `Value` per cell.
+            // `select_columns_of` takes the tree; `star` and the projection
+            // names stay as the request carried them.
+            let batching_stmt = req.clone().into_statement();
             let batch_resp = match &engine {
                 Some(eng) if !req.total_hits => eng
-                    .select_columns(&req.to_sql())
+                    .select_columns_of(&batching_stmt, &display)
                     .ok()
                     .flatten()
                     .map(|batch| {
@@ -1133,7 +1054,10 @@ async fn dispatch_arm(
             let resp = match batch_resp {
                 Some(resp) => resp,
                 None => match &engine {
-                    Some(eng) => match eng.execute(&req.to_sql()).await {
+                    Some(eng) => match eng
+                        .execute_parsed(vec![req.clone().into_statement()], &display)
+                        .await
+                    {
                         Ok(rs) => {
                             let mut columns: Vec<String> = Vec::new();
                             let mut rows: Vec<Vec<Value>> = Vec::new();
@@ -1150,13 +1074,13 @@ async fn dispatch_arm(
                             if std::env::var_os("INF_DEBUG_SQL").is_some() {
                                 eprintln!(
                                     "[COLS] star={} req={:?} got={:?}",
-                                    req.star, req.columns, columns
+                                    req.star, req.items, columns
                                 );
                             }
                             if std::env::var_os("INF_DEBUG_SQL").is_some() {
                                 eprintln!(
                                     "[COLS] star={} req={:?} got={:?}",
-                                    req.star, req.columns, columns
+                                    req.star, req.items, columns
                                 );
                             }
                             // A projected expression is named by the SQL
@@ -1196,7 +1120,7 @@ async fn dispatch_arm(
                                 all.limit = None;
                                 all.offset = None;
                                 let total = eng
-                                    .execute(&all.to_sql())
+                                    .execute_parsed(vec![all.into_statement()], &display)
                                     .await
                                     .map(|rs| {
                                         rs.into_iter()
@@ -1339,7 +1263,7 @@ async fn dispatch_arm(
                     } else if get(3).eq_ignore_ascii_case("database") {
                         eng.restore_database_snapshot(&get(2)).await
                     } else {
-                        eng.execute(&format!("RESTORE TABLE SNAPSHOT {};", sql_name(&get(2))))
+                        eng.execute_parsed(vec![Statement::RestoreSnapshot { name: get(2) }], "")
                             .await
                             .map(|_| ())
                     };
@@ -1382,28 +1306,45 @@ async fn dispatch_arm(
             let resp = if name == "RenameTable" {
                 let (db, table, new_name) = (get(1), get(2), get(3));
                 let full = full_table_name(&db, &table);
-                run_common(
-                    engine.as_ref(),
-                    &format!("ALTER TABLE {full} RENAME TO {new_name};"),
-                    sid,
-                )
-                .await
+                // The name is the client's, and the text path used to hand it
+                // to the parser — which rejected `123` (a number, not a name)
+                // with `expected table name`. Building the tree skips that, so
+                // the fragment is parsed once here to keep the check.
+                match rename_target(&new_name) {
+                    Ok(new_name) => {
+                        run_statement(
+                            engine.as_ref(),
+                            Statement::RenameTable {
+                                table: full,
+                                new_name,
+                            },
+                            sid,
+                        )
+                        .await
+                    }
+                    Err(msg) => CommonResponse {
+                        error_code: 3013,
+                        error_msg: msg,
+                        session_id: sid,
+                    },
+                }
             } else if name == "CreateTableSnapshot" {
                 // {1: session_id, 2: db, 3: table, 4: snapshot}
                 let (db, table, snap) = (get(2), get(3), get(4));
-                let full = full_table_name(&db, &table);
-                run_common(
+                run_statement(
                     engine.as_ref(),
-                    &format!("CREATE SNAPSHOT {} ON TABLE {full};", sql_name(&snap)),
+                    Statement::CreateSnapshot {
+                        name: snap,
+                        table: full_table_name(&db, &table),
+                    },
                     sid,
                 )
                 .await
             } else if name == "DropSnapshot" {
                 // {1: session_id, 2: snapshot}
-                let snap = get(2);
-                run_common(
+                run_statement(
                     engine.as_ref(),
-                    &format!("DROP SNAPSHOT {};", sql_name(&snap)),
+                    Statement::DropSnapshot { name: get(2) },
                     sid,
                 )
                 .await
@@ -1469,13 +1410,17 @@ async fn dispatch_arm(
                 read_explain_args(&mut ip)?
             };
             let kind = match etype {
-                4 => "PHYSICAL",
-                6 => "FRAGMENT",
-                _ => "PHYSICAL",
+                6 => parser::ExplainKind::Fragment,
+                _ => parser::ExplainKind::Physical,
             };
-            let sql = format!("EXPLAIN {kind} {}", req.to_sql());
+            // The inner statement is a tree, and `EXPLAIN` wraps it as one:
+            // the plan is computed from the AST, not from a rendered string.
+            let stmt = Statement::Explain {
+                kind,
+                inner: Box::new(req.clone().into_statement()),
+            };
             let resp = match engine.as_ref() {
-                Some(eng) => match eng.execute(&sql).await {
+                Some(eng) => match eng.execute_parsed(vec![stmt], &req.to_sql()).await {
                     Ok(rs) => {
                         let mut rows: Vec<Vec<Value>> = Vec::new();
                         for r in rs {
@@ -1509,21 +1454,16 @@ async fn dispatch_arm(
                 read_alter_add_args(&mut ip)?
             };
             let full = full_table_name(&db, &table);
-            let defs: Vec<String> = cols
-                .iter()
-                .map(|c| {
-                    let mut def = format!("{} {}", c.name, column_sql_type(c));
-                    if c.not_null {
-                        def.push_str(" NOT NULL");
-                    }
-                    if let Some(d) = &c.default {
-                        def.push_str(&format!(" DEFAULT {}", render_default(d)));
-                    }
-                    def
-                })
-                .collect();
-            let sql = format!("ALTER TABLE {full} ADD COLUMN {}", defs.join(", "));
-            let resp = run_common(engine.as_ref(), &sql, sid).await;
+            let defs: Vec<parser::ColumnDef> = cols.iter().map(column_def_of_wire).collect();
+            let resp = run_statement(
+                engine.as_ref(),
+                Statement::AlterTableAdd {
+                    table: full,
+                    columns: defs,
+                },
+                sid,
+            )
+            .await;
             Ok(ArmResponse::Common(resp))
         }
         "DropColumns" => {
@@ -1538,11 +1478,15 @@ async fn dispatch_arm(
                 session_id: sid,
             };
             for name in names {
-                let sql = format!("ALTER TABLE {full} DROP COLUMN {name}");
-                if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                    eprintln!("[INSERT] {sql}");
-                }
-                resp = run_common(engine.as_ref(), &sql, sid).await;
+                resp = run_statement(
+                    engine.as_ref(),
+                    Statement::AlterTableDropColumn {
+                        table: full.clone(),
+                        column: name.to_ascii_lowercase(),
+                    },
+                    sid,
+                )
+                .await;
                 if resp.error_code != OK {
                     break;
                 }
@@ -1589,19 +1533,19 @@ async fn dispatch_arm(
                 } else {
                     format!("{}.part{index}", req.file)
                 };
-                let mut sql = format!(
-                    "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}, OFFSET {}",
-                    path.replace('\'', "''"),
-                    req.delimiter.replace('\'', "''"),
-                    req.offset + written
-                );
+                // A tree, not a statement string: `path` and `delimiter` come
+                // from the client, and text would let them carry a `;`.
+                let mut opts = vec![
+                    ("DELIMITER".to_string(), req.delimiter.clone()),
+                    ("FORMAT".to_string(), format.to_string()),
+                    ("OFFSET".to_string(), (req.offset + written).to_string()),
+                ];
                 if take > 0 {
-                    sql.push_str(&format!(", LIMIT {take}"));
+                    opts.push(("LIMIT".to_string(), take.to_string()));
                 }
                 if !req.columns.is_empty() {
-                    sql.push_str(&format!(", COLUMNS '{}'", req.columns.join(",")));
+                    opts.push(("COLUMNS".to_string(), req.columns.join(",")));
                 }
-                sql.push_str(" )");
                 let Some(eng) = engine.as_ref() else {
                     resp = CommonResponse {
                         error_code: 1,
@@ -1610,7 +1554,13 @@ async fn dispatch_arm(
                     };
                     break;
                 };
-                match eng.execute(&sql).await {
+                let stmt = Statement::Copy {
+                    table: full.clone(),
+                    from: false,
+                    path,
+                    opts,
+                };
+                match eng.execute_parsed(vec![stmt], "").await {
                     Ok(rs) => {
                         let n = rs
                             .into_iter()
@@ -1662,8 +1612,35 @@ async fn dispatch_arm(
                     session_id: sid,
                 },
                 _ => {
-                    let sql = format!("SET CONFIG {name} {value}");
-                    run_common(engine.as_ref(), &sql, sid).await
+                    let sid2 = sid;
+                    match engine.as_ref() {
+                        Some(eng) => match eng
+                            .execute_parsed(
+                                vec![Statement::SetConfig {
+                                    key: name.clone(),
+                                    value: value.clone(),
+                                }],
+                                "",
+                            )
+                            .await
+                        {
+                            Ok(_) => CommonResponse {
+                                error_code: OK,
+                                error_msg: "OK".into(),
+                                session_id: sid2,
+                            },
+                            Err(e) => CommonResponse {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                session_id: sid2,
+                            },
+                        },
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: sid2,
+                        },
+                    }
                 }
             };
             Ok(ArmResponse::Common(resp))
@@ -1760,19 +1737,22 @@ async fn dispatch_arm(
                 Some(c) if c != '\0' => c.to_string(),
                 _ => ",".to_string(),
             };
-            let mut sql = format!(
-                "COPY {table} FROM '{}' WITH ( DELIMITER '{}', FORMAT {format} )",
-                req.file.replace('\'', "''"),
-                delimiter.replace('\'', "''")
-            );
-            if req.has_header {
-                sql.push_str(" ;");
-            }
-            if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                eprintln!("[IMPORT] {sql}");
-            }
+            // A tree, not a statement string: `file` and `delimiter` come from
+            // the client. `HEADER` is carried as an option; the reference's
+            // CSV reader consumes it (it validates and drops the first line).
+            let opts = vec![
+                ("DELIMITER".to_string(), delimiter),
+                ("FORMAT".to_string(), format.to_string()),
+                ("HEADER".to_string(), req.has_header.to_string()),
+            ];
+            let stmt = Statement::Copy {
+                table,
+                from: true,
+                path: req.file.clone(),
+                opts,
+            };
             let resp = match engine.as_ref() {
-                Some(eng) => match eng.execute(&sql).await {
+                Some(eng) => match eng.execute_parsed(vec![stmt], "").await {
                     Ok(_) => CommonResponse {
                         error_code: OK,
                         error_msg: "OK".into(),
@@ -1801,7 +1781,15 @@ async fn dispatch_arm(
             let table = fields.get(&2).cloned().unwrap_or_default();
             let full = full_table_name(&db, &table);
             let resp = match &engine {
-                Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")).await {
+                Some(eng) => match eng
+                    .execute_parsed(
+                        vec![Statement::ShowTableColumns {
+                            table: full.clone(),
+                        }],
+                        "",
+                    )
+                    .await
+                {
                     Ok(rs) => {
                         let mut rows: Vec<Vec<Value>> = Vec::new();
                         for r in rs {
@@ -1958,41 +1946,28 @@ async fn dispatch_arm(
                 // Identifiers are case-insensitive; the catalog keeps the
                 // canonical lower-case spelling.
                 let name = req.index_name.to_ascii_lowercase();
-                let mut sql = format!(
-                    "CREATE INDEX {}{name} ON {full} ({target})",
-                    if req.conflict == 0 {
-                        "IF NOT EXISTS "
-                    } else {
-                        ""
+                // A tree, not a statement string: `index_name`, `target`,
+                // `index_type` and every parameter come from the client. The
+                // target still gets the parser's validation (see `index_target`).
+                let column = match index_target(&target) {
+                    Ok(c) => c,
+                    Err(msg) => {
+                        return Ok(ArmResponse::Common(CommonResponse {
+                            error_code: 3013,
+                            error_msg: msg,
+                            session_id: req.session_id,
+                        }))
                     }
-                );
-                if !req.index_type.is_empty() {
-                    sql.push_str(&format!(" USING {}", req.index_type));
-                }
-                if !req.params.is_empty() {
-                    // C++ `Infinity::CreateIndex` lowercases every
-                    // `InitParameter` name *and* value before the
-                    // statement runs, so over Thrift `analyzer='Chinese'`
-                    // means `chinese` (the SQL path keeps the spelling
-                    // and stays case sensitive). The value is quoted so
-                    // one with spaces (`invalid compress type`) still
-                    // parses.
-                    let opts = req
-                        .params
-                        .iter()
-                        .map(|(k, v)| {
-                            format!(
-                                "{}='{}'",
-                                k.to_lowercase(),
-                                v.to_lowercase().replace('\'', "''")
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    sql.push_str(&format!(" WITH ({opts})"));
-                }
-                sql.push(';');
-                let resp = run_common(engine.as_ref(), &sql, req.session_id).await;
+                };
+                let stmt = Statement::CreateIndex {
+                    name: name.clone(),
+                    table: full.clone(),
+                    column,
+                    index_type: req.index_type.clone(),
+                    opts: index_params(&req.params),
+                    if_not_exists: req.conflict == 0,
+                };
+                let resp = run_statement(engine.as_ref(), stmt, req.session_id).await;
                 if resp.error_code == OK {
                     if let Some(eng) = engine.as_ref() {
                         eng.set_index_comment(&full, &name, &req.index_comment);
@@ -2133,44 +2108,94 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
     type_sql(c.logic_type, &c.physical)
 }
 
-/// Applies a `CreateTable` request to the engine (or errors if no engine bound).
-/// Renders a wire `DEFAULT` value as SQL, quoting a bare string so that an empty
-/// or identifier-like value does not leave `DEFAULT` without a value.
-pub(crate) fn render_default(d: &str) -> String {
-    let t = d.trim();
-    if t.is_empty() {
-        "''".to_string()
-    } else if t.starts_with('\'')
-        || t.parse::<f64>().is_ok()
-        || t == "null"
-        || t.eq_ignore_ascii_case("true")
-        || t.eq_ignore_ascii_case("false")
-        || t.starts_with('[')
-    {
-        t.to_string()
-    } else {
-        format!("'{}'", t.replace('\'', "''"))
+/// A wire `ColumnDef` as the parser's [`parser::ColumnDef`], which is what the
+/// executor's DDL takes. The declared type keeps its real spelling (embedding
+/// and sparse included) instead of being flattened to `VARCHAR`.
+fn column_def_of_wire(c: &ColumnDefWire) -> parser::ColumnDef {
+    let type_text = column_sql_type(c).to_ascii_uppercase();
+    let head = type_text
+        .split(['(', ','])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_uppercase();
+    let ty = match head.as_str() {
+        "BOOLEAN" | "BOOL" => common::LogicalType::Boolean,
+        "TINYINT" => common::LogicalType::TinyInt,
+        "SMALLINT" => common::LogicalType::SmallInt,
+        "INTEGER" | "INT" => common::LogicalType::Integer,
+        "BIGINT" => common::LogicalType::BigInt,
+        "FLOAT" => common::LogicalType::Float,
+        "DOUBLE" => common::LogicalType::Double,
+        "VARCHAR" | "TEXT" => common::LogicalType::Varchar,
+        _ => common::LogicalType::Invalid,
+    };
+    parser::ColumnDef {
+        name: c.name.to_ascii_lowercase(),
+        ty,
+        type_text,
+        default: c.default.as_ref().map(ValueLit::to_literal),
+        not_null: c.not_null,
+        comment: if c.comment.is_empty() {
+            None
+        } else {
+            Some(c.comment.clone())
+        },
+        sparse_store: None,
     }
 }
 
-/// Renders `name` as a SQL identifier: plain names pass through, anything
-/// else (dashes, dots, spaces) is double-quoted, which the parser accepts.
-fn sql_name(name: &str) -> String {
-    let plain = !name.is_empty()
-        && name
-            .chars()
-            .next()
-            .map(|c| c.is_ascii_alphabetic() || c == '_')
-            .unwrap_or(false)
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
-    if plain {
-        name.to_string()
-    } else {
-        format!("\"{}\"", name.replace('"', ""))
+/// A rename target as the SQL parser used to read it.
+///
+/// `ALTER TABLE t RENAME TO <new>` went through the parser on the text path,
+/// which rejected anything that is not a name (`123` tokenises as a number).
+/// The caller now builds `Statement::RenameTable` itself, so the check is
+/// applied here with a fragment parse; the canonical (lower-cased) name the
+/// parser produced is what the statement should carry.
+pub(crate) fn rename_target(new_name: &str) -> std::result::Result<String, String> {
+    match parser::parse_one(&format!("ALTER TABLE t RENAME TO {new_name};")) {
+        Ok(Statement::RenameTable { new_name, .. }) => Ok(new_name.to_ascii_lowercase()),
+        Ok(_) => Err("parse error: unexpected statement".into()),
+        Err(e) => Err(e.to_string()),
     }
 }
 
-async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
+/// True for the identifiers the SQL lexer accepts as an unquoted name.
+pub(crate) fn is_plain_ident(s: &str) -> bool {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .map(|c| c.is_ascii_alphabetic() || c == '_')
+        .unwrap_or(false)
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// The `CREATE INDEX` target as the SQL parser used to see it.
+///
+/// The front end now builds `Statement::CreateIndex` directly, so the lexing
+/// the parser did for `(column)` has to be reproduced: an invalid name such as
+/// `$#%dfva` (an `unexpected character` at tokenise time) or a `;` that starts
+/// a second statement was rejected before the executor ever saw it.
+/// `parse_expr` is a fragment parser — it parses to an AST and refuses any
+/// trailing input; its result is used only as a validation, never executed.
+pub(crate) fn index_target(target: &str) -> std::result::Result<String, String> {
+    parser::parse_expr(target)
+        .map(|_| target.to_string())
+        .map_err(|e| e.to_string())
+}
+
+/// Index parameters as the parser read them from `WITH (k = v, …)`: a key that
+/// is not an identifier was skipped, keys were upper-cased, and — over the API
+/// boundary — values were lower-cased (`Infinity::CreateIndex`).
+pub(crate) fn index_params(params: &[(String, String)]) -> Vec<(String, String)> {
+    params
+        .iter()
+        .filter(|(k, _)| is_plain_ident(k))
+        .map(|(k, v)| (k.to_ascii_uppercase(), v.to_lowercase()))
+        .collect()
+}
+
+pub async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
     let Some(engine) = engine else {
         return CommonResponse {
             error_code: 1,
@@ -2220,24 +2245,9 @@ async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> Comm
             };
         }
     }
-    let cols: Vec<String> = req
-        .columns
-        .iter()
-        .map(|c| {
-            // The reference lowercases identifiers.
-            let mut col = format!("{} {}", c.name.to_ascii_lowercase(), column_sql_type(c));
-            if c.not_null {
-                col.push_str(" NOT NULL");
-            }
-            if let Some(d) = &c.default {
-                col.push_str(&format!(" DEFAULT {}", render_default(d)));
-            }
-            if !c.comment.is_empty() {
-                col.push_str(&format!(" COMMENT '{}'", c.comment.replace('\'', "''")));
-            }
-            col
-        })
-        .collect();
+    // The column definitions go to the executor as definitions, not as a
+    // rendered `CREATE TABLE` body.
+    let cols: Vec<parser::ColumnDef> = req.columns.iter().map(column_def_of_wire).collect();
     // `db_name` names the target database; an unqualified table would otherwise
     // land in `default_db`.
     let table = if req.db_name.is_empty() {
@@ -2253,12 +2263,17 @@ async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> Comm
             session_id: req.session_id,
         };
     }
-    let sql = format!("CREATE TABLE {table} ({});", cols.join(", "));
-    // The SDK's `sparse,0,…` type carries dimension 0, which SQL DDL rejects.
-    // The flag is thread-local, so it is set around the **await-free** call
-    // below: `execute_async` reads it during DDL planning, before any of its
-    // dispatch points.
-    match engine.execute(&sql).await {
+    match engine
+        .execute_parsed(
+            vec![Statement::CreateTable {
+                name: table,
+                columns: cols,
+                opts: Vec::new(),
+            }],
+            "",
+        )
+        .await
+    {
         Ok(_) => CommonResponse {
             error_code: OK,
             error_msg: "OK".into(),
@@ -3472,8 +3487,8 @@ pub enum PhysicalWire {
 pub struct ColumnDefWire {
     pub id: i32,
     pub name: String,
-    /// `ConstantExpr` rendered as a SQL literal (`'x'`, `1`, `1.5`, `true`).
-    pub default: Option<String>,
+    /// The `ConstantExpr` the column defaults to, kept as the wire value.
+    pub default: Option<ValueLit>,
     /// `Constraint::NotNull` is present.
     pub not_null: bool,
     /// `LogicType` enum ordinal (caller-supplied).
@@ -3772,7 +3787,7 @@ pub struct CreateTableReq {
 fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ColumnDefWire> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut id, mut name, mut lt) = (0i32, String::new(), 0i32);
-    let mut default: Option<String> = None;
+    let mut default: Option<ValueLit> = None;
     let mut comment = String::new();
     let mut not_null = false;
     let mut physical = PhysicalWire::None;
@@ -3818,12 +3833,12 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                 comment = ip.read_string().map_err(tw)?;
             }
             Some(5) if f.field_type == TType::Struct => {
+                // Kept as the wire value: rendering it to SQL text here and
+                // re-reading it was the round trip that let a default
+                // spelling reach the parser as statement text.
                 default = match read_constant_expr(ip)? {
-                    ValueLit::Str(v) => Some(format!("'{}'", v.replace('\'', "''"))),
-                    ValueLit::Int(v) => Some(v.to_string()),
-                    ValueLit::Float(v) => Some(format!("{v}")),
-                    ValueLit::Bool(v) => Some(if v { "true".into() } else { "false".into() }),
-                    _ => None,
+                    ValueLit::Null => None,
+                    v => Some(v),
                 };
             }
             _ => ip.skip(f.field_type).map_err(tw)?,
@@ -4108,8 +4123,8 @@ pub struct SelectReq {
     pub session_id: i64,
     pub db_name: String,
     pub table_name: String,
-    /// Projected columns (empty + `star=false` means `*`).
-    pub columns: Vec<String>,
+    /// The projections, as the statement tree the executor takes.
+    pub items: Vec<SelectItem>,
     /// The client-facing names, which follow the C++ `Name()` printer (a cast
     /// prints as `Cast(c3 AS Varchar)`, string arguments lose their quotes).
     pub names: Vec<String>,
@@ -4117,77 +4132,149 @@ pub struct SelectReq {
     /// projections that are also group keys (`abs(...)` stays lower case).
     pub raw_names: Vec<String>,
     pub star: bool,
-    /// Optional `WHERE` clause already rendered as SQL.
-    pub where_sql: Option<String>,
-    /// Optional `(column, ascending)` order key.
-    pub order_by: Vec<(String, bool)>,
-    /// Group keys, already rendered as SQL text.
-    pub group_by: Vec<String>,
-    /// Optional `HAVING` clause already rendered as SQL.
-    pub having_sql: Option<String>,
+    /// `WHERE`, decoded from the request's `ParsedExpr` rather than rendered.
+    pub where_pred: Option<Predicate>,
+    /// Order keys, with the sort expression the client sent.
+    pub order_by: Vec<OrderKey>,
+    /// Group keys, decoded from the request's `ParsedExpr` list.
+    pub group_by: Vec<ExprAst>,
+    /// `HAVING`, decoded the same way as `where_pred`.
+    pub having: Option<Predicate>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     /// `total_hits_count` option: report how many rows matched before LIMIT.
     pub total_hits: bool,
-    /// `(alias, expression SQL)` pairs, so WHERE/ORDER BY can name a projection.
-    pub aliases: Vec<(String, String)>,
+    /// `(alias, expression)` pairs, so WHERE/ORDER BY can name a projection.
+    pub aliases: Vec<(String, ExprAst)>,
+    /// Output aliases, aligned with `items` (`sum(c3) AS sum1`).
+    pub out_aliases: Vec<Option<String>>,
     /// `HIGHLIGHT` columns.
     pub highlight: Vec<String>,
-    /// Rendered `SEARCH ...` tail (match clauses + fusions).
-    pub search_sql: Option<String>,
+    /// The `SEARCH` clause, decoded from the request's `SearchExpr`.
+    pub search: Option<SearchClause>,
 }
 
 impl SelectReq {
-    /// Builds the SQL for this request.
+    /// The statement this request describes.
+    ///
+    /// The request is decoded from `ParsedExpr`/`SearchExpr` structures, so it
+    /// becomes a [`Statement::Select`] directly. Rendering it to SQL first (see
+    /// [`Self::to_sql`], now diagnostic only) put the client's `table_name` and
+    /// the index hints of a `KNN` request into statement text, where the
+    /// parser - not the request - decided what they meant.
+    pub fn into_statement(self) -> Statement {
+        let table = qualify(&self.db_name, &self.table_name);
+        let mut alias_slots = self.out_aliases.clone();
+        alias_slots.resize(self.items.len(), None);
+        // `WHERE`/`HAVING`/`GROUP BY` name projections by alias; the planner
+        // resolves them against table columns only, so the alias is replaced
+        // by what it projects (the SQL text used to get this for free).
+        let where_pred = self
+            .where_pred
+            .as_ref()
+            .map(|p| substitute_pred_aliases(p, &self.aliases));
+        let having = self
+            .having
+            .as_ref()
+            .map(|p| substitute_pred_aliases(p, &self.aliases));
+        let group_by = self
+            .group_by
+            .iter()
+            .map(|e| substitute_expr_aliases(e, &self.aliases))
+            .collect();
+        Statement::Select {
+            items: self.items,
+            from: Some(table),
+            join: None,
+            where_pred,
+            group_by,
+            // Output names are reported to the client from `names`; the
+            // statement itself carries no projection aliases.
+            aliases: alias_slots,
+            having: having.map(Box::new),
+            order_by: self.order_by,
+            limit: self.limit.map(|n| n.max(0) as u64),
+            offset: self.offset.map(|n| n.max(0) as u64),
+            search: self.search.map(Box::new),
+            distinct: false,
+            highlight: self.highlight,
+            ctes: Vec::new(),
+            cross_tables: Vec::new(),
+            limit_expr: None,
+            offset_expr: None,
+        }
+    }
+
+    /// Renders the request as SQL text.
+    ///
+    /// **Diagnostic only.** Nothing executes this string: the request runs
+    /// through [`Self::into_statement`]. It exists so `EXPLAIN` can be shown in
+    /// the form an operator would type, and so `INF_DEBUG_SQL` can print what a
+    /// request means.
     pub fn to_sql(&self) -> String {
         let cols = if self.star {
             // `SELECT *, distance()` keeps the trailing projection.
-            if self.columns.is_empty() {
+            if self.items.is_empty() {
                 "*".to_string()
             } else {
-                format!("*, {}", self.columns.join(", "))
+                format!(
+                    "*, {}",
+                    self.items
+                        .iter()
+                        .map(parser::render::select_item)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
-        } else if self.columns.is_empty() {
+        } else if self.items.is_empty() {
             "*".to_string()
         } else {
-            self.columns.join(", ")
+            self.items
+                .iter()
+                .map(parser::render::select_item)
+                .collect::<Vec<_>>()
+                .join(", ")
         };
-        let table = if self.db_name.is_empty() {
-            self.table_name.clone()
-        } else {
-            format!("{}.{}", self.db_name, self.table_name)
-        };
+        let table = qualify(&self.db_name, &self.table_name);
         let mut sql = format!("SELECT {cols}");
         if !self.highlight.is_empty() {
             sql.push_str(&format!(" HIGHLIGHT {}", self.highlight.join(", ")));
         }
         sql.push_str(&format!(" FROM {table}"));
-        if let Some(srch) = &self.search_sql {
-            sql.push_str(&format!(" SEARCH {srch}"));
+        if let Some(srch) = &self.search {
+            sql.push_str(&format!(" SEARCH {}", parser::render::search_clause(srch)));
         }
-        if let Some(w) = &self.where_sql {
-            sql.push_str(&format!(" WHERE {}", substitute_aliases(w, &self.aliases)));
+        if let Some(w) = &self.where_pred {
+            sql.push_str(&format!(" WHERE {}", parser::render::predicate(w)));
         }
         if !self.group_by.is_empty() {
-            sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
+            sql.push_str(&format!(
+                " GROUP BY {}",
+                self.group_by
+                    .iter()
+                    .map(parser::render::expr)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
-        if let Some(h) = &self.having_sql {
-            sql.push_str(&format!(" HAVING {}", substitute_aliases(h, &self.aliases)));
+        if let Some(h) = &self.having {
+            sql.push_str(&format!(" HAVING {}", parser::render::predicate(h)));
         }
         if !self.order_by.is_empty() {
-            let keys: Vec<String> = self
-                .order_by
-                .iter()
-                .map(|(c, asc)| format!("{c} {}", if *asc { "ASC" } else { "DESC" }))
-                .collect();
-            sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
+            sql.push_str(&format!(
+                " ORDER BY {}",
+                self.order_by
+                    .iter()
+                    .map(parser::render::order_key)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
         if let Some(n) = self.limit {
             sql.push_str(&format!(" LIMIT {n}"));
         } else if self.offset.is_some() {
             // The reference's planner keeps LIMIT and OFFSET as independent
             // fields, so an OFFSET without a limit means "every row after n".
-            // The SQL grammar requires a LIMIT first, so name an unbounded one.
             sql.push_str(" LIMIT 9223372036854775807");
         }
         if let Some(n) = self.offset {
@@ -4211,8 +4298,96 @@ pub enum PExpr {
     Other,
 }
 
+/// A decoded `ParsedExpr` as the parser's expression tree.
+///
+/// This is the conversion the executing paths use: the wire structure becomes
+/// an AST, and nothing is rendered to text and re-parsed. [`pexpr_sql`] is the
+/// diagnostic renderer and is not on any execution path.
+pub fn pexpr_ast(e: &PExpr) -> ExprAst {
+    match e {
+        PExpr::Column(c) => ExprAst::Column(c.clone()),
+        PExpr::Value(v) => ExprAst::Literal(v.to_literal()),
+        PExpr::Call(n, a) => {
+            let args: Vec<ExprAst> = a.iter().map(pexpr_ast).collect();
+            // The SDK sends a projected binary expression as
+            // `FunctionExpr("+", [a, b])`; the AST has a node for that.
+            // Boolean connectives are nodes, not functions.
+            if n.eq_ignore_ascii_case("and") {
+                if let [l, r] = &args[..] {
+                    return ExprAst::And(Box::new(l.clone()), Box::new(r.clone()));
+                }
+            }
+            if n.eq_ignore_ascii_case("or") {
+                if let [l, r] = &args[..] {
+                    return ExprAst::Or(Box::new(l.clone()), Box::new(r.clone()));
+                }
+            }
+            if n.eq_ignore_ascii_case("not") {
+                if let [only] = &args[..] {
+                    return ExprAst::Not(Box::new(only.clone()));
+                }
+            }
+            // A comparison is a projected boolean expression, not a function
+            // call: `num > 2` has no `>` function to bind.
+            if let Some(op) = cmp_op_of_name(n) {
+                if let [l, r] = &args[..] {
+                    return ExprAst::Cmp(Box::new(l.clone()), op, Box::new(r.clone()));
+                }
+            }
+            if let Some(op) = binary_op_of(n) {
+                if let [l, r] = &args[..] {
+                    return ExprAst::Binary(Box::new(l.clone()), op, Box::new(r.clone()));
+                }
+                // A unary sign arrives as the same function with one argument:
+                // `-c1` is `-(c1)`, which the AST spells as `0 - c1`.
+                if let [only] = &args[..] {
+                    if op == parser::BinOp::Sub {
+                        return ExprAst::Binary(
+                            Box::new(ExprAst::Literal(parser::Literal::Int(0))),
+                            op,
+                            Box::new(only.clone()),
+                        );
+                    }
+                    return only.clone();
+                }
+            }
+            ExprAst::Func {
+                name: canonical_fn_name(n).to_string(),
+                args,
+            }
+        }
+        // `CAST(x AS <type>)` keeps the reference's type spelling, which the
+        // expression evaluator understands.
+        PExpr::Cast(inner, ty) => ExprAst::Func {
+            name: "CAST".into(),
+            args: vec![
+                pexpr_ast(inner),
+                ExprAst::Literal(parser::Literal::Str(ty.clone())),
+            ],
+        },
+        // An expression this decoder does not model: `NULL` keeps the statement
+        // well-formed, and the executor reports the type error.
+        PExpr::Other => ExprAst::Literal(parser::Literal::Null),
+    }
+}
+
+/// The arithmetic operator a `FunctionExpr` name stands for.
+fn binary_op_of(name: &str) -> Option<parser::BinOp> {
+    use parser::BinOp::*;
+    Some(match name {
+        "+" => Add,
+        "-" => Sub,
+        "*" => Mul,
+        "/" => Div,
+        "%" => Mod,
+        _ => return None,
+    })
+}
+
 /// Renders a decoded `ParsedExpr` back to SQL text, so a projected function
 /// (`year(c1)`, `datepart(c4, c1)`) can be sent to the engine as-is.
+///
+/// **Diagnostic only**: nothing executes the result. See [`pexpr_ast`].
 pub fn pexpr_sql(e: &PExpr) -> String {
     match e {
         PExpr::Column(c) => c.clone(),
@@ -4587,65 +4762,13 @@ fn logic_type_name(logic: i32) -> String {
     .to_string()
 }
 
-/// Replaces bare identifiers that name a projection alias with the aliased
-/// expression text, leaving string literals untouched.
-pub(crate) fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
-    if aliases.is_empty() {
-        return text.to_string();
-    }
-    let mut out = String::with_capacity(text.len());
-    let bytes: Vec<char> = text.chars().collect();
-    let mut i = 0usize;
-    let is_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
-    while i < bytes.len() {
-        let c = bytes[i];
-        if c == '\'' || c == '"' {
-            // copy the quoted run verbatim
-            let quote = c;
-            out.push(c);
-            i += 1;
-            while i < bytes.len() {
-                out.push(bytes[i]);
-                if bytes[i] == quote {
-                    i += 1;
-                    break;
-                }
-                i += 1;
-            }
-            continue;
-        }
-        if c.is_ascii_alphabetic() || c == '_' {
-            let start = i;
-            while i < bytes.len() && is_ident(bytes[i]) {
-                out.push(bytes[i]);
-                i += 1;
-            }
-            let word: String = bytes[start..i].iter().collect();
-            if let Some((_, expr)) = aliases.iter().find(|(a, _)| a.eq_ignore_ascii_case(&word)) {
-                out.truncate(out.len() - word.len());
-                out.push('(');
-                out.push_str(expr);
-                out.push(')');
-            }
-            continue;
-        }
-        out.push(c);
-        i += 1;
-    }
-    out
-}
-
 /// Reads a `SearchExpr` (`{1: list<GenericMatchExpr>, 2: list<FusionExpr>}`)
-/// and renders the engine's `SEARCH …` tail.
-fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// as a [`SearchClause`].
+fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<SearchClause>> {
     ip.read_struct_begin().map_err(tw)?;
-    let mut parts: Vec<String> = Vec::new();
-    let mut fusions: Vec<String> = Vec::new();
+    let mut clause = SearchClause::default();
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
-        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-            eprintln!("[SEARCH] field {:?} {:?}", f.id, f.field_type);
-        }
         if f.field_type == TType::Stop {
             break;
         }
@@ -4654,7 +4777,7 @@ fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
                     if let Some(m) = read_generic_match(ip)? {
-                        parts.push(m);
+                        clause.matches.push(m);
                     }
                 }
                 ip.read_list_end().map_err(tw)?;
@@ -4663,7 +4786,7 @@ fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
                     if let Some(fs) = read_fusion_expr(ip)? {
-                        fusions.push(fs);
+                        clause.fusions.push(fs);
                     }
                 }
                 ip.read_list_end().map_err(tw)?;
@@ -4673,26 +4796,29 @@ fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    if parts.is_empty() && fusions.is_empty() {
+    if clause.matches.is_empty() && clause.fusions.is_empty() {
         return Ok(None);
     }
-    parts.extend(fusions);
-    Ok(Some(parts.join(", ")))
+    // The last fusion decides the final score.
+    if let Some((name, params)) = clause.fusions.last() {
+        clause.fusion = Some(name.clone());
+        clause.fusion_params = Some(params.clone());
+    }
+    Ok(Some(clause))
 }
 
-/// Reads a `GenericMatchExpr` union and renders one `MATCH …` clause.
-fn read_generic_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// Reads a `GenericMatchExpr` union into one `MATCH …` term.
+fn read_generic_match(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Option<MatchClause>> {
     ip.read_struct_begin().map_err(tw)?;
     let mut out = None;
     let f = ip.read_field_begin().map_err(tw)?;
-    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-        eprintln!("[MATCH] field {:?} {:?}", f.id, f.field_type);
-    }
     match (f.id, f.field_type) {
-        (Some(4), TType::Struct) => out = Some(read_match_text_sql(ip)?),
-        (Some(1), TType::Struct) => out = read_knn_sql(ip)?,
-        (Some(2), TType::Struct) => out = read_sparse_sql(ip)?,
-        (Some(3), TType::Struct) => out = read_tensor_sql(ip)?,
+        (Some(4), TType::Struct) => out = read_match_text(ip)?,
+        (Some(1), TType::Struct) => out = read_knn_match(ip)?,
+        (Some(2), TType::Struct) => out = read_sparse_match(ip)?,
+        (Some(3), TType::Struct) => out = read_tensor_match(ip)?,
         _ => ip.skip(f.field_type).map_err(tw)?,
     }
     let _ = ip.read_field_end();
@@ -4701,11 +4827,11 @@ fn read_generic_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<O
     Ok(out)
 }
 
-/// `MATCH TEXT ('fields', 'text'[, 'options'])`.
-fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
+/// `MATCH TEXT (fields, 'text'[, 'opts'][, WHERE …])`.
+fn read_match_text(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<MatchClause>> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut fields, mut text, mut opts) = (String::new(), String::new(), String::new());
-    let mut text_filter: Option<String> = None;
+    let mut filter: Option<Predicate> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4715,32 +4841,31 @@ fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<
             Some(1) => fields = ip.read_string().map_err(tw)?,
             Some(2) => text = ip.read_string().map_err(tw)?,
             Some(3) => opts = ip.read_string().map_err(tw)?,
-            Some(4) if f.field_type == TType::Struct => text_filter = read_where(ip)?,
+            Some(4) if f.field_type == TType::Struct => filter = read_where(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    let tail = if opts.is_empty() {
-        String::new()
-    } else {
-        format!(", '{}'", opts.replace('\'', "''"))
-    };
-    let filt = text_filter
-        .map(|p| format!(", WHERE {p}"))
-        .unwrap_or_default();
-    Ok(format!(
-        "MATCH TEXT ('{}', '{}'{tail}{filt})",
-        fields.replace('\'', "''"),
-        text.replace('\'', "''")
-    ))
+    let mut args = vec![ExprAst::Literal(parser::Literal::Str(text))];
+    if !opts.is_empty() {
+        args.push(ExprAst::Literal(parser::Literal::Str(opts)));
+    }
+    Ok(Some(MatchClause {
+        kind: "TEXT".into(),
+        column: fields,
+        args,
+        filter,
+    }))
 }
 
 /// `FUSION('method'[, 'options'])`.
-fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+fn read_fusion_expr(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Option<(String, String)>> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut method, mut opts) = (String::new(), String::new());
-    let mut tensor: Option<(String, String, i32, String)> = None;
+    let mut tensor: Option<(String, Vec<String>, i32, String)> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4756,9 +4881,12 @@ fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    // A fused tensor query carries its column, vector and element type as
+    // option entries, which is how the engine's fusion reads them.
     if let Some((col, vec, elem, _)) = tensor {
         let extra = format!(
-            "column_name={col};search_tensor={vec};tensor_data_type={}",
+            "column_name={col};search_tensor=[{}];tensor_data_type={}",
+            vec.join(","),
             knn_element(elem)
         );
         opts = if opts.is_empty() {
@@ -4770,65 +4898,10 @@ fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
     if method.is_empty() {
         return Ok(None);
     }
-    let tail = if opts.is_empty() {
-        String::new()
-    } else {
-        format!(", '{}'", opts.replace('\'', "''"))
-    };
-    Ok(Some(format!(
-        "FUSION('{}'{tail})",
-        method.replace('\'', "''")
-    )))
+    Ok(Some((method, opts)))
 }
 
-/// Reads `EmbeddingData` and renders `[v0,v1,…]`.
-fn read_embedding_literal(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
-    ip.read_struct_begin().map_err(tw)?;
-    let mut vals: Vec<String> = Vec::new();
-    loop {
-        let f = ip.read_field_begin().map_err(tw)?;
-        if f.field_type == TType::Stop {
-            break;
-        }
-        if let TType::List = f.field_type {
-            let l = ip.read_list_begin().map_err(tw)?;
-            // The *element* type is in the list header, not the field header.
-            let elem_type = l.element_type;
-            vals.clear();
-            for _ in 0..l.size {
-                match elem_type {
-                    TType::Bool => vals.push(ip.read_bool().map_err(tw)?.to_string()),
-                    TType::I16 => vals.push(ip.read_i16().map_err(tw)?.to_string()),
-                    TType::I32 => vals.push(ip.read_i32().map_err(tw)?.to_string()),
-                    TType::I64 => vals.push(ip.read_i64().map_err(tw)?.to_string()),
-                    TType::Double => vals.push(fmt_number(ip.read_double().map_err(tw)?)),
-                    _ => {
-                        ip.skip(elem_type).map_err(tw)?;
-                    }
-                }
-            }
-            ip.read_list_end().map_err(tw)?;
-        } else {
-            ip.skip(f.field_type).map_err(tw)?;
-        }
-        ip.read_field_end().map_err(tw)?;
-    }
-    ip.read_struct_end().map_err(tw)?;
-    Ok(format!("[{}]", vals.join(",")))
-}
-
-/// A compact decimal for a float literal (always with a fractional part, so
-/// the SQL lexer reads it as a float rather than an integer).
-fn fmt_number(f: f64) -> String {
-    let s = format!("{f}");
-    if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
-        s
-    } else {
-        format!("{s}.0")
-    }
-}
-
-/// Reads a list of `InitParameter` into `k=v` pairs.
+/// Reads the `list<InitParameter>` of a search term.
 fn read_init_params(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
 ) -> Result<Vec<(String, String)>> {
@@ -4856,25 +4929,6 @@ fn read_init_params(
     }
     ip.read_list_end().map_err(tw)?;
     Ok(out)
-}
-
-/// Splits `opt_params` into the plain `WITH` options and the index hints the
-/// SQL grammar takes outside the parentheses.
-fn split_index_hints(params: &[(String, String)]) -> (String, String) {
-    let mut opts: Vec<String> = Vec::new();
-    let mut hints = String::new();
-    for (k, v) in params {
-        if k.eq_ignore_ascii_case("index_name") {
-            hints.push_str(&format!(" USING INDEX ({v})"));
-        } else if k.eq_ignore_ascii_case("ignore_index") {
-            if v.eq_ignore_ascii_case("true") {
-                hints.push_str(" IGNORE INDEX");
-            }
-        } else {
-            opts.push(format!("{k}={v}"));
-        }
-    }
-    (opts.join(","), hints)
 }
 
 fn knn_metric(code: i32) -> &'static str {
@@ -4906,16 +4960,16 @@ fn knn_element(code: i32) -> &'static str {
 }
 
 /// `MATCH VECTOR (col, [..], 'elem', 'metric', topn[, 'opts'])`.
-fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+fn read_knn_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<MatchClause>> {
     ip.read_struct_begin().map_err(tw)?;
     let mut col = String::new();
-    let mut vec = String::from("[]");
+    let mut vec: Vec<String> = Vec::new();
     let mut elem = 6i32;
     let mut metric = 0i32;
     let mut topn = 10i64;
     let mut params: Vec<(String, String)> = Vec::new();
-    let mut knn_filter: Option<String> = None;
-    let mut query_expr: Option<String> = None;
+    let mut filter: Option<Predicate> = None;
+    let mut query_expr: Option<ExprAst> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4926,15 +4980,15 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
                 let (names, _) = read_column_expr(ip)?;
                 col = names.into_iter().next().unwrap_or_default();
             }
-            Some(2) if f.field_type == TType::Struct => vec = read_embedding_literal(ip)?,
+            Some(2) if f.field_type == TType::Struct => vec = read_embedding_values(ip)?,
             Some(3) => elem = ip.read_i32().map_err(tw)?,
             Some(4) => metric = ip.read_i32().map_err(tw)?,
             Some(5) => topn = ip.read_i64().map_err(tw)?,
             Some(6) if f.field_type == TType::List => params = read_init_params(ip)?,
-            Some(7) if f.field_type == TType::Struct => knn_filter = read_where(ip)?,
+            Some(7) if f.field_type == TType::Struct => filter = read_where(ip)?,
             Some(8) if f.field_type == TType::Struct => {
                 let (name, args) = read_function_expr(ip)?;
-                query_expr = Some(pexpr_sql(&PExpr::Call(name, args)));
+                query_expr = Some(pexpr_ast(&PExpr::Call(name, args)));
             }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
@@ -4951,47 +5005,67 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     let ignoring = params
         .iter()
         .any(|(k, v)| k.eq_ignore_ascii_case("ignore_index") && v.eq_ignore_ascii_case("true"));
-    let vector = query_expr.unwrap_or(vec);
     if named && ignoring {
-        // Reject it in the *engine* (not while decoding), so the whole request
-        // is consumed first and the connection stays usable for the next call.
+        // Reject it in the *engine*, not while decoding, so the whole request
+        // is consumed and the connection stays usable. The engine reads the
+        // contradiction from the option bag.
         let name = params
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case("index_name"))
             .map(|(_, v)| v.clone())
             .unwrap_or_default();
-        return Ok(Some(format!(
-            "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}, 'index_name={};ignore_index=true')",
-            knn_element(elem),
-            knn_metric(metric),
-            name.replace('\'', "''")
-        )));
+        return Ok(Some(MatchClause {
+            kind: "VECTOR".into(),
+            column: col,
+            args: vec![
+                ExprAst::Literal(parser::Literal::Array(vec)),
+                ExprAst::Literal(parser::Literal::Str(knn_element(elem).into())),
+                ExprAst::Literal(parser::Literal::Str(knn_metric(metric).into())),
+                ExprAst::Literal(parser::Literal::Int(topn)),
+                ExprAst::Literal(parser::Literal::Str(format!(
+                    "index_name={name};ignore_index=true"
+                ))),
+            ],
+            filter,
+        }));
     }
-    let (opts, hints) = split_index_hints(&params);
-    let tail = if opts.is_empty() {
-        String::new()
-    } else {
-        format!(", '{}'", opts.replace('\'', "''"))
-    };
-    let filt = knn_filter
-        .map(|p| format!(", WHERE {p}"))
-        .unwrap_or_default();
-    Ok(Some(format!(
-        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail}{filt}){hints}",
-        knn_element(elem),
-        knn_metric(metric)
-    )))
+    let query = query_expr.unwrap_or(ExprAst::Literal(parser::Literal::Array(vec)));
+    // The option bag keeps every entry: the executor validates `index_name`
+    // (an unknown one is an error) and reads `ignore_index` from it. Splitting
+    // the hints out is only how the *SQL* form spelled them.
+    // Every option goes into the bag, index hints included: the executor
+    // validates `index_name` and reads `ignore_index` from it.
+    let opts = params
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join(";");
+    let mut args = vec![
+        query,
+        ExprAst::Literal(parser::Literal::Str(knn_element(elem).into())),
+        ExprAst::Literal(parser::Literal::Str(knn_metric(metric).into())),
+        ExprAst::Literal(parser::Literal::Int(topn)),
+    ];
+    if !opts.is_empty() {
+        args.push(ExprAst::Literal(parser::Literal::Str(opts)));
+    }
+    Ok(Some(MatchClause {
+        kind: "VECTOR".into(),
+        column: col,
+        args,
+        filter,
+    }))
 }
 
 /// `MATCH SPARSE (col, {i:v,…}, 'metric', topn[, 'opts'])`.
-fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+fn read_sparse_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<MatchClause>> {
     ip.read_struct_begin().map_err(tw)?;
     let mut col = String::new();
-    let mut sparse = String::from("{}");
+    let mut sparse: Vec<String> = Vec::new();
     let mut metric = String::new();
     let mut topn = 10i64;
     let mut params: Vec<(String, String)> = Vec::new();
-    let mut sparse_filter: Option<String> = None;
+    let mut filter: Option<Predicate> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -5003,12 +5077,12 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
                 col = names.into_iter().next().unwrap_or_default();
             }
             Some(2) if f.field_type == TType::Struct => {
-                sparse = read_constant_expr(ip)?.to_sql();
+                sparse = sparse_pairs(&read_constant_expr(ip)?);
             }
             Some(3) => metric = ip.read_string().map_err(tw)?,
             Some(4) => topn = ip.read_i64().map_err(tw)?,
             Some(5) if f.field_type == TType::List => params = read_init_params(ip)?,
-            Some(6) if f.field_type == TType::Struct => sparse_filter = read_where(ip)?,
+            Some(6) if f.field_type == TType::Struct => filter = read_where(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -5017,44 +5091,81 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     if col.is_empty() {
         return Ok(None);
     }
-    let (opts, hints) = split_index_hints(&params);
-    let tail = if opts.is_empty() {
-        String::new()
-    } else {
-        format!(", '{}'", opts.replace('\'', "''"))
-    };
-    let filt = sparse_filter
-        .map(|p| format!(", WHERE {p}"))
-        .unwrap_or_default();
-    Ok(Some(format!(
-        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail}{filt}){hints}"
-    )))
+    // Every option goes into the bag, index hints included: the executor
+    // validates `index_name` and reads `ignore_index` from it.
+    let opts = params
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join(";");
+    let mut args = vec![
+        ExprAst::Literal(parser::Literal::Array(sparse)),
+        ExprAst::Literal(parser::Literal::Str(metric)),
+        ExprAst::Literal(parser::Literal::Int(topn)),
+    ];
+    if !opts.is_empty() {
+        args.push(ExprAst::Literal(parser::Literal::Str(opts)));
+    }
+    Ok(Some(MatchClause {
+        kind: "SPARSE".into(),
+        column: col,
+        args,
+        filter,
+    }))
 }
 
-/// Reads a `MatchTensorExpr` as `(column, [vector], element type, options)`.
-#[allow(clippy::type_complexity)]
+/// The `i:v` items of a sparse constant, which is how the sparse reader wants
+/// the query.
+fn sparse_pairs(constant: &ValueLit) -> Vec<String> {
+    match constant {
+        // A tensor-shaped constant is not a sparse query; the engine reports
+        // the empty vector.
+        ValueLit::IntTensor(_) | ValueLit::FloatTensor(_) => Vec::new(),
+        ValueLit::Sparse {
+            indices,
+            ints,
+            floats,
+            is_float,
+        } => indices
+            .iter()
+            .enumerate()
+            .map(|(k, i)| {
+                if *is_float {
+                    format!("{i}:{}", floats[k])
+                } else {
+                    format!("{i}:{}", ints[k])
+                }
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// `(column, [..], element_type, opts)` of a tensor match.
+type TensorMatchParts = (String, Vec<String>, i32, String);
+
 fn read_tensor_parts(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
-) -> Result<Option<(String, String, i32, String)>> {
+) -> Result<Option<TensorMatchParts>> {
     ip.read_struct_begin().map_err(tw)?;
-    let mut method = String::new();
-    let mut col = String::new();
-    let mut elem = 6i32;
-    let mut vec = String::from("[]");
-    let mut opts = String::new();
+    let (mut col, mut vec, mut elem, mut opts) = (String::new(), Vec::new(), 6i32, String::new());
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
             break;
         }
         match f.id {
-            Some(1) => method = ip.read_string().map_err(tw)?,
+            // 1 is `search_method`, a string the SQL form passed positionally;
+            // the tree carries it in the clause's kind.
+            Some(1) => {
+                let _method = ip.read_string().map_err(tw)?;
+            }
             Some(2) if f.field_type == TType::Struct => {
                 let (names, _) = read_column_expr(ip)?;
                 col = names.into_iter().next().unwrap_or_default();
             }
             Some(3) => elem = ip.read_i32().map_err(tw)?,
-            Some(4) if f.field_type == TType::Struct => vec = read_embedding_literal(ip)?,
+            Some(4) if f.field_type == TType::Struct => vec = read_embedding_values(ip)?,
             Some(5) => opts = ip.read_string().map_err(tw)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
@@ -5064,25 +5175,75 @@ fn read_tensor_parts(
     if col.is_empty() {
         return Ok(None);
     }
-    let _ = method; // the search method is passed positionally in the SQL
     Ok(Some((col, vec, elem, opts)))
 }
 
-/// `MATCH TENSOR (col, [..], 'elem', 'method'[, 'opts'])`.
-fn read_tensor_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// `MATCH TENSOR (col, [..], 'elem', 'maxsim'[, 'opts'])`.
+fn read_tensor_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<MatchClause>> {
     let Some((col, vec, elem, opts)) = read_tensor_parts(ip)? else {
         return Ok(None);
     };
-    let _ = &opts;
-    let tail = if opts.is_empty() {
-        String::new()
+    let mut args = vec![
+        ExprAst::Literal(parser::Literal::Array(vec)),
+        ExprAst::Literal(parser::Literal::Str(knn_element(elem).into())),
+        ExprAst::Literal(parser::Literal::Str("maxsim".into())),
+    ];
+    if !opts.is_empty() {
+        args.push(ExprAst::Literal(parser::Literal::Str(opts)));
+    }
+    Ok(Some(MatchClause {
+        kind: "TENSOR".into(),
+        column: col,
+        args,
+        filter: None,
+    }))
+}
+
+/// Reads an `EmbeddingData` as the query vector's items.
+fn read_embedding_values(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut vals: Vec<String> = Vec::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        if let TType::List = f.field_type {
+            let l = ip.read_list_begin().map_err(tw)?;
+            // The *element* type is in the list header, not the field header.
+            let elem_type = l.element_type;
+            vals.clear();
+            for _ in 0..l.size {
+                match elem_type {
+                    TType::Bool => vals.push(ip.read_bool().map_err(tw)?.to_string()),
+                    TType::I16 => vals.push(ip.read_i16().map_err(tw)?.to_string()),
+                    TType::I32 => vals.push(ip.read_i32().map_err(tw)?.to_string()),
+                    TType::I64 => vals.push(ip.read_i64().map_err(tw)?.to_string()),
+                    TType::Double => vals.push(fmt_number(ip.read_double().map_err(tw)?)),
+                    _ => {
+                        ip.skip(elem_type).map_err(tw)?;
+                    }
+                }
+            }
+            ip.read_list_end().map_err(tw)?;
+        } else {
+            ip.skip(f.field_type).map_err(tw)?;
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(vals)
+}
+
+/// A compact decimal for a float literal (always with a fractional part, so
+/// the SQL lexer reads it as a float rather than an integer).
+fn fmt_number(f: f64) -> String {
+    let s = format!("{f}");
+    if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
+        s
     } else {
-        format!(", '{}'", opts.replace('\'', "''"))
-    };
-    Ok(Some(format!(
-        "MATCH TENSOR ({col}, {vec}, '{}', 'maxsim'{tail})",
-        knn_element(elem)
-    )))
+        format!("{s}.0")
+    }
 }
 
 fn sql_op(name: &str) -> Option<&'static str> {
@@ -5097,10 +5258,13 @@ fn sql_op(name: &str) -> Option<&'static str> {
     })
 }
 
-/// Reads a `where_expr` (`ParsedExpr` → `FunctionExpr`) and renders a predicate.
-fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// Reads a `where_expr` (`ParsedExpr` → `FunctionExpr`) as a predicate tree.
+///
+/// The predicate is what the executor takes; it used to be rendered to SQL text
+/// here and re-parsed, which made the request's own values statement text.
+fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<Predicate>> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
-    let mut pred = None;
+    let mut pred: Option<Predicate> = None;
     // A ColumnExpr/ConstantExpr is not a predicate ("filter('c1')").
     let mut not_predicate = false;
     loop {
@@ -5136,52 +5300,43 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                 }
                 ip.read_struct_end().map_err(tw)?;
                 // Either side may be an expression (`sqrt(c1) = 2`), and the
-                // connectives arrive as functions too.
-                match (sql_op(&name), &args[..]) {
-                    (Some(op), [l, r]) => {
-                        pred = Some(format!("{} {op} {}", pexpr_sql(l), pexpr_sql(r)))
-                    }
-                    // `c1 IN (1, 2, 3)` arrives as `in(c1, 1, 2, 3)`.
-                    (None, [head, rest @ ..])
-                        if name.eq_ignore_ascii_case("in") && !rest.is_empty() =>
+                // connectives arrive as functions too. `as_predicate` decodes
+                // any of those shapes, so the wire's nesting is preserved.
+                let call = PExpr::Call(name.clone(), args.clone());
+                let is_logical = name.eq_ignore_ascii_case("and")
+                    || name.eq_ignore_ascii_case("or")
+                    || name.eq_ignore_ascii_case("not");
+                if sql_op(&name).is_some()
+                    || name.eq_ignore_ascii_case("in")
+                    || name.eq_ignore_ascii_case("not_in")
+                    || name.eq_ignore_ascii_case("is_null")
+                    || name.eq_ignore_ascii_case("is_not_null")
+                    || is_logical
+                {
+                    if is_logical
+                        && !args.iter().all(is_predicate_pexpr)
+                        && !matches!(args.as_slice(), [only]
+                            if name.eq_ignore_ascii_case("not") && is_predicate_pexpr(only))
                     {
-                        let list = rest.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
-                        let op = if name.eq_ignore_ascii_case("not_in") {
-                            "NOT IN"
-                        } else {
-                            "IN"
-                        };
-                        pred = Some(format!("({} {op} ({list}))", pexpr_sql(head)));
-                    }
-                    (None, [only]) if name.eq_ignore_ascii_case("not") => {
-                        pred = Some(format!("(NOT {})", pexpr_sql(only)));
-                    }
-                    // `IS [NOT] NULL` arrive as `is_null`/`is_not_null`.
-                    (None, [only]) if name.eq_ignore_ascii_case("is_null") => {
-                        pred = Some(format!("({} IS NULL)", pexpr_sql(only)));
-                    }
-                    (None, [only]) if name.eq_ignore_ascii_case("is_not_null") => {
-                        pred = Some(format!("({} IS NOT NULL)", pexpr_sql(only)));
-                    }
-                    (None, [l, r])
-                        if (name.eq_ignore_ascii_case("and")
-                            || name.eq_ignore_ascii_case("or"))
-                            && is_predicate_pexpr(l)
-                            && is_predicate_pexpr(r) =>
-                    {
-                        let joiner = name.to_ascii_lowercase();
-                        pred = Some(format!("({} {joiner} {})", pexpr_sql(l), pexpr_sql(r)));
-                    }
-                    // A boolean-valued function (`regex(c1, 'bc')`) is a
-                    // predicate on its own.
-                    (None, _) if is_boolean_fn(&name) => {
-                        pred = Some(pexpr_sql(&PExpr::Call(name.clone(), args.clone())));
-                    }
-                    _ => {
-                        // A non-boolean function (`_row_id()`, `*`, …) — report
-                        // it after the request is fully read.
+                        // `AND`/`OR` over non-boolean operands is a type error.
                         not_predicate = true;
+                    } else {
+                        pred = Some(as_predicate(&call));
                     }
+                } else if is_boolean_fn(&name) {
+                    // A boolean-valued function (`regex(c1, 'bc')`).
+                    pred = Some(Predicate::IsTrue(pexpr_ast(&call)));
+                } else {
+                    // A non-boolean function (`_row_id()`, `*`, …) — report it
+                    // after the request is fully read.
+                    not_predicate = true;
+                }
+                if pred.is_none()
+                    && !not_predicate
+                    && (name.eq_ignore_ascii_case("and") || name.eq_ignore_ascii_case("or"))
+                {
+                    // `AND`/`OR` over non-boolean operands is a type error.
+                    not_predicate = true;
                 }
             } else if uf.id == Some(11) && uf.field_type == TType::Struct {
                 // `InExpr { 1: left_operand, 2: arguments, 3: in_type }` —
@@ -5189,7 +5344,7 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                 ip.read_struct_begin().map_err(tw)?;
                 let mut left = PExpr::Other;
                 let mut vals: Vec<PExpr> = Vec::new();
-                let mut in_type = true;
+                let mut negated = false;
                 loop {
                     let g = ip.read_field_begin().map_err(tw)?;
                     if g.field_type == TType::Stop {
@@ -5204,15 +5359,20 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                             }
                             ip.read_list_end().map_err(tw)?;
                         }
-                        (Some(3), TType::Bool) => in_type = ip.read_bool().map_err(tw)?,
+                        (Some(3), TType::Bool) => {
+                            // `in_type` is true for `IN`, false for `NOT IN`.
+                            negated = !ip.read_bool().map_err(tw)?;
+                        }
                         _ => ip.skip(g.field_type).map_err(tw)?,
                     }
                     ip.read_field_end().map_err(tw)?;
                 }
                 ip.read_struct_end().map_err(tw)?;
-                let list = vals.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
-                let op = if in_type { "IN" } else { "NOT IN" };
-                pred = Some(format!("({} {op} ({list}))", pexpr_sql(&left)));
+                pred = Some(Predicate::In(
+                    pexpr_ast(&left),
+                    vals.iter().map(pexpr_ast).collect(),
+                    negated,
+                ));
             } else {
                 // A bare column / star is not a predicate; report it after the
                 // whole request is read (see NON_BOOLEAN_FILTER).
@@ -5229,15 +5389,93 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
     }
     ip.read_struct_end().map_err(tw)?;
     if not_predicate && pred.is_none() {
-        // The whole request is already consumed; the caller turns this marker
-        // into a 7012 response without desynchronising the stream.
-        return Ok(Some(NON_BOOLEAN_FILTER.to_string()));
+        // The whole request is already consumed, so the caller can still reply
+        // with the error without desynchronising the stream.
+        return Err(Error::Invalid(
+            "parser: the filter must be a boolean expression".into(),
+        ));
     }
     Ok(pred)
 }
 
-/// Marker for a filter that is not a boolean expression.
-const NON_BOOLEAN_FILTER: &str = "__NON_BOOLEAN_FILTER__";
+/// A decoded expression as a predicate, for an `AND`/`OR` operand.
+fn as_predicate(e: &PExpr) -> Predicate {
+    // A nested comparison (`c1 > 0.1` inside `and(...)`) is a predicate, not a
+    // boolean expression the evaluator knows how to call: `<` is not a
+    // function. Decode it here rather than letting it reach the binder.
+    match e {
+        PExpr::Call(name, args) => match (sql_op(name), &args[..]) {
+            (Some(op), [l, r]) => Predicate::Cmp(pexpr_ast(l), cmp_op_of(op), pexpr_ast(r)),
+            (None, [head, rest @ ..])
+                if (name.eq_ignore_ascii_case("in") || name.eq_ignore_ascii_case("not_in"))
+                    && !rest.is_empty() =>
+            {
+                Predicate::In(
+                    pexpr_ast(head),
+                    rest.iter().map(pexpr_ast).collect(),
+                    name.eq_ignore_ascii_case("not_in"),
+                )
+            }
+            (None, [l, r]) if name.eq_ignore_ascii_case("and") => Predicate::Bool(
+                Box::new(as_predicate(l)),
+                parser::BoolOp::And,
+                Box::new(as_predicate(r)),
+            ),
+            (None, [l, r]) if name.eq_ignore_ascii_case("or") => Predicate::Bool(
+                Box::new(as_predicate(l)),
+                parser::BoolOp::Or,
+                Box::new(as_predicate(r)),
+            ),
+            (None, [only]) if name.eq_ignore_ascii_case("not") => {
+                Predicate::Not(Box::new(as_predicate(only)))
+            }
+            (None, [only]) if name.eq_ignore_ascii_case("is_null") => {
+                Predicate::IsNull(pexpr_ast(only), false)
+            }
+            (None, [only]) if name.eq_ignore_ascii_case("is_not_null") => {
+                Predicate::IsNull(pexpr_ast(only), true)
+            }
+            _ => Predicate::IsTrue(pexpr_ast(e)),
+        },
+        _ => Predicate::IsTrue(pexpr_ast(e)),
+    }
+}
+
+/// The aggregate a wire function name stands for, if it is one.
+fn agg_func_of(name: &str) -> Option<parser::AggFunc> {
+    use parser::AggFunc::*;
+    Some(match name.to_ascii_uppercase().as_str() {
+        "COUNT" => Count,
+        "SUM" => Sum,
+        "AVG" => Avg,
+        "MIN" => Min,
+        "MAX" => Max,
+        "FIRST" => First,
+        "LAST" => Last,
+        _ => return None,
+    })
+}
+
+/// The comparison a wire function name stands for, if it is a comparison.
+fn cmp_op_of_name(name: &str) -> Option<parser::CmpOp> {
+    match name {
+        "=" | "==" | "!=" | "<>" | "<" | "<=" | ">" | ">=" => Some(cmp_op_of(name)),
+        _ => None,
+    }
+}
+
+/// The comparison a wire operator name stands for.
+fn cmp_op_of(op: &str) -> parser::CmpOp {
+    use parser::CmpOp::*;
+    match op {
+        "!=" => Ne,
+        "<" => Lt,
+        "<=" => Le,
+        ">" => Gt,
+        ">=" => Ge,
+        _ => Eq,
+    }
+}
 
 /// Reads a `ColumnExpr`: `{1: list<string> column_name, 2: bool star}`.
 fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Vec<String>, bool)> {
@@ -5265,14 +5503,141 @@ fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
     Ok((names, star))
 }
 
-/// Reads a `ParsedExpr` in its `ColumnExpr` form (`ParsedExprType` union field 2).
-#[allow(clippy::type_complexity)] // (sql, display, raw, star)
+/// Replaces projection aliases inside a fragment of **client** SQL text.
+///
+/// This works on text because the REST DSL carries its filter as text: the
+/// fragment is parsed once, after the substitution. The Thrift path decodes
+/// structured expressions instead and uses [`substitute_expr_aliases`].
+pub(crate) fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
+    if aliases.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let bytes: Vec<char> = text.chars().collect();
+    let mut i = 0usize;
+    let is_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == '\'' || c == '"' {
+            let quote = c;
+            out.push(c);
+            i += 1;
+            while i < bytes.len() {
+                out.push(bytes[i]);
+                if bytes[i] == quote {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        if c.is_ascii_alphabetic() || c == '_' {
+            let start = i;
+            while i < bytes.len() && is_ident(bytes[i]) {
+                out.push(bytes[i]);
+                i += 1;
+            }
+            let word: String = bytes[start..i].iter().collect();
+            if let Some((_, expr)) = aliases.iter().find(|(a, _)| a.eq_ignore_ascii_case(&word)) {
+                out.truncate(out.len() - word.len());
+                out.push('(');
+                out.push_str(expr);
+                out.push(')');
+            }
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+/// Replaces a projection alias inside an expression with what it projects.
+///
+/// `SELECT substring(c2,0,5) AS c2_sub … WHERE c2_sub = 'hello'` names the
+/// projection in `WHERE`; the planner resolves `WHERE` against table columns
+/// only, so the alias is substituted here - the same thing the SQL text used to
+/// get from [`substitute_aliases`].
+fn substitute_expr_aliases(e: &ExprAst, aliases: &[(String, ExprAst)]) -> ExprAst {
+    if aliases.is_empty() {
+        return e.clone();
+    }
+    let sub = |x: &ExprAst| substitute_expr_aliases(x, aliases);
+    match e {
+        ExprAst::Column(c) => match aliases.iter().find(|(a, _)| a.eq_ignore_ascii_case(c)) {
+            Some((_, replacement)) => replacement.clone(),
+            None => e.clone(),
+        },
+        ExprAst::Literal(_) => e.clone(),
+        ExprAst::Func { name, args } => ExprAst::Func {
+            name: name.clone(),
+            args: args.iter().map(sub).collect(),
+        },
+        ExprAst::Binary(a, op, b) => ExprAst::Binary(Box::new(sub(a)), *op, Box::new(sub(b))),
+        ExprAst::Cmp(a, op, b) => ExprAst::Cmp(Box::new(sub(a)), *op, Box::new(sub(b))),
+        ExprAst::Not(a) => ExprAst::Not(Box::new(sub(a))),
+        ExprAst::And(a, b) => ExprAst::And(Box::new(sub(a)), Box::new(sub(b))),
+        ExprAst::Or(a, b) => ExprAst::Or(Box::new(sub(a)), Box::new(sub(b))),
+    }
+}
+
+/// [`substitute_expr_aliases`] over a predicate.
+fn substitute_pred_aliases(p: &Predicate, aliases: &[(String, ExprAst)]) -> Predicate {
+    if aliases.is_empty() {
+        return p.clone();
+    }
+    let e = |x: &ExprAst| substitute_expr_aliases(x, aliases);
+    match p {
+        Predicate::Cmp(a, op, b) => Predicate::Cmp(e(a), *op, e(b)),
+        Predicate::IsTrue(x) => Predicate::IsTrue(e(x)),
+        Predicate::IsNull(x, negated) => Predicate::IsNull(e(x), *negated),
+        Predicate::Like(x, pat, esc, negated) => Predicate::Like(e(x), e(pat), *esc, *negated),
+        Predicate::In(x, values, negated) => {
+            Predicate::In(e(x), values.iter().map(e).collect(), *negated)
+        }
+        Predicate::Bool(a, op, b) => Predicate::Bool(
+            Box::new(substitute_pred_aliases(a, aliases)),
+            *op,
+            Box::new(substitute_pred_aliases(b, aliases)),
+        ),
+        Predicate::Not(a) => Predicate::Not(Box::new(substitute_pred_aliases(a, aliases))),
+    }
+}
+
+/// The expression a projection stands for, for alias substitution.
+fn item_as_expr(item: &Option<SelectItem>) -> Option<ExprAst> {
+    match item.as_ref()? {
+        SelectItem::Column(c) => Some(ExprAst::Column(c.clone())),
+        SelectItem::Expr(e) => Some(e.clone()),
+        SelectItem::Func { name, args } => Some(ExprAst::Func {
+            name: name.clone(),
+            args: args.clone(),
+        }),
+        SelectItem::Aggregate(a) => Some(ExprAst::Func {
+            name: a.func.as_str().to_string(),
+            args: a.arg_exprs.iter().flatten().cloned().collect(),
+        }),
+        SelectItem::Literal(l) => Some(ExprAst::Literal(l.clone())),
+        SelectItem::Star => None,
+    }
+}
+
+/// Reads one `select_list` entry.
+///
+/// The projection becomes an AST item; the display/raw names the client sees
+/// are derived from it. `star` and the alias are recorded on the request as
+/// they are met, and `None` means "nothing projectable in this entry".
 fn read_select_item(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
+    req: &mut SelectReq,
     bad: &mut Vec<String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>, bool)> {
+) -> Result<Option<SelectItem>> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
-    let (mut names, mut display, mut raw, mut star) = (Vec::new(), Vec::new(), Vec::new(), false);
+    let mut item: Option<SelectItem> = None;
+    let mut display: Vec<String> = Vec::new();
+    let mut raw: Vec<String> = Vec::new();
+    let mut star = false;
     let mut alias: Option<String> = None;
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
@@ -5286,14 +5651,23 @@ fn read_select_item(
             ip.read_struct_begin().map_err(tw)?; // ParsedExprType union
             let uf = ip.read_field_begin().map_err(tw)?;
             if uf.id == Some(2) && uf.field_type == TType::Struct {
-                let (n, s) = read_column_expr(ip)?;
-                display.extend(n.iter().cloned());
-                raw.extend(n.iter().cloned());
-                names = n;
+                let (names, s) = read_column_expr(ip)?;
                 star = s;
+                if star {
+                    // `*` expands to the table's columns, so it contributes no
+                    // output name of its own: `names` holds only the
+                    // projections the client spelled out, which is what the
+                    // response renames (the expanded columns keep the table's).
+                    item = Some(SelectItem::Star);
+                } else if let Some(first) = names.first() {
+                    item = Some(SelectItem::Column(first.clone()));
+                    for n in &names {
+                        display.push(n.clone());
+                        raw.push(n.clone());
+                    }
+                }
             } else if uf.id == Some(3) && uf.field_type == TType::Struct {
-                // A projected function: send it to the engine as expression text
-                // (`year(c1)`), which is also the output column name.
+                // A projected function (`year(c1)`).
                 let (name, args) = read_function_expr(ip)?;
                 // A projection like `c1 + 0.1 AND c2 - 1.0` is a type error.
                 // Record it and keep parsing: bailing out here would leave the
@@ -5303,15 +5677,50 @@ fn read_select_item(
                 {
                     bad.push("parser: AND/OR operands must be boolean expressions".to_string());
                 }
-                let e = PExpr::Call(name, args);
-                names.push(pexpr_sql(&e));
+                let e = PExpr::Call(name.clone(), args.clone());
+                // An aggregate is a select-list node, not a scalar call: the
+                // executor groups by it, and `count(*)` has no argument.
+                item = Some(match agg_func_of(&name) {
+                    Some(func) => {
+                        let (mut names, mut exprs) = (Vec::new(), Vec::new());
+                        for a in &args {
+                            match a {
+                                PExpr::Column(c) => {
+                                    names.push(c.clone());
+                                    exprs.push(None);
+                                }
+                                other => {
+                                    names.push(parser::render::expr(&pexpr_ast(other)));
+                                    exprs.push(Some(pexpr_ast(other)));
+                                }
+                            }
+                        }
+                        // `count(*)` arrives as one `*` column, which is the
+                        // "no argument" spelling of the aggregate.
+                        if names == ["*"] {
+                            names.clear();
+                            exprs.clear();
+                        }
+                        SelectItem::Aggregate(parser::SelectAgg {
+                            func,
+                            args: names,
+                            arg_exprs: exprs,
+                            distinct: false,
+                        })
+                    }
+                    // A scalar function stays `Func`: `UNNEST` and the
+                    // aggregate-adjacent helpers are found by name there.
+                    None => match pexpr_ast(&e) {
+                        ExprAst::Func { name, args } => SelectItem::Func { name, args },
+                        other => SelectItem::Expr(other),
+                    },
+                });
                 display.push(pexpr_name(&e));
                 raw.push(pexpr_name_raw(&e));
             } else if uf.id == Some(12) && uf.field_type == TType::Struct {
-                // A cast: the engine gets SQL, the client the C++ `Name()`
-                // spelling (`Cast(c3 AS Varchar)`).
+                // A cast: `Cast(c3 AS Varchar)` is the client-facing name.
                 let e = read_cast_pexpr(ip)?;
-                names.push(pexpr_sql(&e));
+                item = Some(SelectItem::Expr(pexpr_ast(&e)));
                 display.push(pexpr_name(&e));
                 raw.push(pexpr_name_raw(&e));
             } else if uf.field_type == TType::Struct {
@@ -5341,30 +5750,38 @@ fn read_select_item(
     ip.read_struct_end().map_err(tw)?;
     // An empty `alias_name` is not an alias.
     let alias = alias.filter(|a| !a.trim().is_empty());
-    if let Some(alias) = alias {
-        if !names.is_empty() {
-            if let Some(sql) = names.last_mut() {
-                *sql = format!("{sql} AS {alias}");
+    if let Some(name) = &alias {
+        if !display.is_empty() {
+            if let Some(d) = display.last_mut() {
+                *d = name.clone();
+            }
+            if let Some(r) = raw.last_mut() {
+                *r = name.clone();
             }
         }
-        if let Some(d) = display.last_mut() {
-            *d = alias.clone();
-        }
-        if let Some(r) = raw.last_mut() {
-            *r = alias;
+        // `SELECT expr AS alias` lets WHERE/ORDER BY/HAVING say `alias`.
+        if let Some(expr) = item_as_expr(&item) {
+            req.aliases.push((name.clone(), expr));
         }
     }
-    Ok((names, display, raw, star))
+    req.star |= star;
+    req.names.extend(display);
+    req.raw_names.extend(raw);
+    // `Statement::Select` wants one alias slot per projection.
+    if item.is_some() {
+        req.out_aliases.push(alias);
+    }
+    Ok(item)
 }
 
 /// Reads an `order_by_list` (`list<OrderByExpr{1: ParsedExpr, 2: bool asc}>`),
 /// returning the first `(column, ascending)`.
-fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<(String, bool)>> {
+fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<OrderKey>> {
     let l = ip.read_list_begin().map_err(tw)?;
-    let mut out: Vec<(String, bool)> = Vec::new();
+    let mut out: Vec<OrderKey> = Vec::new();
     for _ in 0..l.size {
         ip.read_struct_begin().map_err(tw)?; // OrderByExpr
-        let mut col = String::new();
+        let mut key: Option<ExprAst> = None;
         let mut asc = true;
         loop {
             let fd = ip.read_field_begin().map_err(tw)?;
@@ -5372,19 +5789,25 @@ fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<(S
                 break;
             }
             match fd.id {
-                Some(1) => {
-                    if let PExpr::Column(c) = read_pexpr(ip)? {
-                        col = c;
-                    }
-                }
+                Some(1) => key = Some(pexpr_ast(&read_pexpr(ip)?)),
                 Some(2) => asc = ip.read_bool().map_err(tw)?,
                 _ => ip.skip(fd.field_type).map_err(tw)?,
             }
             ip.read_field_end().map_err(tw)?;
         }
         ip.read_struct_end().map_err(tw)?;
-        if !col.is_empty() {
-            out.push((col, asc));
+        if let Some(expr) = key {
+            // The leading identifier is the text the key sorts by; the full
+            // expression is kept for anything more than a plain column.
+            let column = match &expr {
+                ExprAst::Column(c) => c.clone(),
+                other => parser::render::expr(other),
+            };
+            out.push(OrderKey {
+                column,
+                asc,
+                expr: Some(expr),
+            });
         }
     }
     ip.read_list_end().map_err(tw)?;
@@ -5406,20 +5829,21 @@ pub fn read_select_args(
         session_id: 0,
         db_name: String::new(),
         table_name: String::new(),
-        columns: Vec::new(),
+        items: Vec::new(),
         names: Vec::new(),
         raw_names: Vec::new(),
         star: false,
-        where_sql: None,
+        where_pred: None,
         order_by: Vec::new(),
         group_by: Vec::new(),
-        having_sql: None,
+        having: None,
         limit: None,
         offset: None,
         total_hits: false,
         aliases: Vec::new(),
+        out_aliases: Vec::new(),
         highlight: Vec::new(),
-        search_sql: None,
+        search: None,
     };
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -5433,11 +5857,10 @@ pub fn read_select_args(
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, display, raw, star) = read_select_item(ip, &mut bad)?;
-                    r.columns.extend(names);
-                    r.names.extend(display);
-                    r.raw_names.extend(raw);
-                    r.star |= star;
+                    let item = read_select_item(ip, &mut r, &mut bad)?;
+                    if let Some(item) = item {
+                        r.items.push(item);
+                    }
                 }
                 ip.read_list_end().map_err(tw)?;
             }
@@ -5450,33 +5873,27 @@ pub fn read_select_args(
                 }
                 ip.read_list_end().map_err(tw)?;
             }
-            Some(6) if f.field_type == TType::Struct => r.search_sql = read_search_expr(ip)?,
+            Some(6) if f.field_type == TType::Struct => r.search = read_search_expr(ip)?,
             Some(7) if f.field_type == TType::Struct => {
-                r.where_sql = read_where(ip)?;
-                if r.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
-                    bad.push("parser: the filter must be a boolean expression".to_string());
-                    r.where_sql = None;
+                // A filter that is not a boolean expression is a request
+                // error; it is reported through `bad`, not as "no filter".
+                match read_where(ip) {
+                    Ok(p) => r.where_pred = p,
+                    Err(e) => bad.push(e.to_string()),
                 }
             }
             Some(8) if f.field_type == TType::List => {
                 // group_by_list: one ParsedExpr per group key.
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let e = read_pexpr(ip)?;
-                    let sql = pexpr_sql(&e);
-                    if !sql.is_empty() {
-                        r.group_by.push(sql);
-                    }
+                    r.group_by.push(pexpr_ast(&read_pexpr(ip)?));
                 }
                 ip.read_list_end().map_err(tw)?;
             }
-            Some(9) if f.field_type == TType::Struct => {
-                r.having_sql = read_where(ip)?;
-                if r.having_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
-                    bad.push("parser: the filter must be a boolean expression".to_string());
-                    r.having_sql = None;
-                }
-            }
+            Some(9) if f.field_type == TType::Struct => match read_where(ip) {
+                Ok(p) => r.having = p,
+                Err(e) => bad.push(e.to_string()),
+            },
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     r.limit = Some(n);
@@ -5497,20 +5914,18 @@ pub fn read_select_args(
     }
     ip.read_struct_end().map_err(tw)?; // SelectRequest
     end_args(ip)?; // Select_args
-    if !r.star && r.columns.is_empty() {
+    if !r.star && r.items.is_empty() {
         // 3050 EMPTY_SELECT_FIELDS: `output([])` must not degrade into `*`.
         return Err(Error::Invalid("empty select fields".into()));
     }
-    // `SELECT expr AS alias` lets WHERE/ORDER BY/HVING say `alias`.
-    for c in &r.columns {
-        if let Some((expr, alias)) = c.rsplit_once(" AS ") {
-            r.aliases
-                .push((alias.trim().to_string(), expr.trim().to_string()));
-        }
-    }
     // A projection that is also a group key keeps the client's spelling.
-    for (i, sql) in r.columns.iter().enumerate() {
-        if !r.group_by.iter().any(|g| g.eq_ignore_ascii_case(sql)) {
+    for (i, item) in r.items.iter().enumerate() {
+        let text = parser::render::select_item(item);
+        if !r
+            .group_by
+            .iter()
+            .any(|g| parser::render::expr(g).eq_ignore_ascii_case(&text))
+        {
             continue;
         }
         if let (Some(raw), true) = (r.raw_names.get(i).cloned(), i < r.names.len()) {
@@ -6080,6 +6495,96 @@ pub enum ValueLit {
 }
 
 impl ValueLit {
+    /// This value as the parser's [`parser::Literal`], which is what the
+    /// executor's insert and update paths take.
+    pub fn to_literal(&self) -> parser::Literal {
+        match self {
+            ValueLit::Int(n) => parser::Literal::Int(*n),
+            ValueLit::Float(f) => parser::Literal::Float(*f),
+            ValueLit::Str(t) => parser::Literal::Str(t.clone()),
+            ValueLit::Null => parser::Literal::Null,
+            ValueLit::Bool(b) => parser::Literal::Str(b.to_string()),
+            ValueLit::IntArray(v) => parser::Literal::Vector(v.iter().map(|x| *x as f64).collect()),
+            ValueLit::FloatArray(v) => parser::Literal::Vector(v.clone()),
+            ValueLit::IntTensor(rows) => {
+                parser::Literal::Vector(rows.iter().flatten().map(|x| *x as f64).collect())
+            }
+            ValueLit::FloatTensor(rows) => {
+                parser::Literal::Vector(rows.iter().flatten().copied().collect())
+            }
+            ValueLit::Sparse {
+                indices,
+                ints,
+                floats,
+                is_float,
+            } => parser::Literal::Array(
+                indices
+                    .iter()
+                    .enumerate()
+                    .map(|(k, i)| {
+                        if *is_float {
+                            format!("{i}:{}", floats[k])
+                        } else {
+                            format!("{i}:{}", ints[k])
+                        }
+                    })
+                    .collect(),
+            ),
+            // `{a, b, …}`: an ARRAY column's value. Each element keeps the
+            // spelling the array reader understands, and a nested bracket set
+            // stays nested.
+            ValueLit::Brackets(items) => parser::Literal::Array(
+                items
+                    .iter()
+                    .map(|v| match v.to_literal() {
+                        parser::Literal::Str(s) => s,
+                        other => other.to_slt_string(),
+                    })
+                    .collect(),
+            ),
+            // A tensor array is a list of sub-tensors; the encoder reads the
+            // same bracketed text a tensor does.
+            ValueLit::IntTensorArray(t) => parser::Literal::Array(
+                t.iter()
+                    .map(|rows| {
+                        format!(
+                            "[{}]",
+                            rows.iter()
+                                .map(|r| format!(
+                                    "[{}]",
+                                    r.iter()
+                                        .map(|x| x.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                ))
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )
+                    })
+                    .collect(),
+            ),
+            ValueLit::FloatTensorArray(t) => parser::Literal::Array(
+                t.iter()
+                    .map(|rows| {
+                        format!(
+                            "[{}]",
+                            rows.iter()
+                                .map(|r| format!(
+                                    "[{}]",
+                                    r.iter()
+                                        .map(|x| x.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                ))
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )
+                    })
+                    .collect(),
+            ),
+        }
+    }
+
     /// The C++ `ConstantExpr::ToString()` spelling: strings are unquoted.
     pub fn to_display(&self) -> String {
         match self {
@@ -6785,31 +7290,50 @@ async fn run_drop_table(
     }
 }
 
-async fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
-    match engine {
-        Some(eng) => match eng.execute(sql).await {
-            Ok(_) => CommonResponse {
-                error_code: OK,
-                error_msg: "OK".into(),
-                session_id,
-            },
-            Err(e) => {
-                if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                    eprintln!("[SQL-ERR] {sql} -> {e}");
-                }
-                CommonResponse {
-                    error_code: e.status_code(),
-                    error_msg: e.to_string(),
-                    session_id,
-                }
-            }
-        },
-        None => CommonResponse {
+/// Runs statements the handler built itself, so nothing the client sent is
+/// re-parsed as statement text.
+async fn run_statement(
+    engine: Option<&Arc<Engine>>,
+    stmt: Statement,
+    session_id: i64,
+) -> CommonResponse {
+    let Some(eng) = engine else {
+        return CommonResponse {
             error_code: 1,
             error_msg: "no engine bound".into(),
             session_id,
+        };
+    };
+    match eng.execute_parsed(vec![stmt], "").await {
+        Ok(_) => CommonResponse {
+            error_code: OK,
+            error_msg: "OK".into(),
+            session_id,
+        },
+        Err(e) => CommonResponse {
+            error_code: e.status_code(),
+            error_msg: e.to_string(),
+            session_id,
         },
     }
+}
+
+/// `DROP INDEX`, with the index name treated as a name rather than text.
+async fn run_drop_index(
+    engine: Option<&Arc<Engine>>,
+    name: &str,
+    if_exists: bool,
+    session_id: i64,
+) -> CommonResponse {
+    run_statement(
+        engine,
+        Statement::DropIndex {
+            name: name.to_string(),
+            if_exists,
+        },
+        session_id,
+    )
+    .await
 }
 
 /// Reads a full `ListDatabase` CALL, returning `(seqid, session_id)`.
@@ -7096,15 +7620,21 @@ pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32, names: &[Stri
 pub struct DeleteReq {
     pub db_name: String,
     pub table_name: String,
-    pub where_sql: Option<String>,
+    pub where_pred: Option<Predicate>,
     pub session_id: i64,
 }
 
 impl DeleteReq {
-    pub fn to_sql(&self) -> String {
-        match &self.where_sql {
-            Some(w) => format!("DELETE FROM {} WHERE {w};", self.table_name),
-            None => format!("DELETE FROM {};", self.table_name),
+    /// The statement this request describes, with the filter parsed as one
+    /// predicate and the table name taken as a **name**.
+    ///
+    /// The request used to be rendered to `DELETE FROM <table> WHERE <filter>`
+    /// and re-parsed, which put the client's `table_name` into the statement
+    /// text: a name carrying `;` was a second statement.
+    pub fn into_statement(self) -> Statement {
+        Statement::Delete {
+            table: qualify(&self.db_name, &self.table_name),
+            where_pred: self.where_pred,
         }
     }
 }
@@ -7117,7 +7647,7 @@ pub fn read_delete_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     let mut r = DeleteReq {
         db_name: String::new(),
         table_name: String::new(),
-        where_sql: None,
+        where_pred: None,
         session_id: 0,
     };
     loop {
@@ -7128,7 +7658,7 @@ pub fn read_delete_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         match fd.id {
             Some(1) => r.db_name = ip.read_string().map_err(tw)?,
             Some(2) => r.table_name = ip.read_string().map_err(tw)?,
-            Some(3) if fd.field_type == TType::Struct => r.where_sql = read_where(ip)?,
+            Some(3) if fd.field_type == TType::Struct => r.where_pred = read_where(ip)?,
             Some(4) => r.session_id = ip.read_i64().map_err(tw)?,
             _ => ip.skip(fd.field_type).map_err(tw)?,
         }
@@ -7192,24 +7722,27 @@ pub fn write_delete_response(
 pub struct UpdateReq {
     pub db_name: String,
     pub table_name: String,
-    pub where_sql: Option<String>,
+    pub where_pred: Option<Predicate>,
     pub assignments: Vec<(String, ValueLit)>,
     pub session_id: i64,
 }
 
 impl UpdateReq {
-    pub fn to_sql(&self) -> String {
-        let sets: Vec<String> = self
-            .assignments
-            .iter()
-            .map(|(c, v)| format!("{c} = {}", v.to_sql()))
-            .collect();
-        let mut sql = format!("UPDATE {} SET {}", self.table_name, sets.join(", "));
-        if let Some(w) = &self.where_sql {
-            sql.push_str(&format!(" WHERE {w}"));
+    /// The statement this request describes.
+    ///
+    /// The assignment values go in as literals and the filter is parsed as one
+    /// predicate, so neither reaches the parser as a fragment of statement
+    /// text around the client's `table_name`.
+    pub fn into_statement(self) -> Statement {
+        Statement::Update {
+            table: qualify(&self.db_name, &self.table_name),
+            assignments: self
+                .assignments
+                .iter()
+                .map(|(c, v)| (c.clone(), ExprAst::Literal(v.to_literal())))
+                .collect(),
+            where_pred: self.where_pred,
         }
-        sql.push(';');
-        sql
     }
 }
 
@@ -7245,7 +7778,7 @@ pub fn read_update_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     let mut r = UpdateReq {
         db_name: String::new(),
         table_name: String::new(),
-        where_sql: None,
+        where_pred: None,
         assignments: Vec::new(),
         session_id: 0,
     };
@@ -7257,7 +7790,7 @@ pub fn read_update_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         match fd.id {
             Some(1) => r.db_name = ip.read_string().map_err(tw)?,
             Some(2) => r.table_name = ip.read_string().map_err(tw)?,
-            Some(3) if fd.field_type == TType::Struct => r.where_sql = read_where(ip)?,
+            Some(3) if fd.field_type == TType::Struct => r.where_pred = read_where(ip)?,
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
@@ -7745,20 +8278,21 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         session_id: 0,
         db_name: String::new(),
         table_name: String::new(),
-        columns: Vec::new(),
+        items: Vec::new(),
         names: Vec::new(),
         raw_names: Vec::new(),
         star: false,
-        where_sql: None,
+        where_pred: None,
         order_by: Vec::new(),
         group_by: Vec::new(),
-        having_sql: None,
+        having: None,
         limit: None,
         offset: None,
         total_hits: false,
         aliases: Vec::new(),
+        out_aliases: Vec::new(),
         highlight: Vec::new(),
-        search_sql: None,
+        search: None,
     };
     let mut explain_type = 4; // Physical
     ip.read_struct_begin().map_err(tw)?; // Explain_args
@@ -7776,20 +8310,17 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, _, _, star) = read_select_item(ip, &mut Vec::new())?;
-                    req.columns.extend(names);
-                    req.star |= star;
+                    if let Some(item) = read_select_item(ip, &mut req, &mut Vec::new())? {
+                        req.items.push(item);
+                    }
                 }
                 ip.read_list_end().map_err(tw)?;
             }
-            Some(7) if f.field_type == TType::Struct => req.where_sql = read_where(ip)?,
+            Some(7) if f.field_type == TType::Struct => req.where_pred = read_where(ip)?,
             Some(8) if f.field_type == TType::List => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let sql = pexpr_sql(&read_pexpr(ip)?);
-                    if !sql.is_empty() {
-                        req.group_by.push(sql);
-                    }
+                    req.group_by.push(pexpr_ast(&read_pexpr(ip)?));
                 }
                 ip.read_list_end().map_err(tw)?;
             }
@@ -7877,6 +8408,44 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `RENAME TO` carries a client-supplied name; the text path let the parser
+    /// reject one that is not a name. `123` tokenises as a number, so it must
+    /// fail rather than become a table called `123`.
+    #[test]
+    fn rename_target_keeps_the_parser_validation() {
+        assert_eq!(rename_target("New_Name").unwrap(), "new_name");
+        assert!(rename_target("123").is_err());
+        // `999abc` lexes as `999` then `abc`; the parser's `RENAME` branch
+        // skips to `TO` and takes one name, so the tail must be rejected.
+        assert!(rename_target("999abc").is_err());
+        assert!(rename_target("a; DROP TABLE victim;").is_err());
+        assert!(rename_target("").is_err());
+    }
+
+    /// Building `CreateIndex` as a tree must keep the parser's rejection of an
+    /// invalid target — a name with stray characters, or a `;` that would have
+    /// started a second statement.
+    #[test]
+    fn index_target_keeps_the_parser_validation() {
+        assert_eq!(index_target("c1").unwrap(), "c1");
+        assert_eq!(index_target("lower(c1)").unwrap(), "lower(c1)");
+        // The functional-index targets the SDK sends are legal expressions.
+        assert!(index_target("sqrt(c1)").is_ok());
+        assert!(index_target("substring(c2, 0, 5)").is_ok());
+        // An unknown function is syntactically fine; the executor rejects it.
+        assert!(index_target("abc(c2)").is_ok());
+        assert!(index_target("$#%dfva").is_err());
+        assert!(index_target("c1; DROP TABLE victim;").is_err());
+        // A key that is not an identifier was skipped by the SQL parser.
+        assert_eq!(
+            index_params(&[
+                ("analyzer".into(), "Chinese".into()),
+                ("1bad".into(), "x".into())
+            ]),
+            vec![("ANALYZER".to_string(), "chinese".to_string())]
+        );
+    }
 
     /// A header that never ends must not grow the server's buffer (plan 6.2.1).
     #[test]

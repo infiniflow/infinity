@@ -17,16 +17,19 @@ fn main() {
         "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
     ));
 
-    let resp = match engine.execute_blocking(&req.to_sql()) {
+    let sid = req.session_id;
+    let run = executor::block_on(engine.execute_parsed(vec![req.into_statement()], ""))
+        .map_err(|e| e.to_string());
+    let resp = match run {
         Ok(_) => CommonResponse {
             error_code: 0,
             error_msg: "OK".into(),
-            session_id: req.session_id,
+            session_id: sid,
         },
         Err(e) => CommonResponse {
             error_code: 1,
-            error_msg: e.to_string(),
-            session_id: req.session_id,
+            error_msg: e,
+            session_id: sid,
         },
     };
     let mut out = std::io::stdout().lock();

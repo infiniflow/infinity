@@ -482,18 +482,59 @@ impl Engine {
             .await
     }
 
-    /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
-    /// directly: rebuilding SQL text for a 1000-row batch and re-parsing it cost
-    /// more than the insert itself.
+    /// [`Self::insert_literals`], retried the way `execute_stmt_retrying`
+    /// retries a statement.
+    ///
+    /// An `Append` conflicts with a `CreateIndex`/`DropIndex` on the same table
+    /// (`new_txn_impl.cpp:3347`), and that conflict is retryable. The commit
+    /// checks it *before* it allocates the row range, so a conflicting attempt
+    /// has written nothing and the whole batch can run again - which is what
+    /// this loop does. The front ends that insert directly (the Thrift `Insert`
+    /// RPC and the REST `POST .../docs` handler) call this so a transient
+    /// schema change does not surface as a client-visible error.
+    pub async fn insert_literals_retrying(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+    ) -> Result<QueryResult> {
+        for _ in 0..RETRY_LIMIT {
+            let before = self.txn.current_ts();
+            match self
+                .insert_literals_inner(table, columns, rows.clone(), false)
+                .await
+            {
+                Err(Error::TxnConflict(_reason)) => {
+                    // The retry spends another txn id, as
+                    // `QueryStatementInternal` does for a re-run statement.
+                    self.txn.end_statement();
+                    self.txn.ensure_statement_id();
+                    if self.txn.current_ts() == before {
+                        std::thread::yield_now();
+                    }
+                    continue;
+                }
+                Err(Error::TxnConflictNoRetry(reason)) => {
+                    return Err(Error::TxnConflictNoRetry(reason))
+                }
+                other => return other,
+            }
+        }
+        Err(Error::TxnConflict(format!(
+            "the insert kept conflicting for {RETRY_LIMIT} attempts"
+        )))
+    }
+
+    /// Inserts literal rows into `table`. Every front end calls this directly -
+    /// the Thrift `Insert` RPC and the HTTP `POST …/docs` handler included:
+    /// rebuilding SQL text for a 1000-row batch and re-parsing it cost more
+    /// than the insert itself, and the REST path paid it once per **row**.
     pub fn insert_literals(
         &self,
         table: &str,
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        // The Thrift `Insert` RPC reaches this directly, so the mode gate has
-        // to live here and not only in `execute` (`PhysicalInsert`).
-        self.ensure_writable()?;
         crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, false))
     }
 
@@ -505,7 +546,6 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        self.ensure_writable()?;
         crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, true))
     }
 
@@ -516,6 +556,10 @@ impl Engine {
         rows: Vec<Vec<Literal>>,
         new_segment: bool,
     ) -> Result<QueryResult> {
+        // `PhysicalInsert::Execute` gates the storage mode inside the operator,
+        // not in the SQL layer, so every caller of this primitive - the SQL
+        // `INSERT`, the Thrift RPC, the REST handler, `COPY` - gets the gate.
+        self.ensure_writable()?;
         let meta = self
             .storage
             .catalog

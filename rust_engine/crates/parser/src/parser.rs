@@ -9,6 +9,32 @@ use crate::ast::{
 };
 use crate::lexer::{tokenize, Token};
 
+/// Parses one projection (`c1`, `*`, `count(*)`, `abs(c1) AS a`) and rejects
+/// anything after it. This is the entry point for a REST `output` entry.
+///
+/// A projection is not an expression: `*` and the aggregates are only accepted
+/// by the select-list grammar, so they need this rather than [`parse_expr`].
+pub fn parse_select_item(sql: &str) -> Result<(SelectItem, Option<String>)> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let (mut items, mut aliases) = p.select_items()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    if items.len() != 1 {
+        return Err(Error::Invalid(format!(
+            "expected one select item, got {}",
+            items.len()
+        )));
+    }
+    Ok((items.remove(0), aliases.pop().flatten()))
+}
+
 /// Parses zero or more `;`-separated statements.
 pub fn parse(sql: &str) -> Result<Vec<Statement>> {
     let mut p = Parser {
@@ -29,6 +55,75 @@ pub fn parse(sql: &str) -> Result<Vec<Statement>> {
         }
     }
     Ok(out)
+}
+
+/// Parses **exactly one** statement and rejects trailing input.
+///
+/// A front end that carries a fragment of SQL (a REST `filter` string, an SDK
+/// `where` expression) parses it with this, then builds its request as an AST.
+/// [`parse`] accepts `a; b` and would let the fragment smuggle a second
+/// statement into a request that only ever meant to filter rows.
+pub fn parse_one(sql: &str) -> Result<Statement> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    while p.peek() == &Token::Semicolon {
+        p.advance();
+    }
+    if p.peek() == &Token::Eof {
+        return Err(Error::Invalid("parse error: empty statement".into()));
+    }
+    let stmt = p.statement()?;
+    while p.peek() == &Token::Semicolon {
+        p.advance();
+    }
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(stmt)
+}
+
+/// Parses a bare boolean expression as a `WHERE` predicate, rejecting anything
+/// after it. This is the entry point for a filter the client sent as text.
+///
+/// Only end-of-input is accepted here, not `;`: a filter is a fragment, never a
+/// statement, so `c1 = 1; DROP TABLE t` must fail rather than stop at the
+/// semicolon and run the rest as a second statement.
+pub fn parse_predicate(sql: &str) -> Result<Predicate> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let pred = p.predicate()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(pred)
+}
+
+/// Parses a bare expression (a projection or a `SET col = <expr>` value),
+/// rejecting anything after it. End-of-input only, for the same reason
+/// [`parse_predicate`] takes no `;`.
+pub fn parse_expr(sql: &str) -> Result<ExprAst> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let e = p.expr()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(e)
 }
 
 struct Parser {
@@ -3032,6 +3127,33 @@ mod tests {
                 if_exists: false
             }
         );
+    }
+
+    /// A fragment a front end carries (a REST `filter`, a projection, a sort
+    /// key) must not be able to smuggle a second statement in.
+    #[test]
+    fn a_single_fragment_rejects_trailing_statements() {
+        assert!(parse_one("SELECT 1;").is_ok());
+        assert!(parse_one("SELECT 1;;").is_ok());
+        assert!(parse_one("SELECT 1; DROP TABLE t;").is_err());
+        assert!(parse_one("").is_err());
+
+        assert!(parse_predicate("c1 = 1").is_ok());
+        assert!(parse_predicate("c1 = 1 AND c2 > 2").is_ok());
+        assert!(parse_predicate("c1 = 1; DROP TABLE t").is_err());
+        // A complete statement is not a predicate.
+        assert!(parse_predicate("c1 = 1 DROP TABLE t").is_err());
+
+        assert!(parse_expr("c1 + 1").is_ok());
+        assert!(parse_expr("c1 DROP TABLE t").is_err());
+
+        // A projection is not an expression: `*` and an aggregate only parse
+        // through the select-list grammar.
+        assert!(parse_select_item("*").is_ok());
+        assert!(parse_select_item("count(*)").is_ok());
+        assert!(parse_select_item("c1 AS a").unwrap().1.as_deref() == Some("a"));
+        assert!(parse_select_item("c1; DROP TABLE t").is_err());
+        assert!(parse_select_item("c1, c2").is_err());
     }
 
     #[test]

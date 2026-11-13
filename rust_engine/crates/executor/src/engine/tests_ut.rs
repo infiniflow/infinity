@@ -1297,6 +1297,42 @@ mod tests {
         Vec::new()
     }
 
+    /// `HEADER true` on a CSV import consumes the first line (it is not a
+    /// row) and rejects a header whose column count differs from the table's.
+    #[test]
+    fn csv_import_header_is_consumed_and_counted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE h (c1 INT, c2 INT);")
+            .unwrap();
+        let csv = dir.path().join("h.csv");
+        std::fs::write(&csv, "x,y\n1,2\n3,4\n").unwrap();
+        e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            csv.display()
+        ))
+        .unwrap();
+        assert_eq!(rows(&e, "SELECT c1 FROM h ORDER BY c1;").len(), 2);
+
+        // A header with the wrong column count is an error, not a row.
+        let bad = dir.path().join("bad.csv");
+        std::fs::write(&bad, "x\n1,2\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            bad.display()
+        ));
+        assert!(got.is_err(), "a one-column header over a two-column table");
+
+        // Without `HEADER` the first line is data and does not parse as INT.
+        let plain = dir.path().join("plain.csv");
+        std::fs::write(&plain, "x,y\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            plain.display()
+        ));
+        assert!(got.is_err(), "an unparsable first row is data");
+    }
+
     /// How many sealed chunks the table's full-text indexes hold, i.e. the
     /// reference's `SegmentIndexMeta` chunk list length.
     fn fulltext_chunks(e: &Engine) -> usize {
