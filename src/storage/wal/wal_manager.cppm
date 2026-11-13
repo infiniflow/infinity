@@ -15,6 +15,7 @@
 export module infinity_core:wal_manager;
 
 import :blocking_queue;
+import :local_file_handle;
 import :log_file;
 import :options;
 
@@ -99,6 +100,8 @@ public:
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
+    void RecycleWalFile(TxnTimeStamp ckp_ts);
+
     std::vector<std::shared_ptr<std::string>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
@@ -132,8 +135,11 @@ private:
     BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
-    std::ofstream ofs_{};
-    FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
+    // The current wal file
+    std::unique_ptr<LocalFileHandle> wal_handle_{nullptr};
+    // Kept only for configuration compatibility. It is never read: NewFlush() supports a single
+    // behavior and always flushes + fsyncs the WAL, no matter which FlushOptionType is configured.
+    [[maybe_unused]] FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
     std::unique_ptr<BottomExecutor> bottom_executor_{nullptr};
 
     // Flush and Checkpoint threads access following members

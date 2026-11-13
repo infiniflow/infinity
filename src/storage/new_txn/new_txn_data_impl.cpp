@@ -327,10 +327,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     }
 
     if (VirtualStore::Exists(import_tmp_path)) {
-        Status remove_status = VirtualStore::RemoveDirectory(import_tmp_path);
-        if (!remove_status.ok()) {
-            LOG_WARN(fmt::format("Failed to remove import temp directory: {}", import_tmp_path));
-        }
+        VirtualStore::RemoveDirectory(import_tmp_path);
     }
 
     std::vector<WalSegmentInfo> segment_infos;

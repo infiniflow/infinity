@@ -44,33 +44,32 @@ def map_sqlglot_type_to_infinity_type(type_name: str) -> ttypes.DataType:
 
     # Map sqlglot type names to Infinity LogicType
     type_mapping = {
-        'TEXT': ttypes.LogicType.Varchar,
-        'INT': ttypes.LogicType.Integer,
-        'INTEGER': ttypes.LogicType.Integer,
-        'TINYINT': ttypes.LogicType.TinyInt,
-        'SMALLINT': ttypes.LogicType.SmallInt,
-        'BIGINT': ttypes.LogicType.BigInt,
-        'HUGEINT': ttypes.LogicType.HugeInt,
-        'FLOAT': ttypes.LogicType.Float,
-        'DOUBLE': ttypes.LogicType.Double,
-        'DECIMAL': ttypes.LogicType.Decimal,
-        'VARCHAR': ttypes.LogicType.Varchar,
-        'BOOL': ttypes.LogicType.Boolean,
-        'BOOLEAN': ttypes.LogicType.Boolean,
-        'DATE': ttypes.LogicType.Date,
-        'TIME': ttypes.LogicType.Time,
-        'DATETIME': ttypes.LogicType.DateTime,
-        'TIMESTAMP': ttypes.LogicType.Timestamp,
-        'INTERVAL': ttypes.LogicType.Interval,
-        'ARRAY': ttypes.LogicType.Array,
-        'JSON': ttypes.LogicType.Json,
+        "TEXT": ttypes.LogicType.Varchar,
+        "INT": ttypes.LogicType.Integer,
+        "INTEGER": ttypes.LogicType.Integer,
+        "TINYINT": ttypes.LogicType.TinyInt,
+        "SMALLINT": ttypes.LogicType.SmallInt,
+        "BIGINT": ttypes.LogicType.BigInt,
+        "HUGEINT": ttypes.LogicType.HugeInt,
+        "FLOAT": ttypes.LogicType.Float,
+        "DOUBLE": ttypes.LogicType.Double,
+        "DECIMAL": ttypes.LogicType.Decimal,
+        "VARCHAR": ttypes.LogicType.Varchar,
+        "BOOL": ttypes.LogicType.Boolean,
+        "BOOLEAN": ttypes.LogicType.Boolean,
+        "DATE": ttypes.LogicType.Date,
+        "TIME": ttypes.LogicType.Time,
+        "DATETIME": ttypes.LogicType.DateTime,
+        "TIMESTAMP": ttypes.LogicType.Timestamp,
+        "INTERVAL": ttypes.LogicType.Interval,
+        "ARRAY": ttypes.LogicType.Array,
+        "JSON": ttypes.LogicType.Json,
     }
 
     type_name_upper = type_name.upper()
     if type_name_upper not in type_mapping:
         raise InfinityException(
-            ErrorCode.INVALID_DATA_TYPE,
-            f"Unknown type for CAST: {type_name}"
+            ErrorCode.INVALID_DATA_TYPE, f"Unknown type for CAST: {type_name}"
         )
 
     data_type.logic_type = type_mapping[type_name_upper]
@@ -87,33 +86,35 @@ def column_expr_to_string(column_expr: ttypes.ColumnExpr) -> str:
 
 def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
     if expr is None:
-        return ''
+        return ""
 
     expr_type = expr.type
     if expr_type.constant_expr:
-        match expr_type.constant_expr.literal_type:
+        # The value lives on the constant expression, not on the expression type.
+        constant = expr_type.constant_expr
+        match constant.literal_type:
             case ttypes.LiteralType.Boolean:
-                return str(expr_type.constant_expr.bool_value)
+                return str(constant.bool_value)
             case ttypes.LiteralType.Int64:
-                return str(expr_type.i64_value)
+                return str(constant.i64_value)
             case ttypes.LiteralType.Double:
-                return str(expr_type.f64_value)
+                return str(constant.f64_value)
             case ttypes.LiteralType.String:
-                return expr_type.str_value
+                return constant.str_value
             case ttypes.LiteralType.IntegerArray:
-                return str(expr_type.i64_array_value)
+                return str(constant.i64_array_value)
             case ttypes.LiteralType.DoubleArray:
-                return str(expr_type.f64_array_value)
+                return str(constant.f64_array_value)
             case ttypes.LiteralType.IntegerTensor:
-                return str(expr_type.i64_tensor_value)
+                return str(constant.i64_tensor_value)
             case ttypes.LiteralType.DoubleTensor:
-                return str(expr_type.f64_tensor_value)
+                return str(constant.f64_tensor_value)
             case ttypes.LiteralType.IntegerTensorArray:
-                return str(expr_type.i64_tensor_array)
+                return str(constant.i64_tensor_array)
             case ttypes.LiteralType.DoubleTensorArray:
-                return str(expr_type.f64_tensor_array)
+                return str(constant.f64_tensor_array)
             case ttypes.LiteralType.SparseIntegerArray:
-                return str(expr_type.i64_array_idx)
+                return str(constant.i64_array_idx)
 
     if expr_type.column_expr:
         if expr_type.column_expr.column_name:
@@ -134,8 +135,12 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
 
     if expr_type.between_expr:
         value_str = parsed_expression_to_string(expr_type.between_expr.value)
-        upper_bound_str = parsed_expression_to_string(expr_type.between_expr.upper_bound)
-        lower_bound_str = parsed_expression_to_string(expr_type.between_expr.lower_bound)
+        upper_bound_str = parsed_expression_to_string(
+            expr_type.between_expr.upper_bound
+        )
+        lower_bound_str = parsed_expression_to_string(
+            expr_type.between_expr.lower_bound
+        )
         return f"between(f{value_str}, f{upper_bound_str}, f{lower_bound_str})"
 
     if expr_type.knn_expr:
@@ -189,7 +194,9 @@ def search_to_string(search_expr: ttypes.SearchExpr) -> str:
             exprs.append(fusion_to_string(fusion_expr))
 
     if not exprs:
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid search expression")
+        raise InfinityException(
+            ErrorCode.INVALID_EXPRESSION, "Invalid search expression"
+        )
 
     return ", ".join(exprs)
 
@@ -200,7 +207,9 @@ def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
     # 3: optional MatchTensorExpr optional_match_tensor_expr,
     match_tensor_expr_str = None
     if fusion_expr.optional_match_tensor_expr:
-        column_expr_str = column_expr_to_string(fusion_expr.optional_match_tensor_expr.column_expr)
+        column_expr_str = column_expr_to_string(
+            fusion_expr.optional_match_tensor_expr.column_expr
+        )
         match_tensor_expr_str = f"match_tensor(column={column_expr_str}, top={fusion_expr.optional_match_tensor_expr.topn})"
 
     if match_tensor_expr_str:
@@ -211,15 +220,21 @@ def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
 
 def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
     if generic_match_expr.match_vector_expr:
-        column_expr_str = column_expr_to_string(generic_match_expr.match_vector_expr.column_expr)
+        column_expr_str = column_expr_to_string(
+            generic_match_expr.match_vector_expr.column_expr
+        )
         return f"match_dense(column={column_expr_str}, top={generic_match_expr.match_vector_expr.topn})"
 
     if generic_match_expr.match_sparse_expr:
-        column_expr_str = column_expr_to_string(generic_match_expr.match_sparse_expr.column_expr)
+        column_expr_str = column_expr_to_string(
+            generic_match_expr.match_sparse_expr.column_expr
+        )
         return f"match_sparse(column={column_expr_str}, top={generic_match_expr.match_sparse_expr.topn})"
 
     if generic_match_expr.match_tensor_expr:
-        column_expr_str = column_expr_to_string(generic_match_expr.match_tensor_expr.column_expr)
+        column_expr_str = column_expr_to_string(
+            generic_match_expr.match_tensor_expr.column_expr
+        )
         return f"match_tensor(column={column_expr_str}, top={generic_match_expr.match_tensor_expr.topn})"
 
     if generic_match_expr.match_text_expr:
@@ -234,7 +249,7 @@ def _make_escape_expr(escape_char=None):
     # Use explicit escape char or default to backslash
     # escape_char may be a sqlglot Literal or a string
     if escape_char is not None:
-        if hasattr(escape_char, 'output_name'):
+        if hasattr(escape_char, "output_name"):
             escape_value = escape_char.output_name
         else:
             escape_value = str(escape_char)
@@ -251,10 +266,10 @@ def _parse_like(like_node, escape_char=None):
     """Parse a Like node into a ParsedExpr."""
     parsed_expr = ttypes.ParsedExpr()
     function_expr = ttypes.FunctionExpr()
-    function_expr.function_name = binary_exp_to_paser_exp('like')
+    function_expr.function_name = binary_exp_to_paser_exp("like")
 
-    left_expr = parse_expr(like_node.args['this'])
-    pattern_expr = parse_expr(like_node.args['expression'])
+    left_expr = parse_expr(like_node.args["this"])
+    pattern_expr = parse_expr(like_node.args["expression"])
 
     escape_expr = _make_escape_expr(escape_char)
 
@@ -269,10 +284,10 @@ def _parse_not_like(like_node, escape_char=None):
     """Parse a NOT LIKE node into a ParsedExpr."""
     parsed_expr = ttypes.ParsedExpr()
     function_expr = ttypes.FunctionExpr()
-    function_expr.function_name = binary_exp_to_paser_exp('notlike')
+    function_expr.function_name = binary_exp_to_paser_exp("notlike")
 
-    left_expr = parse_expr(like_node.args['this'])
-    pattern_expr = parse_expr(like_node.args['expression'])
+    left_expr = parse_expr(like_node.args["this"])
+    pattern_expr = parse_expr(like_node.args["expression"])
 
     escape_expr = _make_escape_expr(escape_char)
 
@@ -311,33 +326,35 @@ def _json_operator_path(path):
 
 def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Alias):
-        expr = traverse_conditions(cons.args['this'])
+        expr = traverse_conditions(cons.args["this"])
         expr.alias_name = cons.alias
         return expr
 
     if isinstance(cons, exp.Escape):
         # Handle LIKE with explicit ESCAPE clause: LIKE 'pattern' ESCAPE '!'
         # SQLGlot 30.8.0+ wraps Like node in Escape wrapper when ESCAPE is present
-        like_node = cons.args['this']
-        escape_char = cons.args.get('expression')
+        like_node = cons.args["this"]
+        escape_char = cons.args.get("expression")
         return _parse_like(like_node, escape_char)
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Escape):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.Escape):
         # Handle NOT LIKE with explicit ESCAPE clause
-        raw_escape = cons.args['this']
-        like_node = raw_escape.args['this']
-        escape_char = raw_escape.args.get('expression')
+        raw_escape = cons.args["this"]
+        like_node = raw_escape.args["this"]
+        escape_char = raw_escape.args.get("expression")
         return _parse_not_like(like_node, escape_char)
     elif isinstance(cons, exp.Like):
         return _parse_like(cons, None)
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Like):
-        return _parse_not_like(cons.args['this'], None)
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.Like):
+        return _parse_not_like(cons.args["this"], None)
     elif isinstance(cons, exp.Is):
         # Handle IS [NOT] NULL / IS [NOT] TRUE / IS [NOT] FALSE / IS [NOT] UNKNOWN.
         # sqlglot parses all of these as exp.Is nodes.
         # Only IS NULL and IS NOT NULL are supported; others must be rejected.
-        if not isinstance(cons.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        if not isinstance(cons.args.get("expression"), exp.Null):
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.",
+            )
         # Handle IS NULL: exp.Is(this=col, expression=Null())
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
@@ -353,13 +370,15 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parser_expr_type.function_expr = function_expr
         parsed_expr.type = parser_expr_type
         return parsed_expr
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Is):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.Is):
         # Handle IS NOT NULL / IS NOT TRUE / IS NOT FALSE / IS NOT UNKNOWN.
         # Only IS NOT NULL is supported; others must be rejected.
-        inner_is = cons.args['this']
-        if not isinstance(inner_is.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        inner_is = cons.args["this"]
+        if not isinstance(inner_is.args.get("expression"), exp.Null):
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.",
+            )
         # Handle IS NOT NULL: exp.Not(this=exp.Is(this=col, expression=Null()))
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
@@ -402,7 +421,8 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = binary_exp_to_paser_exp(
-            cons.key.lower())  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
+            cons.key.lower()
+        )  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
         if fn:
@@ -425,7 +445,7 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
 
         return parsed_expr
-    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
+    elif isinstance(cons, exp.Not) and not isinstance(cons.args["this"], exp.In):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = "not"
@@ -448,12 +468,16 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_create_timestamp":
-                func_expr = ttypes.FunctionExpr(function_name="create_timestamp", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="create_timestamp", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_delete_timestamp":
-                func_expr = ttypes.FunctionExpr(function_name="delete_timestamp", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="delete_timestamp", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
@@ -463,7 +487,9 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_similarity":
-                func_expr = ttypes.FunctionExpr(function_name="similarity", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="similarity", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
@@ -473,17 +499,23 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_score_factors":
-                func_expr = ttypes.FunctionExpr(function_name="score_factors", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="score_factors", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_similarity_factors":
-                func_expr = ttypes.FunctionExpr(function_name="similarity_factors", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="similarity_factors", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
             case "_distance_factors":
-                func_expr = ttypes.FunctionExpr(function_name="distance_factors", arguments=[])
+                func_expr = ttypes.FunctionExpr(
+                    function_name="distance_factors", arguments=[]
+                )
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
@@ -529,7 +561,9 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
             constant_expr.literal_type = ttypes.LiteralType.String
             constant_expr.str_value = cons.output_name
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Unknown literal type: {cons}")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, f"Unknown literal type: {cons}"
+            )
 
         parser_expr_type = ttypes.ParsedExprType()
         parser_expr_type.constant_expr = constant_expr
@@ -544,42 +578,37 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         # Must check before exp.Func since exp.Cast is a subclass of exp.Func
 
         # Parse the expression being cast
-        expr_arg = parse_expr(cons.args['this'])
+        expr_arg = parse_expr(cons.args["this"])
 
         # Get the target type
-        target_type = cons.args['to']
+        target_type = cons.args["to"]
         type_name = target_type.this
-        if hasattr(type_name, 'name'):
+        if hasattr(type_name, "name"):
             type_name = type_name.name
 
         # Map sqlglot type to Infinity LogicType
         data_type = map_sqlglot_type_to_infinity_type(type_name)
 
         # Create CastExpr
-        cast_expr = ttypes.CastExpr(
-            expr=expr_arg,
-            data_type=data_type
-        )
+        cast_expr = ttypes.CastExpr(expr=expr_arg, data_type=data_type)
 
         expr_type = ttypes.ParsedExprType(cast_expr=cast_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     elif isinstance(cons, exp.Neg):
         func_expr = ttypes.FunctionExpr(
-            function_name='-',
-            arguments=[parse_expr(cons.args['this'])]
+            function_name="-", arguments=[parse_expr(cons.args["this"])]
         )
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     elif isinstance(cons, exp.Anonymous):
         arguments = []
-        for arg in cons.args['expressions']:
+        for arg in cons.args["expressions"]:
             if arg:
                 arguments.append(parse_expr(arg))
         func_expr = ttypes.FunctionExpr(
-            function_name=cons.args['this'],
-            arguments=arguments
+            function_name=cons.args["this"], arguments=arguments
         )
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
@@ -589,29 +618,29 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         func_name = ""
         if isinstance(cons, exp.Substring):
             func_name = cons.key
-            this_arg = parse_expr(cons.args['this'])
+            this_arg = parse_expr(cons.args["this"])
             arguments.append(this_arg)
-            start_arg = parse_expr(cons.args['start'])
+            start_arg = parse_expr(cons.args["start"])
             arguments.append(start_arg)
-            length_arg = parse_expr(cons.args['length'])
+            length_arg = parse_expr(cons.args["length"])
             arguments.append(length_arg)
         elif isinstance(cons, exp.Trim):
-            position = cons.args['position']
-            if position == 'LEADING':
+            position = cons.args["position"]
+            if position == "LEADING":
                 func_name = "ltrim"
-            elif position == 'TRAILING':
+            elif position == "TRAILING":
                 func_name = "rtrim"
             else:
                 func_name = "trim"
-            arg = parse_expr(cons.args['this'])
+            arg = parse_expr(cons.args["this"])
             arguments.append(arg)
         elif isinstance(cons, exp.Unnest):
             func_name = cons.key
-            for arg in cons.args['expressions']:
+            for arg in cons.args["expressions"]:
                 arguments.append(parse_expr(arg))
         elif isinstance(cons, exp.Length):
             func_name = "char_length"
-            this_arg = parse_expr(cons.args['this'])
+            this_arg = parse_expr(cons.args["this"])
             arguments.append(this_arg)
         else:
             func_name = cons.key
@@ -627,50 +656,40 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
 
             if len(arguments) == 0:
                 if cons.alias_or_name == "*":
-                    column_expr = ttypes.ColumnExpr(
-                        star=True,
-                        column_name=[]
-                    )
+                    column_expr = ttypes.ColumnExpr(star=True, column_name=[])
                     expr_type = ttypes.ParsedExprType(column_expr=column_expr)
                     parsed_expr = ttypes.ParsedExpr(type=expr_type)
                     arguments.append(parsed_expr)
                 else:
-                    arguments.append(parse_expr(cons.args['this']))
+                    arguments.append(parse_expr(cons.args["this"]))
 
-        func_expr = ttypes.FunctionExpr(
-            function_name=func_name,
-            arguments=arguments
-        )
+        func_expr = ttypes.FunctionExpr(function_name=func_name, arguments=arguments)
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     # in
     elif isinstance(cons, exp.In):
-        left_operand = parse_expr(cons.args['this'])
+        left_operand = parse_expr(cons.args["this"])
         arguments = []
-        for arg in cons.args['expressions']:
+        for arg in cons.args["expressions"]:
             if arg:
                 arguments.append(parse_expr(arg))
         in_expr = ttypes.InExpr(
-            left_operand=left_operand,
-            arguments=arguments,
-            in_type=True
+            left_operand=left_operand, arguments=arguments, in_type=True
         )
         expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     # not in
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.In):
         raw_in = cons.this
-        left_operand = parse_expr(raw_in.args['this'])
+        left_operand = parse_expr(raw_in.args["this"])
         arguments = []
-        for arg in raw_in.args['expressions']:
+        for arg in raw_in.args["expressions"]:
             if arg:
                 arguments.append(parse_expr(arg))
         in_expr = ttypes.InExpr(
-            left_operand=left_operand,
-            arguments=arguments,
-            in_type=False
+            left_operand=left_operand, arguments=arguments, in_type=False
         )
         expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
@@ -692,7 +711,9 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
     try:
         return traverse_conditions(expr, parse_expr)
     except Exception:
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
+        raise InfinityException(
+            ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}"
+        )
 
 
 def get_search_optional_filter_from_opt_params(opt_params: dict):
@@ -701,11 +722,15 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
     for k, v in opt_params.items():
         if k.lower() == "filter":
             if optional_filter is not None:
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                        "Only one filter is allowed in search optional parameters")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION,
+                    "Only one filter is allowed in search optional parameters",
+                )
             if not isinstance(v, str):
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                        f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION,
+                    f"Invalid filter expression '{v}', type should be string, but get {type(v)}",
+                )
             optional_filter = traverse_conditions(condition(v))
             k_to_pop.append(k)
     for k in k_to_pop:
@@ -718,7 +743,9 @@ def get_remote_function_expr_from_fde(fde_obj) -> ttypes.FunctionExpr:
     from infinity.common import FDE
 
     if not isinstance(fde_obj, FDE):
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}")
+        raise InfinityException(
+            ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}"
+        )
 
     # Create tensor data constant expression (2D array)
     # Convert 2D array to flat list for tensor representation
@@ -727,14 +754,12 @@ def get_remote_function_expr_from_fde(fde_obj) -> ttypes.FunctionExpr:
         flat_tensor_data.extend(row)
 
     tensor_const_expr = ttypes.ConstantExpr(
-        literal_type=ttypes.LiteralType.DoubleArray,
-        f64_array_value=flat_tensor_data
+        literal_type=ttypes.LiteralType.DoubleArray, f64_array_value=flat_tensor_data
     )
 
     # Create target dimension constant expression
     dim_const_expr = ttypes.ConstantExpr(
-        literal_type=ttypes.LiteralType.Int64,
-        i64_value=fde_obj.target_dimension
+        literal_type=ttypes.LiteralType.Int64, i64_value=fde_obj.target_dimension
     )
 
     # Create parsed expressions for arguments
@@ -748,8 +773,7 @@ def get_remote_function_expr_from_fde(fde_obj) -> ttypes.FunctionExpr:
 
     # Create FDE function expression
     function_expr = ttypes.FunctionExpr(
-        function_name="fde",
-        arguments=[tensor_parsed_expr, dim_parsed_expr]
+        function_name="fde", arguments=[tensor_parsed_expr, dim_parsed_expr]
     )
 
     return function_expr
@@ -765,80 +789,120 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         if value[0].ndim <= 2:
             value = [x.tolist() for x in value]
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Invalid list member type: {type(value[0])}, ndarray dimension > 2",
+            )
     elif isinstance(value, list) and len(value) > 0:
         # Normalize numpy scalars in list to native Python types (element-wise check)
-        value = [x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x for x in value]
+        value = [
+            x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x
+            for x in value
+        ]
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
             value = value.tolist()
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Invalid list type: {type(value)}, ndarray dimension > 2",
+            )
     # match ConstantExpr
     match value:
         case str():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String, str_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.String, str_value=value
+            )
         case None:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.Null
+            )
         case bool():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean, bool_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.Boolean, bool_value=value
+            )
         case int():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.Int64, i64_value=value
+            )
         case float():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double, f64_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.Double, f64_value=value
+            )
         case [int(), *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                      i64_array_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.IntegerArray, i64_array_value=value
+            )
         case [float(), *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                      f64_array_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.DoubleArray, f64_array_value=value
+            )
         case [[int(), *_], *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensor,
-                                                      i64_tensor_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.IntegerTensor, i64_tensor_value=value
+            )
         case [[float(), *_], *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensor,
-                                                      f64_tensor_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.DoubleTensor, f64_tensor_value=value
+            )
         case [[[int(), *_], *_], *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensorArray,
-                                                      i64_tensor_array_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.IntegerTensorArray,
+                i64_tensor_array_value=value,
+            )
         case [[[float(), *_], *_], *_]:
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensorArray,
-                                                      f64_tensor_array_value=value)
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.DoubleTensorArray,
+                f64_tensor_array_value=value,
+            )
         case SparseVector([int(), *_] as indices, [int(), *_] as values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseIntegerArray,
                 i64_array_idx=indices,
-                i64_array_value=values)
+                i64_array_value=values,
+            )
         case SparseVector([int(), *_] as indices, [float(), *_] as values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseDoubleArray,
                 i64_array_idx=indices,
-                f64_array_value=values)
+                f64_array_value=values,
+            )
         case dict():
             if len(value) == 0:
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION, "Empty sparse vector"
+                )
             match next(iter(value.values())):
                 case int():
                     constant_expression = ttypes.ConstantExpr(
                         literal_type=ttypes.LiteralType.SparseIntegerArray,
                         i64_array_idx=[int(k) for k in value.keys()],
-                        i64_array_value=[int(v) for v in value.values()])
+                        i64_array_value=[int(v) for v in value.values()],
+                    )
                 case float():
                     constant_expression = ttypes.ConstantExpr(
                         literal_type=ttypes.LiteralType.SparseDoubleArray,
                         i64_array_idx=[int(k) for k in value.keys()],
-                        f64_array_value=[float(v) for v in value.values()])
+                        f64_array_value=[float(v) for v in value.values()],
+                    )
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_EXPRESSION,
+                        f"Invalid sparse vector value type: {type(next(iter(value.values())))}",
+                    )
         case Array():
-            children_list = [get_remote_constant_expr_from_python_value(child) for child in value.elements]
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.CurlyBracketsArray,
-                                                      curly_brackets_array=children_list)
+            children_list = [
+                get_remote_constant_expr_from_python_value(child)
+                for child in value.elements
+            ]
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.CurlyBracketsArray,
+                curly_brackets_array=children_list,
+            )
         case _:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}"
+            )
     return constant_expression
 
 
@@ -951,24 +1015,39 @@ def get_constraints(column_info: dict) -> list[ttypes.Constraint]:
                 if ttypes.Constraint.Null not in res:
                     res.append(ttypes.Constraint.Null)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "not null":
                 if ttypes.Constraint.NotNull not in res:
                     res.append(ttypes.Constraint.NotNull)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "primary key":
                 if ttypes.Constraint.PrimaryKey not in res:
                     res.append(ttypes.Constraint.PrimaryKey)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "unique":
                 if ttypes.Constraint.Unique not in res:
                     res.append(ttypes.Constraint.Unique)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case _:
-                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+                raise InfinityException(
+                    ErrorCode.INVALID_CONSTRAINT_TYPE,
+                    f"Unknown constraint: {constraint}",
+                )
     return res
 
 
@@ -995,7 +1074,10 @@ def get_embedding_element_type(element_type):
         case "int64" | "i64":
             return ttypes.ElementType.ElementInt64
         case _:
-            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+            raise InfinityException(
+                ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                f"Unknown element type: {element_type}",
+            )
 
 
 def get_embedding_type(column_big_info: list[str]) -> ttypes.DataType:
@@ -1010,7 +1092,9 @@ def get_embedding_type(column_big_info: list[str]) -> ttypes.DataType:
         case "tensorarray":
             column_type.logic_type = ttypes.LogicType.TensorArray
         case _:
-            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
+            raise InfinityException(
+                ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}"
+            )
 
     length = column_big_info[1]
     element_type = column_big_info[2]
@@ -1046,7 +1130,9 @@ def get_sparse_type(column_big_info: list[str]) -> ttypes.DataType:
     elif index_type == "int64":
         sparse_type.index_type = ttypes.ElementType.ElementInt64
     else:
-        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}")
+        raise InfinityException(
+            ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}"
+        )
     sparse_type.dimension = int(length)
 
     physical_type = ttypes.PhysicalType()
@@ -1058,7 +1144,9 @@ def get_sparse_type(column_big_info: list[str]) -> ttypes.DataType:
 
 def get_data_type(column_info: dict) -> ttypes.DataType:
     if "type" not in column_info:
-        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type")
+        raise InfinityException(
+            ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type"
+        )
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
     return get_data_type_from_column_big_info(column_big_info)
@@ -1077,18 +1165,23 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
             if len(column_big_info) < 2:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, "No element type for array!")
+                raise InfinityException(
+                    ErrorCode.INVALID_DATA_TYPE, "No element type for array!"
+                )
             array_type = ttypes.DataType()
             array_type.logic_type = ttypes.LogicType.Array
             array_type.physical_type = ttypes.PhysicalType()
             array_type.physical_type.array_type = ttypes.ArrayType()
-            array_type.physical_type.array_type.element_data_type = get_data_type_from_column_big_info(
-                column_big_info[1:])
+            array_type.physical_type.array_type.element_data_type = (
+                get_data_type_from_column_big_info(column_big_info[1:])
+            )
             return array_type
         case _:
             if len(column_big_info) > 1:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
-                                        f"Unknown datatype: {column_big_info}, too many arguments")
+                raise InfinityException(
+                    ErrorCode.INVALID_DATA_TYPE,
+                    f"Unknown datatype: {column_big_info}, too many arguments",
+                )
             proto_column_type = ttypes.DataType()
             match column_big_info_first_str:
                 case "int8":
@@ -1113,7 +1206,12 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
                     proto_column_type.logic_type = ttypes.LogicType.BFloat16
                 case "varchar":
                     proto_column_type.logic_type = ttypes.LogicType.Varchar
-                    proto_column_type.physical_type = ttypes.VarcharType()
+                    # `physical_type` is a union: assigning the payload struct
+                    # directly sends an empty union, which a strict decoder
+                    # rejects (volo/pilota) and which the reference's field-id
+                    # reader silently ignores.
+                    proto_column_type.physical_type = ttypes.PhysicalType()
+                    proto_column_type.physical_type.varchar_type = ttypes.VarcharType()
                 case "bool":
                     proto_column_type.logic_type = ttypes.LogicType.Boolean
                 case "date":
@@ -1127,8 +1225,10 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
                 case "interval":
                     proto_column_type.logic_type = ttypes.LogicType.Interval
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
-                                            f"Unknown datatype: {column_big_info_first_str}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_DATA_TYPE,
+                        f"Unknown datatype: {column_big_info_first_str}",
+                    )
             return proto_column_type
 
 

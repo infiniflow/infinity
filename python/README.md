@@ -19,14 +19,33 @@ from infinity.common import ConflictType
 infinity_obj = infinity.connect(LOCAL_HOST)
 db = infinity_obj.get_database("default_db")
 db.drop_table("my_table", ConflictType.Ignore)
-table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}}, ConflictType.Error)
-table.insert([{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
-table.insert([{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
-table.insert([{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
+table = db.create_table(
+    "my_table",
+    {
+        "num": {"type": "integer"},
+        "body": {"type": "varchar"},
+        "vec": {"type": "vector,5,float"},
+    },
+    ConflictType.Error,
+)
+table.insert(
+    [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}]
+)
+table.insert(
+    [
+        {
+            "num": 2,
+            "body": "publisher=US National Office for Harmful Algal Blooms",
+            "vec": [4.0] * 5,
+        }
+    ]
+)
+table.insert(
+    [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}]
+)
 
 res = table.output(["*"]).match_dense("vec", [3.0] * 5, "float", "ip", 2).to_pl()
 print(res)
-
 ```
 
 # For developer
