@@ -4521,6 +4521,16 @@ impl TableEntry {
     /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
     pub(crate) fn retain_buffered(&mut self, mut keep: impl FnMut(&(usize, Vec<Value>)) -> bool) {
         self.pending_rows.retain(|row| keep(row));
+        if self.pending_rows.is_empty() {
+            // A full drain: `retain` and `clear` keep their backing storage, so
+            // the emptied buffer would still hold `capacity` row slots and
+            // `capacity` map buckets - memory the quota has just stopped
+            // charging. Release it with the rows.
+            self.pending_rows = Vec::new();
+            self.pending_pos = std::collections::HashMap::new();
+            self.pending_bytes = 0;
+            return;
+        }
         self.pending_pos.clear();
         // Rebuilt here rather than adjusted by the rows dropped: the walk is
         // one pass over what is left, which is what `retain` and the map
@@ -4555,8 +4565,7 @@ impl TableEntry {
 
     /// What one buffered row costs, for the running total.
     fn row_bytes(values: &[Value]) -> usize {
-        let mut bytes = std::mem::size_of::<(usize, Vec<Value>)>()
-            + values.len() * std::mem::size_of::<Value>();
+        let mut bytes = std::mem::size_of::<(usize, Vec<Value>)>() + std::mem::size_of_val(values);
         for value in values {
             if let Value::Str(text) = value {
                 bytes += text.len();
@@ -8740,17 +8749,36 @@ impl BgTask for DumpMemIndexTask {
     fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
         Box::pin(async move {
             if let Some(engine) = self.engine.upgrade() {
+                // The flag carries the strength of what is owed, and a later
+                // request may have raised it while this task sat in the queue, so
+                // the strength is read here rather than taken from the value the
+                // task was built with.
+                //
                 // The quota covers both the in-memory index tails and the rows
                 // still in the append buffer, so the task releases both: the
                 // rows go to their block files, then the largest tail is
                 // sealed. It runs here rather than on the writer's thread
                 // because the block write takes the table's bottom gate, which
                 // the caller of `enforce_memindex_quota` may already hold.
-                if self.drain_all {
-                    engine.dump_all_memory_indexes().await;
-                    engine.dump_all_sealed_blocks().await;
-                } else {
-                    engine.dump_under_pressure().await;
+                loop {
+                    let owed = self.pending.load(std::sync::atomic::Ordering::Acquire);
+                    if owed == 0 {
+                        break;
+                    }
+                    if owed >= 2 {
+                        engine.dump_all_memory_indexes().await;
+                        engine.dump_all_sealed_blocks(None).await;
+                    } else {
+                        engine.dump_under_pressure(None).await;
+                    }
+                    // Clear only what was just done: a request that arrived
+                    // meanwhile raised the flag again and gets another round.
+                    let _ = self.pending.compare_exchange(
+                        owed,
+                        0,
+                        std::sync::atomic::Ordering::AcqRel,
+                        std::sync::atomic::Ordering::Acquire,
+                    );
                 }
             }
             self.pending.store(0, std::sync::atomic::Ordering::Relaxed);

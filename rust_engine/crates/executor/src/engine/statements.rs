@@ -497,12 +497,16 @@ impl Engine {
         // path takes the largest one.
         if table.is_none() {
             self.dump_all_memory_indexes().await;
-            self.dump_all_sealed_blocks().await;
+            // An explicit check may run outside any bottom half (a test, a
+            // shutdown), so the block drain can walk every table.
+            self.dump_all_sealed_blocks(None).await;
             // The block drain released rows after the index dump had already
             // folded its own result in, so the total is restated once more.
             self.recompute_memindex_total();
         } else {
-            self.dump_under_pressure().await;
+            // Inside this table's bottom half: its own gate is held, so the
+            // block drain must not reach for another table's.
+            self.dump_under_pressure(table).await;
         }
     }
 
@@ -531,34 +535,57 @@ impl Engine {
             self.propose_dump(false);
             return;
         }
-        self.dump_under_pressure().await;
+        // This runs after the commit returned, so no bottom gate is held and
+        // the blocks of every table are fair game.
+        self.dump_under_pressure(None).await;
     }
 
     /// Queues the background drain. The caller has already established that a
     /// processor is attached; one proposal is in flight at a time
     /// (`proposed_dump_`).
+    ///
+    /// The flag carries the **strength** of what is queued, not just "something
+    /// is": `1` dumps the largest index, `2` drains everything. A weaker request
+    /// that arrives while a stronger one is queued is dropped, and a stronger
+    /// one **upgrades** what is queued - otherwise an explicit "drain it all"
+    /// issued behind a write's "dump one" would be discarded, and waiting for
+    /// that task would not be the full drain it asked for. The worker clears the
+    /// flag and re-checks it, so a request that lands after the drain started
+    /// gets a task of its own.
     fn propose_dump(&self, drain_all: bool) {
         let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
             return;
         };
-        if self
+        let want = if drain_all { 2 } else { 1 };
+        // Raise the queued strength if it is lower; `0 -> want` is the case
+        // that actually submits the task.
+        let mut current = self
             .context
             .memindex_pending
-            .compare_exchange(
-                0,
-                1,
+            .load(std::sync::atomic::Ordering::Acquire);
+        loop {
+            if current >= want {
+                return;
+            }
+            match self.context.memindex_pending.compare_exchange(
+                current,
+                want,
                 std::sync::atomic::Ordering::AcqRel,
-                std::sync::atomic::Ordering::Relaxed,
-            )
-            .is_err()
-        {
+                std::sync::atomic::Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(seen) => current = seen,
+            }
+        }
+        if current != 0 {
+            // A task is already queued for this table; it re-reads the flag when
+            // it runs, so the upgrade above is enough.
             return;
         }
         let engine = self.self_weak.lock().unwrap().clone();
         let queued = processor.submit(Box::new(DumpMemIndexTask {
             engine,
             pending: Arc::clone(&self.context.memindex_pending),
-            drain_all,
         }));
         if !queued {
             // The processor is shutting down and dropped the task, so no worker

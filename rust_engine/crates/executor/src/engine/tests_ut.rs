@@ -5781,6 +5781,67 @@ mod tests {
         );
     }
 
+    /// A sparse column gets an in-memory tail from a query, with no
+    /// `CREATE INDEX` to name it.
+    ///
+    /// No catalog record names that tail, so the index-selection step of a
+    /// pressure drain cannot find it - but `memindex_bytes_of` charges it all
+    /// the same. Without a release step the engine would stay over budget
+    /// forever: every insert the quota would fire, and every drain would free
+    /// nothing it was allowed to see.
+    #[test]
+    fn pressure_seals_the_tail_of_a_sparse_column_with_no_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE osp (id INT, s SPARSE(FLOAT,10));")
+            .unwrap();
+        e.execute_blocking("INSERT INTO osp VALUES (1, [0:1.0, 1:2.0]), (2, [1:3.0]);")
+            .unwrap();
+        // A query is what opens the tail (`sparse_index_for`); the rows written
+        // before it are indexed from the blocks, so the tail only grows with
+        // what arrives afterwards.
+        assert!(!rows(
+            &e,
+            "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
+        )
+        .is_empty());
+        e.execute_blocking("INSERT INTO osp VALUES (3, [0:4.0, 2:5.0]), (4, [3:6.0]);")
+            .unwrap();
+
+        let tail = |e: &Engine| {
+            let tables = e.tables.lock().unwrap();
+            tables[&e.table_key("osp")]
+                .sparse
+                .values()
+                .map(|index| index.read().unwrap().tail_bytes)
+                .sum::<usize>()
+        };
+        assert!(tail(&e) > 0, "the query left rows in the sparse tail");
+        assert!(
+            e.storage.catalog.list_indexes().unwrap().is_empty(),
+            "and no index record names it"
+        );
+
+        // The pressure path itself, not the explicit full drain: the latter
+        // dumps every index and would seal the orphan tail anyway, which is
+        // exactly what this test must not rely on.
+        e.set_memindex_quota(1);
+        crate::scheduler::block_on(e.dump_under_pressure(Some("osp")));
+
+        assert_eq!(
+            tail(&e),
+            0,
+            "the pressure path seals a tail the catalog does not name"
+        );
+        // Sealed, not dropped: the rows still answer.
+        assert!(!rows(
+            &e,
+            "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
+        )
+        .is_empty());
+    }
+
     /// One quota governs every index form: when it is exceeded the tails are
     /// dumped and released, and the results stay correct.
     #[test]
@@ -5904,6 +5965,49 @@ mod tests {
                 vec!["4".to_string(), "four".to_string()],
             ]
         );
+    }
+
+    /// The pressure path can be restricted to one table, which is what a
+    /// caller running inside that table's commit bottom half must do.
+    ///
+    /// Such a caller holds its own table's gate. Walking the other tables would
+    /// wait for *their* gates, and two commits doing that at once - A holding A
+    /// and waiting for B, B holding B and waiting for A - is a deadlock that
+    /// `run_commit_bottom` cannot see, because it only special-cases the same
+    /// table.
+    #[test]
+    fn a_pressure_drain_can_be_limited_to_one_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        for name in ["mine", "other"] {
+            e.execute_blocking(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
+                .unwrap();
+            e.execute_blocking(&format!("INSERT INTO {name} VALUES (1,'a'),(2,'b');"))
+                .unwrap();
+        }
+        let buffered = |e: &Engine, table: &str| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&e.table_key(table))
+                .map(|entry| entry.pending_rows.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(buffered(&e, "mine"), 2);
+        assert_eq!(buffered(&e, "other"), 2);
+
+        e.set_memindex_quota(1);
+        crate::scheduler::block_on(e.dump_under_pressure(Some("mine")));
+
+        assert_eq!(buffered(&e, "mine"), 0, "the named table was drained");
+        assert_eq!(
+            buffered(&e, "other"),
+            2,
+            "the other table is left for a caller that may wait on its gate"
+        );
+        // Both tables still answer.
+        assert_eq!(rows(&e, "SELECT id FROM mine;").len(), 2);
+        assert_eq!(rows(&e, "SELECT id FROM other;").len(), 2);
     }
 
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and

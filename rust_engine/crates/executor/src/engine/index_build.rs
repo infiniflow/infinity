@@ -2835,25 +2835,48 @@ impl Engine {
     ///
     /// A breach therefore does both:
     ///
-    /// 1. **Every table's unsealed rows go to their block files.** That is the
-    ///    per-table step of a checkpoint (`write_blocks_bounded`), not a
-    ///    checkpoint: no timestamp moves, no WAL entry is written, and the rows
-    ///    stay readable because those files *are* the mirror. It is what the
-    ///    reference's buffer manager does when it evicts a block.
+    /// 1. **Unsealed rows go to their block files.** That is the per-table step
+    ///    of a checkpoint (`write_blocks_bounded`), not a checkpoint: no
+    ///    timestamp moves, no WAL entry is written, and the rows stay readable
+    ///    because those files *are* the mirror. It is what the reference's
+    ///    buffer manager does when it evicts a block.
     /// 2. **The largest memory index is dumped** - the unit the reference's
     ///    `DumpIndexProcessor` works in when one step cannot free the whole
     ///    budget. Dumping all of them would spend a transaction per index on
     ///    every breach; the next check picks the next largest if it is still
     ///    over.
-    pub(crate) async fn dump_under_pressure(&self) {
-        self.dump_all_sealed_blocks().await;
+    ///
+    /// `only` restricts the block drain to one table, for the caller that runs
+    /// inside that table's commit bottom half - see
+    /// [`Self::dump_all_sealed_blocks`] for why walking the others there can
+    /// deadlock. The index steps are engine-wide either way: they take no
+    /// bottom gate.
+    pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
+        self.dump_all_sealed_blocks(only).await;
         self.dump_largest_memory_index().await;
+        // Sparse and multi-vector columns get an in-memory tail without a
+        // `CREATE INDEX`, so no catalog record names them and
+        // `dump_largest_memory_index` cannot pick them - yet `memindex_bytes_of`
+        // charges them, which would leave the engine permanently over budget
+        // with nothing here that could release it. They are sealed (not
+        // dumped): the checkpoint publishes their files with the rest of the
+        // mirror, which is what `dump_all_memory_indexes` relies on too.
+        //
+        // Safe from a commit's bottom half: each seal takes only the index's
+        // own write lock, and reads `tables` before it, never under it.
+        self.seal_orphan_memory_tails();
         // The dump released tails: fold that into the engine-wide total so the
         // next quota check sees it without a second scan of every table.
         self.recompute_memindex_total();
     }
 
-    /// Writes every table's unsealed rows into its block files.
+    /// Writes unsealed rows into their block files.
+    ///
+    /// `only` narrows it to one table. The caller inside a commit's bottom half
+    /// **must** pass it: that caller holds its own table's gate, and walking
+    /// other tables would wait on *their* gates while those commits wait on
+    /// this one - A holding A and waiting for B while B waits for A is a
+    /// deadlock, and `run_commit_bottom` only special-cases the same table.
     ///
     /// Each write takes the table's bottom gate, so this cannot simply await
     /// one: the quota is proposed from **inside** a commit's bottom half
@@ -2861,13 +2884,19 @@ impl Engine {
     /// gate), and re-entering it there self-locks. `run_commit_bottom` is the
     /// entry that knows this - it runs the work inline when the gate is already
     /// held on this thread, and on the table's bottom worker otherwise.
-    pub(crate) async fn dump_all_sealed_blocks(&self) {
+    ///
+    /// `only == None` is for the background dump task, which holds no gate and
+    /// may therefore walk every table.
+    pub(crate) async fn dump_all_sealed_blocks(&self, only: Option<&str>) {
+        let wanted = only.map(|table| self.table_key(table));
         let tables: Vec<String> = self
             .tables
             .lock()
             .unwrap()
             .iter()
-            .filter(|(_, entry)| !entry.pending_rows.is_empty())
+            .filter(|(key, entry)| {
+                !entry.pending_rows.is_empty() && wanted.as_ref().is_none_or(|want| *key == want)
+            })
             .map(|(key, _)| key.clone())
             .collect();
         let checkpoint_ts = self.checkpoint_ts();
@@ -3019,7 +3048,7 @@ impl Engine {
     /// `CREATE INDEX`, so no `DumpMemIndex` transaction can name it. Sealing
     /// them here keeps their footprint bounded; the checkpoint publishes the
     /// files with the rest of the mirror.
-    fn seal_orphan_memory_tails(&self) {
+    pub(crate) fn seal_orphan_memory_tails(&self) {
         let known: std::collections::HashSet<(String, String)> = self
             .storage
             .catalog
