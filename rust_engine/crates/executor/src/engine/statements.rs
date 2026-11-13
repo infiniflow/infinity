@@ -4786,7 +4786,7 @@ impl Engine {
                         )
                         .as_bytes(),
                     )?;
-                    let _ = storage::chunk_store::remove_tree(root.join(format!(
+                    storage::chunk_store::remove_tree(root.join(format!(
                         "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                         meta.id
                     )));
@@ -4799,7 +4799,7 @@ impl Engine {
                     )
                     .as_bytes(),
                 )?;
-                let _ = storage::chunk_store::remove_tree(
+                storage::chunk_store::remove_tree(
                     root.join(format!("db_{db_id}/tbl_{}/seg_{segment}", meta.id)),
                 );
             }
@@ -4832,7 +4832,7 @@ impl Engine {
                         continue;
                     };
                     if !live.contains(&(db_id.to_string(), table_id.to_string())) {
-                        let _ = storage::chunk_store::remove_tree(tbl.path());
+                        storage::chunk_store::remove_tree(tbl.path());
                     }
                 }
             }
@@ -4900,7 +4900,7 @@ impl Engine {
                     .into_bytes(),
             );
             delete_all(keys)?;
-            let _ = storage::chunk_store::remove_tree(root.join(format!("db_{db_id}")));
+            storage::chunk_store::remove_tree(root.join(format!("db_{db_id}")));
         }
 
         // `drop|tbl|{db_id}/{name}/{create_ts}/{table_id}`
@@ -4926,8 +4926,7 @@ impl Engine {
                 .into_bytes(),
             );
             delete_all(keys)?;
-            let _ =
-                storage::chunk_store::remove_tree(root.join(format!("db_{db_id}/tbl_{table_id}")));
+            storage::chunk_store::remove_tree(root.join(format!("db_{db_id}/tbl_{table_id}")));
         }
 
         // `drop|idx|{db_id}/{table_id}/{name}/{create_ts}/{index_id}`
@@ -4944,7 +4943,7 @@ impl Engine {
                 (parts[0], parts[1], parts[2], parts[3], parts[4]);
             self.purge_index_records(&store, db_id, table_id, name, create_ts, index_id)?;
             delete_all(vec![key])?;
-            let _ = storage::chunk_store::remove_tree(
+            storage::chunk_store::remove_tree(
                 root.join(format!("db_{db_id}/tbl_{table_id}/idx_{index_id}")),
             );
         }

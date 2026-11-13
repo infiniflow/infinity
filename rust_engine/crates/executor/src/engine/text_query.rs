@@ -138,7 +138,7 @@ impl TermLookup for TextTermLookup {
                 rows.insert(doc);
                 stream.advance(doc + 1);
             }
-            if list.len() == 0 {
+            if list.is_empty() {
                 return None;
             }
             postings.push(list);

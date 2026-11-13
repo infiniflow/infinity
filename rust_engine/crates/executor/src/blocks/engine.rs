@@ -888,7 +888,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.starts_with("seg_") && !live.contains(&name) {
-                    let _ = storage::chunk_store::remove_tree(entry.path());
+                    storage::chunk_store::remove_tree(entry.path());
                 }
             }
         }
@@ -4988,7 +4988,7 @@ impl Engine {
                 for sub in inner.flatten() {
                     let seg = sub.file_name().to_string_lossy().to_string();
                     if seg.starts_with("seg_") && !live.contains(&seg) {
-                        let _ = storage::chunk_store::remove_tree(sub.path());
+                        storage::chunk_store::remove_tree(sub.path());
                     }
                 }
             }

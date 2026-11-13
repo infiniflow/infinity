@@ -79,7 +79,7 @@ impl Engine {
                 .join("fulltext")
                 .join(format!("{}.{column}", key.replace('/', "_")));
             if dir.is_dir() {
-                let _ = storage::chunk_store::remove_tree(dir);
+                storage::chunk_store::remove_tree(dir);
             }
         }
         if self.storage.catalog.is_catalog_only() {
@@ -96,7 +96,7 @@ impl Engine {
                 for db in dbs.flatten() {
                     let dir = db.path().join(format!("tbl_{id}"));
                     if dir.is_dir() {
-                        let _ = storage::chunk_store::remove_tree(dir);
+                        storage::chunk_store::remove_tree(dir);
                     }
                 }
             }
@@ -343,7 +343,7 @@ impl Engine {
         };
         for idx in removed {
             if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
-                let _ = storage::chunk_store::remove_tree(dir);
+                storage::chunk_store::remove_tree(dir);
             }
         }
     }
@@ -370,7 +370,7 @@ impl Engine {
         };
         for idx in indexes {
             if let Ok(g) = idx.read() {
-                let _ = storage::chunk_store::remove_tree(g.dir.clone());
+                storage::chunk_store::remove_tree(g.dir.clone());
             }
         }
         self.drop_multivector_storage(table, column);

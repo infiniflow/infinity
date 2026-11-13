@@ -80,16 +80,16 @@ fn count(e: &Engine, sql: &str) -> i64 {
 fn timed<T>(label: &str, run: impl FnOnce() -> T) -> T {
     let started = Instant::now();
     let out = run();
-    println!("  {label}: {:.1} ms", started.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "  {label}: {:.1} ms",
+        started.elapsed().as_secs_f64() * 1000.0
+    );
     out
 }
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let rows: usize = args
-        .next()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(300_000);
+    let rows: usize = args.next().and_then(|v| v.parse().ok()).unwrap_or(300_000);
     let dir = match args.next() {
         Some(path) => std::path::PathBuf::from(path),
         None => tempfile::tempdir().unwrap().keep(),
@@ -149,20 +149,31 @@ fn main() {
         for i in (0..rows).step_by((rows / probes).max(1)) {
             let want = if deleted.contains(&(i as i64)) { 0 } else { 1 };
             let found = timed(&format!("uniq{i}"), || {
-                count(e, &format!("SELECT count(*) FROM t WHERE filter_fulltext('body', 'uniq{i}');"))
+                count(
+                    e,
+                    &format!("SELECT count(*) FROM t WHERE filter_fulltext('body', 'uniq{i}');"),
+                )
             });
             assert_eq!(found, want, "{label}: uniq{i} -> {found}, wanted {want}");
         }
         for bucket in [0, 3, 6] {
             let alive = (0..rows).filter(|i| i % 7 == bucket).count() as i64
-                - deleted.iter().filter(|i| (*i % 7) as usize == bucket).count() as i64;
+                - deleted
+                    .iter()
+                    .filter(|i| (*i % 7) as usize == bucket)
+                    .count() as i64;
             let found = timed(&format!("bucket{bucket} count"), || {
                 count(
                     e,
-                    &format!("SELECT count(*) FROM t WHERE filter_fulltext('body', 'bucket{bucket}');"),
+                    &format!(
+                        "SELECT count(*) FROM t WHERE filter_fulltext('body', 'bucket{bucket}');"
+                    ),
                 )
             });
-            assert_eq!(found, alive, "{label}: bucket{bucket} -> {found}, wanted {alive}");
+            assert_eq!(
+                found, alive,
+                "{label}: bucket{bucket} -> {found}, wanted {alive}"
+            );
         }
         let top = timed("alpha beta gamma top-10", || {
             ids(

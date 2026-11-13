@@ -58,8 +58,9 @@ use crate::invertedindex::format::position_list::decode_position_list;
 use crate::invertedindex::format::{
     build_fst, decode_dic_meta_at, decode_u32_block_all, dic_fst, encode_column_lengths,
     encode_dic, encode_term_meta_region_with_offsets, fst_get, fulltext_chunk_file,
-    DocListFormatOption, FstStream, SkipListReader, TermMeta, TermMetaFlags, TermPostings,
-    FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
+    DocListFormatOption, FstStream, SkipListFormat, SkipListReader, TermMeta, TermMetaFlags,
+    TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX,
+    POSTING_MINI_BLOCK,
 };
 use crate::invertedindex::index_merger::{decode_doc_block, PostingWriter};
 
@@ -361,6 +362,7 @@ pub fn write_segment_index_streaming_with(
 
 /// [`write_segment_index_streaming_with`] with the live statistics and the
 /// publish marker of the chunk.
+#[allow(clippy::too_many_arguments)] // one argument per piece of the chunk being built, as `write_segment_index`
 pub fn write_segment_index_streaming_with_live(
     index_dir: &str,
     base_name: &str,
@@ -863,12 +865,26 @@ impl SegmentIndexReader {
         // (`VInt pos_skip_len, VInt pos_list_len, pos_skip, pos_list`); take a
         // slice of it instead of decoding the whole list.
         let mut pos_bytes = None;
+        let mut pos_skiplist = None;
         let mut at = body + doc_list_len as usize;
         if let Ok((pos_skip_len, n3)) = crate::invertedindex::format::read_vint(&slice[at..]) {
             at += n3;
             if let Ok((pos_list_len, n4)) = crate::invertedindex::format::read_vint(&slice[at..]) {
-                let start = at + n4 + pos_skip_len as usize;
-                if let Some(list) = slice.get(start..start + pos_list_len as usize) {
+                let skip_start = at + n4;
+                let list_start = skip_start + pos_skip_len as usize;
+                // The position skip list is `[u32 total_pos][u32 offset]` per
+                // flushed record (`PositionListEncoder::flush_position_buffer`
+                // → `SkipListWriter::add_item_2`), the same pair the in-memory
+                // decoder seeks with (`InMemPositionListDecoder::skip_to`). It
+                // is what keeps a hop from replaying the whole prefix.
+                if pos_skip_len > 0 {
+                    if let Some(bytes) = slice.get(skip_start..list_start) {
+                        let mut reader = SkipListReader::new(&SkipListFormat::for_position());
+                        reader.load_byte_slice(bytes, 0, bytes.len());
+                        pos_skiplist = Some(Box::new(reader));
+                    }
+                }
+                if let Some(list) = slice.get(list_start..list_start + pos_list_len as usize) {
                     if !list.is_empty() {
                         pos_bytes = Some(list);
                     }
@@ -900,6 +916,7 @@ impl SegmentIndexReader {
             last_ordinal: 0,
             df: meta.doc_freq as usize,
             pos_bytes,
+            pos_skiplist,
             pos_off: 0,
             pos_buf: Vec::new(),
             pos_at: 0,
@@ -911,6 +928,8 @@ impl SegmentIndexReader {
             pos_skip: 0,
             #[cfg(test)]
             blocks_decoded: 0,
+            #[cfg(test)]
+            pos_records_decoded: 0,
         }))
     }
 
@@ -1016,6 +1035,12 @@ pub struct TermDocCursor<'a> {
     /// The position half of the term's `.pos` slice, decoded one record at a
     /// time (`MAX_POS_PER_RECORD` delta-coded positions per `u8`-framed record).
     pos_bytes: Option<&'a [u8]>,
+    /// The term's position skip list, one item per `MAX_POS_PER_RECORD`-position
+    /// record (`PositionSkipListFormat`: `[u32 total_pos][u32 offset]`). A block
+    /// hop uses it to land on the record that holds the target occurrence
+    /// instead of replaying the stream from its start; `None` for a position
+    /// list shorter than one record, which the writer never flushed an item for.
+    pos_skiplist: Option<Box<SkipListReader>>,
     pos_off: usize,
     pos_buf: Vec<u32>,
     pos_at: usize,
@@ -1037,13 +1062,18 @@ pub struct TermDocCursor<'a> {
     /// without a skip item (shorter than one block), where the caller has to
     /// compute the bound from the decoded postings.
     block_max: Option<(u32, u16)>,
-    /// Occurrences still to drop from the position stream: after a block hop
-    /// the stream is re-read from its start and the skipped blocks' positions
-    /// are discarded lazily, on the first `positions()` call.
+    /// Occurrences still to drop from the position stream, counted from
+    /// `pos_off`: the prefix of the record a hop landed in, discarded lazily on
+    /// the first `positions()` call. At most one record's worth
+    /// (`MAX_POS_PER_RECORD`); a hop no longer replays the whole prefix.
     pos_skip: usize,
     /// Blocks decoded so far (the seek path's cost; tests assert on it).
     #[cfg(test)]
     blocks_decoded: usize,
+    /// Position records decoded so far (the position seek's cost; a hop into a
+    /// long list must not touch the records before the one it landed in).
+    #[cfg(test)]
+    pos_records_decoded: usize,
 }
 
 impl<'a> TermDocCursor<'a> {
@@ -1241,7 +1271,8 @@ impl<'a> TermDocCursor<'a> {
     }
 
     /// The next delta-coded offset from the position stream, dropping the
-    /// occurrences of the blocks a seek hopped over (`pos_skip`).
+    /// prefix of the record a seek landed in (`pos_skip`, bounded by one
+    /// record's length).
     fn next_delta(&mut self) -> Option<u32> {
         loop {
             while self.pos_at >= self.pos_buf.len() {
@@ -1253,6 +1284,10 @@ impl<'a> TermDocCursor<'a> {
                 self.pos_off = end;
                 self.pos_buf = decode_u32_block_all(payload).ok()?;
                 self.pos_at = 0;
+                #[cfg(test)]
+                {
+                    self.pos_records_decoded += 1;
+                }
                 if self.pos_buf.is_empty() {
                     return None;
                 }
@@ -1341,9 +1376,10 @@ impl<'a> TermDocCursor<'a> {
         self.tfs.clear();
         self.ordinals.clear();
         self.at = 0;
-        // The position stream is sequential: it is re-read from its start and the
-        // skipped blocks' occurrences dropped lazily, on the first `positions()`.
-        self.reset_positions(prev_ttf);
+        // The doc skip list already counted the occurrences the hop skipped; the
+        // position skip list turns that count into a record offset, so only the
+        // landed record's prefix is dropped (one record, not the whole prefix).
+        self.seek_positions(prev_ttf);
         self.fill()
     }
 
@@ -1356,8 +1392,42 @@ impl<'a> TermDocCursor<'a> {
         self.ordinals.clear();
     }
 
+    /// Lands the position stream on occurrence `skip`.
+    ///
+    /// Where [`Self::reset_positions`] rewinds to the start and drops `skip`
+    /// deltas one by one — a cost proportional to how far into the list the hop
+    /// landed, i.e. quadratic over a full scan — the position skip list maps the
+    /// occurrence count to the record that holds it (`[u32 total_pos][u32
+    /// offset]`, the pair `InMemPositionListDecoder::skip_to` seeks with). The
+    /// reference's `PositionIterator::SkipTo` does the same; a term whose
+    /// position list never flushed a record has no skip list and keeps the
+    /// rewind.
+    fn seek_positions(&mut self, skip: u32) {
+        // An item is keyed by the **last** occurrence of its record, so `+ 1`
+        // sends a `skip` that lands exactly on a record's end to the next
+        // record, whose `prev_doc_id` is that end: nothing is left to drop.
+        let hit = self
+            .pos_skiplist
+            .as_mut()
+            .and_then(|list| list.skip_to(skip.saturating_add(1)));
+        let Some(hit) = hit else {
+            self.reset_positions(skip);
+            return;
+        };
+        // `offset` is the accumulated offset **before** this item, i.e. where
+        // the record it names starts; `prev_doc_id` counts the occurrences of
+        // the records before it.
+        self.pos_off = hit.offset as usize;
+        self.pos_buf.clear();
+        self.pos_at = 0;
+        self.pos_skip = skip.saturating_sub(hit.prev_doc_id) as usize;
+        self.consumed = 0;
+        self.cur_positions.clear();
+    }
+
     /// Rewinds the position stream and marks the first `skip` occurrences as
-    /// already consumed (the blocks a seek hopped over).
+    /// already consumed (the blocks a seek hopped over). The fallback for a term
+    /// without a position skip list; see [`Self::seek_positions`].
     fn reset_positions(&mut self, skip: u32) {
         self.pos_off = 0;
         self.pos_buf.clear();
@@ -1365,6 +1435,12 @@ impl<'a> TermDocCursor<'a> {
         self.pos_skip = skip as usize;
         self.consumed = 0;
         self.cur_positions.clear();
+    }
+
+    /// Position records decoded so far (the position seek's cost).
+    #[cfg(test)]
+    pub fn pos_records_decoded(&self) -> usize {
+        self.pos_records_decoded
     }
 }
 
@@ -1554,6 +1630,43 @@ mod tests {
             assert_eq!(cursor.positions(), [(doc % 5) as u32], "doc {doc}");
             cursor.skip(1);
         }
+    }
+
+    /// A hop into a long posting list must land the position stream on the
+    /// record that holds the target occurrence (the position skip list), not
+    /// replay every record before it.
+    ///
+    /// That replay is why `OPTIMIZE` used to make a phrase query slower: merging
+    /// k chunks into one multiplied the prefix a hop walks by k, so a 300k-row
+    /// phrase went from 10 s (five chunks) to 40 s (one chunk) with identical
+    /// scores. Here one hop to the last document of a 2000-document list (46
+    /// position records) must decode a handful of records, not the list.
+    #[test]
+    fn a_hop_lands_on_the_position_record_it_needs() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_str = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..2000u64).map(|row| (row, 9)).collect();
+        let postings = BTreeMap::from([(
+            "t".to_string(),
+            (0..2000u64)
+                .map(|row| (row, 3, vec![0u32, 4, 8]))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(dir_str, "hop", 0, &docs, &postings, flags).unwrap();
+        let reader = SegmentIndexReader::open(dir_str, "hop", 0, flags).unwrap();
+        let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
+        cursor.advance(1999);
+        assert_eq!(cursor.doc(), Some(1999));
+        assert_eq!(cursor.positions(), [0, 4, 8]);
+        // Within-block prefix (docs 1920..1999 x 3 occurrences, 128 per record)
+        // plus the document's own: a few records, nowhere near the 46 the
+        // rewind would walk.
+        assert!(
+            cursor.pos_records_decoded() <= 8,
+            "{} position records decoded for one hop",
+            cursor.pos_records_decoded()
+        );
     }
 
     #[allow(clippy::type_complexity)]

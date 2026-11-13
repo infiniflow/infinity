@@ -687,6 +687,10 @@ impl PhrasePostings {
         self.docs.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+    }
+
     fn doc(&self, at: usize) -> Option<u64> {
         self.docs.get(at).map(|(doc, _, _)| *doc)
     }
