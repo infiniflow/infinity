@@ -69,6 +69,9 @@ def _parse_like(like_node, escape_char=None, force_not=False):
     sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True instead
     of wrapping it in a Not node, so the negation must be read off the node.
     """
+    if not isinstance(like_node, exp.Like):
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                f"Unsupported LIKE predicate: {like_node}")
     negate = force_not or bool(like_node.args.get('negate'))
     func_expr = WrapFunctionExpr()
     func_expr.func_name = binary_exp_to_paser_exp('notlike' if negate else 'like')

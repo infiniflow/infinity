@@ -89,3 +89,29 @@ def test_condition_embedded_wrapped_not_like(request, with_escape):
     assert res.function_expr.arguments[0].column_expr.names == ["c1"]
     assert res.function_expr.arguments[1].constant_expr.str_value == "%test!%"
     assert res.function_expr.arguments[2].constant_expr.str_value == ("!" if with_escape else "\\")
+
+
+@pytest.mark.parametrize("negated", [False, True])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_condition_embedded_reject_escaped_ilike(request, negated, wrapped):
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("embedded-only regression test")
+    from infinity_embedded.common import InfinityException
+    from infinity_embedded.errors import ErrorCode as EmbeddedErrorCode
+    from infinity_embedded.local_infinity.utils import (
+        traverse_conditions as embedded_traverse,
+    )
+    from sqlglot import expressions as exp
+
+    if wrapped:
+        node = exp.Escape(
+            this=exp.ILike(this=exp.column("c1"), expression=exp.Literal.string("A%")),
+            expression=exp.Literal.string("!"),
+        )
+        if negated:
+            node = exp.Not(this=node)
+    else:
+        node = condition(f"c1 {'NOT ' if negated else ''}ILIKE 'A%' ESCAPE '!'")
+    with pytest.raises(InfinityException) as exc_info:
+        embedded_traverse(node)
+    assert exc_info.value.args[0] == EmbeddedErrorCode.INVALID_EXPRESSION
