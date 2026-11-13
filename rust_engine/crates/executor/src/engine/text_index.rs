@@ -1184,10 +1184,11 @@ impl TextIndex {
         for mem in self.tails().collect::<Vec<_>>().into_iter().rev() {
             tail.extend(mem.doc_payloads(term));
         }
+        // An overridden id is retired: the id itself never resolves again (a
+        // re-indexed row gets a new one), so its payload must not answer for the
+        // sealed copy either.
         for row in &self.overridden {
-            if !tail.contains_key(row) {
-                out.remove(row);
-            }
+            out.remove(row);
         }
         out.extend(tail);
         out
@@ -2295,25 +2296,23 @@ impl TextIndex {
     /// return them), so `N` would grow with every compaction the table takes.
     /// Only a segment whose rows are **all** retired goes: a partial merge
     /// leaves the live rows of a mixed segment in place.
+    ///
+    /// The overrides stay recorded after the segment is gone: the same id also
+    /// appears in the unsealed segment's postings (the merge replaced a posting
+    /// that was already spilled or still resident), and only `overridden`
+    /// filters those out.
     pub(crate) fn retire_fully_overridden_segments(&mut self) {
         if self.overridden.is_empty() || self.reader.segments.is_empty() {
             return;
         }
-        let mut retired: Vec<u64> = Vec::new();
         let overridden = &self.overridden;
         self.reader.segments.retain(|segment| {
-            let rows = segment.reader.rows();
-            if rows.iter().any(|row| !overridden.contains(row)) {
-                return true;
-            }
-            retired.extend(rows);
-            false
+            segment
+                .reader
+                .rows()
+                .iter()
+                .any(|row| !overridden.contains(row))
         });
-        // Their ids can never come back (a row id is never reused), so nothing
-        // has to remember the overrides any more.
-        for row in retired {
-            self.overridden.remove(&row);
-        }
     }
 
     /// Postings and corpus statistics for `terms`, merging every sealed segment
@@ -2324,12 +2323,18 @@ impl TextIndex {
         let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
         for term in terms {
             let mut list: Vec<(u64, u32)> = Vec::new();
+            // A re-indexed row's copy in the unsealed segment is its current
+            // text, but an id a compaction renumbered (`index_retire_row`) is
+            // retired everywhere: its posting can still be in the tail or in a
+            // spilled run, and nothing else filters it out (the id is not a
+            // `DELETE`, so `tombstone_set` does not know it).
             for mem in self.tails() {
-                list.extend(mem.postings_newest_first(term));
+                list.extend(
+                    mem.postings_newest_first(term)
+                        .into_iter()
+                        .filter(|(d, _)| !self.overridden.contains(d)),
+                );
             }
-            // A re-indexed row's *sealed* copy is stale, but the copy in the
-            // unsealed segment is the current text: only the sealed one is
-            // dropped (the memory index already resolved its own duplicates).
             list.extend(
                 self.reader
                     .postings(term)

@@ -740,9 +740,22 @@ mod tests {
         })));
         let result = e.execute_blocking(q);
         crate::engine::statements::set_text_build_hook(None);
-        assert!(
-            result.is_err(),
-            "the query answered from an index nothing can resolve: {result:?}"
+        // A build a merge invalidated still describes the rows *this* statement
+        // read (one read, one snapshot), so it answers this query and is simply
+        // not cached. Retrying it instead is what kept one `MATCH` running for
+        // the whole gate timeout: with a cache that never catches up (imports
+        // bypass the DML hooks) every attempt rebuilt the column and every
+        // rebuild was invalidated again.
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the invalidated build did not answer its own snapshot: {hits:?}"
         );
     }
 
@@ -836,12 +849,19 @@ mod tests {
                 3,
                 "round {round}: the top-3 were rows the merge retired"
             );
-            // The segments the merge took are gone with their overrides: keeping
-            // them would count their documents in BM25's `N` a second time.
+            // The segments the merge took are dropped (the overrides themselves
+            // stay: the same ids are still in the unsealed postings). Keeping the
+            // segments would count their documents in BM25's `N` again, so the
+            // chunk span must stay at the live population.
             let stats = e.fulltext_stats("churn");
-            assert_eq!(
-                stats[0].overridden_rows, 0,
-                "round {round}: the retired segments stayed in the corpus"
+            assert!(
+                stats[0].chunk_rows <= next,
+                "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
+                stats[0].chunk_rows
+            );
+            assert!(
+                stats[0].overridden_rows > 0,
+                "round {round}: the retired ids are not filtered any more"
             );
         }
         // The whole corpus still answers when the cut is wide enough.

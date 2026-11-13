@@ -3619,16 +3619,19 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        self.text_index_build(table, column, tokenizer, 0)
+        self.text_index_build(table, column, tokenizer)
     }
 
-    /// One attempt of [`Self::text_index_for`], `attempt` deep.
+    /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
+    ///
+    /// The build reads once, so its postings describe exactly the snapshot the
+    /// statement sees; a merge that commits while it runs therefore invalidates
+    /// the *cache*, never the answer - see [`TextPublish`].
     fn text_index_build(
         &self,
         table: &str,
         column: &str,
         tokenizer: TextTokenizer,
-        attempt: usize,
     ) -> Result<SharedTextIndex> {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
@@ -3735,26 +3738,20 @@ impl Engine {
         run_text_build_hook();
         match self.publish_text_index(&tkey, column, epoch, shared.clone()) {
             TextPublish::Cached => return Ok(shared),
-            // The build read exactly the layout this statement sees, so its
-            // postings resolve; a compaction committed after that read, which
-            // only means no later statement may reuse it.
-            TextPublish::ReadTooOld => return Ok(shared),
-            TextPublish::Renumbered => {}
+            // A compaction committed after the build's read. The build still
+            // describes exactly the rows this statement sees (one read, one
+            // snapshot), so its postings resolve for **this** statement; it just
+            // may not be cached, because a statement above the merge would ask it
+            // for ids the merge retired.
+            //
+            // Retrying here was the wrong answer twice over: the rebuild is fast
+            // only when a cache is there to reuse, and while imports keep landing
+            // the cache stays short - so a table under write pressure rebuilt the
+            // whole column for every query, and a merge landing inside each
+            // rebuild could keep one `MATCH` running for the whole gate timeout
+            // (`TestParallelFulltextIndexReadWrite`, 15 s window, 427 s case).
+            TextPublish::ReadTooOld | TextPublish::Renumbered => return Ok(shared),
         }
-        // The rows were renumbered while this build ran: its postings name the
-        // ids of a layout a compaction dropped, and every hit would be a row
-        // `fetch_some_rows_with_ids` cannot find - `MATCH` then answers "column
-        // is empty" on a table full of matches, which is what
-        // `TestParallelFulltextIndexReadWrite` reported. Never answer from such a
-        // build: retry, and if a merge lands inside every attempt, fail the
-        // statement instead.
-        if attempt >= 3 {
-            return Err(Error::Unexpected(format!(
-                "the full-text index of '{table}.{column}' could not be published: \
-                 a compaction renumbered the table during every attempt"
-            )));
-        }
-        self.text_index_build(table, column, tokenizer.clone(), attempt + 1)
     }
 
     /// Publishes a freshly built full-text index for `column`, unless the table's
@@ -3850,20 +3847,23 @@ impl Engine {
             // write (the DML path is split the same way).
             let prepared: Vec<PreparedDoc> = {
                 let tokenizer = shared.read().unwrap().tokenizer.clone();
+                // Every merged row is re-indexed, an unreadable one as an empty
+                // document. Skipping it would leave the cache one document short
+                // of `live_rows`, `text_index_build` would see a cache that never
+                // catches up and rebuild the whole column on every query.
                 rows.iter()
                     .enumerate()
-                    .filter_map(|(i, (_, bytes))| {
-                        let cell = std::str::from_utf8(bytes).ok()?.split('\t').nth(col)?;
-                        let text = match self.decode_cell(table, &types, col, cell) {
-                            Ok(Value::Str(text)) => text,
-                            Ok(other) => other.to_slt_string(),
-                            Err(_) => return None,
-                        };
-                        Some(crate::engine::text_index::prepare_doc(
-                            (base + i) as u64,
-                            &text,
-                            &tokenizer,
-                        ))
+                    .map(|(i, (_, bytes))| {
+                        let text = std::str::from_utf8(bytes)
+                            .ok()
+                            .and_then(|row| row.split('\t').nth(col))
+                            .map(|cell| match self.decode_cell(table, &types, col, cell) {
+                                Ok(Value::Str(text)) => text,
+                                Ok(other) => other.to_slt_string(),
+                                Err(_) => String::new(),
+                            })
+                            .unwrap_or_default();
+                        crate::engine::text_index::prepare_doc((base + i) as u64, &text, &tokenizer)
                     })
                     .collect()
             };
@@ -3887,7 +3887,7 @@ impl Engine {
                 // the new ones.
                 crate::engine::state::index_rows_prepared(&mut index, &prepared);
                 for (seq, _) in rows {
-                    crate::engine::state::index_delete_row(&mut index, *seq as u64);
+                    crate::engine::state::index_retire_row(&mut index, *seq as u64);
                 }
                 // The segments this merge took are now overridden row for row:
                 // dropping them keeps BM25's `N` at the live population instead

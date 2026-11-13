@@ -2257,9 +2257,8 @@ pub(crate) fn reorder<T>(items: Vec<T>, order: &[usize]) -> Vec<T> {
 
 pub(crate) struct MergeCursor<'a> {
     pub(crate) sources: Vec<Source<'a>>,
-    /// Sources >= segment_from are sealed segments: a row in overridden has a
-    /// newer copy in the unsealed segment, so its sealed copy is stale.
-    pub(crate) segment_from: usize,
+    /// Row ids that must not be returned by any source: a re-indexed row's old
+    /// copy, or an id a compaction renumbered (`index_retire_row`).
     pub(crate) overridden: Option<&'a std::collections::HashSet<u64>>,
     /// (row, tf, length, winning source)
     pub(crate) cur: Option<(u64, u32, u32, usize)>,
@@ -2282,12 +2281,14 @@ pub(crate) struct MergeCursor<'a> {
 impl<'a> MergeCursor<'a> {
     pub(crate) fn new(
         sources: Vec<Source<'a>>,
-        segment_from: usize,
+        _segment_from: usize,
         overridden: Option<&'a std::collections::HashSet<u64>>,
     ) -> Self {
         let df = sources.iter().map(|s| s.df()).sum();
+        // `overridden` is filtered on every source (`settle`), so a single source
+        // is only a straight pass-through when there is nothing to drop.
         let no_stale = overridden.is_none_or(|o| o.is_empty());
-        let single = sources.len() == 1 && (segment_from >= 1 || no_stale);
+        let single = sources.len() == 1 && no_stale;
         // Ranges that do not overlap make the merge a concatenation. A stale
         // copy (an overridden row) spans ranges, so it rules the path out.
         let (sources, concat) = match (single || !no_stale, concat_order(&sources)) {
@@ -2296,7 +2297,6 @@ impl<'a> MergeCursor<'a> {
         };
         let mut cursor = Self {
             sources,
-            segment_from,
             overridden,
             cur: None,
             dirty: true,
@@ -2351,7 +2351,12 @@ impl<'a> MergeCursor<'a> {
                 self.dirty = false;
                 return;
             };
-            if winner >= self.segment_from && self.overridden.is_some_and(|o| o.contains(&doc)) {
+            // Checked for every source, not only the sealed ones: a compaction
+            // renumbers rows that its merge already sealed, so the stale copy of
+            // such a posting can still sit in the memory tail or a spilled run
+            // (`index_retire_row`). The row id is not a `DELETE`, so the
+            // tombstone set does not cover it.
+            if self.overridden.is_some_and(|o| o.contains(&doc)) {
                 self.sources[winner].advance(doc + 1);
                 continue;
             }
@@ -5975,6 +5980,24 @@ pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
     if !index.mem.docs.contains_key(&seq) && index.reader.contains(seq) {
         index.overridden.insert(seq);
     }
+}
+
+/// Retires a row id a compaction renumbered: it appears nowhere else any more.
+///
+/// Unlike [`index_delete_row`], nothing is removed from the memory index: the
+/// id was never one of its documents (a merge only moves rows that were already
+/// sealed), and `MemoryIndexer::deleted` is walked by `pending_docs` on every
+/// query, so adding a retired id there makes each compaction slow the column
+/// down for good.
+///
+/// The id is marked overridden **whatever holds its postings**. The copy of the
+/// posting the merge replaced can still sit in the unsealed tail or in a spilled
+/// run, and those are read without a tombstone - the id is not a `DELETE`, so
+/// `tombstone_set` knows nothing about it. Left in, those postings answer a
+/// `MATCH` with rows no fetch can resolve, and a `topn=3` query reports an empty
+/// column on a table full of matches.
+pub(crate) fn index_retire_row(index: &mut TextIndex, seq: u64) {
+    index.overridden.insert(seq);
 }
 
 pub struct EngineOptions {
