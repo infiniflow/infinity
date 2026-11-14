@@ -1565,7 +1565,7 @@ impl Engine {
                 })
                 .unwrap_or_default();
             let sparse = if im.index_type.eq_ignore_ascii_case("BMP") {
-                Some(self.sparse_rows_by_block(table, &im.column))
+                Some(self.sparse_rows_by_block(table, &im.column, crate::index_block_size(im)))
             } else {
                 None
             };
@@ -1848,6 +1848,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
+        block_size: usize,
     ) -> std::collections::BTreeMap<
         u32,
         std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
@@ -1871,10 +1872,16 @@ impl Engine {
                 .map(|(term, value)| (term as i32, value as f32))
                 .collect();
             let row = seq as u64 & 0xffff_ffff;
+            // The chunk is the **index's** block (`WITH (block_size = N)`,
+            // `BMPAlg::block_fwd_`), not the table's 8192-row block storage
+            // block. Dividing by 8192 put every one of `test_mem_bmp`'s 35 rows
+            // in chunk 0, so the chunks' `base_row_id`s were all 0 and a
+            // reopened index covered only the first 15 rows of them.
+            let block_size = block_size.max(1) as u64;
             by_block
                 .entry((seq >> 32) as u32)
                 .or_default()
-                .entry(row / DEFAULT_BLOCK_CAPACITY as u64)
+                .entry(row / block_size)
                 .or_default()
                 .push((row, entries));
         }

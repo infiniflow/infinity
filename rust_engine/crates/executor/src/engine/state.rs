@@ -4246,6 +4246,35 @@ impl SparseIndex {
                 .sum::<usize>()
     }
 
+    /// Maps the chunks the catalog already lists, so a reopened index serves
+    /// them instead of writing them again.
+    ///
+    /// Without this a rebuild put **every** row into the tail and sealed it as
+    /// one more chunk beside the ones on disk: the segment then held several
+    /// overlapping generations, each with its own `term_num`, and a search
+    /// scored the same row more than once with different normalisations
+    /// (`test_mem_bmp`: a self-query answered `[4, 4, 2, 2, 1, ...]` instead of
+    /// the seven `4`s the index covers). `covered` is what the loaded chunks
+    /// cover, per `ROW_ID` segment, as `[begin, end)` in segment offsets.
+    pub(crate) fn load_sealed(
+        &mut self,
+        chunks: &[(u64, std::path::PathBuf, u64, u64)],
+    ) -> std::collections::HashMap<u64, Vec<(u64, u64)>> {
+        let mut covered: std::collections::HashMap<u64, Vec<(u64, u64)>> = Default::default();
+        for (segment, path, base_row_id, row_count) in chunks {
+            let Ok(reader) = storage::bmp::BmpReader::open(path, self.width) else {
+                continue;
+            };
+            self.sealed.push((*segment, Arc::new(reader)));
+            let begin = base_row_id & 0xffff_ffff;
+            covered
+                .entry(*segment)
+                .or_default()
+                .push((begin, begin + row_count));
+        }
+        covered
+    }
+
     /// Dumps the memory tail into one BMP file per `ROW_ID` segment per seal.
     ///
     /// The file is *not* the published chunk: the reference's chunk is the

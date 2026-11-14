@@ -186,7 +186,9 @@ pub(crate) fn publish_bmp_chunks(
             .max(1)
             .max(term_bound as i32) as usize;
         let bytes = storage::bmp::encode_bmp(block_size, width, &docs, term_num);
-        let base_row_id = (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64);
+        // `block` is the index's own block ordinal, so its first row is
+        // `block * block_size` (`BMPAlg`: `doc_id = block_id * block_size`).
+        let base_row_id = (u64::from(segment) << 32) | (block * block_size as u64);
         // The id the record for **this block's** chunk already owns, else the
         // counter the catalog keeps. A block never reuses a retired id.
         let chunk_id = match existing.get(&base_row_id) {

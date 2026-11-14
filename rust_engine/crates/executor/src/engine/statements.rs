@@ -4892,6 +4892,47 @@ impl Engine {
             .and_then(|t| t.get(ci).cloned())
             .and_then(|text| sparse_declared_bound(&text))
             .unwrap_or(0);
+        // Map the chunks the catalog lists, and index only the rows they do not
+        // cover. Re-sealing every row wrote a second chunk on top of the ones on
+        // disk: the segment then held overlapping generations, and a search
+        // scored one row several times with different normalisations
+        // (`test_mem_bmp`).
+        // `catalog_index_files` is the record list (`GetChunkIDs1`); each entry
+        // names the chunk file the writer put on disk.
+        let db_id = self.database_id_of(table).to_string();
+        let table_id = self
+            .storage
+            .catalog
+            .get_table_by_name(table)
+            .ok()
+            .flatten()
+            .map(|m| m.id.to_string())
+            .unwrap_or_default();
+        let mut catalog_chunks: Vec<(u64, std::path::PathBuf, u64, u64)> = Vec::new();
+        if let Ok(layers) = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id,
+            &table_id,
+            &index_id.to_string(),
+        ) {
+            for (segment, chunk_id, path) in self.catalog_index_files(table, index_id) {
+                let Some(info) =
+                    layers
+                        .iter()
+                        .find(|(s, _)| *s == segment)
+                        .and_then(|(_, chunks)| {
+                            chunks
+                                .iter()
+                                .find(|(id, _)| *id == chunk_id)
+                                .map(|(_, i)| i)
+                        })
+                else {
+                    continue;
+                };
+                catalog_chunks.push((u64::from(segment), path, info.base_row_id, info.row_count));
+            }
+        }
+        let covered = index.load_sealed(&catalog_chunks);
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -4899,6 +4940,14 @@ impl Engine {
             let Some(Value::Str(text)) = cells.get(ci) else {
                 continue;
             };
+            let segment = (seq as u64) >> 32;
+            let offset = seq as u64 & 0xffff_ffff;
+            if covered
+                .get(&segment)
+                .is_some_and(|spans| spans.iter().any(|(a, b)| offset >= *a && offset < *b))
+            {
+                continue;
+            }
             let entries: Vec<(i32, f32)> = parse_sparse_str(text)
                 .into_iter()
                 .map(|(i, x)| (i as i32, x as f32))
