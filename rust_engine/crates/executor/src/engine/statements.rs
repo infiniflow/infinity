@@ -4000,6 +4000,22 @@ impl Engine {
             {
                 let mut index = shared.write().unwrap();
                 crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                // Every id this merge left behind is retired: nothing names it any
+                // more, and the row it described now lives under `base + i`.
+                //
+                // A move is not a `DELETE`, so `tombstone_set` knows nothing about
+                // these ids and the read paths would not drop them: the copy of the
+                // posting the merge replaced can still sit in the unsealed tail or
+                // in a spilled run (a seal that was in flight when this ran leaves
+                // its rows in a chunk this drop cannot see), and there it answers
+                // `MATCH` with a row no fetch can resolve - filling a `topn=3`
+                // result with rows the merge retired, i.e. an empty answer on a
+                // table full of matches. Marking them overridden is what
+                // [`MergeCursor`] filters on, **before** the top-n cut.
+                crate::engine::state::retire_row_ids(
+                    &mut index,
+                    rows.iter().map(|(seq, _)| *seq as u64),
+                );
                 // The reference's reader is built from the catalog's live
                 // `SegmentIndexIDs`, so the segments this merge took are simply
                 // not there. Drop them whole: the rows they held were renumbered
@@ -6631,6 +6647,38 @@ impl Engine {
                     .fetch_some_rows_with_ids(table, &wanted)?
                     .into_iter()
                     .collect();
+                {
+                    // A hit whose row cannot be resolved ate a top-n slot: the
+                    // postings name an id no block owns (a retired id left in a
+                    // chunk, a cache of a layout the merge moved). The query
+                    // answers short without saying why, so print what would let
+                    // a run be read back (`INF_FT_TRACE`).
+                    let key = index_key(table, &schema[field_specs[0].0]);
+                    if by_id.len() < wanted.len() && ft_trace_enabled(&key) {
+                        let missing: Vec<u64> = wanted
+                            .iter()
+                            .copied()
+                            .filter(|id| !by_id.contains_key(&(*id as usize)))
+                            .collect();
+                        let (segs, built, min_ts, epoch) = {
+                            let tables = self.tables.lock().unwrap();
+                            match tables.get(&self.table_key(table)) {
+                                Some(entry) => (
+                                    entry.segments.keys().copied().collect::<Vec<_>>(),
+                                    entry.text_built.get(&schema[field_specs[0].0]).copied(),
+                                    entry.text_min_ts,
+                                    entry.text_epoch,
+                                ),
+                                None => (Vec::new(), None, 0, 0),
+                            }
+                        };
+                        eprintln!(
+                            "[FT] {key} MATCH unfetchable: topn={} missing={missing:?} read_ts={} epoch={epoch} min_ts={min_ts} built={built:?} live={segs:?}",
+                            wanted.len(),
+                            crate::read_ts()
+                        );
+                    }
+                }
                 let mut out = Vec::new();
                 for (seq, score) in scored {
                     let Some(mut row) = by_id.remove(&seq) else {

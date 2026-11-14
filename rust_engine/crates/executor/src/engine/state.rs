@@ -6046,6 +6046,10 @@ pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
 /// `tombstone_set` knows nothing about it. Left in, those postings answer a
 /// `MATCH` with rows no fetch can resolve, and a `topn=3` query reports an empty
 /// column on a table full of matches.
+pub(crate) fn retire_row_ids(index: &mut TextIndex, ids: impl IntoIterator<Item = u64>) {
+    index.overridden.extend(ids);
+}
+
 pub struct EngineOptions {
     /// When `false`, catalog DDL becomes durable only at a checkpoint
     /// (`Engine::flush`), reproducing `NEW_CONFIG_NOWAL_PATH`.

@@ -1135,6 +1135,17 @@ pub(crate) struct TextIndex {
     /// Rows re-indexed after their segment was sealed; the sealed copy is stale
     /// and must not be scored (the memory index holds the new text).
     pub(crate) overridden: std::collections::HashSet<u64>,
+    /// The `ROW_ID` segments the catalog listed the last time this index was
+    /// told (a compaction's `drop_segments_not_in`, or the build's
+    /// `load_sealed_scoped`); `None` means "not told yet".
+    ///
+    /// A seal that was already writing when a merge reindexed the column
+    /// publishes a chunk of a segment the merge retired: its postings name rows
+    /// that now live under new ids. `complete_seal` must not clear their
+    /// overridden marks - that would put the retired ids back in the postings
+    /// after the merge published, and a `topn=3` `MATCH` on a table full of
+    /// matches would answer nothing.
+    pub(crate) live_segments: Option<std::collections::HashSet<u32>>,
     /// Publication barrier: the first row id of every run a writer announced
     /// (`announce_publish`) but has not published yet, with the number of
     /// writers holding it.
@@ -1440,6 +1451,7 @@ impl TextIndex {
             reader: ColumnIndexReader::default(),
             dir,
             overridden: Default::default(),
+            live_segments: None,
             pending_publish: Default::default(),
             inflight: None,
             last_seal_us: 0,
@@ -1588,6 +1600,13 @@ impl TextIndex {
         live_segments: Option<&std::collections::HashSet<u32>>,
         catalog: &[CatalogChunk],
     ) -> u64 {
+        // The layout this index is built against, so a seal that lands later can
+        // tell whether its chunk still names live rows (see `complete_seal`).
+        // `None` is "nothing to go by", not "every segment is stale": it must not
+        // wipe the layout a previous `drop_segments_not_in` recorded.
+        if let Some(live) = live_segments {
+            self.live_segments = Some(live.clone());
+        }
         let scan = |dir: &str| -> Vec<String> {
             let store = storage::chunk_store::chunk_store();
             let mut bases: Vec<String> = store
@@ -1978,9 +1997,32 @@ impl TextIndex {
     /// carries the current text of every row it holds, so those rows are no
     /// longer shadowed by an older sealed copy; the tail's memory and its
     /// transient spill files are released.
+    ///
+    /// The exception is a chunk of a `ROW_ID` segment a merge retired: the seal
+    /// was already writing when the merge reindexed the column, so the rows it
+    /// holds are the ids the merge moved, not the new ones. Their marks stay -
+    /// see the note below.
     pub(crate) fn complete_seal(&mut self, job: SealJob, reader: SealedSegment) {
         for row in &job.overridden_rows {
             self.overridden.remove(row);
+        }
+        // Clearing the marks of a chunk the merge retired would put the retired
+        // ids back in the postings *after* the merge published: `drop_segments_not_in`
+        // ran before this chunk existed, so nothing else drops them, and `MATCH`
+        // then fills its top-n with rows no fetch can resolve (0 rows on a table
+        // full of matches).
+        //
+        // A segment the snapshot does not list is only retired when a *newer*
+        // one is live: row-id segments are allocated in ascending order, and an
+        // append opens the next id without telling this index, so its chunk is
+        // newer than every id recorded here and must keep its rows visible.
+        let segment = (reader.reader.base_row_id() >> 32) as u32;
+        let retired = self
+            .live_segments
+            .as_ref()
+            .is_some_and(|live| !live.contains(&segment) && live.iter().any(|id| *id > segment));
+        if retired {
+            self.overridden.extend(job.overridden_rows.iter().copied());
         }
         // The runs were merged into the segment (`MemoryIndexer::Reset`).
         for run in &job.tail.runs {
@@ -2411,9 +2453,30 @@ impl TextIndex {
     /// That is what makes an `overridden` entry safe to keep: it only ever names
     /// a row whose segment may still be in `reader.segments`.
     pub(crate) fn drop_segments_not_in(&mut self, live: &std::collections::HashSet<u32>) {
+        // Remembered for `complete_seal`: a seal that is still writing holds the
+        // ids this merge retired.
+        self.live_segments = Some(live.clone());
         self.reader
             .segments
             .retain(|segment| live.contains(&((segment.reader.base_row_id() >> 32) as u32)));
+        // A retired id only needs its mark while some source can still produce
+        // it. Everything of a dropped segment went with it, and the rows that
+        // moved are in a tail (or, once sealed, in a live segment), so a mark
+        // whose id no range covers is dead weight - and a non-empty set is what
+        // turns off the readers' single-source/concat fast paths, so the set has
+        // to shrink back once the stale copies are gone.
+        let mut ranges: Vec<(u64, u64)> = self
+            .reader
+            .segments
+            .iter()
+            .filter_map(|segment| segment.reader.row_range())
+            .collect();
+        ranges.extend(self.tails().filter_map(|tail| tail.row_range));
+        self.overridden.retain(|row| {
+            ranges
+                .iter()
+                .any(|(first, last)| row >= first && row <= last)
+        });
     }
 
     /// Postings and corpus statistics for `terms`, merging every sealed segment

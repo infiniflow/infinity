@@ -709,6 +709,32 @@ mod tests {
             3,
             "and the kept cache still answers for the merged layout"
         );
+        // A build of the *merged* layout still publishes: with the kept cache
+        // dropped, the next query rebuilds it and the one after that reuses the
+        // same instance. A segment check that refused those instead would
+        // rebuild the column on every query - the shape that once kept a `MATCH`
+        // running for a whole gate timeout.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let cached = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .and_then(|entry| entry.text.get("body").cloned())
+        };
+        assert_eq!(rows(&e, q).len(), 3);
+        let first = cached(&e).expect("the build of the merged layout was published");
+        assert_eq!(rows(&e, q).len(), 3);
+        let again = cached(&e).expect("the published cache is still there");
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the merged layout is rebuilt on every query instead of reused"
+        );
     }
 
     /// A merge that lands **inside** a build renumbers every row the build just
@@ -1020,6 +1046,81 @@ mod tests {
         }
         compactor.join().expect("the compactor panicked");
         assert_eq!(rows(&engine, q).len(), 3, "after the churn");
+    }
+
+    /// The seal a merge runs into: a chunk whose write was already in flight when
+    /// the merge reindexed the column publishes ids of the segment the merge
+    /// retired. A completed seal clears the overridden marks of the rows its
+    /// chunk holds (the row's current text is now in that chunk) - but for a
+    /// chunk of a retired segment they are not current: the rows moved to new
+    /// ids, and clearing the marks put the old ones back in the postings after
+    /// the merge published. `MATCH` then filled its top-n with rows no fetch can
+    /// resolve: 0 rows on a table full of matches
+    /// (`concurrent_churn_never_empties_a_small_top_n`, round 39).
+    #[test]
+    fn a_chunk_sealed_after_the_merge_keeps_its_retired_ids_hidden() {
+        use crate::engine::text_index::{prepare_doc, MemoryIndexer, SealJob};
+
+        let q = "SELECT doctitle FROM late SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE late (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX late_body ON late (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO late VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.late").unwrap();
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the kept cache moved onto the new ids"
+        );
+
+        // The stale copy: segment 0's rows, sealed from a tail that was already
+        // being written when the merge renumbered them.
+        let shared = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("late"))
+            .and_then(|entry| entry.text.get("body").cloned())
+            .expect("the merge keeps the cache");
+        let (tokenizer, cache_dir) = {
+            let g = shared.read().unwrap();
+            (g.tokenizer.clone(), g.dir.clone())
+        };
+        let mut stale = MemoryIndexer::new();
+        for row in 0..30u64 {
+            let doc = prepare_doc(row, "harmful chemical stale", &tokenizer);
+            stale.insert_prepared(&doc, usize::MAX);
+        }
+        let total_len = stale.pending_len();
+        let docs = stale.merged_docs().expect("the stale tail holds documents");
+        let job = SealJob {
+            tail: std::sync::Arc::new(stale),
+            docs: docs.clone(),
+            base_row_id: 0,
+            docs_span: 30,
+            total_len,
+            dir: cache_dir,
+            flags: storage::invertedindex::format::OPTION_FLAG_ALL,
+            overridden_rows: docs.iter().map(|(row, _)| *row).collect(),
+        };
+        let reader = job.write().expect("the stale chunk is written");
+        shared.write().unwrap().complete_seal(job, reader);
+
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the ids of a late chunk ate the top-3 slots"
+        );
     }
 
     /// A query that spans several sealed segments plus the memory tail must
