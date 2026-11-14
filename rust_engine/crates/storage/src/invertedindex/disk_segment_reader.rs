@@ -1741,19 +1741,23 @@ mod tests {
         assert_eq!(meta.total_tf, 300);
     }
 
-    /// A segment is exactly the reference's three files (`.dic`, `.pos`, `.len`)
-    /// plus the publish marker.
+    /// A segment is exactly the reference's three files (`.dic`, `.pos`, `.len`),
+    /// with this port's publish marker kept **out** of the chunk directory.
     ///
     /// The port used to add a `.row` sidecar (a `u64[]` row-id table); the row
     /// of a document is `base_row_id + docid_t`, so no fourth *data* file may be
-    /// written. `.ok` is not data: it names the three files' lengths and the
-    /// chunk's live statistics, is written last, and is what tells a complete
-    /// chunk from one whose publish was interrupted between the three writes.
-    /// An engine that does not know it ignores it.
+    /// written. The `.ok` marker is this port's own bookkeeping - it names the
+    /// three files' lengths and the chunk's live statistics - and it lives in a
+    /// sibling tree (`ChunkManifest::path`), because `data/` has to list exactly
+    /// what the reference writes.
     #[test]
     fn a_segment_is_exactly_the_reference_file_family() {
         let dir = tempfile::tempdir().unwrap();
-        let index_dir = dir.path().to_str().unwrap();
+        // An engine's chunk directory sits under `data/`, which is the tree that
+        // must list exactly the reference's files.
+        let chunk_dir = dir.path().join("data/db_1/tbl_0/idx_1/seg_0");
+        std::fs::create_dir_all(&chunk_dir).unwrap();
+        let index_dir = chunk_dir.to_str().unwrap();
         let docs = vec![(0u64, 7u32), (1, 9)];
         let postings: BTreeMap<String, Vec<PostingEntry>> =
             BTreeMap::from([("t".to_string(), vec![(0u64, 1u32, vec![0u32])])]);
@@ -1777,9 +1781,23 @@ mod tests {
             vec![
                 "ft_0000000000000000.dic".to_string(),
                 "ft_0000000000000000.len".to_string(),
-                "ft_0000000000000000.ok".to_string(),
                 "ft_0000000000000000.pos".to_string(),
             ]
+        );
+        // The marker lives in the sibling `fulltext/manifests/` tree, with the
+        // chunk's relative layout below it.
+        let marker = crate::invertedindex::chunk_manifest::ChunkManifest::path(
+            index_dir,
+            "ft_0000000000000000",
+        );
+        assert_eq!(
+            marker,
+            dir.path()
+                .join("fulltext/manifests/db_1/tbl_0/idx_1/seg_0/ft_0000000000000000.ok")
+        );
+        assert!(
+            marker.exists(),
+            "the marker is not under fulltext/manifests"
         );
         // The marker describes the files that were just written, and every
         // document of a fresh chunk is live.

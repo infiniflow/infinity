@@ -71,15 +71,16 @@ impl Engine {
     pub(crate) fn write_secondary_pgm_chunks(
         &self,
         table: &str,
-        column: &str,
+        index_id: u64,
         kind: storage::secondary_segment::KeyKind,
         by_segment: HashMap<u64, Vec<(storage::secondary_segment::Key, u32)>>,
     ) {
         use storage::secondary_segment::write_secondary_segment_typed;
-        let dir = self
-            .dir
-            .join("secondary")
-            .join(index_key(table, column).replace('/', "_"));
+        // A rebuild writes straight into the segment's own directory under the
+        // id the catalog hands out, so the records can be read back from there
+        // (`GetChunkIDs1`) instead of scanning a spill set. The id is the
+        // caller's: it is the record being rebuilt, not "the column's index".
+        let set = self.index_segment_set(table);
         // One chunk per **block**, as the reference does: the mem indexer is
         // handed a block at a time (`InsertBlockData`,
         // `secondary_index_in_mem_impl.cpp:104`) and dumps only that block into
@@ -88,16 +89,6 @@ impl Engine {
         // `index_filter_evaluators_impl.cpp:912`) - so only the split point
         // changes here, not the values.
         let block_rows = storage::format::DEFAULT_BLOCK_CAPACITY as u64;
-        // Every call rewrites the whole spill set; the file name carries the row
-        // count, so a leftover from an earlier (smaller) snapshot would publish
-        // a second chunk for the same block.
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                if entry.path().extension().is_some_and(|e| e == "idx") {
-                    let _ = storage::chunk_store::remove_file(entry.path());
-                }
-            }
-        }
         let mut readers = Vec::new();
         let mut meta: Vec<(u64, usize)> = Vec::new();
         for (segment, entries) in by_segment {
@@ -112,12 +103,34 @@ impl Engine {
                 // `Key::cmp` is the chunk's own order: u64 for integers and
                 // hashed text, the float order for a FLOAT/DOUBLE column.
                 entries.sort_by(|a, b| a.0.order(&b.0));
-                let path = dir.join(format!("seg_{segment}_{block}_{}.idx", entries.len()));
-                // Always rewrite: the name does not capture the data, and a
-                // stale chunk from an earlier run would shadow this one.
+                let next = self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
+                let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
+                if std::fs::create_dir_all(&seg_dir).is_err() {
+                    continue;
+                }
+                let path = seg_dir.join(format!("chunk_{next}.idx"));
                 if write_secondary_segment_typed(&path, kind, &entries).is_err() {
                     continue;
                 }
+                // `AddNewChunkIndex1`.
+                let record = catalog::layout::IndexChunk {
+                    chunk_id: next,
+                    base_name: String::new(),
+                    base_row_id: (segment << 32) | (block * block_rows),
+                    row_count: entries.len() as u64,
+                    term_count: 0,
+                    index_size: 0,
+                    commit_ts: self.txn.current_ts().max(1),
+                };
+                let index = catalog::layout::IndexSegment {
+                    index_id,
+                    segment_id: segment as u32,
+                    chunks: vec![record.clone()],
+                };
+                let _ = self
+                    .storage
+                    .catalog
+                    .append_index_chunk(&set, &index, &record);
                 if let Ok(reader) =
                     storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
                 {
@@ -132,10 +145,10 @@ impl Engine {
         let tkey = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
-        entry.secondary.disk.insert(column.to_string(), readers);
+        entry.secondary.disk.insert(index_id, readers);
         // A rebuild replaces the whole chunk set, so its meta replaces the list
         // a previous dump appended to.
-        entry.secondary.chunk_meta.insert(column.to_string(), meta);
+        entry.secondary.chunk_meta.insert(index_id, meta);
     }
 
     /// Appends a committed batch to the decoded-row cache, if the table has one.
@@ -1385,12 +1398,21 @@ impl Engine {
         let Some(entry) = tables.get(&tkey) else {
             return Vec::new();
         };
+        // The registries are keyed by index id; the column each one indexes
+        // comes from the catalog record (`IndexMeta::column`), which for a
+        // functional index is the expression it was declared with.
+        let Ok(catalog) = self.storage.catalog.indexes_of_table(table) else {
+            return Vec::new();
+        };
+        let columns: std::collections::HashMap<u64, String> =
+            catalog.into_iter().map(|im| (im.id, im.column)).collect();
         entry
             .secondary
             .indexes
             .iter()
-            .filter_map(|(col, index)| {
-                let declared = entry.secondary.declared_types.get(col)?;
+            .filter_map(|(id, index)| {
+                let col = columns.get(id)?;
+                let declared = entry.secondary.declared_types.get(id)?;
                 // A functional index reads `base` and applies `func`; its
                 // declared type is the function's return type
                 // (`IndexSecondaryFunctional::func_return_type_`).
@@ -1469,7 +1491,13 @@ impl Engine {
         let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
-            if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
+            // Top up the graphs when the catalog lists an HNSW record the
+            // registry does not hold yet. A second `CREATE INDEX … USING HNSW`
+            // on a column clears `hnsw_probed` (see the `CREATE INDEX` path), so
+            // this re-reads the catalog and the new index gets its own graph -
+            // the reference's `MemIndex` map is keyed by index id, so two
+            // indexes on one column never share one.
+            if entry.hnsw_probed {
                 // The probe above marked the table as examined; a table with
                 // no HNSW index leaves `hnsw_mem` empty forever.
                 let Ok(indexes) = self.storage.catalog.list_indexes() else {
@@ -1509,17 +1537,28 @@ impl Engine {
                         index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                     let encoding =
                         index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-                    entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
+                    entry.hnsw_mem.entry(im.id).or_insert_with(|| {
                         Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
                             dims, m, efc, metric, encoding,
                         )))
                     });
                 }
             }
+            // The rows are fed to every HNSW index on the table, each of which
+            // keeps its own graph (the reference's per-`MemIndex` object). The
+            // index id -> column map decides which cell feeds which graph.
+            let by_id: std::collections::HashMap<u64, String> = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|im| (im.id, im.column))
+                .collect();
             entry
                 .hnsw_mem
                 .iter()
-                .map(|(c, m)| (c.clone(), m.clone()))
+                .filter_map(|(id, m)| Some((by_id.get(id)?.clone(), m.clone())))
                 .collect()
         };
         for (column, mem) in segments {
@@ -1598,7 +1637,11 @@ impl Engine {
         let Some(entry) = tables.get_mut(&tkey) else {
             return;
         };
-        for (column, rows) in entry.ivf_mem.iter_mut() {
+        let by_id = self.index_column_map(table);
+        for (index_id, rows) in entry.ivf_mem.iter_mut() {
+            let Some(column) = by_id.get(index_id) else {
+                continue;
+            };
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -1611,14 +1654,33 @@ impl Engine {
         }
     }
 
+    /// `index id -> column` for the table's indexes, resolved from the catalog.
+    ///
+    /// The in-memory registries are keyed by index id, so a hook that walks one
+    /// needs the column each id was built on to find its cell.
+    fn index_column_map(&self, table: &str) -> std::collections::HashMap<u64, String> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|im| (im.id, im.column))
+            .collect()
+    }
+
     pub(crate) fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.mv.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.mv.iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         if indexes.is_empty() {
             return;
@@ -1658,6 +1720,7 @@ impl Engine {
     /// Keeps existing sparse indexes in step with an inserted/rewritten row.
     pub(crate) fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
             .tables
             .lock()
@@ -1666,7 +1729,7 @@ impl Engine {
             .map(|e| {
                 e.sparse
                     .iter()
-                    .map(|(c, v)| (c.clone(), v.clone()))
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -1728,12 +1791,18 @@ impl Engine {
         let tkey = self.table_key(table);
         // Clone the handles, then drop `tables`: an index lock is only ever taken
         // after it (see `batch_gate`'s lock-order note).
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.text
+                    .iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         if indexes.is_empty() {
             return None;
@@ -1823,12 +1892,18 @@ impl Engine {
             self.update_sparse_indexes(table, *seq, cells);
         }
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.text
+                    .iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         for (column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
@@ -1914,6 +1989,10 @@ impl Engine {
                         // tail moves to `TextIndex::inflight`, where queries keep
                         // reading it, so nobody waits for the fsync.
                         crate::engine::state::seal_text_index_unlocked(&shared);
+                        // The chunk is on disk; its catalog record is what a
+                        // reader goes by, so write it before the rows can be
+                        // queried from a fresh build.
+                        self.record_sealed_text_chunks(table, &column);
                     }
                     drop(ticket);
                 }
@@ -2260,10 +2339,7 @@ impl Engine {
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
-                let cur = entry
-                    .index_pending_bytes
-                    .entry(im.column.clone())
-                    .or_insert(0);
+                let cur = entry.index_pending_bytes.entry(im.id).or_insert(0);
                 *cur += bytes;
                 // The reference dumps when the memory passes the quota and
                 // subtracts only what the dump released, so the rows above
@@ -2282,7 +2358,8 @@ impl Engine {
                 // do here but drop the graph the dump just sealed.
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.remove(&im.column);
+                    e.hnsw_mem.remove(&im.id);
+                    e.index_pending_bytes.insert(im.id, 0);
                     e.hnsw_probed = false;
                 }
             }

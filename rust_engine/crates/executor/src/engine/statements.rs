@@ -328,7 +328,6 @@ impl Engine {
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
                 memindex_pending: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-                last_quota_check_ms: std::sync::atomic::AtomicU64::new(0),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 scan_gate: ScanGate::new(
@@ -559,31 +558,19 @@ impl Engine {
         if quota == 0 {
             return;
         }
-        // This runs per row, so it is gated: at 20k rows through eight threads
-        // the ungated check was the insert path's hottest lock. The
-        // reference's tracer checks on its own thread, so a 10 ms gate is
-        // finer than the reference's own granularity.
-        // The gate is for the **per-row** call only. An explicit check
-        // (`table == None`, `Engine::enforce_memindex_quota(None)`) is the
-        // caller asking "enforce it now" - a test, or a statement that just
-        // changed the charge - and must not be dropped because another row
-        // checked 3 ms ago.
-        if table.is_some() {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
-            let last = self
-                .context
-                .last_quota_check_ms
-                .load(std::sync::atomic::Ordering::Relaxed);
-            if now.saturating_sub(last) < 10 {
-                return;
-            }
-            self.context
-                .last_quota_check_ms
-                .store(now, std::sync::atomic::Ordering::Relaxed);
-        }
+        // No time gate. The reference's `MemIndexTracer::IncreaseMemoryUsage`
+        // compares on **every** increase (`cur_index_memory_ >
+        // index_memory_limit_ + proposed_dump_size_`, `memindex_tracer.cppm:103`)
+        // and relies on `proposed_dump_` to avoid queueing a second task for an
+        // index that already has one in flight - never on a clock.
+        //
+        // This used to skip a check whose predecessor was younger than 10 ms,
+        // which made the outcome of a write depend on how fast the previous
+        // statement had been: two `INSERT`s issued back to back landed as one
+        // breach, so only one dump happened where the reference makes two.
+        // The callers are **per statement** (`update_text_indexes_batch`), not
+        // per row, so the clock bought nothing anyway.
+        //
         // Fold in what changed before comparing: one table when the caller
         // names it (O(that table's indexes)), everything for an explicit check.
         match table {
@@ -1682,6 +1669,10 @@ impl Engine {
         ts: Option<u64>,
     ) -> Result<RowRange> {
         let key = self.table_key(table);
+        // The segment floor is read **before** the entry is locked:
+        // `next_segment_id` walks the block layout and the catalog, and both
+        // reach this same table entry.
+        let floor = self.next_segment_id(table);
         // The allocator's counter, resolved **before** the entry is locked:
         // `next_row_seq` reads the block layout, which reaches
         // `block_index_for` and takes the same lock.
@@ -1718,10 +1709,17 @@ impl Engine {
         // that was *claimed* but not filled yet (an import that opened it and
         // has not written its first batch) is already taken as well, or a second
         // `COPY` would reuse its ids.
+        // A new segment gets the id the catalog says comes next, never
+        // `seg + 1`: a compaction retires segments, and reusing a retired id
+        // would hand this write the row ids, chunk names and block directory of
+        // a dead segment.
         let opens_segment = new_segment && (off > 0 || entry.segments.contains_key(&seg));
         let after_sealed_segment = !copy && sealed;
         if opens_segment || after_sealed_segment {
-            seg += 1;
+            // Opening a segment takes the next id the catalog knows of - never
+            // a retired one (`MetaTableObject::GetNextSegmentID` reads the
+            // segment map, which keeps a retired entry until cleanup).
+            seg = (seg + 1).max(floor);
             off = 0;
         }
         // Exactly `Self::SEGMENT_CAPACITY` rows seal a segment
@@ -1729,7 +1727,7 @@ impl Engine {
         // one, which is how a table larger than 8,388,608 rows gets its second
         // segment without any compaction.
         if off as usize >= Self::SEGMENT_ROW_CAPACITY {
-            seg += 1;
+            seg = (seg + 1).max(floor);
             off = 0;
         }
         let base = ((seg as usize) << 32) | off as usize;
@@ -3044,13 +3042,25 @@ impl Engine {
     /// the append buffer's, which holds the commits above the last checkpoint.
     /// Handing out an id twice would overwrite a row the mirror already holds.
     pub(crate) fn next_row_seq(&self, table: &str) -> Result<usize> {
-        let mut max = self
-            .block_segment_row_counts(table)
-            .last()
-            .map(|(segment, rows)| ((*segment as usize) << 32) | *rows as usize)
-            .unwrap_or(0);
+        // The highest `(segment, rows)` pair the rows already occupy. A write
+        // continues in the segment it was in - the one the block layout and the
+        // append buffer both point at - not in a fresh one; only an empty table
+        // opens the id the catalog says comes next
+        // (`MetaTableObject::GetNextSegmentID` reads the segment map, which
+        // keeps a retired entry until cleanup).
+        let mut max = 0usize;
+        for (id, rows) in self.block_segment_row_counts(table) {
+            max = max.max(((id as usize) << 32) | rows as usize);
+        }
         for (seq, _) in self.pending_rows_of(table) {
             max = max.max(seq + 1);
+        }
+        if max == 0 {
+            // Nothing written yet: the very first append opens the segment the
+            // catalog says comes next, never a retired one
+            // (`MetaTableObject::GetNextSegmentID` reads the segment map, which
+            // keeps a retired entry until cleanup).
+            max = (self.next_segment_id(table) as usize) << 32;
         }
         Ok(max)
     }
@@ -3562,6 +3572,17 @@ impl Engine {
     /// The rows go through the same append hook as an insert, so the graph is
     /// the reference's in-memory segment; the next dump seals it into a chunk.
     pub(crate) fn build_hnsw_index(&self, table: &str, column: &str) -> Result<()> {
+        self.build_hnsw_index_of(table, column, None)
+    }
+
+    /// [`Self::build_hnsw_index`] for one catalog record (see
+    /// [`Self::hnsw_mem_segments_of`]).
+    pub(crate) fn build_hnsw_index_of(
+        &self,
+        table: &str,
+        column: &str,
+        only: Option<u64>,
+    ) -> Result<()> {
         let schema = self.table_schema(table)?;
         let Some(ci) = schema.iter().position(|c| c == column) else {
             return Ok(());
@@ -3578,7 +3599,14 @@ impl Engine {
             rows.push((seq as u64, v));
         }
         let read = t_read.elapsed();
-        let segments = self.hnsw_mem_segments(table, column)?;
+        // The graph of **this** record only: a column may carry several HNSW
+        // indexes and each owns its rows once (the reference's per-`MemIndex`
+        // object), so feeding every graph on the column would double-count the
+        // rows in the others.
+        let segments = match only {
+            Some(id) => self.hnsw_mem_segments_of(table, column, Some(id))?,
+            None => self.hnsw_mem_segments(table, column)?,
+        };
         let t_build = std::time::Instant::now();
         for mem in segments {
             if let Ok(mut mem) = mem.lock() {
@@ -3602,21 +3630,38 @@ impl Engine {
         Ok(())
     }
 
-    pub(crate) fn hnsw_mem_segments(
+    /// The memory graphs of `table`'s HNSW indexes, topped up from the catalog.
+    ///
+    /// `only` narrows the result to one index record: a build or a recovery
+    /// step feeds rows to **that** index's graph, and the reference's `MemIndex`
+    /// is keyed by index id, so a column carrying two HNSW indexes must not
+    /// receive the same rows twice through one shared graph.
+    pub(crate) fn hnsw_mem_segments_of(
         &self,
         table: &str,
         column: &str,
+        only: Option<u64>,
     ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
         let key = self.table_key(table);
         let schema = self.table_schema(table)?;
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
-        if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
-            entry.hnsw_probed = true;
+        // Every HNSW **record** on the table owns a graph, so the registry is
+        // topped up from the catalog on every call rather than only while it is
+        // empty. The reference's `MemIndex` map is keyed by
+        // `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so a second
+        // `CREATE INDEX … USING HNSW` on a column the first one already covers
+        // gets a graph of its own - gating on `hnsw_mem.is_empty()` left the
+        // new index without one, and its dump then wrote nothing while the
+        // first index's graph was fed by both build paths.
+        {
             let indexes = self.storage.catalog.indexes_of_table(table)?;
             let types = self.column_types(table)?;
             for im in indexes {
                 if !im.index_type.eq_ignore_ascii_case("HNSW") {
+                    continue;
+                }
+                if entry.hnsw_mem.contains_key(&im.id) {
                     continue;
                 }
                 let Some(ci) = schema.iter().position(|c| c == &im.column) else {
@@ -3643,18 +3688,33 @@ impl Engine {
                     index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
                 let encoding =
                     index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-                entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
+                entry.hnsw_mem.insert(
+                    im.id,
                     Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
                         dims, m, efc, metric, encoding,
-                    )))
-                });
+                    ))),
+                );
             }
+            entry.hnsw_probed = true;
         }
-        Ok(entry
-            .hnsw_mem
-            .get(column)
-            .map(|m| vec![m.clone()])
-            .unwrap_or_default())
+        // Every HNSW index on `column` owns its own graph.
+        let ids: Vec<u64> = match only {
+            Some(id) => vec![id],
+            None => self.index_ids_on_column(table, column),
+        };
+        Ok(ids
+            .into_iter()
+            .filter_map(|id| entry.hnsw_mem.get(&id).cloned())
+            .collect())
+    }
+
+    /// [`Self::hnsw_mem_segments_of`] over every HNSW index on `column`.
+    pub(crate) fn hnsw_mem_segments(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
+        self.hnsw_mem_segments_of(table, column, None)
     }
 
     /// Builds (once) the inverted index for a text column from its live rows.
@@ -3675,7 +3735,37 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        self.text_index_build(table, column, tokenizer)
+        let index_id = self.fulltext_index_id(table, column).ok_or_else(|| {
+            Error::Invalid(format!(
+                "fulltext index does not exist for column '{column}'"
+            ))
+        })?;
+        self.text_index_for_id(table, index_id, column, tokenizer)
+    }
+
+    /// The catalog id of the full-text index on `column` - the first one when
+    /// the column has several, which is what the reference's
+    /// `TableIndexMeta::GetIndexBase` resolves for a plain `MATCH TEXT`.
+    fn fulltext_index_id(&self, table: &str, column: &str) -> Option<u64> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
+    }
+
+    /// [`Self::text_index_build`] for one specific index id.
+    pub(crate) fn text_index_for_id(
+        &self,
+        table: &str,
+        index_id: u64,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<SharedTextIndex> {
+        self.text_index_build(table, index_id, column, tokenizer)
     }
 
     /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
@@ -3686,10 +3776,11 @@ impl Engine {
     fn text_index_build(
         &self,
         table: &str,
+        index_id: u64,
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        let key = index_key(table, column);
+        let key = mem_index_key(table, index_id);
         let tkey = self.table_key(table);
         // A bulk load that bypasses the DML hooks would leave the index short of
         // rows; compare against the published row count and rebuild. Prefer the
@@ -3723,15 +3814,14 @@ impl Engine {
                 Some(entry) => (
                     entry
                         .text
-                        .get(column)
+                        .get(&index_id)
                         .filter(|_| {
-                            entry
-                                .text_built
-                                .get(column)
-                                .is_some_and(|(built_epoch, built_ts)| {
+                            entry.text_built.get(&index_id).is_some_and(
+                                |(built_epoch, built_ts)| {
                                     *built_epoch == entry.text_epoch
                                         && *built_ts >= entry.text_min_ts
-                                })
+                                },
+                            )
                         })
                         .cloned(),
                     entry.text_epoch,
@@ -3768,52 +3858,40 @@ impl Engine {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let dir = self
-            .dir
-            .join("fulltext")
-            .join(key.replace('/', "_"))
-            .to_string_lossy()
-            .into_owned();
-        // The `ROW_ID` segments the catalog still lists. A chunk of any other
-        // segment belongs to rows a compaction moved: loading it would map its
-        // postings onto row ids that name nothing (or, worse, another row), so
-        // the loader retires it and the rows are re-indexed under their new ids.
-        // An empty set is "nothing to go by", not "every chunk is stale".
-        let live_segments: Option<std::collections::HashSet<u32>> = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .map(|entry| entry.segments.keys().copied().collect())
-            .filter(|segments: &std::collections::HashSet<u32>| !segments.is_empty());
-        if live_segments.is_none() && ft_trace_enabled(&key) {
-            // `None` disables the retired-segment check, so any chunk on disk is
-            // loaded - including the ones a compaction left behind, whose row
-            // ids push the rebuild's start past every live row.
-            eprintln!("[FT] {key} build with NO live segments: chunk filtering is off");
-        }
-        // The chunk list the catalog holds, in the reference's layout. It is
-        // the only way to find the chunks of a directory the reference wrote:
-        // the reference never scans for `ft_*.dic`, it reads `idx_chunk|…`.
+        // The chunk list the catalog holds, in the reference's layout
+        // (`idx_{id}/seg_{n}/ft_{base:016x}`). It is the **only** input: the
+        // reference's `ColumnIndexReader` walks `SegmentIndexIDs -> ChunkIDs`
+        // and never lists a directory, which is what makes a compaction's
+        // deprecated segments unreachable the moment their ids are dropped.
         let catalog_chunks = self
-            .fulltext_catalog_chunks(table, column)
+            .fulltext_catalog_chunks_of(table, index_id)
             .unwrap_or_default();
+        // A chunk has no other place to be, so the index root follows the same
+        // index the catalog named; the writer/sealer and the reader agree on
+        // `idx_{id}/seg_{n}`.
+        let dir = match self.fulltext_index_root_of(table, index_id) {
+            Some(root) => root.to_string_lossy().into_owned(),
+            // No FULLTEXT index record (a column whose index was just dropped,
+            // or a bare name the catalog cannot resolve): nothing to read, and
+            // the caller's build will publish into record absence anyway.
+            None => self
+                .dir
+                .join("fulltext")
+                .join(key.replace('/', "_"))
+                .to_string_lossy()
+                .into_owned(),
+        };
         // Cloned because a rejected publish retries the whole build.
         let build_dir = dir.clone();
         let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
+        let first = index.load_sealed_scoped(&catalog_chunks) as usize;
         if ft_trace_enabled(&key) {
             eprintln!(
-                "[FT] {key} build dir={build_dir} segs_loaded={} first={first} live={:?} catalog_chunks={}",
+                "[FT] {key} build dir={build_dir} segs_loaded={} first={first} catalog_chunks={}",
                 index.reader.segments.len(),
-                live_segments.as_ref().map(|s| {
-                    let mut v: Vec<u32> = s.iter().copied().collect();
-                    v.sort_unstable();
-                    v
-                }),
                 catalog_chunks.len()
             );
         }
@@ -3829,7 +3907,7 @@ impl Engine {
         let shared = Arc::new(std::sync::RwLock::new(index));
         #[cfg(test)]
         run_text_build_hook();
-        match self.publish_text_index(&tkey, column, epoch, shared.clone()) {
+        match self.publish_text_index(&tkey, index_id, epoch, shared.clone()) {
             TextPublish::Cached => Ok(shared),
             // A compaction committed after the build's read. The build still
             // describes exactly the rows this statement sees (one read, one
@@ -3853,7 +3931,7 @@ impl Engine {
     pub(crate) fn publish_text_index(
         &self,
         tkey: &str,
-        column: &str,
+        index_id: u64,
         epoch: u64,
         index: SharedTextIndex,
     ) -> TextPublish {
@@ -3872,10 +3950,8 @@ impl Engine {
         if read_ts < entry.text_min_ts {
             return TextPublish::ReadTooOld;
         }
-        entry.text.insert(column.to_string(), index);
-        entry
-            .text_built
-            .insert(column.to_string(), (epoch, read_ts));
+        entry.text.insert(index_id, index);
+        entry.text_built.insert(index_id, (epoch, read_ts));
         TextPublish::Cached
     }
 
@@ -3915,14 +3991,26 @@ impl Engine {
         let (indexes, epoch) = {
             let tables = self.tables.lock().unwrap();
             match tables.get(&tkey) {
-                Some(entry) if !entry.text.is_empty() => (
-                    entry
-                        .text
-                        .iter()
-                        .map(|(column, index)| (column.clone(), index.clone()))
-                        .collect::<Vec<_>>(),
-                    entry.text_epoch,
-                ),
+                Some(entry) if !entry.text.is_empty() => {
+                    let by_id: std::collections::HashMap<u64, String> = self
+                        .storage
+                        .catalog
+                        .indexes_of_table(&self.qualified_table(table))
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|im| (im.id, im.column))
+                        .collect();
+                    (
+                        entry
+                            .text
+                            .iter()
+                            .filter_map(|(id, index)| {
+                                Some((*id, by_id.get(id)?.clone(), index.clone()))
+                            })
+                            .collect::<Vec<_>>(),
+                        entry.text_epoch,
+                    )
+                }
                 // Nothing cached: the next query builds the merged layout.
                 _ => return,
             }
@@ -3932,7 +4020,7 @@ impl Engine {
         };
         let types = self.column_types(table).unwrap_or_default();
         let segment = (base as u64) >> 32;
-        for (column, shared) in &indexes {
+        for (_index_id, column, shared) in &indexes {
             let Some(col) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -3988,9 +4076,10 @@ impl Engine {
                 index.drop_segments_not_in(&live);
             }
             // Persist the moved rows: the chunk names the new ids, so the next
-            // build maps it instead of re-reading the column, and the chunks of the
-            // retired segments are dropped at load (`live_segments`).
+            // build maps it instead of re-reading the column, and the chunks of
+            // the retired segments are gone from the catalog.
             crate::engine::state::seal_text_index_unlocked(shared);
+            self.record_sealed_text_chunks(table, column);
             if ft_trace_enabled(&self.table_key(table)) {
                 let g = shared.read().unwrap_or_else(|e| e.into_inner());
                 // The failure this trace exists for: a row is in the tail (so it
@@ -4021,8 +4110,8 @@ impl Engine {
             // pass owns the stamp.
             return;
         }
-        for (column, _) in &indexes {
-            entry.text_built.insert(column.clone(), (epoch, built_ts));
+        for (index_id, _, _) in &indexes {
+            entry.text_built.insert(*index_id, (epoch, built_ts));
         }
     }
 
@@ -4035,10 +4124,24 @@ impl Engine {
     /// GetSegmentIndexDir()` (`db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}`). This is
     /// that walk: it is how a directory the reference wrote is read at all, and
     /// it is also the authoritative list for a directory the port wrote.
-    pub(crate) fn fulltext_catalog_chunks(
+    /// `idx_{index_id}` for a full-text index - the root the seals write under
+    /// and the catalog's `idx_chunk` records name.
+    fn fulltext_index_root_of(&self, table: &str, index_id: u64) -> Option<std::path::PathBuf> {
+        let qualified = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&qualified).ok()??;
+        Some(self.blocks_root().join(format!(
+            "db_{}/tbl_{}/idx_{index_id}",
+            self.database_id_of(&qualified),
+            meta.id
+        )))
+    }
+
+    /// The chunks the catalog lists for one **specific** full-text index id,
+    /// in the reference's layout.
+    pub(crate) fn fulltext_catalog_chunks_of(
         &self,
         table: &str,
-        column: &str,
+        index_id: u64,
     ) -> Result<Vec<CatalogChunk>> {
         // The catalog accepts both spellings depending on which record wrote it
         // (`im.table` is the bare name for an index created without a database,
@@ -4050,57 +4153,6 @@ impl Engine {
         }
         let Some(meta) = meta else {
             return Ok(Vec::new());
-        };
-        let mut indexes = self.storage.catalog.indexes_of_table(&qualified)?;
-        if qualified != table {
-            for im in self.storage.catalog.indexes_of_table(table)? {
-                if !indexes.iter().any(|known| known.name == im.name) {
-                    indexes.push(im);
-                }
-            }
-        }
-        // A column may carry several FULLTEXT indexes (a sparse-gram one beside a
-        // regular one), and `indexes_of_table` lists them **by name**, so taking
-        // the first match would return chunks another analyzer wrote. The chunks
-        // have to belong to the index `text_index_for` built the tokenizer from,
-        // i.e. the analyzer `column_analyzer_name` resolves - the same rule as
-        // C++ `SearchDriver::GetAnalyzerName` (a regular analyzer wins over a
-        // sparse-gram one regardless of name order).
-        let wanted = self.column_analyzer_name(table, column);
-        let im = indexes
-            .into_iter()
-            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.column == *column)
-            .min_by_key(|im| {
-                let analyzer = im
-                    .options
-                    .iter()
-                    .find(|(k, _)| k.eq_ignore_ascii_case("analyzer"))
-                    .map(|(_, v)| v.clone())
-                    .unwrap_or_else(|| "standard".to_string());
-                let sparsegram = matches!(
-                    analyzer::parse_analyzer_name(&analyzer),
-                    Ok(analyzer::AnalyzerName::SparseGram { .. })
-                );
-                // 0: the analyzer the column's tokenizer uses, 1: another
-                // regular one, 2: a sparse-gram one.
-                if Some(&analyzer) == wanted.as_ref() {
-                    0
-                } else if sparsegram {
-                    2
-                } else {
-                    1
-                }
-            });
-        let Some(im) = im else {
-            return Ok(Vec::new());
-        };
-        let index_id = if im.id > 0 {
-            im.id
-        } else {
-            match self.index_position(&qualified, &im.name) {
-                Ok(id) => id as u64,
-                Err(_) => return Ok(Vec::new()),
-            }
         };
         let db_id = self.database_id_of(&qualified);
         let layers = catalog::layout::read_index_chunks(
@@ -4139,10 +4191,81 @@ impl Engine {
     /// document goes to the memory tail and is dumped immediately, so later
     /// queries only map the segment files. Subsequent inserts append to the
     /// tail and `flush()` seals it (the reference's dump).
+    /// Points a multi-vector index at its catalog chunk directory and takes its
+    /// chunk counter from the catalog (`GetAndSetNextChunkID`).
+    fn attach_mv_chunk_root(&self, table: &str, index_id: u64, index: &mut MultiVectorIndex) {
+        let qualified = self.qualified_table(table);
+        let Some(meta) = self
+            .storage
+            .catalog
+            .get_table_by_name(&qualified)
+            .ok()
+            .flatten()
+        else {
+            return;
+        };
+        if index_id == 0 {
+            return;
+        }
+        let db_id = self.database_id_of(&qualified);
+        index.chunk_root = Some(
+            self.blocks_root()
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
+        );
+        // `GetAndSetNextChunkID` over every segment of this index.
+        let mut next = 0u32;
+        let Ok(layers) = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+        ) else {
+            return;
+        };
+        for (segment, chunks) in layers {
+            let from_tag = self
+                .storage
+                .catalog
+                .next_chunk_id(&db_id.to_string(), &meta.id.to_string(), index_id, segment)
+                .unwrap_or(0);
+            let from_records = chunks
+                .iter()
+                .map(|(id, _)| *id as u32 + 1)
+                .max()
+                .unwrap_or(0);
+            next = next.max(from_tag).max(from_records);
+        }
+        index.next_chunk = u64::from(next);
+    }
+
+    /// The multi-vector index a `MATCH TENSOR` on `column` resolves to: the
+    /// column's first `PLAID`/`SMVE`/`EMVB` record, or an error when it has
+    /// none (`PhysicalMatchTensorScan::PlanWithIndex` leaves such a column to
+    /// the block scan).
     pub(crate) fn multivector_index_for(
         &self,
         table: &str,
         column: &str,
+        dims: usize,
+    ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
+        let index_id = self
+            .multivector_index_id(table, column)
+            .ok_or_else(|| Error::NotFound(format!("no multi-vector index on '{column}'")))?;
+        self.multivector_index_by_id(table, column, index_id, dims)
+    }
+
+    /// [`Self::multivector_index_for`] for one specific catalog record.
+    ///
+    /// The registry is keyed by the catalog index id: a column may carry
+    /// several multi-vector indexes, each with its own tail, chunk list and
+    /// options. The index's identity is its record - the reference's `MemIndex`
+    /// is keyed by `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index` - so a
+    /// second `CREATE INDEX` on the same column must not rebuild the first.
+    pub(crate) fn multivector_index_by_id(
+        &self,
+        table: &str,
+        column: &str,
+        index_id: u64,
         dims: usize,
     ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
         // The catalog and the index directory are keyed by the qualified name, so
@@ -4150,7 +4273,7 @@ impl Engine {
         // the index under a different key and rebuild it on every call.
         let qualified = self.qualified_table(table);
         let table = qualified.as_str();
-        let key = index_key(table, column);
+        let key = mem_index_key(table, index_id);
         let tkey = self.table_key(table);
         // Prefer the counter the write paths maintain (live_rows): row_count
         // walks every block version file and every slot, which cost 0.67 ms of
@@ -4168,7 +4291,7 @@ impl Engine {
         // See `text_index_for`: `tables` is released before the index lock.
         let cached = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&tkey).and_then(|e| e.mv.get(column)).cloned()
+            tables.get(&tkey).and_then(|e| e.mv.get(&index_id)).cloned()
         };
         if let Some(idx) = cached {
             // `doc_count` counts parsed documents only: a column with a NULL or
@@ -4189,21 +4312,33 @@ impl Engine {
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
         let dir = self.dir.join("multivector").join(key.replace('/', "_"));
-        // A previous `flush` wrote the index out as C++ PLAID chunks; loading
-        // them costs O(chunks), while the rebuild below retrains the centroids
-        // and re-adds every embedding. The chunk's document order is the row
-        // order, so a light column scan recovers the row ids.
-        if let Some(index_name) = self.plaid_index_name(table, column) {
+        // The options, the kind and the chunk list all belong to this index's
+        // own record: two indexes on one column are two `PlaidIndex`es, and a
+        // `SMVE` and a `PLAID` beside each other keep separate configs.
+        let record = self
+            .storage
+            .catalog
+            .indexes_of_table(table)?
+            .into_iter()
+            .find(|im| im.id == index_id)
+            .ok_or_else(|| Error::NotFound(format!("index {index_id} on '{column}'")))?;
+        let index_name = record.name.clone();
+        // A previous dump wrote the index out as C++ PLAID chunks; loading them
+        // costs O(chunks), while the rebuild below retrains the centroids and
+        // re-adds every embedding. The chunk's document order is the row order,
+        // so a light column scan recovers the row ids.
+        if record.index_type.eq_ignore_ascii_case("PLAID") {
             if let Ok(loaded) = self.read_plaid_index(table, &index_name) {
                 let seqs = self.multivector_row_ids(table, ci, dims)?;
                 if !seqs.is_empty() && loaded.doc_num() as usize == seqs.len() {
                     let mut index = MultiVectorIndex::new(
                         dir.clone(),
                         dims,
-                        self.mv_plaid_config(table, column),
-                        self.mv_smve_config(table, column),
-                        self.mv_emvb_config(table, column),
+                        self.mv_plaid_config(table, &index_name),
+                        self.mv_smve_config(table, &index_name),
+                        self.mv_emvb_config(table, &index_name),
                     );
+                    self.attach_mv_chunk_root(table, index_id, &mut index);
                     index.scanned_rows = reserved;
                     // The sealed scan is the fallback when a filter excludes
                     // every PLAID candidate; without the readers a filtered
@@ -4218,7 +4353,7 @@ impl Engine {
                         .entry(tkey)
                         .or_default()
                         .mv
-                        .insert(column.to_string(), shared.clone());
+                        .insert(index_id, shared.clone());
                     return Ok(shared);
                 }
             }
@@ -4233,20 +4368,14 @@ impl Engine {
                 }
             }
         }
-        if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
-            eprintln!(
-                "DEBUG mv_for build table={table} col={column} plaid={:?} smve={:?}",
-                self.mv_plaid_config(table, column),
-                self.mv_smve_config(table, column)
-            );
-        }
         let mut index = MultiVectorIndex::new(
             dir,
             dims,
-            self.mv_plaid_config(table, column),
-            self.mv_smve_config(table, column),
-            self.mv_emvb_config(table, column),
+            self.mv_plaid_config(table, &index_name),
+            self.mv_smve_config(table, &index_name),
+            self.mv_emvb_config(table, &index_name),
         );
+        self.attach_mv_chunk_root(table, index_id, &mut index);
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -4275,7 +4404,7 @@ impl Engine {
             .entry(tkey)
             .or_default()
             .mv
-            .insert(column.to_string(), shared.clone());
+            .insert(index_id, shared.clone());
         Ok(shared)
     }
 
@@ -4297,22 +4426,6 @@ impl Engine {
             }
         }
         Ok(out)
-    }
-
-    /// Name of the `USING PLAID` index on `table.column`, if any.
-    fn plaid_index_name(&self, table: &str, column: &str) -> Option<String> {
-        let short = table.rsplit('.').next().unwrap_or(table);
-        self.storage
-            .catalog
-            .list_indexes()
-            .ok()?
-            .into_iter()
-            .find(|im| {
-                im.index_type.eq_ignore_ascii_case("PLAID")
-                    && im.column == column
-                    && (im.table == table || im.table == short)
-            })
-            .map(|im| im.name)
     }
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
@@ -4337,16 +4450,22 @@ impl Engine {
         Ok(out)
     }
 
-    /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)` on
-    /// `table.column`, if one exists.
-    pub(crate) fn mv_plaid_config(&self, table: &str, column: &str) -> Option<PlaidConfig> {
+    /// `CREATE INDEX … USING PLAID WITH (nbits=…, n_centroids=…)`: the options
+    /// of **that** index record.
+    ///
+    /// Keyed by the index, not the column: the reference's `MemIndex` holds one
+    /// object per index, so `index3` on `col3` and a later `index7` on the same
+    /// column are two different `PlaidIndex`es with their own options. The
+    /// configs of the other kinds stay `None` - an index is exactly one kind.
+    pub(crate) fn mv_plaid_config(&self, table: &str, index: &str) -> Option<PlaidConfig> {
         let im = self
             .storage
             .catalog
-            .indexes_of_table(table)
-            .ok()?
-            .into_iter()
-            .find(|im| im.index_type.eq_ignore_ascii_case("PLAID") && im.column == column)?;
+            .index_by_name(&self.qualified_table(table), index)
+            .ok()??;
+        if !im.index_type.eq_ignore_ascii_case("PLAID") {
+            return None;
+        }
         let mut cfg = PlaidConfig {
             nbits: 4,
             n_centroids: 0,
@@ -4387,14 +4506,15 @@ impl Engine {
 
     /// `CREATE INDEX … USING EMVB WITH (pq_subspace_num=…, pq_subspace_bits=…)`
     /// on `table.column`.
-    pub(crate) fn mv_emvb_config(&self, table: &str, column: &str) -> Option<EmvbConfig> {
+    pub(crate) fn mv_emvb_config(&self, table: &str, index: &str) -> Option<EmvbConfig> {
         let im = self
             .storage
             .catalog
-            .indexes_of_table(table)
-            .ok()?
-            .into_iter()
-            .find(|im| im.index_type.eq_ignore_ascii_case("EMVB") && im.column == column)?;
+            .index_by_name(&self.qualified_table(table), index)
+            .ok()??;
+        if !im.index_type.eq_ignore_ascii_case("EMVB") {
+            return None;
+        }
         let mut cfg = EmvbConfig {
             subspace_num: 1,
             subspace_bits: 8,
@@ -4414,14 +4534,15 @@ impl Engine {
     }
 
     /// `CREATE INDEX … USING SMVE WITH (width=…, topk=…)` on `table.column`.
-    pub(crate) fn mv_smve_config(&self, table: &str, column: &str) -> Option<SmveConfig> {
+    pub(crate) fn mv_smve_config(&self, table: &str, index: &str) -> Option<SmveConfig> {
         let im = self
             .storage
             .catalog
-            .indexes_of_table(table)
-            .ok()?
-            .into_iter()
-            .find(|im| im.index_type.eq_ignore_ascii_case("SMVE") && im.column == column)?;
+            .index_by_name(&self.qualified_table(table), index)
+            .ok()??;
+        if !im.index_type.eq_ignore_ascii_case("SMVE") {
+            return None;
+        }
         let mut cfg = SmveConfig {
             width: 2048,
             topk: 8,
@@ -4466,40 +4587,149 @@ impl Engine {
         Some(maxsim_tokens(query, &doc))
     }
 
-    /// Keeps existing multi-vector indexes in step with an inserted/rewritten
-    /// row. Called from the shared DML hook so every write path is covered.
-    /// Drops the cached memory index of `(table, column)` when it was built
-    /// before `kind` existed, so the caller rebuilds it with that config.
-    pub(crate) fn forget_multivector_index(&self, table: &str, column: &str, kind: &str) {
-        let tkey = self.table_key(table);
-        // The cached index is probed outside `tables` for the same reason as
-        // `text_index_for`: a scan can hold its read guard while it waits for
-        // `tables`, and a writer pending under `tables` would then close the
-        // cycle.
-        let cached = {
-            let tables = self.tables.lock().unwrap();
-            tables.get(&tkey).and_then(|e| e.mv.get(column)).cloned()
-        };
-        let rebuild = cached
-            .map(|idx| !idx.read().map(|g| g.knows_kind(kind)).unwrap_or(false))
-            .unwrap_or(false);
-        if rebuild {
-            if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
-                entry.mv.remove(column);
-            }
-        }
+    /// Test-only: the id of the **first secondary** index on `column`.
+    ///
+    /// The registries are keyed by index id; a test names the column, so this
+    /// resolves the one secondary record the test created.
+    #[cfg(test)]
+    pub(crate) fn test_secondary_id(&self, table: &str, column: &str) -> u64 {
+        self.secondary_index_ids_on_column(table, column)
+            .into_iter()
+            .next()
+            .unwrap_or(0)
+    }
+
+    /// Test-only: the id of the index on `column` whose type is `kind`.
+    ///
+    /// The registries are keyed by index id; a test names the column, so this
+    /// resolves the one index of that kind the test created. A column can carry
+    /// several indexes (`col3` holds both an IVF and an HNSW one), so the kind
+    /// disambiguates.
+    #[cfg(test)]
+    pub(crate) fn test_index_id(&self, table: &str, column: &str, kind: &str) -> u64 {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case(kind))
+            .map(|im| im.id)
+            .unwrap_or(0)
+    }
+
+    /// Every multi-vector index id on `column`.
+    fn multivector_index_ids(&self, table: &str, column: &str) -> Vec<u64> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|im| {
+                im.column == column
+                    && (im.index_type.eq_ignore_ascii_case("PLAID")
+                        || im.index_type.eq_ignore_ascii_case("SMVE")
+                        || im.index_type.eq_ignore_ascii_case("EMVB")
+                        || im.index_type.eq_ignore_ascii_case("MULTIVECTOR"))
+            })
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
+            .collect()
+    }
+
+    /// The first multi-vector index id on `column` (what a plain
+    /// `MATCH TENSOR` resolves to).
+    fn multivector_index_id(&self, table: &str, column: &str) -> Option<u64> {
+        self.multivector_index_ids(table, column).into_iter().next()
+    }
+
+    /// The catalog id of the BMP index on `column` (a column carries one).
+    fn sparse_index_id(&self, table: &str, column: &str) -> Option<u64> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("BMP"))
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
     }
 
     /// Builds (once) the sparse BMP index of a column, dumping every segment so
     /// later queries only map the chunk files. Inserts append to the memory
     /// tail and `flush()` seals it.
+    /// Points a sparse index at its catalog chunk directory and takes its chunk
+    /// counter from the catalog (`GetAndSetNextChunkID`).
+    fn attach_sparse_chunk_root(&self, table: &str, index_id: u64, index: &mut SparseIndex) {
+        let qualified = self.qualified_table(table);
+        let Some(meta) = self
+            .storage
+            .catalog
+            .get_table_by_name(&qualified)
+            .ok()
+            .flatten()
+        else {
+            return;
+        };
+        if index_id == 0 {
+            return;
+        }
+        let db_id = self.database_id_of(&qualified);
+        index.chunk_root = Some(
+            self.blocks_root()
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
+        );
+        let mut next = 0u32;
+        let Ok(layers) = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+        ) else {
+            return;
+        };
+        for (segment, chunks) in layers {
+            let from_tag = self
+                .storage
+                .catalog
+                .next_chunk_id(&db_id.to_string(), &meta.id.to_string(), index_id, segment)
+                .unwrap_or(0);
+            let from_records = chunks
+                .iter()
+                .map(|(id, _)| *id as u32 + 1)
+                .max()
+                .unwrap_or(0);
+            next = next.max(from_tag).max(from_records);
+        }
+        index.next_chunk = u64::from(next);
+    }
+
+    /// The BMP index a `MATCH SPARSE` on `column` resolves to: the column's
+    /// `USING BMP` record, or an error when it has none
+    /// (`PhysicalMatchSparseScan::PlanWithIndex` leaves such a column to the
+    /// block scan).
     pub(crate) fn sparse_index_for(
         &self,
         table: &str,
         column: &str,
         width: storage::bmp::IdxWidth,
     ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
-        let key = index_key(table, column);
+        let index_id = self
+            .sparse_index_id(table, column)
+            .ok_or_else(|| Error::NotFound(format!("no BMP index on '{column}'")))?;
+        self.sparse_index_by_id(table, column, index_id, width)
+    }
+
+    /// [`Self::sparse_index_for`] for one specific catalog record, so two BMP
+    /// indexes on a column keep their own tails (the reference's per-`MemIndex`
+    /// object).
+    pub(crate) fn sparse_index_by_id(
+        &self,
+        table: &str,
+        column: &str,
+        index_id: u64,
+        width: storage::bmp::IdxWidth,
+    ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
+        let key = mem_index_key(table, index_id);
         let tkey = self.table_key(table);
         // The counter the write paths maintain, like `multivector_index_for`:
         // `row_count` walks every block version file and slot, which is a
@@ -4530,7 +4760,7 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables
                 .get(&tkey)
-                .and_then(|e| e.sparse.get(column))
+                .and_then(|e| e.sparse.get(&index_id))
                 .cloned()
         };
         if let Some(idx) = cached {
@@ -4561,10 +4791,11 @@ impl Engine {
             .catalog
             .indexes_of_table(table)?
             .into_iter()
-            .find(|im| im.column == *column && im.index_type.eq_ignore_ascii_case("BMP"))
+            .find(|im| im.id == index_id)
             .map(|im| index_block_size(&im))
             .unwrap_or(index::sparse::BMP_BLOCK_SIZE);
         let mut index = SparseIndex::new(dir, width, store, block_size);
+        self.attach_sparse_chunk_root(table, index_id, &mut index);
         // The column type carries the declared bound (`SPARSE(float,int8,8)`);
         // the reference uses it as the index's term space.
         index.terms = self
@@ -4597,7 +4828,7 @@ impl Engine {
             .entry(tkey)
             .or_default()
             .sparse
-            .insert(column.to_string(), shared.clone());
+            .insert(index_id, shared.clone());
         Ok(shared)
     }
 
@@ -4923,6 +5154,48 @@ impl Engine {
     /// Deleted rows are included: the reference's index chunks keep them (a
     /// block is append-only), so the chunk's `row_count` counts every row the
     /// segment ever held, not the live ones.
+    /// The next segment id for `table`: one past **every** id it has ever used.
+    ///
+    /// A compaction deprecates its source segments (`drop|seg|…`) and `Cleanup`
+    /// later removes the records, so the newest live id alone is not a
+    /// watermark: reusing a retired id would give a fresh segment the row ids,
+    /// chunk names and block directories of a dead one. The reference reads the
+    /// same set - its segment map keeps an entry until cleanup, and
+    /// `MetaTableObject::GetNextSegmentID` takes the map's maximum.
+    pub(crate) fn next_segment_id(&self, table: &str) -> u32 {
+        let qualified = self.qualified_table(table);
+        let live = self
+            .segment_row_counts(&qualified)
+            .into_iter()
+            .map(|(id, _)| id)
+            .max();
+        let dropped = self
+            .storage
+            .catalog
+            .get_table_by_name(&qualified)
+            .ok()
+            .flatten()
+            .and_then(|meta| {
+                self.storage
+                    .catalog
+                    .dropped_segments(
+                        &self.database_id_of(&qualified).to_string(),
+                        &meta.id.to_string(),
+                    )
+                    .ok()
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .max();
+        match live.max(dropped) {
+            // A table that has not written a row yet opens segment **0**
+            // (`TableMeta::InitSet` starts the map empty and the first append
+            // takes id 0).
+            None => 0,
+            Some(id) => id + 1,
+        }
+    }
+
     pub fn segment_row_counts(&self, table: &str) -> Vec<(u32, u64)> {
         let key = self.table_key(table);
         let tracked: Vec<(u32, u64)> = self
@@ -5051,11 +5324,21 @@ impl Engine {
     /// (C++ `SegmentIndexMeta::GetMemIndex() != nullptr` plus its size).
     pub fn mem_index_len(&self, table: &str, column: &str) -> Option<usize> {
         let key = self.table_key(table);
+        // Every HNSW index on `column` keeps its own graph; the answer is the
+        // one a plain `MATCH VECTOR` resolves to (the first by id).
+        let index_id = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("HNSW"))
+            .map(|im| im.id)?;
         // The handle is cloned and `tables` released before it is locked (see
         // `text_index_for`).
         let mem = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&key)?.hnsw_mem.get(column)?.clone()
+            tables.get(&key)?.hnsw_mem.get(&index_id)?.clone()
         };
         let len = mem.lock().unwrap().len();
         Some(len)
@@ -6065,11 +6348,18 @@ impl Engine {
         if out.0.is_empty() {
             let tkey = self.table_key(table);
             if ft_trace_enabled(&tkey) {
-                let shared = self.tables.lock().unwrap().get(&tkey).and_then(|e| {
-                    e.text
-                        .get(match_columns(&m.column).first()?.as_str())
-                        .cloned()
-                });
+                let Some(col) = match_columns(&m.column).first().cloned() else {
+                    return Ok(out);
+                };
+                let Some(index_id) = self.fulltext_index_id(table, &col) else {
+                    return Ok(out);
+                };
+                let shared = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&tkey)
+                    .and_then(|e| e.text.get(&index_id).cloned());
                 match shared {
                     Some(shared) => {
                         let g = shared.read().unwrap_or_else(|e| e.into_inner());
@@ -6998,12 +7288,27 @@ impl Engine {
             let tokenizer = self.index_tokenizer(table, name);
             let _ = self.text_index_for(table, name, tokenizer)?;
         }
+        // The registry is keyed by index id; the query names columns, so build
+        // the `column -> shared index` view once from the catalog.
         let (indexes, analyzers) = {
+            let by_id: std::collections::HashMap<u64, String> = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|im| (im.id, im.column))
+                .collect();
             let tables = self.tables.lock().unwrap();
             let Some(entry) = tables.get(&tkey) else {
                 return Ok(None);
             };
-            (entry.text.clone(), entry.analyzers.clone())
+            let by_column: HashMap<String, super::state::SharedTextIndex> = entry
+                .text
+                .iter()
+                .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                .collect();
+            (by_column, entry.analyzers.clone())
         };
         if indexes.is_empty() {
             return Ok(None);
@@ -7594,12 +7899,15 @@ impl Engine {
     /// `(term, row)` pairs, not distinct terms: 100 rows of `aaa bbb` is 200).
     pub(crate) fn text_term_count(&self, table: &str, column: &str) -> u32 {
         let key = self.table_key(table);
+        let Some(index_id) = self.fulltext_index_id(table, column) else {
+            return 0;
+        };
         let shared = self
             .tables
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.text.get(column).cloned());
+            .and_then(|e| e.text.get(&index_id).cloned());
         let Some(shared) = shared else {
             return 0;
         };
@@ -8360,54 +8668,61 @@ impl Engine {
                     if dims > 0 && !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
                         let query: Vec<Vec<f32>> =
                             q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
-                        let index = self.multivector_index_for(table, &column, dims)?;
-                        let dead = self.tombstone_set(table)?;
-                        let rank =
-                            |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
-                        let plaid_options = crate::engine::state::plaid_search_options(
-                            |key| option_value(key),
-                            topn,
-                        );
-                        let filters: Vec<&Expr> = [in_filter.as_ref(), search_filter.as_ref()]
-                            .into_iter()
-                            .flatten()
-                            .collect();
-                        let allowed: Option<std::collections::HashSet<u64>> = if filters.is_empty()
-                        {
-                            None
-                        } else {
-                            Some(self.match_filter_rows(table, &filters)?)
-                        };
-                        let hits = index.read().unwrap().search(
-                            &query,
-                            topn.max(1),
-                            &dead,
-                            Some(&rank),
-                            &plaid_options,
-                            allowed.as_ref(),
-                        );
-                        let scored: Vec<(u64, f64)> = hits
-                            .into_iter()
-                            .map(|(seq, score)| (seq, f64::from(score)))
-                            .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
-                            .collect();
-                        let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
-                        let mut by_id: HashMap<usize, Vec<Value>> = self
-                            .fetch_some_rows_with_ids(table, &wanted)?
-                            .into_iter()
-                            .collect();
-                        let mut out = Vec::new();
-                        for (seq, score) in scored {
-                            let Some(mut row) = by_id.remove(&(seq as usize)) else {
-                                continue;
+                        // No catalog index on the column: the reference's
+                        // `PlanWithIndex` simply leaves the index out and the
+                        // scan reads the blocks, so a missing record falls
+                        // through to the exact scan below.
+                        let index = self.multivector_index_for(table, &column, dims).ok();
+                        if let Some(index) = index {
+                            let dead = self.tombstone_set(table)?;
+                            let rank = |seq: u64| {
+                                self.exact_tensor_score(table, &column, dims, &query, seq)
                             };
-                            row.push(Value::Int(seq as i64));
-                            row.push(Value::Float(score));
-                            row.push(Value::Float(-score));
-                            row.push(Value::Float(score));
-                            out.push(row);
+                            let plaid_options = crate::engine::state::plaid_search_options(
+                                |key| option_value(key),
+                                topn,
+                            );
+                            let filters: Vec<&Expr> = [in_filter.as_ref(), search_filter.as_ref()]
+                                .into_iter()
+                                .flatten()
+                                .collect();
+                            let allowed: Option<std::collections::HashSet<u64>> =
+                                if filters.is_empty() {
+                                    None
+                                } else {
+                                    Some(self.match_filter_rows(table, &filters)?)
+                                };
+                            let hits = index.read().unwrap().search(
+                                &query,
+                                topn.max(1),
+                                &dead,
+                                Some(&rank),
+                                &plaid_options,
+                                allowed.as_ref(),
+                            );
+                            let scored: Vec<(u64, f64)> = hits
+                                .into_iter()
+                                .map(|(seq, score)| (seq, f64::from(score)))
+                                .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                                .collect();
+                            let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
+                            let mut by_id: HashMap<usize, Vec<Value>> = self
+                                .fetch_some_rows_with_ids(table, &wanted)?
+                                .into_iter()
+                                .collect();
+                            let mut out = Vec::new();
+                            for (seq, score) in scored {
+                                let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                                    continue;
+                                };
+                                row.push(Value::Int(seq as i64));
+                                row.push(Value::Float(score));
+                                row.push(Value::Float(-score));
+                                row.push(Value::Float(score));
+                                out.push(row);
+                            }
+                            return Ok((out, hidden));
                         }
-                        return Ok((out, hidden));
                     }
                 }
             }
@@ -8431,35 +8746,40 @@ impl Engine {
                     .first()
                     .cloned()
                     .unwrap_or_default();
-                let index = self.sparse_index_for(table, &column, width)?;
-                let dead = self.tombstone_set(table)?;
-                let bmp_options = parse_bmp_search_options(with_opts, &params);
-                let hits = index
-                    .read()
-                    .unwrap()
-                    .search(&qv, topn.max(1), &dead, bmp_options);
-                let scored: Vec<(u64, f64)> = hits
-                    .into_iter()
-                    .map(|(seq, score)| (seq, f64::from(score)))
-                    .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
-                    .collect();
-                let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
-                let mut by_id: HashMap<usize, Vec<Value>> = self
-                    .fetch_some_rows_with_ids(table, &wanted)?
-                    .into_iter()
-                    .collect();
-                let mut out = Vec::new();
-                for (seq, score) in scored {
-                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
-                        continue;
-                    };
-                    row.push(Value::Int(seq as i64));
-                    row.push(Value::Float(score));
-                    row.push(Value::Float(-score));
-                    row.push(Value::Float(score));
-                    out.push(row);
+                // A column without a BMP index is answered by the exact scan
+                // (the reference's `PlanWithIndex` skips a column whose index
+                // the catalog does not list).
+                let index = self.sparse_index_for(table, &column, width).ok();
+                if let Some(index) = index {
+                    let dead = self.tombstone_set(table)?;
+                    let bmp_options = parse_bmp_search_options(with_opts, &params);
+                    let hits = index
+                        .read()
+                        .unwrap()
+                        .search(&qv, topn.max(1), &dead, bmp_options);
+                    let scored: Vec<(u64, f64)> = hits
+                        .into_iter()
+                        .map(|(seq, score)| (seq, f64::from(score)))
+                        .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                        .collect();
+                    let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
+                    let mut by_id: HashMap<usize, Vec<Value>> = self
+                        .fetch_some_rows_with_ids(table, &wanted)?
+                        .into_iter()
+                        .collect();
+                    let mut out = Vec::new();
+                    for (seq, score) in scored {
+                        let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                            continue;
+                        };
+                        row.push(Value::Int(seq as i64));
+                        row.push(Value::Float(score));
+                        row.push(Value::Float(-score));
+                        row.push(Value::Float(score));
+                        out.push(row);
+                    }
+                    return Ok((out, hidden));
                 }
-                return Ok((out, hidden));
             }
         }
 
@@ -8487,13 +8807,15 @@ impl Engine {
                         .cloned()
                         .unwrap_or_default();
                     let tkey = self.table_key(table);
-                    let index = self
-                        .tables
-                        .lock()
-                        .unwrap()
-                        .get(&tkey)
-                        .and_then(|e| e.mv.get(&column))
-                        .cloned();
+                    let index_id = self.multivector_index_id(table, &column);
+                    let index = index_id.and_then(|id| {
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .get(&tkey)
+                            .and_then(|e| e.mv.get(&id))
+                            .cloned()
+                    });
                     if let Some(index) = index {
                         let dead = self.tombstone_set(table)?;
                         let rank =
@@ -8609,9 +8931,23 @@ impl Engine {
             if has_filter {
                 return None;
             }
+            // The index this scan reads: the one the statement named, else the
+            // column's first HNSW/IVF index.
+            let index_id = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .find(|im| {
+                    im.column == col_name
+                        && (im.index_type.eq_ignore_ascii_case("HNSW")
+                            || im.index_type.eq_ignore_ascii_case("IVF"))
+                })
+                .map(|im| im.id);
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
-                column: &col_name,
+                index_id,
                 query: &qv,
                 rows: &rows,
                 live_rows: None,
@@ -9106,11 +9442,18 @@ impl Engine {
     #[allow(dead_code)]
     pub(crate) fn secondary_chunk_meta(&self, table: &str, column: &str) -> Vec<(u64, usize)> {
         let key = self.table_key(table);
+        let id = self
+            .secondary_index_ids_on_column(table, column)
+            .into_iter()
+            .next();
+        let Some(id) = id else {
+            return Vec::new();
+        };
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|entry| entry.secondary.chunk_meta.get(column))
+            .and_then(|entry| entry.secondary.chunk_meta.get(&id))
             .cloned()
             .unwrap_or_default()
     }
@@ -9404,20 +9747,17 @@ impl Engine {
                 match kind.as_str() {
                     "HNSW" => entry
                         .hnsw_mem
-                        .get(&meta.column)
+                        .get(&meta.id)
                         .map(|h| Handle::Hnsw(h.clone())),
-                    "FULLTEXT" => entry
-                        .text
-                        .get(&meta.column)
-                        .map(|t| Handle::Text(t.clone())),
+                    "FULLTEXT" => entry.text.get(&meta.id).map(|t| Handle::Text(t.clone())),
                     "SPARSE" | "BMP" => entry
                         .sparse
-                        .get(&meta.column)
+                        .get(&meta.id)
                         .map(|s| Handle::Sparse(s.clone())),
-                    "MULTIVECTOR" => entry.mv.get(&meta.column).map(|m| Handle::Mv(m.clone())),
+                    "MULTIVECTOR" => entry.mv.get(&meta.id).map(|m| Handle::Mv(m.clone())),
                     "IVF" => entry
                         .ivf_mem
-                        .get(&meta.column)
+                        .get(&meta.id)
                         .map(|rows| Handle::Ivf(rows.len())),
                     _ => None,
                 }
@@ -9478,13 +9818,23 @@ impl Engine {
         let key = self.table_key(table);
         // Clone the handles out of `tables`, then drop the guard: the index lock
         // is taken after it everywhere (see `dml::batch_gate`).
+        // The stats name the column each index was built on, so the id-keyed
+        // registry is joined with the catalog once.
+        let by_id: std::collections::HashMap<u64, String> = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|im| (im.id, im.column))
+            .collect();
         let handles: Vec<(String, SharedTextIndex)> = {
             let tables = self.tables.lock().unwrap();
             match tables.get(&key) {
                 Some(entry) => entry
                     .text
                     .iter()
-                    .map(|(column, shared)| (column.clone(), shared.clone()))
+                    .filter_map(|(id, shared)| Some((by_id.get(id)?.clone(), shared.clone())))
                     .collect(),
                 None => Vec::new(),
             }

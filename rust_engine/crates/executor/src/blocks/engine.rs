@@ -1329,67 +1329,17 @@ impl Engine {
                 engine.write_blocks_bounded_locked(&table, checkpoint_ts)
             })
             .await?;
-            // The mirror now covers every row; the IVF memory segment is
-            // redundant and would double-count candidates.
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&key) {
-                for rows in entry.ivf_mem.values_mut() {
-                    rows.clear();
-                }
-            }
         }
-        // A dropped index keeps its `idx_{id}` mirror until `Cleanup`:
-        // `NewTxn::DropIndexByName` writes a `drop|idx|` marker and leaves the
-        // chunk files alone (`CleanupInner` reclaims them), so deleting the
-        // directory here made a directory that had dropped an index differ from
-        // the reference's by that one file.
-        for im in self.storage.catalog.indexes_of_table(&meta.name)? {
-            let (table, name, column) = (im.table.clone(), im.name.clone(), im.column.clone());
-            if im.index_type.eq_ignore_ascii_case("HNSW") {
-                // A chunk written here covers every row (the mirror builds it
-                // from the blocks when the index has no chunk yet), so the
-                // memory segment it was built from is released: keeping it
-                // would make the next dump seal the same rows a second time.
-                let written = self
-                    .flush_leaf(move |engine| engine.write_hnsw_index(&table, &name))
-                    .await?;
-                if written > 0 {
-                    let mut tables = self.tables.lock().unwrap();
-                    if let Some(e) = tables.get_mut(&key) {
-                        e.hnsw_mem.remove(&column);
-                        e.index_pending_bytes.insert(column.clone(), 0);
-                        e.hnsw_probed = false;
-                    }
-                }
-            } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
-                let _ = self
-                    .flush_leaf(move |engine| engine.write_fulltext_index(&table, &name))
-                    .await;
-            } else if im.index_type.eq_ignore_ascii_case("PLAID") {
-                let _ = self
-                    .flush_leaf(move |engine| engine.write_plaid_index(&table, &name))
-                    .await;
-            } else if im.index_type.eq_ignore_ascii_case("IVF") {
-                let _ = self
-                    .flush_leaf(move |engine| engine.write_ivf_index(&table, &name))
-                    .await;
-            }
-        }
-        // The reference only enumerates the chunks listed in
-        // `idx_chunk|…|chunk_info`, and a scan whose chunk file is missing reads
-        // a zero-length buffer (the BMP path indexes `res[block_offset]` of an
-        // empty vector and aborts). Some mirrors are already in the reference's
-        // byte layout but live in their own directory (`secondary/…`,
-        // `sparse/…`), so copy them into `idx_{id}/seg_0/chunk_0.idx`.
-        let table = meta.name.clone();
-        let id = meta.id;
-        // `publish_index_chunks` returns `()`; the leaf helper is typed on
-        // `Result<usize>`, so the count of published chunks is what it reports.
-        let _ = self
-            .flush_leaf(move |engine| engine.publish_index_chunks(&table, id, None).map(|_| 0))
-            .await;
-        // The step released this table's tails; move its charge inside the
-        // same bottom, so the quota sees the drop with the write that caused it.
+        // **No index work here.** `NewTxn::CheckpointTable`
+        // (`new_txn_data_impl.cpp:1438`) walks the table's blocks and flushes
+        // each block's `version` and column files - it never touches an index.
+        // An index reaches disk in its own `DumpIndex` transaction
+        // (`NewTxn::DumpMemIndex` / `PopulateIndex`), which is the only place a
+        // chunk is written and where its `GetAndSetNextChunkID` id and commit ts
+        // come from. Rebuilding an index from the rows on every checkpoint
+        // rewrote the whole table per tick (a measured `write_fulltext_index`
+        // held a CPU for minutes while rows kept arriving) and invented chunk
+        // records no dump transaction names.
         self.refresh_memindex_charge(&meta.name);
         Ok(())
     }
@@ -1466,14 +1416,14 @@ impl Engine {
     pub(crate) fn multivector_chunk(
         &self,
         table: &str,
-        column: &str,
+        index_id: u64,
         kind: &str,
         segment: u32,
     ) -> Option<Vec<u8>> {
         let key = self.table_key(table);
         let index = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&key)?.mv.get(column).cloned()?
+            tables.get(&key)?.mv.get(&index_id).cloned()?
         };
         let guard = index.read().ok()?;
         if kind.eq_ignore_ascii_case("SMVE") {
@@ -1595,8 +1545,6 @@ impl Engine {
                 };
                 id
             };
-            let private =
-                crate::index_key(&self.qualified_table(table), &im.column).replace('/', "_");
             // Every chunk the index holds, not just the first: a chunk the
             // catalog does not list is invisible to the reference's readers.
             //
@@ -1634,6 +1582,21 @@ impl Engine {
                 .filter(|v| v.len() >= 8)
                 .map(|v| u64::from_le_bytes(v[..8].try_into().unwrap()))
                 .unwrap_or(0);
+            // The chunk records this index already has, by first row id: a
+            // re-dump of a block rewrites its own chunk under its own id
+            // instead of appending a second one.
+            let existing_chunks: std::collections::HashMap<u64, u32> =
+                catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &table_id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(|(_, chunks)| chunks)
+                .map(|(id, info)| (info.base_row_id, id as u32))
+                .collect();
             for (segment, seg_rows) in &segments {
                 let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
                 // A chunk's ts is the commit ts of the transaction whose dump
@@ -1651,22 +1614,39 @@ impl Engine {
                 // A plain `CREATE INDEX` leaves the type empty, which is the
                 // secondary default everywhere else (`is_secondary_kind`).
                 let chunks = if crate::is_secondary_kind(&im.index_type) {
-                    let dir = self.dir.join("secondary").join(&private);
-                    // The chunk's key width comes from the column's declared type,
-                    // exactly as the reader derives it (`SecondarySegmentReader::
-                    // open_with_kind`).
-                    publish_secondary_chunks(
-                        &seg_dir,
-                        &dir,
-                        crate::secondary_key_kind(&declared),
-                        *segment,
-                        imported,
-                    )
+                    // The dump already wrote each chunk into the segment's own
+                    // directory under the id the catalog handed out, so the
+                    // records are read back from there. Deriving them from the
+                    // `secondary/` spill set instead named chunk 0 for every
+                    // dump and made the last one overwrite the others.
+                    let low = declared.trim().to_uppercase().starts_with("BOOL")
+                        || declared.trim().to_uppercase().starts_with("JSON")
+                        || im.options.iter().any(|(k, v)| {
+                            k.eq_ignore_ascii_case("CARDINALITY") && v.eq_ignore_ascii_case("low")
+                        });
+                    if low {
+                        publish_lowcard_chunks_from_dir(&seg_dir, *segment)
+                    } else {
+                        publish_secondary_chunks_from_dir(
+                            &seg_dir,
+                            crate::secondary_key_kind(&declared),
+                            *segment,
+                        )
+                    }
                 } else if im.index_type.eq_ignore_ascii_case("BMP") {
                     // Rebuilt from the rows: the reference's chunk is the block and
                     // every dump extends it, while the port's spill files are per
-                    // dump, so merging has to happen here.
+                    // dump, so merging has to happen here. The id a record already
+                    // named for a block is kept (`PopulateBMPIndexInner` and
+                    // `DumpMemIndex` only *take* ids from `GetAndSetNextChunkID`).
                     let empty = Default::default();
+                    let set = SegmentSet {
+                        db_id: db_id.to_string(),
+                        table_id: table_id.to_string(),
+                        segments: Vec::new(),
+                    };
+                    let mut next_id =
+                        self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
                     publish_bmp_chunks(
                         &seg_dir,
                         sparse
@@ -1674,31 +1654,101 @@ impl Engine {
                             .and_then(|m| m.get(segment))
                             .cloned()
                             .unwrap_or(empty),
-                        crate::sparse_idx_width(&declared),
-                        crate::sparse_declared_bound(&declared).unwrap_or(0),
-                        crate::index_block_size(im),
-                        *segment,
-                        imported,
+                        &crate::blocks::chunk::BmpChunkShape {
+                            width: crate::sparse_idx_width(&declared),
+                            term_bound: crate::sparse_declared_bound(&declared).unwrap_or(0),
+                            block_size: crate::index_block_size(im),
+                            segment: *segment,
+                            single_chunk: imported,
+                        },
+                        &existing_chunks,
+                        &mut next_id,
                     )
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
-                    // Written in place by `write_fulltext_index`; its files are
-                    // named after the chunk's base name, not `chunk_N.idx`.
-                    publish_fulltext_chunks(&seg_dir)
+                    // Written in place by the seal; its files are named after
+                    // the chunk's base name, not `chunk_N.idx`. The ids come
+                    // from the catalog counter like every other kind
+                    // (`AddNewChunkIndex1` in `DumpMemIndex`), so a chunk a
+                    // record already names keeps its id and a re-dump of the
+                    // same base name never takes a second one.
+                    let set = SegmentSet {
+                        db_id: db_id.to_string(),
+                        table_id: table_id.to_string(),
+                        segments: Vec::new(),
+                    };
+                    let mut next_id =
+                        self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
+                    publish_fulltext_chunks(&seg_dir, &existing_chunks, &mut next_id)
+                } else if im.index_type.eq_ignore_ascii_case("PLAID") {
+                    // `PopulatePlaidIndexInner` / `DumpSegmentMemIndex`'s
+                    // `kPLAID`: the built memory index is dumped into the chunk
+                    // the record names. `write_plaid_index` appends only the
+                    // rows past the chunks already on disk, so the create-index
+                    // publish writes the first chunk and a later dump the rest.
+                    std::fs::create_dir_all(&seg_dir).ok();
+                    let before = catalog::layout::read_index_chunks(
+                        self.storage.catalog.store().as_ref(),
+                        &db_id.to_string(),
+                        &table_id.to_string(),
+                        &index_id.to_string(),
+                    )
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|(s, _)| *s == *segment)
+                    .map(|(_, chunks)| chunks.len())
+                    .unwrap_or(0);
+                    let _ = self.write_plaid_index(table, &im.name);
+                    catalog::layout::read_index_chunks(
+                        self.storage.catalog.store().as_ref(),
+                        &db_id.to_string(),
+                        &table_id.to_string(),
+                        &index_id.to_string(),
+                    )
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|(s, _)| *s == *segment)
+                    .map(|(_, chunks)| chunks)
+                    .map(|chunks| {
+                        // Only the chunks this publish could have written are
+                        // stamped; the earlier ones keep their own ts.
+                        chunks
+                            .into_iter()
+                            .skip(before)
+                            .map(|(id, info)| IndexChunk {
+                                chunk_id: id as u32,
+                                base_name: info.base_name.clone(),
+                                base_row_id: info.base_row_id,
+                                row_count: info.row_count,
+                                term_count: info.term_count,
+                                index_size: info.index_size,
+                                commit_ts: chunk_ts,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
                 } else if im.index_type.eq_ignore_ascii_case("SMVE")
                     || im.index_type.eq_ignore_ascii_case("EMVB")
                 {
-                    // These two write their chunk through their own file
-                    // worker in the reference (`smve_index_file_worker`,
-                    // `emvb_index_file_worker`): one `chunk_0.idx` per
-                    // segment naming the whole segment.
+                    // These two write their chunk through their own file worker
+                    // in the reference (`smve_index_file_worker`,
+                    // `emvb_index_file_worker`), but the file name is still
+                    // `chunk_{id}.idx` with the id `GetAndSetNextChunkID` hands
+                    // out (`ChunkIndexMeta::IndexFileName`) - never a literal
+                    // `chunk_0`, which two dumps would share.
                     let Some(bytes) =
-                        self.multivector_chunk(table, &im.column, &im.index_type, *segment)
+                        self.multivector_chunk(table, index_id as u64, &im.index_type, *segment)
                     else {
                         continue;
                     };
+                    let set = SegmentSet {
+                        db_id: db_id.to_string(),
+                        table_id: table_id.to_string(),
+                        segments: Vec::new(),
+                    };
+                    let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
                     if std::fs::create_dir_all(&seg_dir).is_err()
                         || storage::definition::format::write_synced(
-                            &seg_dir.join("chunk_0.idx"),
+                            &seg_dir.join(format!("chunk_{chunk_id}.idx")),
                             &bytes,
                         )
                         .is_err()
@@ -1706,33 +1756,7 @@ impl Engine {
                         continue;
                     }
                     vec![IndexChunk {
-                        chunk_id: 0,
-                        base_name: String::new(),
-                        base_row_id: u64::from(*segment) << 32,
-                        row_count: *seg_rows,
-                        term_count: 0,
-                        index_size: bytes.len() as u64,
-                        commit_ts: chunk_ts,
-                    }]
-                } else if im.index_type.eq_ignore_ascii_case("SMVE")
-                    || im.index_type.eq_ignore_ascii_case("EMVB")
-                {
-                    let Some(bytes) =
-                        self.multivector_chunk(table, &im.column, &im.index_type, *segment)
-                    else {
-                        continue;
-                    };
-                    if std::fs::create_dir_all(&seg_dir).is_err()
-                        || storage::definition::format::write_synced(
-                            &seg_dir.join("chunk_0.idx"),
-                            &bytes,
-                        )
-                        .is_err()
-                    {
-                        continue;
-                    }
-                    vec![IndexChunk {
-                        chunk_id: 0,
+                        chunk_id,
                         base_name: String::new(),
                         base_row_id: u64::from(*segment) << 32,
                         row_count: *seg_rows,
@@ -1770,14 +1794,35 @@ impl Engine {
         if published.is_empty() {
             return Ok(());
         }
-        self.storage.catalog.publish_index_segments(
-            &SegmentSet {
-                db_id: db_id.to_string(),
-                table_id: table_id.to_string(),
-                segments: Vec::new(),
-            },
-            &published,
-        )?;
+        // **Append**, never replace: the records a writer already published
+        // under an id `GetAndSetNextChunkID` handed out are the chunk list, and
+        // rewriting the whole list here would drop the ones whose ids differ
+        // from the directory names this mirror happened to produce. Only a
+        // chunk without a record is added (`AddNewChunkIndex1`).
+        let set = SegmentSet {
+            db_id: db_id.to_string(),
+            table_id: table_id.to_string(),
+            segments: Vec::new(),
+        };
+        for index in &published {
+            let existing: std::collections::HashSet<u64> = catalog::layout::read_index_chunks(
+                self.storage.catalog.store().as_ref(),
+                &set.db_id,
+                &set.table_id,
+                &index.index_id.to_string(),
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .find(|(segment, _)| *segment == index.segment_id)
+            .map(|(_, chunks)| chunks.into_iter().map(|(id, _)| id).collect())
+            .unwrap_or_default();
+            for chunk in &index.chunks {
+                if existing.contains(&(chunk.chunk_id as u64)) {
+                    continue;
+                }
+                let _ = self.storage.catalog.append_index_chunk(&set, index, chunk);
+            }
+        }
         Ok(())
     }
 
@@ -4742,7 +4787,7 @@ impl Engine {
                 .lock()
                 .unwrap()
                 .get(&tkey)
-                .and_then(|e| e.hnsw_mem.get(&column).cloned())
+                .and_then(|e| e.hnsw_mem.get(&(index_id as u64)).cloned())
             else {
                 // Nothing buffered since the last dump: a checkpoint has
                 // nothing to write and must not rebuild the whole graph.
@@ -4772,7 +4817,24 @@ impl Engine {
                 path: dir.clone(),
                 source: e,
             })?;
-            let chunks = hnsw_chunks(&dir);
+            // The chunk family is the catalog's (`GetChunkIDs1`), not the
+            // directory's: a file whose record `Cleanup` removed must not raise
+            // the next id, and an id a record already names must never be
+            // handed out again (`GetAndSetNextChunkID` only moves forward).
+            let set = self.index_segment_set(&table);
+            let catalog_chunks: Vec<(u64, std::path::PathBuf)> = self
+                .catalog_index_files(&table, index_id as u64)
+                .into_iter()
+                .filter(|(seg, _, _)| *seg == *segment)
+                .map(|(_, id, path)| (id, path))
+                .collect();
+            let chunks: Vec<(u64, std::path::PathBuf)> = if catalog_chunks.is_empty() {
+                // A C++ directory this port has not published: the files are
+                // the only record, and adopting them keeps their ids.
+                hnsw_chunks(&dir)
+            } else {
+                catalog_chunks
+            };
             // A checkpoint only mirrors an index that has no chunk yet. Check
             // that before building: the build decodes every row and graph,
             // which on a long import is the dominant transient (Gate C RSS)
@@ -4794,22 +4856,27 @@ impl Engine {
             let Some((count, chunk)) = built else {
                 continue;
             };
-            let name = format!(
-                "chunk_{}.idx",
-                chunks.last().map(|(id, _)| id + 1).unwrap_or(0)
-            );
-            let chunk_id: u32 = chunks
-                .last()
-                .map(|(id, _)| id + 1)
-                .unwrap_or(0)
-                .try_into()
-                .unwrap_or(u32::MAX);
+            // `GetAndSetNextChunkID`: the counter the catalog keeps, raised past
+            // every record this segment already names. Only ever forward, so an
+            // id a merge or `Cleanup` retired never comes back.
+            let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
+            let name = format!("chunk_{chunk_id}.idx");
             storage::definition::format::write_synced(&dir.join(name), &chunk).map_err(|e| {
                 Error::Io {
                     path: dir.clone(),
                     source: e,
                 }
             })?;
+            // `AddNewChunkIndex1`: the reader enumerates this record, not the
+            // directory, so the dump publishes the chunk it just wrote.
+            self.record_chunk(
+                &set,
+                index_id as u64,
+                chunk_id,
+                *segment,
+                count as u64,
+                chunk.len() as u64,
+            );
             written += count;
             // The chunks this one supersedes: the reference's
             // `deprecate_chunks_`, which its optimize transaction removes from
@@ -5191,11 +5258,11 @@ impl Engine {
                 };
                 self.reclaim_deprecated_chunks(&im.table, &im.name, 0, &mirror.dir)?;
                 // The safety net: a merge that ran before the markers existed
-                // leaves files whose ids no marker names. PLAID chunks carry
-                // their own document count in the header, so "the newest chunk
-                // holds every document of the older ones" is readable without
-                // decoding.
-                let chunks = hnsw_chunks(&mirror.dir);
+                // leaves a chunk whose record is gone but whose bytes are not.
+                // PLAID chunks carry their own document count in the header, so
+                // "the newest chunk holds every document of the older ones" is
+                // readable without decoding.
+                let chunks = self.live_chunk_files(&im.table, &im.name, 0, &mirror.dir);
                 let Some(((_, newest), older)) = chunks.split_last() else {
                     continue;
                 };
@@ -5224,7 +5291,9 @@ impl Engine {
                 continue;
             };
             self.reclaim_deprecated_chunks(&im.table, &im.name, 0, &dir)?;
-            let chunks = hnsw_chunks(&dir);
+            // The catalog's list, so a chunk a merge already took out of it is
+            // not read back here.
+            let chunks = self.live_chunk_files(&im.table, &im.name, 0, &dir);
             let covered = self
                 .hnsw_chunk_path(&im.table, &im.name)
                 .ok()
@@ -5300,21 +5369,30 @@ impl Engine {
         .unwrap_or_default()
     }
 
-    /// The chunks of one segment that are still part of the index: the files
-    /// minus the deprecated ids. The reference only ever enumerates the chunk
-    /// list, and a deprecated chunk has left it even though its bytes are still
-    /// on disk until `Cleanup`.
+    /// The chunks of one segment that are still part of the index, from the
+    /// catalog's chunk list (`GetChunkIDs1`).
+    ///
+    /// The reference never enumerates a directory for this: `ColumnIndexReader`
+    /// walks `SegmentIndexIDs -> ChunkIDs`, and an optimize's `RemoveChunkIDs`
+    /// makes a superseded chunk unreachable the moment it leaves the list, even
+    /// though its bytes are still on disk until `Cleanup`. Reading the
+    /// directory instead would hand the merged chunk's siblings back to a
+    /// query, and would raise the next id off a file no record names any more.
     pub(crate) fn live_chunk_files(
         &self,
         table: &str,
         index_name: &str,
         segment: u32,
-        dir: &Path,
+        _dir: &Path,
     ) -> Vec<(u64, PathBuf)> {
-        let deprecated = self.deprecated_chunk_ids(table, index_name, segment);
-        hnsw_chunks(dir)
+        let table = self.qualified_table(table);
+        let Ok(index_id) = self.index_position(&table, index_name) else {
+            return Vec::new();
+        };
+        self.catalog_index_files(&table, index_id as u64)
             .into_iter()
-            .filter(|(id, _)| !deprecated.contains(id))
+            .filter(|(seg, _, _)| *seg == segment)
+            .map(|(_, id, path)| (id, path))
             .collect()
     }
 
@@ -6129,8 +6207,18 @@ impl Engine {
             segments.push((0, 0));
         }
         let mut written = 0usize;
+        let set = self.index_segment_set(&table);
         for (segment, rows) in segments {
             if rows == 0 {
+                continue;
+            }
+            // A checkpoint mirrors an index that has no chunk yet: the chunk is
+            // the whole segment's vectors, so rewriting it under a fresh id
+            // would append a duplicate to the chunk list every tick.
+            if !self
+                .live_chunk_files(&table, index_name, segment, Path::new(""))
+                .is_empty()
+            {
                 continue;
             }
             let (count, chunk) = self.ivf_chunk(&table, &column, &options, Some(segment))?;
@@ -6142,12 +6230,35 @@ impl Engine {
                 path: dir.clone(),
                 source: e,
             })?;
-            storage::definition::format::write_synced(&dir.join("chunk_0.idx"), &chunk).map_err(
-                |e| Error::Io {
-                    path: dir.clone(),
+            // `GetAndSetNextChunkID`: the counter, never a literal `chunk_0`.
+            let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), segment);
+            let name = format!("chunk_{chunk_id}.idx");
+            storage::definition::format::write_synced(&dir.join(&name), &chunk).map_err(|e| {
+                Error::Io {
+                    path: dir.join(&name),
                     source: e,
-                },
-            )?;
+                }
+            })?;
+            // `AddNewChunkIndex1`: the reader enumerates this record, not the
+            // directory.
+            let record = catalog::layout::IndexChunk {
+                chunk_id,
+                base_name: String::new(),
+                base_row_id: u64::from(segment) << 32,
+                row_count: count as u64,
+                term_count: 0,
+                index_size: chunk.len() as u64,
+                commit_ts: self.txn.current_ts().max(1),
+            };
+            let index = catalog::layout::IndexSegment {
+                index_id: index_id as u64,
+                segment_id: segment,
+                chunks: vec![record.clone()],
+            };
+            let _ = self
+                .storage
+                .catalog
+                .append_index_chunk(&set, &index, &record);
             written += count;
         }
         Ok(written)
@@ -6156,12 +6267,15 @@ impl Engine {
     /// Reads back a mirror written by [`Self::write_ivf_index`], returning
     /// the IVF chunks so a query can probe them (plan #89).
     pub fn load_ivf_indexes(&self, table: &str, index_name: &str) -> Vec<index::ivf::IvfSegment> {
-        let Some(dir) = self.hnsw_dir(table, index_name) else {
-            return Vec::new();
-        };
         let options = self.ivf_storage_option(table, index_name);
         let mut out = Vec::new();
-        for (_, path) in hnsw_chunks(&dir) {
+        // The catalog's chunk list (`GetChunkIDs1`), over every segment: the
+        // reference probes the chunks a segment records, and an entry `Cleanup`
+        // retired is not one of them.
+        let Some(index_id) = self.index_position(table, index_name).ok() else {
+            return Vec::new();
+        };
+        for (_, _, path) in self.catalog_index_files(table, index_id as u64) {
             let Ok(bytes) = storage::chunk_store::read_file(&path) else {
                 continue;
             };
@@ -6296,11 +6410,21 @@ impl Engine {
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let index_id = self.index_position(&table, index_name)?;
-        let db_id = self.database_id_of(&table);
-        let path = self.blocks_root().join(format!(
-            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
+        // The catalog's chunk list, not a literal `chunk_0.idx`: the id comes
+        // from `GetAndSetNextChunkID`, so the file is named after it.
+        let dir = self.blocks_root().join(format!(
+            "db_{}/tbl_{}/idx_{index_id}/seg_0",
+            self.database_id_of(&table),
             meta.id
         ));
+        let path = self
+            .live_chunk_files(&table, index_name, 0, &dir)
+            .into_iter()
+            .map(|(_, path)| path)
+            .next()
+            .ok_or_else(|| {
+                Error::NotFound(format!("no IVF mirror for '{index_name}' on '{table}'"))
+            })?;
         let bytes = storage::chunk_store::read_file(&path)
             .map_err(|_| Error::NotFound(format!("no IVF mirror at {}", path.display())))?;
         let (header, centroids, parts) = knn_format::decode_ivf_plain_chunk(&bytes, 4)
@@ -6573,20 +6697,31 @@ impl Engine {
         if chunks.len() < 2 {
             return Ok(None);
         }
-        let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
+        // `GetAndSetNextChunkID`: merged chunks take the catalog's next id, so
+        // they never land on a source's file or a retired id.
+        let set = self.index_segment_set(table);
+        let index_id = self.index_position(table, index_name)? as u64;
+        let next = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
         let deprecate_ids: Vec<u32> = chunks.iter().map(|c| c.id as u32).collect();
         let indexes: Vec<PlaidIndex> = chunks.into_iter().map(|c| c.index).collect();
         let merged = Self::merge_plaid_chunk_indexes(&indexes)?;
+        let bytes = merged.to_bytes();
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
-        storage::definition::format::write_synced(&path, &merged.to_bytes()).map_err(|e| {
-            Error::Io {
-                path: path.clone(),
-                source: e,
-            }
+        storage::definition::format::write_synced(&path, &bytes).map_err(|e| Error::Io {
+            path: path.clone(),
+            source: e,
         })?;
+        self.record_chunk(
+            &set,
+            index_id,
+            next,
+            0,
+            merged.doc_num() as u64,
+            bytes.len() as u64,
+        );
         Ok(Some(ChunkRewrite {
             segment: 0,
-            chunk_id: next as u32,
+            chunk_id: next,
             row_count: merged.doc_num(),
             deprecate_ids,
         }))
@@ -6611,13 +6746,33 @@ impl Engine {
         })?;
         let chunks = self.read_plaid_chunks(&table, index_name)?;
         if chunks.is_empty() {
+            let docs_len = self
+                .column_docs(&table, &mirror.column, mirror.dims as usize)
+                .map(|docs| docs.len())
+                .unwrap_or(0);
             let (count, bytes) =
                 self.plaid_chunk(&table, &mirror.column, mirror.dims as usize, &options)?;
-            let path = mirror.dir.join("chunk_0.idx");
+            // `GetAndSetNextChunkID`, never a literal `chunk_0`: the counter
+            // only moves forward, so an id a merge or `Cleanup` retired never
+            // comes back and two dumps never share a file.
+            let set = self.index_segment_set(&table);
+            let index_id = self.index_position(&table, index_name)? as u64;
+            let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
+            let path = mirror.dir.join(format!("chunk_{chunk_id}.idx"));
             storage::definition::format::write_synced(&path, &bytes).map_err(|e| Error::Io {
                 path: path.clone(),
                 source: e,
             })?;
+            // `row_cnt_` is the **document** count (`ChunkIndexMetaInfo`), which
+            // is what the chunk covers; `count` here is the token total.
+            self.record_chunk(
+                &set,
+                index_id,
+                chunk_id,
+                0,
+                docs_len as u64,
+                bytes.len() as u64,
+            );
             // `SegmentIndexMeta::SavePlaidGlobalCentroids`: the trained
             // centroids and their quantizer live in a sidecar next to the
             // chunk, and a reference reader needs it to open the segment.
@@ -6682,14 +6837,25 @@ impl Engine {
             false,
         )?;
         index.add_multiple_docs_embeddings(&flat, &lens)?;
-        let next = chunks.last().map(|c| c.id + 1).unwrap_or(0);
+        // `GetAndSetNextChunkID`: the counter, not "one past the newest file".
+        let set = self.index_segment_set(&table);
+        let index_id = self.index_position(&table, index_name)? as u64;
+        let next = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
+        let bytes = index.to_bytes();
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
-        storage::definition::format::write_synced(&path, &index.to_bytes()).map_err(|e| {
-            Error::Io {
-                path: path.clone(),
-                source: e,
-            }
+        storage::definition::format::write_synced(&path, &bytes).map_err(|e| Error::Io {
+            path: path.clone(),
+            source: e,
         })?;
+        // The record's `row_cnt_` is the document count, not the token total.
+        self.record_chunk(
+            &set,
+            index_id,
+            next,
+            0,
+            fresh.len() as u64,
+            bytes.len() as u64,
+        );
         Ok(indexed as usize + total)
     }
 

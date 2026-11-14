@@ -23,3 +23,15 @@ pub const FULLTEXT_CHUNK_FILES: [&str; 3] = [
 pub fn fulltext_chunk_file(index_dir: &str, base_name: &str, suffix: &str) -> String {
     format!("{index_dir}/{base_name}{suffix}")
 }
+
+/// `{index_root}/seg_{segment}` — the directory one `ROW_ID` segment's chunks
+/// live in.
+///
+/// `index_root` is the index's own directory (`.../idx_{index_id}`), so this is
+/// the reference's `SegmentIndexMeta::GetSegmentIndexDir`
+/// (`src/storage/catalog/meta/segment_index_meta_impl.cpp:288`): every index
+/// kind keeps one subdirectory per segment, and the catalog's `idx_chunk`
+/// records name the same place.
+pub fn segment_chunk_dir(index_root: &str, segment: u64) -> String {
+    format!("{index_root}/seg_{segment}")
+}

@@ -1006,12 +1006,23 @@ impl Catalog {
                 .max()
                 .unwrap_or(0);
             let next_index_id = previous_index_id.max(live_index_max);
+            // `next_column_id` is a counter too (`TableMeta::GetNextColumnID`
+            // increments and returns the new value): `DROP COLUMN c; ADD COLUMN c`
+            // must not hand the new column the dropped one's id, or it inherits
+            // that column's files. Take the larger of the tag and the live ids.
+            // `next_column_id` is a counter too (`TableMeta::GetNextColumnID`
+            // returns the stored value and `AddColumns` advances it): reusing a
+            // dropped column's id would hand the new column the old one's files.
+            // The tag only moves forward, so take the larger of it and the live
+            // ids (`live+1` covers a directory that predates the tag).
+            let previous_column_id: u64 = ts_source
+                .get(key::catalog_table_tag_key(&db_str, &tbl_str, "next_column_id").as_bytes())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                .unwrap_or(0);
+            let next_column_id =
+                previous_column_id.max(t.ids.iter().copied().max().map_or(0, |v| v + 1));
             for (tag, value) in [
-                // The next id to hand out; dropping a column leaves a hole.
-                (
-                    "next_column_id",
-                    t.ids.iter().copied().max().map_or(0, |v| v + 1),
-                ),
+                ("next_column_id", next_column_id),
                 ("next_segment_id", 0),
                 // `unsealed_segment_id` is **not** a creation-time tag: the
                 // reference writes it when a segment is opened for appends and
@@ -1080,7 +1091,7 @@ impl Catalog {
                     table_name: name.to_string(),
                     table_id: t.id,
                     columns,
-                    next_column_id: t.ids.iter().copied().max().map_or(0, |v| v + 1),
+                    next_column_id,
                 },
             ));
             // The segment/block records of this table's block mirror. Written
@@ -2462,25 +2473,178 @@ pub fn write_index_segments(
             store.put(key.as_bytes(), value.as_bytes())?;
             written += 1;
         }
-        // `next_chunk_id` is written by the first transaction that seals a
-        // chunk (`SegmentIndexMeta::InitSet1` leaves it unset), so a segment
-        // nothing has dumped has no tag.
-        if let Some(next_chunk) = recorded.iter().max().map(|id| id + 1) {
-            store.put(
-                key::catalog_index_segment_tag_key(
-                    &set.db_id,
-                    &set.table_id,
-                    &idx_str,
-                    index.segment_id,
-                    "next_chunk_id",
-                )
-                .as_bytes(),
-                next_chunk.to_string().as_bytes(),
-            )?;
+        // `next_chunk_id` only ever moves forward
+        // (`SegmentIndexMeta::GetAndSetNextChunkID`): a chunk id is never
+        // reused, not even after `Cleanup` dropped the chunk that held it. A
+        // publish therefore keeps the larger of what is recorded here and what
+        // the tag already says.
+        let next_key = key::catalog_index_segment_tag_key(
+            &set.db_id,
+            &set.table_id,
+            &idx_str,
+            index.segment_id,
+            "next_chunk_id",
+        );
+        let previous_next = store
+            .get(next_key.as_bytes())?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+            .unwrap_or(0);
+        let from_records = recorded.iter().max().map(|id| id + 1).unwrap_or(0);
+        let next_chunk = previous_next.max(from_records);
+        if next_chunk > 0 {
+            store.put(next_key.as_bytes(), next_chunk.to_string().as_bytes())?;
             written += 1;
         }
     }
     Ok(written)
+}
+
+/// Appends **one** chunk record to a segment (`NewCatalog::AddNewChunkIndex1`,
+/// `src/storage/catalog/new_catalog_static_impl.cpp:1054`).
+///
+/// A seal knows exactly the chunk it wrote, and it must not disturb the ones
+/// the segment already lists - [`write_index_segments`] rewrites the whole
+/// layer, which is what a checkpoint or a compaction wants but not what an
+/// incremental seal does.
+pub fn append_index_chunk(
+    store: &dyn MetaStore,
+    set: &SegmentSet,
+    index: &IndexSegment,
+    chunk: &IndexChunk,
+) -> Result<usize> {
+    let idx_str = index.index_id.to_string();
+    let mut written = 0usize;
+    // `AddSegmentIndexID1`: the pair exists from the moment a chunk does.
+    let seg_key =
+        key::catalog_index_segment_key(&set.db_id, &set.table_id, &idx_str, index.segment_id);
+    if store.get(seg_key.as_bytes())?.is_none() {
+        let index_ts = index_create_ts(store, &set.db_id, &set.table_id, index.index_id)?;
+        let segment_ts = segment_create_ts(store, &set.db_id, &set.table_id, index.segment_id)?;
+        let paired_ts = match (index_ts, segment_ts) {
+            (Some(a), Some(b)) => a.max(b),
+            (Some(a), None) | (None, Some(a)) => a,
+            (None, None) => CPP_MIRROR_TS,
+        };
+        store.put(seg_key.as_bytes(), paired_ts.to_string().as_bytes())?;
+        written += 1;
+    }
+    // `AddChunkIndexID1`: the id key is what `LoadChunkIDs1` enumerates. A ts
+    // is required - a "0" would make the reference's replay skip the dump that
+    // later names the chunk.
+    let id_key = key::catalog_index_chunk_key(
+        &set.db_id,
+        &set.table_id,
+        &idx_str,
+        index.segment_id,
+        chunk.chunk_id as u64,
+    );
+    let existing = store
+        .get(id_key.as_bytes())?
+        .filter(|v| v.as_slice() != b"0" && !v.is_empty());
+    let value = existing
+        .or_else(|| (chunk.commit_ts != 0).then(|| chunk.commit_ts.to_string().into_bytes()));
+    let Some(value) = value else {
+        return Ok(written);
+    };
+    store.put(id_key.as_bytes(), &value)?;
+    written += 1;
+    // `SetChunkInfo`. `nlohmann::json::dump()` orders an object's keys, so the
+    // byte order of the record is fixed: base_name, base_row_id, index_size,
+    // row_count, term_count.
+    let key = key::catalog_index_chunk_tag_key(
+        &set.db_id,
+        &set.table_id,
+        &idx_str,
+        index.segment_id,
+        chunk.chunk_id as u64,
+        "chunk_info",
+    );
+    let value = format!(
+        "{{\"base_name\":{},\"base_row_id\":{},\"index_size\":{},\"row_count\":{},\"term_count\":{}}}",
+        json_string(&chunk.base_name),
+        chunk.base_row_id,
+        chunk.index_size,
+        chunk.row_count,
+        chunk.term_count
+    );
+    store.put(key.as_bytes(), value.as_bytes())?;
+    written += 1;
+    // `GetAndSetNextChunkID`: only ever moves forward.
+    let next_key = key::catalog_index_segment_tag_key(
+        &set.db_id,
+        &set.table_id,
+        &idx_str,
+        index.segment_id,
+        "next_chunk_id",
+    );
+    let current = store
+        .get(next_key.as_bytes())?
+        .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+        .unwrap_or(0);
+    if chunk.chunk_id >= current {
+        store.put(
+            next_key.as_bytes(),
+            (chunk.chunk_id + 1).to_string().as_bytes(),
+        )?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+/// Replaces one segment's chunk list with `chunks`
+/// (`SegmentIndexMeta::RemoveChunkIDs` + `AddNewChunkIndex1`).
+///
+/// An optimize folds a segment's chunks into one: the sources leave the list and
+/// the merged chunk joins it. The sources' **files** are not touched - the
+/// reference removes them in `Cleanup` (`CleanChunkIndex`), which is what keeps
+/// a failed merge recoverable.
+pub fn replace_segment_chunks(
+    store: &dyn MetaStore,
+    set: &SegmentSet,
+    index_id: u64,
+    segment: u32,
+    chunks: &[IndexChunk],
+) -> Result<usize> {
+    let idx_str = index_id.to_string();
+    let prefix = key::catalog_index_chunk_prefix(&set.db_id, &set.table_id, &idx_str, segment);
+    for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+        store.delete(&k)?;
+    }
+    // The ids the sources held are **retired**: `GetAndSetNextChunkID` never
+    // hands one out twice, so the tag is raised past the highest id this
+    // segment has ever seen before the new chunks are appended.
+    let next_key = key::catalog_index_segment_tag_key(
+        &set.db_id,
+        &set.table_id,
+        &idx_str,
+        segment,
+        "next_chunk_id",
+    );
+    let previous_next = store
+        .get(next_key.as_bytes())?
+        .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+        .unwrap_or(0);
+    let mut written = 0usize;
+    let index = IndexSegment {
+        index_id,
+        segment_id: segment,
+        chunks: Vec::new(),
+    };
+    for chunk in chunks {
+        written += append_index_chunk(store, set, &index, chunk)?;
+    }
+    let next = previous_next.max(chunk_floor(chunks));
+    if next > 0 {
+        store.put(next_key.as_bytes(), next.to_string().as_bytes())?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+/// One past the highest id `chunks` uses, so a caller can keep its counter
+/// monotonic without re-reading the segment.
+fn chunk_floor(chunks: &[IndexChunk]) -> u32 {
+    chunks.iter().map(|c| c.chunk_id + 1).max().unwrap_or(0)
 }
 
 /// One `idx_chunk|…|chunk_info` record, i.e. `ChunkIndexMetaInfo`

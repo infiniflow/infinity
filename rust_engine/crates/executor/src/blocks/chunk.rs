@@ -6,25 +6,6 @@ use super::*;
 /// `publish_secondary_chunks` merges them rather than copying one file.
 ///
 /// One raw ordered key, from a chunk's key array.
-pub(crate) fn decode_secondary_key(
-    bytes: &[u8],
-    kind: storage::secondary_segment::KeyKind,
-) -> Option<storage::secondary_segment::Key> {
-    use storage::secondary_segment::{Key, KeyKind};
-    Some(match kind {
-        KeyKind::U64 => Key::U64(u64::from_le_bytes(bytes.try_into().ok()?)),
-        KeyKind::I64 => Key::I64(i64::from_le_bytes(bytes.try_into().ok()?)),
-        KeyKind::I32 => Key::I32(i32::from_le_bytes(bytes.try_into().ok()?)),
-        KeyKind::I16 => Key::I16(i16::from_le_bytes(bytes.try_into().ok()?)),
-        KeyKind::I8 => Key::I8(*bytes.first()? as i8),
-        KeyKind::Bool => Key::Bool(*bytes.first()? != 0),
-        KeyKind::F32 => Key::F32(f32::from_le_bytes(bytes.try_into().ok()?)),
-        KeyKind::F64 => Key::F64(f64::from_le_bytes(bytes.try_into().ok()?)),
-        // A JSON chunk is low-cardinality and has no ordered key array.
-        KeyKind::Bytes => return None,
-    })
-}
-
 /// Rebuilds a secondary index's published chunks: every spill run is decoded
 /// and re-bucketed by **block**, then written as `chunk_{block}.idx`.
 ///
@@ -39,117 +20,100 @@ pub(crate) fn decode_secondary_key(
 /// `write_secondary_pgm_chunks`), because two segments restart their offsets
 /// at zero: only the runs of `segment` are published here, into that
 /// segment's directory.
-pub(crate) fn publish_secondary_chunks(
+/// The chunks a segment directory already holds, as records
+/// (`SegmentIndexMeta::GetChunkIDs1`'s contents, read from the files the seal
+/// wrote).
+///
+/// A secondary dump writes each tail straight into `idx_{id}/seg_{n}` with the
+/// id the catalog handed out, so publishing must not derive the chunk list from
+/// the `secondary/` spill set again: that would name chunk 0 for every dump and
+/// overwrite the record the previous one wrote.
+pub(crate) fn publish_secondary_chunks_from_dir(
     seg_dir: &Path,
-    dir: &Path,
     kind: storage::secondary_segment::KeyKind,
     segment: u32,
-    single_chunk: bool,
 ) -> Vec<IndexChunk> {
-    use storage::secondary_segment::{write_secondary_segment_typed, SecondarySegmentReader};
-    let width = kind.key_width();
-    let stride = width + 4;
-    let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
-    // A merged spill file holds the whole segment (`merge_secondary_chunks`),
-    // which is the reference's layout after `OptimizeIndex`: one chunk per
-    // segment rather than one per block.
-    let mut merged = false;
-    let Ok(entries) = std::fs::read_dir(dir) else {
+    use storage::secondary_segment::SecondarySegmentReader;
+    let Ok(entries) = std::fs::read_dir(seg_dir) else {
         return Vec::new();
     };
+    let mut chunks = Vec::new();
     for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("idx") {
-            continue;
-        }
-        // `seg_{segment}_{block}_{rows}.idx` when `build_index` wrote it,
-        // `seg_{segment}_tail{n}.idx` when a dump sealed a memory tail; both
-        // carry the segment first, and a tail may span blocks, so the block of
-        // an entry is derived from its offset rather than from the name.
         let name = entry.file_name().to_string_lossy().to_string();
-        let Some(rest) = name
-            .strip_prefix("seg_")
-            .and_then(|n| n.strip_suffix(".idx"))
+        let Some(id) = name
+            .strip_prefix("chunk_")
+            .and_then(|rest| rest.strip_suffix(".idx"))
+            .and_then(|id| id.parse::<u32>().ok())
         else {
             continue;
         };
-        let Some((run_segment, _)) = rest.split_once('_') else {
+        let path = entry.path();
+        let Ok(bytes) = storage::chunk_store::read_file(&path) else {
             continue;
         };
-        if run_segment.parse::<u32>() != Ok(segment) {
+        let Ok(reader) = SecondarySegmentReader::open_with_kind(&path, kind) else {
             continue;
         };
-        if rest.contains("_merged") {
-            merged = true;
-        }
-        let (Ok(bytes), Ok(reader)) = (
-            storage::chunk_store::read_file(&path),
-            SecondarySegmentReader::open_with_kind(&path, kind),
-        ) else {
-            continue;
-        };
+        let width = kind.key_width();
+        let stride = width + 4;
         let n = reader.row_count();
         if bytes.len() < n * stride {
             continue;
         }
+        let mut base_row_id = u64::from(segment) << 32;
+        let mut min_offset = u32::MAX;
         for i in 0..n {
-            let Some(key) = decode_secondary_key(&bytes[i * width..(i + 1) * width], kind) else {
-                continue;
-            };
             let at = n * width + i * 4;
             let offset = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
-            by_block
-                .entry(u64::from(offset) / DEFAULT_BLOCK_CAPACITY as u64)
-                .or_default()
-                .push((key, offset));
+            min_offset = min_offset.min(offset);
         }
-    }
-    // `PopulateSecondaryIndexInner` inserts every block of the segment into
-    // one in-memory index and dumps **once**, so an imported segment has a
-    // single chunk covering all of its blocks (`InsertBlockData` is called per
-    // block, `Dump` once after the loop).
-    if single_chunk || merged {
-        let mut entries: Vec<_> = by_block.into_values().flatten().collect();
-        if entries.is_empty() || std::fs::create_dir_all(seg_dir).is_err() {
-            return Vec::new();
-        }
-        entries.sort_by(|a, b| a.0.order(&b.0));
-        let path = seg_dir.join("chunk_0.idx");
-        if write_secondary_segment_typed(&path, kind, &entries).is_err() {
-            return Vec::new();
-        }
-        return vec![IndexChunk {
-            chunk_id: 0,
-            base_name: String::new(),
-            base_row_id: u64::from(segment) << 32,
-            row_count: entries.len() as u64,
-            term_count: 0,
-            index_size: 0,
-            commit_ts: 0,
-        }];
-    }
-    let mut chunks = Vec::new();
-    for (block, mut entries) in by_block {
-        if std::fs::create_dir_all(seg_dir).is_err() {
-            break;
-        }
-        entries.sort_by(|a, b| a.0.order(&b.0));
-        let path = seg_dir.join(format!("chunk_{block}.idx"));
-        if write_secondary_segment_typed(&path, kind, &entries).is_err() {
-            continue;
+        if min_offset != u32::MAX {
+            base_row_id |= u64::from(min_offset);
         }
         chunks.push(IndexChunk {
-            chunk_id: block as u32,
+            chunk_id: id,
             base_name: String::new(),
-            // `RowID` of the block's first row: the segment in the high bits,
-            // the in-segment offset in the low ones.
-            base_row_id: (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64),
-            row_count: entries.len() as u64,
+            base_row_id,
+            row_count: n as u64,
             term_count: 0,
             index_size: 0,
             commit_ts: 0,
         });
     }
+    chunks.sort_by_key(|c| c.chunk_id);
+    chunks
+}
+
+/// The chunks a low-cardinality segment directory already holds.
+pub(crate) fn publish_lowcard_chunks_from_dir(seg_dir: &Path, segment: u32) -> Vec<IndexChunk> {
+    use storage::secondary_lowcard::LowCardReader;
+    let Ok(entries) = std::fs::read_dir(seg_dir) else {
+        return Vec::new();
+    };
+    let mut chunks = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(id) = name
+            .strip_prefix("chunk_")
+            .and_then(|rest| rest.strip_suffix(".idx"))
+            .and_then(|id| id.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let Ok(reader) = LowCardReader::open(&entry.path()) else {
+            continue;
+        };
+        chunks.push(IndexChunk {
+            chunk_id: id,
+            base_name: String::new(),
+            base_row_id: u64::from(segment) << 32,
+            row_count: reader.len() as u64,
+            term_count: 0,
+            index_size: 0,
+            commit_ts: 0,
+        });
+    }
+    chunks.sort_by_key(|c| c.chunk_id);
     chunks
 }
 
@@ -159,15 +123,38 @@ pub(crate) fn publish_secondary_chunks(
 /// it touches (`BMPIndexInMem::Dump` hands the whole in-memory `BMPAlg` to the
 /// chunk buffer), so two 100-row inserts into one block leave **one** chunk of
 /// 200 rows. The port's spill files are per dump, so the merge happens here.
+///
+/// The chunk id is the catalog's, not the block number: `PopulateBMPIndexInner`
+/// and `DumpMemIndex` both take one from `GetAndSetNextChunkID`, and that
+/// counter only moves forward. `existing` maps a chunk's first row id to the id
+/// a record already named, so a re-dump of the same block rewrites its own
+/// chunk instead of appending a second one; `next_id` hands out the ones no
+/// record names yet.
+/// Where and how a sparse chunk is encoded: the column's `IdxWidth` and
+/// declared term bound, the block size, the segment the chunk belongs to and
+/// whether the whole segment folds into one chunk (an `IMPORT` does).
+pub(crate) struct BmpChunkShape {
+    pub(crate) width: storage::bmp::IdxWidth,
+    pub(crate) term_bound: usize,
+    pub(crate) block_size: usize,
+    pub(crate) segment: u32,
+    pub(crate) single_chunk: bool,
+}
+
 pub(crate) fn publish_bmp_chunks(
     seg_dir: &Path,
     by_block: std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
-    width: storage::bmp::IdxWidth,
-    term_bound: usize,
-    block_size: usize,
-    segment: u32,
-    single_chunk: bool,
+    shape: &BmpChunkShape,
+    existing: &std::collections::HashMap<u64, u32>,
+    next_id: &mut u32,
 ) -> Vec<IndexChunk> {
+    let BmpChunkShape {
+        width,
+        term_bound,
+        block_size,
+        segment,
+        single_chunk,
+    } = *shape;
     // `PopulateBMPIndexInner` adds every block of the segment to one
     // `BMPIndexInMem` and dumps once, so an imported segment's sparse chunk
     // covers all of its blocks.
@@ -199,14 +186,25 @@ pub(crate) fn publish_bmp_chunks(
             .max(1)
             .max(term_bound as i32) as usize;
         let bytes = storage::bmp::encode_bmp(block_size, width, &docs, term_num);
-        let path = seg_dir.join(format!("chunk_{block}.idx"));
+        let base_row_id = (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64);
+        // The id the record for **this block's** chunk already owns, else the
+        // counter the catalog keeps. A block never reuses a retired id.
+        let chunk_id = match existing.get(&base_row_id) {
+            Some(id) => *id,
+            None => {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            }
+        };
+        let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
         if storage::definition::format::write_synced(&path, &bytes).is_err() {
             continue;
         }
         chunks.push(IndexChunk {
-            chunk_id: block as u32,
+            chunk_id,
             base_name: String::new(),
-            base_row_id: (u64::from(segment) << 32) | (block * DEFAULT_BLOCK_CAPACITY as u64),
+            base_row_id,
             row_count: docs.len() as u64,
             term_count: 0,
             index_size: 0,
@@ -217,7 +215,20 @@ pub(crate) fn publish_bmp_chunks(
 }
 
 /// The full-text chunks on disk, one per block, named `ft_{base_row_id:016x}`.
-pub(crate) fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<IndexChunk> {
+///
+/// The chunk **id** is the catalog's, never the chunk's position in the
+/// directory: `DumpMemIndex`'s full-text case calls `AddNewChunkIndex1` with the
+/// id `GetAndSetNextChunkID` handed out, and that counter only moves forward.
+/// Numbering the files `0..n` in row order handed a retired id to a later
+/// chunk (`Cleanup` removes the file but not the counter), and a re-dump of an
+/// already-recorded block rewrote its record under a different id. `existing`
+/// maps a chunk's first row id to the id its record already owns, so a
+/// re-publish keeps it; `next_id` supplies the ones no record names yet.
+pub(crate) fn publish_fulltext_chunks(
+    seg_dir: &Path,
+    existing: &std::collections::HashMap<u64, u32>,
+    next_id: &mut u32,
+) -> Vec<IndexChunk> {
     let mut chunks = Vec::new();
     let Ok(entries) = std::fs::read_dir(seg_dir) else {
         return chunks;
@@ -230,10 +241,18 @@ pub(crate) fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<IndexChunk> {
         else {
             continue;
         };
-        let Ok(base_row_id) = u64::from_str_radix(hex, 16) else {
+        // A merged chunk is `ft_{base:016x}_{rows:x}` (`fulltext_base_name`
+        // with a row count, written by `optimize_chunks`); a plain one is just
+        // the base. Both record their first row id the same way, and the file
+        // name is what a record has to repeat.
+        let (base_hex, merged_rows) = match hex.split_once('_') {
+            Some((first, rows)) => (first, u64::from_str_radix(rows, 16).ok()),
+            None => (hex, None),
+        };
+        let Ok(base_row_id) = u64::from_str_radix(base_hex, 16) else {
             continue;
         };
-        let base = storage::definition::format::fulltext_base_name(base_row_id, None);
+        let base = storage::definition::format::fulltext_base_name(base_row_id, merged_rows);
         // The `.len` file is the chunk's per-document column length
         // (`u32[row_cnt]`, `RawFileWorker` in `chunk_index_meta_impl.cpp:157`),
         // so it carries both numbers the reference records in the chunk info:
@@ -246,8 +265,16 @@ pub(crate) fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<IndexChunk> {
         else {
             continue;
         };
+        let chunk_id = match existing.get(&base_row_id) {
+            Some(id) => *id,
+            None => {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            }
+        };
         chunks.push(IndexChunk {
-            chunk_id: 0, // assigned below, in base-row-id order
+            chunk_id,
             base_name: base,
             base_row_id,
             row_count,
@@ -256,16 +283,7 @@ pub(crate) fn publish_fulltext_chunks(seg_dir: &Path) -> Vec<IndexChunk> {
             commit_ts: 0,
         });
     }
-    // The reference's chunk ids are the order the chunks were dumped in, not
-    // the block each one starts at: a second run that appends 110 rows to a
-    // 100-row table dumps `ft_0000000000000064` as chunk 1, although both
-    // chunks live in block 0. Reading them back, `CountMemIndexGapInSegment`
-    // requires the chunk infos to line up end to end from row 0, so the ids
-    // have to be distinct and ascending.
-    chunks.sort_by_key(|c| c.base_row_id);
-    for (id, chunk) in chunks.iter_mut().enumerate() {
-        chunk.chunk_id = id as u32;
-    }
+    chunks.sort_by_key(|c| c.chunk_id);
     chunks
 }
 
@@ -300,19 +318,20 @@ pub(crate) fn publish_chunk_files(
         }
     }
     if !hnsw {
-        return if ids.is_empty() {
-            Vec::new()
-        } else {
-            vec![IndexChunk {
-                chunk_id: 0,
-                base_name: String::new(),
-                base_row_id: u64::from(segment) << 32,
-                row_count: rows,
-                term_count: 0,
-                index_size: 0,
-                commit_ts: 0,
-            }]
+        // One chunk per segment, but under **its own** id: a literal 0 would
+        // append a second record next to the one `write_ivf_index` published.
+        let Some(id) = ids.into_iter().min() else {
+            return Vec::new();
         };
+        return vec![IndexChunk {
+            chunk_id: id,
+            base_name: String::new(),
+            base_row_id: u64::from(segment) << 32,
+            row_count: rows,
+            term_count: 0,
+            index_size: 0,
+            commit_ts: 0,
+        }];
     }
     ids.sort_unstable();
     let mut chunks = Vec::new();

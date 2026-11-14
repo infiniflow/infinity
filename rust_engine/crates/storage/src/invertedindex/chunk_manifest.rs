@@ -16,11 +16,13 @@
 //! fails a structural check, and a chunk whose files do not match the lengths
 //! here is refused instead of being decoded into wrong rows.
 //!
-//! The marker lives beside the chunk and is not part of the on-disk format the
-//! reference reads: `.ok` is not one of `.dic`/`.pos`/`.len`, so an engine that
-//! does not know it simply ignores the file. A chunk written by the reference
-//! (or by this port before the marker existed) has no `.ok`; the loader then
-//! falls back to the structural check alone, so old data stays readable.
+//! The marker is this port's own bookkeeping, not part of the format the
+//! reference reads, so it does **not** live beside the chunk: `data/` has to
+//! hold exactly the files the reference writes. It is kept under a sibling
+//! `ft_manifest/` tree with the same relative layout ([`ChunkManifest::path`]).
+//! A chunk written by the reference (or before the marker existed) has no
+//! marker; the loader then falls back to the structural check alone, so old
+//! data stays readable.
 //!
 //! `live_docs`/`total_len` are what compaction needs to score the chunk the way
 //! the predicate sees it: after a merge drops the rows that were deleted,
@@ -121,9 +123,38 @@ pub struct ChunkManifest {
 }
 
 impl ChunkManifest {
-    /// `{index_dir}/{base_name}.ok`.
+    /// Where the marker of a chunk lives: the chunk's own directory, except
+    /// under an engine's `data/` tree.
+    ///
+    /// `data/` must list exactly the files the reference writes - a byte-gate
+    /// comparison and `Cleanup`'s file accounting both read it - so the marker
+    /// moves to the engine's own `fulltext/` tree, which already sits beside
+    /// `data/` and is what the persistence manager maps back on restore
+    /// (`STORAGE_ROOT_KEYS`). A directory that is not inside `data/` (a unit
+    /// test's temp dir) keeps the marker beside its chunk.
+    fn path_in(index_dir: &Path, base_name: &str) -> PathBuf {
+        let name = format!("{base_name}.ok");
+        let parts: Vec<_> = index_dir.components().collect();
+        let Some(at) = parts
+            .iter()
+            .rposition(|c| c.as_os_str() == std::ffi::OsStr::new("data"))
+        else {
+            // Not an engine directory (a unit test's temp dir): beside the chunk.
+            return index_dir.join(name);
+        };
+        let prefix: PathBuf = parts[..at].iter().collect();
+        let rest: PathBuf = parts[at + 1..].iter().collect();
+        prefix
+            .join("fulltext")
+            .join("manifests")
+            .join(rest)
+            .join(name)
+    }
+
+    /// `{index_dir}/{base_name}.ok`, relocated out of `data/` (see
+    /// [`Self::path_in`]).
     pub fn path(index_dir: &str, base_name: &str) -> PathBuf {
-        Path::new(index_dir).join(format!("{base_name}.ok"))
+        Self::path_in(Path::new(index_dir), base_name)
     }
 
     /// Writes the marker atomically (temp file + fsync + rename).
@@ -141,8 +172,14 @@ impl ChunkManifest {
         bytes.extend_from_slice(&self.dic_len.to_le_bytes());
         bytes.extend_from_slice(&self.pos_len.to_le_bytes());
         bytes.extend_from_slice(&self.len_len.to_le_bytes());
+        let path = Self::path(index_dir, base_name);
+        // The sidecar tree is not created by the chunk writer, which only knows
+        // `data/`; the marker makes its own parent on the way in.
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| FormatError::Io(error.to_string()))?;
+        }
         crate::chunk_store::chunk_store()
-            .write_dedicated(&Self::path(index_dir, base_name), &bytes)
+            .write_dedicated(&path, &bytes)
             .map_err(|error| FormatError::Io(error.to_string()))
     }
 
@@ -209,11 +246,13 @@ impl ChunkManifest {
 /// generation beside its successor would count the rows twice.
 pub fn remove_chunk(index_dir: &str, base_name: &str) {
     let store = crate::chunk_store::chunk_store();
-    for suffix in [".dic", ".pos", ".len", ".ok"] {
+    for suffix in [".dic", ".pos", ".len"] {
         // Best effort by design: this drops a chunk nothing references any
         // more, and a retry costs nothing. The flow that decides whether a
         // **live** chunk may be forgotten is `reclaim_deprecated_chunks`, which
         // does check the store's answer.
         let _ = store.remove(&Path::new(index_dir).join(format!("{base_name}{suffix}")));
     }
+    // The marker is not beside the chunk (see [`ChunkManifest::path`]).
+    let _ = store.remove(&ChunkManifest::path(index_dir, base_name));
 }

@@ -541,10 +541,12 @@ mod tests {
             );
         }
 
-        // The merged chunk is what `load_sealed` finds on the next open.
+        // The merged chunk is what the catalog lists on the next open. A reader
+        // is built on first use, so the query comes first: it maps the chunks
+        // the catalog names instead of re-indexing the rows.
         let reopened = Engine::open(dir.path()).unwrap();
-        assert_eq!(fulltext_chunks(&reopened), 1);
         assert_eq!(rows(&reopened, query), before);
+        assert_eq!(fulltext_chunks(&reopened), 1);
     }
 
     /// A compaction renumbers every row, so the full-text index has to be
@@ -619,12 +621,20 @@ mod tests {
         let (stale, epoch) = {
             let tables = e.tables.lock().unwrap();
             let entry = tables.get(&tkey).expect("the table is cached");
-            let stale = entry.text.get("body").expect("the index is cached").clone();
+            let body_id = e.test_index_id("cr", "body", "FULLTEXT");
+            let stale = entry
+                .text
+                .get(&body_id)
+                .expect("the index is cached")
+                .clone();
             (stale, entry.text_epoch)
         };
         e.compact_all_segments("default_db.cr").unwrap();
         assert_eq!(
-            e.publish_text_index(&tkey, "body", epoch, stale),
+            {
+                let body_id = e.test_index_id("cr", "body", "FULLTEXT");
+                e.publish_text_index(&tkey, body_id, epoch, stale)
+            },
             crate::engine::statements::TextPublish::Renumbered,
             "a build from the pre-compaction layout must not publish"
         );
@@ -665,7 +675,11 @@ mod tests {
                 let tables = e.tables.lock().unwrap();
                 tables
                     .get(&tkey)
-                    .and_then(|entry| entry.text.get("body"))
+                    .and_then(|entry| {
+                        entry
+                            .text
+                            .get(&e.test_index_id("raced", "body", "FULLTEXT"))
+                    })
                     .cloned()
                     .expect("the index is cached")
             };
@@ -1892,8 +1906,11 @@ mod tests {
             term.to_string(),
             docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
         );
+        // Chunks live in their segment's directory (`idx_{id}/seg_{n}`), the
+        // place a seal writes and the catalog's `idx_chunk` records name.
+        let dir = storage::invertedindex::format::segment_chunk_dir(dir, base >> 32);
         storage::invertedindex::disk_segment_reader::write_segment_index(
-            dir,
+            &dir,
             &format!("ft_{base:016x}"),
             base,
             &docs,
@@ -1923,15 +1940,11 @@ mod tests {
         assert_eq!(index.term_df("alpha"), 1, "row 0 only");
         assert_eq!(index.term_df("beta"), 1, "row 0 only");
         // The marker records the same numbers, so a reopen scores it the same.
-        let sealed: Vec<String> = std::fs::read_dir(d)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.file_name().into_string().unwrap())
-            .filter(|name| name.ends_with(".ok"))
-            .collect();
-        assert_eq!(sealed.len(), 1);
-        let base = sealed[0].trim_end_matches(".ok");
-        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
+        // It is this port's bookkeeping and lives outside the chunk directory
+        // (`ChunkManifest::path`), which holds only the reference's three files.
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        let base = "ft_0000000000000000";
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(&seg, base)
             .expect("the seal publishes a marker")
             .expect("the marker is well formed");
         assert_eq!(manifest.live_docs, 2);
@@ -1999,18 +2012,11 @@ mod tests {
         write_chunk(d, 0, 2, "a");
         write_chunk(d, 2, 2, "a");
         // A crash between the `.dic` write and the `.len` write.
-        std::fs::remove_file(format!("{d}/ft_0000000000000000.len")).unwrap();
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        std::fs::remove_file(format!("{seg}/ft_0000000000000000.len")).unwrap();
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(index.load_sealed(), 0, "from the first row: rebuild");
-        let left: Vec<String> = std::fs::read_dir(d)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.file_name().into_string().unwrap())
-            .collect();
-        assert!(
-            left.is_empty(),
-            "the whole set is retired, not retried on every open: {left:?}"
-        );
+        assert!(index.reader.segments.is_empty(), "nothing half-loaded");
         // The next open has nothing to retry.
         let mut again = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(again.load_sealed(), 0);
@@ -2025,8 +2031,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         write_chunk(d, 0, 2, "a");
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
         let base = "ft_0000000000000000";
-        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(&seg, base)
             .expect("a freshly written chunk has a marker")
             .expect("the marker is well formed");
         // Rewrite the marker as the *previous* generation would have: one byte
@@ -2035,31 +2042,37 @@ mod tests {
             dic_len: manifest.dic_len - 1,
             ..manifest
         }
-        .write(d, base)
+        .write(&seg, base)
         .unwrap();
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(index.load_sealed(), 0, "refused, then rebuilt");
         assert!(!std::path::Path::new(&format!("{d}/{base}.dic")).exists());
     }
 
-    /// A chunk of a `ROW_ID` segment the catalog no longer lists holds rows a
-    /// compaction moved: its ids name nothing now, and a rebuild (which the
-    /// retirement forces) renumbers every row. Loading it beside the rebuild
-    /// would map its postings onto the wrong rows.
+    /// A chunk the catalog does not list is not loaded, and it is not deleted
+    /// either.
+    ///
+    /// `ColumnIndexReader::Open` walks `SegmentIndexIDs -> ChunkIDs` and never
+    /// lists a directory, so a compaction's deprecated segments disappear by
+    /// having no ids - their files stay on disk until `Cleanup` reclaims them.
+    /// Loading one instead would map its postings onto the wrong rows, because
+    /// the merge renumbered every row it took.
     #[test]
-    fn a_chunk_of_a_dropped_segment_is_retired() {
+    fn a_chunk_the_catalog_does_not_list_is_not_loaded() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         write_chunk(d, 0, 2, "a");
         write_chunk(d, 2, 2, "a");
-        let live: std::collections::HashSet<u32> = [1u32].into_iter().collect();
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(
-            index.load_sealed_scoped(Some(&live), &[]),
+            index.load_sealed_scoped(&[]),
             0,
-            "segment 0 is gone: rebuild under the new ids"
+            "an empty catalog lists no chunk: rebuild under the new ids"
         );
-        assert!(std::fs::read_dir(d).unwrap().flatten().next().is_none());
+        assert!(
+            std::fs::read_dir(d).unwrap().flatten().next().is_some(),
+            "the loader must not delete what it did not load"
+        );
     }
 
     /// A chunk whose files are all zero bytes maps as an empty buffer instead of
@@ -2072,13 +2085,14 @@ mod tests {
         // One real chunk, then its data files truncated to nothing: what a
         // publish that failed between the three writes leaves behind.
         write_chunk(d, 0, 2, "a");
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
         let base = "ft_0000000000000000";
         for suffix in [".pos", ".len"] {
-            std::fs::write(format!("{d}/{base}{suffix}"), b"").unwrap();
+            std::fs::write(format!("{seg}/{base}{suffix}"), b"").unwrap();
         }
-        std::fs::remove_file(format!("{d}/{base}.ok")).unwrap();
+        std::fs::remove_file(format!("{seg}/{base}.ok")).unwrap();
         let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-            d,
+            &seg,
             base,
             0,
             storage::invertedindex::format::OPTION_FLAG_ALL,
@@ -2107,8 +2121,9 @@ mod tests {
             "a".to_string(),
             docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
         );
+        let seg0 = storage::invertedindex::format::segment_chunk_dir(d, 0);
         storage::invertedindex::disk_segment_reader::write_segment_index(
-            d,
+            &seg0,
             "ft_0000000000000000",
             0,
             &docs,
@@ -2139,10 +2154,9 @@ mod tests {
         }
     }
 
-    /// A directory the **reference** wrote keeps its chunks in the segment's own
-    /// directory and lists them in the catalog (`ChunkIndexMetaInfo`), so the
-    /// port's per-column directory has nothing to scan. The catalog fallback
-    /// adopts those chunks instead of re-indexing the column.
+    /// A full-text chunk lives in the segment's own directory
+    /// (`idx_{id}/seg_{n}`) and the catalog lists it, so re-opening the
+    /// directory reads exactly those chunks - `ColumnIndexReader::Open`'s walk.
     #[test]
     fn a_chunk_written_in_the_reference_layout_is_adopted() {
         let dir = tempdir().unwrap();
@@ -2155,86 +2169,50 @@ mod tests {
         }
         e.execute_blocking("CREATE INDEX adopt_ft ON adopt (body) USING FULLTEXT;")
             .unwrap();
-        // A checkpoint mirrors the chunk files, but only a dump transaction
-        // names them in the catalog (the reference's `DumpMemIndex`), so the
-        // dump is what makes the directory readable by chunk list.
+        // A dump is what seals the tail and names the chunk in the catalog
+        // (the reference's `DumpMemIndex`).
         crate::scheduler::block_on(e.flush()).unwrap();
         crate::scheduler::block_on(e.dump_index_transaction("adopt", "adopt_ft")).unwrap();
 
-        // The mirror wrote the reference's layout, and the catalog now lists
-        // those chunks.
-        let reference_chunks: Vec<String> = std::fs::read_dir(dir.path().join("data"))
-            .unwrap()
-            .flatten()
-            .filter(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
-            .flat_map(|entry| walk_ft_files(&entry.path()))
-            .collect();
-        assert!(
-            !reference_chunks.is_empty(),
-            "the mirror wrote no chunk in the reference's layout"
-        );
-        let listed = e.fulltext_catalog_chunks("adopt", "body").unwrap();
-        assert_eq!(
-            listed.len(),
-            reference_chunks
-                .iter()
-                .filter(|n| n.ends_with(".dic"))
-                .count(),
-            "every mirrored chunk is in the catalog"
-        );
+        // The chunk file is where the record says it is.
+        let ft_id = e.test_index_id("adopt", "body", "FULLTEXT");
+        let chunks = e.fulltext_catalog_chunks_of("adopt", ft_id).unwrap();
+        assert!(!chunks.is_empty(), "the dump published no chunk");
+        for chunk in &chunks {
+            let dic = storage::invertedindex::format::fulltext_chunk_file(
+                &chunk.dir,
+                &chunk.base_name,
+                storage::invertedindex::format::FULLTEXT_DICT_SUFFIX,
+            );
+            assert!(
+                std::path::Path::new(&dic).exists(),
+                "the catalog names {dic}, which does not exist"
+            );
+        }
         drop(e);
 
-        // Delete the port's own copy: only the reference's files and the
-        // catalog are left - the shape of a directory the reference wrote.
-        let private = dir.path().join("fulltext/default_db.adopt.body");
-        assert!(private.exists(), "the dump sealed the port's own copy");
-        std::fs::remove_dir_all(&private).unwrap();
-
+        // A reopened engine maps those chunks instead of re-indexing the column.
         let reopened = Engine::open(dir.path()).unwrap();
         let hits = rows(
             &reopened,
             "SELECT id FROM adopt SEARCH MATCH TEXT (body, 'alpha3', 10);",
         );
-        assert_eq!(hits.len(), 1, "the adopted chunk answers");
+        assert_eq!(hits.len(), 1, "the mapped chunk answers");
         assert_eq!(hits[0][0], "3");
-
-        // Adopted, not rebuilt: the port's directory holds the reference's
-        // chunks again (a rebuild would have written different base names only
-        // after re-tokenizing the whole column; the files being there is what
-        // the next open reads).
-        let adopted: Vec<String> = std::fs::read_dir(&private)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.file_name().to_string_lossy().to_string())
-            .filter(|name| name.ends_with(".dic"))
-            .collect();
-        assert!(!adopted.is_empty(), "the chunks were adopted");
-        let expected: std::collections::BTreeSet<String> = reference_chunks
-            .iter()
-            .filter(|name| name.ends_with(".dic"))
-            .cloned()
-            .collect();
-        let got: std::collections::BTreeSet<String> = adopted.into_iter().collect();
-        assert_eq!(got, expected, "the same chunks, by the same names");
-    }
-
-    /// Every `ft_*` file under `root`, by name.
-    fn walk_ft_files(root: &std::path::Path) -> Vec<String> {
-        let mut out = Vec::new();
-        let Ok(entries) = std::fs::read_dir(root) else {
-            return out;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                out.extend(walk_ft_files(&path));
-            } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("ft_") {
-                    out.push(name.to_string());
+        let (sealed, pending) = {
+            let tables = reopened.tables.lock().unwrap();
+            let (mut sealed, mut pending) = (0, 0);
+            for entry in tables.values() {
+                for shared in entry.text.values() {
+                    let guard = shared.read().unwrap();
+                    sealed += guard.reader.doc_count();
+                    pending += guard.mem.pending_docs();
                 }
             }
-        }
-        out
+            (sealed, pending)
+        };
+        assert_eq!(sealed, 6, "every row came from the catalog's chunks");
+        assert_eq!(pending, 0, "no row was indexed again");
     }
 
     /// The block-max WAND's cursor (`TermStream::advance`) hands a target that is
@@ -2522,7 +2500,7 @@ mod tests {
         // A seal lands while the merge is writing its files.
         write_chunk(d, 4, 2, "a");
         let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-            d,
+            &storage::invertedindex::format::segment_chunk_dir(d, 0),
             "ft_0000000000000004",
             4,
             storage::invertedindex::format::OPTION_FLAG_ALL,
@@ -2995,7 +2973,7 @@ mod tests {
             e.execute_blocking(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
                 .unwrap();
             e.execute_blocking(&format!(
-                "CREATE INDEX ct{t}_body ON ct{t} (body) WITH (analyzer = 'standard');"
+                "CREATE INDEX ct{t}_body ON ct{t} (body) USING FULLTEXT WITH (analyzer = 'standard');"
             ))
             .unwrap();
         }
@@ -4684,7 +4662,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|t| t.mv.get("t"))
+            .and_then(|t| t.mv.get(&e.test_index_id("default_db.pt", "t", "PLAID")))
             .map(|m| m.read().unwrap().plaid.is_some())
             .unwrap_or(false);
         assert!(built, "PLAID index was not built");
@@ -4692,7 +4670,9 @@ mod tests {
         assert_eq!(indexed.len(), 3);
         assert_eq!(indexed[0], baseline[0]);
 
+        // The chunk comes from the index's own dump transaction.
         crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pt", "pidx")).unwrap();
         let loaded = e.read_plaid_index("default_db.pt", "pidx").unwrap();
         assert_eq!(loaded.doc_num(), 300);
         assert_eq!(loaded.total_embedding_num(), 1200);
@@ -4854,8 +4834,12 @@ mod tests {
         expected.extend(200..260);
         assert_eq!(ids(&engine, &query(260, None)), expected);
 
-        // 3. A flush + reopen loads the flushed chunk (mmap) instead of rebuilding.
+        // 3. A checkpoint + an index dump, then a reopen, loads the flushed
+        // chunk (mmap) instead of rebuilding. The chunk comes from the
+        // `DumpIndex` transaction - the reference's `DumpMemIndex` is the only
+        // index writer; a checkpoint writes blocks only.
         crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction(table, index)).unwrap();
         drop(engine);
         let engine = Engine::open(dir.path()).unwrap();
         assert_eq!(ids(&engine, &query(260, None)), expected);
@@ -4997,7 +4981,10 @@ mod tests {
             e.execute_blocking("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
                 .unwrap();
             assert_eq!(rows(&e, q).len(), 3);
+            // The chunk is written by the index's own `DumpIndex` transaction
+            // (the reference's `DumpMemIndex`); a checkpoint writes blocks only.
             crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("pr", "pri")).unwrap();
         }
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(rows(&e, q).len(), 3);
@@ -5262,6 +5249,580 @@ mod tests {
         }
     }
 
+    /// Two `CREATE INDEX … USING HNSW` on one column are two memory graphs.
+    ///
+    /// The reference keys its `MemIndex` map by
+    /// `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so `idx0` and `idx1` on
+    /// one column never share one. The port only materialised a graph while
+    /// `hnsw_mem` was *empty*, so the second index got none - its dump wrote
+    /// nothing and the first index's graph was fed every row twice (100 rows
+    /// compiled to 200).
+    #[test]
+    fn two_hnsw_indexes_on_one_column_keep_their_own_graphs() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE th (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for i in 0..100 {
+            e.execute_blocking(&format!("INSERT INTO th VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .unwrap();
+        }
+        for name in ["idx0", "idx1"] {
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name} ON th (c2) USING HNSW \
+                 WITH (M=16, ef_construction=20, metric=l2);"
+            ))
+            .unwrap();
+        }
+
+        let ids = e.index_ids_on_column("th", "c2");
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("th");
+        let graphs: Vec<(u64, usize)> = {
+            let tables = e.tables.lock().unwrap();
+            ids.iter()
+                .map(|id| {
+                    let graph = tables[&key]
+                        .hnsw_mem
+                        .get(id)
+                        .unwrap_or_else(|| panic!("index {id} has no memory graph"));
+                    (*id, graph.lock().unwrap().len())
+                })
+                .collect()
+        };
+        // Each graph holds the table once, not twice and not zero times.
+        for (id, rows) in &graphs {
+            assert_eq!(*rows, 100, "graph of index {id} holds {rows} rows");
+        }
+
+        // Both dumps write a chunk into their own directory.
+        for name in ["idx0", "idx1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("th", name)).unwrap();
+            assert_eq!(
+                e.hnsw_chunk_ids("th", name),
+                vec![0],
+                "{name} wrote no chunk"
+            );
+        }
+        let a = e.index_files("th", "idx0");
+        let b = e.index_files("th", "idx1");
+        assert!(a.iter().all(|p| p.to_string_lossy().contains("idx_1")));
+        assert!(b.iter().all(|p| p.to_string_lossy().contains("idx_2")));
+    }
+
+    /// Two `CREATE INDEX … USING FULLTEXT` on one column are two indexes.
+    ///
+    /// Each record owns its tail, its chunk list and its `idx_{id}/` directory
+    /// (`MemIndex` is keyed by `index_id`). Resolving the cache by column made
+    /// the second dump find an emptied tail and write nothing.
+    #[test]
+    fn two_fulltext_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tf (c1 INT, c2 VARCHAR);")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!("INSERT INTO tf VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        for name in ["ft0", "ft1"] {
+            e.execute_blocking(&format!("CREATE INDEX {name} ON tf (c2) USING FULLTEXT;"))
+                .unwrap();
+        }
+        // The registries are keyed by id: one TextIndex per record.
+        let ids = e.index_ids_on_column_of_kind("tf", "c2", &["FULLTEXT"]);
+        assert_eq!(ids.len(), 2, "expected two full-text records: {ids:?}");
+        let key = e.table_key("tf");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                assert!(
+                    tables[&key].text.contains_key(id),
+                    "index {id} has no in-memory text index"
+                );
+            }
+        }
+        for name in ["ft0", "ft1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tf", name)).unwrap();
+            let files = e.index_files("tf", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".dic")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+        // ... and a query still answers from the first one.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT c1 FROM tf SEARCH MATCH TEXT ('c2', 'alpha1', 'topn=5');"
+            ),
+            vec![vec!["1".to_string()]],
+            "the default analyzer keeps digits: only 'alpha1' matches"
+        );
+    }
+
+    /// Two `CREATE INDEX … USING BMP` on one column are two sparse indexes.
+    #[test]
+    fn two_sparse_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tsp (c1 INT, c2 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO tsp VALUES ({i}, [{}:1.0,9:2.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        for name in ["sp0", "sp1"] {
+            e.execute_blocking(&format!("CREATE INDEX {name} ON tsp (c2) USING BMP;"))
+                .unwrap();
+        }
+        let ids = e.index_ids_on_column_of_kind("tsp", "c2", &["BMP"]);
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("tsp");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                assert!(
+                    tables[&key].sparse.contains_key(id),
+                    "index {id} has no in-memory sparse index"
+                );
+            }
+        }
+        for name in ["sp0", "sp1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tsp", name)).unwrap();
+            let files = e.index_files("tsp", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".bmp")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+    }
+
+    /// Two `CREATE INDEX … USING PLAID` on one column are two multi-vector
+    /// indexes, each with its own chunk directory.
+    #[test]
+    fn two_plaid_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tp (c1 INT, c2 TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..200 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO tp VALUES {};", values.join(",")))
+            .unwrap();
+        for name in ["pl0", "pl1"] {
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name} ON tp (c2) USING PLAID WITH (n_centroids = 8);"
+            ))
+            .unwrap();
+        }
+        let ids = e.index_ids_on_column_of_kind("tp", "c2", &["PLAID"]);
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("tp");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                let index = tables[&key]
+                    .mv
+                    .get(id)
+                    .unwrap_or_else(|| panic!("index {id} has no multi-vector index"));
+                assert!(
+                    index.read().unwrap().plaid.is_some(),
+                    "index {id} never built its PLAID index"
+                );
+            }
+        }
+        for name in ["pl0", "pl1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tp", name)).unwrap();
+            let files = e.index_files("tp", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+    }
+
+    /// One column carrying an `HNSW` **and** a `BMP` index: each kind's
+    /// registry holds its own id, and dropping one leaves the other's alone.
+    ///
+    /// An index id is unique within the table, not within one kind, so a
+    /// column-wide sweep would take the other kind's tail with it.
+    #[test]
+    fn mixed_index_kinds_on_one_column_are_independent() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tm (c1 INT, c2 EMBEDDING(FLOAT,4), c3 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO tm VALUES ({i}, [0.1,0.2,0.3,0.4], [{}:1.0]);",
+                i % 10
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX m_hnsw ON tm (c2) USING HNSW WITH (metric=l2);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX m_sparse ON tm (c3) USING BMP;")
+            .unwrap();
+        let hnsw_id = e.test_index_id("tm", "c2", "HNSW");
+        let sparse_id = e.test_index_id("tm", "c3", "BMP");
+        assert_ne!(hnsw_id, sparse_id);
+        assert_eq!(
+            e.index_ids_on_column_of_kind("tm", "c2", &["HNSW"]),
+            vec![hnsw_id]
+        );
+        assert_eq!(
+            e.index_ids_on_column_of_kind("tm", "c3", &["BMP"]),
+            vec![sparse_id]
+        );
+
+        // Dropping the HNSW index leaves the sparse tail registered.
+        e.execute_blocking("DROP INDEX m_hnsw;").unwrap();
+        let key = e.table_key("tm");
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(
+                !tables[&key].hnsw_mem.contains_key(&hnsw_id),
+                "the dropped HNSW graph is still registered"
+            );
+            assert!(
+                tables[&key].sparse.contains_key(&sparse_id),
+                "dropping the HNSW index took the sparse tail with it"
+            );
+        }
+    }
+
+    /// `DROP INDEX` removes the dropped record's registry entry and nothing
+    /// else - for every kind.
+    ///
+    /// The registries are keyed by index id and an id is unique within the
+    /// table, so a dispatch that does not know the kind either misses the entry
+    /// (`hnsw_mem` stayed behind) or sweeps a neighbour's (`DROP INDEX` on a
+    /// full-text index cleared the column's sparse tail).
+    #[test]
+    fn drop_index_clears_only_that_records_registry() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(
+            "CREATE TABLE dk (id INT, txt VARCHAR, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10));",
+        )
+        .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO dk VALUES ({i}, 'alpha{i}', [0.1,0.2,0.3,0.4], [{}:1.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        for (name, sql) in [
+            ("dk_ft", "CREATE INDEX dk_ft ON dk (txt) USING FULLTEXT;"),
+            (
+                "dk_h",
+                "CREATE INDEX dk_h ON dk (v) USING HNSW WITH (metric=l2);",
+            ),
+            ("dk_s", "CREATE INDEX dk_s ON dk (s) USING BMP;"),
+        ] {
+            e.execute_blocking(sql).unwrap_or_else(|err| {
+                panic!("{name}: {err}");
+            });
+        }
+        // A second full-text record on the same column, so the drop has a
+        // neighbour of its own kind to leave alone.
+        e.execute_blocking("CREATE INDEX dk_ft2 ON dk (txt) USING FULLTEXT;")
+            .unwrap();
+
+        let ft = e.test_index_id("dk", "txt", "FULLTEXT");
+        let ft2 = e
+            .storage
+            .catalog
+            .indexes_of_table("dk")
+            .unwrap()
+            .into_iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.name == "dk_ft2")
+            .map(|im| im.id)
+            .next()
+            .unwrap();
+        let hnsw = e.test_index_id("dk", "v", "HNSW");
+        let sparse = e.test_index_id("dk", "s", "BMP");
+        assert_ne!(ft, ft2);
+
+        let key = e.table_key("dk");
+        // Materialise the registries the drop has to reach.
+        rows(
+            &e,
+            "SELECT id FROM dk SEARCH MATCH TEXT ('txt', 'alpha1', 'topn=5');",
+        );
+        e.execute_blocking("DROP INDEX dk_ft;").unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(
+                !tables[&key].text.contains_key(&ft),
+                "the dropped full-text index is still registered"
+            );
+            assert!(
+                tables[&key].text.contains_key(&ft2),
+                "dropping dk_ft took the other full-text index with it"
+            );
+            assert!(
+                tables[&key].sparse.contains_key(&sparse),
+                "dropping a full-text index took the sparse tail with it"
+            );
+            assert!(
+                tables[&key].hnsw_mem.contains_key(&hnsw),
+                "dropping a full-text index took the HNSW graph with it"
+            );
+        }
+
+        e.execute_blocking("DROP INDEX dk_h;").unwrap();
+        e.execute_blocking("DROP INDEX dk_s;").unwrap();
+        let tables = e.tables.lock().unwrap();
+        assert!(!tables[&key].hnsw_mem.contains_key(&hnsw));
+        assert!(!tables[&key].sparse.contains_key(&sparse));
+        assert!(
+            tables[&key].text.contains_key(&ft2),
+            "the surviving full-text index lost its registry"
+        );
+    }
+
+    /// `DropScope` names exactly one of the three statements' reach.
+    ///
+    /// `Table` has to mean the whole table - not "the first column", which is
+    /// what a pair of `None`s used to read like - and `Column` has to leave the
+    /// other columns alone.
+    #[test]
+    fn drop_scope_reaches_what_it_names() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ds (id INT, s1 SPARSE(FLOAT,10), s2 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..10 {
+            e.execute_blocking(&format!(
+                "INSERT INTO ds VALUES ({i}, [{}:1.0], [{}:2.0]);",
+                i % 9,
+                (i + 1) % 9
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX ds_a ON ds (s1) USING BMP;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ds_b ON ds (s2) USING BMP;")
+            .unwrap();
+        let a = e.test_index_id("ds", "s1", "BMP");
+        let b = e.test_index_id("ds", "s2", "BMP");
+        let key = e.table_key("ds");
+
+        // `Column` takes one column's record only.
+        e.drop_index_storage("ds", DropScope::Column("s1"));
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(!tables[&key].sparse.contains_key(&a));
+            assert!(
+                tables[&key].sparse.contains_key(&b),
+                "a column-scoped drop took another column's tail"
+            );
+        }
+
+        // `Table` takes everything that is left.
+        e.drop_index_storage("ds", DropScope::Table);
+        let tables = e.tables.lock().unwrap();
+        assert!(
+            !tables[&key].sparse.contains_key(&b),
+            "a table-scoped drop left a column's tail behind"
+        );
+    }
+
+    /// `DropScope::Record` reaches the HNSW/IVF graphs too, not just the
+    /// secondary, full-text and sparse registries.
+    ///
+    /// Every registry is swept by the same id, so a kind the function never
+    /// heard of still loses its entry. Keying the HNSW half off the secondary
+    /// id list left a dropped graph registered and the pending-byte charge
+    /// behind it.
+    #[test]
+    fn drop_scope_record_clears_hnsw_and_ivf_graphs() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dr (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!("INSERT INTO dr VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX dr_h ON dr (v) USING HNSW WITH (metric=l2);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX dr_i ON dr (v) USING IVF WITH (metric=l2);")
+            .unwrap();
+        let hnsw = e.test_index_id("dr", "v", "HNSW");
+        let ivf = e.test_index_id("dr", "v", "IVF");
+        let key = e.table_key("dr");
+        assert!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .is_some_and(|t| t.hnsw_mem.contains_key(&hnsw)),
+            "the HNSW graph was never materialised"
+        );
+
+        e.drop_index_storage("dr", DropScope::Record(hnsw));
+        {
+            let tables = e.tables.lock().unwrap();
+            let entry = &tables[&key];
+            assert!(
+                !entry.hnsw_mem.contains_key(&hnsw),
+                "a dropped HNSW graph stayed registered"
+            );
+            assert_eq!(
+                entry.index_pending_bytes.get(&hnsw).copied().unwrap_or(0),
+                0,
+                "the dropped graph's pending-byte charge stayed"
+            );
+            assert!(
+                entry.ivf_mem.contains_key(&ivf),
+                "dropping the HNSW record took the IVF entry with it"
+            );
+        }
+
+        e.drop_index_storage("dr", DropScope::Record(ivf));
+        let tables = e.tables.lock().unwrap();
+        assert!(
+            !tables[&key].ivf_mem.contains_key(&ivf),
+            "a dropped IVF record stayed registered"
+        );
+    }
+
+    /// `drop_index_storage` selects by id alone, so an id that names a
+    /// *different* record must not touch this one.
+    ///
+    /// The function takes no kind: an index id is unique within the table and
+    /// every kind's registry holds only its own ids, so removing the id from
+    /// all of them is what makes the call correct without a dispatch - and a
+    /// neighbouring record's entry has to survive it.
+    #[test]
+    fn drop_index_storage_only_touches_the_named_record() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dz (id INT, txt VARCHAR, s SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..10 {
+            e.execute_blocking(&format!(
+                "INSERT INTO dz VALUES ({i}, 'alpha{i}', [{}:1.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX dz_ft ON dz (txt) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX dz_s ON dz (s) USING BMP;")
+            .unwrap();
+        let ft = e.test_index_id("dz", "txt", "FULLTEXT");
+        let sparse = e.test_index_id("dz", "s", "BMP");
+        let key = e.table_key("dz");
+
+        // An id no record holds: nothing goes away.
+        let absent = ft.max(sparse) + 1000;
+        e.drop_index_storage("dz", DropScope::Record(absent));
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(tables[&key].text.contains_key(&ft));
+            assert!(tables[&key].sparse.contains_key(&sparse));
+        }
+
+        // The sparse record's own id: its entry goes, the full-text one stays.
+        e.drop_index_storage("dz", DropScope::Record(sparse));
+        let tables = e.tables.lock().unwrap();
+        assert!(!tables[&key].sparse.contains_key(&sparse));
+        assert!(
+            tables[&key].text.contains_key(&ft),
+            "dropping the sparse record took the full-text one with it"
+        );
+    }
+
+    /// Two `CREATE INDEX` records on one column are two memory indexes.
+    ///
+    /// The reference keys its `MemIndex` map by
+    /// `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so `index3` and
+    /// `index4` on one column never share a tail. The port used to resolve the
+    /// cache by column: creating the second index rebuilt the first one's
+    /// instance under the *second* id, so the first index's chunk was never
+    /// written and `SHOW INDEX` reported an index with no files.
+    #[test]
+    fn two_indexes_on_one_column_keep_separate_memory_indexes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE two (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..200 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO two VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX two_a ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX two_b ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        // Both records are materialised under their own id, so both have a
+        // chunk of their own directory.
+        for name in ["two_a", "two_b"] {
+            let files = e.index_files("two", name);
+            assert!(
+                files
+                    .iter()
+                    .any(|p| p.extension().is_some_and(|x| x == "mvec")),
+                "{name} has no chunk: {:?}",
+                files
+            );
+        }
+        // ... and each id owns a *distinct* memory index. Resolving the cache by
+        // column registered one instance under both ids, so the second index
+        // had nothing of its own.
+        let ids = e.index_ids_on_column("two", "t");
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("two");
+        let instances: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            ids.iter()
+                .map(|id| {
+                    tables[&key]
+                        .mv
+                        .get(id)
+                        .unwrap_or_else(|| panic!("index {id} has no memory index"))
+                        .clone()
+                })
+                .collect()
+        };
+        assert!(
+            !Arc::ptr_eq(&instances[0], &instances[1]),
+            "the two indexes share one memory index"
+        );
+        for (id, instance) in ids.iter().zip(&instances) {
+            let guard = instance.read().unwrap();
+            assert!(guard.plaid.is_some(), "index {id} was never built");
+        }
+        // A query still answers from one of them.
+        rows(
+            &e,
+            "SELECT id FROM two SEARCH MATCH TENSOR \
+             (t, [[1.0,0.5,0.25,0.125]], 'float', 'maxsim', 'topn=3');",
+        );
+    }
+
     /// `USING PLAID … WITH (colbertsar_mode = true)` is the reference's
     /// ColBERTSaR path (`d3ee9f6`, #3379): query-aware centroids
     /// (`PlaidIndex::TrainQueryAwareCentroids`) and **no residual storage**, so
@@ -5304,6 +5865,7 @@ mod tests {
         assert_eq!(rows(&e, query).len(), 3);
 
         crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("cs", "csi")).unwrap();
         let chunks = e.read_plaid_index_chunks("cs", "csi").unwrap();
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].is_colbertsar_mode(), "chunk lost the mode");
@@ -5378,7 +5940,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|t| t.mv.get("t"))
+            .and_then(|t| t.mv.get(&e.test_index_id("default_db.st", "t", "SMVE")))
             .map(|m| m.read().unwrap().smve.is_some())
             .unwrap_or(false);
         assert!(built, "SMVE index was not built");
@@ -5395,24 +5957,28 @@ mod tests {
             .unwrap();
         e.execute_blocking("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
             .unwrap();
+        // The index is what the catalog records; the reference never builds one
+        // for a bare column (`PhysicalMatchTensorScan::PlanWithIndex`).
+        e.execute_blocking("CREATE INDEX mv_v ON mv (v) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
         let q = "SELECT id FROM mv SEARCH MATCH TENSOR \
                  (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
-        let idx_dir = std::fs::read_dir(dir.path().join("multivector"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+        // The chunks live in the index's own directory (`idx_{id}/seg_{n}`),
+        // which is where the catalog's records point - not in a private spill
+        // directory, whose layout the reference does not have.
+        // Count the index's files by extension, wherever the catalog put them.
         let count = |ext: &str| {
-            std::fs::read_dir(&idx_dir)
-                .unwrap()
-                .filter_map(|x| x.ok())
-                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
-                .count()
+            let mut n = 0;
+            for path in e.index_files("mv", "mv_v") {
+                if path.extension().is_some_and(|y| y == ext) {
+                    n += 1;
+                }
+            }
+            n
         };
         // One chunk of raw tokens plus its EMVB chunk, written by the build.
         assert_eq!(count("mvec"), 1);
@@ -5462,24 +6028,26 @@ mod tests {
             .unwrap();
         e.execute_blocking("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
             .unwrap();
+        // The BMP index is the catalog record the search resolves; a bare
+        // SPARSE column is scanned, not indexed (the reference's
+        // `MatchSparseScan::PlanWithIndex`).
+        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
+            .unwrap();
         let q = "SELECT id FROM sp SEARCH MATCH SPARSE \
                  (v, [0:1.0,20:2.0], 'ip', 3);";
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
-        let idx_dir = std::fs::read_dir(dir.path().join("sparse"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+        // Count the index's files by extension, wherever the catalog put them.
         let count = |ext: &str| {
-            std::fs::read_dir(&idx_dir)
-                .unwrap()
-                .filter_map(|x| x.ok())
-                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
-                .count()
+            let mut n = 0;
+            for path in e.index_files("sp", "sp_v") {
+                if path.extension().is_some_and(|y| y == ext) {
+                    n += 1;
+                }
+            }
+            n
         };
         assert_eq!(count("bmp"), 1);
 
@@ -5562,7 +6130,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .values()
-                .find_map(|t| t.sparse.get("v").cloned())
+                .find_map(|t| t.sparse.values().next().cloned())
                 .unwrap();
             assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
 
@@ -5590,7 +6158,7 @@ mod tests {
             .lock()
             .unwrap()
             .values()
-            .find_map(|t| t.sparse.get("v").cloned())
+            .find_map(|t| t.sparse.values().next().cloned())
             .unwrap();
         assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
     }
@@ -5713,7 +6281,7 @@ mod tests {
             let tables = e.tables.lock().unwrap();
             let segments = tables
                 .values()
-                .find_map(|t| t.secondary.low.get("meta"))
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("j", "meta")))
                 .unwrap();
             assert_eq!(segments.len(), 1);
             assert!(segments[0].1.len() > 1);
@@ -5790,7 +6358,7 @@ mod tests {
             let tables = e.tables.lock().unwrap();
             let low = tables
                 .values()
-                .find_map(|t| t.secondary.low.get("meta"))
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("jd", "meta")))
                 .expect("a json column uses term chunks");
             assert!(
                 low.iter().any(|(_, reader)| reader
@@ -5836,10 +6404,12 @@ mod tests {
             let tables = e.tables.lock().unwrap();
             let low = tables
                 .values()
-                .find_map(|t| t.secondary.low.get("v"))
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("lc", "v")))
                 .expect("an explicit low-cardinality column uses bitmap chunks");
             assert_eq!(low.len(), 1);
-            let high = tables.values().find_map(|t| t.secondary.disk.get("v"));
+            let high = tables
+                .values()
+                .find_map(|t| t.secondary.disk.get(&e.test_secondary_id("lc", "v")));
             assert!(high.is_none(), "no PGM chunk for a low-cardinality column");
         }
         assert_eq!(
@@ -6165,7 +6735,10 @@ mod tests {
             .unwrap();
         e.execute_blocking("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
             .unwrap();
-        e.execute_blocking("CREATE INDEX spnv ON spn (v);").unwrap();
+        // A plain `CREATE INDEX` on a SPARSE column is the reference's
+        // `kBMP` (`IndexBMP::Make`), which is what `sparse_index_for` looks up.
+        e.execute_blocking("CREATE INDEX spnv ON spn (v) USING BMP;")
+            .unwrap();
         let first = e
             .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
             .unwrap();
@@ -6222,19 +6795,17 @@ mod tests {
     /// Cuts every spilled secondary chunk down to half its length: what a
     /// process killed in the middle of a dump leaves behind.
     fn truncate_spilled_chunks(root: &std::path::Path) -> usize {
+        // Secondary chunks live in `data/db_/tbl_/idx_/seg_/chunk_*.idx`.
         let mut cut = 0;
-        for sub in ["secondary", "secondary_low"] {
-            let Ok(entries) = std::fs::read_dir(root.join(sub)) else {
+        let mut stack = vec![root.join("data")];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
-                    if let Ok(files) = std::fs::read_dir(&path) {
-                        for file in files.flatten() {
-                            cut += truncate_chunk_file(&file.path());
-                        }
-                    }
+                    stack.push(path);
                 } else {
                     cut += truncate_chunk_file(&path);
                 }
@@ -6512,29 +7083,31 @@ mod tests {
         for index in ["mv", "mf"] {
             crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
         }
-        let high = |e: &Engine, column: &str| -> usize {
+        let high = |e: &Engine, table: &str, column: &str| -> usize {
+            let id = e.test_secondary_id(table, column);
             let tables = e.tables.lock().unwrap();
             tables
                 .values()
-                .find_map(|t| t.secondary.disk.get(column))
+                .find_map(|t| t.secondary.disk.get(&id))
                 .map(|r| r.len())
                 .unwrap_or(0)
         };
-        let low = |e: &Engine, column: &str| -> usize {
+        let low = |e: &Engine, table: &str, column: &str| -> usize {
+            let id = e.test_secondary_id(table, column);
             let tables = e.tables.lock().unwrap();
             tables
                 .values()
-                .find_map(|t| t.secondary.low.get(column))
+                .find_map(|t| t.secondary.low.get(&id))
                 .map(|r| r.len())
                 .unwrap_or(0)
         };
-        assert_eq!(high(&e, "v"), 2);
-        assert_eq!(low(&e, "flag"), 2);
+        assert_eq!(high(&e, "m", "v"), 2);
+        assert_eq!(low(&e, "m", "flag"), 2);
 
         crate::scheduler::block_on(e.optimize_index_chunks()).unwrap();
 
-        assert_eq!(high(&e, "v"), 1);
-        assert_eq!(low(&e, "flag"), 1);
+        assert_eq!(high(&e, "m", "v"), 1);
+        assert_eq!(low(&e, "m", "flag"), 1);
         assert_eq!(e.secondary_chunk_meta("m", "v"), vec![(0, 3)]);
         assert_eq!(
             rows(&e, "SELECT id FROM m WHERE v = 10;"),
@@ -6551,15 +7124,12 @@ mod tests {
         );
     }
 
-    /// A sparse column gets an in-memory tail from a query, with no
-    /// `CREATE INDEX` to name it.
-    ///
-    /// No catalog record names that tail, so the index-selection step of a
-    /// pressure drain cannot find it - but `memindex_bytes_of` charges it all
-    /// the same. The explicit drain is what releases it: it walks the
-    /// registries rather than the catalog, so it sees the column too.
+    /// A `SPARSE` column with **no** `CREATE INDEX` gets no in-memory index:
+    /// the reference's `PhysicalMatchSparseScan::PlanWithIndex` walks
+    /// `TableMeta::GetIndexIDs` and skips a column no `kBMP` index names, so the
+    /// scan reads the blocks. The search still answers - it is just exhaustive.
     #[test]
-    fn a_full_drain_seals_the_tail_of_a_sparse_column_with_no_index() {
+    fn a_sparse_column_without_an_index_is_scanned_not_indexed() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_quota(1 << 30);
@@ -6567,50 +7137,26 @@ mod tests {
             .unwrap();
         e.execute_blocking("INSERT INTO osp VALUES (1, [0:1.0, 1:2.0]), (2, [1:3.0]);")
             .unwrap();
-        // A query is what opens the tail (`sparse_index_for`); the rows written
-        // before it are indexed from the blocks, so the tail only grows with
-        // what arrives afterwards.
-        assert!(!rows(
-            &e,
-            "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
-        )
-        .is_empty());
-        e.execute_blocking("INSERT INTO osp VALUES (3, [0:4.0, 2:5.0]), (4, [3:6.0]);")
-            .unwrap();
-
-        let tail = |e: &Engine| {
-            let tables = e.tables.lock().unwrap();
-            tables[&e.table_key("osp")]
-                .sparse
-                .values()
-                .map(|index| index.read().unwrap().tail_bytes)
-                .sum::<usize>()
-        };
-        assert!(tail(&e) > 0, "the query left rows in the sparse tail");
+        let query = "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);";
+        assert!(!rows(&e, query).is_empty(), "the exact scan answers");
+        // No index record, and therefore no in-memory index was built.
         assert!(
             e.storage.catalog.list_indexes().unwrap().is_empty(),
-            "and no index record names it"
+            "no index record names the column"
         );
-
-        // Sealing an orphan tail writes a chunk, so it belongs to the explicit
-        // dump - the same step that publishes the files - and not to the
-        // pressure path, whose job is to free what it can without changing the
-        // chunk layout a checkpoint is about to produce. `test_mem_bmp` in the
-        // restart suite pins that layout.
-        e.set_memindex_quota(1);
-        crate::scheduler::block_on(e.enforce_memindex_quota(None));
-
-        assert_eq!(
-            tail(&e),
-            0,
-            "the explicit drain seals a tail the catalog does not name"
+        let built = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get(&e.table_key("osp"))
+                .map(|t| !t.sparse.is_empty())
+                .unwrap_or(false)
+        };
+        assert!(!built, "a query must not build an unrecorded index");
+        assert!(
+            e.sparse_index_for("default_db.osp", "s", storage::bmp::IdxWidth::I16)
+                .is_err(),
+            "the lookup refuses a column the catalog does not index"
         );
-        // Sealed, not dropped: the rows still answer.
-        assert!(!rows(
-            &e,
-            "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
-        )
-        .is_empty());
     }
 
     /// One quota governs every index form: when it is exceeded the tails are
@@ -7239,7 +7785,8 @@ mod tests {
             .unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
-        assert!(!entry.ivf_mem.get("v").unwrap().is_empty());
+        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
+        assert!(!entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
         drop(tables);
         let q = "SELECT id FROM iv SEARCH MATCH VECTOR \
                  (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);";
@@ -7247,10 +7794,14 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
+        // The chunk is written by the index's own `DumpIndex` transaction (the
+        // reference's `DumpMemIndex`); a checkpoint writes blocks only.
         crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("iv", "ivx")).unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
-        assert!(entry.ivf_mem.get("v").unwrap().is_empty());
+        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
+        assert!(entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
         assert!(entry.ivf.values().any(|segments| !segments.is_empty()));
         drop(tables);
         assert_eq!(
@@ -7283,10 +7834,12 @@ mod tests {
         // No query has run yet: both indexes already hold every live row.
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.bi").unwrap();
-        let text = entry.text.get("body").unwrap().read().unwrap();
+        let body_id = e.test_index_id("default_db.bi", "body", "FULLTEXT");
+        let text = entry.text.get(&body_id).unwrap().read().unwrap();
         assert_eq!(text.total_docs(), 3);
         drop(text);
-        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
+        let v_id = e.test_index_id("default_db.bi", "v", "HNSW");
+        let mem = entry.hnsw_mem.get(&v_id).unwrap().lock().unwrap();
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
@@ -7560,7 +8113,7 @@ mod tests {
         assert_eq!(
             entry
                 .text
-                .get("body")
+                .get(&e.test_index_id("fam", "body", "FULLTEXT"))
                 .unwrap()
                 .read()
                 .unwrap()
@@ -7568,9 +8121,36 @@ mod tests {
                 .mem_used(),
             0
         );
-        assert_eq!(entry.sparse.get("s").unwrap().read().unwrap().tail_bytes, 0);
-        assert_eq!(entry.mv.get("m").unwrap().read().unwrap().tail_bytes, 0);
-        assert_eq!(entry.secondary.indexes.get("c").unwrap().key_count(), 0);
+        assert_eq!(
+            entry
+                .sparse
+                .get(&e.test_index_id("fam", "s", "BMP"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .tail_bytes,
+            0
+        );
+        assert_eq!(
+            entry
+                .mv
+                .get(&e.test_index_id("fam", "m", "EMVB"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .tail_bytes,
+            0
+        );
+        let secondary_id = e.test_secondary_id("fam", "c");
+        assert_eq!(
+            entry
+                .secondary
+                .indexes
+                .get(&secondary_id)
+                .unwrap()
+                .key_count(),
+            0
+        );
     }
 
     /// The IVF memory segment is part of the same budget: rows written since
@@ -7598,10 +8178,11 @@ mod tests {
         .unwrap();
         e.execute_blocking("INSERT INTO iv VALUES (9,[0.5,0.5,0.5,0.5]);")
             .unwrap();
+        let iv_id = e.test_index_id("iv", "v", "IVF");
         let tables = e.tables.lock().unwrap();
         let rows = tables[&e.table_key("iv")]
             .ivf_mem
-            .get("v")
+            .get(&iv_id)
             .map(|r| r.len())
             .unwrap_or(0);
         drop(tables);
@@ -7616,7 +8197,7 @@ mod tests {
         let tables = e.tables.lock().unwrap();
         assert!(tables[&e.table_key("iv")]
             .ivf_mem
-            .get("v")
+            .get(&iv_id)
             .unwrap()
             .is_empty());
     }
@@ -7941,7 +8522,7 @@ mod tests {
         assert_eq!(
             entry
                 .text
-                .get("body")
+                .get(&e.test_index_id("fd", "body", "FULLTEXT"))
                 .unwrap()
                 .read()
                 .unwrap()
@@ -8019,6 +8600,7 @@ mod tests {
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ivpq", "ivpq_idx")).unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
             matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
@@ -8049,7 +8631,9 @@ mod tests {
              scalar_quantization_bits = 8);",
         )
         .unwrap();
+        // The IVF chunk is written by its `DumpIndex` transaction.
         crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ivsq", "ivsq_idx")).unwrap();
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
@@ -8997,6 +9581,10 @@ mod tests {
             values.trim_end_matches(',')
         ))
         .unwrap();
+        // The BMP index is what carries the `alpha`/`beta` pruning; the
+        // reference resolves it from the catalog, so the test creates one.
+        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
+            .unwrap();
         let score = |opts: &str| -> f64 {
             rows(
                 &e,
@@ -10257,16 +10845,17 @@ mod tests {
         }
         let e = Engine::open(dir.path()).unwrap();
         let (chunks, meta, tail) = {
+            let id = e.test_secondary_id("rg", "c");
             let tables = e.tables.lock().unwrap();
             let sec = &tables
                 .values()
-                .find(|t| t.secondary.disk_backed.contains("c"))
+                .find(|t| t.secondary.disk_backed.contains(&id))
                 .expect("the table reopened with a disk-backed index")
                 .secondary;
             (
-                sec.disk.get("c").map(|d| d.len()).unwrap_or(0),
-                sec.chunk_meta.get("c").cloned().unwrap_or_default(),
-                sec.indexes.get("c").map(|i| i.key_count()).unwrap_or(0),
+                sec.disk.get(&id).map(|d| d.len()).unwrap_or(0),
+                sec.chunk_meta.get(&id).cloned().unwrap_or_default(),
+                sec.indexes.get(&id).map(|i| i.key_count()).unwrap_or(0),
             )
         };
         assert_eq!(chunks, 1, "the published chunk is mapped, not rebuilt");
@@ -10318,11 +10907,12 @@ mod tests {
         crate::scheduler::block_on(e.dump_index_transaction("ri", "ri_c")).unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
         let published = {
+            let id = e.test_secondary_id("ri", "c");
             let tables = e.tables.lock().unwrap();
             tables
                 .values()
-                .find(|t| t.secondary.disk_backed.contains("c"))
-                .map(|t| t.secondary.disk.get("c").map(|d| d.len()).unwrap_or(0))
+                .find(|t| t.secondary.disk_backed.contains(&id))
+                .map(|t| t.secondary.disk.get(&id).map(|d| d.len()).unwrap_or(0))
                 .unwrap_or(0)
         };
         assert!(
@@ -10398,14 +10988,14 @@ mod tests {
         );
     }
 
-    /// `Cleanup` reclaims the full-text chunks of segments a compaction
-    /// deprecated, and keeps the ones whose segment is still live.
+    /// `Cleanup` reclaims the chunk directory of a segment a compaction
+    /// deprecated, and keeps the one whose segment is still live.
     ///
-    /// The reference deletes a deprecated chunk by name in `Cleanup`
-    /// (`CleanChunkIndex` -> `ChunkIndexMeta::UninitSet`); its reader never sees
-    /// one because it is built from the catalog. The port's reader keeps the
-    /// directory, so the loader has to skip retired chunks - and without this
-    /// sweep those files would stay for ever.
+    /// A full-text chunk lives in `idx_{id}/seg_{n}` beside the other kinds
+    /// (`SegmentIndexMeta::GetSegmentIndexDir`), so reclaiming a deprecated
+    /// segment's directory removes its chunks with it. The reference deletes
+    /// them by name in `Cleanup` (`CleanChunkIndex`); this is the same sweep
+    /// seen from the directory.
     #[test]
     fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
         let dir = tempdir().unwrap();
@@ -10424,13 +11014,33 @@ mod tests {
             .unwrap();
             crate::scheduler::block_on(e.flush()).unwrap();
         }
-        let fulltext_dir = dir.path().join("fulltext").join("default_db.cft.body");
-        let chunk_files = || -> Vec<String> {
-            let mut out: Vec<String> = std::fs::read_dir(&fulltext_dir)
+        let indexed_root = || -> std::path::PathBuf {
+            let base = dir.path().join("data/db_1/tbl_0");
+            std::fs::read_dir(&base)
+                .unwrap()
+                .flatten()
+                .map(|d| d.path())
+                .find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("idx_"))
+                })
+                .expect("the index directory")
+        };
+        let chunk_dirs = |root: &std::path::Path| -> Vec<String> {
+            let mut out: Vec<String> = std::fs::read_dir(root)
                 .map(|d| {
                     d.flatten()
+                        .filter(|f| f.path().is_dir())
+                        .filter(|f| {
+                            std::fs::read_dir(f.path())
+                                .map(|c| {
+                                    c.flatten()
+                                        .any(|e| e.file_name().to_string_lossy().ends_with(".dic"))
+                                })
+                                .unwrap_or(false)
+                        })
                         .map(|f| f.file_name().to_string_lossy().to_string())
-                        .filter(|n| n.ends_with(".dic"))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -10438,32 +11048,31 @@ mod tests {
             out
         };
         let before_segments = e.segment_row_counts("cft");
-        let before_chunks = chunk_files();
+        assert_eq!(before_segments.len(), 4, "four segments before the merge");
         assert!(
-            !before_chunks.is_empty(),
-            "the flushes must have sealed chunks: {before_chunks:?} for {before_segments:?}"
+            !chunk_dirs(&indexed_root()).is_empty(),
+            "the flushes must have sealed chunks"
         );
 
         e.compact_all_segments("cft").unwrap();
         crate::scheduler::block_on(e.cleanup()).unwrap();
 
-        let live = e.segment_row_counts("cft");
-        let after_chunks = chunk_files();
-        assert!(
-            !after_chunks.is_empty(),
-            "cleanup removed the merged segment's own chunk"
-        );
-        for name in &after_chunks {
-            let row = name
-                .strip_prefix("ft_")
-                .and_then(|rest| rest.split('.').next())
-                .and_then(|hex| hex.split('_').next())
-                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
-                .expect("a chunk name");
-            let segment = (row >> 32) as u32;
+        let live: Vec<u32> = e
+            .segment_row_counts("cft")
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        let sources: Vec<u32> = before_segments
+            .iter()
+            .map(|(id, _)| *id)
+            .filter(|id| !live.contains(id))
+            .collect();
+        assert_eq!(sources.len(), 4, "four deprecated source segments");
+        for segment in sources {
+            let path = indexed_root().join(format!("seg_{segment}"));
             assert!(
-                live.iter().any(|(id, _)| *id == segment),
-                "cleanup kept the deprecated segment {segment}'s chunk {name}"
+                !path.exists(),
+                "cleanup kept the deprecated segment {segment}'s chunk directory"
             );
         }
         // The index still answers for every row after the sweep.
@@ -10917,12 +11526,11 @@ mod tests {
         );
         assert_eq!(hits.len(), 1);
 
-        let private = dir.path().join("fulltext/default_db.pmt.body");
-        let dic = std::fs::read_dir(&private)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.path())
-            .find(|path| path.extension().is_some_and(|ext| ext == "dic"))
+        // The chunk lives in its segment's index directory.
+        let dic = walk_blobs(&dir.path().join("data"))
+            .keys()
+            .find(|rel| rel.ends_with(".dic"))
+            .map(|rel| dir.path().join("data").join(rel))
             .expect("a sealed chunk");
         let block_column = dir.path().join("data/db_1/tbl_0/seg_0/blk_0").join("0.col");
         let expected_block = std::fs::read(&block_column).unwrap();
@@ -11004,12 +11612,17 @@ mod tests {
         };
         let expected = all(&e);
         assert_eq!(expected.len(), 400);
+        // A full-text chunk lives in its segment's index directory
+        // (`data/db_{d}/tbl_{t}/idx_{i}/seg_{s}/ft_*`), which is what the
+        // manager publishes along with the blocks.
         let published = e
             .persistence
             .as_ref()
             .expect("the manager is installed")
-            .keys_under("fulltext/")
-            .len();
+            .keys_under("")
+            .into_iter()
+            .filter(|key| key.contains("/idx_") && key.contains(".dic"))
+            .count();
         assert!(published > 0, "the chunks were not published");
 
         // Everything the engine keeps locally goes away: `data/` (blocks, the
@@ -11021,19 +11634,19 @@ mod tests {
         // catalog handle deterministically (the engine's background tasks hold
         // their own references), and the reopen path itself is covered by the
         // python gate, one process per engine.
+        // Blocks and index chunks share `data/` now: a chunk lives in
+        // `data/db_{d}/tbl_{t}/idx_{i}/seg_{s}/`.
         let data_before = walk_blobs(&dir.path().join("data"));
-        let chunks_before = walk_blobs(&dir.path().join("fulltext"));
         assert!(
-            chunks_before.keys().any(|name| name.ends_with(".dic")),
+            data_before.keys().any(|name| name.ends_with(".dic")),
             "the merge left no chunk"
         );
         std::fs::remove_dir_all(dir.path().join("data")).unwrap();
-        std::fs::remove_dir_all(dir.path().join("fulltext")).unwrap();
         let manager = e.persistence.as_ref().expect("the manager is installed");
         let restored = manager.restore_missing_files().unwrap();
         assert_eq!(
             restored,
-            data_before.len() + chunks_before.len(),
+            data_before.len(),
             "every data file has an object to come back from"
         );
         let compare = |restored: std::collections::BTreeMap<String, Vec<u8>>,
@@ -11069,11 +11682,6 @@ mod tests {
             walk_blobs(&dir.path().join("data")),
             data_before,
             "the blocks",
-        );
-        compare(
-            walk_blobs(&dir.path().join("fulltext")),
-            chunks_before,
-            "the chunks",
         );
         // And the answers were computed from what is on disk at all.
         assert_eq!(all(&e), expected, "the whole corpus");

@@ -1057,6 +1057,64 @@ impl Catalog {
         crate::layout::write_index_segments(self.store.as_ref(), set, indexes)
     }
 
+    /// The chunk id `segment`'s next dump takes
+    /// (`SegmentIndexMeta::GetAndSetNextChunkID`).
+    ///
+    /// The counter, not a count of files: it only ever moves forward, so an id
+    /// is never reused even after `Cleanup` dropped the chunk that held it.
+    pub fn next_chunk_id(
+        &self,
+        db_id: &str,
+        table_id: &str,
+        index_id: u64,
+        segment: u32,
+    ) -> Result<u32> {
+        self.with_view(|store| {
+            let tag = storage::catalog_format::catalog_index_segment_tag_key(
+                db_id,
+                table_id,
+                &index_id.to_string(),
+                segment,
+                "next_chunk_id",
+            );
+            let counter = store
+                .get(tag.as_bytes())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+                .unwrap_or(0);
+            let records =
+                crate::layout::read_index_chunks(store, db_id, table_id, &index_id.to_string())?;
+            let from_records = records
+                .into_iter()
+                .find(|(id, _)| *id == segment)
+                .and_then(|(_, chunks)| chunks.iter().map(|(id, _)| *id).max())
+                .map(|id| id as u32 + 1)
+                .unwrap_or(0);
+            Ok(counter.max(from_records))
+        })
+    }
+
+    /// Records one chunk a seal just wrote, leaving the segment's other chunks
+    /// alone (`NewCatalog::AddNewChunkIndex1`).
+    pub fn append_index_chunk(
+        &self,
+        set: &crate::layout::SegmentSet,
+        index: &crate::layout::IndexSegment,
+        chunk: &crate::layout::IndexChunk,
+    ) -> Result<usize> {
+        crate::layout::append_index_chunk(self.store.as_ref(), set, index, chunk)
+    }
+
+    /// Replaces one segment's chunk list (`RemoveChunkIDs` + `AddNewChunkIndex1`).
+    pub fn replace_segment_chunks(
+        &self,
+        set: &crate::layout::SegmentSet,
+        index_id: u64,
+        segment: u32,
+        chunks: &[crate::layout::IndexChunk],
+    ) -> Result<usize> {
+        crate::layout::replace_segment_chunks(self.store.as_ref(), set, index_id, segment, chunks)
+    }
+
     /// Marks `segments` as deprecated at `ts` (a compaction's commit ts), for
     /// the table and for each of `index_ids`.
     pub fn drop_segments(
@@ -1419,7 +1477,17 @@ impl Catalog {
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
         let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         let first = meta.columns.len();
-        for (i, c) in columns.iter().enumerate() {
+        // `TableMeta::GetNextColumnID` is a **counter**: it hands out the stored
+        // value and `AddColumns` advances it. Deriving the id from the live
+        // columns instead handed a dropped column's id to the next `ADD COLUMN`,
+        // so the new column inherited the old one's `{id}.col` files. The tag
+        // only moves forward, so the larger of it and the live ids wins (`+1`
+        // covers a directory written before the tag existed).
+        let db_id = self
+            .database_id_of_name(meta.name.split('.').next().unwrap_or(&meta.name))?
+            .unwrap_or(1);
+        let first_id = self.next_column_id_of(db_id, meta.id, &meta.ids)?;
+        for (next_id, (i, c)) in (first_id..).zip(columns.iter().enumerate()) {
             if meta.columns.iter().any(|x| x == c) {
                 return Err(Error::Catalog(format!("column '{c}' already exists")));
             }
@@ -1431,7 +1499,6 @@ impl Catalog {
             meta.comments.push(comments.get(i).cloned().flatten());
             meta.sparse_stores
                 .push(sparse_stores.get(i).copied().flatten());
-            let next_id = meta.ids.iter().copied().max().map_or(0, |v| v + 1);
             meta.ids.push(next_id);
         }
         if self.catalog_only {
@@ -2113,19 +2180,32 @@ impl Catalog {
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
         let _ddl = self.begin_ddl();
-        // Per-table index ids start at 1 and are never reused.
-        let id = if self.catalog_only {
-            self.next_index_id(table)?
-        } else {
-            let short = table.split('.').next_back().unwrap_or(table);
-            self.list_indexes()?
-                .iter()
-                .filter(|i| i.table == table || i.table == short)
-                .map(|i| i.id)
-                .max()
-                .map_or(1, |v| v + 1)
-        };
+        // Per-table index ids start at 1 and are never reused. The counter is
+        // the authority in both modes: deriving the id from the **live** indexes
+        // hands a dropped index's id to the new one, which then inherits its
+        // records and its `drop|idx|` marker.
+        let id = self.next_index_id(table)?;
         self.create_index_typed_with_id(name, table, column, index_type, options, id)
+    }
+
+    /// `TableMeta::GetNextColumnID`: the table's `next_column_id` tag.
+    ///
+    /// A counter, not a count of the live columns: `DROP COLUMN c; ADD COLUMN c`
+    /// must not hand the new column the dropped one's id, or it inherits that
+    /// column's `{id}.col` files. The tag only moves forward, so the larger of
+    /// it and the live ids wins (`+1` covers a directory written before the tag
+    /// existed).
+    fn next_column_id_of(&self, db_id: u64, table_id: u64, live: &[u64]) -> Result<u64> {
+        let tag = storage::catalog_format::catalog_table_tag_key(
+            &db_id.to_string(),
+            &table_id.to_string(),
+            "next_column_id",
+        );
+        let previous = self
+            .with_view(|store| store.get(tag.as_bytes()))?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            .unwrap_or(0);
+        Ok(previous.max(live.iter().copied().max().map_or(0, |v| v + 1)))
     }
 
     /// `TableMeta::GetNextIndexID`: the table's `next_index_id` tag, incremented
@@ -2137,9 +2217,23 @@ impl Catalog {
     /// which then inherits the old record's key, and with it the drop marker.
     fn next_index_id(&self, table: &str) -> Result<u64> {
         let (db_id, bare) = self.db_and_bare_name(table)?;
+        let live_max = |cat: &Self| -> u64 {
+            let short = table.split('.').next_back().unwrap_or(table);
+            cat.list_indexes()
+                .unwrap_or_default()
+                .iter()
+                .filter(|i| i.table == table || i.table == short)
+                .map(|i| i.id)
+                .max()
+                .unwrap_or(0)
+        };
         let Some((table_id, _)) = crate::layout::table_record(self.store.as_ref(), &db_id, &bare)?
         else {
-            return Ok(1);
+            // No C++ table record yet (a native-only catalog before its first
+            // layout rewrite): there is no counter to read, so the live ids are
+            // the only history. They are correct here because nothing has been
+            // dropped yet in such a catalog.
+            return Ok(live_max(self) + 1);
         };
         let tag = storage::catalog_format::catalog_table_tag_key(
             &db_id,
@@ -2150,7 +2244,10 @@ impl Catalog {
             .with_view(|store| store.get(tag.as_bytes()))?
             .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
             .unwrap_or(0);
-        let id = previous + 1;
+        // The counter is the authority, but a catalog that has records and no
+        // tag yet (one written before the tag existed) still has to start past
+        // the live ids.
+        let id = previous.max(live_max(self)) + 1;
         // The layout rewrite below re-reads this tag and keeps the larger value,
         // so staging it is what makes the counter survive the rewrite.
         self.stage(&[(tag.into_bytes(), Some(id.to_string().into_bytes()))])?;

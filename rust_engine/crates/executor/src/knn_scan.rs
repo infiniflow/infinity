@@ -57,7 +57,9 @@ use crate::{Engine, SharedVectorCache};
 /// (`src/executor/operator/physical_scan/physical_knn_scan_impl.cpp`).
 pub(crate) struct KnnCandidateScan<'a> {
     pub table: &'a str,
-    pub column: &'a str,
+    /// The catalog index id in use. The memory and chunk registries are keyed
+    /// by it, not by the column: a column may carry several indexes.
+    pub index_id: Option<u64>,
     pub query: &'a [f32],
     pub rows: &'a [(usize, Vec<Value>)],
     /// The live row ids, when the caller has them: the coverage check needs the
@@ -108,13 +110,14 @@ impl Engine {
         // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
         // below, so ranking matches an exhaustive scan whenever the probe
         // covers the true top-k.
+        let index_id = q.index_id?;
         let ivf = {
             let tables = self.tables.lock().unwrap();
             tables.get(&tkey).and_then(|e| {
-                (e.ivf.contains_key(q.column) || e.ivf_mem.contains_key(q.column)).then(|| {
+                (e.ivf.contains_key(&index_id) || e.ivf_mem.contains_key(&index_id)).then(|| {
                     (
-                        e.ivf.get(q.column).cloned().unwrap_or_default(),
-                        e.ivf_mem.get(q.column).cloned().unwrap_or_default(),
+                        e.ivf.get(&index_id).cloned().unwrap_or_default(),
+                        e.ivf_mem.get(&index_id).cloned().unwrap_or_default(),
                     )
                 })
             })
@@ -156,7 +159,7 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables
                 .get(&tkey)
-                .and_then(|e| e.vector.get(q.column).cloned())
+                .and_then(|e| e.vector.get(&index_id).cloned())
                 .unwrap_or_default()
         };
         // Every sealed segment is its own graph; the query searches each
@@ -170,7 +173,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|e| e.hnsw_mem.get(q.column).cloned());
+            .and_then(|e| e.hnsw_mem.get(&index_id).cloned());
         // No graph at all: this column is answered by the exact scan. Returning
         // `Some(empty)` here would be read as "the index covers nothing", and
         // the caller (which defers decoding the rows) would then score none of
