@@ -635,6 +635,82 @@ mod tests {
         );
     }
 
+    /// A build can start **after** a compaction bumped `text_epoch` and still
+    /// hold the pre-merge rows: the merge's drops are not visible until it
+    /// commits, and the read ts does not separate the two either - a statement
+    /// reads at `current_ts() + 1`, and the writers keep committing past a
+    /// running merge's ts, so a build can look newer than the merge and still
+    /// have read the layout it retires. What separates them is the layout the
+    /// build indexed: every `ROW_ID` segment it covers has to still be live.
+    /// Caching such an index left every hit naming a row no block owns, and
+    /// `MATCH` answered `column "doctitle" is empty` for the rest of the run
+    /// (`TestParallelFulltextIndexReadWrite`, on the query after its writers
+    /// stopped).
+    #[test]
+    fn an_index_of_a_retired_segment_is_never_cached() {
+        let q = "SELECT doctitle FROM retired SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE retired (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX retired_body ON retired (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO retired VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.retired").unwrap();
+        let tkey = e.table_key("retired");
+        let (epoch, live) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            (
+                entry.text_epoch,
+                entry.segments.keys().copied().collect::<Vec<_>>(),
+            )
+        };
+        assert!(
+            !live.contains(&0),
+            "the merge renumbers segment 0, live is {live:?}"
+        );
+        // The layout the merge retired, with one document per (old) live row, so
+        // its document count alone would let it pass for a complete cache.
+        let stale_dir = tempdir().unwrap();
+        let stale = {
+            let mut index = TextIndex::new(
+                stale_dir.path().to_string_lossy().into_owned(),
+                TextTokenizer::default(),
+            );
+            for row in 0..40u64 {
+                index_row(&mut index, row, "harmful chemical");
+            }
+            assert_eq!(
+                index
+                    .covered_row_segments()
+                    .iter()
+                    .copied()
+                    .collect::<Vec<u32>>(),
+                vec![0]
+            );
+            let stale: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+            stale
+        };
+        assert_eq!(
+            e.publish_text_index(&tkey, "body", epoch, stale),
+            crate::engine::statements::TextPublish::Renumbered,
+            "a build of the retired segment must not be cached"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "and the kept cache still answers for the merged layout"
+        );
+    }
+
     /// A merge that lands **inside** a build renumbers every row the build just
     /// read, so its postings name ids nothing owns. The tokenizer/scan window is
     /// too narrow to hit by chance here, so the test drives it deterministically

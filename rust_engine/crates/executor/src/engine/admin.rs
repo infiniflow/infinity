@@ -457,7 +457,17 @@ impl Engine {
         // row ids this merge retires. Retire those: from `compact_ts` on, only an
         // index built against the merged layout may be served. The rebuild above
         // runs at `u64::MAX`, so it survives; a build a query started during the
-        // merge is refused by `publish_text_index`.
+        // merge is refused by `publish_text_index` - either because it started
+        // before the epoch bump, or because the `ROW_ID` segments it indexed are
+        // the ones this merge retires.
+        //
+        // Only the caches `reindex_compacted_text` moved onto the new ids carry
+        // `compact_ts`; everything else was built from a retired layout. A
+        // `built_ts < compact_ts` test is not enough to see that: a statement
+        // reads at `current_ts() + 1`, so a build that started while this merge
+        // was already running can claim a ts at or above `compact_ts` while it
+        // still read the pre-merge rows (`TestParallelFulltextIndexReadWrite`,
+        // `column "doctitle" is empty`).
         {
             let tkey = self.table_key(table);
             let mut tables = self.tables.lock().unwrap();
@@ -466,7 +476,7 @@ impl Engine {
             let stale: Vec<String> = entry
                 .text_built
                 .iter()
-                .filter(|(_, (_, built_ts))| *built_ts < entry.text_min_ts)
+                .filter(|(_, (_, built_ts))| *built_ts != compact_ts)
                 .map(|(column, _)| column.clone())
                 .collect();
             for column in stale {

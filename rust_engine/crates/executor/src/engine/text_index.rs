@@ -1802,6 +1802,36 @@ impl TextIndex {
         self.tails().map(|mem| mem.pending_docs()).sum::<usize>() + self.reader.doc_count()
     }
 
+    /// The `ROW_ID` segments (`row >> 32`) this index holds documents for.
+    ///
+    /// A freshly built index may only be cached while every segment it covers is
+    /// still listed by the catalog: a compaction renumbers the rows of the
+    /// segments it takes, so a posting that names a retired segment resolves to
+    /// nothing (or to another row). The set of covered segments decides that
+    /// exactly; a timestamp comparison cannot, because a statement reads at
+    /// `current_ts() + 1` and other transactions keep committing past a running
+    /// merge's ts while its drops are still invisible (see
+    /// `Engine::publish_text_index`).
+    pub(crate) fn covered_row_segments(&self) -> std::collections::BTreeSet<u32> {
+        let mut segments = std::collections::BTreeSet::new();
+        let mut add = |first: u64, last: u64| {
+            for id in (first >> 32)..=(last >> 32) {
+                segments.insert(id as u32);
+            }
+        };
+        for segment in &self.reader.segments {
+            if let Some((first, last)) = segment.reader.row_range() {
+                add(first, last);
+            }
+        }
+        for tail in self.tails() {
+            if let Some((first, last)) = tail.row_range {
+                add(first, last);
+            }
+        }
+        segments
+    }
+
     /// Writes the current (unsealed) segment's index to disk and clears the
     /// in-memory postings. The spill runs are merged into the segment first.
     /// Returns `false` (leaving the tail readable) if the files cannot be

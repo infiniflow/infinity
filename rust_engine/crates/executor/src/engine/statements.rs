@@ -3857,12 +3857,38 @@ impl Engine {
         epoch: u64,
         index: SharedTextIndex,
     ) -> TextPublish {
+        // The `ROW_ID` segments the build indexed, read before the table lock:
+        // a query holds the index's read guard while it fetches rows, and that
+        // fetch needs `tables`, so the reverse order is the deadlocking one.
+        let covered = index
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .covered_row_segments();
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
         // by the compaction that renumbers the rows, so the build read ids that
         // now name nothing.
         if entry.text_epoch != epoch {
+            return TextPublish::Renumbered;
+        }
+        // The epoch is not enough: a build can *start* after a compaction bumped
+        // it and still read the pre-merge rows, because the merge's drops are
+        // not visible until it commits. The read ts does not catch that either -
+        // a statement reads at `current_ts() + 1`, and the writers keep
+        // committing past a running merge's ts - so what decides is the layout
+        // the build actually indexed: every `ROW_ID` segment it holds documents
+        // for has to still be listed by the catalog. One that is not is a build
+        // of ids the merge retired, and caching it answers `MATCH` with rows no
+        // block owns (`TestParallelFulltextIndexReadWrite`, `column "doctitle"
+        // is empty`).
+        if !entry.segments.is_empty() && !covered.iter().all(|id| entry.segments.contains_key(id)) {
+            if ft_trace_enabled(tkey) {
+                eprintln!(
+                    "[FT] {tkey}.{column} publish refused: build covers retired segments {covered:?}, live {:?}",
+                    entry.segments.keys().collect::<Vec<_>>()
+                );
+            }
             return TextPublish::Renumbered;
         }
         let read_ts = crate::read_ts();
@@ -3885,11 +3911,11 @@ impl Engine {
     /// A merge renumbers every row it takes, so the postings of the kept caches
     /// stop naming live rows the moment it lands. The rows it moved are indexed
     /// here under their new ids - from the row bytes the merge already read, not
-    /// from a scan - and the ids they left are marked overridden
-    /// (`index_delete_row`). Overridden ids are what the sealed read paths skip
-    /// while they iterate (`MergeCursor`), i.e. **before** the top-n cut: leaving
-    /// them in the postings made `MATCH` fill its top-n with rows no fetch can
-    /// resolve and answer "column is empty" on a table full of matches.
+    /// from a scan - and the ids they left are marked overridden. Overridden ids
+    /// are what the read paths skip while they iterate (`MergeCursor`), i.e.
+    /// **before** the top-n cut: leaving them in the postings made `MATCH` fill
+    /// its top-n with rows no fetch can resolve and answer "column is empty" on
+    /// a table full of matches.
     ///
     /// The caches are not dropped for this. Doing that put a full rebuild of the
     /// column on the query path, and a table that keeps taking writes is
