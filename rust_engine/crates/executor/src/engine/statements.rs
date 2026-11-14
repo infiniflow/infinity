@@ -3737,7 +3737,7 @@ impl Engine {
         #[cfg(test)]
         run_text_build_hook();
         match self.publish_text_index(&tkey, column, epoch, shared.clone()) {
-            TextPublish::Cached => return Ok(shared),
+            TextPublish::Cached => Ok(shared),
             // A compaction committed after the build's read. The build still
             // describes exactly the rows this statement sees (one read, one
             // snapshot), so its postings resolve for **this** statement; it just
@@ -3750,7 +3750,7 @@ impl Engine {
             // whole column for every query, and a merge landing inside each
             // rebuild could keep one `MATCH` running for the whole gate timeout
             // (`TestParallelFulltextIndexReadWrite`, 15 s window, 427 s case).
-            TextPublish::ReadTooOld | TextPublish::Renumbered => return Ok(shared),
+            TextPublish::ReadTooOld | TextPublish::Renumbered => Ok(shared),
         }
     }
 
