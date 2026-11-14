@@ -45,19 +45,27 @@ pub fn trim_allocator() {
 /// Drops clean page cache for one file after writing it back. Long imports
 /// write gigabytes of segment/sidecar files; without this the cache grows
 /// until the OOM killer fires (the reference bounds it with its buffer manager).
+///
+/// Darwin has no `posix_fadvise` (it exposes `fcntl(F_NOCACHE)`, which cannot
+/// drop pages that are already cached), so the write-back is all that happens
+/// there: the function is best effort on every target.
 #[allow(unsafe_code)]
 pub fn drop_file_cache(path: &std::path::Path) {
-    use std::os::unix::io::AsRawFd;
     let Ok(file) = std::fs::File::open(path) else {
         return;
     };
     let _ = file.sync_data();
-    // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
-    unsafe {
-        posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::io::AsRawFd;
+        // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
+        unsafe {
+            posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
+        }
     }
 }
 
+#[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
 unsafe extern "C" {
     fn posix_fadvise(fd: i32, offset: i64, len: i64, advice: i32) -> i32;
