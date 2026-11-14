@@ -640,21 +640,9 @@ impl Engine {
     /// processor is attached; one proposal is in flight at a time
     /// (`proposed_dump_`).
     pub(crate) fn propose_dump(&self, drain_all: bool, table: Option<String>) {
+        // Both callers check the processor first, so reaching here without one
+        // is a shutdown in progress: there is no worker to run the task.
         let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
-            // No worker (a test, or shutdown): drain inline, the same way
-            // `enforce_memindex_quota` does. Returning here silently dropped
-            // the dump for every caller that only had this entry point.
-            if let Some(engine) = self.self_weak.lock().unwrap().upgrade() {
-                let table = table.clone();
-                crate::scheduler::block_on(async move {
-                    if drain_all {
-                        engine.dump_all_memory_indexes().await;
-                        engine.dump_all_sealed_blocks(None).await;
-                    } else {
-                        engine.dump_under_pressure(table.as_deref()).await;
-                    }
-                });
-            }
             return;
         };
         // One task per table at a time, but a breach that arrives while that
