@@ -8979,9 +8979,14 @@ impl BgTask for DumpMemIndexTask {
                 }
             };
             if more {
+                // Submit the continuation **without** recording another breach:
+                // the count already holds the one this task serves.
                 if let Some(engine) = self.engine.upgrade() {
-                    let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
-                    engine.propose_dump(drain_all, self.table.clone());
+                    let processor = engine.bg_processor.lock().unwrap().clone();
+                    if let Some(processor) = processor {
+                        let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
+                        engine.submit_dump_task(processor, drain_all, self.table.clone());
+                    }
                 }
             }
         })

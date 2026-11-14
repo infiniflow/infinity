@@ -678,17 +678,34 @@ impl Engine {
                 return;
             }
         }
+        self.submit_dump_task(processor, drain_all, table);
+    }
+
+    /// Enqueues one dump task, without recording a breach.
+    ///
+    /// Separate from [`Self::propose_dump`] because the task's completion uses
+    /// it: going back through `propose_dump` incremented the count it had just
+    /// decremented, so the guard saw "already queued" and returned without
+    /// submitting anything - and every later breach returned the same way, so
+    /// that table never dumped again.
+    pub(crate) fn submit_dump_task(
+        &self,
+        processor: Arc<crate::bg_task::BGTaskProcessor>,
+        drain_all: bool,
+        table: Option<String>,
+    ) {
         let engine = self.self_weak.lock().unwrap().clone();
         let queued = processor.submit(Box::new(DumpMemIndexTask {
             engine,
             pending: Arc::clone(&self.context.memindex_pending),
             drain_all,
-            table,
+            table: table.clone(),
         }));
         if !queued {
             // The processor is shutting down and dropped the task, so no worker
             // will clear its proposal: drop it here or that table is never
             // proposed again.
+            let key = table.unwrap_or_else(|| ALL_TABLES.to_string());
             self.context
                 .memindex_pending
                 .lock()

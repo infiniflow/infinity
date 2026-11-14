@@ -8061,6 +8061,49 @@ mod tests {
         assert!(pending.pending.is_empty() && pending.drain_all.is_empty());
     }
 
+    /// The task that serves a counted breach must not record another one.
+    ///
+    /// Completion decrements the count and then enqueues the next task. Going
+    /// back through `propose_dump` incremented it again, so the "already
+    /// queued" guard fired and nothing was submitted - and every later breach
+    /// took the same path, so the table stopped dumping entirely.
+    #[test]
+    fn a_continuation_dump_does_not_record_a_breach() {
+        use crate::engine::state::MemIndexPending;
+
+        // The bookkeeping both paths share.
+        let mut pending = MemIndexPending::default();
+        let key = "default_db.t".to_string();
+        // Two breaches while one task is queued.
+        *pending.pending.entry(key.clone()).or_insert(0) += 1;
+        *pending.pending.entry(key.clone()).or_insert(0) += 1;
+
+        // Serving one leaves one owed. A continuation must submit with this
+        // count in hand, not re-enter the recording path.
+        let left = {
+            let count = pending.pending.get_mut(&key).unwrap();
+            *count -= 1;
+            *count
+        };
+        assert_eq!(left, 1, "one breach is still owed");
+        assert!(
+            pending.pending.contains_key(&key),
+            "the owed breach stays recorded until a task serves it"
+        );
+
+        // And the continuation itself serves it.
+        let left = {
+            let count = pending.pending.get_mut(&key).unwrap();
+            *count -= 1;
+            *count
+        };
+        assert_eq!(left, 0);
+        if left == 0 {
+            pending.pending.remove(&key);
+        }
+        assert!(pending.pending.is_empty());
+    }
+
     /// The unified budget counts the HNSW charge, not only the text/sparse/
     /// multi-vector/secondary tails: an engine whose only memory is a graph
     /// must still notice it is over.
