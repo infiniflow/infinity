@@ -5113,6 +5113,7 @@ pub(crate) const CLOCK_TICKS_PER_SEC: f64 = 100.0;
 /// field C++'s `SystemInfo::MemoryUsage` (`src/metrics/system_info_impl.cpp:305`)
 /// parses, with `/proc/self/statm` (field 2 = resident pages) as the fallback
 /// for a kernel that does not publish `VmRSS`. Both report the same quantity.
+#[cfg(target_os = "linux")]
 pub(crate) fn process_rss_bytes() -> u64 {
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         for line in status.lines() {
@@ -5138,10 +5139,37 @@ pub(crate) fn process_rss_bytes() -> u64 {
     pages * 4096
 }
 
+/// Resident set size in bytes on the platforms without `/proc`: `ps -o rss=`
+/// reads the same figure from libproc (macOS) / the BSDs' kernel interface and
+/// prints it in KiB. Nothing overflows on the way back to bytes - an RSS is a
+/// `u64` many orders of magnitude larger than any process reaches.
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn process_rss_bytes() -> u64 {
+    let pid = std::process::id().to_string();
+    let Ok(out) = std::process::Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid])
+        .output()
+    else {
+        return 0;
+    };
+    let kb: u64 = String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .unwrap_or(0);
+    kb * 1024
+}
+
 /// Open file descriptors, the way C++'s `SystemInfo::OpenFileCount`
 /// (`src/metrics/system_info_impl.cpp:357`) counts entries in `/proc/<pid>/fd`.
+/// macOS and the BSDs mount the same table at `/dev/fd`, so the count is real
+/// there too instead of a constant zero.
 pub(crate) fn open_file_count() -> u64 {
-    std::fs::read_dir("/proc/self/fd")
+    let path = if cfg!(target_os = "linux") {
+        "/proc/self/fd"
+    } else {
+        "/dev/fd"
+    };
+    std::fs::read_dir(path)
         .map(|entries| entries.filter(|e| e.is_ok()).count() as u64)
         .unwrap_or(0)
 }
