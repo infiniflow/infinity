@@ -2796,6 +2796,33 @@ mod tests {
         }
     }
 
+    /// A chunk that went missing leaves a hole in the list, and the resume
+    /// point `load_sealed` returns is the largest end - past the hole. The
+    /// build asks [`TextIndex::first_coverage_hole`] when the chunks are short
+    /// of the table's rows, and rebuilds from it after
+    /// [`TextIndex::drop_chunks_from`] removed the chunks that cover rows the
+    /// rebuild is about to index again.
+    #[test]
+    fn a_lost_chunk_is_a_hole_the_build_can_rebuild_from() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        // Rows 4..10 have no chunk: it was overwritten by a narrower one.
+        write_chunk(d, 10, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 12, "resume at the largest end");
+        assert_eq!(index.reader.segments.len(), 3, "every chunk loads");
+        assert_eq!(index.first_coverage_hole(), Some(4));
+        assert_eq!(index.drop_chunks_from(4), 1, "the chunk after the hole");
+        assert_eq!(index.reader.segments.len(), 2, "the prefix stays");
+        assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
+        assert!(
+            !std::path::Path::new(&format!("{d}/ft_000000000000000a.dic")).exists(),
+            "its files are gone, so the rebuilt rows are not counted twice"
+        );
+    }
+
     /// An overlapping chunk list is unrecoverable in the reference
     /// (`new_txn_index_impl.cpp:2228-2233`); merging it would produce a doc list
     /// no reference run could produce, so it is refused.

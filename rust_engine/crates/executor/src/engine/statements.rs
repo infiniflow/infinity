@@ -3804,7 +3804,7 @@ impl Engine {
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
+        let mut first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
         if ft_trace_enabled(&key) {
             eprintln!(
                 "[FT] {key} build dir={build_dir} segs_loaded={} first={first} live={:?} catalog_chunks={}",
@@ -3816,6 +3816,35 @@ impl Engine {
                 }),
                 catalog_chunks.len()
             );
+        }
+        // `load_sealed_scoped` hands back where the unsealed rows start, which is
+        // the largest end any chunk covers. That is the right resume point only
+        // while the chunks account for every live row: a chunk that went missing
+        // leaves the rows inside its range unindexed, and resuming past them
+        // never repairs it. A chunk's file name is derived from its first row
+        // id, so two writers publishing one directory can pick the same name and
+        // one write replaces the other - exactly one chunk's worth of rows, live
+        // in the table and absent from the index, and only after a reopen (the
+        // writer's own mmap keeps answering). See
+        // `writers_readers_deletes_and_merges_stay_consistent`.
+        //
+        // A hole alone is legitimate (rows between two seals may have no
+        // postings, or may not exist at all), so it only counts as lost rows
+        // when the chunks are *also* short of the table's live rows. Then the
+        // chunks at and after the hole are dropped and those rows are rebuilt
+        // from the blocks, which keeps the count exact.
+        let covered = index.total_docs();
+        if covered < reserved {
+            if let Some(hole) = index.first_coverage_hole() {
+                let dropped = index.drop_chunks_from(hole);
+                if ft_trace_enabled(&key) {
+                    eprintln!(
+                        "[FT] {key} chunks cover {covered} < reserved {reserved}, hole at row \
+                         {hole}: dropped {dropped} chunk(s), rebuilding from there"
+                    );
+                }
+                first = hole as usize;
+            }
         }
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {

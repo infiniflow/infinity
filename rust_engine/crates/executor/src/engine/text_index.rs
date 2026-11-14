@@ -1815,6 +1815,66 @@ impl TextIndex {
         next
     }
 
+    /// Where the loaded chunk list stops being contiguous inside one `ROW_ID`
+    /// segment, if it does.
+    ///
+    /// A hole is legitimate on its own: rows between two seals may have no
+    /// postings at all (`InsertGap`), or the rows in between may not exist, and
+    /// `load_sealed` must keep the chunks on both sides of it
+    /// (`optimize_merges_every_contiguous_run`). It is only *evidence of a lost
+    /// chunk* when the caller also finds the index short of the table's rows:
+    /// chunks are published under a name derived from their first row id, so a
+    /// chunk that a second writer overwrote with a narrower one leaves exactly
+    /// this shape - and `next` cannot repair it, because it resumes at the
+    /// largest end and the rows inside the hole are then indexed never again.
+    pub(crate) fn first_coverage_hole(&self) -> Option<u64> {
+        let mut order: Vec<usize> = (0..self.reader.segments.len()).collect();
+        order.sort_by_key(|at| self.reader.segments[*at].reader.base_row_id());
+        for pair in order.windows(2) {
+            let previous = &self.reader.segments[pair[0]];
+            let following = &self.reader.segments[pair[1]];
+            let (previous_base, following_base) = (
+                previous.reader.base_row_id(),
+                following.reader.base_row_id(),
+            );
+            // Two `ROW_ID` segments are 2^32 apart, and a segment's chunk list
+            // starts where its own rows start: only a gap *inside* one segment
+            // can be a lost chunk.
+            if (previous_base >> 32) != (following_base >> 32) {
+                continue;
+            }
+            let Some((_, previous_last)) = previous.reader.row_range() else {
+                continue;
+            };
+            if following_base > previous_last + 1 {
+                return Some(previous_last + 1);
+            }
+        }
+        None
+    }
+
+    /// Drops every sealed chunk at or after `hole`, files included, so a caller
+    /// can re-index those rows from the blocks without counting them twice.
+    /// Returns how many chunks were dropped. The chunks below `hole` stay: they
+    /// are still the truth for the rows they cover.
+    pub(crate) fn drop_chunks_from(&mut self, hole: u64) -> usize {
+        let mut kept = Vec::with_capacity(self.reader.segments.len());
+        let mut dropped = 0usize;
+        for segment in std::mem::take(&mut self.reader.segments) {
+            if segment.reader.base_row_id() >= hole {
+                storage::invertedindex::chunk_manifest::remove_chunk(
+                    &self.dir,
+                    segment.reader.base_name(),
+                );
+                dropped += 1;
+            } else {
+                kept.push(segment);
+            }
+        }
+        self.reader.segments = kept;
+        dropped
+    }
+
     /// Documents in the column across the sealed segments and the unsealed
     /// segment (the memory tail, a tail in flight and their spill runs).
     pub(crate) fn total_docs(&self) -> usize {
@@ -2299,6 +2359,12 @@ impl TextIndex {
                     .map(move |(name, _)| (name.as_str(), index))
             })
             .collect();
+        // A run whose merge failed keeps **every** source: the files are still on
+        // disk and they are the only copy of those rows' postings. Dropping the
+        // members behind the first one (the shape this loop used to have) made
+        // the index answer without those rows until the next reopen, while the
+        // files looked healthy the whole time.
+        let failed: Vec<bool> = merged.iter().map(Option::is_none).collect();
         let segments = std::mem::take(&mut self.reader.segments);
         let mut out: Vec<SealedSegment> = Vec::with_capacity(segments.len());
         for segment in segments {
@@ -2307,6 +2373,10 @@ impl TextIndex {
                 out.push(segment);
                 continue;
             };
+            if failed[run_index] {
+                out.push(segment);
+                continue;
+            }
             // The merged chunk takes the place of the run's first member; the
             // rest of the run's chunks disappear into it.
             if plan.runs[run_index].sources[0].0 != base_name {
@@ -2318,7 +2388,8 @@ impl TextIndex {
                     done[run_index] = true;
                     applied += 1;
                 }
-                // The merge failed: its sources stay as they are.
+                // Unreachable while `failed` above is exact; keeping the sources
+                // is the only safe answer if it ever is not.
                 None => out.push(segment),
             }
         }
