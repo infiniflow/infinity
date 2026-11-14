@@ -3228,6 +3228,11 @@ impl Drop for ScanSlot<'_> {
 /// and dumping it on `flush()` keeps the query path read-only.
 pub(crate) struct MultiVectorIndex {
     pub(crate) dims: usize,
+    /// This index's chunk root, `idx_{index_id}`, when the catalog knows one.
+    ///
+    /// Chunks are written to `chunk_root/seg_{n}/` - the place the catalog's
+    /// `idx_chunk` records name. `dir` stays as the transient spill directory.
+    pub(crate) chunk_root: Option<PathBuf>,
     pub(crate) dir: PathBuf,
     /// `ROW_ID -> token rows` for documents not yet dumped.
     pub(crate) tail: std::collections::BTreeMap<u64, Vec<Vec<f32>>>,
@@ -3428,15 +3433,13 @@ impl MultiVectorIndex {
         smve_config: Option<SmveConfig>,
         emvb_config: Option<EmvbConfig>,
     ) -> Self {
-        let next_chunk = std::fs::read_dir(&dir)
-            .map(|d| {
-                d.filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().is_some_and(|x| x == "mvec"))
-                    .count() as u64
-            })
-            .unwrap_or(0);
+        // The counter is seeded from the catalog once the owner knows the index
+        // (`attach_mv_chunk_root`); counting the directory would hand out an id
+        // a file still holds, or skip one a cleanup removed.
+        let next_chunk = 0u64;
         Self {
             dims,
+            chunk_root: None,
             dir,
             tail: Default::default(),
             sealed: Vec::new(),
@@ -3656,18 +3659,6 @@ impl MultiVectorIndex {
         self.scanned_rows >= live_rows && (!self.plaid_dropped || self.plaid_unavailable)
     }
 
-    /// Whether this index was built knowing about `kind` (`PLAID` / `SMVE`).
-    /// `EMVB` has no config of its own and is always known.
-    pub(crate) fn knows_kind(&self, kind: &str) -> bool {
-        if kind.eq_ignore_ascii_case("PLAID") {
-            self.plaid_config.is_some()
-        } else if kind.eq_ignore_ascii_case("SMVE") {
-            self.smve_config.is_some()
-        } else {
-            true
-        }
-    }
-
     /// C++: `SMVEIndexInMem::BuildFromColumn` over the buffered documents.
     pub(crate) fn build_smve(&mut self) {
         if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
@@ -3769,9 +3760,18 @@ impl MultiVectorIndex {
             rows.sort_by_key(|(seq, _)| *seq);
             let ids: Vec<u64> = rows.iter().map(|(seq, _)| *seq).collect();
             let docs: Vec<Vec<Vec<f32>>> = rows.into_iter().map(|(_, doc)| doc).collect();
+            // A dumped chunk belongs in the segment's own directory, the place
+            // its catalog record names; `dir` is the transient spill area.
+            let out_dir = match &self.chunk_root {
+                Some(root) => root.join(format!("seg_{segment}")),
+                None => self.dir.clone(),
+            };
+            if std::fs::create_dir_all(&out_dir).is_err() {
+                continue;
+            }
             let name = format!("seg_{segment}_{}_{}.mvec", self.next_chunk, docs.len());
             self.next_chunk += 1;
-            let path = self.dir.join(name);
+            let path = out_dir.join(name);
             if storage::multivector_segment::write_multivector_segment(&path, self.dims, &docs)
                 .is_err()
             {
@@ -3832,40 +3832,84 @@ impl MultiVectorIndex {
     /// `ids` is the live, parseable row list in document order - the same list
     /// the chunk writer used (`column_docs`), split per segment.
     pub(crate) fn load_sealed(&mut self, ids: &[u64]) {
-        let Ok(entries) = std::fs::read_dir(&self.dir) else {
-            return;
+        // Chunks live under `chunk_root/seg_{n}/`; `dir` only holds spills from
+        // before the catalog owned them.
+        let roots: Vec<&Path> = match &self.chunk_root {
+            Some(root) => vec![root.as_path()],
+            None => vec![self.dir.as_path()],
         };
-        let mut chunks: Vec<(u64, std::path::PathBuf)> = entries
-            .flatten()
-            .filter_map(|entry| {
-                let path = entry.path();
-                if path.extension().is_none_or(|x| x != "mvec") {
-                    return None;
+        let mut chunks: Vec<(u64, u64, std::path::PathBuf)> = Vec::new();
+        for root in roots {
+            let Ok(segments) = std::fs::read_dir(root) else {
+                continue;
+            };
+            for seg in segments.flatten() {
+                let dir = if seg.path().is_dir() {
+                    seg.path()
+                } else {
+                    root.to_path_buf()
+                };
+                let Ok(entries) = std::fs::read_dir(&dir) else {
+                    continue;
+                };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().is_none_or(|x| x != "mvec") {
+                        continue;
+                    }
+                    // `seg_<segment>_<chunk>_<rows>.mvec`, the name `seal` writes.
+                    let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                        continue;
+                    };
+                    let Some(segment) = stem
+                        .strip_prefix("seg_")
+                        .and_then(|rest| rest.split('_').next())
+                        .and_then(|id| id.parse().ok())
+                    else {
+                        continue;
+                    };
+                    // `seg_<segment>_<chunk>_<rows>.mvec`; sort by the two
+                    // numbers, not by the path. Lexically `seg_0_10_` precedes
+                    // `seg_0_2_`, which handed the newest chunk's rows the older
+                    // chunk's ids.
+                    let ordinal = stem
+                        .strip_prefix("seg_")
+                        .and_then(|rest| rest.split('_').nth(1))
+                        .and_then(|id| id.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    chunks.push((segment, ordinal, path));
                 }
-                // `seg_<segment>_<chunk>_<rows>.mvec`, the name `seal` writes.
-                let stem = path.file_stem()?.to_str()?;
-                let segment = stem.strip_prefix("seg_")?.split('_').next()?.parse().ok()?;
-                Some((segment, path))
-            })
-            .collect();
-        chunks.sort();
-        for (segment, path) in chunks {
+            }
+        }
+        chunks.sort_by_key(|(segment, ordinal, _)| (*segment, *ordinal));
+        // A segment can be written by more than one dump, so its chunks each
+        // hold a slice of it. Walk them in chunk order and hand each the next
+        // `doc_count` of that segment's live rows: requiring every chunk to
+        // cover the **whole** segment rejected all of them and left the
+        // fallback (`search` falls through to it when a filter excludes every
+        // PLAID candidate) empty for a multi-dump segment.
+        let mut cursor: std::collections::HashMap<u64, usize> = Default::default();
+        for (segment, _, path) in chunks {
             let Ok(reader) = storage::multivector_segment::MultiVectorSegmentReader::open(&path)
             else {
                 continue;
             };
-            let segment_ids: Vec<u64> = ids
+            let at = cursor.entry(segment).or_default();
+            // The chunk's rows are the ones written together, in row order.
+            let taken: Vec<u64> = ids
                 .iter()
                 .copied()
                 .filter(|seq| *seq >> 32 == segment)
+                .skip(*at)
+                .take(reader.doc_count())
                 .collect();
-            // A chunk whose document count no longer matches the live rows was
-            // written before a delete; the PLAID rebuild will rewrite it.
-            if reader.doc_count() != segment_ids.len() {
+            // A chunk longer than what the segment still has was written before
+            // a delete; the PLAID rebuild will rewrite it.
+            if taken.len() != reader.doc_count() {
                 continue;
             }
-            self.sealed
-                .push((Arc::new(reader), Arc::new(segment_ids), None));
+            *at += taken.len();
+            self.sealed.push((Arc::new(reader), Arc::new(taken), None));
         }
     }
 
@@ -4053,6 +4097,8 @@ pub(crate) struct SparseIndex {
     pub(crate) block_size: usize,
     /// The catalog's `SparseStoreType` for this column.
     pub(crate) store: CatalogSparseStore,
+    /// This index's chunk root, `idx_{index_id}`, when the catalog knows one.
+    pub(crate) chunk_root: Option<PathBuf>,
     pub(crate) dir: PathBuf,
     /// The term space declared by the column type (`SPARSE(elem,index,bound)`),
     /// or 0 when the column declares no bound. The reference sizes the BMP
@@ -4141,17 +4187,13 @@ impl SparseIndex {
         store: CatalogSparseStore,
         block_size: usize,
     ) -> Self {
-        let next_chunk = std::fs::read_dir(&dir)
-            .map(|d| {
-                d.filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().is_some_and(|x| x == "bmp"))
-                    .count() as u64
-            })
-            .unwrap_or(0);
+        // Seeded from the catalog by `attach_sparse_chunk_root`.
+        let next_chunk = 0u64;
         Self {
             width,
             block_size,
             store,
+            chunk_root: None,
             dir,
             terms: 0,
             tail: Default::default(),
@@ -4204,6 +4246,35 @@ impl SparseIndex {
                 .sum::<usize>()
     }
 
+    /// Maps the chunks the catalog already lists, so a reopened index serves
+    /// them instead of writing them again.
+    ///
+    /// Without this a rebuild put **every** row into the tail and sealed it as
+    /// one more chunk beside the ones on disk: the segment then held several
+    /// overlapping generations, each with its own `term_num`, and a search
+    /// scored the same row more than once with different normalisations
+    /// (`test_mem_bmp`: a self-query answered `[4, 4, 2, 2, 1, ...]` instead of
+    /// the seven `4`s the index covers). `covered` is what the loaded chunks
+    /// cover, per `ROW_ID` segment, as `[begin, end)` in segment offsets.
+    pub(crate) fn load_sealed(
+        &mut self,
+        chunks: &[(u64, std::path::PathBuf, u64, u64)],
+    ) -> std::collections::HashMap<u64, Vec<(u64, u64)>> {
+        let mut covered: std::collections::HashMap<u64, Vec<(u64, u64)>> = Default::default();
+        for (segment, path, base_row_id, row_count) in chunks {
+            let Ok(reader) = storage::bmp::BmpReader::open(path, self.width) else {
+                continue;
+            };
+            self.sealed.push((*segment, Arc::new(reader)));
+            let begin = base_row_id & 0xffff_ffff;
+            covered
+                .entry(*segment)
+                .or_default()
+                .push((begin, begin + row_count));
+        }
+        covered
+    }
+
     /// Dumps the memory tail into one BMP file per `ROW_ID` segment per seal.
     ///
     /// The file is *not* the published chunk: the reference's chunk is the
@@ -4234,9 +4305,17 @@ impl SparseIndex {
                 .unwrap_or(0)
                 .max(1) as usize)
                 .max(self.terms);
+            // A dumped chunk belongs in the segment's own directory.
+            let out_dir = match &self.chunk_root {
+                Some(root) => root.join(format!("seg_{segment}")),
+                None => self.dir.clone(),
+            };
+            if std::fs::create_dir_all(&out_dir).is_err() {
+                continue;
+            }
             let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
             self.next_chunk += 1;
-            let path = self.dir.join(name);
+            let path = out_dir.join(name);
             if storage::bmp::write_bmp_file(&path, self.block_size, self.width, &docs, term_num)
                 .is_err()
             {
@@ -4434,30 +4513,96 @@ pub(crate) type SecondaryDiskChunks =
 /// Sealed low-cardinality (boolean) chunk readers with their base row id.
 pub(crate) type SecondaryLowChunks = Vec<(u64, Arc<storage::secondary_lowcard::LowCardReader>)>;
 
+/// What an index-registry drop removes: one record, every record on a column,
+/// or every record of the table.
+///
+/// The three cases are the three statements that drop an index - `DROP INDEX`,
+/// `DROP COLUMN`, `DROP TABLE` - and spelling them out keeps the calls readable:
+/// a pair of `Option`s made "no id and no column" read like an empty selection
+/// when it actually means "the whole table".
+pub(crate) enum DropScope<'a> {
+    /// One catalog record (`DROP INDEX`).
+    Record(u64),
+    /// Every record of that kind on `column` (`DROP COLUMN`).
+    Column(&'a str),
+    /// Every record of that kind on the table (`DROP TABLE`).
+    Table,
+}
+
+impl DropScope<'_> {
+    /// The ids this scope names, given the records of one kind in `table`.
+    ///
+    /// `None` means "everything the registry holds": the caller has no catalog
+    /// handle to resolve against (`DropScope::Table`), or the record is gone.
+    pub(crate) fn ids(&self, resolve_column: impl Fn(&str) -> Vec<u64>) -> Option<Vec<u64>> {
+        match self {
+            Self::Record(id) => Some(vec![*id]),
+            Self::Column(column) => Some(resolve_column(column)),
+            Self::Table => None,
+        }
+    }
+}
+
+/// The quota's proposed dumps: one per table, `drain_all` when the proposal
+/// asked for every tail.
+///
+/// A second breach for a table already listed merges into the pending entry
+/// instead of queueing a second task (`MemIndexTracer::proposed_dump_`'s
+/// coalescing); a breach for a different table still gets its own task.
+#[derive(Default)]
+pub(crate) struct MemIndexPending {
+    /// How many breaches each table has reported since its dump was proposed,
+    /// with [`ALL_TABLES`] standing for "every tail". A dump serves one, so a
+    /// count above 1 means another one is owed.
+    ///
+    /// The reference's `proposed_dump_` skips an **index** that already has a
+    /// dump in flight, but the breach it would have served is not lost: the
+    /// next `IncreaseMemoryUsage` sees the freed memory and only re-proposes if
+    /// it is still over. Counting here is the port's equivalent - a proposal
+    /// that arrives while a dump is queued is served by the dump that follows
+    /// it, not dropped.
+    pub(crate) pending: std::collections::HashMap<String, usize>,
+    /// The `drain_all` a queued task was asked for, per key.
+    pub(crate) drain_all: std::collections::HashSet<String>,
+}
+
+/// The marker [`MemIndexPending::tables`] uses for an "every tail" proposal.
+pub(crate) const ALL_TABLES: &str = "*";
+
 /// Secondary-index registry of one table (the reference's index metas under
-/// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by column.
+/// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by
+/// **index id**.
+///
+/// The reference's identity for a secondary index is its catalog record, not
+/// its column: `MemIndex` is keyed by
+/// `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index` and holds one
+/// `SecondaryIndexInMem` each, so `CREATE INDEX a (c)` and `CREATE INDEX b (c)`
+/// are two tails, two chunk lists and two chunk directories. Keying the port's
+/// maps by column made the two share one tail: the first dump emptied it and
+/// the second index then wrote nothing (its `idx_{id}/` directory stayed
+/// empty and `Cleanup` had no files to reclaim).
 #[derive(Default)]
 pub(crate) struct SecondaryIndexes {
-    /// Memory tails: rows written since the last chunk dump.
+    /// Memory tails: rows written since the last chunk dump, one per index.
     ///
-    /// Shared behind an `Arc` so a scan or a bulk insert can hold one column's
+    /// Shared behind an `Arc` so a scan or a bulk insert can hold one index's
     /// tail across the table lock, and so the tail's own RCU handles reader /
     /// writer overlap (see `index::SecondaryIndex`).
-    pub(crate) indexes: HashMap<String, Arc<SecondaryIndex>>,
+    pub(crate) indexes: HashMap<u64, Arc<SecondaryIndex>>,
     /// The declared type of each indexed column, which fixes its ordered key
     /// domain (`ConvertToOrderedType`): a tail key is the value's
     /// order-preserving encoding, so a range scan can slice it. Recorded when
     /// the index is created and read back when the tail is dumped into a chunk.
-    pub(crate) declared_types: HashMap<String, String>,
+    pub(crate) declared_types: HashMap<u64, String>,
     /// Low-cardinality (boolean) chunk readers with their base row id.
-    pub(crate) low: HashMap<String, SecondaryLowChunks>,
+    pub(crate) low: HashMap<u64, SecondaryLowChunks>,
     /// High-cardinality (integer/varchar) PGM chunk readers.
-    pub(crate) disk: HashMap<String, SecondaryDiskChunks>,
-    /// Dumped chunk metadata per column: `(base row id, row count)` — the
+    pub(crate) disk: HashMap<u64, SecondaryDiskChunks>,
+    /// Dumped chunk metadata per index: `(base row id, row count)` — the
     /// `ChunkIndexMetaInfo` the reference stores next to each chunk.
-    pub(crate) chunk_meta: HashMap<String, Vec<(u64, usize)>>,
-    /// Columns whose memory map is a tail backed by on-disk chunks.
-    pub(crate) disk_backed: std::collections::HashSet<String>,
+    pub(crate) chunk_meta: HashMap<u64, Vec<(u64, usize)>>,
+    /// Indexes whose memory map is a tail backed by on-disk chunks.
+    pub(crate) disk_backed: std::collections::HashSet<u64>,
     /// Functional indexes of this table, keyed by the expression the catalog
     /// stores as the index's column (`lower(name)`).
     pub(crate) functional: HashMap<String, FunctionalIndex>,
@@ -4467,7 +4612,7 @@ pub(crate) struct SecondaryIndexes {
     /// entries only becomes visible a few writes later. A reader landing in that
     /// window would see neither copy, so the dump keeps the frozen entries here
     /// and readers merge them until the chunk is registered.
-    pub(crate) sealing: HashMap<String, Vec<std::sync::Arc<index::SealedTail>>>,
+    pub(crate) sealing: HashMap<u64, Vec<std::sync::Arc<index::SealedTail>>>,
 }
 
 impl TableEntry {
@@ -4696,18 +4841,32 @@ pub(crate) struct TableEntry {
     pub(crate) column_index_analyzers: HashMap<String, std::collections::BTreeMap<String, String>>,
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
-    /// HNSW memory segment per vector column (`MemIndex::hnsw_index_`).
-    pub(crate) hnsw_mem: HashMap<String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
-    /// HNSW bytes buffered per column since its last dump (memindex quota).
-    pub(crate) index_pending_bytes: HashMap<String, usize>,
-    /// Whether this table's HNSW indexes were probed since the last dump.
+    /// HNSW memory segment per **index** (`MemIndex::hnsw_index_`).
+    ///
+    /// Keyed by the catalog index id, not the column: the reference keeps one
+    /// `MemIndex` per `SegmentIndexMeta` (a `(index, segment)` pair), so two
+    /// `USING HNSW` indexes on one column own two graphs.
+    pub(crate) hnsw_mem: HashMap<u64, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+    /// HNSW bytes buffered per index since its last dump (memindex quota).
+    pub(crate) index_pending_bytes: HashMap<u64, usize>,
+    /// Whether this table's HNSW indexes have been looked up in the catalog at
+    /// least once, so the per-row insert hook does not scan the catalog again
+    /// for a table that has none.
     pub(crate) hnsw_probed: bool,
-    /// Sparse (BMP) indexes per column.
-    pub(crate) sparse: HashMap<String, Arc<std::sync::RwLock<SparseIndex>>>,
-    /// Multi-vector indexes per column.
-    pub(crate) mv: HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>,
-    /// Full-text inverted indexes per column.
-    pub(crate) text: HashMap<String, SharedTextIndex>,
+    /// Set when the registry must be topped up from the catalog
+    /// (`CREATE INDEX … USING HNSW`, a reopen). The insert hook consumes it, so
+    /// a warm insert never reads the catalog.
+    pub(crate) hnsw_topup: bool,
+    /// Sparse (BMP) indexes per **index** id.
+    pub(crate) sparse: HashMap<u64, Arc<std::sync::RwLock<SparseIndex>>>,
+    /// Multi-vector indexes per **index** id.
+    pub(crate) mv: HashMap<u64, Arc<std::sync::RwLock<MultiVectorIndex>>>,
+    /// Full-text inverted indexes per **index** id.
+    ///
+    /// One `MemoryIndexer` per `TableIndexMeta`, matching
+    /// `SegmentIndexMeta::GetMemIndex()`: two full-text indexes on one column
+    /// have separate tails, separate chunk lists and separate chunk ids.
+    pub(crate) text: HashMap<u64, SharedTextIndex>,
     /// Bumped whenever cached full-text indexes are dropped: a compaction that
     /// renumbers every row, or `drop_text_index_storage`.
     ///
@@ -4717,26 +4876,26 @@ pub(crate) struct TableEntry {
     /// `Engine::publish_text_index` checks it against.
     pub(crate) text_epoch: u64,
     /// The `(text_epoch, read_ts)` each cached index was published at, per
-    /// column.
+    /// index id.
     ///
     /// A cached index is only reusable when both agree: the entry that survives
     /// a bump was built from the layout that bump retired, and one built at an
     /// older `read_ts` names rows a later merge moved.
-    pub(crate) text_built: HashMap<String, (u64, u64)>,
+    pub(crate) text_built: HashMap<u64, (u64, u64)>,
     /// The commit ts of the last compaction whose drops are visible. A build
     /// that read at an older ts saw the source segments, so its postings name
     /// rows the merge retired; publishing it is refused.
     pub(crate) text_min_ts: u64,
-    /// Secondary indexes per column with their sealed chunk readers.
+    /// Secondary indexes per **index** id with their sealed chunk readers.
     pub(crate) secondary: SecondaryIndexes,
-    /// HNSW chunks loaded from the C++ block mirror, per column (the
+    /// HNSW chunks loaded from the C++ block mirror, per index id (the
     /// reference's `TableIndexMeta` chain for the index, on-disk form).
-    pub(crate) vector: HashMap<String, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
-    /// IVF chunks loaded from the C++ mirror, per column.
-    pub(crate) ivf: HashMap<String, Vec<Arc<index::ivf::IvfSegment>>>,
-    /// IVF memory segment: rows written since the last mirror dump, merged
-    /// with the sealed chunks at query time.
-    pub(crate) ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
+    pub(crate) vector: HashMap<u64, Vec<Arc<crate::blocks::LoadedVectorIndex>>>,
+    /// IVF chunks loaded from the C++ mirror, per index id.
+    pub(crate) ivf: HashMap<u64, Vec<Arc<index::ivf::IvfSegment>>>,
+    /// IVF memory segment per index id: rows written since the last mirror
+    /// dump, merged with the sealed chunks at query time.
+    pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,
@@ -4942,13 +5101,16 @@ pub(crate) struct Context {
     /// `PhysicalFlush` only runs a checkpoint and the cross-engine byte gates
     /// compare directories after `flush_data()`.
     pub(crate) flush_dumps_mem_index: std::sync::atomic::AtomicBool,
-    /// Set while a background `DumpMemIndexTask` proposed by the quota is
-    /// queued or running (C++ `MemIndexTracer::proposed_dump_`). Prevents the
-    /// per-row quota check from queueing one task per row.
-    pub(crate) memindex_pending: Arc<std::sync::atomic::AtomicUsize>,
-    /// Milliseconds of the last `memindex_bytes` check (see
-    /// `Engine::enforce_memindex_quota`).
-    pub(crate) last_quota_check_ms: std::sync::atomic::AtomicU64,
+    /// The tables with a quota-proposed `DumpMemIndexTask` queued or running,
+    /// and the engine-wide count that gates the fast path.
+    ///
+    /// The reference's `MemIndexTracer::proposed_dump_` records the indexes a
+    /// dump already covers and skips **those**; it does not refuse to propose
+    /// anything else. A single global flag did: while one table's dump was in
+    /// flight, another table's breach was dropped outright, so that table
+    /// never drained (two databases, one HNSW index each, in
+    /// `test_optimize_from_different_database`).
+    pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,
@@ -5928,6 +6090,21 @@ pub(crate) fn index_key(table: &str, column: &str) -> String {
     format!("{table}.{column}")
 }
 
+/// The identity of one **in-memory index**: the catalog index id, not the
+/// column it is built on.
+///
+/// The reference keys its `MemIndex` map by
+/// `idx_seg|{db}|{tbl}|{index_id}|{segment}|mem_index`
+/// (`SegmentIndexMeta::GetSegmentIndexTag`), so two indexes on one column are
+/// two independent memory objects. Keying the port's registries by column
+/// instead made them share one tail: the first dump released it and the second
+/// index then found nothing to write (its chunk never appeared), and a second
+/// full-text index on a column needed its chunk files copied into its own
+/// directory just so the shared reader would find them.
+pub(crate) fn mem_index_key(table: &str, index_id: u64) -> String {
+    format!("{table}#{index_id}")
+}
+
 /// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
 ///
 /// C++: `MemoryIndexer::Insert` followed by the spill `CommitOffline` performs
@@ -5946,7 +6123,11 @@ pub(crate) fn index_row_prepared(index: &mut TextIndex, doc: &PreparedDoc) {
     if index.mem.insert_prepared(doc, budget) {
         return;
     }
-    if index.mem.spill(&index.dir) && index.mem.insert_prepared(doc, budget) {
+    // A spill run is a transient chunk of the segment its rows belong to
+    // (`MemoryIndexer::CommitOffline` writes it beside the chunk files), so it
+    // goes into that segment's directory.
+    let spill_dir = storage::invertedindex::format::segment_chunk_dir(&index.dir, doc.seq >> 32);
+    if index.mem.spill(&spill_dir) && index.mem.insert_prepared(doc, budget) {
         return;
     }
     // Either the run could not be written (no directory, disk error) or this
@@ -8804,10 +8985,39 @@ impl BgTask for DumpMemIndexTask {
                     engine.dump_all_memory_indexes().await;
                     engine.dump_all_sealed_blocks(None).await;
                 } else {
-                    engine.dump_under_pressure(None).await;
+                    engine.dump_under_pressure(self.table.as_deref()).await;
                 }
             }
-            self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
+            // This task served one breach for its table. A breach that
+            // arrived while it was queued is still counted, and the dump that
+            // follows it is what turns that insert into its own chunk.
+            let key = self.table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
+            let more = {
+                let mut pending = self.pending.lock().unwrap();
+                let left = pending.pending.get_mut(&key).map(|count| {
+                    *count = count.saturating_sub(1);
+                    *count
+                });
+                match left {
+                    Some(0) | None => {
+                        pending.pending.remove(&key);
+                        pending.drain_all.remove(&key);
+                        false
+                    }
+                    Some(_) => true,
+                }
+            };
+            if more {
+                // Submit the continuation **without** recording another breach:
+                // the count already holds the one this task serves.
+                if let Some(engine) = self.engine.upgrade() {
+                    let processor = engine.bg_processor.lock().unwrap().clone();
+                    if let Some(processor) = processor {
+                        let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
+                        engine.submit_dump_task(processor, drain_all, self.table.clone());
+                    }
+                }
+            }
         })
     }
 }

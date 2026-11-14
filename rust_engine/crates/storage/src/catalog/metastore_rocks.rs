@@ -53,9 +53,20 @@ impl RocksMetaStore {
     /// everything else is written with `disable_wal` and becomes durable at the
     /// checkpoint's `Flush()` (see `keeps_wal`).
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        // `create_if_missing` creates the database's own files, not its parent
+        // directory: a data root that was just emptied (the restart harness
+        // removes `catalog/` between cases) made `DB::open` fail with
+        // "No such file or directory" and the server exit at startup.
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::Io {
+                path: parent.to_path_buf(),
+                source: e,
+            })?;
+        }
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        let db = DB::open(&opts, path.as_ref()).map_err(re)?;
+        let db = DB::open(&opts, path).map_err(re)?;
         Ok(Self {
             db,
             merge_lock: Mutex::new(()),

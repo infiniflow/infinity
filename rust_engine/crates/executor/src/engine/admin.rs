@@ -93,12 +93,24 @@ impl Engine {
         // taking any index write lock. `text_index_for` takes `tables` first and
         // the index second, so waiting for an index lock with `tables` held is the
         // reverse order and can deadlock a concurrent seal or query.
-        let indexes: Vec<_> = {
+        let indexes: Vec<(u64, String, SharedTextIndex)> = {
             let tables = self.tables.lock().unwrap();
             let Some(entry) = tables.get(&key) else {
                 return Ok(0);
             };
-            entry.text.values().cloned().collect()
+            let by_id: std::collections::HashMap<u64, String> = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|im| (im.id, im.column))
+                .collect();
+            entry
+                .text
+                .iter()
+                .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
+                .collect()
         };
         if indexes.is_empty() {
             return Ok(0);
@@ -107,34 +119,256 @@ impl Engine {
         // be reclaimed (a chunk is immutable once published), so it takes the
         // table's deleted rows with it.
         let deleted = self.tombstone_set(table)?;
+        if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
+            eprintln!(
+                "[FT] optimize_fulltext_locked {table} indexes={}",
+                indexes.len()
+            );
+        }
         let mut merges = 0;
-        for index in indexes {
+        let mut merged: Vec<(u64, String)> = Vec::new();
+        for (index_id, column, index) in indexes {
             // The merge rewrites whole chunks and fsyncs every file it writes:
             // it is a blocking leaf, so it runs on the blocking pool. Running it
             // here would hold a runtime worker for the duration of the rewrite,
             // stalling every other task scheduled on it.
-            merges += crate::scheduler::scheduler()
+            let done = crate::scheduler::scheduler()
                 .spawn_blocking({
                     let deleted = deleted.clone();
                     move || crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
                 })
                 .await?;
+            if done > 0 {
+                merged.push((index_id, column));
+            }
+            merges += done;
+        }
+        // The merge replaced chunks: the catalog's chunk list is what a reader
+        // maps, so it has to name the merged chunk and stop naming the sources
+        // the merge deleted (`OptimizeFtIndex` -> `RemoveChunkIDs`).
+        for (index_id, column) in merged {
+            if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
+                eprintln!("[FT] {table}.{column} optimize merged {merges}, republishing records");
+            }
+            self.republish_text_chunks(table, index_id, &column);
         }
         Ok(merges)
     }
 
+    /// Rewrites one full-text index's chunk records from the chunks it holds
+    /// now.
+    ///
+    /// A merge retires its sources and writes one new chunk, so the record list
+    /// has to be replaced: `RemoveChunkIDs` + `AddNewChunkIndex1`, exactly what
+    /// `OptimizeFtIndex` does. The replacement is built **from the catalog**:
+    /// a chunk whose `base_name` already has a record keeps its id, and only a
+    /// chunk no record names yet (the merged one) takes the id
+    /// `GetAndSetNextChunkID` hands out. Counting files instead would name the
+    /// merged chunk after the first source's id and hand that id out twice.
+    pub(crate) fn republish_text_chunks(&self, table: &str, index_id: u64, column: &str) {
+        let qualified = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
+            return;
+        };
+        if crate::engine::text_index::ft_trace_enabled(&qualified) {
+            eprintln!(
+                "[FT] republish {qualified}.{column} idx={index_id} tbl={}",
+                meta.id
+            );
+        }
+        let key = self.table_key(&qualified);
+        let held: Vec<(u32, String, u64, u64, u64)> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&key)
+                .and_then(|entry| entry.text.get(&index_id).cloned())
+                .map(|shared| {
+                    let index = shared.read().unwrap_or_else(|e| e.into_inner());
+                    index
+                        .reader
+                        .segments
+                        .iter()
+                        .map(|s: &crate::engine::text_index::SealedSegment| {
+                            let base_row_id = s.reader.base_row_id();
+                            (
+                                (base_row_id >> 32) as u32,
+                                s.reader.base_name().to_string(),
+                                base_row_id,
+                                u64::from(s.docs),
+                                s.total_len,
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let set = catalog::layout::SegmentSet {
+            db_id: self.database_id_of(&qualified).to_string(),
+            table_id: meta.id.to_string(),
+            segments: Vec::new(),
+        };
+        let existing = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &set.db_id,
+            &set.table_id,
+            &index_id.to_string(),
+        )
+        .unwrap_or_default();
+        // The ids each surviving `base_name` already owns; only a chunk no
+        // record names (the merged one) takes a fresh id from the counter.
+        //
+        // The counter is **per segment** (`SegmentIndexMeta::next_chunk_id`), so
+        // it is read lazily for the segment being allocated: taking segment 0's
+        // value and handing it to every segment restarts a segment that had
+        // already used 0..19 at 0, and the new chunk overwrote one of its
+        // files.
+        let mut next_by_segment: std::collections::HashMap<u32, u32> = Default::default();
+        let mut by_base: std::collections::HashMap<String, u32> = Default::default();
+        for (_, chunks) in &existing {
+            for (id, info) in chunks {
+                if !info.base_name.is_empty() {
+                    by_base.insert(info.base_name.clone(), *id as u32);
+                }
+            }
+        }
+        let mut per_segment: std::collections::BTreeMap<u32, Vec<catalog::layout::IndexChunk>> =
+            Default::default();
+        let ts = self.txn.current_ts().max(1);
+        for (segment, base_name, base_row_id, row_count, term_count) in &held {
+            let chunk_id = match by_base.get(base_name) {
+                Some(id) => *id,
+                None => {
+                    let next = next_by_segment.entry(*segment).or_insert_with(|| {
+                        self.next_index_chunk_id(&set, &index_id.to_string(), *segment)
+                    });
+                    let id = *next;
+                    *next += 1;
+                    id
+                }
+            };
+            per_segment
+                .entry(*segment)
+                .or_default()
+                .push(catalog::layout::IndexChunk {
+                    chunk_id,
+                    base_name: base_name.clone(),
+                    base_row_id: *base_row_id,
+                    row_count: *row_count,
+                    term_count: *term_count,
+                    index_size: 0,
+                    commit_ts: ts,
+                });
+        }
+        // The segments the merge emptied keep no chunks at all
+        // (`RemoveChunkIDs` on the last one).
+        let mut segments: std::collections::BTreeSet<u32> =
+            existing.iter().map(|(s, _)| *s).collect();
+        segments.extend(per_segment.keys().copied());
+        for segment in segments {
+            let chunks = per_segment.remove(&segment).unwrap_or_default();
+            if let Err(error) = catalog::layout::replace_segment_chunks(
+                self.storage.catalog.store().as_ref(),
+                &set,
+                index_id,
+                segment,
+                &chunks,
+            ) {
+                eprintln!(
+                    "[FT] republish {qualified}.{column} idx {index_id} seg {segment}: {error}"
+                );
+            }
+        }
+    }
+
+    /// `PopulateIndex(…, DumpIndexCause::kCompact)` for every index after a
+    /// merge: the merged segment gets its own chunk and the chunks of the
+    /// source segments leave the index's list.
+    ///
+    /// The reader maps the catalog's chunk list, so a source segment's chunk
+    /// (whose row ids the merge retired) must stop being listed; leaving it in
+    /// would map postings onto rows nothing owns, and a query over them answers
+    /// with rows the fetch cannot resolve. This is the reference's
+    /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
+    /// `ToWalEntry`, `kCompact`).
+    fn populate_compacted_indexes(&self, table: &str, merged_segment: u32, sources: &[u32]) {
+        self.populate_secondary_indexes(table);
+        let qualified = self.qualified_table(table);
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
+            return;
+        };
+        let key = self.table_key(&qualified);
+        for im in indexes
+            .iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+        {
+            // Build the merged segment's chunk from its rows, then drop every
+            // other segment's chunks.
+            let shared = self
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|e| e.text.get(&im.id).cloned());
+            let Some(shared) = shared else {
+                continue;
+            };
+            crate::engine::state::seal_text_index_unlocked(&shared);
+            self.record_sealed_text_chunks(&qualified, &im.column);
+            self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
+        }
+    }
+
+    /// Keeps `merged_segment`'s chunks and drops the ones the compaction
+    /// actually retired.
+    ///
+    /// `sources` is what the compaction merged, not "every segment but the
+    /// merged one": `compact_segments` can be asked for a subset, and removing
+    /// an untouched segment's records left its live rows with no registered
+    /// postings.
+    fn rewrite_text_chunk_segments(
+        &self,
+        table: &str,
+        index_id: u64,
+        merged_segment: u32,
+        sources: &[u32],
+    ) {
+        let qualified = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
+            return;
+        };
+        let set = catalog::layout::SegmentSet {
+            db_id: self.database_id_of(&qualified).to_string(),
+            table_id: meta.id.to_string(),
+            segments: Vec::new(),
+        };
+        let Ok(existing) = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &set.db_id,
+            &set.table_id,
+            &index_id.to_string(),
+        ) else {
+            return;
+        };
+        for (segment, chunks) in existing {
+            if segment == merged_segment || chunks.is_empty() || !sources.contains(&segment) {
+                continue;
+            }
+            // `RemoveChunkIDs` on a source segment: the chunk files stay until
+            // `Cleanup`, but the reader no longer sees them.
+            if let Err(error) = catalog::layout::replace_segment_chunks(
+                self.storage.catalog.store().as_ref(),
+                &set,
+                index_id,
+                segment,
+                &[],
+            ) {
+                eprintln!("[FT] compact {qualified} idx {index_id} seg {segment}: {error}");
+            }
+        }
+    }
+
     /// [`Self::optimize_fulltext_async`] for every open table — the full-text
     /// half of an optimize tick (`OptimizationProcessor` → `OptimizeAllIndexes`).
-    ///
-    /// The reference walks the catalog's index metas and merges each
-    /// `kFullText` index's chunk list (`new_txn_index_impl.cpp:349-353`); this
-    /// port walks the tables whose indexes are open, which is a subset: a table
-    /// nobody touched since the process started has no `TextIndex` in memory
-    /// yet, and its chunks are merged by a later tick (opening the table runs
-    /// `load_sealed`, which sees every chunk). Loading it here instead would
-    /// mean calling `text_index_for`, whose row-count check can start a rebuild
-    /// — an optimize tick must not rewrite an index it was only asked to
-    /// compact. Returns the number of chunk merges.
     pub(crate) async fn optimize_all_fulltext_indexes_async(&self) -> Result<usize> {
         let keys: Vec<String> = {
             let tables = self.tables.lock().unwrap();
@@ -179,11 +413,8 @@ impl Engine {
         // `next_seg` counts from every segment, and the append log is rebased
         // against it.
         let layout = self.segment_row_counts(table);
-        let next_seg = layout
-            .iter()
-            .map(|(id, _)| *id)
-            .max()
-            .map_or(0, |id| id + 1);
+        // One past every id the table has used, retired ones included.
+        let next_seg = self.next_segment_id(table);
         // Only the picked segments' rows move, read one block at a time: a row
         // id names its segment, block and slot, so the walk never materialises
         // the table (compaction moves every row of its sources, and a table
@@ -444,11 +675,12 @@ impl Engine {
         }
         // The reference's compaction runs `PopulateIndex` for the merged
         // segment inside the compaction transaction, so that segment gets its
-        // own index chunks (`secondary_index_in_mem_impl`). The port's reload
-        // only maps the published chunks and leaves the merged segment's rows in
-        // a memory tail, so build the secondary spills for the new segment here;
-        // the next checkpoint publishes them as its chunk.
-        self.populate_secondary_indexes(table);
+        // own index chunks and the source segments' chunks are deprecated
+        // (`CompactTxnStore::ToWalEntry` -> `WalCmdDumpIndexV2`, `kCompact`).
+        // The port reloads only the chunks the catalog lists, so the merged
+        // segment's rows would otherwise stay in a memory tail and the old
+        // chunks (whose row ids the merge retired) would keep answering.
+        self.populate_compacted_indexes(table, next_seg, &source_ids);
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
         // The commit is published only when `_visible` drops (end of scope), and
@@ -463,15 +695,15 @@ impl Engine {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey).or_default();
             entry.text_min_ts = entry.text_min_ts.max(compact_ts);
-            let stale: Vec<String> = entry
+            let stale: Vec<u64> = entry
                 .text_built
                 .iter()
                 .filter(|(_, (_, built_ts))| *built_ts < entry.text_min_ts)
-                .map(|(column, _)| column.clone())
+                .map(|(index_id, _)| *index_id)
                 .collect();
-            for column in stale {
-                entry.text.remove(&column);
-                entry.text_built.remove(&column);
+            for index_id in stale {
+                entry.text.remove(&index_id);
+                entry.text_built.remove(&index_id);
             }
         }
         Ok(())
