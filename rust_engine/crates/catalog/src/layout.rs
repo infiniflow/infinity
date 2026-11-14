@@ -2618,8 +2618,13 @@ pub fn replace_segment_chunks(
 ) -> Result<usize> {
     let idx_str = index_id.to_string();
     let prefix = key::catalog_index_chunk_prefix(&set.db_id, &set.table_id, &idx_str, segment);
+    // Everything this replacement needs is staged and applied in one batch: a
+    // failure between the deletion and the re-append would otherwise leave the
+    // segment with **no** chunk records at all, and the source files on disk do
+    // not restore them.
+    let mut batch: Vec<(Vec<u8>, Option<Vec<u8>>)> = Vec::new();
     for (k, _) in store.scan_prefix(prefix.as_bytes())? {
-        store.delete(&k)?;
+        batch.push((k, None));
     }
     // The ids the sources held are **retired**: `GetAndSetNextChunkID` never
     // hands one out twice, so the tag is raised past the highest id this
@@ -2635,20 +2640,61 @@ pub fn replace_segment_chunks(
         .get(next_key.as_bytes())?
         .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
         .unwrap_or(0);
-    let mut written = 0usize;
-    let index = IndexSegment {
-        index_id,
-        segment_id: segment,
-        chunks: Vec::new(),
-    };
+    // `AddSegmentIndexID1`: the index/segment pair exists from the moment a
+    // chunk does.
+    let seg_key = key::catalog_index_segment_key(&set.db_id, &set.table_id, &idx_str, segment);
+    if store.get(seg_key.as_bytes())?.is_none() {
+        let index_ts = index_create_ts(store, &set.db_id, &set.table_id, index_id)?;
+        let segment_ts = segment_create_ts(store, &set.db_id, &set.table_id, segment)?;
+        let paired_ts = match (index_ts, segment_ts) {
+            (Some(a), Some(b)) => a.max(b),
+            (Some(a), None) | (None, Some(a)) => a,
+            (None, None) => CPP_MIRROR_TS,
+        };
+        batch.push((
+            seg_key.into_bytes(),
+            Some(paired_ts.to_string().into_bytes()),
+        ));
+    }
     for chunk in chunks {
-        written += append_index_chunk(store, set, &index, chunk)?;
+        // A chunk without a commit ts has no key to publish: the reference's
+        // replay would skip the dump that later names it.
+        let Some(value) = (chunk.commit_ts != 0).then(|| chunk.commit_ts.to_string().into_bytes())
+        else {
+            continue;
+        };
+        let id_key = key::catalog_index_chunk_key(
+            &set.db_id,
+            &set.table_id,
+            &idx_str,
+            segment,
+            chunk.chunk_id as u64,
+        );
+        batch.push((id_key.into_bytes(), Some(value)));
+        let tag_key = key::catalog_index_chunk_tag_key(
+            &set.db_id,
+            &set.table_id,
+            &idx_str,
+            segment,
+            chunk.chunk_id as u64,
+            "chunk_info",
+        );
+        let value = format!(
+            "{{\"base_name\":{},\"base_row_id\":{},\"index_size\":{},\"row_count\":{},\"term_count\":{}}}",
+            json_string(&chunk.base_name),
+            chunk.base_row_id,
+            chunk.index_size,
+            chunk.row_count,
+            chunk.term_count
+        );
+        batch.push((tag_key.into_bytes(), Some(value.into_bytes())));
     }
     let next = previous_next.max(chunk_floor(chunks));
     if next > 0 {
-        store.put(next_key.as_bytes(), next.to_string().as_bytes())?;
-        written += 1;
+        batch.push((next_key.into_bytes(), Some(next.to_string().into_bytes())));
     }
+    let written = batch.len();
+    store.atomic_batch(&batch)?;
     Ok(written)
 }
 

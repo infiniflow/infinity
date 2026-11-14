@@ -1093,6 +1093,33 @@ impl Catalog {
         })
     }
 
+    /// Takes the next chunk id **and** raises the counter in one batch
+    /// (`SegmentIndexMeta::GetAndSetNextChunkID`).
+    ///
+    /// [`Self::next_chunk_id`] only reads: two recorders that both read it and
+    /// then both append would publish two chunks under one id, and
+    /// `append_index_chunk` overwrites rather than rejecting. The read and the
+    /// write are one batch here, so the id cannot be handed out twice.
+    pub fn take_next_chunk_id(
+        &self,
+        db_id: &str,
+        table_id: &str,
+        index_id: u64,
+        segment: u32,
+    ) -> Result<u32> {
+        let id = self.next_chunk_id(db_id, table_id, index_id, segment)?;
+        let tag = storage::catalog_format::catalog_index_segment_tag_key(
+            db_id,
+            table_id,
+            &index_id.to_string(),
+            segment,
+            "next_chunk_id",
+        );
+        self.store
+            .atomic_batch(&[(tag.into_bytes(), Some((id + 1).to_string().into_bytes()))])?;
+        Ok(id)
+    }
+
     /// Records one chunk a seal just wrote, leaving the segment's other chunks
     /// alone (`NewCatalog::AddNewChunkIndex1`).
     pub fn append_index_chunk(

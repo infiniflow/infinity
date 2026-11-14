@@ -3873,23 +3873,34 @@ impl MultiVectorIndex {
             }
         }
         chunks.sort();
+        // A segment can be written by more than one dump, so its chunks each
+        // hold a slice of it. Walk them in chunk order and hand each the next
+        // `doc_count` of that segment's live rows: requiring every chunk to
+        // cover the **whole** segment rejected all of them and left the
+        // fallback (`search` falls through to it when a filter excludes every
+        // PLAID candidate) empty for a multi-dump segment.
+        let mut cursor: std::collections::HashMap<u64, usize> = Default::default();
         for (segment, path) in chunks {
             let Ok(reader) = storage::multivector_segment::MultiVectorSegmentReader::open(&path)
             else {
                 continue;
             };
-            let segment_ids: Vec<u64> = ids
+            let at = cursor.entry(segment).or_default();
+            // The chunk's rows are the ones written together, in row order.
+            let taken: Vec<u64> = ids
                 .iter()
                 .copied()
                 .filter(|seq| *seq >> 32 == segment)
+                .skip(*at)
+                .take(reader.doc_count())
                 .collect();
-            // A chunk whose document count no longer matches the live rows was
-            // written before a delete; the PLAID rebuild will rewrite it.
-            if reader.doc_count() != segment_ids.len() {
+            // A chunk longer than what the segment still has was written before
+            // a delete; the PLAID rebuild will rewrite it.
+            if taken.len() != reader.doc_count() {
                 continue;
             }
-            self.sealed
-                .push((Arc::new(reader), Arc::new(segment_ids), None));
+            *at += taken.len();
+            self.sealed.push((Arc::new(reader), Arc::new(taken), None));
         }
     }
 

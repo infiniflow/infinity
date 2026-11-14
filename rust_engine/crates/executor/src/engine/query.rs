@@ -2187,7 +2187,14 @@ impl Engine {
                     // the gate it holds (`populate_secondary_indexes`).
                     let gate = self.batch_gate(table);
                     let _held = gate.lock().await;
-                    self.build_index(table, column)?;
+                    // Only the record this statement created: a column may
+                    // already carry another secondary index, and rebuilding that
+                    // one would scan the rows again, append a second chunk set
+                    // and leave its rows covered twice.
+                    match created_index_id {
+                        Some(id) => self.build_index_of(table, column, id)?,
+                        None => self.build_index(table, column)?,
+                    }
                 }
                 // C++ `IndexBuilder`: a full-text or HNSW index is materialised
                 // by `CREATE INDEX`, not by the first query. Building lazily

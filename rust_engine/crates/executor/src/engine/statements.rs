@@ -3739,12 +3739,58 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        let index_id = self.fulltext_index_id(table, column).ok_or_else(|| {
+        let (index_id, index_name) = self.fulltext_record(table, column).ok_or_else(|| {
             Error::Invalid(format!(
                 "fulltext index does not exist for column '{column}'"
             ))
         })?;
+        // The tokeniser belongs to the **record**, not the column: two
+        // `FULLTEXT` indexes on one column may declare different analyzers, and
+        // `column_analyzer_name` picks one for the whole column (in *name*
+        // order) while this resolves the index by id. Using the column's choice
+        // for the record it did not select tokenises the query with one
+        // analyzer and the postings with another.
+        let tokenizer = self
+            .index_tokenizer_of(table, &index_name)
+            .unwrap_or(tokenizer);
         self.text_index_for_id(table, index_id, column, tokenizer)
+    }
+
+    /// The `(id, name)` of the full-text record a plain `MATCH TEXT` resolves
+    /// to on `column`.
+    fn fulltext_record(&self, table: &str, column: &str) -> Option<(u64, String)> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+            .filter(|im| im.id > 0)
+            .map(|im| (im.id, im.name))
+    }
+
+    /// The tokeniser one full-text record was created with.
+    fn index_tokenizer_of(&self, table: &str, index_name: &str) -> Option<TextTokenizer> {
+        let analyzer = self.analyzer_of_index(table, index_name);
+        let column = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.name == index_name)?
+            .column;
+        let mut tokenizer = TextTokenizer::new(
+            self.index_delims(table, &column),
+            analyzer.and_then(|name| match analyzer::parse_analyzer_name(&name) {
+                Ok(analyzer::AnalyzerName::Standard { .. })
+                | Ok(analyzer::AnalyzerName::Whitespace { .. })
+                | Err(_) => None,
+                Ok(_) => Some(name),
+            }),
+        );
+        tokenizer.stemmer = self.index_stemmer(table, &column);
+        Some(tokenizer)
     }
 
     /// The catalog id of the full-text index on `column` - the first one when
@@ -4363,12 +4409,22 @@ impl Engine {
             }
         }
         // A rebuild rewrites the chunk set; drop stale files so the readers
-        // never mix two builds.
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                    let _ = storage::chunk_store::remove_file(p);
+        // never mix two builds. `seal` writes under `chunk_root/seg_{n}`, so a
+        // sweep of the transient `dir` alone left every earlier generation in
+        // place - and `load_sealed` loads any `.mvec` whose document count
+        // matches, so a stale generation could be served instead of the new one.
+        let mut roots = vec![dir.clone()];
+        if let Some(meta) = self.storage.catalog.get_table_by_name(table).ok().flatten() {
+            roots.push(self.blocks_root().join(format!(
+                "db_{}/tbl_{}/idx_{index_id}",
+                self.database_id_of(table),
+                meta.id
+            )));
+        }
+        for root in roots {
+            for path in crate::engine::state::files_under(&root) {
+                if path.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
+                    let _ = storage::chunk_store::remove_file(path);
                 }
             }
         }
@@ -7307,11 +7363,18 @@ impl Engine {
             let Some(entry) = tables.get(&tkey) else {
                 return Ok(None);
             };
-            let by_column: HashMap<String, super::state::SharedTextIndex> = entry
-                .text
-                .iter()
-                .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
-                .collect();
+            // A column can carry more than one full-text record. Keep the
+            // **first** one, which is what `text_index_for` resolves for a plain
+            // `MATCH TEXT` (`TableIndexMeta::GetIndexBase`); a `collect` over
+            // both made the later one overwrite it, so a query could be answered
+            // by an index the planner had not selected.
+            let mut by_column: HashMap<String, super::state::SharedTextIndex> = HashMap::new();
+            for (id, v) in entry.text.iter() {
+                let Some(column) = by_id.get(id) else {
+                    continue;
+                };
+                by_column.entry(column.clone()).or_insert_with(|| v.clone());
+            }
             (by_column, entry.analyzers.clone())
         };
         if indexes.is_empty() {

@@ -1293,7 +1293,17 @@ impl Engine {
         // second index's records are written, and no files are copied into
         // another directory.
         for chunk in &sealed {
-            let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), chunk.segment);
+            // Take the id **and** raise the counter in one batch: reading it
+            // here and appending below let two recorders of one index read the
+            // same value and publish two chunks under one id
+            // (`append_index_chunk` overwrites, it does not reject).
+            let chunk_id = self
+                .storage
+                .catalog
+                .take_next_chunk_id(&set.db_id, &set.table_id, index_id, chunk.segment)
+                .unwrap_or_else(|_| {
+                    self.next_index_chunk_id(&set, &index_id.to_string(), chunk.segment)
+                });
             let record = catalog::layout::IndexChunk {
                 chunk_id,
                 base_name: chunk.base_name.clone(),
@@ -1575,7 +1585,14 @@ impl Engine {
             }
         };
         for (tkey, index_id) in wanted {
-            let Some(im) = catalog_indexes.iter().find(|im| im.id == index_id) else {
+            // By table **and** id: an index id is unique within its table, not
+            // across the catalog, so two tables that both hold index 1 must not
+            // resolve to the same record - the seal would then write one
+            // table's chunks under the other's directory.
+            let Some(im) = catalog_indexes
+                .iter()
+                .find(|im| im.id == index_id && self.table_key(&im.table) == tkey)
+            else {
                 continue;
             };
             let column = im.column.clone();
@@ -2252,11 +2269,11 @@ impl Engine {
             if write_secondary_segment_typed(&path, kind, &pairs).is_err() {
                 continue;
             }
-            for (_, old) in &chunks {
-                let _ = storage::chunk_store::remove_file(old);
-            }
             // `RemoveChunkIDs` + `AddNewChunkIndex1`: the segment lists the
-            // merged chunk and no longer its sources.
+            // merged chunk and no longer its sources. **Before** the source
+            // files are removed: if the catalog write failed, a reader would
+            // keep following records that name deleted files and answer with
+            // half the rows until the index was rebuilt.
             let set = self.index_segment_set(table);
             let record = catalog::layout::IndexChunk {
                 chunk_id: next,
@@ -2267,12 +2284,20 @@ impl Engine {
                 index_size: 0,
                 commit_ts: self.txn.current_ts().max(1),
             };
-            let _ = self.storage.catalog.replace_segment_chunks(
-                &set,
-                index_id,
-                segment,
-                std::slice::from_ref(&record),
-            );
+            if self
+                .storage
+                .catalog
+                .replace_segment_chunks(&set, index_id, segment, std::slice::from_ref(&record))
+                .is_err()
+            {
+                eprintln!(
+                    "[idx] merge {table} idx {index_id} seg {segment}: catalog replace failed"
+                );
+                continue;
+            }
+            for (_, old) in &chunks {
+                let _ = storage::chunk_store::remove_file(old);
+            }
             merged = true;
         }
         if merged {
@@ -2393,13 +2418,27 @@ impl Engine {
                     let _ = storage::chunk_store::remove_file(old);
                 }
             }
+            // `ChunkIndexMetaInfo::row_count_` counts **data rows**, not
+            // distinct keys (`SecondaryIndexInMemT::GetRowCount`): two BOOL keys
+            // cover every row of the segment, and a JSON document contributes
+            // one key per flattened term. Counting `entries.len()` recorded the
+            // key count instead.
+            let row_count = {
+                let mut rows: Vec<u32> = entries
+                    .iter()
+                    .flat_map(|(_, o)| o.iter().copied())
+                    .collect();
+                rows.sort_unstable();
+                rows.dedup();
+                rows.len() as u64
+            };
             // `RemoveChunkIDs` + `AddNewChunkIndex1`.
             let set = self.index_segment_set(table);
             let record = catalog::layout::IndexChunk {
                 chunk_id: next,
                 base_name: String::new(),
                 base_row_id: u64::from(segment) << 32,
-                row_count: entries.len() as u64,
+                row_count,
                 term_count: 0,
                 index_size: 0,
                 commit_ts: self.txn.current_ts().max(1),
