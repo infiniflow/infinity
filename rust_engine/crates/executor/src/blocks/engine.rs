@@ -6735,6 +6735,12 @@ impl Engine {
             path: path.clone(),
             source: e,
         })?;
+        // The merged chunk is recorded here **and** rides in the transaction's
+        // `WalCmdDumpIndexV2` (`optimize_index_commands`): the command is what
+        // gives it its commit ts, and this write is what makes it visible to a
+        // reader that lands before the commit. A rolled-back pass leaves it in
+        // the list beside its sources, which the superseded ids below retire on
+        // the next successful optimize.
         self.record_chunk(
             &set,
             index_id,
