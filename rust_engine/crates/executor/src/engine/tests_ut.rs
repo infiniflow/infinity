@@ -8031,37 +8031,34 @@ mod tests {
         assert!(e.memindex_bytes() <= 1500);
     }
 
-    /// A quota proposal for one table must not swallow another table's.
-    ///
-    /// `MemIndexTracer::proposed_dump_` records the indexes a queued dump
-    /// covers and skips **those**; it never refuses to propose a different
-    /// table's index. A single global "one dump in flight" flag did, so while
-    /// one table drained, every other table's breach was dropped and that
-    /// table's chunk never appeared (`test_optimize_from_different_database` in
-    /// the restart suite: two databases, one HNSW index each).
+    /// A breach that arrives while its table's dump is queued is counted, not
+    /// dropped: the task re-proposes when it finishes if one is still owed.
     #[test]
-    fn a_queued_dump_does_not_suppress_another_tables_proposal() {
+    fn a_queued_dump_counts_the_breaches_it_coalesces() {
         use crate::engine::state::{MemIndexPending, ALL_TABLES};
 
-        // The bookkeeping the quota uses, exercised directly: this is exactly
-        // what the old global flag got wrong. The end-to-end path needs a
-        // background processor (a test attaches none), so the restart suite's
-        // `test_optimize_from_different_database` covers that side.
+        // The bookkeeping the quota uses, exercised directly. The end-to-end
+        // path needs a background processor (a test attaches none), so the
+        // restart suite's `test_mem_bmp` and
+        // `test_optimize_from_different_database` cover that side.
         let mut pending = MemIndexPending::default();
-        assert!(pending.tables.insert("default_db.a".to_string()));
-        // The same table again: coalesced into the entry already there.
-        assert!(!pending.tables.insert("default_db.a".to_string()));
-        // A different table: its own entry, so it still gets a task.
-        assert!(pending.tables.insert("default_db.b".to_string()));
-        assert_eq!(pending.tables.len(), 2);
+        // Two breaches for one table while its dump is queued: one task, but
+        // two owed dumps - the second is not lost.
+        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
+        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
+        assert_eq!(pending.pending.get("default_db.a").copied(), Some(2));
+        // A different table keeps its own count, so it is served too.
+        *pending.pending.entry("default_db.b".into()).or_insert(0) += 1;
+        assert_eq!(pending.pending.len(), 2);
 
-        // An "every tail" proposal covers every table, so nothing else needs a
-        // task; once it is served the marker goes.
+        // An "every tail" proposal is marked as such and cleared with its key.
         let mut pending = MemIndexPending::default();
-        pending.tables.insert(ALL_TABLES.to_string());
-        assert!(pending.tables.contains(ALL_TABLES));
-        pending.tables.clear();
-        assert!(pending.tables.is_empty());
+        pending.pending.insert(ALL_TABLES.to_string(), 1);
+        pending.drain_all.insert(ALL_TABLES.to_string());
+        assert!(pending.drain_all.contains(ALL_TABLES));
+        pending.pending.remove(ALL_TABLES);
+        pending.drain_all.remove(ALL_TABLES);
+        assert!(pending.pending.is_empty() && pending.drain_all.is_empty());
     }
 
     /// The unified budget counts the HNSW charge, not only the text/sparse/

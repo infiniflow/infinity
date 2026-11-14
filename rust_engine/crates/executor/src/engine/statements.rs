@@ -639,24 +639,42 @@ impl Engine {
     /// Queues the background drain. The caller has already established that a
     /// processor is attached; one proposal is in flight at a time
     /// (`proposed_dump_`).
-    fn propose_dump(&self, drain_all: bool, table: Option<String>) {
+    pub(crate) fn propose_dump(&self, drain_all: bool, table: Option<String>) {
         let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
+            // No worker (a test, or shutdown): drain inline, the same way
+            // `enforce_memindex_quota` does. Returning here silently dropped
+            // the dump for every caller that only had this entry point.
+            if let Some(engine) = self.self_weak.lock().unwrap().upgrade() {
+                let table = table.clone();
+                crate::scheduler::block_on(async move {
+                    if drain_all {
+                        engine.dump_all_memory_indexes().await;
+                        engine.dump_all_sealed_blocks(None).await;
+                    } else {
+                        engine.dump_under_pressure(table.as_deref()).await;
+                    }
+                });
+            }
             return;
         };
-        // Coalesce like `MemIndexTracer::proposed_dump_`: a table that already
-        // has a proposal does not get a second task, but a **different** table
-        // still does. A single global flag dropped the second table's breach
-        // and left it undrained.
+        // One task per table at a time, but a breach that arrives while that
+        // task is still queued is **counted**, not dropped: the task's
+        // completion re-proposes when the count is still above zero. Dropping
+        // it lost a chunk the write was supposed to produce
+        // (`test_mem_bmp`, `test_optimize_from_different_database`).
+        let key = table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
         {
             let mut pending = self.context.memindex_pending.lock().unwrap();
-            let key = table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
-            // An "every tail" drain already queued covers any table, so nothing
-            // more is needed; otherwise a table is skipped only when its own
-            // proposal is still in flight.
-            if pending.tables.contains(ALL_TABLES) {
-                return;
+            let count = {
+                let count = pending.pending.entry(key.clone()).or_insert(0);
+                *count += 1;
+                *count
+            };
+            if drain_all {
+                pending.drain_all.insert(key.clone());
             }
-            if !pending.tables.insert(key) {
+            // A task is already queued for this key; it serves this breach too.
+            if count > 1 {
                 return;
             }
         }
@@ -671,7 +689,12 @@ impl Engine {
             // The processor is shutting down and dropped the task, so no worker
             // will clear its proposal: drop it here or that table is never
             // proposed again.
-            self.context.memindex_pending.lock().unwrap().tables.clear();
+            self.context
+                .memindex_pending
+                .lock()
+                .unwrap()
+                .pending
+                .remove(&key);
         }
     }
 

@@ -4522,9 +4522,19 @@ impl DropScope<'_> {
 /// coalescing); a breach for a different table still gets its own task.
 #[derive(Default)]
 pub(crate) struct MemIndexPending {
-    /// The tables a queued or running dump already covers, plus
-    /// [`ALL_TABLES`] when one of them asked for every tail.
-    pub(crate) tables: std::collections::HashSet<String>,
+    /// How many breaches each table has reported since its dump was proposed,
+    /// with [`ALL_TABLES`] standing for "every tail". A dump serves one, so a
+    /// count above 1 means another one is owed.
+    ///
+    /// The reference's `proposed_dump_` skips an **index** that already has a
+    /// dump in flight, but the breach it would have served is not lost: the
+    /// next `IncreaseMemoryUsage` sees the freed memory and only re-proposes if
+    /// it is still over. Counting here is the port's equivalent - a proposal
+    /// that arrives while a dump is queued is served by the dump that follows
+    /// it, not dropped.
+    pub(crate) pending: std::collections::HashMap<String, usize>,
+    /// The `drain_all` a queued task was asked for, per key.
+    pub(crate) drain_all: std::collections::HashSet<String>,
 }
 
 /// The marker [`MemIndexPending::tables`] uses for an "every tail" proposal.
@@ -8949,15 +8959,29 @@ impl BgTask for DumpMemIndexTask {
                     engine.dump_under_pressure(self.table.as_deref()).await;
                 }
             }
-            // This task served its table (or every table); another breach may
-            // propose it again.
-            let mut pending = self.pending.lock().unwrap();
-            match &self.table {
-                Some(table) => {
-                    pending.tables.remove(table);
+            // This task served one breach for its table. A breach that
+            // arrived while it was queued is still counted, and the dump that
+            // follows it is what turns that insert into its own chunk.
+            let key = self.table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
+            let more = {
+                let mut pending = self.pending.lock().unwrap();
+                let left = pending.pending.get_mut(&key).map(|count| {
+                    *count = count.saturating_sub(1);
+                    *count
+                });
+                match left {
+                    Some(0) | None => {
+                        pending.pending.remove(&key);
+                        pending.drain_all.remove(&key);
+                        false
+                    }
+                    Some(_) => true,
                 }
-                None => {
-                    pending.tables.clear();
+            };
+            if more {
+                if let Some(engine) = self.engine.upgrade() {
+                    let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
+                    engine.propose_dump(drain_all, self.table.clone());
                 }
             }
         })
