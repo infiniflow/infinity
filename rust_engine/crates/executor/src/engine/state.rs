@@ -2258,7 +2258,7 @@ pub(crate) fn reorder<T>(items: Vec<T>, order: &[usize]) -> Vec<T> {
 pub(crate) struct MergeCursor<'a> {
     pub(crate) sources: Vec<Source<'a>>,
     /// Row ids that must not be returned by any source: a re-indexed row's old
-    /// copy, or an id a compaction renumbered (`index_retire_row`).
+    /// copy, or an id a compaction renumbered.
     pub(crate) overridden: Option<&'a std::collections::HashSet<u64>>,
     /// (row, tf, length, winning source)
     pub(crate) cur: Option<(u64, u32, u32, usize)>,
@@ -2354,7 +2354,7 @@ impl<'a> MergeCursor<'a> {
             // Checked for every source, not only the sealed ones: a compaction
             // renumbers rows that its merge already sealed, so the stale copy of
             // such a posting can still sit in the memory tail or a spilled run
-            // (`index_retire_row`). The row id is not a `DELETE`, so the
+            // The row id is not a `DELETE`, so the
             // tombstone set does not cover it.
             if self.overridden.is_some_and(|o| o.contains(&doc)) {
                 self.sources[winner].advance(doc + 1);
@@ -6046,10 +6046,6 @@ pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
 /// `tombstone_set` knows nothing about it. Left in, those postings answer a
 /// `MATCH` with rows no fetch can resolve, and a `topn=3` query reports an empty
 /// column on a table full of matches.
-pub(crate) fn index_retire_row(index: &mut TextIndex, seq: u64) {
-    index.overridden.insert(seq);
-}
-
 pub struct EngineOptions {
     /// When `false`, catalog DDL becomes durable only at a checkpoint
     /// (`Engine::flush`), reproducing `NEW_CONFIG_NOWAL_PATH`.

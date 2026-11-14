@@ -4,7 +4,7 @@
 use std::io::Write;
 
 use executor::Engine;
-use server::{read_create_table_call, write_reply_common, CommonResponse};
+use server::{read_create_table_call, run_create_table, write_reply_common};
 
 fn main() {
     let dir = std::env::temp_dir().join(format!("infinity-thrift-{}", std::process::id()));
@@ -14,24 +14,10 @@ fn main() {
     let mut stdin = std::io::stdin();
     let (seq, req) = read_create_table_call(&mut stdin).expect("decode CreateTable call");
 
-    let cols: Vec<String> = req
-        .columns
-        .iter()
-        .map(|c| format!("{} VARCHAR", c.name))
-        .collect();
-    let sql = format!("CREATE TABLE {} ({});", req.table_name, cols.join(", "));
-    let resp = match engine.execute_blocking(&sql) {
-        Ok(_) => CommonResponse {
-            error_code: 0,
-            error_msg: "OK".into(),
-            session_id: req.session_id,
-        },
-        Err(e) => CommonResponse {
-            error_code: 1,
-            error_msg: e.to_string(),
-            session_id: req.session_id,
-        },
-    };
+    // The same primitive the Thrift `CreateTable` handler uses, so the fixture
+    // builds `Statement::CreateTable` from the request rather than rendering
+    // the column names into a statement string.
+    let resp = executor::block_on(run_create_table(Some(&engine), &req));
     let _ = executor::block_on(engine.flush());
 
     let mut out = std::io::stdout().lock();

@@ -17,7 +17,7 @@ fn main() {
         "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
     ));
 
-    let deleted = match engine.execute_blocking(&req.to_sql()) {
+    let deleted = match executor::block_on(engine.execute_parsed(vec![req.into_statement()], "")) {
         Ok(rs) => rs
             .into_iter()
             .map(|r| {

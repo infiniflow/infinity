@@ -19,19 +19,14 @@ fn main() {
     let cols: Vec<String> = (0..ncols).map(|i| format!("c{i} VARCHAR")).collect();
     let _ = engine.execute_blocking(&format!("CREATE TABLE {t} ({});", cols.join(", ")));
 
-    let vals = req
+    // The rows go in as literals: this is the same primitive the Thrift
+    // `Insert` handler uses, so the fixture cannot drift from the real path.
+    let rows: Vec<Vec<parser::Literal>> = req
         .rows
         .iter()
-        .map(|(_, vs)| {
-            format!(
-                "({})",
-                vs.iter().map(|v| v.to_sql()).collect::<Vec<_>>().join(", ")
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    let sql = format!("INSERT INTO {t} VALUES {vals};");
-    let resp = match engine.execute_blocking(&sql) {
+        .map(|(_, vs)| vs.iter().map(|v| v.to_literal()).collect())
+        .collect();
+    let resp = match engine.insert_literals(t, None, rows) {
         Ok(_) => CommonResponse {
             error_code: 0,
             error_msg: "OK".into(),

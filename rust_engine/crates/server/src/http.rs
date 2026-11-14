@@ -15,7 +15,11 @@
 use std::net::TcpListener;
 use std::sync::Arc;
 
-use executor::{Engine, QueryResult};
+use common::LogicalType;
+use executor::{Engine, Literal, QueryResult};
+use parser::{
+    BoolOp, ExprAst, MatchClause, OrderKey, Predicate, SearchClause, SelectItem, Statement,
+};
 
 use crate::peer::{NodeRole, PeerManager};
 use crate::{
@@ -342,10 +346,6 @@ fn parse_json(text: &str) -> Option<Json> {
     Some(v)
 }
 
-fn quote_sql(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
-}
-
 /// Restricts a list of identifiers to the ones we accept as names.
 fn safe_ident(name: &str) -> Option<&str> {
     // Identifiers start with a letter and contain letters, digits and `_`.
@@ -373,8 +373,15 @@ fn ident(name: &str) -> Option<String> {
 /// grammar is laxer (it accepts `EMBEDDING(bool,3)`), so the check has to run
 /// here, on the API boundary, exactly where the reference has it.
 fn column_type_error(ty: &str) -> Option<(i64, String)> {
+    // `ParseColumnDefs` lower-cases the type and splits it on commas, with no
+    // bracket handling: a type that carries a stray `(` — `SPARSE(`, `vector(` —
+    // lands in the head token, matches no branch below, and would otherwise be
+    // stored verbatim, only to be re-parsed (and indexed into) by the executor.
     let parts: Vec<&str> = ty.split(',').map(|s| s.trim()).collect();
     let head = parts.first().copied().unwrap_or("").to_ascii_lowercase();
+    if head.contains(['(', ')']) {
+        return Some((3013, format!("{} isn't supported.", parts[0])));
+    }
     match head.as_str() {
         "vector" | "multivector" | "tensor" | "tensorarray" => {
             if parts.len() != 3 {
@@ -488,42 +495,90 @@ fn type_to_sql(ty: &str) -> String {
     }
 }
 
-/// Renders a JSON value as a SQL literal; `ty` is the target column type.
-fn sql_value(v: &Json, ty: &str) -> String {
+/// A declared type whose cells are floating point.
+fn is_float_type(upper_type: &str) -> bool {
+    upper_type.starts_with("FLOAT") || upper_type.starts_with("DOUBLE")
+}
+
+/// Converts one JSON cell into the literal the executor takes, the job the
+/// reference's `InsertHandler` does when it builds a `ConstantExpr`
+/// (`http_server_impl.cpp:955-1350`). No SQL text is produced: the literal
+/// vector goes straight to `Engine::insert_literals_inner`.
+///
+/// `ty` is the target column's declared type, which only decides how an
+/// object/array is read (a `JSON` column keeps the JSON text, a `SPARSE` one
+/// takes `{index: value}` pairs).
+/// `Ok(None)` when the JSON number cannot be represented in the target column.
+///
+/// The old text path let the lexer apply this check: it read the cell text and
+/// failed with `bad int` on a value beyond `i64`. Building the literal
+/// directly means the check has to happen here, or the value is silently
+/// wrapped.
+fn insert_literal(v: &Json, ty: &str) -> std::result::Result<Literal, (u16, String)> {
     let up = ty.to_ascii_uppercase();
+    Ok(match v {
+        Json::Null => Literal::Null,
+        // The reference records `kBoolean`; the literal form the insert path
+        // and the reference's stored text agree on is `true`/`false`.
+        Json::Bool(b) => Literal::Str(if *b { "true" } else { "false" }.into()),
+        Json::Num(n) => match n.parse::<i64>() {
+            Ok(i) => Literal::Int(i),
+            // Not an `i64`: a fraction/exponent (a float literal), or a u64 the
+            // wire allowed. A u64 above `i64::MAX` must not be cast to `i64` —
+            // `18446744073709551615` would land as `-1`. For a floating-point
+            // column the value survives as a float; anywhere else it cannot be
+            // represented, which is what the old text path reported (`bad int`).
+            Err(_) => match n.parse::<u64>() {
+                Ok(u) if is_float_type(&up) => Literal::Float(u as f64),
+                Ok(_) => {
+                    return Err(err_response(
+                        3013,
+                        &format!("parse error: bad int {n} for a column of type '{ty}'"),
+                    ))
+                }
+                Err(_) => Literal::Float(n.parse::<f64>().unwrap_or_default()),
+            },
+        },
+        Json::Str(s) => Literal::Str(s.clone()),
+        // A `JSON` column stores the document's own text; any other array
+        // column keeps its elements as source text, which is what the
+        // encoder's `[a,b,c]` reader consumes for a dense vector or tensor.
+        Json::Arr(_) if up.starts_with("JSON") => Literal::Str(render_json(v)),
+        Json::Arr(items) => Literal::Array(items.iter().map(array_item_text).collect()),
+        Json::Obj(map) if up.starts_with("SPARSE") => Literal::Array(
+            map.iter()
+                .map(|(k, v)| match v {
+                    Json::Num(n) => format!("{k}:{n}"),
+                    Json::Str(s) => format!("{k}:{s}"),
+                    _ => format!("{k}:0"),
+                })
+                .collect(),
+        ),
+        Json::Obj(_) => Literal::Str(render_json(v)),
+    })
+}
+
+/// One element of a [`Literal::Array`], as the text the executor's array and
+/// tensor encoders read back. A nested array keeps its brackets; a string
+/// element is bare text, because this literal is built directly rather than
+/// re-read from SQL (the parser would have stripped the quotes).
+fn array_item_text(v: &Json) -> String {
     match v {
+        // The text the SQL round-trip used to produce: `NULL` arrived as a bare
+        // identifier, so it kept its upper-case spelling.
         Json::Null => "NULL".into(),
-        Json::Bool(b) => (if *b { "true" } else { "false" }).into(),
+        Json::Bool(b) => b.to_string(),
         Json::Num(n) => n.clone(),
-        Json::Str(s) => quote_sql(s),
-        Json::Arr(items) => {
-            if up.starts_with("JSON") {
-                quote_sql(&render_json(v))
-            } else {
-                let inner = items
-                    .iter()
-                    .map(|x| sql_value(x, &up))
-                    .collect::<Vec<_>>()
-                    .join(",");
-                format!("[{inner}]")
-            }
-        }
-        Json::Obj(map) => {
-            if up.starts_with("SPARSE") {
-                let inner = map
-                    .iter()
-                    .map(|(k, v)| match v {
-                        Json::Num(n) => format!("{k}:{n}"),
-                        Json::Str(s) => format!("{k}:{s}"),
-                        _ => format!("{k}:0"),
-                    })
-                    .collect::<Vec<_>>()
-                    .join(",");
-                format!("[{inner}]")
-            } else {
-                quote_sql(&render_json(v))
-            }
-        }
+        Json::Str(s) => s.clone(),
+        Json::Arr(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(array_item_text)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        Json::Obj(_) => render_json(v),
     }
 }
 
@@ -635,31 +690,23 @@ fn configs_json(engine: &Engine) -> String {
 
 /// The single-field body of `POST /configs` (`SetConfigHandler`): the name and
 /// its JSON literal, or the reference's 3076 "No config will be set".
+/// The one `(name, value)` pair of a request body, with the value as text.
+///
+/// The value is **not** SQL-quoted: the caller hands it to
+/// [`Statement::SetConfig`], which takes the setting's own spelling.
 fn single_field(doc: &Json) -> Option<(String, String)> {
     let obj = doc.as_obj()?;
     if obj.len() != 1 {
         return None;
     }
     let (name, value) = &obj[0];
-    let literal = match value {
-        Json::Str(s) => quote_sql(s),
+    let value = match value {
+        Json::Str(s) => s.clone(),
         Json::Num(n) => n.clone(),
         Json::Bool(b) => b.to_string(),
         _ => return None,
     };
-    Some((name.clone(), literal))
-}
-
-/// Appends the rows of a `SHOW …` result as `(column, value)` pairs — the
-/// `/variables/<scope>` body is one flat object, not a list.
-/// Quotes a snapshot name for SQL. `CREATE SNAPSHOT "snap-1" …` is the form
-/// the parser accepts for names that are not bare identifiers.
-fn snapshot_sql(name: &str) -> String {
-    if safe_ident(name).is_some() {
-        name.to_string()
-    } else {
-        format!("\"{}\"", name.replace('"', "\"\""))
-    }
+    Some((name.clone(), value))
 }
 
 /// `NodeInfo` as the reference's node objects (`AdminListAllNodesHandler`).
@@ -692,22 +739,21 @@ fn engine_err(e: &Error) -> (u16, String) {
     err_response(e.status_code(), &e.to_string())
 }
 
-/// The declared types of a table's columns (`SHOW TABLE … COLUMNS`).
-async fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
-    let sql = format!("SHOW TABLE {table} COLUMNS;");
-    let mut out = Vec::new();
-    if let Ok(results) = engine.execute(&sql).await {
-        for r in results {
-            if let QueryResult::Rows { rows, .. } = r {
-                for row in rows {
-                    if row.len() >= 2 {
-                        out.push((row[0].to_slt_string(), row[1].to_slt_string()));
-                    }
-                }
-            }
-        }
+/// The declared types of a table's columns.
+///
+/// Reads the catalog record the `SHOW TABLE … COLUMNS` statement would have
+/// reported, instead of running that statement: the caller already holds the
+/// name, so the statement would only round-trip through the parser.
+fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
+    match engine.catalog().get_table_by_name(table) {
+        Ok(Some(meta)) => meta
+            .columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.clone(), meta.types.get(i).cloned().unwrap_or_default()))
+            .collect(),
+        _ => Vec::new(),
     }
-    out
 }
 
 /// A JSON cell for a result value, typed from the declared column type.
@@ -814,6 +860,75 @@ fn output_json(columns: &[String], types: &[String], rows: &[Vec<String>]) -> St
     format!("[{rows_json}]")
 }
 
+/// Builds a [`parser::ColumnDef`] from one REST `fields` entry.
+///
+/// The executor reads `type_text` (and `comment`/`default`/`not_null`); `ty`
+/// mirrors what the SQL parser would have produced so the AST is the same
+/// shape either way.
+fn column_def(
+    name: &str,
+    ty: &str,
+    comment: Option<&str>,
+    default: Option<&Json>,
+    not_null: bool,
+) -> std::result::Result<parser::ColumnDef, (u16, String)> {
+    let text = type_to_sql(ty);
+    let head = text
+        .split(['(', ','])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_uppercase();
+    let logical = match head.as_str() {
+        "BOOLEAN" | "BOOL" => LogicalType::Boolean,
+        "TINYINT" => LogicalType::TinyInt,
+        "SMALLINT" => LogicalType::SmallInt,
+        "INTEGER" | "INT" => LogicalType::Integer,
+        "BIGINT" => LogicalType::BigInt,
+        "FLOAT" => LogicalType::Float,
+        "DOUBLE" => LogicalType::Double,
+        "VARCHAR" | "TEXT" => LogicalType::Varchar,
+        _ => LogicalType::Invalid,
+    };
+    let default = match default {
+        Some(Json::Str(s)) => Some(Literal::Str(s.clone())),
+        Some(other) => Some(insert_literal(other, &text)?),
+        None => None,
+    };
+    Ok(parser::ColumnDef {
+        name: name.to_ascii_lowercase(),
+        ty: logical,
+        type_text: text.to_ascii_uppercase(),
+        default,
+        not_null,
+        comment: comment.map(str::to_string),
+        sparse_store: None,
+    })
+}
+
+/// Parses a REST `filter` string as **one** predicate.
+///
+/// The fragment is client text, so it is parsed here and never concatenated
+/// into a statement: `parse_predicate` rejects anything after the expression,
+/// which is what stops `c1 = 1; DROP TABLE t` from being two statements.
+///
+/// Only an **empty** string means "no filter", which is what the text path did:
+/// a whitespace-only one used to reach `parse` and fail, and treating it as
+/// "match everything" turns a malformed DELETE/UPDATE into a whole-table one.
+///
+/// The text is not rewritten here. `rewrite_pseudo` (`_score` → `score()`)
+/// substitutes on the raw text and would also hit those spellings inside a
+/// string literal, so `label = '_score'` would match the wrong rows. The query
+/// path applies it where it was always applied — see `docs_select`.
+fn parse_filter(text: &str) -> std::result::Result<Option<Predicate>, (u16, String)> {
+    if text.is_empty() {
+        return Ok(None);
+    }
+    parser::parse_predicate(text)
+        .map(Some)
+        .map_err(|e| err_response(3063, &format!("Invalid filter expression: {text} ({e})")))
+}
+
 fn create_option_sql(body: &Json) -> std::result::Result<(bool, bool), (u16, String)> {
     match body.get("create_option") {
         None => Ok((false, false)),
@@ -859,8 +974,19 @@ fn str_list(v: &Json) -> Vec<String> {
     }
 }
 
-/// Builds `SELECT …` for a `GET …/docs` request (the HTTP query DSL).
-fn docs_sql(body: &Json, db: &str, table: &str) -> String {
+/// Builds the `SELECT` a `GET …/docs` request describes.
+///
+/// The request fields are assembled into a [`Statement::Select`] directly. The
+/// previous version rendered them to SQL text, which meant a `filter` string
+/// the client sent went through the parser as text: `c1 = 1; DROP TABLE t`
+/// filtered nothing and dropped `t`. Parsing the fragment on its own (with
+/// [`parser::parse_predicate`]) and handing the AST to the engine keeps the
+/// fragment a fragment.
+fn docs_select(
+    body: &Json,
+    db: &str,
+    table: &str,
+) -> std::result::Result<Statement, (u16, String)> {
     let output: Vec<String> = body
         .get("output")
         .and_then(Json::as_arr)
@@ -876,23 +1002,35 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
     // projection aliases into WHERE/HAVING (`SelectReq::to_sql`), so mirror it
     // here — the engine itself resolves WHERE against table columns only.
     let aliases: Vec<(String, String)> = named.iter().filter_map(|n| split_alias(n)).collect();
-    let mut sql = format!("SELECT {} FROM {db}.{table}", named.join(", "));
 
-    if let Some(h) = body.get("highlight").and_then(Json::as_arr) {
-        let cols: Vec<&str> = h.iter().filter_map(Json::as_str).collect();
-        if !cols.is_empty() {
-            // HIGHLIGHT follows the select list
-            sql = format!(
-                "SELECT {} HIGHLIGHT {} FROM {db}.{table}",
-                named.join(", "),
-                cols.join(", ")
-            );
-        }
+    let err = |e: common::Error| err_response(3013, &e.to_string());
+    let mut items: Vec<SelectItem> = Vec::with_capacity(named.len());
+    let mut out_aliases: Vec<Option<String>> = Vec::with_capacity(named.len());
+    for n in &named {
+        // The REST DSL puts the alias in the projection text (`expr AS name`),
+        // so it is split off and re-attached after the item is parsed.
+        let (expr, alias) = match split_alias(n) {
+            Some((alias, expr)) => (expr, Some(alias)),
+            None => (n.clone(), None),
+        };
+        let (item, parsed_alias) = parser::parse_select_item(&expr).map_err(err)?;
+        items.push(item);
+        out_aliases.push(alias.or(parsed_alias));
     }
 
-    if let Some(search) = body.get("search").and_then(Json::as_arr) {
-        let mut parts: Vec<String> = Vec::new();
-        for e in search {
+    let mut highlight = Vec::new();
+    if let Some(h) = body.get("highlight").and_then(Json::as_arr) {
+        highlight = h
+            .iter()
+            .filter_map(Json::as_str)
+            .map(str::to_string)
+            .collect();
+    }
+
+    let mut search = None;
+    if let Some(list) = body.get("search").and_then(Json::as_arr) {
+        let mut clause = SearchClause::default();
+        for e in list {
             let method = e.get("match_method").and_then(Json::as_str).unwrap_or("");
             // An integer topn ≥ 1; anything else becomes -1 so the engine
             // reports the reference's invalid-topn error.
@@ -925,27 +1063,38 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                     .join(";"),
                 Some(_) => "__invalid_param__".to_string(),
             };
+            let mut opts = format!("topn={topn}");
+            if !params.is_empty() {
+                opts = format!("{opts};{params}");
+            }
+            // Options are a single-quoted literal in the reference's request,
+            // so the text keeps its own quotes inside the string value.
+            let text_lit = |s: &str| ExprAst::Literal(Literal::Str(s.to_string()));
             match method {
                 "dense" => {
                     let field = e.get("fields").and_then(Json::as_str).unwrap_or("");
                     let vec = e
                         .get("query_vector")
-                        .map(sql_value_arr)
-                        .unwrap_or("[]".into());
+                        .map(|v| ExprAst::Literal(Literal::Array(json_array_items(v))))
+                        .unwrap_or_else(|| ExprAst::Literal(Literal::Array(Vec::new())));
                     let elem = match e.get("element_type") {
                         None => "float".to_string(),
                         Some(Json::Str(s)) => s.clone(),
                         Some(_) => "__invalid__".to_string(),
                     };
                     let metric = e.get("metric_type").and_then(Json::as_str).unwrap_or("l2");
-                    let mut opts = format!("topn={topn}");
-                    if !params.is_empty() {
-                        opts = format!("{opts};{params}");
-                    }
-                    parts.push(format!(
-                        "MATCH VECTOR ({field}, {vec}, '{elem}', '{metric}', {topn}, '{}')",
-                        opts.replace('\'', "''")
-                    ));
+                    clause.matches.push(MatchClause {
+                        kind: "VECTOR".into(),
+                        column: field.to_string(),
+                        args: vec![
+                            vec,
+                            text_lit(&elem),
+                            text_lit(metric),
+                            ExprAst::Literal(Literal::Int(topn)),
+                            text_lit(&opts),
+                        ],
+                        filter: None,
+                    });
                 }
                 "text" => {
                     let field = match e.get("fields") {
@@ -956,52 +1105,52 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                         Some(_) => "__invalid__",
                     };
                     let text = e.get("matching_text").and_then(Json::as_str).unwrap_or("");
-                    let mut opts = format!("topn={topn}");
-                    if !params.is_empty() {
-                        opts = format!("{opts};{params}");
-                    }
-                    parts.push(format!(
-                        "MATCH TEXT ('{field}', '{}', '{}')",
-                        text.replace('\'', "''"),
-                        opts.replace('\'', "''")
-                    ));
+                    clause.matches.push(MatchClause {
+                        kind: "TEXT".into(),
+                        column: field.to_string(),
+                        args: vec![text_lit(text), text_lit(&opts)],
+                        filter: None,
+                    });
                 }
                 "sparse" => {
                     let field = e.get("fields").and_then(Json::as_str).unwrap_or("");
                     let qv = e
                         .get("query_vector")
-                        .map(|v| sql_value(v, "SPARSE"))
-                        .unwrap_or("[]".into());
+                        .map(|v| ExprAst::Literal(Literal::Array(sparse_query_items(v))))
+                        .unwrap_or_else(|| ExprAst::Literal(Literal::Array(Vec::new())));
                     let metric = e.get("metric_type").and_then(Json::as_str).unwrap_or("ip");
-                    let mut opts = format!("topn={topn}");
-                    if !params.is_empty() {
-                        opts = format!("{opts};{params}");
-                    }
-                    parts.push(format!(
-                        "MATCH SPARSE ({field}, {qv}, '{metric}', {topn}, '{}')",
-                        opts.replace('\'', "''")
-                    ));
+                    clause.matches.push(MatchClause {
+                        kind: "SPARSE".into(),
+                        column: field.to_string(),
+                        args: vec![
+                            qv,
+                            text_lit(metric),
+                            ExprAst::Literal(Literal::Int(topn)),
+                            text_lit(&opts),
+                        ],
+                        filter: None,
+                    });
                 }
                 "tensor" => {
                     let field = e.get("field").and_then(Json::as_str).unwrap_or("");
                     let vec = e
                         .get("query_tensor")
-                        .map(sql_value_arr)
-                        .unwrap_or("[]".into());
+                        .map(|v| ExprAst::Literal(Literal::Array(json_array_items(v))))
+                        .unwrap_or_else(|| ExprAst::Literal(Literal::Array(Vec::new())));
                     let elem = match e.get("element_type") {
                         None => "float".to_string(),
                         Some(Json::Str(s)) => s.clone(),
-                        // A non-string type is invalid; let the engine reject it.
                         Some(_) => "__invalid__".to_string(),
                     };
-                    let mut opts = format!("topn={topn}");
-                    if !params.is_empty() {
-                        opts = format!("{opts};{params}");
-                    }
-                    parts.push(format!(
-                        "MATCH TENSOR ({field}, {vec}, '{elem}', 'maxsim', '{}')",
-                        opts.replace('\'', "''")
-                    ));
+                    // `MATCH TENSOR (col, vec, 'elem', 'options')`: the row count
+                    // and the options share the trailing parameter string, so
+                    // `topn` is carried in the bag (`args[3]`).
+                    clause.matches.push(MatchClause {
+                        kind: "TENSOR".into(),
+                        column: field.to_string(),
+                        args: vec![vec, text_lit(&elem), text_lit("maxsim"), text_lit(&opts)],
+                        filter: None,
+                    });
                 }
                 _ => {}
             }
@@ -1012,72 +1161,77 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                     .get("fusion_method")
                     .and_then(Json::as_str)
                     .unwrap_or("rrf");
-                parts.push(format!("FUSION('{m}')"));
+                clause.fusions.push((m.to_string(), String::new()));
+            }
+            if let Some((m, _)) = clause.fusions.last() {
+                clause.fusion = Some(m.clone());
             }
         }
-        if !parts.is_empty() {
-            sql.push_str(&format!(" SEARCH {}", parts.join(", ")));
+        if !clause.matches.is_empty() {
+            search = Some(Box::new(clause));
         }
     }
 
-    if let Some(f) = body.get("filter").and_then(Json::as_str) {
-        if !f.is_empty() {
+    let where_pred = match body.get("filter").and_then(Json::as_str) {
+        Some(f) if !f.is_empty() => {
             let f = crate::substitute_aliases(&rewrite_pseudo(f), &aliases);
-            sql.push_str(&format!(" WHERE {f}"));
+            Some(parser::parse_predicate(&f).map_err(err)?)
         }
-    }
+        _ => None,
+    };
+
+    let mut group_by = Vec::new();
     if let Some(g) = body.get("group_by") {
-        let cols = str_list(g);
-        if !cols.is_empty() {
-            let cols: Vec<String> = cols.iter().map(|c| rewrite_pseudo(c)).collect();
-            sql.push_str(&format!(" GROUP BY {}", cols.join(", ")));
+        for c in str_list(g) {
+            group_by.push(parser::parse_expr(&rewrite_pseudo(&c)).map_err(err)?);
         }
     }
-    if let Some(h) = body.get("having") {
-        let preds = str_list(h);
-        if !preds.is_empty() {
-            let preds: Vec<String> = preds
-                .iter()
-                .map(|p| crate::substitute_aliases(&rewrite_pseudo(p), &aliases))
-                .collect();
-            sql.push_str(&format!(" HAVING {}", preds.join(" AND ")));
-        }
-    }
-    if let Some(s) = body.get("sort").and_then(Json::as_arr) {
-        let keys: Vec<String> = s
-            .iter()
-            .filter_map(|x| {
-                // `[col, "asc"]` (thrift-like) or `{col: "asc"}` (the REST SDK)
-                if let Some(a) = x.as_arr() {
-                    let col = rewrite_pseudo(a.first()?.as_str()?);
-                    let dir = a.get(1).and_then(Json::as_str).unwrap_or("asc");
-                    return Some(format!(
-                        "{col} {}",
-                        if dir.eq_ignore_ascii_case("desc") {
-                            "DESC"
-                        } else {
-                            "ASC"
-                        }
-                    ));
+
+    let having = match body.get("having") {
+        Some(h) => {
+            let preds = str_list(h);
+            if preds.is_empty() {
+                None
+            } else {
+                let mut acc: Option<Predicate> = None;
+                for p in preds {
+                    let p = crate::substitute_aliases(&rewrite_pseudo(&p), &aliases);
+                    let pred = parser::parse_predicate(&p).map_err(err)?;
+                    acc = Some(match acc {
+                        Some(a) => Predicate::Bool(Box::new(a), BoolOp::And, Box::new(pred)),
+                        None => pred,
+                    });
                 }
-                let obj = x.as_obj()?;
-                let (col, dir) = obj.first()?;
-                let col = rewrite_pseudo(col);
-                let dir = dir.as_str().unwrap_or("asc");
-                Some(format!(
-                    "{col} {}",
-                    if dir.eq_ignore_ascii_case("desc") {
-                        "DESC"
-                    } else {
-                        "ASC"
-                    }
-                ))
-            })
-            .collect();
-        if !keys.is_empty() {
-            sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
+                acc.map(Box::new)
+            }
+        }
+        None => None,
+    };
+
+    let mut order_by = Vec::new();
+    if let Some(s) = body.get("sort").and_then(Json::as_arr) {
+        for x in s {
+            // `[col, "asc"]` (thrift-like) or `{col: "asc"}` (the REST SDK)
+            let (col, dir) = if let Some(a) = x.as_arr() {
+                let col = a.first().and_then(Json::as_str).unwrap_or("");
+                let dir = a.get(1).and_then(Json::as_str).unwrap_or("asc");
+                (col, dir)
+            } else {
+                match x.as_obj().and_then(|o| o.first()) {
+                    Some((col, dir)) => (col.as_str(), dir.as_str().unwrap_or("asc")),
+                    None => continue,
+                }
+            };
+            let col = rewrite_pseudo(col);
+            let expr = parser::parse_expr(&col).map_err(err)?;
+            order_by.push(OrderKey {
+                column: col,
+                asc: !dir.eq_ignore_ascii_case("desc"),
+                expr: Some(expr),
+            });
         }
     }
+
     let limit = body.get("limit").and_then(|l| {
         l.as_f64()
             .map(|n| n as i64)
@@ -1088,20 +1242,69 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
             .map(|n| n as i64)
             .or_else(|| o.as_str().and_then(|s| s.parse().ok()))
     });
-    if let Some(n) = limit {
-        sql.push_str(&format!(" LIMIT {n}"));
-    } else if offset.is_some() {
-        // The reference's planner takes LIMIT and OFFSET as two independent
-        // fields of the request object, so `Offset(n)` without a limit means
-        // "every row after n". The SQL grammar insists on a LIMIT first, so an
-        // unbounded one is spelled out here.
-        sql.push_str(" LIMIT 9223372036854775807");
+
+    // An offset without a limit means "every row after n": the REST request
+    // carries the two as independent fields, and the text path spelled out an
+    // unbounded LIMIT so the SQL grammar (which insists on one) accepted it.
+    // The tree has no such restriction, so the unbounded limit is written here.
+    let limit = limit.or_else(|| offset.map(|_| i64::MAX));
+    // `SEARCH` is the one clause the parser refuses to combine with `ORDER BY`
+    // (`parser.y:1546`); building the tree skips that reduction, so it is
+    // checked here.
+    if search.is_some() && !order_by.is_empty() {
+        return Err(err_response(
+            3013,
+            "parse error: SEARCH cannot be combined with ORDER BY",
+        ));
     }
-    if let Some(n) = offset {
-        sql.push_str(&format!(" OFFSET {n}"));
+
+    Ok(Statement::Select {
+        items,
+        from: Some(format!("{db}.{table}")),
+        join: None,
+        where_pred,
+        group_by,
+        aliases: out_aliases,
+        having,
+        order_by,
+        limit: limit.map(|n| n.max(0) as u64),
+        offset: offset.map(|n| n.max(0) as u64),
+        search,
+        distinct: false,
+        highlight,
+        ctes: Vec::new(),
+        cross_tables: Vec::new(),
+        limit_expr: None,
+        offset_expr: None,
+    })
+}
+
+/// A JSON array as the `Literal::Array` items the executor's vector readers
+/// take. A tensor query is a list of sub-vectors, so nesting is preserved.
+fn json_array_items(v: &Json) -> Vec<String> {
+    match v {
+        Json::Arr(items) => items.iter().map(array_item_text).collect(),
+        _ => Vec::new(),
     }
-    sql.push(';');
-    sql
+}
+
+/// A sparse query `{index: value}` as `index:value` items.
+fn sparse_query_items(v: &Json) -> Vec<String> {
+    match v {
+        Json::Obj(map) => map
+            .iter()
+            .map(|(k, v)| match v {
+                Json::Num(n) => format!("{k}:{n}"),
+                Json::Str(s) => format!("{k}:{s}"),
+                _ => format!("{k}:0"),
+            })
+            .collect(),
+        Json::Arr(_) => json_array_items(v)
+            .into_iter()
+            .map(|i| format!("{i}:1"))
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// The REST DSL's pseudo-columns and the functions they stand for.
@@ -1176,27 +1379,6 @@ fn split_alias(projection: &str) -> Option<(String, String)> {
     Some((alias.to_string(), expr.to_string()))
 }
 
-fn sql_value_arr(v: &Json) -> String {
-    match v {
-        Json::Arr(items) => format!(
-            "[{}]",
-            items
-                .iter()
-                .map(|x| match x {
-                    Json::Num(n) => n.clone(),
-                    Json::Str(s) => format!("'{}'", s.replace('\'', "''")),
-                    // A tensor query is a list of sub-vectors; recurse so the
-                    // nesting survives (a flat `[0,0]` scores every row 0).
-                    Json::Arr(_) => sql_value_arr(x),
-                    _ => "0".to_string(),
-                })
-                .collect::<Vec<_>>()
-                .join(",")
-        ),
-        _ => "[]".to_string(),
-    }
-}
-
 fn rows_of(results: Vec<QueryResult>) -> (Vec<String>, Vec<Vec<String>>) {
     let mut cols = Vec::new();
     let mut rows = Vec::new();
@@ -1269,11 +1451,23 @@ pub async fn route(
     // parks the calling thread and a statement's completion can need the very
     // worker it parked (verified by its own assertion, which the HTTP suite hit
     // as `DROP TABLE` killed the connection).
-    async fn run(
+    //
+    /// Runs statements the handler built itself.
+    ///
+    /// Every route that used to `format!` a statement out of request fields
+    /// goes through here instead. The formatted text was re-tokenised by the
+    /// parser, so a request field the caller controls (a REST `filter`, a
+    /// config name) could carry `;` and run a second statement the route never
+    /// authored. Building the AST directly removes the text layer entirely.
+    async fn run_ast(
         engine: &Engine,
-        sql: &str,
+        stmt: Statement,
+        text: &str,
     ) -> std::result::Result<Vec<QueryResult>, (u16, String)> {
-        engine.execute(sql).await.map_err(|e| engine_err(&e))
+        engine
+            .execute_parsed(vec![stmt], text)
+            .await
+            .map_err(|e| engine_err(&e))
     }
 
     match (method, parts.as_slice()) {
@@ -1299,14 +1493,21 @@ pub async fn route(
                 Err(e) => return e,
             };
             if replace {
-                let _ = engine.execute(&format!("DROP DATABASE IF EXISTS {db};")).await;
+                let _ = engine
+                    .execute_parsed(
+                        vec![Statement::DropDatabase {
+                            name: db.clone(),
+                            if_exists: true,
+                        }],
+                        "",
+                    )
+                    .await;
             }
-            let sql = if ignore {
-                format!("CREATE DATABASE IF NOT EXISTS {db};")
-            } else {
-                format!("CREATE DATABASE {db};")
+            let stmt = Statement::CreateDatabase {
+                name: db.clone(),
+                if_not_exists: ignore,
             };
-            match run(engine, &sql).await {
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1315,16 +1516,20 @@ pub async fn route(
             let Some(db) = ident(db) else {
                 return (404, String::new());
             };
-            let drop_ignore = match drop_option_sql(&doc) {
+            let if_exists = match drop_option_sql(&doc) {
                 Ok(v) => v,
                 Err(e) => return e,
             };
-            let sql = if drop_ignore {
-                format!("DROP DATABASE IF EXISTS {db};")
-            } else {
-                format!("DROP DATABASE {db};")
-            };
-            match run(engine, &sql).await {
+            match run_ast(
+                engine,
+                Statement::DropDatabase {
+                    name: db,
+                    if_exists,
+                },
+                "",
+            )
+            .await
+            {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1362,7 +1567,7 @@ pub async fn route(
             if fields.is_empty() {
                 return err_response(3048, "no column defined");
             }
-            let mut cols = Vec::new();
+            let mut cols: Vec<parser::ColumnDef> = Vec::new();
             for f in fields {
                 let name = f.get("name").and_then(Json::as_str).unwrap_or("");
                 let ty = f.get("type").and_then(Json::as_str).unwrap_or("varchar");
@@ -1375,30 +1580,24 @@ pub async fn route(
                 if let Some((code, msg)) = column_type_error(ty) {
                     return err_response(code, &msg);
                 }
-                let name = name.to_ascii_lowercase();
-                let mut col = format!("{name} {}", type_to_sql(ty));
-                if let Some(c) = f.get("comment").and_then(Json::as_str) {
-                    col.push_str(&format!(" COMMENT {}", quote_sql(c)));
-                }
-                if let Some(default) = f.get("default") {
-                    let d = match default {
-                        Json::Str(s) => quote_sql(s),
-                        other => render_json(other),
-                    };
-                    col.push_str(&format!(" DEFAULT {d}"));
-                }
+                let mut not_null = false;
                 if let Some(cs) = f.get("constraints").and_then(Json::as_arr) {
                     for c in cs.iter().filter_map(Json::as_str) {
                         if c.eq_ignore_ascii_case("not null") {
-                            col.push_str(" NOT NULL");
-                        } else if c.eq_ignore_ascii_case("primary key") {
-                            col.push_str(" PRIMARY KEY");
-                        } else if c.eq_ignore_ascii_case("unique") {
-                            col.push_str(" UNIQUE");
+                            not_null = true;
                         }
                     }
                 }
-                cols.push(col);
+                cols.push(match column_def(
+                    name,
+                    ty,
+                    f.get("comment").and_then(Json::as_str),
+                    f.get("default"),
+                    not_null,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => return e,
+                });
             }
             let (ignore, replace) = match create_option_sql(&doc) {
                 Ok(v) => v,
@@ -1406,7 +1605,15 @@ pub async fn route(
             };
             let full = format!("{db}.{table}");
             if replace {
-                let _ = engine.execute(&format!("DROP TABLE IF EXISTS {full};")).await;
+                let _ = run_ast(
+                    engine,
+                    Statement::DropTable {
+                        name: full.clone(),
+                        if_exists: true,
+                    },
+                    "",
+                )
+                .await;
             } else if ignore
                 && engine
                     .catalog()
@@ -1417,8 +1624,12 @@ pub async fn route(
             {
                 return (200, ok_json());
             }
-            let sql = format!("CREATE TABLE {full} ({});", cols.join(", "));
-            match run(engine, &sql).await {
+            let stmt = Statement::CreateTable {
+                name: full,
+                columns: cols,
+                opts: Vec::new(),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1427,15 +1638,15 @@ pub async fn route(
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            let drop_ignore = match drop_option_sql(&doc) {
+            let if_exists = match drop_option_sql(&doc) {
                 Ok(v) => v,
                 Err(e) => return e,
             };
-            let sql = format!(
-                "DROP TABLE {}{db}.{table};",
-                if drop_ignore { "IF EXISTS " } else { "" }
-            );
-            match run(engine, &sql).await {
+            let stmt = Statement::DropTable {
+                name: format!("{db}.{table}"),
+                if_exists,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1518,7 +1729,6 @@ pub async fn route(
                 if let Some((code, msg)) = column_type_error(ty) {
                     return err_response(code, &msg);
                 }
-                let mut def = format!("{name} {}", type_to_sql(ty));
                 // `constraints: ["not null"]` is part of the column definition.
                 let not_null = f
                     .get("constraints")
@@ -1531,21 +1741,24 @@ pub async fn route(
                         })
                     })
                     .unwrap_or(false);
-                if not_null {
-                    def.push_str(" NOT NULL");
-                }
-                // A declared default must be applied to the rows already stored.
-                if let Some(d) = f.get("default") {
-                    let lit = match d {
-                        Json::Str(s) => quote_sql(s),
-                        other => render_json(other),
-                    };
-                    def.push_str(&format!(" DEFAULT {lit}"));
-                }
-                cols.push(def);
+                cols.push(match column_def(
+                    name,
+                    ty,
+                    None,
+                    // A declared default must be applied to the rows already
+                    // stored.
+                    f.get("default"),
+                    not_null,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => return e,
+                });
             }
-            let stmt = format!("ALTER TABLE {db}.{table} ADD COLUMN ({});", cols.join(", "));
-            match run(engine, &stmt).await {
+            let stmt = Statement::AlterTableAdd {
+                table: format!("{db}.{table}"),
+                columns: cols,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1559,25 +1772,30 @@ pub async fn route(
                 .and_then(Json::as_arr)
                 .map(|a| a.iter().filter_map(Json::as_str).collect())
                 .unwrap_or_default();
-            let mut resp = ok_json();
+            let resp = ok_json();
             for n in names {
                 if safe_ident(n).is_none() {
                     return err_response(3003, "invalid column name");
                 }
-                match run(engine, &format!("ALTER TABLE {db}.{table} DROP COLUMN {n};")).await {
+                let stmt = Statement::AlterTableDropColumn {
+                    table: format!("{db}.{table}"),
+                    column: n.to_ascii_lowercase(),
+                };
+                match run_ast(engine, stmt, "").await {
                     Ok(_) => {}
                     Err(e) => return e,
                 }
             }
-            resp.push_str("");
             (200, resp)
         }
         ("GET", ["databases", db, "tables", table, "columns"]) => {
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            let sql = format!("SHOW TABLE {db}.{table} COLUMNS;");
-            match run(engine, &sql).await {
+            let stmt = Statement::ShowTableColumns {
+                table: format!("{db}.{table}"),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(results) => {
                     let (_, rows) = rows_of(results);
                     let cols = rows
@@ -1645,14 +1863,7 @@ pub async fn route(
                 k if k.eq_ignore_ascii_case("SECONDARYFUNCTIONAL") => "SECONDARY",
                 k => k,
             };
-            let mut sql = format!(
-                "CREATE INDEX {}{index} ON {db}.{table} ({column})",
-                if ignore { "IF NOT EXISTS " } else { "" }
-            );
-            if !kind.is_empty() {
-                sql.push_str(&format!(" USING {kind}"));
-            }
-            let mut opts: Vec<String> = Vec::new();
+            let mut raw: Vec<(String, String)> = Vec::new();
             if let Some(map) = info.as_obj() {
                 for (k, v) in map {
                     if k.eq_ignore_ascii_case("type") {
@@ -1666,18 +1877,25 @@ pub async fn route(
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| render_json(v))
                         .to_lowercase();
-                    opts.push(format!(
-                        "{}='{}'",
-                        k.to_lowercase(),
-                        value.replace('\'', "''")
-                    ));
+                    raw.push((k.to_ascii_uppercase(), value));
                 }
             }
-            if !opts.is_empty() {
-                sql.push_str(&format!(" WITH ({})", opts.join(",")));
-            }
-            sql.push(';');
-            match run(engine, &sql).await {
+            // A tree, not a statement string: `index`, `column` and every
+            // option come from the request body. The target still gets the same
+            // validation the SQL parser applied when it read `(column)`.
+            let column = match crate::index_target(column) {
+                Ok(c) => c,
+                Err(e) => return err_response(3013, &e),
+            };
+            let stmt = Statement::CreateIndex {
+                name: index.clone(),
+                table: full.clone(),
+                column,
+                index_type: kind.to_string(),
+                opts: crate::index_params(&raw),
+                if_not_exists: ignore,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => {
                     // `SHOW INDEX` reports this back, as in the reference.
                     engine.set_index_comment(&full, &index, &comment);
@@ -1714,11 +1932,11 @@ pub async fn route(
                 Err(e) => return e,
             };
             let _ = (db, table);
-            let sql = format!(
-                "DROP INDEX {}{index};",
-                if drop_ignore { "IF EXISTS " } else { "" }
-            );
-            match run(engine, &sql).await {
+            let stmt = Statement::DropIndex {
+                name: index.clone(),
+                if_exists: drop_ignore,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1814,18 +2032,31 @@ pub async fn route(
                 })
                 .unwrap_or_else(|| vec!["*".into()]);
             let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
-            let mut inner = format!("SELECT {} FROM {db}.{table}", output.join(", "));
-            if !filter.is_empty() {
-                inner.push_str(&format!(" WHERE {filter}"));
-            }
-            let kind = match explain.as_str() {
-                "LOGICAL" => "LOGICAL",
-                "OPT" | "UNOPT" => "LOGICAL",
-                "PIPELINE" | "FRAGMENT" => "PHYSICAL",
-                _ => "PHYSICAL",
+            // The inner SELECT is built as an AST and then wrapped, so a
+            // `filter` the client sent is parsed once as a predicate.
+            let inner = match docs_select(
+                &Json::Obj(vec![
+                    (
+                        "output".into(),
+                        Json::Arr(output.into_iter().map(Json::Str).collect()),
+                    ),
+                    ("filter".into(), Json::Str(filter.to_string())),
+                ]),
+                &db,
+                &table,
+            ) {
+                Ok(s) => s,
+                Err(e) => return e,
             };
-            let sql = format!("EXPLAIN {kind} {inner};");
-            match run(engine, &sql).await {
+            let kind = match explain.as_str() {
+                "LOGICAL" | "OPT" | "UNOPT" => parser::ExplainKind::Logical,
+                _ => parser::ExplainKind::Physical,
+            };
+            let stmt = Statement::Explain {
+                kind,
+                inner: Box::new(inner),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
                     // the SDK renders every value under its column name
@@ -1856,7 +2087,11 @@ pub async fn route(
             let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
-            let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
+            let path_text = doc
+                .get("file_path")
+                .and_then(Json::as_str)
+                .unwrap_or("")
+                .to_string();
             // `ImportHandler` lower-cases the type and accepts only the four it
             // knows about; anything else is `kNotSupported` before the engine is
             // even reached (the Thrift adapter rejects the same set client-side).
@@ -1880,11 +2115,17 @@ pub async fn route(
                     _ => None,
                 })
                 .unwrap_or(false);
-            let sql = format!(
-                "COPY {db}.{table} FROM {path} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header});",
-                delim.replace('\'', "''")
-            );
-            match run(engine, &sql).await {
+            let stmt = Statement::Copy {
+                table: format!("{db}.{table}"),
+                from: true,
+                path: path_text,
+                opts: vec![
+                    ("DELIMITER".into(), delim.to_string()),
+                    ("FORMAT".into(), format.clone()),
+                    ("HEADER".into(), header.to_string()),
+                ],
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -1936,17 +2177,22 @@ pub async fn route(
                 } else {
                     format!("{file}.part{index}")
                 };
-                let mut sql = format!(
-                    "COPY {db}.{table} TO {} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header}, OFFSET {}",
-                    quote_sql(&path),
-                    delim.replace('\'', "''"),
-                    offset + written
-                );
+                let mut opts = vec![
+                    ("DELIMITER".into(), delim.to_string()),
+                    ("FORMAT".into(), format.clone()),
+                    ("HEADER".into(), header.to_string()),
+                    ("OFFSET".into(), (offset + written).to_string()),
+                ];
                 if take > 0 {
-                    sql.push_str(&format!(", LIMIT {take}"));
+                    opts.push(("LIMIT".into(), take.to_string()));
                 }
-                sql.push_str(" )");
-                let n = match run(engine, &sql).await {
+                let stmt = Statement::Copy {
+                    table: format!("{db}.{table}"),
+                    from: false,
+                    path,
+                    opts,
+                };
+                let n = match run_ast(engine, stmt, "").await {
                     Ok(results) => results
                         .into_iter()
                         .map(|r| match r {
@@ -1973,10 +2219,17 @@ pub async fn route(
                 .get("new_table_name")
                 .and_then(Json::as_str)
                 .unwrap_or("");
-            let Some(new_name) = safe_ident(new_name) else {
-                return err_response(3003, "invalid table name");
+            // Same check the SQL path applies to a rename target: `123` is a
+            // number, not a name.
+            let new_name = match crate::rename_target(new_name) {
+                Ok(n) => n,
+                Err(e) => return err_response(3013, &e),
             };
-            match run(engine, &format!("ALTER TABLE {db}.{table} RENAME TO {new_name};")).await {
+            let stmt = Statement::RenameTable {
+                table: format!("{db}.{table}"),
+                new_name,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2078,14 +2331,6 @@ pub async fn route(
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full).await;
-            let ty_of = |name: &str| -> String {
-                types
-                    .iter()
-                    .find(|(c, _)| c.eq_ignore_ascii_case(name))
-                    .map(|(_, t)| t.clone())
-                    .unwrap_or_default()
-            };
             let rows = match &doc {
                 Json::Arr(rs) => rs.clone(),
                 Json::Obj(_) => vec![doc.clone()],
@@ -2099,8 +2344,23 @@ pub async fn route(
             if rows.len() > 8192 {
                 return err_response(3014, "Insert batch row limit shouldn't more than 8193");
             }
-            let mut n = 0i64;
-            for row in rows {
+            let meta = match engine.catalog().get_table_by_name(&full) {
+                Ok(Some(meta)) => meta,
+                Ok(None) => {
+                    return err_response(3022, &format!("table '{full}' does not exist"));
+                }
+                Err(e) => return engine_err(&e),
+            };
+            let ty_of = |name: &str| -> String {
+                meta.columns
+                    .iter()
+                    .position(|c| c.eq_ignore_ascii_case(name))
+                    .and_then(|i| meta.types.get(i))
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let mut prepared: Vec<(Vec<String>, Vec<Literal>)> = Vec::with_capacity(rows.len());
+            for row in &rows {
                 let Some(fields) = row.as_obj() else {
                     return err_response(3013, "insert row must be an object");
                 };
@@ -2109,20 +2369,56 @@ pub async fn route(
                 if fields.is_empty() {
                     return err_response(3013, "insert row must not be empty");
                 }
-                let cols: Vec<String> = fields.iter().map(|(k, _)| k.clone()).collect();
-                let vals: Vec<String> = fields
-                    .iter()
-                    .map(|(k, v)| sql_value(v, &ty_of(k)))
-                    .collect();
-                let sql = format!(
-                    "INSERT INTO {full} ({}) VALUES ({});",
-                    cols.join(","),
-                    vals.join(",")
-                );
-                match run(engine, &sql).await {
-                    Ok(_) => n += 1,
-                    Err(e) => return e,
+                // Column names are case-insensitive. The SQL path got the
+                // canonical spelling from the lexer/lowercasing the parser
+                // applied; here the key is the client's, so lower-case it —
+                // `InsertHandler` does the same (`http_server_impl.cpp:950`) and
+                // reports a repeat that only appears after folding
+                // (`{"c1":1,"C1":2}`) as a duplicate column.
+                let mut seen = std::collections::HashSet::with_capacity(fields.len());
+                let mut cols: Vec<String> = Vec::with_capacity(fields.len());
+                let mut vals: Vec<Literal> = Vec::with_capacity(fields.len());
+                for (k, v) in fields {
+                    let key = k.to_ascii_lowercase();
+                    if !seen.insert(key.clone()) {
+                        return err_response(3068, &format!("Duplicated column name: {key}"));
+                    }
+                    vals.push(match insert_literal(v, &ty_of(&key)) {
+                        Ok(l) => l,
+                        Err(e) => return e,
+                    });
+                    cols.push(key);
                 }
+                prepared.push((cols, vals));
+            }
+            // One statement for the whole request (`InsertHandler` runs one
+            // `QueryStatement`), so the batch spends one transaction id.
+            engine.begin_statement();
+            // Rows that share a column list go in one call: the executor takes
+            // one column list per batch, and the Thrift `Insert` RPC groups the
+            // same way.
+            let mut n = 0i64;
+            let mut i = 0usize;
+            let mut failed = None;
+            while i < prepared.len() && failed.is_none() {
+                let cols = prepared[i].0.clone();
+                let mut batch: Vec<Vec<Literal>> = Vec::new();
+                while i < prepared.len() && prepared[i].0 == cols {
+                    batch.push(std::mem::take(&mut prepared[i].1));
+                    i += 1;
+                }
+                match engine
+                    .insert_literals_retrying(&full, Some(&cols), batch)
+                    .await
+                {
+                    Ok(QueryResult::Inserted { count }) => n += count as i64,
+                    Ok(_) => {}
+                    Err(e) => failed = Some(engine_err(&e)),
+                }
+            }
+            engine.end_statement();
+            if let Some(e) = failed {
+                return e;
             }
             (
                 200,
@@ -2134,15 +2430,15 @@ pub async fn route(
                 return (404, String::new());
             };
             let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
-            let sql = format!(
-                "DELETE FROM {db}.{table}{};",
-                if filter.is_empty() {
-                    String::new()
-                } else {
-                    format!(" WHERE {filter}")
-                }
-            );
-            match run(engine, &sql).await {
+            let where_pred = match parse_filter(filter) {
+                Ok(p) => p,
+                Err(e) => return e,
+            };
+            let stmt = Statement::Delete {
+                table: format!("{db}.{table}"),
+                where_pred,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(results) => (
                     200,
                     format!(
@@ -2161,29 +2457,37 @@ pub async fn route(
             let Some(update) = doc.get("update").and_then(Json::as_obj) else {
                 return err_response(3013, "update needs values");
             };
+            // An empty `SET` list was a syntax error in the text path, and the
+            // executor's Update arm would otherwise delete and re-insert every
+            // matching row, giving them new row ids for no change.
+            if update.is_empty() {
+                return err_response(3013, "update needs values");
+            }
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full).await;
-            let sets = update
-                .iter()
-                .map(|(k, v)| {
-                    let ty = types
-                        .iter()
-                        .find(|(c, _)| c.eq_ignore_ascii_case(k))
-                        .map(|(_, t)| t.clone())
-                        .unwrap_or_default();
-                    format!("{k} = {}", sql_value(v, &ty))
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "UPDATE {full} SET {sets}{};",
-                if filter.is_empty() {
-                    String::new()
-                } else {
-                    format!(" WHERE {filter}")
-                }
-            );
-            match run(engine, &sql).await {
+            let types = column_types(engine, &full);
+            let mut assignments = Vec::with_capacity(update.len());
+            for (k, v) in update {
+                let ty = types
+                    .iter()
+                    .find(|(c, _)| c.eq_ignore_ascii_case(k))
+                    .map(|(_, t)| t.clone())
+                    .unwrap_or_default();
+                let lit = match insert_literal(v, &ty) {
+                    Ok(l) => l,
+                    Err(e) => return e,
+                };
+                assignments.push((k.to_ascii_lowercase(), ExprAst::Literal(lit)));
+            }
+            let where_pred = match parse_filter(filter) {
+                Ok(p) => p,
+                Err(e) => return e,
+            };
+            let stmt = Statement::Update {
+                table: full,
+                assignments,
+                where_pred,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2193,12 +2497,13 @@ pub async fn route(
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
-            let types = column_types(engine, &full).await;
-            let sql = docs_sql(&doc, &db, &table);
-            if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                eprintln!("[HTTP-SQL] {sql}");
-            }
-            match run(engine, &sql).await {
+            let types = column_types(engine, &full);
+            let stmt = match docs_select(&doc, &db, &table) {
+                Ok(s) => s,
+                Err(e) => return e,
+            };
+            let selected = stmt.clone();
+            match run_ast(engine, stmt, "").await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
                     let out_types: Vec<String> = cols
@@ -2222,25 +2527,39 @@ pub async fn route(
                             .unwrap_or(false)
                         {
                             // Count the rows the query would return without
-                            // LIMIT/OFFSET: the projection is replaced by
-                            // `count(*)` (prepending it to the select list, as
-                            // this used to, produced `SELECT count(*) AS n c1,
-                            // c2 …`, which the engine rejects and the count then
-                            // silently read as 0).
-                            let mut count_sql = sql.trim_end_matches(';').to_string();
-                            if let Some(pos) = count_sql.rfind(" LIMIT ") {
-                                count_sql.truncate(pos);
-                            }
-                            if let Some(pos) = count_sql.to_ascii_lowercase().rfind(" order by ") {
-                                count_sql.truncate(pos);
-                            }
-                            if let (Some(a), Some(b)) =
-                                (count_sql.find("SELECT "), count_sql.rfind(" FROM "))
+                            // LIMIT/OFFSET/ORDER BY: the same statement with the
+                            // projection replaced by `count(*)` and the tail
+                            // dropped. It is rebuilt from the AST rather than by
+                            // editing SQL text, so nothing the request carried
+                            // reaches the parser twice.
+                            let mut counting = selected.clone();
+                            if let Statement::Select {
+                                items,
+                                aliases,
+                                order_by,
+                                limit,
+                                offset,
+                                limit_expr,
+                                offset_expr,
+                                ..
+                            } = &mut counting
                             {
-                                count_sql.replace_range(a + 7..b, "count(*) AS n");
+                                // `count(*)` parses to an aggregate with **no**
+                                // arguments (the star is a flag, not an arg).
+                                *items = vec![SelectItem::Aggregate(parser::SelectAgg {
+                                    func: parser::AggFunc::Count,
+                                    args: Vec::new(),
+                                    arg_exprs: Vec::new(),
+                                    distinct: false,
+                                })];
+                                *aliases = vec![Some("n".into())];
+                                order_by.clear();
+                                *limit = None;
+                                *offset = None;
+                                *limit_expr = None;
+                                *offset_expr = None;
                             }
-                            count_sql.push(';');
-                            let total = match engine.execute(&count_sql).await {
+                            let total = match run_ast(engine, counting, "").await {
                                 Ok(rs) => {
                                     let (_, rows) = rows_of(rs);
                                     rows.first()
@@ -2295,8 +2614,11 @@ pub async fn route(
             if lower == "log_level" && !matches!(doc.get(&name), Some(Json::Str(_))) {
                 return err_response(3010, "data type mismatch for config 'log_level'");
             }
-            let sql = format!("SET CONFIG {lower} {literal};");
-            match run(engine, &sql).await {
+            let stmt = Statement::SetConfig {
+                key: lower,
+                value: literal,
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2404,11 +2726,11 @@ pub async fn route(
             let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
                 return err_response(3037, "invalid table name");
             };
-            let sql = format!(
-                "CREATE SNAPSHOT {} ON TABLE {db}.{table};",
-                snapshot_sql(snapshot)
-            );
-            match run(engine, &sql).await {
+            let stmt = Statement::CreateSnapshot {
+                name: snapshot.to_string(),
+                table: format!("{db}.{table}"),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2417,10 +2739,15 @@ pub async fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(engine, &format!(
-                "RESTORE TABLE SNAPSHOT {};",
-                snapshot_sql(snapshot)
-            )).await {
+            match run_ast(
+                engine,
+                Statement::RestoreSnapshot {
+                    name: snapshot.to_string(),
+                },
+                "",
+            )
+            .await
+            {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2429,10 +2756,15 @@ pub async fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(engine, &format!(
-                "CREATE SNAPSHOT {} ON SYSTEM;",
-                snapshot_sql(snapshot)
-            )).await {
+            match run_ast(
+                engine,
+                Statement::CreateSystemSnapshot {
+                    name: snapshot.to_string(),
+                },
+                "",
+            )
+            .await
+            {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2441,10 +2773,15 @@ pub async fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(engine, &format!(
-                "RESTORE SYSTEM SNAPSHOT {};",
-                snapshot_sql(snapshot)
-            )).await {
+            match run_ast(
+                engine,
+                Statement::RestoreSystemSnapshot {
+                    name: snapshot.to_string(),
+                },
+                "",
+            )
+            .await
+            {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2457,10 +2794,11 @@ pub async fn route(
             let Some(db) = safe_ident(db) else {
                 return err_response(3003, "invalid database name");
             };
-            match run(engine, &format!(
-                "CREATE SNAPSHOT {} ON DATABASE {db};",
-                snapshot_sql(snapshot)
-            )).await {
+            let stmt = Statement::CreateDatabaseSnapshot {
+                name: snapshot.to_string(),
+                database: db.to_string(),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -2469,16 +2807,24 @@ pub async fn route(
             let Some(snapshot) = doc.get("snapshot_name").and_then(Json::as_str) else {
                 return err_response(3037, "snapshot_name is required");
             };
-            match run(engine, &format!(
-                "RESTORE DATABASE SNAPSHOT {};",
-                snapshot_sql(snapshot)
-            )).await {
+            match run_ast(
+                engine,
+                Statement::RestoreDatabaseSnapshot {
+                    name: snapshot.to_string(),
+                },
+                "",
+            )
+            .await
+            {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
         }
         ("DELETE", ["snapshots", name]) => {
-            match run(engine, &format!("DROP SNAPSHOT {};", snapshot_sql(name))).await {
+            let stmt = Statement::DropSnapshot {
+                name: name.to_string(),
+            };
+            match run_ast(engine, stmt, "").await {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
@@ -3460,6 +3806,289 @@ mod tests {
     /// `GET /segments` / `GET /segments/{id}/blocks` reuse the real
     /// `SHOW SEGMENTS` / `SHOW BLOCKS` metadata (`ShowSegmentsListHandler`,
     /// `ShowBlocksListHandler`).
+    /// A request field that reaches the engine as a **fragment** (a `filter`,
+    /// a projection, a sort key) must not be able to carry a second statement.
+    ///
+    /// These routes used to render the request to SQL text and hand it to
+    /// `Engine::execute`, which parses `;`-separated statements: `filter` was
+    /// `c1 = 1; DROP TABLE victim;` and the drop ran.
+    #[test]
+    fn a_request_fragment_cannot_run_a_second_statement() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        for t in ["host", "victim"] {
+            engine
+                .execute_blocking(&format!("CREATE TABLE {t} (c1 INT, c2 VARCHAR);"))
+                .unwrap();
+        }
+        engine
+            .execute_blocking("INSERT INTO host VALUES (1, 'a'), (2, 'b');")
+            .unwrap();
+
+        let victim_alive = |engine: &Engine| {
+            engine
+                .catalog()
+                .get_table_by_name("default_db.victim")
+                .unwrap()
+                .is_some()
+        };
+
+        // Each of the three `filter` routes, plus the projection/group/sort
+        // fragments of the query DSL.
+        for (method, path, body) in [
+            (
+                "GET",
+                "/databases/default_db/tables/host/docs",
+                "{\"output\":[\"c1\"],\"filter\":\"c1 = 1; DROP TABLE victim;\"}",
+            ),
+            (
+                "DELETE",
+                "/databases/default_db/tables/host/docs",
+                "{\"filter\":\"c1 = 1; DROP TABLE victim;\"}",
+            ),
+            (
+                "PUT",
+                "/databases/default_db/tables/host/docs",
+                "{\"update\":{\"c1\":2},\"filter\":\"c1 = 1; DROP TABLE victim;\"}",
+            ),
+            (
+                "GET",
+                "/databases/default_db/tables/host/docs",
+                "{\"output\":[\"c1\"],\"group_by\":\"c1; DROP TABLE victim;\"}",
+            ),
+            (
+                "GET",
+                "/databases/default_db/tables/host/docs",
+                "{\"output\":[\"c1\"],\"sort\":[[\"c1; DROP TABLE victim;\",\"asc\"]]}",
+            ),
+            (
+                "GET",
+                "/databases/default_db/tables/host/meta",
+                "{\"output\":[\"c1\"],\"filter\":\"c1 = 1; DROP TABLE victim;\"}",
+            ),
+        ] {
+            let (status, body) = executor::block_on(route(&engine, &peer, method, path, body));
+            assert_ne!(
+                status, 200,
+                "{method} {path} accepted the injection: {body}"
+            );
+            assert!(
+                victim_alive(&engine),
+                "{method} {path} dropped the other table: {body}"
+            );
+        }
+
+        // A plain filter still works.
+        let (status, body) = executor::block_on(route(
+            &engine,
+            &peer,
+            "GET",
+            "/databases/default_db/tables/host/docs",
+            "{\"output\":[\"c1\"],\"filter\":\"c1 = 2\"}",
+        ));
+        assert_eq!(status, 200, "{body}");
+        assert!(body.contains("\"c1\":2"), "{body}");
+
+        // A table name carrying a `;` is a name, not statement text.
+        let (status, _) = executor::block_on(route(
+            &engine,
+            &peer,
+            "POST",
+            "/databases/default_db/tables/host%3B%20DROP%20TABLE%20victim/docs",
+            "[{\"c1\":1}]",
+        ));
+        assert_ne!(status, 200);
+        assert!(victim_alive(&engine), "an insert dropped the other table");
+
+        // Index names, import/export paths and delimiters are request fields
+        // too; each used to be interpolated into statement text. A name that
+        // carries `;` is a name now, so the request may legitimately succeed —
+        // what must never happen is the second statement running.
+        // An export writes a file: keep it inside the test's tempdir so the
+        // probe does not leave a fixture in the source tree.
+        let export_body = format!(
+            "{{\"file_path\":\"{}\",\"file_type\":\"csv\"}}",
+            dir.path().join("a.csv; DROP TABLE victim;").display()
+        );
+        for (method, path, body) in [
+            (
+                "POST",
+                "/databases/default_db/tables/host/indexes/idx%3B%20DROP%20TABLE%20victim",
+                "{\"fields\":[\"c1\"],\"index\":{\"type\":\"secondary\"}}",
+            ),
+            (
+                "POST",
+                "/databases/default_db/tables/host/indexes/idx",
+                "{\"fields\":[\"c1; DROP TABLE victim;\"],\"index\":{\"type\":\"secondary\"}}",
+            ),
+            (
+                "POST",
+                "/databases/default_db/tables/host/indexes/idx",
+                "{\"fields\":[\"c1\"],\"index\":{\"type\":\"secondary\",\"x\":\"1; DROP TABLE victim;\"}}",
+            ),
+            (
+                "DELETE",
+                "/databases/default_db/tables/host/indexes/idx%3B%20DROP%20TABLE%20victim",
+                "",
+            ),
+            (
+                "PUT",
+                "/databases/default_db/tables/host",
+                "{\"file_path\":\"a.csv; DROP TABLE victim;\",\"file_type\":\"csv\"}",
+            ),
+            (
+                "PUT",
+                "/databases/default_db/tables/host",
+                "{\"file_path\":\"a.csv\",\"file_type\":\"csv; DROP TABLE victim;\"}",
+            ),
+            (
+                "GET",
+                "/databases/default_db/table/host",
+                export_body.as_str(),
+            ),
+        ] {
+            let (status, body) = executor::block_on(route(&engine, &peer, method, path, body));
+            assert!(
+                victim_alive(&engine),
+                "{method} {path} dropped the other table ({status}): {body}"
+            );
+        }
+    }
+
+    /// The REST mutation and query DSL must keep the semantics the statement
+    /// text gave it: an empty filter is "all rows" but a blank one is an error,
+    /// a literal that looks like a pseudo-column stays a literal, and an offset
+    /// without a limit still returns the rows after it.
+    #[test]
+    fn rest_dsl_keeps_the_text_path_semantics() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        let route_of = |method: &str, path: &str, body: &str| {
+            executor::block_on(route(&engine, &peer, method, path, body))
+        };
+        engine
+            .execute_blocking(
+                "CREATE TABLE dsl (c1 INT, label VARCHAR); \
+                 INSERT INTO dsl VALUES (1, '_score'), (2, 'score()'), (3, 'plain');",
+            )
+            .unwrap();
+        let rows = |sql: &str| -> Vec<Vec<String>> {
+            engine
+                .execute_blocking(sql)
+                .unwrap()
+                .into_iter()
+                .find_map(|r| match r {
+                    QueryResult::Rows { .. } => Some(r.rows_text()),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        };
+
+        // A whitespace-only filter is not "match everything".
+        let (s, b) = route_of(
+            "DELETE",
+            "/databases/default_db/tables/dsl/docs",
+            "{\"filter\":\"   \"}",
+        );
+        assert_ne!(s, 200, "a blank filter must not delete every row: {b}");
+        assert_eq!(rows("SELECT c1 FROM dsl;").len(), 3, "rows were deleted");
+
+        // A string literal that spells a pseudo-column keeps its value:
+        // rewriting the text before parsing would turn `'_score'` into
+        // `'score()'` and delete the wrong row.
+        let (s, b) = route_of(
+            "DELETE",
+            "/databases/default_db/tables/dsl/docs",
+            "{\"filter\":\"label = '_score'\"}",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert_eq!(
+            rows("SELECT c1 FROM dsl;"),
+            vec![vec!["2".to_string()], vec!["3".to_string()]],
+            "the wrong row was deleted"
+        );
+
+        // An offset without a limit returns every row after it. Two rows are
+        // left at this point, so `offset: 1` yields exactly the second one.
+        let (s, b) = route_of(
+            "GET",
+            "/databases/default_db/tables/dsl/docs",
+            "{\"output\":[\"c1\"],\"offset\":1}",
+        );
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"c1\":3"), "the row after the offset: {b}");
+        assert!(!b.contains("\"c1\":2"), "the skipped row came back: {b}");
+    }
+
+    /// The request path builds the insert literal itself, so it has to keep the
+    /// checks the SQL lexer used to apply: column names are case-insensitive,
+    /// a u64 above `i64::MAX` is not silently wrapped to `-1`, and a malformed
+    /// column type is rejected instead of reaching a `parts[1]` index.
+    #[test]
+    fn rest_insert_and_ddl_keep_the_parser_checks() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        let insert = |table: &str, body: &str| {
+            executor::block_on(route(
+                &engine,
+                &peer,
+                "POST",
+                &format!("/databases/default_db/tables/{table}/docs"),
+                body,
+            ))
+        };
+
+        // 1. An upper-cased column names the same column (the reference
+        //    lower-cases every key before it builds the row).
+        engine
+            .execute_blocking("CREATE TABLE up (c1 INT);")
+            .unwrap();
+        let (s, b) = insert("up", "[{\"C1\":1}]");
+        assert_eq!(s, 200, "{b}");
+        let rows = engine
+            .execute_blocking("SELECT c1 FROM up;")
+            .unwrap()
+            .into_iter()
+            .find_map(|r| match r {
+                QueryResult::Rows { rows, .. } => Some(rows),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(rows.len(), 1, "the row was stored under the canonical name");
+
+        // A repeat that only appears after folding is a duplicate column.
+        let (s, b) = insert("up", "[{\"c1\":1,\"C1\":2}]");
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("Duplicated column name"), "{b}");
+
+        // 2. A u64 beyond `i64::MAX` keeps its value on a DOUBLE column and is
+        //    refused on an integer one (the text path reported `bad int`).
+        engine
+            .execute_blocking("CREATE TABLE big (d DOUBLE, i BIGINT);")
+            .unwrap();
+        let (s, b) = insert("big", "[{\"d\":18446744073709551615}]");
+        assert_eq!(s, 200, "{b}");
+        engine
+            .execute_blocking("CREATE TABLE bigi (i BIGINT);")
+            .unwrap();
+        let (s, b) = insert("bigi", "[{\"i\":18446744073709551615}]");
+        assert_ne!(s, 200, "an out-of-range integer must not be stored: {b}");
+
+        // 3. A malformed type is a request error, never a panic.
+        let (s, b) = executor::block_on(route(
+            &engine,
+            &peer,
+            "POST",
+            "/databases/default_db/tables/sp",
+            "{\"fields\":[{\"name\":\"c1\",\"type\":\"SPARSE(\"}]}",
+        ));
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("isn't supported"), "{b}");
+    }
+
     #[test]
     fn http_segment_and_block_routes_report_real_metadata() {
         let dir = tempdir().unwrap();

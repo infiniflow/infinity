@@ -849,19 +849,16 @@ mod tests {
                 3,
                 "round {round}: the top-3 were rows the merge retired"
             );
-            // The segments the merge took are dropped (the overrides themselves
-            // stay: the same ids are still in the unsealed postings). Keeping the
-            // segments would count their documents in BM25's `N` again, so the
-            // chunk span must stay at the live population.
+            // The segments the merge took are dropped whole, the way the
+            // reference's reader - built from the catalog's live
+            // `SegmentIndexIDs` - never sees them. That is what keeps BM25's `N`
+            // at the live population instead of growing by a table per merge,
+            // so the chunk span may not exceed the rows that exist.
             let stats = e.fulltext_stats("churn");
             assert!(
                 stats[0].chunk_rows <= next,
                 "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
                 stats[0].chunk_rows
-            );
-            assert!(
-                stats[0].overridden_rows > 0,
-                "round {round}: the retired ids are not filtered any more"
             );
         }
         // The whole corpus still answers when the cut is wide enough.
@@ -1295,6 +1292,42 @@ mod tests {
             }
         }
         Vec::new()
+    }
+
+    /// `HEADER true` on a CSV import consumes the first line (it is not a
+    /// row) and rejects a header whose column count differs from the table's.
+    #[test]
+    fn csv_import_header_is_consumed_and_counted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE h (c1 INT, c2 INT);")
+            .unwrap();
+        let csv = dir.path().join("h.csv");
+        std::fs::write(&csv, "x,y\n1,2\n3,4\n").unwrap();
+        e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            csv.display()
+        ))
+        .unwrap();
+        assert_eq!(rows(&e, "SELECT c1 FROM h ORDER BY c1;").len(), 2);
+
+        // A header with the wrong column count is an error, not a row.
+        let bad = dir.path().join("bad.csv");
+        std::fs::write(&bad, "x\n1,2\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            bad.display()
+        ));
+        assert!(got.is_err(), "a one-column header over a two-column table");
+
+        // Without `HEADER` the first line is data and does not parse as INT.
+        let plain = dir.path().join("plain.csv");
+        std::fs::write(&plain, "x,y\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            plain.display()
+        ));
+        assert!(got.is_err(), "an unparsable first row is data");
     }
 
     /// How many sealed chunks the table's full-text indexes hold, i.e. the
@@ -10362,6 +10395,85 @@ mod tests {
         assert_eq!(
             rows(&e, "SELECT id FROM rc WHERE c = 7 ORDER BY id;"),
             vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+    }
+
+    /// `Cleanup` reclaims the full-text chunks of segments a compaction
+    /// deprecated, and keeps the ones whose segment is still live.
+    ///
+    /// The reference deletes a deprecated chunk by name in `Cleanup`
+    /// (`CleanChunkIndex` -> `ChunkIndexMeta::UninitSet`); its reader never sees
+    /// one because it is built from the catalog. The port's reader keeps the
+    /// directory, so the loader has to skip retired chunks - and without this
+    /// sweep those files would stay for ever.
+    #[test]
+    fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cft (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cft_body ON cft (body) USING FULLTEXT;")
+            .unwrap();
+        for n in 0..4 {
+            let csv = dir.path().join(format!("c{n}.csv"));
+            std::fs::write(&csv, format!("{},alpha row\n", 10 + n)).unwrap();
+            e.execute_blocking(&format!(
+                "COPY cft FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let fulltext_dir = dir.path().join("fulltext").join("default_db.cft.body");
+        let chunk_files = || -> Vec<String> {
+            let mut out: Vec<String> = std::fs::read_dir(&fulltext_dir)
+                .map(|d| {
+                    d.flatten()
+                        .map(|f| f.file_name().to_string_lossy().to_string())
+                        .filter(|n| n.ends_with(".dic"))
+                        .collect()
+                })
+                .unwrap_or_default();
+            out.sort();
+            out
+        };
+        let before_segments = e.segment_row_counts("cft");
+        let before_chunks = chunk_files();
+        assert!(
+            !before_chunks.is_empty(),
+            "the flushes must have sealed chunks: {before_chunks:?} for {before_segments:?}"
+        );
+
+        e.compact_all_segments("cft").unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
+
+        let live = e.segment_row_counts("cft");
+        let after_chunks = chunk_files();
+        assert!(
+            !after_chunks.is_empty(),
+            "cleanup removed the merged segment's own chunk"
+        );
+        for name in &after_chunks {
+            let row = name
+                .strip_prefix("ft_")
+                .and_then(|rest| rest.split('.').next())
+                .and_then(|hex| hex.split('_').next())
+                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+                .expect("a chunk name");
+            let segment = (row >> 32) as u32;
+            assert!(
+                live.iter().any(|(id, _)| *id == segment),
+                "cleanup kept the deprecated segment {segment}'s chunk {name}"
+            );
+        }
+        // The index still answers for every row after the sweep.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cft SEARCH MATCH TEXT (body, 'alpha', 100);"
+            )
+            .len(),
+            4
         );
     }
 

@@ -1097,6 +1097,23 @@ impl TextTokenizer {
     }
 }
 
+/// `INF_FT_TRACE=1` turns on the full-text diagnostics, `INF_FT_TRACE=<substr>`
+/// narrows them to columns whose `table.column` contains the substring.
+///
+/// The point of these lines is a CI-only failure: a query that answers with no
+/// rows on a table full of matches leaves nothing behind but the assertion, so
+/// every decision that can make an index empty prints the numbers it decided
+/// on. They are silent unless the variable is set - the write path runs them
+/// for every seal.
+pub(crate) fn ft_trace_enabled(what: &str) -> bool {
+    match std::env::var("INF_FT_TRACE") {
+        Ok(v) if v.is_empty() || v == "0" => false,
+        Ok(v) if v == "1" || v == "true" => true,
+        Ok(v) => what.contains(v.as_str()),
+        Err(_) => false,
+    }
+}
+
 /// In-memory inverted index for one text column: a [`MemoryIndexer`] for the
 /// unsealed segment plus the sealed on-disk segments.
 /// C++: the `MemoryIndexer` + `IndexSegmentReader` pair held by a column.
@@ -1645,10 +1662,15 @@ impl TextIndex {
         // not on every open) and the caller rebuilds from scratch.
         let mut broken = false;
         // Chunks of a `ROW_ID` segment the catalog no longer lists were moved
-        // away by a compaction: their row ids name no row any more. They go too,
-        // for the same overlap reason - the rows were renumbered, so the rebuild
-        // writes a chunk that covers what they claim.
-        let mut retired = false;
+        // away by a compaction: their row ids name no row any more, so they are
+        // **skipped**. They are not deleted here, and they do not retire the
+        // chunks that are still live: `live_segments` is a snapshot taken
+        // before the build, and a seal that lands while it runs writes a chunk
+        // of the *merged* segment - a segment the snapshot cannot know. Deleting
+        // on that signal removed every chunk in the directory, and the build
+        // that saw it answered with no rows at all
+        // (`concurrent_compactions_never_lose_fulltext_hits`). The files of a
+        // deprecated segment are `Cleanup`'s to reclaim.
         for base in &bases {
             // The chunk's first row id is part of its name
             // (`fulltext_base_name`), and it is what turns a posting's dense
@@ -1664,7 +1686,13 @@ impl TextIndex {
             };
             if let Some(live) = live_segments {
                 if !live.contains(&((base_row_id >> 32) as u32)) {
-                    retired = true;
+                    if ft_trace_enabled(&self.dir) {
+                        eprintln!(
+                            "[FT] {} skip chunk {base} (segment {} not live)",
+                            self.dir,
+                            base_row_id >> 32
+                        );
+                    }
                     continue;
                 }
             }
@@ -1712,7 +1740,49 @@ impl TextIndex {
                 reader,
             });
         }
-        if broken || retired {
+        // A chunk that cannot be read retires the set: its rows are committed
+        // rows whose postings are gone, so the caller has to rebuild the column
+        // from the blocks - and a rebuild starts at row 0, which would overlap
+        // every chunk already loaded.
+        //
+        // A directory that holds **only** chunks of retired segments is the
+        // after-effects of a compaction; removing it is what keeps the next open
+        // from re-reading row ids nothing owns. A directory with at least one
+        // live chunk is left alone: `live_segments` is a snapshot from before
+        // this build, so the chunks it cannot place may be a seal that landed
+        // meanwhile - deleting those answered "no rows" on a table full of
+        // matches (`concurrent_compactions_never_lose_fulltext_hits`).
+        let only_retired = segments.is_empty()
+            && !bases.is_empty()
+            && live_segments.is_some_and(|live| {
+                bases.iter().all(|base| {
+                    base.strip_prefix("ft_")
+                        .and_then(|hex| hex.split('_').next())
+                        .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+                        .is_some_and(|row| !live.contains(&((row >> 32) as u32)))
+                })
+            });
+        if only_retired {
+            if ft_trace_enabled(&self.dir) {
+                eprintln!(
+                    "[FT] {} purge {} chunks: every one is retired",
+                    self.dir,
+                    bases.len()
+                );
+            }
+            for base in &bases {
+                storage::invertedindex::chunk_manifest::remove_chunk(&self.dir, base);
+            }
+            return 0;
+        }
+        if broken {
+            if ft_trace_enabled(&self.dir) {
+                eprintln!(
+                    "[FT] {} purge {} chunks: a chunk could not be read",
+                    self.dir,
+                    bases.len()
+                );
+            }
             drop(segments);
             for base in &bases {
                 storage::invertedindex::chunk_manifest::remove_chunk(&self.dir, base);
@@ -2301,18 +2371,19 @@ impl TextIndex {
     /// appears in the unsealed segment's postings (the merge replaced a posting
     /// that was already spilled or still resident), and only `overridden`
     /// filters those out.
-    pub(crate) fn retire_fully_overridden_segments(&mut self) {
-        if self.overridden.is_empty() || self.reader.segments.is_empty() {
-            return;
-        }
-        let overridden = &self.overridden;
-        self.reader.segments.retain(|segment| {
-            segment
-                .reader
-                .rows()
-                .iter()
-                .any(|row| !overridden.contains(row))
-        });
+    /// Drops the sealed segments whose `ROW_ID` segment is no longer live.
+    ///
+    /// This is the reference's behaviour seen from the reader: its
+    /// `ColumnIndexReader` is built from the catalog's `SegmentIndexIDs`, so a
+    /// segment a compaction deprecated simply never appears. The port keeps
+    /// every reader in memory and cannot re-walk the catalog on each merge, so
+    /// the segments are dropped here instead - **whole segments**, not rows.
+    /// That is what makes an `overridden` entry safe to keep: it only ever names
+    /// a row whose segment may still be in `reader.segments`.
+    pub(crate) fn drop_segments_not_in(&mut self, live: &std::collections::HashSet<u32>) {
+        self.reader
+            .segments
+            .retain(|segment| live.contains(&((segment.reader.base_row_id() >> 32) as u32)));
     }
 
     /// Postings and corpus statistics for `terms`, merging every sealed segment
@@ -2324,7 +2395,7 @@ impl TextIndex {
         for term in terms {
             let mut list: Vec<(u64, u32)> = Vec::new();
             // A re-indexed row's copy in the unsealed segment is its current
-            // text, but an id a compaction renumbered (`index_retire_row`) is
+            // text, but an id a compaction renumbered is
             // retired everywhere: its posting can still be in the tail or in a
             // spilled run, and nothing else filters it out (the id is not a
             // `DELETE`, so `tombstone_set` does not know it).

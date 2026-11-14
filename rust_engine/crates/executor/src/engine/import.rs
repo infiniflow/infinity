@@ -132,6 +132,12 @@ impl Engine {
         // `(row id, stored text)` per row, so the commit can hand the block the
         // values it publishes without a second pass over the file.
         let mut encoded_rows: Vec<(usize, String)> = Vec::new();
+        // `HEADER true` makes the first line a header: the reference validates
+        // its column count against the table and then drops it without counting
+        // it as a row (`PhysicalImport::NewCSVHeaderHandler`).
+        let mut pending_header = opts
+            .iter()
+            .any(|(k, v)| k == "HEADER" && v.eq_ignore_ascii_case("true"));
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -151,6 +157,23 @@ impl Engine {
                     continue;
                 }
                 let fields: Vec<String> = csv_fields(line, delim);
+                if pending_header {
+                    pending_header = false;
+                    // The reference requires the header to have exactly the
+                    // table's column count and then drops it without counting
+                    // it as a row. Its cell-by-cell name comparison is
+                    // inverted (`!strcmp` aborts on *equal* names) under a
+                    // comment that says the names are not checked; that is a
+                    // bug, so only the count is enforced here.
+                    if fields.len() != types_for_scan.len() {
+                        return Err(Error::Invalid(format!(
+                            "import: the header has {} columns but the table has {}",
+                            fields.len(),
+                            types_for_scan.len()
+                        )));
+                    }
+                    continue;
+                }
                 // One allocation per cell, not two: `normalize_cell` hands back
                 // the field unchanged for the plain numeric/text cells that
                 // make up most of a `COPY`.
