@@ -5125,6 +5125,50 @@ impl Engine {
                     }
                 }
             }
+            // The full-text chunks live in their own directory, named after the
+            // row id they start at (`fulltext/<table>.<column>/ft_{row:016x}*`).
+            // A compaction renumbers the rows it takes, so the chunks of the
+            // segments it deprecated name ids nothing owns; the loader skips
+            // them, and this is what finally removes them - the reference does
+            // the same in `Cleanup` (`CleanChunkIndex`), which is why its reader
+            // can be built from the catalog alone.
+            let fulltext_root = self.dir.join("fulltext");
+            let own_prefix = format!("{}.", meta.name.replace('/', "_"));
+            if let Ok(entries) = std::fs::read_dir(&fulltext_root) {
+                for entry in entries.flatten() {
+                    let index_dir = entry.path();
+                    if !index_dir.is_dir() {
+                        continue;
+                    }
+                    // `fulltext/<db>.<table>.<column>`: only this table's.
+                    let dir_name = index_dir
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    if !dir_name.starts_with(&own_prefix) {
+                        continue;
+                    }
+                    let Ok(files) = std::fs::read_dir(&index_dir) else {
+                        continue;
+                    };
+                    for file in files.flatten() {
+                        let name = file.file_name().to_string_lossy().to_string();
+                        let Some(hex) = name
+                            .strip_prefix("ft_")
+                            .and_then(|rest| rest.split('.').next())
+                            .and_then(|rest| rest.split('_').next())
+                        else {
+                            continue;
+                        };
+                        let Ok(row) = u64::from_str_radix(hex, 16) else {
+                            continue;
+                        };
+                        if !live.contains(&format!("seg_{}", row >> 32)) {
+                            let _ = storage::chunk_store::remove_file(file.path());
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }

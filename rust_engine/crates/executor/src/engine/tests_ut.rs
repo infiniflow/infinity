@@ -10398,6 +10398,85 @@ mod tests {
         );
     }
 
+    /// `Cleanup` reclaims the full-text chunks of segments a compaction
+    /// deprecated, and keeps the ones whose segment is still live.
+    ///
+    /// The reference deletes a deprecated chunk by name in `Cleanup`
+    /// (`CleanChunkIndex` -> `ChunkIndexMeta::UninitSet`); its reader never sees
+    /// one because it is built from the catalog. The port's reader keeps the
+    /// directory, so the loader has to skip retired chunks - and without this
+    /// sweep those files would stay for ever.
+    #[test]
+    fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cft (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cft_body ON cft (body) USING FULLTEXT;")
+            .unwrap();
+        for n in 0..4 {
+            let csv = dir.path().join(format!("c{n}.csv"));
+            std::fs::write(&csv, format!("{},alpha row\n", 10 + n)).unwrap();
+            e.execute_blocking(&format!(
+                "COPY cft FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let fulltext_dir = dir.path().join("fulltext").join("default_db.cft.body");
+        let chunk_files = || -> Vec<String> {
+            let mut out: Vec<String> = std::fs::read_dir(&fulltext_dir)
+                .map(|d| {
+                    d.flatten()
+                        .map(|f| f.file_name().to_string_lossy().to_string())
+                        .filter(|n| n.ends_with(".dic"))
+                        .collect()
+                })
+                .unwrap_or_default();
+            out.sort();
+            out
+        };
+        let before_segments = e.segment_row_counts("cft");
+        let before_chunks = chunk_files();
+        assert!(
+            !before_chunks.is_empty(),
+            "the flushes must have sealed chunks: {before_chunks:?} for {before_segments:?}"
+        );
+
+        e.compact_all_segments("cft").unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
+
+        let live = e.segment_row_counts("cft");
+        let after_chunks = chunk_files();
+        assert!(
+            !after_chunks.is_empty(),
+            "cleanup removed the merged segment's own chunk"
+        );
+        for name in &after_chunks {
+            let row = name
+                .strip_prefix("ft_")
+                .and_then(|rest| rest.split('.').next())
+                .and_then(|hex| hex.split('_').next())
+                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+                .expect("a chunk name");
+            let segment = (row >> 32) as u32;
+            assert!(
+                live.iter().any(|(id, _)| *id == segment),
+                "cleanup kept the deprecated segment {segment}'s chunk {name}"
+            );
+        }
+        // The index still answers for every row after the sweep.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cft SEARCH MATCH TEXT (body, 'alpha', 100);"
+            )
+            .len(),
+            4
+        );
+    }
+
     /// A panic inside `with_zero_dimension_sparse` must not leave the flag set.
     ///
     /// The pool reuses its threads, so a leaked flag would let a later,
