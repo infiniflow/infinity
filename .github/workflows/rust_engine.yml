@@ -7,7 +7,9 @@ name: rust_engine
 # workflows (tests.yml / slow_tests.yml), so nothing here builds C++.
 #
 # Each suite is written once and run per architecture; every trigger covers
-# both amd64 and arm64.
+# both amd64 and arm64. `macos` is the one exception: a single Apple Silicon
+# lane that builds the whole workspace and runs the tests that do not need the
+# Linux-only resource root.
 
 on:
   push:
@@ -279,6 +281,77 @@ jobs:
         run: cargo test --workspace
       - name: smoke
         run: cargo run -q -p cli -- smoke /tmp/infinity-smoke
+
+  macos:
+    # macOS (Apple Silicon): the rewrite has to build and pass its tests on the
+    # platform the developers run locally, not only on Linux.
+    #
+    # Two details shape the job:
+    #  - `rust_engine/.cargo/config.toml` pins `-fuse-ld=mold` for
+    #    `x86_64-unknown-linux-gnu` only, so the Apple toolchain links the
+    #    workspace as it is; clang/libclang (bindgen, for `librocksdb-sys`) come
+    #    from the Xcode command line tools the image ships.
+    #  - `/usr/share` is on the sealed, read-only system volume on macOS, so
+    #    `/usr/share/infinity/resource` cannot be installed the way `unit` does
+    #    it. `analyzer` (its tests hard-code that root and treat a missing one as
+    #    a failure) and `executor` (its full-text cases go through the
+    #    process-wide `AnalyzerPool::instance()`, which loads the same root) are
+    #    therefore excluded; both keep their Linux coverage in `unit`.
+    #    `analyzer-ffi` reads `INFINITY_RESOURCE_PATH`, so it runs against the
+    #    checkout's `resource/` instead of skipping.
+    name: macos (arm64)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: rust_engine
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install the pinned toolchain
+        # `rust-toolchain.toml` lives in `rust_engine`; from the repository root
+        # rustup would pick the runner's default toolchain instead.
+        run: rustup toolchain install --profile minimal
+      - name: Provide the SDK's libclang to dyld
+        # `clang-sys` links the build scripts (`librocksdb-sys` -> bindgen)
+        # against `@rpath/libclang.dylib`. On a developer machine the rpath to
+        # the SDK lands in the binary; on the runner it does not, and the script
+        # aborts before `main` ("Library not loaded: @rpath/libclang.dylib",
+        # after trying `~/lib`, `/usr/local/lib`, `/usr/lib`). Handing dyld the
+        # SDK directory as a fallback fixes the load without relinking the
+        # workspace; `LIBCLANG_PATH` keeps bindgen's own search on the same file.
+        run: |
+          dir=""
+          for candidate in "$(xcode-select -p)/usr/lib" \
+                           "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib" \
+                           /Library/Developer/CommandLineTools/usr/lib; do
+            if [ -f "${candidate}/libclang.dylib" ]; then
+              dir="${candidate}"
+              break
+            fi
+          done
+          if [ -z "${dir}" ]; then
+            brew install llvm
+            dir="$(brew --prefix llvm)/lib"
+          fi
+          echo "LIBCLANG_PATH=${dir}" >> "${GITHUB_ENV}"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=${dir}:${HOME}/lib:/usr/local/lib:/usr/lib" \
+            >> "${GITHUB_ENV}"
+          ls -l "${dir}/libclang.dylib"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: Build the workspace (all targets)
+        # The compile gate for the excluded crates' tests as well: every target
+        # of every crate has to build on macOS.
+        run: cargo build --workspace --all-targets
+      - name: test
+        env:
+          RUST_BACKTRACE: "1"
+          INFINITY_RESOURCE_PATH: ${{ github.workspace }}/resource
+        run: cargo test --workspace --exclude analyzer --exclude executor
+      - name: smoke
+        run: cargo run -q -p cli -- smoke "${RUNNER_TEMP}/infinity-smoke"
 
   gate-a:
     # Gate A on its own: `cargo test --workspace` and the slt conformance used
