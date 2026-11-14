@@ -13,8 +13,6 @@
 //! ```
 
 use crate::mapped::MappedFile;
-use memmap2::Mmap;
-use std::fs::File;
 use std::path::Path;
 
 use crate::format::FormatError;
@@ -69,12 +67,11 @@ pub struct MultiVectorSegmentReader {
 impl MultiVectorSegmentReader {
     #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
-        let file =
-            File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
-        // SAFETY: read-only mapping of an immutable segment file.
-        let map = MappedFile::from_mmap(
-            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
-        );
+        // The chunk store owns the bytes: a persistence profile may hold this
+        // file only as an object part.
+        let map = crate::chunk_store::chunk_store()
+            .open(path)
+            .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         if map.len() < HEADER_LEN || &map[..8] != MAGIC {
             return Err(FormatError::BadMagic(0));
         }

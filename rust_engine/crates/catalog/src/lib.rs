@@ -1082,6 +1082,12 @@ impl Catalog {
         self.with_view(|store| crate::layout::dropped_segments(store, db_id, table_id))
     }
 
+    /// [`Self::dropped_segments`] with the ts of each deprecation, so a reader
+    /// can ignore the ones that were recorded after it started.
+    pub fn dropped_segments_with_ts(&self, db_id: &str, table_id: &str) -> Result<Vec<(u32, u64)>> {
+        self.with_view(|store| crate::layout::dropped_segments_with_ts(store, db_id, table_id))
+    }
+
     /// The deletes a C++-layout rewrite performs before writing the layout.
     ///
     /// A `drop|…` marker deprecates records without removing them - that is

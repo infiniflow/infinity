@@ -883,7 +883,7 @@ impl Engine {
                     for entry in entries.flatten() {
                         let name = entry.file_name().to_string_lossy().to_string();
                         if !keep.contains(&name) {
-                            let _ = std::fs::remove_file(entry.path());
+                            let _ = storage::chunk_store::remove_file(entry.path());
                         }
                     }
                 }
@@ -1000,7 +1000,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.starts_with("seg_") && !live.contains(&name) {
-                    let _ = std::fs::remove_dir_all(entry.path());
+                    storage::chunk_store::remove_tree(entry.path());
                 }
             }
         }
@@ -1537,7 +1537,7 @@ impl Engine {
                     newest = Some((ordinal, entry.path()));
                 }
             }
-            newest.and_then(|(_, path)| std::fs::read(path).ok())
+            newest.and_then(|(_, path)| storage::chunk_store::read_file(path).ok())
         }
     }
 
@@ -2030,6 +2030,7 @@ impl Engine {
             });
             let frame_ids = ids_at(timeline, append.commit_ts, &current_ids);
             let defaults = self.table_defaults(&table).unwrap_or_default();
+            let types = meta.types.clone();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
             // (a DDL rewrite logs its rows and then writes them), and buffering
@@ -2053,7 +2054,7 @@ impl Engine {
                 // buffered: the append buffer is the only place a row the block
                 // files do not hold can live, and the port keeps no row journal
                 // to hold its text instead.
-                if let Ok(row) = self.parse_stored_row(&table, &defaults, text.as_bytes()) {
+                if let Ok(row) = self.parse_stored_row(&table, &defaults, &types, text.as_bytes()) {
                     batch.push((*seq as usize, row));
                 }
             }
@@ -2483,7 +2484,8 @@ impl Engine {
                 storage::definition::format::column_file(id),
                 storage::definition::format::column_outline_file(id),
             ] {
-                if std::fs::remove_file(dir.join(name)).is_ok() {
+                if dir.join(&name).exists() {
+                    let _ = storage::chunk_store::remove_file(dir.join(&name));
                     removed += 1;
                 }
             }
@@ -2588,11 +2590,24 @@ impl Engine {
         // Through the catalog, not the raw store: a compaction marks the
         // source segments inside its transaction, and a read afterwards must
         // see those marks even before the checkpoint writes them through.
-        let dropped = self
+        //
+        // A mark only hides its segment from readers that started after it. A
+        // compaction records the drops with its commit ts and publishes the
+        // merged blocks afterwards, so a reader at an older ts - a query that was
+        // already running - must keep the source segments: its full-text index
+        // still names their rows, and hiding them turned every hit into a row
+        // that could not be fetched (`0` rows on a table full of matches).
+        // `u64::MAX` (a checkpoint, an index rebuild, `Cleanup`) applies them all.
+        let read_ts = crate::read_ts();
+        let dropped: std::collections::HashSet<u32> = self
             .storage
             .catalog
-            .dropped_segments(&db_id.to_string(), &meta.id.to_string())
-            .unwrap_or_default();
+            .dropped_segments_with_ts(&db_id.to_string(), &meta.id.to_string())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, ts)| *ts <= read_ts)
+            .map(|(segment, _)| segment)
+            .collect();
         let Some(index) = self.block_index_for(&table) else {
             return Vec::new();
         };
@@ -2614,7 +2629,8 @@ impl Engine {
                 id.block_id,
             ));
         BlockVersionFile::decode(
-            &std::fs::read(dir.join(storage::definition::format::VERSION_FILE)).ok()?,
+            &storage::chunk_store::read_file(dir.join(storage::definition::format::VERSION_FILE))
+                .ok()?,
         )
         .ok()
     }
@@ -3369,16 +3385,17 @@ impl Engine {
                                     .unwrap_or(Value::Null),
                                 }
                             }
-                            ColumnLayout::VarLen(_) => decode_value_shaped(
-                                &type_text[col],
+                            ColumnLayout::VarLen(_) => decoded_text_value(
+                                decode_value_shaped(
+                                    &type_text[col],
+                                    *column_type,
+                                    body_data,
+                                    row,
+                                    outline,
+                                    column.shape,
+                                ),
                                 *column_type,
-                                body_data,
-                                row,
-                                outline,
-                                column.shape,
-                            )
-                            .map(parse_owned_value)
-                            .unwrap_or(Value::Null),
+                            ),
                         }
                     } else {
                         // Tensor / sparse / array slots point into the column's
@@ -4164,16 +4181,17 @@ impl Engine {
                             .unwrap_or(Value::Null),
                         }
                     }
-                    ColumnLayout::VarLen(_) => decode_value_shaped(
-                        &type_text[pos],
+                    ColumnLayout::VarLen(_) => decoded_text_value(
+                        decode_value_shaped(
+                            &type_text[pos],
+                            *column_type,
+                            &body.data,
+                            row,
+                            raw_outline,
+                            shape,
+                        ),
                         *column_type,
-                        &body.data,
-                        row,
-                        raw_outline,
-                        shape,
-                    )
-                    .map(parse_owned_value)
-                    .unwrap_or(Value::Null),
+                    ),
                 },
                 _ => return None,
             };
@@ -4991,7 +5009,7 @@ impl Engine {
             let covered = self
                 .hnsw_chunk_path(&im.table, &im.name)
                 .ok()
-                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|p| storage::chunk_store::read_file(p).ok())
                 .and_then(|b| {
                     knn_format::decode_hnsw_chunk(
                         &b,
@@ -5103,7 +5121,7 @@ impl Engine {
                 for sub in inner.flatten() {
                     let seg = sub.file_name().to_string_lossy().to_string();
                     if seg.starts_with("seg_") && !live.contains(&seg) {
-                        let _ = std::fs::remove_dir_all(sub.path());
+                        storage::chunk_store::remove_tree(sub.path());
                     }
                 }
             }
@@ -5148,7 +5166,7 @@ impl Engine {
                     continue;
                 }
                 for (_, path) in older {
-                    let _ = std::fs::remove_file(path);
+                    let _ = storage::chunk_store::remove_file(path);
                 }
                 continue;
             }
@@ -5166,7 +5184,7 @@ impl Engine {
             let covered = self
                 .hnsw_chunk_path(&im.table, &im.name)
                 .ok()
-                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|p| storage::chunk_store::read_file(p).ok())
                 .and_then(|b| {
                     knn_format::decode_hnsw_chunk(
                         &b,
@@ -5189,7 +5207,7 @@ impl Engine {
             if let Some((keep, _)) = chunks.last() {
                 for (id, path) in &chunks {
                     if id != keep {
-                        let _ = std::fs::remove_file(path);
+                        let _ = storage::chunk_store::remove_file(path);
                     }
                 }
             }
@@ -5311,7 +5329,12 @@ impl Engine {
         let mut gone = Vec::new();
         for id in deprecated {
             let path = dir.join(format!("chunk_{id}.idx"));
-            if !path.exists() || std::fs::remove_file(&path).is_ok() {
+            // Always ask the store, never `path.exists()`: on an object profile
+            // the bytes live in an object and the logical path may be absent
+            // while the chunk is still there. The id joins `gone` - and its
+            // deprecation marker is cleared - only when the store reports the
+            // bytes as removed (a missing local file alone is that success).
+            if storage::chunk_store::remove_file(&path).is_ok() {
                 gone.push(id);
             }
         }
@@ -5439,7 +5462,7 @@ impl Engine {
             }
             if base > seg_rows.len() {
                 for path in &stale {
-                    let _ = std::fs::remove_file(path);
+                    let _ = storage::chunk_store::remove_file(path);
                 }
                 base = 0;
             }
@@ -5536,7 +5559,7 @@ impl Engine {
     pub fn read_hnsw_index(&self, table: &str, index_name: &str) -> Result<VectorRows> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let bytes = std::fs::read(&path)
+        let bytes = storage::chunk_store::read_file(&path)
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
             .read_hnsw_chunk_parts(&table, index_name, &bytes)
@@ -5685,7 +5708,7 @@ impl Engine {
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let bytes = std::fs::read(&path)
+        let bytes = storage::chunk_store::read_file(&path)
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
             .read_hnsw_chunk_parts(&table, index_name, &bytes)
@@ -5719,7 +5742,7 @@ impl Engine {
             if after.is_some_and(|a| chunk_id <= a) {
                 continue;
             }
-            let Ok(bytes) = std::fs::read(&path) else {
+            let Ok(bytes) = storage::chunk_store::read_file(&path) else {
                 continue;
             };
             let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
@@ -5761,7 +5784,7 @@ impl Engine {
             .into_iter()
             .find(|(id, _)| *id == chunk_id)
             .map(|(_, path)| path)?;
-        let bytes = std::fs::read(&path).ok()?;
+        let bytes = storage::chunk_store::read_file(&path).ok()?;
         let parts = self.read_hnsw_chunk_parts(&table, index_name, &bytes)?;
         Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path))
     }
@@ -6095,7 +6118,7 @@ impl Engine {
         let options = self.ivf_storage_option(table, index_name);
         let mut out = Vec::new();
         for (_, path) in hnsw_chunks(&dir) {
-            let Ok(bytes) = std::fs::read(&path) else {
+            let Ok(bytes) = storage::chunk_store::read_file(&path) else {
                 continue;
             };
             if options.storage.eq_ignore_ascii_case("scalar_quantization") {
@@ -6234,7 +6257,7 @@ impl Engine {
             "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
             meta.id
         ));
-        let bytes = std::fs::read(&path)
+        let bytes = storage::chunk_store::read_file(&path)
             .map_err(|_| Error::NotFound(format!("no IVF mirror at {}", path.display())))?;
         let (header, centroids, parts) = knn_format::decode_ivf_plain_chunk(&bytes, 4)
             .map_err(|e| Error::Invalid(format!("bad IVF chunk: {e}")))?;
@@ -6424,7 +6447,7 @@ impl Engine {
                     PlaidIndex::from_shared(backing, mirror.dims, nbits).map_err(|e| bad(&e))?
                 }
                 _ => {
-                    let bytes = std::fs::read(&path).map_err(|e| Error::Io {
+                    let bytes = storage::chunk_store::read_file(&path).map_err(|e| Error::Io {
                         path: path.clone(),
                         source: e,
                     })?;

@@ -2257,9 +2257,8 @@ pub(crate) fn reorder<T>(items: Vec<T>, order: &[usize]) -> Vec<T> {
 
 pub(crate) struct MergeCursor<'a> {
     pub(crate) sources: Vec<Source<'a>>,
-    /// Sources >= segment_from are sealed segments: a row in overridden has a
-    /// newer copy in the unsealed segment, so its sealed copy is stale.
-    pub(crate) segment_from: usize,
+    /// Row ids that must not be returned by any source: a re-indexed row's old
+    /// copy, or an id a compaction renumbered (`index_retire_row`).
     pub(crate) overridden: Option<&'a std::collections::HashSet<u64>>,
     /// (row, tf, length, winning source)
     pub(crate) cur: Option<(u64, u32, u32, usize)>,
@@ -2282,12 +2281,14 @@ pub(crate) struct MergeCursor<'a> {
 impl<'a> MergeCursor<'a> {
     pub(crate) fn new(
         sources: Vec<Source<'a>>,
-        segment_from: usize,
+        _segment_from: usize,
         overridden: Option<&'a std::collections::HashSet<u64>>,
     ) -> Self {
         let df = sources.iter().map(|s| s.df()).sum();
+        // `overridden` is filtered on every source (`settle`), so a single source
+        // is only a straight pass-through when there is nothing to drop.
         let no_stale = overridden.is_none_or(|o| o.is_empty());
-        let single = sources.len() == 1 && (segment_from >= 1 || no_stale);
+        let single = sources.len() == 1 && no_stale;
         // Ranges that do not overlap make the merge a concatenation. A stale
         // copy (an overridden row) spans ranges, so it rules the path out.
         let (sources, concat) = match (single || !no_stale, concat_order(&sources)) {
@@ -2296,7 +2297,6 @@ impl<'a> MergeCursor<'a> {
         };
         let mut cursor = Self {
             sources,
-            segment_from,
             overridden,
             cur: None,
             dirty: true,
@@ -2351,7 +2351,12 @@ impl<'a> MergeCursor<'a> {
                 self.dirty = false;
                 return;
             };
-            if winner >= self.segment_from && self.overridden.is_some_and(|o| o.contains(&doc)) {
+            // Checked for every source, not only the sealed ones: a compaction
+            // renumbers rows that its merge already sealed, so the stale copy of
+            // such a posting can still sit in the memory tail or a spilled run
+            // (`index_retire_row`). The row id is not a `DELETE`, so the
+            // tombstone set does not cover it.
+            if self.overridden.is_some_and(|o| o.contains(&doc)) {
                 self.sources[winner].advance(doc + 1);
                 continue;
             }
@@ -4703,6 +4708,25 @@ pub(crate) struct TableEntry {
     pub(crate) mv: HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>,
     /// Full-text inverted indexes per column.
     pub(crate) text: HashMap<String, SharedTextIndex>,
+    /// Bumped whenever cached full-text indexes are dropped: a compaction that
+    /// renumbers every row, or `drop_text_index_storage`.
+    ///
+    /// A build reads the rows one batch at a time and publishes when it is done,
+    /// so it can straddle one of those and end up with postings that name row
+    /// ids nothing owns any more. The epoch a build started at is what
+    /// `Engine::publish_text_index` checks it against.
+    pub(crate) text_epoch: u64,
+    /// The `(text_epoch, read_ts)` each cached index was published at, per
+    /// column.
+    ///
+    /// A cached index is only reusable when both agree: the entry that survives
+    /// a bump was built from the layout that bump retired, and one built at an
+    /// older `read_ts` names rows a later merge moved.
+    pub(crate) text_built: HashMap<String, (u64, u64)>,
+    /// The commit ts of the last compaction whose drops are visible. A build
+    /// that read at an older ts saw the source segments, so its postings name
+    /// rows the merge retired; publishing it is refused.
+    pub(crate) text_min_ts: u64,
     /// Secondary indexes per column with their sealed chunk readers.
     pub(crate) secondary: SecondaryIndexes,
     /// HNSW chunks loaded from the C++ block mirror, per column (the
@@ -4958,7 +4982,7 @@ pub struct Engine {
     /// The persistence layer (`PersistenceManager`), when this engine publishes
     /// its data files through `pm|object|` instead of leaving `data/` private
     /// (`EngineOptions::object_dir`).
-    pub(crate) persistence: Option<storage::persistence::PersistenceManager>,
+    pub(crate) persistence: Option<std::sync::Arc<storage::persistence::PersistenceManager>>,
     /// Bumped when `optimize_indexes` runs: a `DumpMemIndex` staged before the
     /// optimize cannot commit after it (the reference's index meta version).
     pub(crate) index_epoch: std::sync::atomic::AtomicU64,
@@ -5058,6 +5082,19 @@ pub struct Engine {
     /// on, a finished statement is appended to the profile history. The
     /// running-query registry is kept either way, as `SHOW QUERIES` needs it.
     pub(crate) profile_enabled: std::sync::atomic::AtomicBool,
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        // The chunk-store registry holds the engine's store, and through it the
+        // persistence manager - which is the only thing keeping the object
+        // catalog open. An engine that leaves its root registered therefore
+        // leaks both, and the same object directory cannot be opened again in
+        // this process (a reopened engine, or the next test in a suite).
+        if self.persistence.is_some() {
+            storage::chunk_store::uninstall_chunk_store_for(&self.dir);
+        }
+    }
 }
 
 /// A `cpu_usage` sample: the process's utime+stime ticks and when they were
@@ -5371,13 +5408,14 @@ pub(crate) async fn run_bottom(
         // row, and the port keeps no row journal either: such a table's rows
         // stay in the append buffer (see `has_block_layout`).
         let defaults = engine.table_defaults(table).unwrap_or_default();
+        let stored_types = engine.column_types(table).unwrap_or_default();
         let mut published: Vec<(usize, Vec<Value>)> = Vec::new();
         for append in appends.iter().filter(|append| append.table == table) {
             for (k, text) in append.encoded.iter().enumerate() {
                 // Never drop a row because its text form would not parse: the
                 // commit has already published it, and the block is the only
                 // place its values can come from.
-                match engine.parse_stored_row(table, &defaults, text.as_bytes()) {
+                match engine.parse_stored_row(table, &defaults, &stored_types, text.as_bytes()) {
                     Ok(row) => published.push((append.base + k, row)),
                     Err(_) => published.push((
                         append.base + k,
@@ -5967,10 +6005,13 @@ pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
 /// appended a chunk, another optimize replaced one) is left alone and the merged
 /// files are dropped, so a long merge never blocks a query or a writer and never
 /// loses a chunk that arrived meanwhile.
-pub(crate) fn optimize_text_index_unlocked(shared: &SharedTextIndex) -> crate::Result<usize> {
+pub(crate) fn optimize_text_index_unlocked(
+    shared: &SharedTextIndex,
+    deleted: &std::collections::HashSet<u64>,
+) -> crate::Result<usize> {
     let (plan, dir) = {
         let index = shared.read().unwrap();
-        let Some(plan) = index.plan_merge()? else {
+        let Some(plan) = index.plan_merge(deleted)? else {
             return Ok(0);
         };
         (plan, index.dir.clone())
@@ -5989,6 +6030,24 @@ pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
     if !index.mem.docs.contains_key(&seq) && index.reader.contains(seq) {
         index.overridden.insert(seq);
     }
+}
+
+/// Retires a row id a compaction renumbered: it appears nowhere else any more.
+///
+/// Unlike [`index_delete_row`], nothing is removed from the memory index: the
+/// id was never one of its documents (a merge only moves rows that were already
+/// sealed), and `MemoryIndexer::deleted` is walked by `pending_docs` on every
+/// query, so adding a retired id there makes each compaction slow the column
+/// down for good.
+///
+/// The id is marked overridden **whatever holds its postings**. The copy of the
+/// posting the merge replaced can still sit in the unsealed tail or in a spilled
+/// run, and those are read without a tombstone - the id is not a `DELETE`, so
+/// `tombstone_set` knows nothing about it. Left in, those postings answer a
+/// `MATCH` with rows no fetch can resolve, and a `topn=3` query reports an empty
+/// column on a table full of matches.
+pub(crate) fn index_retire_row(index: &mut TextIndex, seq: u64) {
+    index.overridden.insert(seq);
 }
 
 pub struct EngineOptions {

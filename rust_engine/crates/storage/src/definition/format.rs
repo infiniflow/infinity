@@ -538,24 +538,18 @@ pub fn write_block_column_synced(
     Ok(dir)
 }
 
-/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it before
-/// returning (no directory fsync — the reference does not fsync directories).
+/// Publishes one data file: [`write_synced_direct`] plus, on a persistence
+/// profile, the object the manager publishes it as.
 ///
-/// Used for every file a checkpoint publishes: block columns here and the
-/// index chunks in `executor::blocks`. The reference's file workers sync
-/// each file they finish (`FileWorker::WriteToFile`,
-/// `memory_indexer_impl.cpp:535-536,762-763`, `column_index_merger_impl.cpp:151-152`),
-/// so a chunk named by a catalog record is on disk, not just in the page cache.
-///
-/// The bytes go to a sibling temp file that is renamed over `path`. A block is
-/// rewritten **in place** when a commit re-publishes its rows (`ALTER TABLE
-/// ADD/DROP COLUMN`, an update), while readers hold an `mmap` of it
-/// (`buffer::MappedFile` maps block columns and index chunks, and the mapping
-/// outlives the catalog's map cache); truncating the file under a live mapping
-/// raises SIGBUS. The rename swaps the directory entry, so whoever mapped the
-/// old file keeps a valid inode (measured: the periodic checkpoint died with
-/// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
-/// truncated `blk_0/0.col`).
+/// This is the write half of the reference's rule that **every** data file goes
+/// through the persistence manager (`FileWorker::WriteToFile` →
+/// `pm->Persist`, `file_worker_impl.cpp:170`; the full-text and index writers do
+/// the same). With no manager installed the store is the direct-disk one and
+/// this is exactly the old behaviour.
+pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    crate::chunk_store::chunk_store().write(path, bytes)
+}
+
 /// [`write_synced`] for a file assembled from several slices, with no
 /// intermediate `Vec`.
 pub fn write_synced_parts(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> {
@@ -575,6 +569,32 @@ pub fn write_parts_no_sync(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> 
     write_parts(path, parts, false)
 }
 
+/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it - and
+/// the directory entry the rename creates - before returning.
+///
+/// This is the raw primitive that bypasses the chunk store: [`write_synced`]
+/// publishes through the store and both of its backends bottom out here, so a
+/// direct-disk profile behaves exactly as it did before the seam existed.
+///
+/// Used for every file a checkpoint publishes: block columns here and the
+/// index chunks in `executor::blocks`. The reference's file workers sync
+/// each file they finish (`FileWorker::WriteToFile`,
+/// `memory_indexer_impl.cpp:535-536,762-763`, `column_index_merger_impl.cpp:151-152`),
+/// so a chunk named by a catalog record is on disk, not just in the page cache.
+///
+/// The bytes go to a sibling temp file that is renamed over `path`. A block is
+/// rewritten **in place** when a commit re-publishes its rows (`ALTER TABLE
+/// ADD/DROP COLUMN`, an update), while readers hold an `mmap` of it
+/// (`buffer::MappedFile` maps block columns and index chunks, and the mapping
+/// outlives the catalog's map cache); truncating the file under a live mapping
+/// raises SIGBUS. The rename swaps the directory entry, so whoever mapped the
+/// old file keeps a valid inode (measured: the periodic checkpoint died with
+/// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
+/// truncated `blk_0/0.col`).
+pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    write_parts(path, &[bytes], true)
+}
+
 fn write_parts(path: &Path, parts: &[&[u8]], sync: bool) -> std::io::Result<()> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -591,9 +611,22 @@ fn write_parts(path: &Path, parts: &[&[u8]], sync: bool) -> std::io::Result<()> 
             file.write_all(part)?;
         }
         if sync {
+            // The bytes have to reach the disk before the rename publishes
+            // them: a rename is only ordered against data that is already
+            // durable.
             file.sync_all()?;
         }
-        std::fs::rename(&tmp, path)
+        std::fs::rename(&tmp, path)?;
+        if sync {
+            // The rename itself is a directory update, and it is what the
+            // readers discover. Without this fsync a power cut can leave the
+            // old entry (or no entry) pointing at a file whose contents are on
+            // the disk, which is how a "complete" chunk disappears or a
+            // half-published one survives. The no-sync path skips both: its
+            // durability comes from the checkpoint that follows.
+            sync_parent(path)?;
+        }
+        Ok(())
     };
     let out = write();
     if out.is_err() {
@@ -602,8 +635,34 @@ fn write_parts(path: &Path, parts: &[&[u8]], sync: bool) -> std::io::Result<()> 
     out
 }
 
-pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    write_synced_parts(path, &[bytes])
+/// `fsync`s the directory holding `path`, so a rename (or an unlink) in it is
+/// durable.
+///
+/// The barrier is what makes "the file is on the disk" mean "the entry naming
+/// it is on the disk too", so a failure here is reported: a caller that cannot
+/// sync the directory has not reached durability, and pretending otherwise is
+/// how a chunk that never got its directory entry survives a power cut as a
+/// published one. Two cases are genuinely not a barrier: a directory that does
+/// not exist (`NotFound` - nothing to sync), and a platform that cannot open a
+/// directory for `fsync` at all (Windows reports `PermissionDenied`), where the
+/// rename is journaled by the filesystem itself.
+pub fn sync_parent(path: &Path) -> std::io::Result<()> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    let dir = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    let handle = match std::fs::File::open(dir) {
+        Ok(handle) => handle,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        #[cfg(windows)]
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    handle.sync_all()
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).

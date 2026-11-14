@@ -83,7 +83,7 @@ pub(crate) fn publish_secondary_chunks(
             merged = true;
         }
         let (Ok(bytes), Ok(reader)) = (
-            std::fs::read(&path),
+            storage::chunk_store::read_file(&path),
             SecondarySegmentReader::open_with_kind(&path, kind),
         ) else {
             continue;
@@ -320,7 +320,8 @@ pub(crate) fn publish_chunk_files(
     for id in ids {
         // `[M][ef_construction][cur_vec_num]…` — the third u64 is this chunk's
         // vector count (`HnswHeader::cur_vec_num`, `knn_format.rs:44`).
-        let row_count = std::fs::read(seg_dir.join(format!("chunk_{id}.idx")))
+        let row_count = storage::chunk_store::chunk_store()
+            .read(&seg_dir.join(format!("chunk_{id}.idx")))
             .ok()
             .filter(|bytes| bytes.len() >= 24)
             .map(|bytes| u64::from_le_bytes(bytes[16..24].try_into().unwrap()))
@@ -348,7 +349,7 @@ pub(crate) fn publish_chunk_files(
 /// sum of the lengths (`MemoryIndexer::GetDocTermCount`,
 /// `memory_indexer_impl.cpp:636`).
 pub(crate) fn fulltext_chunk_counts(len_path: &Path) -> Option<(u64, u64)> {
-    let bytes = std::fs::read(len_path).ok()?;
+    let bytes = storage::chunk_store::read_file(len_path).ok()?;
     if bytes.len() % 4 != 0 {
         return None;
     }

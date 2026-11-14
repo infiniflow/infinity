@@ -21,8 +21,8 @@ use std::collections::HashSet;
 
 use crate::engine::state::SharedTextIndex;
 use crate::query_builder::{
-    DocIterator, FullTextQueryContext, PhraseDocIterator, QueryBuilder, QueryNode, TermDocIterator,
-    TermLookup, INVALID_DOC_ID,
+    DocIterator, FullTextQueryContext, PhraseDocIterator, PhrasePostings, QueryBuilder, QueryNode,
+    TermDocIterator, TermLookup, INVALID_DOC_ID,
 };
 
 /// True when `query` uses anything `query_units` cannot express: a boolean
@@ -126,13 +126,15 @@ impl TermLookup for TextTermLookup {
     ) -> Option<Box<dyn DocIterator>> {
         let index = self.indexes.get(column)?;
         let text = index.read().ok()?;
-        let mut postings: Vec<Vec<(u64, Vec<u32>)>> = Vec::with_capacity(terms.len());
+        let mut postings: Vec<PhrasePostings> = Vec::with_capacity(terms.len());
         let mut rows: HashSet<u64> = HashSet::new();
         for term in terms {
-            let mut list: Vec<(u64, Vec<u32>)> = Vec::new();
+            // One arena per term (`PhrasePostings`): the positions are still
+            // all in memory, but as two allocations instead of one per document.
+            let mut list = PhrasePostings::default();
             let mut stream = text.term_stream_capture(term, true);
             while let Some(doc) = stream.doc() {
-                list.push((doc, stream.positions().to_vec()));
+                list.push(doc, stream.positions());
                 rows.insert(doc);
                 stream.advance(doc + 1);
             }

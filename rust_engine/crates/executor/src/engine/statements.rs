@@ -33,6 +33,44 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
+thread_local! {
+    /// Runs inside a full-text build, right after the rows are read and before
+    /// the index is published. The tests use it to land a compaction in exactly
+    /// that window: the schedule that breaks a build is otherwise a race, and a
+    /// compaction cannot be driven from the thread that is building.
+    static TEXT_BUILD_HOOK: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Installs [`TEXT_BUILD_HOOK`] for this thread; `None` removes it.
+#[cfg(test)]
+pub(crate) fn set_text_build_hook(hook: Option<Box<dyn FnMut()>>) {
+    TEXT_BUILD_HOOK.with(|slot| *slot.borrow_mut() = hook);
+}
+
+#[cfg(test)]
+fn run_text_build_hook() {
+    TEXT_BUILD_HOOK.with(|slot| {
+        if let Some(hook) = slot.borrow_mut().as_mut() {
+            hook();
+        }
+    });
+}
+
+/// What [`Engine::publish_text_index`] did with a freshly built index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextPublish {
+    /// Stored in the table's cache: later statements reuse it.
+    Cached,
+    /// The rows were renumbered under the build, so its postings name ids of a
+    /// layout that is gone. The build is worthless for every reader.
+    Renumbered,
+    /// A compaction committed after the build read: the postings still describe
+    /// what this statement sees, but a statement above the merge would resolve
+    /// the ids it left behind. Answer this one from it, cache nothing.
+    ReadTooOld,
+}
+
 /// Marks one table's bottom as running on this thread for as long as it lives.
 pub(crate) struct HeldBottom(String);
 
@@ -124,6 +162,41 @@ pub fn with_session_sync<T>(id: i64, f: impl FnOnce() -> T) -> T {
     crate::scheduler::block_on(with_session_scope(id, async { f() }))
 }
 
+/// Takes back the chunk-store registration when `open` fails after installing it.
+///
+/// The registration happens before the WAL directory is created and before
+/// `TxnManager::open`, and both can fail; without this guard every `?` in
+/// between would leave a store registered for a directory no engine has open -
+/// and the manager behind it never drops, so the same object directory could not
+/// be opened again in this process. Once the engine exists, [`Engine::drop`]
+/// owns the cleanup and the guard is disarmed.
+struct StoreRegistration {
+    root: PathBuf,
+    armed: bool,
+}
+
+impl StoreRegistration {
+    fn new(root: &Path) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            armed: true,
+        }
+    }
+
+    /// The constructed engine owns the cleanup from here on.
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for StoreRegistration {
+    fn drop(&mut self) {
+        if self.armed {
+            storage::chunk_store::uninstall_chunk_store_for(&self.root);
+        }
+    }
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_options(dir, EngineOptions::default())
@@ -190,10 +263,40 @@ impl Engine {
                     storage::persistence::DEFAULT_OBJECT_SIZE_LIMIT,
                 )?;
                 pm.restore_missing_files()?;
-                Some(pm)
+                Some(Arc::new(pm))
             }
             None => None,
         };
+        // `InfinityContext::instance().persistence_manager()`: once the engine
+        // has a manager, **every** data file it writes is published through it
+        // and every mapping is resolved through it - blocks, index chunks and
+        // the full-text chunk cache alike, exactly as the reference's file
+        // workers do. Without one the direct-disk store stays installed, so a
+        // plain directory behaves as before.
+        // Installed **for this engine's root**, not as the process default: a
+        // process may hold several engines, each with its own manager and its
+        // own directory, and the one opened last must not serve the earlier
+        // ones' reads, writes and cleanups.
+        // The registration is undone by the guard if anything below fails
+        // (the WAL directory, `TxnManager::open`, the replay, the startup
+        // checkpoint); once the engine is built, its `Drop` takes over.
+        let mut registration = None;
+        match persistence.as_ref() {
+            Some(pm) => {
+                storage::chunk_store::install_chunk_store_for(
+                    &dir,
+                    Arc::new(storage::chunk_store::PersistentChunkStore::new(
+                        Arc::clone(pm),
+                        &dir,
+                    )),
+                );
+                registration = Some(StoreRegistration::new(&dir));
+            }
+            // A plain open never undoes a manager another open installed: one
+            // engine per process makes this a no-op, and a process with several
+            // (a test suite) keeps the object profile while it is in use.
+            None => storage::chunk_store::install_local_chunk_store_unless_persistent(),
+        }
         // The row/meta store, on the same substrate as the catalog.
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
@@ -387,6 +490,11 @@ impl Engine {
         engine.recover_mem_index()?;
         // The in-memory indexes were just rebuilt; the quota reads this total.
         engine.recompute_memindex_total();
+        // The engine is complete: its `Drop` releases the registration, and the
+        // guard must not undo it under a live engine.
+        if let Some(registration) = registration.as_mut() {
+            registration.disarm();
+        }
         Ok(engine)
     }
 
@@ -639,9 +747,10 @@ impl Engine {
 
     pub(crate) fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         let mut rows = Vec::new();
         for (_, v) in self.row_texts(table, ids)? {
-            rows.push(self.parse_stored_row(table, &defaults, &v)?);
+            rows.push(self.parse_stored_row(table, &defaults, &types, &v)?);
         }
         Ok(rows)
     }
@@ -1889,7 +1998,7 @@ impl Engine {
             // the reader agree on: an array literal's `{…}` is normalized to
             // the stored `[…]` only on that path.
             let text = self.encode_row_stored(table, row, &types)?;
-            if let Ok(values) = self.parse_stored_row(table, &defaults, text.as_bytes()) {
+            if let Ok(values) = self.parse_stored_row(table, &defaults, &types, text.as_bytes()) {
                 published.push((base + k, values));
             }
         }
@@ -1910,13 +2019,14 @@ impl Engine {
             return Ok(());
         }
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         // Batch by batch: holding the parsed values of the whole file next to
         // its stored text doubled the peak (4.6 GB resident for a 326 MB
         // import). Each batch is parsed, appended to the buffer and dropped.
         const CHUNK: usize = 8192;
         let mut published: Vec<(usize, Vec<Value>)> = Vec::with_capacity(CHUNK.min(rows.len()));
         for (seq, text) in rows {
-            match self.parse_stored_row(table, &defaults, text.as_ref()) {
+            match self.parse_stored_row(table, &defaults, &types, text.as_ref()) {
                 Ok(values) => published.push((*seq, values)),
                 // Never drop a row because its text form would not parse: the
                 // cells are simply that text, which is what the writer stores.
@@ -3296,8 +3406,30 @@ impl Engine {
         }
     }
 
-    /// Decodes one stored cell.
-    pub(crate) fn decode_cell(&self, _table: &str, cell: &str) -> Result<Value> {
+    /// Decodes one stored cell of column `col`.
+    ///
+    /// A cell of a text column (`VARCHAR`/`JSON`) is returned as the text it
+    /// was stored as; only the other columns go through [`parse_value`], whose
+    /// inference would otherwise re-read `iNF` as the float `inf`.
+    pub(crate) fn decode_cell(
+        &self,
+        _table: &str,
+        types: &[String],
+        col: usize,
+        cell: &str,
+    ) -> Result<Value> {
+        if types
+            .get(col)
+            .map(|t| crate::blocks::keeps_cell_text(t))
+            .unwrap_or(false)
+        {
+            // The stored form spells a NULL cell `null` and has no other way to
+            // say it, so that one spelling still decodes as NULL.
+            if cell.eq_ignore_ascii_case("null") {
+                return Ok(Value::Null);
+            }
+            return Ok(Value::Str(cell.to_string()));
+        }
         Ok(parse_value(cell))
     }
 
@@ -3353,10 +3485,11 @@ impl Engine {
             return cursor.rows(ids);
         }
         // A table whose columns have no block layout lives in the buffer only.
+        let types = self.column_types(table).unwrap_or_default();
         for &id in ids {
             let seq = id as usize;
             if let Some(text) = self.pending_row_text(table, seq)? {
-                out.push((seq, self.parse_stored_row(table, &defaults, &text)?));
+                out.push((seq, self.parse_stored_row(table, &defaults, &types, &text)?));
             }
         }
         Ok(out)
@@ -3525,7 +3658,32 @@ impl Engine {
     }
 
     /// Builds (once) the inverted index for a text column from its live rows.
+    ///
+    /// The build walks the rows one batch at a time, so it can straddle a
+    /// compaction - which renumbers every row and drops the cached indexes at a
+    /// new `TableEntry::text_epoch`. A build therefore only publishes at the
+    /// epoch it started at, and a cached index is only reused when it was
+    /// published at the current one (see [`Self::publish_text_index`]). Without
+    /// that, a build that read the pre-compaction ids could land *after* the
+    /// compaction rebuilt the index: every hit would then name a row the merge
+    /// moved, `fetch_some_rows_with_ids` drops those, and `MATCH` answers
+    /// nothing on a table full of matches (`TestParallelFulltextIndexReadWrite`,
+    /// on the query that runs after its writers stopped).
     pub(crate) fn text_index_for(
+        &self,
+        table: &str,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<SharedTextIndex> {
+        self.text_index_build(table, column, tokenizer)
+    }
+
+    /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
+    ///
+    /// The build reads once, so its postings describe exactly the snapshot the
+    /// statement sees; a merge that commits while it runs therefore invalidates
+    /// the *cache*, never the answer - see [`TextPublish`].
+    fn text_index_build(
         &self,
         table: &str,
         column: &str,
@@ -3555,9 +3713,31 @@ impl Engine {
         // under `tables` here closes a cycle as soon as a writer (the appender)
         // is pending: nobody can make progress, and every later statement
         // queues behind the frozen `tables`.
-        let cached = {
+        let (cached, epoch) = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&tkey).and_then(|e| e.text.get(column)).cloned()
+            match tables.get(&tkey) {
+                // A cached index built before the last bump belongs to the
+                // layout that bump retired, and one built before the last
+                // visible compaction read the source segments: both name row
+                // ids nothing owns any more.
+                Some(entry) => (
+                    entry
+                        .text
+                        .get(column)
+                        .filter(|_| {
+                            entry
+                                .text_built
+                                .get(column)
+                                .is_some_and(|(built_epoch, built_ts)| {
+                                    *built_epoch == entry.text_epoch
+                                        && *built_ts >= entry.text_min_ts
+                                })
+                        })
+                        .cloned(),
+                    entry.text_epoch,
+                ),
+                None => (None, 0),
+            }
         };
         if let Some(idx) = cached {
             let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
@@ -3576,11 +3756,30 @@ impl Engine {
             .join(key.replace('/', "_"))
             .to_string_lossy()
             .into_owned();
-        let mut index = TextIndex::new(dir, tokenizer);
+        // The `ROW_ID` segments the catalog still lists. A chunk of any other
+        // segment belongs to rows a compaction moved: loading it would map its
+        // postings onto row ids that name nothing (or, worse, another row), so
+        // the loader retires it and the rows are re-indexed under their new ids.
+        // An empty set is "nothing to go by", not "every chunk is stale".
+        let live_segments: Option<std::collections::HashSet<u32>> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .map(|entry| entry.segments.keys().copied().collect())
+            .filter(|segments: &std::collections::HashSet<u32>| !segments.is_empty());
+        // The chunk list the catalog holds, in the reference's layout. It is
+        // the only way to find the chunks of a directory the reference wrote:
+        // the reference never scans for `ft_*.dic`, it reads `idx_chunk|…`.
+        let catalog_chunks = self
+            .fulltext_catalog_chunks(table, column)
+            .unwrap_or_default();
+        // Cloned because a rejected publish retries the whole build.
+        let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed() as usize;
+        let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
@@ -3591,14 +3790,292 @@ impl Engine {
             index.maybe_seal(self.memindex_capacity());
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(tkey)
-            .or_default()
-            .text
-            .insert(column.to_string(), shared.clone());
-        Ok(shared)
+        #[cfg(test)]
+        run_text_build_hook();
+        match self.publish_text_index(&tkey, column, epoch, shared.clone()) {
+            TextPublish::Cached => Ok(shared),
+            // A compaction committed after the build's read. The build still
+            // describes exactly the rows this statement sees (one read, one
+            // snapshot), so its postings resolve for **this** statement; it just
+            // may not be cached, because a statement above the merge would ask it
+            // for ids the merge retired.
+            //
+            // Retrying here was the wrong answer twice over: the rebuild is fast
+            // only when a cache is there to reuse, and while imports keep landing
+            // the cache stays short - so a table under write pressure rebuilt the
+            // whole column for every query, and a merge landing inside each
+            // rebuild could keep one `MATCH` running for the whole gate timeout
+            // (`TestParallelFulltextIndexReadWrite`, 15 s window, 427 s case).
+            TextPublish::ReadTooOld | TextPublish::Renumbered => Ok(shared),
+        }
+    }
+
+    /// Publishes a freshly built full-text index for `column`, unless the table's
+    /// cached indexes were dropped (or a merge committed after the build's read)
+    /// while it ran. See [`TextPublish`] for what the caller may do with it.
+    pub(crate) fn publish_text_index(
+        &self,
+        tkey: &str,
+        column: &str,
+        epoch: u64,
+        index: SharedTextIndex,
+    ) -> TextPublish {
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey.to_string()).or_default();
+        // The layout changed under the build: `TableEntry::text_epoch` is bumped
+        // by the compaction that renumbers the rows, so the build read ids that
+        // now name nothing.
+        if entry.text_epoch != epoch {
+            return TextPublish::Renumbered;
+        }
+        let read_ts = crate::read_ts();
+        // A compaction committed after the build's read: the build still
+        // describes the segments this statement sees, but a later statement, at
+        // a ts above the merge, would resolve the ids it left behind.
+        if read_ts < entry.text_min_ts {
+            return TextPublish::ReadTooOld;
+        }
+        entry.text.insert(column.to_string(), index);
+        entry
+            .text_built
+            .insert(column.to_string(), (epoch, read_ts));
+        TextPublish::Cached
+    }
+
+    /// Moves a table's full-text caches onto the row ids a compaction just
+    /// assigned.
+    ///
+    /// A merge renumbers every row it takes, so the postings of the kept caches
+    /// stop naming live rows the moment it lands. The rows it moved are indexed
+    /// here under their new ids - from the row bytes the merge already read, not
+    /// from a scan - and the ids they left are marked overridden
+    /// (`index_delete_row`). Overridden ids are what the sealed read paths skip
+    /// while they iterate (`MergeCursor`), i.e. **before** the top-n cut: leaving
+    /// them in the postings made `MATCH` fill its top-n with rows no fetch can
+    /// resolve and answer "column is empty" on a table full of matches.
+    ///
+    /// The caches are not dropped for this. Doing that put a full rebuild of the
+    /// column on the query path, and a table that keeps taking writes is
+    /// compacted every couple of minutes - the rebuild outlived the next
+    /// compaction, its publish was refused and it retried, which is what blocked
+    /// one `MATCH` for the whole gate timeout
+    /// (`TestParallelFulltextIndexReadWrite`).
+    ///
+    /// `built_ts` is the merge's commit ts: the caller raises
+    /// `TableEntry::text_min_ts` to it, so the cache has to claim it.
+    pub(crate) fn reindex_compacted_text(
+        &self,
+        table: &str,
+        rows: &[(usize, Vec<u8>)],
+        base: usize,
+        built_ts: u64,
+    ) {
+        let tkey = self.table_key(table);
+        // Clone the handles and let go of `tables` before an index is locked: a
+        // query holds the index's read guard while it fetches rows, and that
+        // fetch needs `tables`. Waiting for the write lock under it is the
+        // reverse order and deadlocks the query.
+        let (indexes, epoch) = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey) {
+                Some(entry) if !entry.text.is_empty() => (
+                    entry
+                        .text
+                        .iter()
+                        .map(|(column, index)| (column.clone(), index.clone()))
+                        .collect::<Vec<_>>(),
+                    entry.text_epoch,
+                ),
+                // Nothing cached: the next query builds the merged layout.
+                _ => return,
+            }
+        };
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        let types = self.column_types(table).unwrap_or_default();
+        let segment = (base as u64) >> 32;
+        for (column, shared) in &indexes {
+            let Some(col) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            // Tokenise with no lock held: the analyzer is the expensive half of a
+            // write (the DML path is split the same way).
+            let prepared: Vec<PreparedDoc> = {
+                let tokenizer = shared.read().unwrap().tokenizer.clone();
+                // Every merged row is re-indexed, an unreadable one as an empty
+                // document. Skipping it would leave the cache one document short
+                // of `live_rows`, `text_index_build` would see a cache that never
+                // catches up and rebuild the whole column on every query.
+                rows.iter()
+                    .enumerate()
+                    .map(|(i, (_, bytes))| {
+                        let text = std::str::from_utf8(bytes)
+                            .ok()
+                            .and_then(|row| row.split('\t').nth(col))
+                            .map(|cell| match self.decode_cell(table, &types, col, cell) {
+                                Ok(Value::Str(text)) => text,
+                                Ok(other) => other.to_slt_string(),
+                                Err(_) => String::new(),
+                            })
+                            .unwrap_or_default();
+                        crate::engine::text_index::prepare_doc((base + i) as u64, &text, &tokenizer)
+                    })
+                    .collect()
+            };
+            // A tail spans one `ROW_ID` segment; the merged rows are a new one, so
+            // write out whatever else is still unsealed first (no lock held).
+            if rows.is_empty()
+                || shared
+                    .read()
+                    .unwrap()
+                    .unsealed_segment()
+                    .is_some_and(|held| held != segment)
+            {
+                crate::engine::state::seal_text_index_unlocked(shared);
+            }
+            {
+                let mut index = shared.write().unwrap();
+                // The new ids first, the overrides last: the reverse order leaves a
+                // moment where the row is in neither. A query already running below
+                // `compact_ts` resolves the old ids only, so it may miss the moved
+                // rows until it ends; every query at `compact_ts` or above resolves
+                // the new ones.
+                crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                for (seq, _) in rows {
+                    crate::engine::state::index_retire_row(&mut index, *seq as u64);
+                }
+                // The segments this merge took are now overridden row for row:
+                // dropping them keeps BM25's `N` at the live population instead
+                // of growing it by a table per compaction.
+                index.retire_fully_overridden_segments();
+            }
+            // Persist the moved rows: the chunk names the new ids, so the next
+            // build maps it instead of re-reading the column, and the chunks of the
+            // retired segments are dropped at load (`live_segments`).
+            crate::engine::state::seal_text_index_unlocked(shared);
+        }
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        if entry.text_epoch != epoch {
+            // Another compaction renumbered the table while this ran; its own
+            // pass owns the stamp.
+            return;
+        }
+        for (column, _) in &indexes {
+            entry.text_built.insert(column.clone(), (epoch, built_ts));
+        }
+    }
+
+    /// The sealed chunks the catalog lists for a table's full-text index on
+    /// `column`, in the reference's layout.
+    ///
+    /// C++: `ColumnIndexReader::Open` (`column_index_reader_impl.cpp:71-105`)
+    /// walks `TableIndexMeta` → segment ids → chunk ids → `ChunkIndexMetaInfo`,
+    /// and the segment's directory comes from `SegmentIndexMeta::
+    /// GetSegmentIndexDir()` (`db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}`). This is
+    /// that walk: it is how a directory the reference wrote is read at all, and
+    /// it is also the authoritative list for a directory the port wrote.
+    pub(crate) fn fulltext_catalog_chunks(
+        &self,
+        table: &str,
+        column: &str,
+    ) -> Result<Vec<CatalogChunk>> {
+        // The catalog accepts both spellings depending on which record wrote it
+        // (`im.table` is the bare name for an index created without a database,
+        // the qualified one for the mirror), so both are tried.
+        let qualified = self.qualified_table(table);
+        let mut meta = self.storage.catalog.get_table_by_name(&qualified)?;
+        if meta.is_none() && qualified != table {
+            meta = self.storage.catalog.get_table_by_name(table)?;
+        }
+        let Some(meta) = meta else {
+            return Ok(Vec::new());
+        };
+        let mut indexes = self.storage.catalog.indexes_of_table(&qualified)?;
+        if qualified != table {
+            for im in self.storage.catalog.indexes_of_table(table)? {
+                if !indexes.iter().any(|known| known.name == im.name) {
+                    indexes.push(im);
+                }
+            }
+        }
+        // A column may carry several FULLTEXT indexes (a sparse-gram one beside a
+        // regular one), and `indexes_of_table` lists them **by name**, so taking
+        // the first match would return chunks another analyzer wrote. The chunks
+        // have to belong to the index `text_index_for` built the tokenizer from,
+        // i.e. the analyzer `column_analyzer_name` resolves - the same rule as
+        // C++ `SearchDriver::GetAnalyzerName` (a regular analyzer wins over a
+        // sparse-gram one regardless of name order).
+        let wanted = self.column_analyzer_name(table, column);
+        let im = indexes
+            .into_iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.column == *column)
+            .min_by_key(|im| {
+                let analyzer = im
+                    .options
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("analyzer"))
+                    .map(|(_, v)| v.clone())
+                    .unwrap_or_else(|| "standard".to_string());
+                let sparsegram = matches!(
+                    analyzer::parse_analyzer_name(&analyzer),
+                    Ok(analyzer::AnalyzerName::SparseGram { .. })
+                );
+                // 0: the analyzer the column's tokenizer uses, 1: another
+                // regular one, 2: a sparse-gram one.
+                if Some(&analyzer) == wanted.as_ref() {
+                    0
+                } else if sparsegram {
+                    2
+                } else {
+                    1
+                }
+            });
+        let Some(im) = im else {
+            return Ok(Vec::new());
+        };
+        let index_id = if im.id > 0 {
+            im.id
+        } else {
+            match self.index_position(&qualified, &im.name) {
+                Ok(id) => id as u64,
+                Err(_) => return Ok(Vec::new()),
+            }
+        };
+        let db_id = self.database_id_of(&qualified);
+        let layers = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id.to_string(),
+            &meta.id.to_string(),
+            &index_id.to_string(),
+        )?;
+        let mut chunks = Vec::new();
+        for (segment, entries) in layers {
+            let dir = self
+                .blocks_root()
+                .join(format!(
+                    "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
+                    meta.id
+                ))
+                .to_string_lossy()
+                .into_owned();
+            for (_, info) in entries {
+                if info.base_name.is_empty() {
+                    continue;
+                }
+                chunks.push(CatalogChunk {
+                    dir: dir.clone(),
+                    base_name: info.base_name,
+                    base_row_id: info.base_row_id,
+                });
+            }
+        }
+        // Chunk-id order is dump order; the loader wants row order.
+        chunks.sort_by_key(|chunk| chunk.base_row_id);
+        Ok(chunks)
     }
 
     /// Builds (once) the multi-vector index of a column from its rows: every
@@ -3695,7 +4172,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                    let _ = std::fs::remove_file(p);
+                    let _ = storage::chunk_store::remove_file(p);
                 }
             }
         }
@@ -4018,7 +4495,7 @@ impl Engine {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.extension().is_some_and(|x| x == "bmp") {
-                    let _ = std::fs::remove_file(p);
+                    let _ = storage::chunk_store::remove_file(p);
                 }
             }
         }
@@ -4196,10 +4673,17 @@ impl Engine {
     }
 
     /// Parses a stored row, padding trailing cells from the column defaults.
+    ///
+    /// `types` are the table's declared column types: the stored text is
+    /// re-read with them so a text column's cell stays text. Inferring the cell
+    /// type instead rewrote the value - `str::parse::<f64>` accepts `inf`,
+    /// `infinity` and `nan` in any case, so a stored `iNF` came back as `inf`
+    /// (and `007` as `7`, `1.50` as `1.5`).
     pub(crate) fn parse_stored_row(
         &self,
         table: &str,
         defaults: &[Option<String>],
+        types: &[String],
         v: &[u8],
     ) -> Result<Vec<Value>> {
         // The stored form is written from a `String` and read straight back, so
@@ -4207,11 +4691,11 @@ impl Engine {
         // a `Cow` per row for 8.4 M rows.
         let text = match std::str::from_utf8(v) {
             Ok(t) => t,
-            Err(_) => return self.parse_stored_row_lossy(table, defaults, v),
+            Err(_) => return self.parse_stored_row_lossy(table, defaults, types, v),
         };
         let mut cells: Vec<Value> = Vec::new();
         for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, cell)?);
+            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
         }
         while cells.len() < defaults.len() {
             let i = cells.len();
@@ -4229,12 +4713,13 @@ impl Engine {
         &self,
         table: &str,
         defaults: &[Option<String>],
+        types: &[String],
         v: &[u8],
     ) -> Result<Vec<Value>> {
         let text = String::from_utf8_lossy(v);
         let mut cells: Vec<Value> = Vec::new();
         for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, cell)?);
+            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
         }
         while cells.len() < defaults.len() {
             let i = cells.len();
@@ -4769,7 +5254,7 @@ impl Engine {
                         )
                         .as_bytes(),
                     )?;
-                    let _ = std::fs::remove_dir_all(root.join(format!(
+                    storage::chunk_store::remove_tree(root.join(format!(
                         "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                         meta.id
                     )));
@@ -4782,7 +5267,7 @@ impl Engine {
                     )
                     .as_bytes(),
                 )?;
-                let _ = std::fs::remove_dir_all(
+                storage::chunk_store::remove_tree(
                     root.join(format!("db_{db_id}/tbl_{}/seg_{segment}", meta.id)),
                 );
             }
@@ -4815,7 +5300,7 @@ impl Engine {
                         continue;
                     };
                     if !live.contains(&(db_id.to_string(), table_id.to_string())) {
-                        let _ = std::fs::remove_dir_all(tbl.path());
+                        storage::chunk_store::remove_tree(tbl.path());
                     }
                 }
             }
@@ -4883,7 +5368,7 @@ impl Engine {
                     .into_bytes(),
             );
             delete_all(keys)?;
-            let _ = std::fs::remove_dir_all(root.join(format!("db_{db_id}")));
+            storage::chunk_store::remove_tree(root.join(format!("db_{db_id}")));
         }
 
         // `drop|tbl|{db_id}/{name}/{create_ts}/{table_id}`
@@ -4909,7 +5394,7 @@ impl Engine {
                 .into_bytes(),
             );
             delete_all(keys)?;
-            let _ = std::fs::remove_dir_all(root.join(format!("db_{db_id}/tbl_{table_id}")));
+            storage::chunk_store::remove_tree(root.join(format!("db_{db_id}/tbl_{table_id}")));
         }
 
         // `drop|idx|{db_id}/{table_id}/{name}/{create_ts}/{index_id}`
@@ -4926,7 +5411,7 @@ impl Engine {
                 (parts[0], parts[1], parts[2], parts[3], parts[4]);
             self.purge_index_records(&store, db_id, table_id, name, create_ts, index_id)?;
             delete_all(vec![key])?;
-            let _ = std::fs::remove_dir_all(
+            storage::chunk_store::remove_tree(
                 root.join(format!("db_{db_id}/tbl_{table_id}/idx_{index_id}")),
             );
         }
@@ -6547,6 +7032,7 @@ impl Engine {
             .unwrap_or(1);
         let topn = parse_topn_param(params).unwrap_or(10);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let stored_types = self.column_types(table).unwrap_or_default();
         // The index decides which documents can hold one of the group's terms;
         // only those rows are read and tokenised. This syntax has no negation
         // (`parse_field_query` keeps a `-term` as a literal term), so the union
@@ -6576,7 +7062,7 @@ impl Engine {
         // One cursor over the blocks: a candidate the index still lists but the
         // table no longer shows (a tombstoned row) simply has no text.
         for (seq, v) in self.row_texts(table, &candidate_ids)? {
-            let mut row = self.parse_stored_row(table, &defaults, &v)?;
+            let mut row = self.parse_stored_row(table, &defaults, &stored_types, &v)?;
             while row.len() < defaults.len() {
                 let i = row.len();
                 row.push(match defaults.get(i).and_then(|d| d.as_deref()) {

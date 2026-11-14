@@ -94,7 +94,7 @@ impl Engine {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 if entry.path().extension().is_some_and(|e| e == "idx") {
-                    let _ = std::fs::remove_file(entry.path());
+                    let _ = storage::chunk_store::remove_file(entry.path());
                 }
             }
         }
@@ -155,9 +155,10 @@ impl Engine {
         // canonical rendering (e.g. a FLOAT column renders `1.000000` even when
         // the literal was `1`).
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         let mut decoded = Vec::with_capacity(encoded.len());
         for text in encoded {
-            match self.parse_stored_row(table, &defaults, text.as_bytes()) {
+            match self.parse_stored_row(table, &defaults, &types, text.as_bytes()) {
                 Ok(values) => decoded.push(values),
                 Err(_) => return,
             }

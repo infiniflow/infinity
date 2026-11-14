@@ -2146,6 +2146,18 @@ impl Engine {
                     );
                 }
                 if is_secondary_kind(effective_type) && has_rows {
+                    // The build measures the row id its scan stops at and
+                    // registers the tail the write hook feeds. A writer's
+                    // commit runs its hook and its block append inside this
+                    // gate, so a row that reached neither the scan nor the
+                    // hook exists only if it was allocated before the
+                    // measurement, appended after the scan and hooked while
+                    // no index was registered yet - the gate excludes exactly
+                    // that window (`create_index_covers_rows_committed_while
+                    // _it_builds`). The compaction path already builds under
+                    // the gate it holds (`populate_secondary_indexes`).
+                    let gate = self.batch_gate(table);
+                    let _held = gate.lock().await;
                     self.build_index(table, column)?;
                 }
                 // C++ `IndexBuilder`: a full-text or HNSW index is materialised

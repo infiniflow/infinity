@@ -48,18 +48,19 @@
 //! `PositionListEncoder` (see `docs/CPP_FORMAT_SPEC.md` §9.3.5).
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs;
 
+use crate::invertedindex::chunk_manifest::{ChunkManifest, LiveStats};
 use crate::mapped::MappedFile;
-use memmap2::Mmap;
 
 use crate::format::FormatError;
 use crate::invertedindex::format::position_list::decode_position_list;
 use crate::invertedindex::format::{
     build_fst, decode_dic_meta_at, decode_u32_block_all, dic_fst, encode_column_lengths,
     encode_dic, encode_term_meta_region_with_offsets, fst_get, fulltext_chunk_file,
-    DocListFormatOption, FstStream, SkipListReader, TermMeta, TermMetaFlags, TermPostings,
-    FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
+    DocListFormatOption, FstStream, SkipListFormat, SkipListReader, TermMeta, TermMetaFlags,
+    TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX,
+    POSTING_MINI_BLOCK,
 };
 use crate::invertedindex::index_merger::{decode_doc_block, PostingWriter};
 
@@ -292,13 +293,42 @@ pub fn write_segment_index_streaming(
     flags: TermMetaFlags,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
-    write_segment_index_streaming_with(
+    write_segment_index_streaming_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming`] with the chunk's live statistics stated.
+///
+/// `docs` still describes every row the chunk spans (the `.len` slots are
+/// addressed by `row - base_row_id`, so they cannot be compacted), while
+/// `live` is what a predicate still sees: the token count of the documents the
+/// caller kept (`sum(dl)`) and how many of them there are (BM25 `N`). `None`
+/// means the chunk holds every document it lists, which is the seal path's
+/// answer once deleted rows are filtered out of `docs`.
+pub fn write_segment_index_streaming_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    live: Option<LiveStats>,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
         index_dir,
         base_name,
         base_row_id,
         docs,
         flags,
         SEAL_BATCH_TERMS,
+        live,
         for_each_term,
     )
 }
@@ -316,6 +346,31 @@ pub fn write_segment_index_streaming_with(
     docs: &[(u64, u32)],
     flags: TermMetaFlags,
     batch_terms: usize,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        batch_terms,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming_with`] with the live statistics and the
+/// publish marker of the chunk.
+#[allow(clippy::too_many_arguments)] // one argument per piece of the chunk being built, as `write_segment_index`
+pub fn write_segment_index_streaming_with_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    batch_terms: usize,
+    live: Option<LiveStats>,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
     let batch_terms = batch_terms.max(1);
@@ -448,14 +503,34 @@ pub fn write_segment_index_streaming_with(
     let fst = build_fst(&entries);
     let dic = encode_dic(&meta_region, &fst);
 
+    // Every file goes through the chunk store, dedicated (`try_compose = false`
+    // like the reference's full-text writer): a persistence profile publishes it
+    // as an object of its own at the same moment, instead of a checkpoint-time
+    // sweep finding it later.
+    let store = crate::chunk_store::chunk_store();
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        crate::format::write_synced(std::path::Path::new(&path), bytes)
+        store
+            .write_dedicated(std::path::Path::new(&path), bytes)
             .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
+    // The publish marker goes last: it is what makes "all three files are on
+    // the disk at these sizes" a fact the loader can check. Without it a crash
+    // between the writes above leaves a `.dic` that `load_sealed` would find
+    // beside the previous generation's `.pos`/`.len`.
+    let live = live.unwrap_or_else(|| LiveStats::of(docs));
+    ChunkManifest {
+        span_docs: doc_count,
+        live_docs: live.docs.min(doc_count),
+        total_len: live.total_len,
+        dic_len: dic.len() as u64,
+        pos_len: pos.len() as u64,
+        len_len: len_bytes.len() as u64,
+    }
+    .write(index_dir, base_name)?;
     Ok(())
 }
 
@@ -477,32 +552,79 @@ pub struct SegmentIndexReader {
 }
 
 impl SegmentIndexReader {
-    /// Opens `{dir}/{base_name}.{dic,pos,len}`. Fails if any file is missing;
-    /// an empty segment (`len` file of zero bytes) is allowed.
+    /// Opens `{dir}/{base_name}.{dic,pos,len}` and validates the set.
     ///
     /// The mapping is the only `unsafe` operation in this crate: a segment is
     /// immutable once sealed, so the mapped region cannot change underneath the
     /// reader (rebuilds write a new base name instead of overwriting).
-    #[allow(unsafe_code)]
+    ///
+    /// Validation, in the order it costs:
+    ///
+    /// * `.len` must be a whole number of `u32` slots — a truncated write
+    ///   leaves a partial slot, and `doc_count` is derived from that length;
+    /// * `.dic` must carry a parseable FST region — a truncated dictionary
+    ///   would otherwise be read as a shorter one with valid-looking offsets;
+    /// * when the chunk's [`ChunkManifest`] is present, the three files must be
+    ///   the exact bytes it recorded. That is what rejects a file set published
+    ///   in two generations (`.dic` from a retried seal, `.pos`/`.len` left from
+    ///   the previous one), which decodes into wrong rows rather than failing.
+    ///
+    /// A chunk with no manifest (written by the reference, or by this port
+    /// before the marker existed) passes on the structural checks alone, so old
+    /// data stays readable.
     pub fn open(
         dir: &str,
         base_name: &str,
         base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
+        // `chunk_store().open` is the resolution step of the reference's
+        // `pm->GetObjCache` + `MmapFile(pm->GetObjPath(...))`: the local copy is
+        // used when it is there, and the object's part is mapped when the file
+        // set was only ever published to the persistence manager.
+        let store = crate::chunk_store::chunk_store();
         let map = |suffix: &str| -> Result<MappedFile, FormatError> {
             let path = fulltext_chunk_file(dir, base_name, suffix);
-            let file = File::open(&path).map_err(|e| FormatError::Io(e.to_string()))?;
-            // SAFETY: the file is read-only for the lifetime of the mapping and
-            // does not change while it is mapped (a segment is immutable once
-            // sealed).
-            let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
-            Ok(MappedFile::from_mmap(map))
+            store
+                .open(std::path::Path::new(&path))
+                .map_err(|e| FormatError::Io(e.to_string()))
         };
         let len = map(FULLTEXT_LENGTH_SUFFIX)?;
+        if len.len() % 4 != 0 {
+            return Err(FormatError::Invalid(format!(
+                "chunk '{base_name}': the .len file is {} bytes, not a whole number of u32 slots",
+                len.len()
+            )));
+        }
+        let dic = map(FULLTEXT_DICT_SUFFIX)?;
+        // The FST region's own trailer is the only structural check a `.dic`
+        // carries; a truncated write loses it.
+        dic_fst(&dic)?;
+        let pos = map(FULLTEXT_POSTING_SUFFIX)?;
+        if let Some(manifest) = ChunkManifest::read(dir, base_name)? {
+            if !manifest.matches_files(dic.len() as u64, pos.len() as u64, len.len() as u64) {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the files are {} / {} / {} bytes, but its marker \
+                     records {} / {} / {}",
+                    dic.len(),
+                    pos.len(),
+                    len.len(),
+                    manifest.dic_len,
+                    manifest.pos_len,
+                    manifest.len_len
+                )));
+            }
+            if manifest.span_docs as usize != len.len() / 4 {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the marker records {} documents but .len holds {}",
+                    manifest.span_docs,
+                    len.len() / 4
+                )));
+            }
+        }
         Ok(Self {
-            dic: map(FULLTEXT_DICT_SUFFIX)?,
-            pos: map(FULLTEXT_POSTING_SUFFIX)?,
+            dic,
+            pos,
             len,
             base_row_id,
             flags,
@@ -743,12 +865,26 @@ impl SegmentIndexReader {
         // (`VInt pos_skip_len, VInt pos_list_len, pos_skip, pos_list`); take a
         // slice of it instead of decoding the whole list.
         let mut pos_bytes = None;
+        let mut pos_skiplist = None;
         let mut at = body + doc_list_len as usize;
         if let Ok((pos_skip_len, n3)) = crate::invertedindex::format::read_vint(&slice[at..]) {
             at += n3;
             if let Ok((pos_list_len, n4)) = crate::invertedindex::format::read_vint(&slice[at..]) {
-                let start = at + n4 + pos_skip_len as usize;
-                if let Some(list) = slice.get(start..start + pos_list_len as usize) {
+                let skip_start = at + n4;
+                let list_start = skip_start + pos_skip_len as usize;
+                // The position skip list is `[u32 total_pos][u32 offset]` per
+                // flushed record (`PositionListEncoder::flush_position_buffer`
+                // → `SkipListWriter::add_item_2`), the same pair the in-memory
+                // decoder seeks with (`InMemPositionListDecoder::skip_to`). It
+                // is what keeps a hop from replaying the whole prefix.
+                if pos_skip_len > 0 {
+                    if let Some(bytes) = slice.get(skip_start..list_start) {
+                        let mut reader = SkipListReader::new(&SkipListFormat::for_position());
+                        reader.load_byte_slice(bytes, 0, bytes.len());
+                        pos_skiplist = Some(Box::new(reader));
+                    }
+                }
+                if let Some(list) = slice.get(list_start..list_start + pos_list_len as usize) {
                     if !list.is_empty() {
                         pos_bytes = Some(list);
                     }
@@ -780,6 +916,7 @@ impl SegmentIndexReader {
             last_ordinal: 0,
             df: meta.doc_freq as usize,
             pos_bytes,
+            pos_skiplist,
             pos_off: 0,
             pos_buf: Vec::new(),
             pos_at: 0,
@@ -791,6 +928,8 @@ impl SegmentIndexReader {
             pos_skip: 0,
             #[cfg(test)]
             blocks_decoded: 0,
+            #[cfg(test)]
+            pos_records_decoded: 0,
         }))
     }
 
@@ -896,6 +1035,12 @@ pub struct TermDocCursor<'a> {
     /// The position half of the term's `.pos` slice, decoded one record at a
     /// time (`MAX_POS_PER_RECORD` delta-coded positions per `u8`-framed record).
     pos_bytes: Option<&'a [u8]>,
+    /// The term's position skip list, one item per `MAX_POS_PER_RECORD`-position
+    /// record (`PositionSkipListFormat`: `[u32 total_pos][u32 offset]`). A block
+    /// hop uses it to land on the record that holds the target occurrence
+    /// instead of replaying the stream from its start; `None` for a position
+    /// list shorter than one record, which the writer never flushed an item for.
+    pos_skiplist: Option<Box<SkipListReader>>,
     pos_off: usize,
     pos_buf: Vec<u32>,
     pos_at: usize,
@@ -917,13 +1062,18 @@ pub struct TermDocCursor<'a> {
     /// without a skip item (shorter than one block), where the caller has to
     /// compute the bound from the decoded postings.
     block_max: Option<(u32, u16)>,
-    /// Occurrences still to drop from the position stream: after a block hop
-    /// the stream is re-read from its start and the skipped blocks' positions
-    /// are discarded lazily, on the first `positions()` call.
+    /// Occurrences still to drop from the position stream, counted from
+    /// `pos_off`: the prefix of the record a hop landed in, discarded lazily on
+    /// the first `positions()` call. At most one record's worth
+    /// (`MAX_POS_PER_RECORD`); a hop no longer replays the whole prefix.
     pos_skip: usize,
     /// Blocks decoded so far (the seek path's cost; tests assert on it).
     #[cfg(test)]
     blocks_decoded: usize,
+    /// Position records decoded so far (the position seek's cost; a hop into a
+    /// long list must not touch the records before the one it landed in).
+    #[cfg(test)]
+    pos_records_decoded: usize,
 }
 
 impl<'a> TermDocCursor<'a> {
@@ -1121,7 +1271,8 @@ impl<'a> TermDocCursor<'a> {
     }
 
     /// The next delta-coded offset from the position stream, dropping the
-    /// occurrences of the blocks a seek hopped over (`pos_skip`).
+    /// prefix of the record a seek landed in (`pos_skip`, bounded by one
+    /// record's length).
     fn next_delta(&mut self) -> Option<u32> {
         loop {
             while self.pos_at >= self.pos_buf.len() {
@@ -1133,6 +1284,10 @@ impl<'a> TermDocCursor<'a> {
                 self.pos_off = end;
                 self.pos_buf = decode_u32_block_all(payload).ok()?;
                 self.pos_at = 0;
+                #[cfg(test)]
+                {
+                    self.pos_records_decoded += 1;
+                }
                 if self.pos_buf.is_empty() {
                     return None;
                 }
@@ -1221,9 +1376,10 @@ impl<'a> TermDocCursor<'a> {
         self.tfs.clear();
         self.ordinals.clear();
         self.at = 0;
-        // The position stream is sequential: it is re-read from its start and the
-        // skipped blocks' occurrences dropped lazily, on the first `positions()`.
-        self.reset_positions(prev_ttf);
+        // The doc skip list already counted the occurrences the hop skipped; the
+        // position skip list turns that count into a record offset, so only the
+        // landed record's prefix is dropped (one record, not the whole prefix).
+        self.seek_positions(prev_ttf);
         self.fill()
     }
 
@@ -1236,8 +1392,42 @@ impl<'a> TermDocCursor<'a> {
         self.ordinals.clear();
     }
 
+    /// Lands the position stream on occurrence `skip`.
+    ///
+    /// Where [`Self::reset_positions`] rewinds to the start and drops `skip`
+    /// deltas one by one — a cost proportional to how far into the list the hop
+    /// landed, i.e. quadratic over a full scan — the position skip list maps the
+    /// occurrence count to the record that holds it (`[u32 total_pos][u32
+    /// offset]`, the pair `InMemPositionListDecoder::skip_to` seeks with). The
+    /// reference's `PositionIterator::SkipTo` does the same; a term whose
+    /// position list never flushed a record has no skip list and keeps the
+    /// rewind.
+    fn seek_positions(&mut self, skip: u32) {
+        // An item is keyed by the **last** occurrence of its record, so `+ 1`
+        // sends a `skip` that lands exactly on a record's end to the next
+        // record, whose `prev_doc_id` is that end: nothing is left to drop.
+        let hit = self
+            .pos_skiplist
+            .as_mut()
+            .and_then(|list| list.skip_to(skip.saturating_add(1)));
+        let Some(hit) = hit else {
+            self.reset_positions(skip);
+            return;
+        };
+        // `offset` is the accumulated offset **before** this item, i.e. where
+        // the record it names starts; `prev_doc_id` counts the occurrences of
+        // the records before it.
+        self.pos_off = hit.offset as usize;
+        self.pos_buf.clear();
+        self.pos_at = 0;
+        self.pos_skip = skip.saturating_sub(hit.prev_doc_id) as usize;
+        self.consumed = 0;
+        self.cur_positions.clear();
+    }
+
     /// Rewinds the position stream and marks the first `skip` occurrences as
-    /// already consumed (the blocks a seek hopped over).
+    /// already consumed (the blocks a seek hopped over). The fallback for a term
+    /// without a position skip list; see [`Self::seek_positions`].
     fn reset_positions(&mut self, skip: u32) {
         self.pos_off = 0;
         self.pos_buf.clear();
@@ -1245,6 +1435,12 @@ impl<'a> TermDocCursor<'a> {
         self.pos_skip = skip as usize;
         self.consumed = 0;
         self.cur_positions.clear();
+    }
+
+    /// Position records decoded so far (the position seek's cost).
+    #[cfg(test)]
+    pub fn pos_records_decoded(&self) -> usize {
+        self.pos_records_decoded
     }
 }
 
@@ -1436,6 +1632,43 @@ mod tests {
         }
     }
 
+    /// A hop into a long posting list must land the position stream on the
+    /// record that holds the target occurrence (the position skip list), not
+    /// replay every record before it.
+    ///
+    /// That replay is why `OPTIMIZE` used to make a phrase query slower: merging
+    /// k chunks into one multiplied the prefix a hop walks by k, so a 300k-row
+    /// phrase went from 10 s (five chunks) to 40 s (one chunk) with identical
+    /// scores. Here one hop to the last document of a 2000-document list (46
+    /// position records) must decode a handful of records, not the list.
+    #[test]
+    fn a_hop_lands_on_the_position_record_it_needs() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_str = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..2000u64).map(|row| (row, 9)).collect();
+        let postings = BTreeMap::from([(
+            "t".to_string(),
+            (0..2000u64)
+                .map(|row| (row, 3, vec![0u32, 4, 8]))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(dir_str, "hop", 0, &docs, &postings, flags).unwrap();
+        let reader = SegmentIndexReader::open(dir_str, "hop", 0, flags).unwrap();
+        let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
+        cursor.advance(1999);
+        assert_eq!(cursor.doc(), Some(1999));
+        assert_eq!(cursor.positions(), [0, 4, 8]);
+        // Within-block prefix (docs 1920..1999 x 3 occurrences, 128 per record)
+        // plus the document's own: a few records, nowhere near the 46 the
+        // rewind would walk.
+        assert!(
+            cursor.pos_records_decoded() <= 8,
+            "{} position records decoded for one hop",
+            cursor.pos_records_decoded()
+        );
+    }
+
     #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
         // 300 documents whose row ids start at 1<<32: a later insert batch, far
@@ -1508,10 +1741,15 @@ mod tests {
         assert_eq!(meta.total_tf, 300);
     }
 
-    /// A segment is exactly the reference's three files: `.dic`, `.pos`, `.len`.
+    /// A segment is exactly the reference's three files (`.dic`, `.pos`, `.len`)
+    /// plus the publish marker.
+    ///
     /// The port used to add a `.row` sidecar (a `u64[]` row-id table); the row
-    /// of a document is now `base_row_id + docid_t`, so nothing else may be
-    /// written - an extra file in the chunk directory is a format deviation.
+    /// of a document is `base_row_id + docid_t`, so no fourth *data* file may be
+    /// written. `.ok` is not data: it names the three files' lengths and the
+    /// chunk's live statistics, is written last, and is what tells a complete
+    /// chunk from one whose publish was interrupted between the three writes.
+    /// An engine that does not know it ignores it.
     #[test]
     fn a_segment_is_exactly_the_reference_file_family() {
         let dir = tempfile::tempdir().unwrap();
@@ -1539,9 +1777,35 @@ mod tests {
             vec![
                 "ft_0000000000000000.dic".to_string(),
                 "ft_0000000000000000.len".to_string(),
+                "ft_0000000000000000.ok".to_string(),
                 "ft_0000000000000000.pos".to_string(),
             ]
         );
+        // The marker describes the files that were just written, and every
+        // document of a fresh chunk is live.
+        let manifest = crate::invertedindex::chunk_manifest::ChunkManifest::read(
+            index_dir,
+            "ft_0000000000000000",
+        )
+        .expect("the chunk is published with a marker")
+        .expect("the marker is well formed");
+        let size = |suffix: &str| -> u64 {
+            std::fs::metadata(crate::invertedindex::format::fulltext_chunk_file(
+                index_dir,
+                "ft_0000000000000000",
+                suffix,
+            ))
+            .unwrap()
+            .len()
+        };
+        assert!(manifest.matches_files(
+            size(FULLTEXT_DICT_SUFFIX),
+            size(FULLTEXT_POSTING_SUFFIX),
+            size(FULLTEXT_LENGTH_SUFFIX)
+        ));
+        assert_eq!(manifest.span_docs, 2);
+        assert_eq!(manifest.live_docs, 2);
+        assert_eq!(manifest.total_len, 16);
     }
 
     /// A row with no text (the reference's `InsertGap`) keeps its `docid_t`: the

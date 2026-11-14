@@ -2232,13 +2232,37 @@ pub fn write_drops(
 /// The segments of `table` that a compaction deprecated (and `Cleanup` has not
 /// reclaimed yet).
 pub fn dropped_segments(store: &dyn MetaStore, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
+    Ok(dropped_segments_with_ts(store, db_id, table_id)?
+        .into_iter()
+        .map(|(segment, _)| segment)
+        .collect())
+}
+
+/// [`dropped_segments`] with the commit ts each deprecation was recorded at.
+///
+/// The value of a `drop|seg|…` record is that ts (`write_drops`). A reader older
+/// than the record must not apply it: a compaction hides its source segments
+/// before it publishes the merged ones, so a query that started before the merge
+/// would otherwise see neither the old rows nor the new.
+pub fn dropped_segments_with_ts(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+) -> Result<Vec<(u32, u64)>> {
     let prefix = format!("drop|seg|{db_id}/{table_id}/");
     let mut out = Vec::new();
-    for (k, _) in store.scan_prefix(prefix.as_bytes())? {
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
         let key = String::from_utf8_lossy(&k).to_string();
-        if let Some(id) = key.rsplit('/').next().and_then(|s| s.parse::<u32>().ok()) {
-            out.push(id);
-        }
+        let Some(id) = key.rsplit('/').next().and_then(|s| s.parse::<u32>().ok()) else {
+            continue;
+        };
+        // An unreadable value keeps the old meaning ("deprecated, no ts"), which
+        // is the safe side: the segment stays hidden from every reader.
+        let ts = String::from_utf8_lossy(&v)
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(0);
+        out.push((id, ts));
     }
     out.sort_unstable();
     Ok(out)

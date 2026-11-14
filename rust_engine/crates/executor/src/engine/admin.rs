@@ -75,15 +75,19 @@ impl Engine {
     /// that owns the gate can only finish on that same worker - the optimizer
     /// then waits for itself (observed as a background optimize that never
     /// returns, with every client of the table stuck behind it).
-    pub(crate) async fn optimize_fulltext_async(&self, table: &str) -> Result<usize> {
+    /// Public for embedders and the scale probe. **Await it inside the
+    /// runtime**: it takes the table's batch gate, which an insert may hold
+    /// across its own awaits, so bridging it from a runtime worker with
+    /// `block_on` deadlocks (see the note above).
+    pub async fn optimize_fulltext_async(&self, table: &str) -> Result<usize> {
         self.ensure_writable()?;
         let gate = self.batch_gate(table);
         let _batch = gate.lock().await;
-        self.optimize_fulltext_locked(table)
+        self.optimize_fulltext_locked(table).await
     }
 
     /// The body [`Self::optimize_fulltext_async`] runs: the gate is held.
-    fn optimize_fulltext_locked(&self, table: &str) -> Result<usize> {
+    async fn optimize_fulltext_locked(&self, table: &str) -> Result<usize> {
         let key = self.table_key(table);
         // Clone the handles while the `tables` guard is held, then drop it before
         // taking any index write lock. `text_index_for` takes `tables` first and
@@ -96,11 +100,25 @@ impl Engine {
             };
             entry.text.values().cloned().collect()
         };
+        if indexes.is_empty() {
+            return Ok(0);
+        }
+        // A merge is the only point at which the postings of a deleted row can
+        // be reclaimed (a chunk is immutable once published), so it takes the
+        // table's deleted rows with it.
+        let deleted = self.tombstone_set(table)?;
         let mut merges = 0;
         for index in indexes {
-            // The merge rewrites whole chunks: keep its I/O out of the column's
-            // write lock so queries and inserts are not held behind it.
-            merges += crate::engine::state::optimize_text_index_unlocked(&index)?;
+            // The merge rewrites whole chunks and fsyncs every file it writes:
+            // it is a blocking leaf, so it runs on the blocking pool. Running it
+            // here would hold a runtime worker for the duration of the rewrite,
+            // stalling every other task scheduled on it.
+            merges += crate::scheduler::scheduler()
+                .spawn_blocking({
+                    let deleted = deleted.clone();
+                    move || crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
+                })
+                .await?;
         }
         Ok(merges)
     }
@@ -258,7 +276,30 @@ impl Engine {
                     entry.secondary.indexes.clear();
                     entry.secondary.declared_types.clear();
                     entry.secondary.disk.clear();
-                    entry.text.clear();
+                    // The full-text caches stay. Dropping them handed the next
+                    // `MATCH` a full rebuild of the column, and a table that keeps
+                    // taking writes is compacted every couple of minutes: on tens
+                    // of thousands of rows that build outlives the next compaction,
+                    // so its publish was refused and the build retried - one query
+                    // blocked for the whole 20 minute gate
+                    // (`TestParallelFulltextIndexReadWrite`, on the query after
+                    // its writers stopped). `reindex_compacted_text` below adds
+                    // the rows this merge moved under their new ids and marks the
+                    // ids they left as overridden, which the sealed read paths
+                    // skip before the top-n cut.
+                    entry.text_epoch = entry.text_epoch.wrapping_add(1);
+                    // A build that is running right now read the ids this
+                    // compaction renumbers: publishing it later would leave the
+                    // table's `MATCH` postings pointing at segments the merge just
+                    // dropped, so the bump makes its publish a no-op. The caches
+                    // kept above are re-stamped on the new epoch: their postings
+                    // still name rows a reader below `compact_ts` can fetch, and
+                    // `reindex_compacted_text` moves them before this commit is
+                    // published.
+                    let epoch = entry.text_epoch;
+                    for built in entry.text_built.values_mut() {
+                        built.0 = epoch;
+                    }
                     entry.sparse.clear();
                     entry.mv.clear();
                     entry.hnsw_mem.clear();
@@ -363,6 +404,10 @@ impl Engine {
                 // whose bitmap coverage came from a journal without these rows.
                 let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
                 self.publish_encoded_rows(table, &merged)?;
+                // The moved rows are published under their new ids now: add them
+                // to the full-text caches the merge kept (see the note where the
+                // caches are no longer dropped).
+                self.reindex_compacted_text(table, &rows, base, compact_ts);
                 // `PrepareCommitCompact`: the merged segment's blocks and
                 // records belong to the compaction transaction; writing them here
                 // (before the frame) is what makes a kill harmless - the
@@ -393,6 +438,29 @@ impl Engine {
         self.populate_secondary_indexes(table);
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
+        // The commit is published only when `_visible` drops (end of scope), and
+        // until then a query reads at a ts below `compact_ts` - it still sees the
+        // source segments (`visible_block_ids`) and can publish an index of the
+        // row ids this merge retires. Retire those: from `compact_ts` on, only an
+        // index built against the merged layout may be served. The rebuild above
+        // runs at `u64::MAX`, so it survives; a build a query started during the
+        // merge is refused by `publish_text_index`.
+        {
+            let tkey = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(tkey).or_default();
+            entry.text_min_ts = entry.text_min_ts.max(compact_ts);
+            let stale: Vec<String> = entry
+                .text_built
+                .iter()
+                .filter(|(_, (_, built_ts))| *built_ts < entry.text_min_ts)
+                .map(|(column, _)| column.clone())
+                .collect();
+            for column in stale {
+                entry.text.remove(&column);
+                entry.text_built.remove(&column);
+            }
+        }
         Ok(())
     }
 

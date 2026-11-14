@@ -114,6 +114,8 @@ mod subquery_cte_ut;
 #[cfg(test)]
 mod table_ut;
 #[cfg(test)]
+mod text_cell_ut;
+#[cfg(test)]
 mod txn_ut;
 #[cfg(test)]
 mod update_import_ut;

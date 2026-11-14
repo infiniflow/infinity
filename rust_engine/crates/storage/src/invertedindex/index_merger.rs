@@ -497,6 +497,7 @@ impl<'a> PostingMerger<'a> {
         &mut self,
         postings: &mut [MergingPosting],
         merge_base_rowid: u64,
+        deleted: Option<&std::collections::HashSet<u64>>,
     ) -> Result<(), FormatError> {
         for posting in postings.iter_mut() {
             let base_doc_id =
@@ -512,6 +513,16 @@ impl<'a> PostingMerger<'a> {
                     doc_id = doc_id.wrapping_add(*delta);
                     let merged_doc = base_doc_id.wrapping_add(doc_id);
                     let positions = posting.decoder.decode_doc_positions(*tf)?;
+                    // A deleted row's postings are dropped here: this is the
+                    // only chance to reclaim them, because a chunk is immutable
+                    // once published and the `.len` slot cannot move (a
+                    // posting's id is `row - base_row_id`). The position stream
+                    // above is still consumed, so the decoder stays in sync.
+                    if deleted.is_some_and(|deleted| {
+                        deleted.contains(&(merge_base_rowid + u64::from(merged_doc)))
+                    }) {
+                        continue;
+                    }
                     if positions.is_empty() {
                         // Written without a position list: the frequency cannot
                         // be recounted, so it is taken from the doc list.
@@ -588,8 +599,25 @@ impl ColumnIndexMerger {
     /// `base_row_id - merge_base_rowid` as a `u32` (`column_index_merger_impl.
     /// cpp:91-92`).
     pub fn merge(&self, sources: &[ColumnSource], dst_base_name: &str) -> Result<(), FormatError> {
+        self.merge_with(sources, dst_base_name, None).map(|_| ())
+    }
+
+    /// [`Self::merge`] dropping the postings of the rows `deleted` names, and
+    /// writing the chunk's publish marker with what survives.
+    ///
+    /// The `.len` slots of the deleted rows stay in place: a posting's `docid_t`
+    /// is `row - base_row_id`, so compacting the array would shift every later
+    /// row onto another row's length. What the merge reclaims is the dictionary
+    /// and posting bytes, and what the marker records is the *live* count and
+    /// token total, so BM25 scores the chunk the way the predicate sees it.
+    pub fn merge_with(
+        &self,
+        sources: &[ColumnSource],
+        dst_base_name: &str,
+        deleted: Option<&std::collections::HashSet<u64>>,
+    ) -> Result<MergedChunk, FormatError> {
         if sources.is_empty() {
-            return Ok(());
+            return Ok(MergedChunk::default());
         }
         // A merged list is re-blocked from `tf` documents per mini-block, so the
         // frequencies are what delimit the position stream
@@ -608,6 +636,10 @@ impl ColumnIndexMerger {
             ));
         }
         fs::create_dir_all(&self.index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
+        // Sources and destination both go through the chunk store, so a
+        // persistence profile reads the parts it published and publishes the
+        // merged chunk as it writes it.
+        let store = crate::chunk_store::chunk_store();
         let merge_base_rowid = sources
             .iter()
             .map(|source| source.base_row_id)
@@ -633,7 +665,9 @@ impl ColumnIndexMerger {
             })? as usize;
             let path =
                 fulltext_chunk_file(&self.index_dir, &source.base_name, FULLTEXT_LENGTH_SUFFIX);
-            let bytes = fs::read(&path).map_err(|e| FormatError::Io(e.to_string()))?;
+            let bytes = store
+                .read(std::path::Path::new(&path))
+                .map_err(|e| FormatError::Io(e.to_string()))?;
             let lengths = decode_column_lengths(&bytes)?;
             if column_lengths.len() < offset + lengths.len() {
                 column_lengths.resize(offset + lengths.len(), 0);
@@ -652,7 +686,7 @@ impl ColumnIndexMerger {
         let mut terms: Vec<Vec<u8>> = Vec::new();
         while let Some((term, mut group)) = queue.next_group()? {
             let mut merger = PostingMerger::new(self.flags, &column_lengths);
-            merger.merge(&mut group, merge_base_rowid)?;
+            merger.merge(&mut group, merge_base_rowid, deleted)?;
             metas.push(merger.dump(&mut posting));
             terms.push(term.into_bytes());
         }
@@ -663,31 +697,56 @@ impl ColumnIndexMerger {
         let dic = encode_dic(&meta_region, &fst);
         let len_bytes = encode_column_lengths(&column_lengths);
 
-        // The three files are staged as `<final>.tmp` and renamed into place, so
-        // a failure between the writes cannot leave a chunk that `load_sealed`
-        // would pick up half-written (it matches `*.dic`, and `*.dic.tmp` does
-        // not). The reference has the same hazard with its three `FileWriter`s;
-        // the rename costs nothing and the bytes are unchanged.
-        let mut staged: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
+        // What a predicate still sees once the deleted rows are dropped: the
+        // `.len` array keeps every slot (a posting's id is an offset into it),
+        // so the live count and the live token total are not derivable from the
+        // merged files - they are recorded in the marker.
+        let span_docs = u32::try_from(column_lengths.len()).map_err(|_| {
+            FormatError::Invalid(format!(
+                "the merged chunk '{dst_base_name}' spans more than u32::MAX rows"
+            ))
+        })?;
+        let live = crate::invertedindex::chunk_manifest::LiveStats::over_slots(
+            &column_lengths,
+            deleted,
+            merge_base_rowid,
+        );
+
+        // Each file is published by the chunk store, which is atomic on its own
+        // (a sibling temp file renamed over the target), so a failure between
+        // the three writes cannot leave a chunk that `load_sealed` would pick up
+        // half-written - `.dic` only appears once its bytes are complete, and
+        // the `.ok` marker below is what names the set.
         for (suffix, bytes) in [
             (FULLTEXT_DICT_SUFFIX, &dic),
             (FULLTEXT_POSTING_SUFFIX, &posting),
             (FULLTEXT_LENGTH_SUFFIX, &len_bytes),
         ] {
-            let final_path = fulltext_chunk_file(&self.index_dir, dst_base_name, suffix);
-            let staging = format!("{final_path}.tmp");
-            crate::format::write_synced(std::path::Path::new(&staging), bytes)
+            let path = fulltext_chunk_file(&self.index_dir, dst_base_name, suffix);
+            store
+                .write_dedicated(std::path::Path::new(&path), bytes)
                 .map_err(|e| FormatError::Io(e.to_string()))?;
-            staged.push((
-                std::path::PathBuf::from(staging),
-                std::path::PathBuf::from(final_path),
-            ));
         }
-        for (staging, final_path) in staged {
-            fs::rename(&staging, &final_path).map_err(|e| FormatError::Io(e.to_string()))?;
+        // Published last, after every file it describes is in place.
+        crate::invertedindex::chunk_manifest::ChunkManifest {
+            span_docs,
+            live_docs: live.docs,
+            total_len: live.total_len,
+            dic_len: dic.len() as u64,
+            pos_len: posting.len() as u64,
+            len_len: len_bytes.len() as u64,
         }
-        Ok(())
+        .write(&self.index_dir, dst_base_name)?;
+        Ok(MergedChunk { span_docs, live })
     }
+}
+
+/// What a merged chunk covers, for the caller that has to publish it: the row
+/// span the `.len` slots describe, and the statistics of the rows that survived.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MergedChunk {
+    pub span_docs: u32,
+    pub live: crate::invertedindex::chunk_manifest::LiveStats,
 }
 
 #[cfg(test)]

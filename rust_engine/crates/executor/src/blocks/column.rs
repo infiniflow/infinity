@@ -748,6 +748,33 @@ pub(crate) fn parse_owned_value(cell: String) -> Value {
     }
 }
 
+/// Whether a column stores its value as text (`VARCHAR(255)`), so a stored cell
+/// has to be read back verbatim instead of being re-typed.
+pub(crate) fn keeps_cell_text(type_text: &str) -> bool {
+    let head = type_text
+        .trim()
+        .split(|c: char| !c.is_ascii_alphabetic())
+        .next()
+        .unwrap_or("");
+    head.eq_ignore_ascii_case("varchar")
+}
+
+/// [`parse_owned_value`] for a cell that was decoded out of a `VARCHAR` column.
+///
+/// A `VARCHAR` cell has to come back exactly as it was stored, but the inference
+/// above re-reads the stored text as a number, and `str::parse::<f64>` accepts
+/// `inf`, `infinity` and `nan` in *any* case (`from_str` matches them with
+/// `eq_ignore_ascii_case`). A stored `iNF` therefore came back as `inf` - two
+/// bytes of the value flipped - and `007` came back as `7`, `1.50` as `1.5`.
+pub(crate) fn decoded_text_value(text: Option<String>, column_type: i32) -> Value {
+    use catalog::value_format::logical;
+    match text {
+        None => Value::Null,
+        Some(text) if column_type as i64 == logical::VARCHAR => Value::Str(text),
+        Some(text) => parse_owned_value(text),
+    }
+}
+
 /// The types the reference stores in a variable-length buffer
 /// (`ColumnVector::GetVectorBufferType` -> `kVarBuffer`): the data of such a
 /// column is preceded by an outline file, `col_{id}_out`.

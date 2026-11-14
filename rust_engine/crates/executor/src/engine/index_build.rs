@@ -1567,7 +1567,7 @@ impl Engine {
             if let Ok(entries) = std::fs::read_dir(&dir) {
                 for entry in entries.flatten() {
                     if entry.path().extension().is_some_and(|e| e == "idx") {
-                        let _ = std::fs::remove_file(entry.path());
+                        let _ = storage::chunk_store::remove_file(entry.path());
                     }
                 }
             }
@@ -1798,7 +1798,7 @@ impl Engine {
                 continue;
             }
             for old in &paths {
-                let _ = std::fs::remove_file(old);
+                let _ = storage::chunk_store::remove_file(old);
             }
             merged = true;
         }
@@ -1924,7 +1924,7 @@ impl Engine {
                 // Never an input by construction, but skipping the output keeps
                 // the merged chunk reloadable even if that ever changes.
                 if old != &path {
-                    let _ = std::fs::remove_file(old);
+                    let _ = storage::chunk_store::remove_file(old);
                 }
             }
             merged = true;

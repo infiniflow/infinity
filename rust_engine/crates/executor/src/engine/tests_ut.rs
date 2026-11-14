@@ -547,6 +547,408 @@ mod tests {
         assert_eq!(rows(&reopened, query), before);
     }
 
+    /// A compaction renumbers every row, so the full-text index has to be
+    /// rebuilt with the new ids. The query after the merge must still answer,
+    /// both from the in-memory rebuild and from the chunks a reopen maps.
+    #[test]
+    fn a_compaction_keeps_the_fulltext_index_answering() {
+        let q = "SELECT doctitle FROM ct SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE ct (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX ct_body ON ct (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..20 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            crate::scheduler::block_on(e.flush()).unwrap();
+            for i in 20..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+            e.compact_all_segments("default_db.ct").unwrap();
+            assert_eq!(rows(&e, q).len(), 40, "after the compaction");
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q).len(), 40, "after a reopen");
+    }
+
+    /// A full-text build reads the rows one batch at a time, so a compaction can
+    /// renumber every row while it runs. Such a build must not publish: its
+    /// postings name the segments the merge dropped, every hit is then a row
+    /// `fetch_some_rows_with_ids` cannot find, and `MATCH` answers nothing on a
+    /// table full of matches - which is what
+    /// `TestParallelFulltextIndexReadWrite` reported as `column "doctitle" is
+    /// empty` on the query that runs after its writers stopped.
+    #[test]
+    fn a_fulltext_build_does_not_publish_across_a_compaction() {
+        let q = "SELECT doctitle FROM cr SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cr (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cr_body ON cr (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        for i in 20..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+
+        // The index (and the epoch) a build that started before the merge still
+        // holds when it finishes.
+        let tkey = e.table_key("cr");
+        let (stale, epoch) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            let stale = entry.text.get("body").expect("the index is cached").clone();
+            (stale, entry.text_epoch)
+        };
+        e.compact_all_segments("default_db.cr").unwrap();
+        assert_eq!(
+            e.publish_text_index(&tkey, "body", epoch, stale),
+            crate::engine::statements::TextPublish::Renumbered,
+            "a build from the pre-compaction layout must not publish"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            40,
+            "and the query after the merge still answers"
+        );
+    }
+
+    /// A merge that lands **inside** a build renumbers every row the build just
+    /// read, so its postings name ids nothing owns. The tokenizer/scan window is
+    /// too narrow to hit by chance here, so the test drives it deterministically
+    /// (`TEXT_BUILD_HOOK`, which fires between the scan and the publish).
+    #[test]
+    fn a_compaction_inside_a_build_still_answers_the_query() {
+        let q = "SELECT doctitle FROM raced SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced_body ON raced (body) USING FULLTEXT")
+            .unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        // Make the cache one row short of the table: that is the cold path a bulk
+        // load which bypassed the DML hooks takes, and it is what puts a rebuild
+        // on the query path while a cache is still in place.
+        {
+            let tkey = e.table_key("raced");
+            let shared = {
+                let tables = e.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.text.get("body"))
+                    .cloned()
+                    .expect("the index is cached")
+            };
+            let mut index = shared.write().unwrap();
+            crate::engine::state::index_delete_row(&mut index, 0);
+            assert!(
+                index.total_docs() < 30,
+                "the cache has to look short of the table"
+            );
+        }
+        let compacting = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            compacting
+                .compact_all_segments("raced")
+                .expect("the merge inside the build");
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the merge inside the build lost the rows: {hits:?}"
+        );
+    }
+
+    /// The worst schedule: every attempt is both renumbered *and* left without a
+    /// cache to read. Answering from such a build returns rows no fetch can
+    /// resolve (an empty `MATCH` on a table full of matches), so the statement
+    /// has to fail instead.
+    #[test]
+    fn a_build_that_can_never_publish_fails_instead_of_answering() {
+        let q = "SELECT doctitle FROM raced2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced2 VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced2_body ON raced2 (body) USING FULLTEXT")
+            .unwrap();
+        {
+            let tkey = e.table_key("raced2");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&tkey).expect("the table is cached");
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let racing = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            racing
+                .compact_all_segments("raced2")
+                .expect("the merge inside the build");
+            // A compaction keeps its caches (`reindex_compacted_text`); this is
+            // the extreme where nothing usable is left for the retry either.
+            let tkey = racing.table_key("raced2");
+            let mut tables = racing.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.text.clear();
+                entry.text_built.clear();
+            }
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        // A build a merge invalidated still describes the rows *this* statement
+        // read (one read, one snapshot), so it answers this query and is simply
+        // not cached. Retrying it instead is what kept one `MATCH` running for
+        // the whole gate timeout: with a cache that never catches up (imports
+        // bypass the DML hooks) every attempt rebuilt the column and every
+        // rebuild was invalidated again.
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the invalidated build did not answer its own snapshot: {hits:?}"
+        );
+    }
+
+    /// The caches a compaction drops are read by every query and written by
+    /// every rebuild, so the two race in production. Churn them from several
+    /// threads: a query may answer from a build that a merge invalidated, but a
+    /// build may not land in the cache, so no hit may go missing.
+    #[test]
+    fn concurrent_compactions_never_lose_fulltext_hits() {
+        let q = "SELECT id FROM ch SEARCH MATCH TEXT (body, 'harmful chemical', 500);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 120);
+
+        let readers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                std::thread::spawn(move || {
+                    let mut worst = usize::MAX;
+                    for _ in 0..20 {
+                        worst = worst.min(rows(&engine, q).len());
+                    }
+                    worst
+                })
+            })
+            .collect();
+        for _ in 0..4 {
+            engine.compact_all_segments("default_db.ch").unwrap();
+        }
+        for reader in readers {
+            assert_eq!(
+                reader.join().expect("a concurrent query panicked"),
+                120,
+                "a query lost hits across a compaction"
+            );
+        }
+        assert_eq!(rows(&engine, q).len(), 120);
+    }
+
+    /// `MATCH` asks for a handful of rows (`topn=3`, as the parallel gate does).
+    /// A compaction retires every row id it renumbers; a retired id that is
+    /// still in the postings takes a `topn` slot the fetch cannot resolve, so
+    /// three such hits answer "the column is empty" on a table full of matches.
+    #[test]
+    fn a_compaction_never_answers_a_small_top_n_with_retired_rows() {
+        let q = "SELECT doctitle FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE churn (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX churn_body ON churn (body) USING FULLTEXT")
+            .unwrap();
+        let mut next = 0usize;
+        for _ in 0..120 {
+            e.execute_blocking(&format!(
+                "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+            ))
+            .unwrap();
+            next += 1;
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3, "before the churn");
+
+        for round in 0..6 {
+            // Writes land in the unsealed tail, then the merge renumbers every
+            // sealed row under it.
+            for _ in 0..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+                ))
+                .unwrap();
+                next += 1;
+            }
+            e.compact_all_segments("default_db.churn").unwrap();
+            assert_eq!(
+                rows(&e, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+            // The segments the merge took are dropped (the overrides themselves
+            // stay: the same ids are still in the unsealed postings). Keeping the
+            // segments would count their documents in BM25's `N` again, so the
+            // chunk span must stay at the live population.
+            let stats = e.fulltext_stats("churn");
+            assert!(
+                stats[0].chunk_rows <= next,
+                "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
+                stats[0].chunk_rows
+            );
+            assert!(
+                stats[0].overridden_rows > 0,
+                "round {round}: the retired ids are not filtered any more"
+            );
+        }
+        // The whole corpus still answers when the cut is wide enough.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 1000);"
+            )
+            .len(),
+            next
+        );
+    }
+
+    /// The parallel gate's shape: writers keep appending while the optimizer
+    /// compacts, and the reader asks for three rows only. Every query must
+    /// return three fetchable rows - a retired id in the postings eats a slot.
+    #[test]
+    fn concurrent_churn_never_empties_a_small_top_n() {
+        let q = "SELECT doctitle FROM churn2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE churn2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX churn2_body ON churn2 (body) USING FULLTEXT")
+            .unwrap();
+        let next = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut seed = 0usize;
+        for _ in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO churn2 VALUES ({seed}, 'title{seed}', 'harmful chemical row{seed}');"
+                ))
+                .unwrap();
+            seed += 1;
+        }
+        next.store(seed, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3);
+
+        let writers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                let next = std::sync::Arc::clone(&next);
+                std::thread::spawn(move || {
+                    for _ in 0..20 {
+                        let base = next.fetch_add(4, std::sync::atomic::Ordering::Relaxed);
+                        let values: Vec<String> = (0..4)
+                            .map(|i| {
+                                let id = base + i;
+                                format!("({id}, 'title{id}', 'harmful chemical row{id}')")
+                            })
+                            .collect();
+                        engine
+                            .execute_blocking(&format!(
+                                "INSERT INTO churn2 VALUES {};",
+                                values.join(",")
+                            ))
+                            .unwrap();
+                    }
+                })
+            })
+            .collect();
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                for _ in 0..8 {
+                    engine.compact_all_segments("default_db.churn2").unwrap();
+                    crate::scheduler::block_on(engine.flush()).unwrap();
+                }
+            })
+        };
+        for round in 0..40 {
+            assert_eq!(
+                rows(&engine, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+        }
+        for writer in writers {
+            writer.join().expect("a writer panicked");
+        }
+        compactor.join().expect("the compactor panicked");
+        assert_eq!(rows(&engine, q).len(), 3, "after the churn");
+    }
+
     /// A query that spans several sealed segments plus the memory tail must
     /// return exactly what one unsealed segment returns: same rows, same order.
     /// That is the concat path's contract (the segments' row ranges are
@@ -1468,6 +1870,340 @@ mod tests {
         .unwrap();
     }
 
+    /// A row deleted before its tail is sealed is not a document of the chunk
+    /// the seal writes: its postings never reach `.dic`/`.pos`, and BM25's `N`
+    /// does not count it. Otherwise the delete is invisible to the index until a
+    /// compaction, and the chunk is scored against a document no query can
+    /// return.
+    #[test]
+    fn a_seal_leaves_out_the_rows_deleted_before_it() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index_row(&mut index, 0, "alpha beta");
+        index_row(&mut index, 1, "alpha");
+        index_row(&mut index, 2, "gamma");
+        index.mem.delete(1);
+        assert!(index.seal(), "the tail writes");
+        assert_eq!(index.total_docs(), 2, "the deleted row is not a document");
+        assert_eq!(index.corpus_len(), 3, "`alpha beta` + `gamma`");
+        assert_eq!(index.term_df("alpha"), 1, "row 0 only");
+        assert_eq!(index.term_df("beta"), 1, "row 0 only");
+        // The marker records the same numbers, so a reopen scores it the same.
+        let sealed: Vec<String> = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().into_string().unwrap())
+            .filter(|name| name.ends_with(".ok"))
+            .collect();
+        assert_eq!(sealed.len(), 1);
+        let base = sealed[0].trim_end_matches(".ok");
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
+            .expect("the seal publishes a marker")
+            .expect("the marker is well formed");
+        assert_eq!(manifest.live_docs, 2);
+        assert_eq!(manifest.total_len, 3);
+        let mut reopened = TextIndex::new(d.to_string(), TextTokenizer::default());
+        reopened.load_sealed();
+        assert_eq!(reopened.total_docs(), 2);
+        assert_eq!(reopened.corpus_len(), 3);
+    }
+
+    /// A merge is where the postings of a deleted row are reclaimed: the chunk
+    /// is immutable once published, so nothing else can drop them. The `.len`
+    /// slot stays (a posting's id is `row - base_row_id`), and the marker records
+    /// the live count so the chunk is scored without the dead row.
+    #[test]
+    fn a_merge_reclaims_the_postings_of_a_deleted_row() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "alpha");
+        write_chunk(d, 2, 2, "alpha");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.total_docs(), 4);
+        assert_eq!(index.term_df("alpha"), 4);
+
+        let deleted: std::collections::HashSet<u64> = [1u64].into_iter().collect();
+        assert_eq!(
+            index.optimize_chunks_with(&deleted).unwrap(),
+            1,
+            "the two chunks merge"
+        );
+        assert_eq!(index.reader.segments.len(), 1);
+        assert_eq!(index.reader.segments[0].docs, 4, "the span is unchanged");
+        assert_eq!(
+            index.reader.segments[0].live_docs, 3,
+            "the deleted row is not a document"
+        );
+        assert_eq!(index.total_docs(), 3, "BM25's N");
+        assert_eq!(index.term_df("alpha"), 3, "its posting is gone");
+        assert_eq!(
+            index.reader.segments[0].reader.base_name(),
+            storage::fulltext_base_name(0, Some(4))
+        );
+        // The marker carries the live statistics, so a reopen agrees.
+        let reopened = {
+            let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+            index.load_sealed();
+            index
+        };
+        assert_eq!(reopened.total_docs(), 3);
+        assert_eq!(reopened.term_df("alpha"), 3);
+        // The row is not lost as a *slot*: its length is still addressable.
+        assert_eq!(reopened.doc_len_opt(1), Some(1));
+    }
+
+    /// A chunk whose files do not validate is the remains of a publish that
+    /// never finished. Its rows are committed rows whose postings are gone, so
+    /// the only correct answer is a rebuild - and a rebuild starts at row 0,
+    /// which is why the whole set is retired instead of skipping the broken
+    /// chunk. The files are removed, so the next open does not rebuild again.
+    #[test]
+    fn a_broken_chunk_is_removed_and_forces_a_rebuild() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        // A crash between the `.dic` write and the `.len` write.
+        std::fs::remove_file(format!("{d}/ft_0000000000000000.len")).unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0, "from the first row: rebuild");
+        let left: Vec<String> = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().into_string().unwrap())
+            .collect();
+        assert!(
+            left.is_empty(),
+            "the whole set is retired, not retried on every open: {left:?}"
+        );
+        // The next open has nothing to retry.
+        let mut again = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(again.load_sealed(), 0);
+    }
+
+    /// Two generations of one chunk (a seal retried over a base name, or a
+    /// rebuild) can leave `.dic` from one and `.pos`/`.len` from the other. The
+    /// marker is what catches it: the files decode into the wrong rows instead
+    /// of failing.
+    #[test]
+    fn a_chunk_whose_files_do_not_match_its_marker_is_refused() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        let base = "ft_0000000000000000";
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(d, base)
+            .expect("a freshly written chunk has a marker")
+            .expect("the marker is well formed");
+        // Rewrite the marker as the *previous* generation would have: one byte
+        // shorter in `.dic` than what is on the disk.
+        storage::invertedindex::chunk_manifest::ChunkManifest {
+            dic_len: manifest.dic_len - 1,
+            ..manifest
+        }
+        .write(d, base)
+        .unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0, "refused, then rebuilt");
+        assert!(!std::path::Path::new(&format!("{d}/{base}.dic")).exists());
+    }
+
+    /// A chunk of a `ROW_ID` segment the catalog no longer lists holds rows a
+    /// compaction moved: its ids name nothing now, and a rebuild (which the
+    /// retirement forces) renumbers every row. Loading it beside the rebuild
+    /// would map its postings onto the wrong rows.
+    #[test]
+    fn a_chunk_of_a_dropped_segment_is_retired() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        let live: std::collections::HashSet<u32> = [1u32].into_iter().collect();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(
+            index.load_sealed_scoped(Some(&live), &[]),
+            0,
+            "segment 0 is gone: rebuild under the new ids"
+        );
+        assert!(std::fs::read_dir(d).unwrap().flatten().next().is_none());
+    }
+
+    /// A chunk whose files are all zero bytes maps as an empty buffer instead of
+    /// failing: `mmap` refuses a zero-length file, and `.len` is legitimately
+    /// empty when the chunk spans no document.
+    #[test]
+    fn a_chunk_with_an_empty_length_array_maps() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        // One real chunk, then its data files truncated to nothing: what a
+        // publish that failed between the three writes leaves behind.
+        write_chunk(d, 0, 2, "a");
+        let base = "ft_0000000000000000";
+        for suffix in [".pos", ".len"] {
+            std::fs::write(format!("{d}/{base}{suffix}"), b"").unwrap();
+        }
+        std::fs::remove_file(format!("{d}/{base}.ok")).unwrap();
+        let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
+            d,
+            base,
+            0,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .expect("an empty .len is an empty chunk, not a failure");
+        assert_eq!(reader.doc_count(), 0);
+        assert!(reader.postings("a").unwrap_or_default().is_empty());
+        // And the loader skips it rather than counting it as gap coverage.
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0);
+    }
+
+    /// A chunk that skips rows inside itself (the reference's `InsertGap`, or a
+    /// seal after a delete) keeps its **span** - `.len` is addressed by
+    /// `row - base_row_id` - while its live statistics count only the documents
+    /// it holds. A neighbour that starts at the span's end is contiguous with it,
+    /// so the merge still joins the two.
+    #[test]
+    fn a_sparse_chunk_keeps_its_span_and_merges_with_its_neighbour() {
+        use std::collections::BTreeMap;
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = vec![(0, 1), (1, 1), (5, 1), (6, 1)];
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        postings.insert(
+            "a".to_string(),
+            docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
+        );
+        storage::invertedindex::disk_segment_reader::write_segment_index(
+            d,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        write_chunk(d, 7, 2, "a");
+
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2);
+        assert_eq!(index.reader.segments[0].docs, 7, "the span, holes included");
+        assert_eq!(
+            index.reader.segments[0].live_docs, 4,
+            "the documents it has"
+        );
+        assert_eq!(index.reader.segments[0].total_len, 4);
+        // 7 is where the span ends, so the run continues into the second chunk.
+        assert_eq!(index.optimize_chunks().unwrap(), 1);
+        assert_eq!(index.reader.segments.len(), 1);
+        let merged = &index.reader.segments[0];
+        assert_eq!(merged.docs, 9, "0..=8");
+        assert_eq!(merged.live_docs, 6);
+        assert_eq!(merged.total_len, 6);
+        for row in [0u64, 1, 5, 6, 7, 8] {
+            assert!(merged.reader.ordinal(row).is_some(), "row {row}");
+        }
+    }
+
+    /// A directory the **reference** wrote keeps its chunks in the segment's own
+    /// directory and lists them in the catalog (`ChunkIndexMetaInfo`), so the
+    /// port's per-column directory has nothing to scan. The catalog fallback
+    /// adopts those chunks instead of re-indexing the column.
+    #[test]
+    fn a_chunk_written_in_the_reference_layout_is_adopted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE adopt (id INT, body VARCHAR);")
+            .unwrap();
+        for i in 0..6 {
+            e.execute_blocking(&format!("INSERT INTO adopt VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX adopt_ft ON adopt (body) USING FULLTEXT;")
+            .unwrap();
+        // A checkpoint mirrors the chunk files, but only a dump transaction
+        // names them in the catalog (the reference's `DumpMemIndex`), so the
+        // dump is what makes the directory readable by chunk list.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("adopt", "adopt_ft")).unwrap();
+
+        // The mirror wrote the reference's layout, and the catalog now lists
+        // those chunks.
+        let reference_chunks: Vec<String> = std::fs::read_dir(dir.path().join("data"))
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .flat_map(|entry| walk_ft_files(&entry.path()))
+            .collect();
+        assert!(
+            !reference_chunks.is_empty(),
+            "the mirror wrote no chunk in the reference's layout"
+        );
+        let listed = e.fulltext_catalog_chunks("adopt", "body").unwrap();
+        assert_eq!(
+            listed.len(),
+            reference_chunks
+                .iter()
+                .filter(|n| n.ends_with(".dic"))
+                .count(),
+            "every mirrored chunk is in the catalog"
+        );
+        drop(e);
+
+        // Delete the port's own copy: only the reference's files and the
+        // catalog are left - the shape of a directory the reference wrote.
+        let private = dir.path().join("fulltext/default_db.adopt.body");
+        assert!(private.exists(), "the dump sealed the port's own copy");
+        std::fs::remove_dir_all(&private).unwrap();
+
+        let reopened = Engine::open(dir.path()).unwrap();
+        let hits = rows(
+            &reopened,
+            "SELECT id FROM adopt SEARCH MATCH TEXT (body, 'alpha3', 10);",
+        );
+        assert_eq!(hits.len(), 1, "the adopted chunk answers");
+        assert_eq!(hits[0][0], "3");
+
+        // Adopted, not rebuilt: the port's directory holds the reference's
+        // chunks again (a rebuild would have written different base names only
+        // after re-tokenizing the whole column; the files being there is what
+        // the next open reads).
+        let adopted: Vec<String> = std::fs::read_dir(&private)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| name.ends_with(".dic"))
+            .collect();
+        assert!(!adopted.is_empty(), "the chunks were adopted");
+        let expected: std::collections::BTreeSet<String> = reference_chunks
+            .iter()
+            .filter(|name| name.ends_with(".dic"))
+            .cloned()
+            .collect();
+        let got: std::collections::BTreeSet<String> = adopted.into_iter().collect();
+        assert_eq!(got, expected, "the same chunks, by the same names");
+    }
+
+    /// Every `ft_*` file under `root`, by name.
+    fn walk_ft_files(root: &std::path::Path) -> Vec<String> {
+        let mut out = Vec::new();
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return out;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                out.extend(walk_ft_files(&path));
+            } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with("ft_") {
+                    out.push(name.to_string());
+                }
+            }
+        }
+        out
+    }
+
     /// The block-max WAND's cursor (`TermStream::advance`) hands a target that is
     /// past the loaded block to the merged cursor, which hops the sealed
     /// segment's blocks through the doc skip list
@@ -1746,7 +2482,7 @@ mod tests {
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         let plan = index
-            .plan_merge()
+            .plan_merge(&Default::default())
             .unwrap()
             .expect("two contiguous chunks are one run");
 
@@ -1761,6 +2497,7 @@ mod tests {
         .unwrap();
         index.reader.segments.push(SealedSegment {
             docs: 2,
+            live_docs: 2,
             total_len: 0,
             reader,
         });
@@ -9982,5 +10719,484 @@ mod tests {
             rows(&e, "SELECT id FROM crash_t;"),
             vec![vec!["7".to_string()]]
         );
+    }
+
+    /// Serializes the tests that install or depend on the process-wide chunk
+    /// store.
+    ///
+    /// Two of them running at once would each install a backend for its own
+    /// temporary directory, and the engine parts that resolve paths through the
+    /// slot would then read the other test's manager.
+    static CHUNK_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Every data file the engine writes is published through the persistence
+    /// manager, and a read resolves the object when the local copy is gone.
+    ///
+    /// This is the port's half of the reference's rule: `FileWorker::WriteToFile`
+    /// hands the spool file to `pm->Persist` and a reader maps
+    /// `pm->GetObjPath(obj_addr.obj_key)` (`file_worker_impl.cpp:170`,
+    /// `disk_segment_reader_impl.cpp:59`). Nothing here is specific to the
+    /// full-text index: the block columns are checked too.
+    #[test]
+    fn the_persistent_manager_publishes_every_data_file() {
+        // Declared before `LocalStore` so the locals drop in the other order:
+        // the reset to the local backend happens while the lock is still held.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        /// The backend is process-wide, so a panicking test must not leave a
+        /// manager from its own temporary directory installed.
+        struct LocalStore(());
+        impl Drop for LocalStore {
+            fn drop(&mut self) {
+                storage::chunk_store::install_local_chunk_store();
+            }
+        }
+        let _local = LocalStore(());
+
+        let dir = tempdir().unwrap();
+        let objects = tempdir().unwrap();
+        let object_options = || crate::engine::state::EngineOptions {
+            object_dir: Some(objects.path().to_path_buf()),
+            ..crate::engine::state::EngineOptions::default()
+        };
+        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
+        e.execute_blocking("CREATE TABLE pmt (id INT, body VARCHAR);")
+            .unwrap();
+        for i in 0..8 {
+            e.execute_blocking(&format!("INSERT INTO pmt VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX pmt_ft ON pmt (body) USING FULLTEXT;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmt", "pmt_ft")).unwrap();
+
+        // Every file under `data/` has an object record, and the object holds at
+        // least the bytes of that part.
+        let files = walk_relative(&dir.path().join("data"));
+        assert!(!files.is_empty(), "the engine wrote no data files");
+        let pm = e.persistence.as_ref().expect("the manager is installed");
+        for rel in &files {
+            let addr = pm
+                .lookup_key(rel)
+                .unwrap_or_else(|| panic!("'{rel}' was not published"));
+            if addr.part_size == 0 {
+                continue;
+            }
+            let object = pm.get_obj_path(&addr.obj_key);
+            let size = std::fs::metadata(&object)
+                .unwrap_or_else(|error| panic!("object for '{rel}': {error}"))
+                .len() as usize;
+            assert!(
+                size >= addr.part_offset + addr.part_size,
+                "object for '{rel}' is {size} bytes, part ends at {}",
+                addr.part_offset + addr.part_size
+            );
+        }
+
+        // The query answers, and a local copy that is gone is served from the
+        // object: the reader resolves the address and maps that part of the
+        // object file, which is what the reference's `GetObjCache` +
+        // `MmapFile(pm->GetObjPath(..))` does.
+        let hits = rows(
+            &e,
+            "SELECT id FROM pmt SEARCH MATCH TEXT (body, 'alpha5', 10);",
+        );
+        assert_eq!(hits.len(), 1);
+
+        let private = dir.path().join("fulltext/default_db.pmt.body");
+        let dic = std::fs::read_dir(&private)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|path| path.extension().is_some_and(|ext| ext == "dic"))
+            .expect("a sealed chunk");
+        let block_column = dir.path().join("data/db_1/tbl_0/seg_0/blk_0").join("0.col");
+        let expected_block = std::fs::read(&block_column).unwrap();
+        for (path, expected) in [(&dic, None), (&block_column, Some(expected_block))] {
+            std::fs::remove_file(path).unwrap();
+            let mapped = storage::mapped::MappedFile::open(path)
+                .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            assert!(!mapped.is_empty(), "{}", path.display());
+            if let Some(expected) = expected {
+                assert_eq!(&mapped[..], &expected[..], "the block's bytes");
+            }
+        }
+        drop(e);
+        storage::chunk_store::install_local_chunk_store();
+    }
+
+    /// The objects are the truth: with every local data file gone, opening the
+    /// same directory again answers the same questions.
+    ///
+    /// This is what the object profile is for - the reference's `data/` may be a
+    /// cache, and `pm|object|` the storage of record. A merge runs first so the
+    /// superseded chunks' objects are cleaned up as well: the reopened engine
+    /// must not see them.
+    #[test]
+    fn a_data_directory_comes_back_from_the_objects_alone() {
+        // See `the_persistent_manager_publishes_every_data_file`: same global
+        // slot, same lock, and the guard declared before `LocalStore`.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        /// See `the_persistent_manager_publishes_every_data_file`.
+        struct LocalStore(());
+        impl Drop for LocalStore {
+            fn drop(&mut self) {
+                storage::chunk_store::install_local_chunk_store();
+            }
+        }
+        let _local = LocalStore(());
+
+        let dir = tempdir().unwrap();
+        let objects = tempdir().unwrap();
+        let object_options = || crate::engine::state::EngineOptions {
+            object_dir: Some(objects.path().to_path_buf()),
+            ..crate::engine::state::EngineOptions::default()
+        };
+        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
+        e.execute_blocking("CREATE TABLE pmd (id INT, body VARCHAR);")
+            .unwrap();
+        let insert = |e: &Engine, lo: i64, hi: i64| {
+            let values: Vec<String> = (lo..hi)
+                .map(|i| format!("({i}, 'alpha beta bucket{} uniq{i} delta')", i % 7))
+                .collect();
+            e.execute_blocking(&format!("INSERT INTO pmd VALUES {};", values.join(",")))
+                .unwrap();
+        };
+        insert(&e, 0, 200);
+        e.execute_blocking("CREATE INDEX pmd_ft ON pmd (body) USING FULLTEXT;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
+        insert(&e, 200, 400);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
+        // Two chunks are on disk; the merge rewrites them as one and drops the
+        // sources' objects.
+        crate::scheduler::block_on(e.optimize_fulltext_async("pmd")).unwrap();
+
+        let query = "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'uniq42', 5);";
+        let single = rows(&e, query);
+        assert_eq!(single.len(), 1);
+        let all = |e: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(
+                e,
+                "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'beta', 1000);",
+            )
+            .into_iter()
+            .map(|row| row[0].parse().unwrap())
+            .collect()
+        };
+        let expected = all(&e);
+        assert_eq!(expected.len(), 400);
+        let published = e
+            .persistence
+            .as_ref()
+            .expect("the manager is installed")
+            .keys_under("fulltext/")
+            .len();
+        assert!(published > 0, "the chunks were not published");
+
+        // Everything the engine keeps locally goes away: `data/` (blocks, the
+        // mirror chunks) and the port's own chunk directory. Only the objects
+        // and the catalog are left.
+        //
+        // The restore is driven on the same manager rather than through a second
+        // open: a process that opens a directory twice cannot release the first
+        // catalog handle deterministically (the engine's background tasks hold
+        // their own references), and the reopen path itself is covered by the
+        // python gate, one process per engine.
+        let data_before = walk_blobs(&dir.path().join("data"));
+        let chunks_before = walk_blobs(&dir.path().join("fulltext"));
+        assert!(
+            chunks_before.keys().any(|name| name.ends_with(".dic")),
+            "the merge left no chunk"
+        );
+        std::fs::remove_dir_all(dir.path().join("data")).unwrap();
+        std::fs::remove_dir_all(dir.path().join("fulltext")).unwrap();
+        let manager = e.persistence.as_ref().expect("the manager is installed");
+        let restored = manager.restore_missing_files().unwrap();
+        assert_eq!(
+            restored,
+            data_before.len() + chunks_before.len(),
+            "every data file has an object to come back from"
+        );
+        let compare = |restored: std::collections::BTreeMap<String, Vec<u8>>,
+                       before: std::collections::BTreeMap<String, Vec<u8>>,
+                       what: &str| {
+            let mut missing: Vec<&String> = before
+                .keys()
+                .filter(|k| !restored.contains_key(*k))
+                .collect();
+            let mut extra: Vec<&String> = restored
+                .keys()
+                .filter(|k| !before.contains_key(*k))
+                .collect();
+            missing.sort();
+            extra.sort();
+            assert!(
+                missing.is_empty() && extra.is_empty(),
+                "{what}: {} missing ({:?}), {} extra ({:?})",
+                missing.len(),
+                &missing[..missing.len().min(6)],
+                extra.len(),
+                &extra[..extra.len().min(6)]
+            );
+            for (name, blob) in &before {
+                assert_eq!(
+                    restored[name].len(),
+                    blob.len(),
+                    "{what}: '{name}' came back with a different size"
+                );
+            }
+        };
+        compare(
+            walk_blobs(&dir.path().join("data")),
+            data_before,
+            "the blocks",
+        );
+        compare(
+            walk_blobs(&dir.path().join("fulltext")),
+            chunks_before,
+            "the chunks",
+        );
+        // And the answers were computed from what is on disk at all.
+        assert_eq!(all(&e), expected, "the whole corpus");
+        assert_eq!(rows(&e, query), single, "the single-term answer");
+    }
+
+    /// Every file under `root` with its bytes, keyed by relative path.
+    fn walk_blobs(root: &std::path::Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+        let mut out = std::collections::BTreeMap::new();
+        for rel in walk_relative(root) {
+            let path = root.join(&rel);
+            out.insert(rel, std::fs::read(path).unwrap_or_default());
+        }
+        out
+    }
+
+    /// Every file under `root`, as a path relative to it.
+    fn walk_relative(root: &std::path::Path) -> Vec<String> {
+        let mut out = Vec::new();
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return out;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let rel = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            if path.is_dir() {
+                out.extend(
+                    walk_relative(&path)
+                        .into_iter()
+                        .map(|name| format!("{rel}/{name}")),
+                );
+            } else {
+                out.push(rel);
+            }
+        }
+        out
+    }
+
+    /// Writers, readers, deletes and maintenance share one table: every answer a
+    /// reader gets is a row the table really holds, and once the writers stop the
+    /// index covers exactly the live rows - across dumps, merges and a restart.
+    ///
+    /// The invariant is "what the table holds", computed here, not another
+    /// engine's answer: `alpha` is in every document, so a full-text query with a
+    /// large `topn` must return exactly the rows that were not deleted.
+    #[test]
+    fn writers_readers_deletes_and_merges_stay_consistent() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::sync::{Arc, Mutex};
+
+        const WRITERS: i64 = 8;
+        const BATCHES: i64 = 20;
+        const ROWS_PER_BATCH: i64 = 100;
+        const READERS: usize = 6;
+        const MAINTENANCE_ROUNDS: usize = 8;
+        const DELETE_ROUNDS: usize = 16;
+        let total_written = WRITERS * BATCHES * ROWS_PER_BATCH;
+
+        let dir = tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE stress (id INT, body VARCHAR);")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX stress_ft ON stress (body) USING FULLTEXT;")
+            .unwrap();
+
+        let inserted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
+        let deleted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
+        let stop = Arc::new(AtomicBool::new(false));
+        let queries = Arc::new(AtomicUsize::new(0));
+
+        let mut writers = Vec::new();
+        for writer in 0..WRITERS {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            writers.push(std::thread::spawn(move || {
+                for batch in 0..BATCHES {
+                    let mut ids = Vec::new();
+                    let mut values = Vec::new();
+                    for row in 0..ROWS_PER_BATCH {
+                        // Disjoint per writer and per batch, at any scale.
+                        let id = writer * 1_000_000 + batch * 1_000 + row;
+                        ids.push(id);
+                        values.push(format!("({id}, 'alpha{id} beta')"));
+                    }
+                    // Recorded **before** the insert commits: a reader may see a
+                    // committed row the instant `execute_blocking` returns, so
+                    // accounting for it afterwards leaves a window in which the
+                    // row is in the table and not yet in `inserted` - which the
+                    // readers below would report as a ghost. The insert below
+                    // unwraps, so a failure cannot leave a stale id behind
+                    // unnoticed.
+                    inserted.lock().unwrap().extend(ids);
+                    engine
+                        .execute_blocking(&format!(
+                            "INSERT INTO stress VALUES {};",
+                            values.join(",")
+                        ))
+                        .unwrap();
+                }
+            }));
+        }
+        let mut readers = Vec::new();
+        for _ in 0..READERS {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            let stop = Arc::clone(&stop);
+            let queries = Arc::clone(&queries);
+            readers.push(std::thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    let hits = rows(
+                        &engine,
+                        "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 5000);",
+                    );
+                    let known = inserted.lock().unwrap().clone();
+                    for hit in &hits {
+                        let id: i64 = hit[0].parse().unwrap();
+                        assert!(known.contains(&id), "reader saw the ghost id {id}");
+                    }
+                    queries.fetch_add(1, Ordering::Relaxed);
+                }
+            }));
+        }
+        let deleter = {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            let deleted = Arc::clone(&deleted);
+            std::thread::spawn(move || {
+                for _ in 0..DELETE_ROUNDS {
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let known: Vec<i64> = inserted.lock().unwrap().iter().copied().collect();
+                    if known.len() < 100 {
+                        continue;
+                    }
+                    // Every 17th row of the first half of what is there so far.
+                    let victims: Vec<i64> = known
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .filter(|(at, _)| at % 17 == 0 && *at < known.len() / 2)
+                        .map(|(_, id)| id)
+                        .collect();
+                    if victims.is_empty() {
+                        continue;
+                    }
+                    let list = victims
+                        .iter()
+                        .map(|id| id.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    let sql = format!("DELETE FROM stress WHERE id IN ({list});");
+                    if engine.execute_blocking(&sql).is_ok() {
+                        deleted.lock().unwrap().extend(victims);
+                    }
+                }
+            })
+        };
+        for _ in 0..MAINTENANCE_ROUNDS {
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            let _ =
+                crate::scheduler::block_on(engine.dump_index_transaction("stress", "stress_ft"));
+            let _ = crate::scheduler::block_on(engine.optimize_fulltext_async("stress"));
+            let _ = crate::scheduler::block_on(engine.flush());
+        }
+
+        for handle in writers {
+            handle.join().unwrap();
+        }
+        deleter.join().unwrap();
+        // The readers keep querying until the writers are done.
+        stop.store(true, Ordering::Relaxed);
+        for handle in readers {
+            handle.join().unwrap();
+        }
+        let inserted = inserted.lock().unwrap().clone();
+        assert_eq!(
+            inserted.len(),
+            total_written as usize,
+            "every row the writers sent reached the table"
+        );
+        // What the table holds is the invariant, not what the deleter asked
+        // for: a delete that ran against a transaction the table had not
+        // committed yet removes nothing, and the request list cannot see that.
+        let live_rows = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(engine, "SELECT id FROM stress;")
+                .into_iter()
+                .map(|row| row[0].parse().unwrap())
+                .collect()
+        };
+        let collect = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(
+                engine,
+                "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 100000);",
+            )
+            .into_iter()
+            .map(|row| row[0].parse().unwrap())
+            .collect()
+        };
+        assert!(queries.load(Ordering::Relaxed) > 0, "the readers ran");
+        let expected = live_rows(&engine);
+        assert!(
+            expected.len() < total_written as usize,
+            "the deletes removed nothing, the test proves nothing"
+        );
+        let tombstones = engine.tombstone_set("stress").unwrap().len();
+        assert_eq!(
+            expected.len() + tombstones,
+            total_written as usize,
+            "the table's rows and its tombstones account for every insert \
+             ({} + {tombstones})",
+            expected.len()
+        );
+        let got = collect(&engine);
+        let missing: Vec<i64> = expected.difference(&got).copied().collect();
+        let extra: Vec<i64> = got.difference(&expected).copied().collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "the index does not cover the live rows: {} missing (first {:?}), \
+             {} extra (first {:?}), table holds {}",
+            missing.len(),
+            &missing[..missing.len().min(20)],
+            extra.len(),
+            &extra[..extra.len().min(20)],
+            expected.len()
+        );
+        let _ = crate::scheduler::block_on(engine.flush());
+        drop(engine);
+
+        // The same answer after a restart: the chunks on disk are the truth.
+        let reopened = Engine::open(dir.path()).unwrap();
+        assert_eq!(collect(&reopened), live_rows(&reopened), "after a restart");
     }
 }

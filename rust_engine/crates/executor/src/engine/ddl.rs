@@ -103,7 +103,7 @@ impl Engine {
                 .join("fulltext")
                 .join(format!("{}.{column}", key.replace('/', "_")));
             if dir.is_dir() {
-                let _ = std::fs::remove_dir_all(dir);
+                storage::chunk_store::remove_tree(dir);
             }
         }
         if self.storage.catalog.is_catalog_only() {
@@ -120,7 +120,7 @@ impl Engine {
                 for db in dbs.flatten() {
                     let dir = db.path().join(format!("tbl_{id}"));
                     if dir.is_dir() {
-                        let _ = std::fs::remove_dir_all(dir);
+                        storage::chunk_store::remove_tree(dir);
                     }
                 }
             }
@@ -359,7 +359,7 @@ impl Engine {
                     for entry in entries.flatten() {
                         let p = entry.path();
                         if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                            let _ = std::fs::remove_file(p);
+                            let _ = storage::chunk_store::remove_file(p);
                         }
                     }
                 }
@@ -388,7 +388,7 @@ impl Engine {
         };
         for idx in removed {
             if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
-                let _ = std::fs::remove_dir_all(dir);
+                storage::chunk_store::remove_tree(dir);
             }
         }
     }
@@ -402,6 +402,9 @@ impl Engine {
         // indexes are read.
         let indexes: Vec<SharedTextIndex> = match self.tables.lock().unwrap().get_mut(&tkey) {
             Some(entry) => {
+                // A build that is running right now targets the index being
+                // dropped; the bump keeps it from publishing after the fact.
+                entry.text_epoch = entry.text_epoch.wrapping_add(1);
                 let columns: Vec<String> = match column {
                     Some(c) => vec![c.to_string()],
                     None => entry.text.keys().cloned().collect(),
@@ -415,7 +418,7 @@ impl Engine {
         };
         for idx in indexes {
             if let Ok(g) = idx.read() {
-                let _ = std::fs::remove_dir_all(g.dir.clone());
+                storage::chunk_store::remove_tree(g.dir.clone());
             }
         }
         self.drop_multivector_storage(table, column);

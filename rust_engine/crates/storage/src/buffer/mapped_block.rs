@@ -34,8 +34,12 @@ impl MappedBlock {
     /// so a directory whose `version` decodes is a complete block.
     pub fn open(root: &Path, id: BlockId) -> std::io::Result<Self> {
         let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
-        let version = BlockVersionFile::decode(&std::fs::read(dir.join(VERSION_FILE))?)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        // The `version` file is a data file like any other: a persistence
+        // profile may hold it only as an object part.
+        let version = BlockVersionFile::decode(
+            &crate::chunk_store::chunk_store().read(&dir.join(VERSION_FILE))?,
+        )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let mut columns: Vec<(u64, MappedFile, Option<MappedFile>)> = Vec::new();
         let mut bytes = 0usize;
         for entry in std::fs::read_dir(&dir)? {
