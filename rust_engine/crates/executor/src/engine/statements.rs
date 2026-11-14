@@ -3740,9 +3740,27 @@ impl Engine {
             }
         };
         if let Some(idx) = cached {
-            let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
+            let (complete, segments, tail, overridden) = {
+                let g = idx.read().unwrap_or_else(|e| e.into_inner());
+                (
+                    g.total_docs(),
+                    g.reader.segments.len(),
+                    g.tails().map(|m| m.pending_docs()).sum::<usize>(),
+                    g.overridden.len(),
+                )
+            };
             if complete >= reserved {
+                if ft_trace_enabled(&key) {
+                    eprintln!(
+                        "[FT] {key} reuse docs={complete} reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+                    );
+                }
                 return Ok(idx);
+            }
+            if ft_trace_enabled(&key) {
+                eprintln!(
+                    "[FT] {key} rebuild: cached docs={complete} < reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+                );
             }
         }
         let schema = self.table_schema(table)?;
@@ -3768,6 +3786,12 @@ impl Engine {
             .get(&tkey)
             .map(|entry| entry.segments.keys().copied().collect())
             .filter(|segments: &std::collections::HashSet<u32>| !segments.is_empty());
+        if live_segments.is_none() && ft_trace_enabled(&key) {
+            // `None` disables the retired-segment check, so any chunk on disk is
+            // loaded - including the ones a compaction left behind, whose row
+            // ids push the rebuild's start past every live row.
+            eprintln!("[FT] {key} build with NO live segments: chunk filtering is off");
+        }
         // The chunk list the catalog holds, in the reference's layout. It is
         // the only way to find the chunks of a directory the reference wrote:
         // the reference never scans for `ft_*.dic`, it reads `idx_chunk|…`.
@@ -3775,11 +3799,24 @@ impl Engine {
             .fulltext_catalog_chunks(table, column)
             .unwrap_or_default();
         // Cloned because a rejected publish retries the whole build.
+        let build_dir = dir.clone();
         let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
         let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
+        if ft_trace_enabled(&key) {
+            eprintln!(
+                "[FT] {key} build dir={build_dir} segs_loaded={} first={first} live={:?} catalog_chunks={}",
+                index.reader.segments.len(),
+                live_segments.as_ref().map(|s| {
+                    let mut v: Vec<u32> = s.iter().copied().collect();
+                    v.sort_unstable();
+                    v
+                }),
+                catalog_chunks.len()
+            );
+        }
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
@@ -3936,24 +3973,44 @@ impl Engine {
             }
             {
                 let mut index = shared.write().unwrap();
-                // The new ids first, the overrides last: the reverse order leaves a
-                // moment where the row is in neither. A query already running below
-                // `compact_ts` resolves the old ids only, so it may miss the moved
-                // rows until it ends; every query at `compact_ts` or above resolves
-                // the new ones.
                 crate::engine::state::index_rows_prepared(&mut index, &prepared);
-                for (seq, _) in rows {
-                    crate::engine::state::index_retire_row(&mut index, *seq as u64);
-                }
-                // The segments this merge took are now overridden row for row:
-                // dropping them keeps BM25's `N` at the live population instead
-                // of growing it by a table per compaction.
-                index.retire_fully_overridden_segments();
+                // The reference's reader is built from the catalog's live
+                // `SegmentIndexIDs`, so the segments this merge took are simply
+                // not there. Drop them whole: the rows they held were renumbered
+                // into `prepared` above, so nothing of them is owed.
+                let live: std::collections::HashSet<u32> = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&tkey)
+                    .map(|entry| entry.segments.keys().copied().collect())
+                    .unwrap_or_default();
+                index.drop_segments_not_in(&live);
             }
             // Persist the moved rows: the chunk names the new ids, so the next
             // build maps it instead of re-reading the column, and the chunks of the
             // retired segments are dropped at load (`live_segments`).
             crate::engine::state::seal_text_index_unlocked(shared);
+            if ft_trace_enabled(&self.table_key(table)) {
+                let g = shared.read().unwrap_or_else(|e| e.into_inner());
+                // The failure this trace exists for: a row is in the tail (so it
+                // counts towards `total_docs`, which is what lets the cache be
+                // reused) **and** marked overridden (so `merge` filters it out
+                // of every posting). That combination answers 0 rows while the
+                // counter says the index is complete.
+                let shadowed = g
+                    .tails()
+                    .flat_map(|m| m.docs.keys().copied())
+                    .filter(|row| g.overridden.contains(row))
+                    .count();
+                eprintln!(
+                    "[FT] {tkey}.{column} reindexed {} rows at base={base} segs={} tail={} overridden={} shadowed_tail_rows={shadowed}",
+                    rows.len(),
+                    g.reader.segments.len(),
+                    g.tails().map(|m| m.pending_docs()).sum::<usize>(),
+                    g.overridden.len()
+                );
+            }
         }
         let mut tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get_mut(&tkey) else {
@@ -6002,7 +6059,35 @@ impl Engine {
         // A full-text scan holds the whole table's token data; bound how many
         // run at once so a handful of concurrent readers cannot exhaust memory.
         let _scan = self.context.scan_gate.enter();
-        self.search_text_terms_with_slot(table, m, pred, hidden)
+        let out = self.search_text_terms_with_slot(table, m, pred, hidden)?;
+        // An empty answer on a table full of matches is the failure this trace
+        // exists for: record what the index held when it answered.
+        if out.0.is_empty() {
+            let tkey = self.table_key(table);
+            if ft_trace_enabled(&tkey) {
+                let shared = self.tables.lock().unwrap().get(&tkey).and_then(|e| {
+                    e.text
+                        .get(match_columns(&m.column).first()?.as_str())
+                        .cloned()
+                });
+                match shared {
+                    Some(shared) => {
+                        let g = shared.read().unwrap_or_else(|e| e.into_inner());
+                        eprintln!(
+                            "[FT] {tkey}.{} MATCH {:?} -> 0 rows; docs={} segs={} tail={} overridden={}",
+                            m.column,
+                            m.args.first().map(|a| format!("{a:?}")).unwrap_or_default(),
+                            g.total_docs(),
+                            g.reader.segments.len(),
+                            g.tails().map(|x| x.pending_docs()).sum::<usize>(),
+                            g.overridden.len()
+                        );
+                    }
+                    None => eprintln!("[FT] {tkey}.{} MATCH -> 0 rows; no cached index", m.column),
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// [`Self::search_text_terms`] for a caller that already holds the scan

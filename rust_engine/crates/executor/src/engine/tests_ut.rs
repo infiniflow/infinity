@@ -849,19 +849,16 @@ mod tests {
                 3,
                 "round {round}: the top-3 were rows the merge retired"
             );
-            // The segments the merge took are dropped (the overrides themselves
-            // stay: the same ids are still in the unsealed postings). Keeping the
-            // segments would count their documents in BM25's `N` again, so the
-            // chunk span must stay at the live population.
+            // The segments the merge took are dropped whole, the way the
+            // reference's reader - built from the catalog's live
+            // `SegmentIndexIDs` - never sees them. That is what keeps BM25's `N`
+            // at the live population instead of growing by a table per merge,
+            // so the chunk span may not exceed the rows that exist.
             let stats = e.fulltext_stats("churn");
             assert!(
                 stats[0].chunk_rows <= next,
                 "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
                 stats[0].chunk_rows
-            );
-            assert!(
-                stats[0].overridden_rows > 0,
-                "round {round}: the retired ids are not filtered any more"
             );
         }
         // The whole corpus still answers when the cut is wide enough.

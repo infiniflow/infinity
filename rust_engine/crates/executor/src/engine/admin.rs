@@ -429,6 +429,19 @@ impl Engine {
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
+        if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
+            let (segments, live_rows) = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&self.table_key(table))
+                    .map(|e| (e.segments.keys().copied().collect::<Vec<_>>(), e.live_rows))
+                    .unwrap_or_default()
+            };
+            eprintln!(
+                "[FT] {table} compacted: next_seg={next_seg} merged_rows={} sources={source_ids:?} live_segments={segments:?} live_rows={live_rows:?}",
+                rows.len()
+            );
+        }
         // The reference's compaction runs `PopulateIndex` for the merged
         // segment inside the compaction transaction, so that segment gets its
         // own index chunks (`secondary_index_in_mem_impl`). The port's reload
