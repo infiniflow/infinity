@@ -2343,19 +2343,38 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
-            {
+            let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
                 let cur = entry.index_pending_bytes.entry(im.id).or_insert(0);
-                // Only the bookkeeping happens here. The dump itself is
-                // proposed **after** the rows are written
-                // (`enforce_memindex_quota`, which `update_text_indexes_batch`
-                // runs once the batch is indexed): proposing it before the
-                // insert let the worker seal a graph that did not hold these
-                // rows yet, so the batch produced no chunk - and in the full
-                // suite, where the worker is slower, that lost one
-                // (`test_mem_bmp`, `test_optimize_from_different_database`).
                 *cur += bytes;
+                // The reference dumps when the memory passes the quota and
+                // subtracts only what the dump released, so the rows above
+                // the limit stay accounted and the *next* batch is what
+                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
+                if quota > 0 && *cur > quota {
+                    *cur -= quota;
+                    true
+                } else {
+                    false
+                }
+            };
+            if dump && self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+                // The dumped segment leaves memory. The bytes above the
+                // quota were already left in the counter, so nothing else to
+                // do here but drop the graph the dump just sealed.
+                //
+                // **Before** the rows of this batch are written: a dump seals
+                // what the graph holds now, so each batch lands in its own
+                // chunk. Proposing it from the post-write quota check instead
+                // merged every batch into one chunk (`test_mem_bmp`,
+                // `test_optimize_from_different_database`).
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(e) = tables.get_mut(&tkey) {
+                    e.hnsw_mem.remove(&im.id);
+                    e.index_pending_bytes.insert(im.id, 0);
+                    e.hnsw_topup = true;
+                }
             }
         }
     }
