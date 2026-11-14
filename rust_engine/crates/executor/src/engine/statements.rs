@@ -3574,8 +3574,7 @@ impl Engine {
         // time made `CREATE INDEX` a serial point-by-point build.
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
-            rows.push((seq as u64, v));
+            rows.push((seq as u64, parse_vec_f32(&text)));
         }
         let read = t_read.elapsed();
         let segments = self.hnsw_mem_segments(table, column)?;
@@ -3625,27 +3624,10 @@ impl Engine {
                 let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
                     continue;
                 };
-                let opt = |name: &str| -> Option<usize> {
-                    im.options
-                        .iter()
-                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                        .and_then(|(_, v)| v.parse().ok())
-                };
-                let m = opt("M").unwrap_or(16);
-                let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
-                let opt = |name: &str| {
-                    im.options
-                        .iter()
-                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                        .map(|(_, v)| v.clone())
-                };
-                let metric =
-                    index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
-                let encoding =
-                    index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                let options = crate::blocks::index_chunk::HnswOptions::from_options(&im.options);
                 entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
                     Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                        dims, m, efc, metric, encoding,
+                        dims, &options,
                     )))
                 });
             }

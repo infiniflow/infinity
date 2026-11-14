@@ -391,6 +391,9 @@ fn as_show_index(arm: ArmResponse) -> Result<vg::ShowIndexResponse, ServerError>
             error_msg,
             index_type,
             columns,
+            other_parameters,
+            store_dir,
+            segment_index_count,
         } => Ok(vg::ShowIndexResponse {
             error_code: Some(error_code),
             error_msg: Some(error_msg.into()),
@@ -402,9 +405,9 @@ fn as_show_index(arm: ArmResponse) -> Result<vg::ShowIndexResponse, ServerError>
             index_column_names: Some(columns.into()),
             index_column_ids: Some("".into()),
             index_function_info: Some("".into()),
-            other_parameters: Some("".into()),
-            store_dir: Some("".into()),
-            segment_index_count: Some("".into()),
+            other_parameters: Some(other_parameters.into()),
+            store_dir: Some(store_dir.into()),
+            segment_index_count: Some(segment_index_count.into()),
         }),
         other => Err(unexpected("ShowIndexResponse", &other)),
     }

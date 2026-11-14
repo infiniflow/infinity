@@ -486,10 +486,7 @@ impl Store {
                 .zip(data.get(b))
                 .map(|(x, y)| plain_distance(x, y, *metric))
                 .unwrap_or(f32::MAX),
-            Store::Lvq(store) => store
-                .query_at(a)
-                .and_then(|q| store.distance(&q, b))
-                .unwrap_or(f32::MAX),
+            Store::Lvq(store) => store.distance_between(a, b).unwrap_or(f32::MAX),
             Store::Rabitq(store) => store
                 .decompress(a)
                 .map(|v| {
@@ -665,6 +662,16 @@ impl HnswIndex {
 
     pub fn lsg(&self) -> Option<&crate::lsg::LsgIndex> {
         self.lsg.as_ref()
+    }
+
+    /// The LVQ store's trained per-dimension mean (`None` for the other
+    /// encodings). A mean of all zeros means the store was never trained, which
+    /// makes every code carry no magnitude.
+    pub fn lvq_mean(&self) -> Option<&[f64]> {
+        match &self.store {
+            Store::Lvq(store) => Some(store.mean()),
+            _ => None,
+        }
     }
 
     pub fn encoding(&self) -> HnswEncoding {
@@ -1249,16 +1256,12 @@ impl HnswIndex {
             }
             return vectors.len();
         }
-        // The quantized stores keep a code per vertex and re-derive a query from
-        // that code; the reference only instantiates its batch path for the
-        // plain store's DataType, so a quantized index keeps the serial build
-        // instead of gaining a parallel one that would mean something else.
-        if !matches!(self.store, Store::Plain { .. }) {
-            for v in vectors {
-                self.add(v);
-            }
-            return vectors.len();
-        }
+        // Quantized stores build here too. They used to fall back to the serial
+        // loop because their query is a code derived from the stored vector
+        // rather than the stored bytes; `QueryRef::for_node` already handles
+        // that by materialising the query per vertex, so the bucket build below
+        // is store-agnostic. Compressing the batch stays serial (`store.push`),
+        // because it needs `&mut Store` and is a per-vector pass anyway.
         let base = self.store.len();
         for v in vectors {
             assert_eq!(v.len(), self.dims, "dimension mismatch");
@@ -1936,6 +1939,50 @@ mod tests {
         let recall = hits as f64 / (40 * 5) as f64;
         assert!(recall >= 0.9, "parallel graph diverged: recall {recall}");
         parallel.check().expect("parallel graph is well formed");
+    }
+
+    /// Quantized indexes build in parallel too. The store is trained first
+    /// (`InitAbstractIndexT`), then the batch must land on a graph that answers
+    /// like the serial one: a quantized index used to fall back to `add` inside
+    /// `add_batch`, which made a 10k-row LVQ build 15x slower than Plain.
+    #[test]
+    fn quantized_batch_build_matches_serial_answers() {
+        let data = dataset(600, 8);
+        for (label, encoding) in [("lvq", HnswEncoding::Lvq), ("rabitq", HnswEncoding::Rabitq)] {
+            let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            serial.train_store(&data, None);
+            parallel.train_store(&data, None);
+            for v in &data {
+                serial.add(v);
+            }
+            assert_eq!(parallel.add_batch(&data, 4), data.len());
+            assert_eq!(parallel.len(), serial.len());
+            let mut rng = Rng::new(11);
+            let mut hits = 0usize;
+            let mut total = 0usize;
+            for _ in 0..20 {
+                let q: Vec<f32> = (0..8).map(|_| (rng.unit() as f32) * 10.0).collect();
+                let want: HashSet<usize> = serial
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .collect();
+                let got: Vec<usize> = parallel
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .collect();
+                hits += got.iter().filter(|i| want.contains(i)).count();
+                total += got.len();
+            }
+            let recall = hits as f64 / total as f64;
+            assert!(
+                recall >= 0.9,
+                "{label}: parallel graph diverged, recall {recall}"
+            );
+            parallel.check().expect("parallel graph is well formed");
+        }
     }
     #[test]
     fn hnsw_recall_vs_flat() {

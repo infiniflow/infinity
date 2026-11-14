@@ -113,6 +113,12 @@ impl HnswHandler {
         &self.index
     }
 
+    /// The wrapped graph, mutably: the in-memory segment trains the store's
+    /// quantizer and the LSG averages from its batch before the first insert.
+    pub fn index_mut(&mut self) -> &mut HnswIndex {
+        &mut self.index
+    }
+
     /// Consumes the handler and returns the graph.
     pub fn into_index(self) -> HnswIndex {
         self.index

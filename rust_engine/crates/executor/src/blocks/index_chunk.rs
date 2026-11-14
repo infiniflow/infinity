@@ -28,6 +28,42 @@ pub(crate) fn hnsw_store_meta_len(
     }
 }
 
+/// C++ `Index*::BuildOtherParamsString`: the `WITH (...)` list `SHOW INDEX`
+/// prints as `other_parameters`.
+///
+/// HNSW names its fields in a fixed order regardless of how the statement wrote
+/// them (`index_hnsw_impl.cpp:268`); the other kinds keep the pairs they were
+/// created with, lower-cased.
+pub(crate) fn other_params_string(im: &catalog::IndexMeta) -> String {
+    use index::vector::{HnswEncoding, Metric};
+    if im.index_type.eq_ignore_ascii_case("HNSW") {
+        let options = HnswOptions::from_options(&im.options);
+        let metric = match options.metric {
+            Metric::Cos => "cosine",
+            Metric::Ip => "ip",
+            Metric::L2 => "l2",
+        };
+        let encode = match options.encoding {
+            HnswEncoding::Lvq => "lvq",
+            HnswEncoding::Rabitq => "rabitq",
+            HnswEncoding::Plain => "plain",
+        };
+        let mut text = format!(
+            "metric = {metric}, encode_type = {encode}, M = {}, ef_construction = {}",
+            options.m, options.ef_construction
+        );
+        if let Some(lsg) = options.lsg {
+            text.push_str(&format!(", lsg_config = {lsg}"));
+        }
+        return text;
+    }
+    im.options
+        .iter()
+        .map(|(k, v)| format!("{} = {}", k.to_ascii_lowercase(), v))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Bytes per vector in the chunk's vector region.
 pub(crate) fn hnsw_record_size(dims: usize, encoding: index::vector::HnswEncoding) -> usize {
     use index::vector::HnswEncoding;
@@ -47,6 +83,48 @@ pub(crate) struct HnswOptions {
     pub(crate) metric: index::vector::Metric,
     pub(crate) encoding: index::vector::HnswEncoding,
     pub(crate) lsg: Option<index::lsg::LsgConfig>,
+}
+
+impl HnswOptions {
+    /// The `WITH (...)` options a `CREATE INDEX ... USING HNSW` stored.
+    ///
+    /// `build_type='lsg'` is what turns the index into a local-scaling one; the
+    /// reference then requires `lsg_config` and falls back to `LSGConfig`'s own
+    /// defaults (`0.01 / 10 / 1`) when it is missing.
+    pub(crate) fn from_options(options: &[(String, String)]) -> Self {
+        let raw = |name: &str| {
+            options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.as_str())
+        };
+        let num = |name: &str, default: usize| {
+            raw(name)
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(default)
+        };
+        let lsg = match raw("build_type") {
+            Some(t)
+                if t.trim()
+                    .trim_matches(['\'', '"'])
+                    .eq_ignore_ascii_case("lsg") =>
+            {
+                Some(
+                    raw("lsg_config")
+                        .and_then(index::lsg::LsgConfig::parse)
+                        .unwrap_or_default(),
+                )
+            }
+            _ => None,
+        };
+        Self {
+            m: num("M", 16),
+            ef_construction: num("EF_CONSTRUCTION", 200),
+            metric: index::vector::Metric::parse(raw("metric").unwrap_or("l2")),
+            encoding: index::vector::HnswEncoding::parse(raw("encode").unwrap_or_default()),
+            lsg,
+        }
+    }
 }
 
 pub struct LoadedVectorIndex {

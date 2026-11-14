@@ -25,7 +25,12 @@ impl Default for LsgConfig {
 
 impl LsgConfig {
     /// C++ `LSGConfig::FromString`: `key=value` pairs separated by commas
-    /// (`sample_ratio`, `ls_k`, `alpha`).
+    /// (`sample_raito`, `ls_k`, `alpha`).
+    ///
+    /// `sample_ratio` is accepted as an alias: the reference's own option is
+    /// spelled `sample_raito` (a typo it has always persisted, see
+    /// `storage/definition/index_hnsw_impl.cpp:112`), while the SQL examples in
+    /// this repository use the corrected spelling for the same parameter.
     pub fn parse(text: &str) -> Option<Self> {
         let mut config = Self::default();
         for part in text.split(',') {
@@ -33,7 +38,7 @@ impl LsgConfig {
             let key = key.trim().to_ascii_lowercase();
             let value = value.trim();
             match key.as_str() {
-                "sample_ratio" => config.sample_ratio = value.parse().ok()?,
+                "sample_raito" | "sample_ratio" => config.sample_ratio = value.parse().ok()?,
                 "ls_k" => config.ls_k = value.parse().ok()?,
                 "alpha" => config.alpha = value.parse().ok()?,
                 _ => return None,
@@ -44,10 +49,15 @@ impl LsgConfig {
 }
 
 impl std::fmt::Display for LsgConfig {
+    /// C++ `LSGConfig::ToString`, byte for byte — including its `sample_raito`
+    /// spelling. This is the text the reference stores in the catalog's
+    /// `lsg_config_` field and parses back with `LSGConfig::FromString`, which
+    /// only knows that spelling; writing `sample_ratio` there made the reference
+    /// abort on a checkpoint this engine produced.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sample_ratio={},ls_k={},alpha={}",
+            "sample_raito = {}, ls_k = {}, alpha = {}",
             self.sample_ratio, self.ls_k, self.alpha
         )
     }
@@ -210,7 +220,15 @@ mod tests {
             }
         );
         assert_eq!(LsgConfig::parse("bogus=1"), None);
-        assert_eq!(c.to_string(), "sample_ratio=0.25,ls_k=7,alpha=0.5");
+        // The reference's own spelling (`sample_raito`) must parse too: it is
+        // what its catalog and its `ToString` produce.
+        assert_eq!(
+            LsgConfig::parse("sample_raito = 0.25, ls_k = 7, alpha = 0.5"),
+            Some(c)
+        );
+        // ... and what this engine writes back must be reference-readable.
+        assert_eq!(c.to_string(), "sample_raito = 0.25, ls_k = 7, alpha = 0.5");
+        assert_eq!(LsgConfig::parse(&c.to_string()), Some(c));
     }
 
     #[test]

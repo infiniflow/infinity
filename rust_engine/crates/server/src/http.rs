@@ -1998,18 +1998,24 @@ pub async fn route(
                 .into_iter()
                 .find(|i| i.name.eq_ignore_ascii_case(index));
             match found {
-                Some(i) => (
-                    200,
-                    format!(
-                        "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"{}\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"\",\"store_dir\":\"\",\"segment_index_count\":\"\"}}",
-                        json_escape(&db),
-                        json_escape(&table),
-                        json_escape(&i.name),
-                        json_escape(&engine.index_comment(&full, &i.name).unwrap_or_default()),
-                        json_escape(&i.index_type),
-                        json_escape(&i.column)
-                    ),
-                ),
+                Some(i) => {
+                    let (other, dir, segments) = engine.index_show_meta(&full, &i.name);
+                    (
+                        200,
+                        format!(
+                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"{}\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"{}\",\"store_dir\":\"{}\",\"segment_index_count\":\"{}\"}}",
+                            json_escape(&db),
+                            json_escape(&table),
+                            json_escape(&i.name),
+                            json_escape(&engine.index_comment(&full, &i.name).unwrap_or_default()),
+                            json_escape(&i.index_type),
+                            json_escape(&i.column),
+                            json_escape(&other),
+                            json_escape(&dir),
+                            json_escape(&segments)
+                        ),
+                    )
+                }
                 None => err_response(3023, &format!("index '{index}' does not exist")),
             }
         }

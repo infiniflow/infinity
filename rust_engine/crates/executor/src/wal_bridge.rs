@@ -390,7 +390,9 @@ pub fn index_def_from_json(text: &str) -> Option<storage::wal::index_def::IndexD
             m: as_i64(extract(&doc, ".M")).unwrap_or(0) as u64,
             ef_construction: as_i64(extract(&doc, ".ef_construction")).unwrap_or(0) as u64,
             block_size: as_i64(extract(&doc, ".block_size")).unwrap_or(0) as u64,
-            has_lsg: false,
+            // The reference writes `lsg_config_` as `LSGConfig::ToString()`
+            // text, e.g. `sample_raito = 0.25, ls_k = 10, alpha = 1`.
+            lsg: as_str(extract(&doc, ".lsg_config")).and_then(::index::lsg::LsgConfig::parse),
         },
         _ => return None,
     })
@@ -1134,7 +1136,7 @@ fn index_type_text(t: storage::wal::index_def::IndexType) -> &'static str {
 /// only have to name the same values: the option lookup is case-insensitive and
 /// trims quotes.
 fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String)> {
-    use storage::wal::index_def::{IndexDef, MetricType};
+    use storage::wal::index_def::{HnswBuildType, HnswEncodeType, IndexDef, MetricType};
     let pair = |k: &str, v: String| (k.to_string(), v);
     match def {
         IndexDef::Hnsw {
@@ -1142,21 +1144,52 @@ fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String
             ef_construction,
             block_size,
             metric_type,
+            encode_type,
+            build_type,
+            lsg,
             ..
-        } => vec![
-            pair("M", m.to_string()),
-            pair("EF_CONSTRUCTION", ef_construction.to_string()),
-            pair("BLOCK_SIZE", block_size.to_string()),
-            pair(
-                "METRIC",
-                match metric_type {
-                    MetricType::Cosine => "cosine",
-                    MetricType::InnerProduct => "ip",
-                    _ => "l2",
-                }
-                .to_string(),
-            ),
-        ],
+        } => {
+            // A replay rebuilds the index from these options alone, so every
+            // `WITH` value the definition carries has to be named here. Missing
+            // `ENCODE`/`BUILD_TYPE`/`LSG_CONFIG` made a WAL replay turn a
+            // `plain+LVQ` index into `plain+plain` and drop its LSG config.
+            let mut options = vec![
+                pair("M", m.to_string()),
+                pair("EF_CONSTRUCTION", ef_construction.to_string()),
+                pair("BLOCK_SIZE", block_size.to_string()),
+                pair(
+                    "METRIC",
+                    match metric_type {
+                        MetricType::Cosine => "cosine",
+                        MetricType::InnerProduct => "ip",
+                        _ => "l2",
+                    }
+                    .to_string(),
+                ),
+                pair(
+                    "ENCODE",
+                    match encode_type {
+                        HnswEncodeType::Lvq => "lvq",
+                        HnswEncodeType::Rabitq => "rabitq",
+                        _ => "plain",
+                    }
+                    .to_string(),
+                ),
+                pair(
+                    "BUILD_TYPE",
+                    match build_type {
+                        HnswBuildType::Lsg => "lsg",
+                        _ => "plain",
+                    }
+                    .to_string(),
+                ),
+            ];
+            if let Some(config) = lsg {
+                // `LSGConfig::ToString`, the same text the catalog stores.
+                options.push(pair("LSG_CONFIG", config.to_string()));
+            }
+            options
+        }
         IndexDef::FullText { analyzer, .. } => vec![pair("ANALYZER", analyzer.clone())],
         IndexDef::Bmp { block_size, .. } => vec![pair("BLOCK_SIZE", block_size.to_string())],
         IndexDef::Emvb {
@@ -1288,5 +1321,46 @@ mod tests {
             }
             other => panic!("expected Secondary, got {other:?}"),
         }
+    }
+
+    /// A replay recreates the index from the typed definition alone
+    /// (`index_options` -> `Catalog::create_index_typed`), so every `WITH`
+    /// value has to be named there. Missing `ENCODE`/`BUILD_TYPE`/`LSG_CONFIG`
+    /// turned a `plain+LVQ` index into `plain+plain` after a recovery that had
+    /// no checkpoint to read the definition back from.
+    #[test]
+    fn hnsw_replay_options_keep_encode_build_type_and_lsg() {
+        use storage::wal::index_def::{HnswBuildType, HnswEncodeType, IndexDef};
+        let text = r#"{"block_size":16,"build_type":"lsg","column_names":["v"],"ef_construction":200,"encode_type":"lvq","file_name":"ix_v","index_comment":"","index_name":"v_i","index_type":"HNSW","lsg_config":"sample_raito = 0.25, ls_k = 7, alpha = 0.5","metric_type":"l2","M":16}"#;
+        let def = index_def_from_json(text).expect("the reference's HNSW record parses");
+        match &def {
+            IndexDef::Hnsw {
+                encode_type,
+                build_type,
+                lsg,
+                ..
+            } => {
+                assert_eq!(*encode_type, HnswEncodeType::Lvq);
+                assert_eq!(*build_type, HnswBuildType::Lsg);
+                let config = lsg.expect("lsg_config has to survive the record read");
+                assert_eq!(config.sample_ratio, 0.25);
+                assert_eq!(config.ls_k, 7);
+                assert_eq!(config.alpha, 0.5);
+            }
+            other => panic!("expected Hnsw, got {other:?}"),
+        }
+        let options: std::collections::HashMap<String, String> =
+            index_options(&def).into_iter().collect();
+        assert_eq!(options.get("ENCODE").map(String::as_str), Some("lvq"));
+        assert_eq!(options.get("BUILD_TYPE").map(String::as_str), Some("lsg"));
+        assert_eq!(
+            options.get("LSG_CONFIG").map(String::as_str),
+            Some("sample_raito = 0.25, ls_k = 7, alpha = 0.5")
+        );
+        assert_eq!(options.get("M").map(String::as_str), Some("16"));
+        assert_eq!(
+            options.get("EF_CONSTRUCTION").map(String::as_str),
+            Some("200")
+        );
     }
 }

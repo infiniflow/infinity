@@ -4621,35 +4621,38 @@ impl Engine {
         else {
             return HnswOptions::default();
         };
-        let opt = |name: &str| {
-            im.options
-                .iter()
-                .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                .map(|(_, v)| v.clone())
+        HnswOptions::from_options(&im.options)
+    }
+
+    /// `SHOW INDEX`'s `other_parameters`, `store_dir` and `segment_index_count`.
+    ///
+    /// The reference fills them from the catalog's index info
+    /// (`TableIndexMeta::GetTableIndexInfo`, `table_index_meta_impl.cpp:273`):
+    /// `BuildOtherParamsString()`, the index directory
+    /// (`db_{db}/tbl_{tbl}/idx_{id}`) and the number of segment ids. This mirror
+    /// answered all three with an empty string, so a client could not see the
+    /// `WITH (...)` an index was created with.
+    pub fn index_show_meta(&self, table: &str, index_name: &str) -> (String, String, String) {
+        let table = self.qualified_table(table);
+        let name = index_name.to_ascii_lowercase();
+        let Ok(Some(im)) = self.storage.catalog.index_by_name(&table, &name) else {
+            return (String::new(), String::new(), String::new());
         };
-        let metric = index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
-        let encoding = index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-        let lsg = if opt("build_type")
-            .map(|v| v.eq_ignore_ascii_case("lsg"))
-            .unwrap_or(false)
-        {
-            Some(
-                opt("lsg_config")
-                    .and_then(|v| index::lsg::LsgConfig::parse(&v))
-                    .unwrap_or_default(),
-            )
-        } else {
-            None
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return (String::new(), String::new(), String::new());
         };
-        HnswOptions {
-            m: opt("M").and_then(|v| v.parse().ok()).unwrap_or(16),
-            ef_construction: opt("EF_CONSTRUCTION")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(200),
-            metric,
-            encoding,
-            lsg,
-        }
+        let db_id = self.database_id_of(&table).to_string();
+        let table_id = meta.id.to_string();
+        let store_dir = format!("db_{db_id}/tbl_{table_id}/idx_{}", im.id);
+        let segments = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &db_id,
+            &table_id,
+            &im.id.to_string(),
+        )
+        .map(|chunks| chunks.len())
+        .unwrap_or(0);
+        (other_params_string(&im), store_dir, segments.to_string())
     }
 
     /// Writes `table`'s index as a C++ HNSW chunk file under

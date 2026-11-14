@@ -4509,6 +4509,96 @@ mod tests {
         assert!(recall >= 0.95, "LSG recall@1 = {recall}");
     }
 
+    /// `build_type='lsg'` and the LVQ mean must reach the graph: the reference
+    /// trains both from the whole column before the first insert
+    /// (`InitAbstractIndexT`). Regression: `lsg_config` was parsed, stored in the
+    /// catalog and then dropped on the floor, so an LSG index was a plain one,
+    /// and the LVQ mean stayed all zeros because nothing ever called the store's
+    /// `train`.
+    #[test]
+    fn create_index_trains_lsg_and_lvq_mean() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tr (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let base = [27.4f32, 16.0, 10.4, 8.6];
+        let mut sql = String::from("INSERT INTO tr VALUES ");
+        for i in 0..64usize {
+            let parts: Vec<String> = base
+                .iter()
+                .enumerate()
+                .map(|(j, b)| format!("{}", b + (i * (j + 1)) as f32 / 8.0))
+                .collect();
+            sql.push_str(&format!("({i}, [{}])", parts.join(",")));
+            if i + 1 < 64 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        // `sample_raito` is the spelling the reference persists and parses.
+        e.execute_blocking(
+            "CREATE INDEX tr_i ON tr (v) USING HNSW WITH (metric='l2', encode='lvq', \
+             build_type='lsg', lsg_config='sample_raito=0.5,ls_k=10,alpha=1.0');",
+        )
+        .unwrap();
+        let segments = e.hnsw_mem_segments("tr", "v").unwrap();
+        assert_eq!(segments.len(), 1);
+        let graph = segments[0].lock().unwrap();
+        assert!(
+            graph.index().lsg().is_some(),
+            "LSG averages were never trained"
+        );
+        let mean = graph.index().lvq_mean().expect("lvq store");
+        assert!(
+            mean.iter().any(|m| m.abs() > 1e-6),
+            "LVQ mean is all zeros: {mean:?}"
+        );
+        // Column 0 averages `27.4 + (0 + .. + 63) / 8 / 64`.
+        let expected = 27.4 + (0..64).map(|i| i as f64 / 8.0).sum::<f64>() / 64.0;
+        assert!(
+            (mean[0] - expected).abs() < 1e-3,
+            "mean {:?} vs the column's {expected}",
+            mean[0]
+        );
+    }
+
+    /// `SHOW INDEX` answered `other_parameters`, `store_dir` and
+    /// `segment_index_count` with fixed empty strings, so a client could not
+    /// see the `WITH (...)` an index was built with. The reference fills them
+    /// from the catalog's index info (`TableIndexMeta::GetTableIndexInfo`).
+    #[test]
+    fn show_index_reports_the_creation_options() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE si (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking("INSERT INTO si VALUES (1, [1.0,2.0,3.0,4.0]), (2, [4.0,3.0,2.0,1.0]);")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX si_i ON si (v) USING HNSW WITH (metric='l2', encode='lvq', M='8', \
+             ef_construction='64', build_type='lsg', \
+             lsg_config='sample_ratio=0.5,ls_k=10,alpha=1');",
+        )
+        .unwrap();
+        let (other, store_dir, segments) = e.index_show_meta("si", "si_i");
+        assert_eq!(
+            other,
+            "metric = l2, encode_type = lvq, M = 8, ef_construction = 64, \
+             lsg_config = sample_raito = 0.5, ls_k = 10, alpha = 1"
+        );
+        assert!(
+            store_dir.starts_with("db_")
+                && store_dir.contains("/tbl_")
+                && store_dir.contains("/idx_"),
+            "store_dir {store_dir}"
+        );
+        assert!(
+            segments.parse::<usize>().is_ok(),
+            "segment_index_count {segments} is not a number"
+        );
+    }
+
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
     /// vectors per the `encode` option and answers the same top-1.
     #[test]

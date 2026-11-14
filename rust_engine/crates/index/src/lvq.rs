@@ -259,8 +259,19 @@ impl LvqStore {
     /// The LVQ distance used by the HNSW graph (smaller is closer):
     /// squared L2, or the negated cosine/inner product.
     pub fn distance(&self, query: &LvqQuery, index: usize) -> Option<f32> {
-        let q = &query.data;
-        let v = self.data.get(index)?;
+        Some(self.distance_data(&query.data, self.data.get(index)?))
+    }
+
+    /// The distance between two stored codes.
+    ///
+    /// The neighbour-selection heuristic and reverse-link pruning compare two
+    /// stored vertices, and going through [`LvqStore::query_at`] for the first
+    /// one clones its `Vec<i8>` code on every comparison.
+    pub fn distance_between(&self, a: usize, b: usize) -> Option<f32> {
+        Some(self.distance_data(self.data.get(a)?, self.data.get(b)?))
+    }
+
+    fn distance_data(&self, q: &LvqData, v: &LvqData) -> f32 {
         let ip: i32 = q
             .code
             .iter()
@@ -270,12 +281,10 @@ impl LvqStore {
         match self.metric {
             Metric::L2 => {
                 let beta = q.bias - v.bias;
-                Some(
-                    q.local.1 + v.local.1 + beta * beta * self.dim as f32
-                        - 2.0 * q.scale * v.scale * ip as f32
-                        + 2.0 * beta * q.local.0
-                        - 2.0 * beta * v.local.0,
-                )
+                q.local.1 + v.local.1 + beta * beta * self.dim as f32
+                    - 2.0 * q.scale * v.scale * ip as f32
+                    + 2.0 * beta * q.local.0
+                    - 2.0 * beta * v.local.0
             }
             Metric::Ip | Metric::Cos => {
                 let (n1_mean, n2_mean) = self.global.unwrap_or((0.0, 0.0));
@@ -287,7 +296,7 @@ impl LvqStore {
                     + (f64::from(q.bias) + f64::from(v.bias)) * n1_mean
                     + f64::from(q.local.1)
                     + f64::from(v.local.1);
-                Some(-(dist as f32))
+                -(dist as f32)
             }
         }
     }
