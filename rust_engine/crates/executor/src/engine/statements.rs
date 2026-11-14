@@ -3804,7 +3804,7 @@ impl Engine {
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
+        let mut first = index.load_sealed_scoped(live_segments.as_ref(), &catalog_chunks) as usize;
         if ft_trace_enabled(&key) {
             eprintln!(
                 "[FT] {key} build dir={build_dir} segs_loaded={} first={first} live={:?} catalog_chunks={}",
@@ -3816,6 +3816,35 @@ impl Engine {
                 }),
                 catalog_chunks.len()
             );
+        }
+        // `load_sealed_scoped` hands back where the unsealed rows start, which is
+        // the largest end any chunk covers. That is the right resume point only
+        // while the chunks account for every live row: a chunk that went missing
+        // leaves the rows inside its range unindexed, and resuming past them
+        // never repairs it. A chunk's file name is derived from its first row
+        // id, so two writers publishing one directory can pick the same name and
+        // one write replaces the other - exactly one chunk's worth of rows, live
+        // in the table and absent from the index, and only after a reopen (the
+        // writer's own mmap keeps answering). See
+        // `writers_readers_deletes_and_merges_stay_consistent`.
+        //
+        // A hole alone is legitimate (rows between two seals may have no
+        // postings, or may not exist at all), so it only counts as lost rows
+        // when the chunks are *also* short of the table's live rows. Then the
+        // chunks at and after the hole are dropped and those rows are rebuilt
+        // from the blocks, which keeps the count exact.
+        let covered = index.total_docs();
+        if covered < reserved {
+            if let Some(hole) = index.first_coverage_hole() {
+                let dropped = index.drop_chunks_from(hole);
+                if ft_trace_enabled(&key) {
+                    eprintln!(
+                        "[FT] {key} chunks cover {covered} < reserved {reserved}, hole at row \
+                         {hole}: dropped {dropped} chunk(s), rebuilding from there"
+                    );
+                }
+                first = hole as usize;
+            }
         }
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
@@ -3857,12 +3886,38 @@ impl Engine {
         epoch: u64,
         index: SharedTextIndex,
     ) -> TextPublish {
+        // The `ROW_ID` segments the build indexed, read before the table lock:
+        // a query holds the index's read guard while it fetches rows, and that
+        // fetch needs `tables`, so the reverse order is the deadlocking one.
+        let covered = index
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .covered_row_segments();
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
         // by the compaction that renumbers the rows, so the build read ids that
         // now name nothing.
         if entry.text_epoch != epoch {
+            return TextPublish::Renumbered;
+        }
+        // The epoch is not enough: a build can *start* after a compaction bumped
+        // it and still read the pre-merge rows, because the merge's drops are
+        // not visible until it commits. The read ts does not catch that either -
+        // a statement reads at `current_ts() + 1`, and the writers keep
+        // committing past a running merge's ts - so what decides is the layout
+        // the build actually indexed: every `ROW_ID` segment it holds documents
+        // for has to still be listed by the catalog. One that is not is a build
+        // of ids the merge retired, and caching it answers `MATCH` with rows no
+        // block owns (`TestParallelFulltextIndexReadWrite`, `column "doctitle"
+        // is empty`).
+        if !entry.segments.is_empty() && !covered.iter().all(|id| entry.segments.contains_key(id)) {
+            if ft_trace_enabled(tkey) {
+                eprintln!(
+                    "[FT] {tkey}.{column} publish refused: build covers retired segments {covered:?}, live {:?}",
+                    entry.segments.keys().collect::<Vec<_>>()
+                );
+            }
             return TextPublish::Renumbered;
         }
         let read_ts = crate::read_ts();
@@ -3885,11 +3940,11 @@ impl Engine {
     /// A merge renumbers every row it takes, so the postings of the kept caches
     /// stop naming live rows the moment it lands. The rows it moved are indexed
     /// here under their new ids - from the row bytes the merge already read, not
-    /// from a scan - and the ids they left are marked overridden
-    /// (`index_delete_row`). Overridden ids are what the sealed read paths skip
-    /// while they iterate (`MergeCursor`), i.e. **before** the top-n cut: leaving
-    /// them in the postings made `MATCH` fill its top-n with rows no fetch can
-    /// resolve and answer "column is empty" on a table full of matches.
+    /// from a scan - and the ids they left are marked overridden. Overridden ids
+    /// are what the read paths skip while they iterate (`MergeCursor`), i.e.
+    /// **before** the top-n cut: leaving them in the postings made `MATCH` fill
+    /// its top-n with rows no fetch can resolve and answer "column is empty" on
+    /// a table full of matches.
     ///
     /// The caches are not dropped for this. Doing that put a full rebuild of the
     /// column on the query path, and a table that keeps taking writes is
@@ -3974,6 +4029,22 @@ impl Engine {
             {
                 let mut index = shared.write().unwrap();
                 crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                // Every id this merge left behind is retired: nothing names it any
+                // more, and the row it described now lives under `base + i`.
+                //
+                // A move is not a `DELETE`, so `tombstone_set` knows nothing about
+                // these ids and the read paths would not drop them: the copy of the
+                // posting the merge replaced can still sit in the unsealed tail or
+                // in a spilled run (a seal that was in flight when this ran leaves
+                // its rows in a chunk this drop cannot see), and there it answers
+                // `MATCH` with a row no fetch can resolve - filling a `topn=3`
+                // result with rows the merge retired, i.e. an empty answer on a
+                // table full of matches. Marking them overridden is what
+                // [`MergeCursor`] filters on, **before** the top-n cut.
+                crate::engine::state::retire_row_ids(
+                    &mut index,
+                    rows.iter().map(|(seq, _)| *seq as u64),
+                );
                 // The reference's reader is built from the catalog's live
                 // `SegmentIndexIDs`, so the segments this merge took are simply
                 // not there. Drop them whole: the rows they held were renumbered
@@ -6605,6 +6676,38 @@ impl Engine {
                     .fetch_some_rows_with_ids(table, &wanted)?
                     .into_iter()
                     .collect();
+                {
+                    // A hit whose row cannot be resolved ate a top-n slot: the
+                    // postings name an id no block owns (a retired id left in a
+                    // chunk, a cache of a layout the merge moved). The query
+                    // answers short without saying why, so print what would let
+                    // a run be read back (`INF_FT_TRACE`).
+                    let key = index_key(table, &schema[field_specs[0].0]);
+                    if by_id.len() < wanted.len() && ft_trace_enabled(&key) {
+                        let missing: Vec<u64> = wanted
+                            .iter()
+                            .copied()
+                            .filter(|id| !by_id.contains_key(&(*id as usize)))
+                            .collect();
+                        let (segs, built, min_ts, epoch) = {
+                            let tables = self.tables.lock().unwrap();
+                            match tables.get(&self.table_key(table)) {
+                                Some(entry) => (
+                                    entry.segments.keys().copied().collect::<Vec<_>>(),
+                                    entry.text_built.get(&schema[field_specs[0].0]).copied(),
+                                    entry.text_min_ts,
+                                    entry.text_epoch,
+                                ),
+                                None => (Vec::new(), None, 0, 0),
+                            }
+                        };
+                        eprintln!(
+                            "[FT] {key} MATCH unfetchable: topn={} missing={missing:?} read_ts={} epoch={epoch} min_ts={min_ts} built={built:?} live={segs:?}",
+                            wanted.len(),
+                            crate::read_ts()
+                        );
+                    }
+                }
                 let mut out = Vec::new();
                 for (seq, score) in scored {
                     let Some(mut row) = by_id.remove(&seq) else {

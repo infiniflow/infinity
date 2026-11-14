@@ -635,6 +635,108 @@ mod tests {
         );
     }
 
+    /// A build can start **after** a compaction bumped `text_epoch` and still
+    /// hold the pre-merge rows: the merge's drops are not visible until it
+    /// commits, and the read ts does not separate the two either - a statement
+    /// reads at `current_ts() + 1`, and the writers keep committing past a
+    /// running merge's ts, so a build can look newer than the merge and still
+    /// have read the layout it retires. What separates them is the layout the
+    /// build indexed: every `ROW_ID` segment it covers has to still be live.
+    /// Caching such an index left every hit naming a row no block owns, and
+    /// `MATCH` answered `column "doctitle" is empty` for the rest of the run
+    /// (`TestParallelFulltextIndexReadWrite`, on the query after its writers
+    /// stopped).
+    #[test]
+    fn an_index_of_a_retired_segment_is_never_cached() {
+        let q = "SELECT doctitle FROM retired SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE retired (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX retired_body ON retired (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO retired VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.retired").unwrap();
+        let tkey = e.table_key("retired");
+        let (epoch, live) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            (
+                entry.text_epoch,
+                entry.segments.keys().copied().collect::<Vec<_>>(),
+            )
+        };
+        assert!(
+            !live.contains(&0),
+            "the merge renumbers segment 0, live is {live:?}"
+        );
+        // The layout the merge retired, with one document per (old) live row, so
+        // its document count alone would let it pass for a complete cache.
+        let stale_dir = tempdir().unwrap();
+        let stale = {
+            let mut index = TextIndex::new(
+                stale_dir.path().to_string_lossy().into_owned(),
+                TextTokenizer::default(),
+            );
+            for row in 0..40u64 {
+                index_row(&mut index, row, "harmful chemical");
+            }
+            assert_eq!(
+                index
+                    .covered_row_segments()
+                    .iter()
+                    .copied()
+                    .collect::<Vec<u32>>(),
+                vec![0]
+            );
+            let stale: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+            stale
+        };
+        assert_eq!(
+            e.publish_text_index(&tkey, "body", epoch, stale),
+            crate::engine::statements::TextPublish::Renumbered,
+            "a build of the retired segment must not be cached"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "and the kept cache still answers for the merged layout"
+        );
+        // A build of the *merged* layout still publishes: with the kept cache
+        // dropped, the next query rebuilds it and the one after that reuses the
+        // same instance. A segment check that refused those instead would
+        // rebuild the column on every query - the shape that once kept a `MATCH`
+        // running for a whole gate timeout.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let cached = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .and_then(|entry| entry.text.get("body").cloned())
+        };
+        assert_eq!(rows(&e, q).len(), 3);
+        let first = cached(&e).expect("the build of the merged layout was published");
+        assert_eq!(rows(&e, q).len(), 3);
+        let again = cached(&e).expect("the published cache is still there");
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the merged layout is rebuilt on every query instead of reused"
+        );
+    }
+
     /// A merge that lands **inside** a build renumbers every row the build just
     /// read, so its postings name ids nothing owns. The tokenizer/scan window is
     /// too narrow to hit by chance here, so the test drives it deterministically
@@ -944,6 +1046,81 @@ mod tests {
         }
         compactor.join().expect("the compactor panicked");
         assert_eq!(rows(&engine, q).len(), 3, "after the churn");
+    }
+
+    /// The seal a merge runs into: a chunk whose write was already in flight when
+    /// the merge reindexed the column publishes ids of the segment the merge
+    /// retired. A completed seal clears the overridden marks of the rows its
+    /// chunk holds (the row's current text is now in that chunk) - but for a
+    /// chunk of a retired segment they are not current: the rows moved to new
+    /// ids, and clearing the marks put the old ones back in the postings after
+    /// the merge published. `MATCH` then filled its top-n with rows no fetch can
+    /// resolve: 0 rows on a table full of matches
+    /// (`concurrent_churn_never_empties_a_small_top_n`, round 39).
+    #[test]
+    fn a_chunk_sealed_after_the_merge_keeps_its_retired_ids_hidden() {
+        use crate::engine::text_index::{prepare_doc, MemoryIndexer, SealJob};
+
+        let q = "SELECT doctitle FROM late SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE late (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX late_body ON late (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO late VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.late").unwrap();
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the kept cache moved onto the new ids"
+        );
+
+        // The stale copy: segment 0's rows, sealed from a tail that was already
+        // being written when the merge renumbered them.
+        let shared = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("late"))
+            .and_then(|entry| entry.text.get("body").cloned())
+            .expect("the merge keeps the cache");
+        let (tokenizer, cache_dir) = {
+            let g = shared.read().unwrap();
+            (g.tokenizer.clone(), g.dir.clone())
+        };
+        let mut stale = MemoryIndexer::new();
+        for row in 0..30u64 {
+            let doc = prepare_doc(row, "harmful chemical stale", &tokenizer);
+            stale.insert_prepared(&doc, usize::MAX);
+        }
+        let total_len = stale.pending_len();
+        let docs = stale.merged_docs().expect("the stale tail holds documents");
+        let job = SealJob {
+            tail: std::sync::Arc::new(stale),
+            docs: docs.clone(),
+            base_row_id: 0,
+            docs_span: 30,
+            total_len,
+            dir: cache_dir,
+            flags: storage::invertedindex::format::OPTION_FLAG_ALL,
+            overridden_rows: docs.iter().map(|(row, _)| *row).collect(),
+        };
+        let reader = job.write().expect("the stale chunk is written");
+        shared.write().unwrap().complete_seal(job, reader);
+
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the ids of a late chunk ate the top-3 slots"
+        );
     }
 
     /// A query that spans several sealed segments plus the memory tail must
@@ -2617,6 +2794,33 @@ mod tests {
                 "row {row}"
             );
         }
+    }
+
+    /// A chunk that went missing leaves a hole in the list, and the resume
+    /// point `load_sealed` returns is the largest end - past the hole. The
+    /// build asks [`TextIndex::first_coverage_hole`] when the chunks are short
+    /// of the table's rows, and rebuilds from it after
+    /// [`TextIndex::drop_chunks_from`] removed the chunks that cover rows the
+    /// rebuild is about to index again.
+    #[test]
+    fn a_lost_chunk_is_a_hole_the_build_can_rebuild_from() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        // Rows 4..10 have no chunk: it was overwritten by a narrower one.
+        write_chunk(d, 10, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 12, "resume at the largest end");
+        assert_eq!(index.reader.segments.len(), 3, "every chunk loads");
+        assert_eq!(index.first_coverage_hole(), Some(4));
+        assert_eq!(index.drop_chunks_from(4), 1, "the chunk after the hole");
+        assert_eq!(index.reader.segments.len(), 2, "the prefix stays");
+        assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
+        assert!(
+            !std::path::Path::new(&format!("{d}/ft_000000000000000a.dic")).exists(),
+            "its files are gone, so the rebuilt rows are not counted twice"
+        );
     }
 
     /// An overlapping chunk list is unrecoverable in the reference
