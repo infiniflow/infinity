@@ -2380,11 +2380,33 @@ pub fn write_index_segments(
         }
         let seg_key =
             key::catalog_index_segment_key(&set.db_id, &set.table_id, &idx_str, index.segment_id);
+        // `next_chunk_id` lives under this same prefix, and `GetAndSetNextChunkID`
+        // only ever moves forward: read it **before** the sweep, or the value
+        // this publish is supposed to preserve has already been deleted and the
+        // counter falls back to "one past the highest surviving chunk", handing
+        // a retired id to the next dump.
+        let next_key = key::catalog_index_segment_tag_key(
+            &set.db_id,
+            &set.table_id,
+            &idx_str,
+            index.segment_id,
+            "next_chunk_id",
+        );
+        let previous_next = store
+            .get(next_key.as_bytes())?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+            .unwrap_or(0);
         for (k, _) in store.scan_prefix(format!("{seg_key}|").as_bytes())? {
             store.delete(&k)?;
         }
         if index.chunks.is_empty() {
             store.delete(seg_key.as_bytes())?;
+            // The counter stays: an emptied segment still must not reissue the
+            // ids its retired chunks held.
+            if previous_next > 0 {
+                store.put(next_key.as_bytes(), previous_next.to_string().as_bytes())?;
+                written += 1;
+            }
             continue;
         }
         // `idx_seg|…` holds the commit ts of the transaction that first paired
@@ -2475,20 +2497,9 @@ pub fn write_index_segments(
         }
         // `next_chunk_id` only ever moves forward
         // (`SegmentIndexMeta::GetAndSetNextChunkID`): a chunk id is never
-        // reused, not even after `Cleanup` dropped the chunk that held it. A
-        // publish therefore keeps the larger of what is recorded here and what
-        // the tag already says.
-        let next_key = key::catalog_index_segment_tag_key(
-            &set.db_id,
-            &set.table_id,
-            &idx_str,
-            index.segment_id,
-            "next_chunk_id",
-        );
-        let previous_next = store
-            .get(next_key.as_bytes())?
-            .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
-            .unwrap_or(0);
+        // reused, not even after `Cleanup` dropped the chunk that held it. This
+        // publish keeps the larger of the value read before the sweep and what
+        // the chunks it just wrote imply.
         let from_records = recorded.iter().max().map(|id| id + 1).unwrap_or(0);
         let next_chunk = previous_next.max(from_records);
         if next_chunk > 0 {

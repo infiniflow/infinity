@@ -327,7 +327,7 @@ impl Engine {
                 memindex_total: std::sync::atomic::AtomicUsize::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
-                memindex_pending: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                memindex_pending: Arc::new(std::sync::Mutex::new(MemIndexPending::default())),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 scan_gate: ScanGate::new(
@@ -583,7 +583,7 @@ impl Engine {
             return;
         }
         if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(table.is_none());
+            self.propose_dump(table.is_none(), table.map(str::to_string));
             return;
         }
         // No background processor (a test, or shutdown): do the same work
@@ -627,47 +627,51 @@ impl Engine {
             return;
         }
         if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(false);
+            self.propose_dump(false, Some(table.to_string()));
             return;
         }
-        // This runs after the commit returned, so no bottom gate is held and
-        // the blocks of every table are fair game.
-        self.dump_under_pressure(None).await;
+        // This runs after the commit returned, so no bottom gate is held. It
+        // still names the table: the breach is that table's charge, and picking
+        // the victim across the engine would leave it undrained.
+        self.dump_under_pressure(Some(table)).await;
     }
 
     /// Queues the background drain. The caller has already established that a
     /// processor is attached; one proposal is in flight at a time
     /// (`proposed_dump_`).
-    fn propose_dump(&self, drain_all: bool) {
+    fn propose_dump(&self, drain_all: bool, table: Option<String>) {
         let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
             return;
         };
-        if self
-            .context
-            .memindex_pending
-            .compare_exchange(
-                0,
-                1,
-                std::sync::atomic::Ordering::AcqRel,
-                std::sync::atomic::Ordering::Relaxed,
-            )
-            .is_err()
+        // Coalesce like `MemIndexTracer::proposed_dump_`: a table that already
+        // has a proposal does not get a second task, but a **different** table
+        // still does. A single global flag dropped the second table's breach
+        // and left it undrained.
         {
-            return;
+            let mut pending = self.context.memindex_pending.lock().unwrap();
+            let key = table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
+            // An "every tail" drain already queued covers any table, so nothing
+            // more is needed; otherwise a table is skipped only when its own
+            // proposal is still in flight.
+            if pending.tables.contains(ALL_TABLES) {
+                return;
+            }
+            if !pending.tables.insert(key) {
+                return;
+            }
         }
         let engine = self.self_weak.lock().unwrap().clone();
         let queued = processor.submit(Box::new(DumpMemIndexTask {
             engine,
             pending: Arc::clone(&self.context.memindex_pending),
             drain_all,
+            table,
         }));
         if !queued {
             // The processor is shutting down and dropped the task, so no worker
-            // will clear the proposed-dump flag: clear it here or the quota
-            // never proposes another dump.
-            self.context
-                .memindex_pending
-                .store(0, std::sync::atomic::Ordering::Relaxed);
+            // will clear its proposal: drop it here or that table is never
+            // proposed again.
+            self.context.memindex_pending.lock().unwrap().tables.clear();
         }
     }
 

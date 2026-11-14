@@ -434,7 +434,7 @@ impl Engine {
             // The probe is a one-shot "have I looked for an HNSW index yet"
             // flag; a graph just went away, so the next write probes again.
             if any_hnsw {
-                entry.hnsw_probed = false;
+                entry.hnsw_topup = true;
             }
             (texts, sparse_indexes, multi_indexes)
         };

@@ -2212,7 +2212,7 @@ impl Engine {
                         let key = self.table_key(table);
                         let mut tables = self.tables.lock().unwrap();
                         let entry = tables.entry(key).or_default();
-                        entry.hnsw_probed = false;
+                        entry.hnsw_topup = true;
                         if let Some(index_id) = created_index_id {
                             entry.hnsw_mem.remove(&index_id);
                         }

@@ -19,7 +19,7 @@ impl Engine {
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
         // A new index may have appeared since the last write.
         for e in self.tables.lock().unwrap().values_mut() {
-            e.hnsw_probed = false;
+            e.hnsw_topup = true;
             // Sealed chunk readers are reloaded from the mirror below.
             e.vector.clear();
             e.ivf.clear();
@@ -926,10 +926,14 @@ impl Engine {
                 .map(|docs| docs.len() as u64)
                 .unwrap_or(0)
         } else {
-            let Ok(rows) = self.row_count(table) else {
-                return false;
-            };
-            rows as u64
+            // IVF: the writer's coverage is `column_vectors`, which skips a
+            // NULL or unparseable cell. Comparing against the table's row count
+            // instead left `rows > total` true forever on a column with one such
+            // row, so every quota sweep re-opened a dump transaction, spent a
+            // commit ts and took the exclusive flush lock to write nothing.
+            self.column_vectors(table, &meta.column, None)
+                .map(|rows| rows.len() as u64)
+                .unwrap_or(0)
         };
         let total: u64 = covered.values().sum();
         rows > total
@@ -1204,7 +1208,7 @@ impl Engine {
         if let Some(e) = tables.get_mut(&key) {
             e.hnsw_mem.remove(&index_id);
             e.index_pending_bytes.insert(index_id, 0);
-            e.hnsw_probed = false;
+            e.hnsw_topup = true;
         }
     }
     /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
@@ -3355,7 +3359,7 @@ impl Engine {
     /// bottom gate.
     pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
         self.dump_all_sealed_blocks(only).await;
-        self.dump_largest_memory_index().await;
+        self.dump_largest_memory_index(only).await;
         // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
         // are **not** sealed here. `seal_sparse_index` is only half a dump: it
         // calls `SealedTail::take`, which removes the entries and hands them
@@ -3435,10 +3439,22 @@ impl Engine {
     /// The rows are the part that has to go now: they are what grows without
     /// any other bound, and [`Self::dump_all_sealed_blocks`] has just released
     /// them.
-    async fn dump_largest_memory_index(&self) {
+    ///
+    /// `only` restricts the choice to one table. The write path passes the
+    /// table whose batch raised the charge: picking the largest tail in the
+    /// *engine* would let a table that merely happens to hold more bytes
+    /// absorb every breach, and the table that just grew would never drain
+    /// (`test_optimize_from_different_database` in the restart suite).
+    async fn dump_largest_memory_index(&self, only: Option<&str>) {
+        let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         let mut largest: Option<(usize, u64, &IndexMeta)> = None;
         for im in &indexes {
+            if let Some(wanted) = &wanted {
+                if &self.table_key(&im.table) != wanted {
+                    continue;
+                }
+            }
             if !self.index_has_memory_tail(&im.table, im) {
                 continue;
             }
@@ -3619,7 +3635,7 @@ impl Engine {
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.id);
                     e.index_pending_bytes.insert(im.id, 0);
-                    e.hnsw_probed = false;
+                    e.hnsw_topup = true;
                 }
             }
         }

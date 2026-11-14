@@ -4494,6 +4494,22 @@ impl DropScope<'_> {
     }
 }
 
+/// The quota's proposed dumps: one per table, `drain_all` when the proposal
+/// asked for every tail.
+///
+/// A second breach for a table already listed merges into the pending entry
+/// instead of queueing a second task (`MemIndexTracer::proposed_dump_`'s
+/// coalescing); a breach for a different table still gets its own task.
+#[derive(Default)]
+pub(crate) struct MemIndexPending {
+    /// The tables a queued or running dump already covers, plus
+    /// [`ALL_TABLES`] when one of them asked for every tail.
+    pub(crate) tables: std::collections::HashSet<String>,
+}
+
+/// The marker [`MemIndexPending::tables`] uses for an "every tail" proposal.
+pub(crate) const ALL_TABLES: &str = "*";
+
 /// Secondary-index registry of one table (the reference's index metas under
 /// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by
 /// **index id**.
@@ -4774,8 +4790,14 @@ pub(crate) struct TableEntry {
     pub(crate) hnsw_mem: HashMap<u64, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
     /// HNSW bytes buffered per index since its last dump (memindex quota).
     pub(crate) index_pending_bytes: HashMap<u64, usize>,
-    /// Whether this table's HNSW indexes were probed since the last dump.
+    /// Whether this table's HNSW indexes have been looked up in the catalog at
+    /// least once, so the per-row insert hook does not scan the catalog again
+    /// for a table that has none.
     pub(crate) hnsw_probed: bool,
+    /// Set when the registry must be topped up from the catalog
+    /// (`CREATE INDEX … USING HNSW`, a reopen). The insert hook consumes it, so
+    /// a warm insert never reads the catalog.
+    pub(crate) hnsw_topup: bool,
     /// Sparse (BMP) indexes per **index** id.
     pub(crate) sparse: HashMap<u64, Arc<std::sync::RwLock<SparseIndex>>>,
     /// Multi-vector indexes per **index** id.
@@ -5020,10 +5042,16 @@ pub(crate) struct Context {
     /// `PhysicalFlush` only runs a checkpoint and the cross-engine byte gates
     /// compare directories after `flush_data()`.
     pub(crate) flush_dumps_mem_index: std::sync::atomic::AtomicBool,
-    /// Set while a background `DumpMemIndexTask` proposed by the quota is
-    /// queued or running (C++ `MemIndexTracer::proposed_dump_`). Prevents the
-    /// per-row quota check from queueing one task per row.
-    pub(crate) memindex_pending: Arc<std::sync::atomic::AtomicUsize>,
+    /// The tables with a quota-proposed `DumpMemIndexTask` queued or running,
+    /// and the engine-wide count that gates the fast path.
+    ///
+    /// The reference's `MemIndexTracer::proposed_dump_` records the indexes a
+    /// dump already covers and skips **those**; it does not refuse to propose
+    /// anything else. A single global flag did: while one table's dump was in
+    /// flight, another table's breach was dropped outright, so that table
+    /// never drained (two databases, one HNSW index each, in
+    /// `test_optimize_from_different_database`).
+    pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,
@@ -8898,10 +8926,20 @@ impl BgTask for DumpMemIndexTask {
                     engine.dump_all_memory_indexes().await;
                     engine.dump_all_sealed_blocks(None).await;
                 } else {
-                    engine.dump_under_pressure(None).await;
+                    engine.dump_under_pressure(self.table.as_deref()).await;
                 }
             }
-            self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
+            // This task served its table (or every table); another breach may
+            // propose it again.
+            let mut pending = self.pending.lock().unwrap();
+            match &self.table {
+                Some(table) => {
+                    pending.tables.remove(table);
+                }
+                None => {
+                    pending.tables.clear();
+                }
+            }
         })
     }
 }

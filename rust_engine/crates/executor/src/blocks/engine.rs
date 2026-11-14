@@ -1805,7 +1805,7 @@ impl Engine {
             segments: Vec::new(),
         };
         for index in &published {
-            let existing: std::collections::HashSet<u64> = catalog::layout::read_index_chunks(
+            let existing: std::collections::HashMap<u64, u64> = catalog::layout::read_index_chunks(
                 self.storage.catalog.store().as_ref(),
                 &set.db_id,
                 &set.table_id,
@@ -1814,10 +1814,21 @@ impl Engine {
             .unwrap_or_default()
             .into_iter()
             .find(|(segment, _)| *segment == index.segment_id)
-            .map(|(_, chunks)| chunks.into_iter().map(|(id, _)| id).collect())
+            .map(|(_, chunks)| {
+                chunks
+                    .into_iter()
+                    .map(|(id, info)| (id, info.row_count))
+                    .collect()
+            })
             .unwrap_or_default();
             for chunk in &index.chunks {
-                if existing.contains(&(chunk.chunk_id as u64)) {
+                // A record that already exists is the chunk list; but the file
+                // it names can have been rewritten in place, and then the
+                // record's `row_count` is stale. A sparse dump reuses a block's
+                // chunk id and grows the file from 100 to 200 rows, so treating
+                // "the id is listed" as "the record is current" left the catalog
+                // describing half the rows. Write when anything differs.
+                if existing.get(&(chunk.chunk_id as u64)) == Some(&chunk.row_count) {
                     continue;
                 }
                 let _ = self.storage.catalog.append_index_chunk(&set, index, chunk);
@@ -6212,13 +6223,26 @@ impl Engine {
             if rows == 0 {
                 continue;
             }
-            // A checkpoint mirrors an index that has no chunk yet: the chunk is
-            // the whole segment's vectors, so rewriting it under a fresh id
-            // would append a duplicate to the chunk list every tick.
-            if !self
-                .live_chunk_files(&table, index_name, segment, Path::new(""))
-                .is_empty()
-            {
+            // A checkpoint mirrors an index whose chunks already cover the
+            // segment: the chunk is the whole segment's vectors, so rewriting it
+            // under a fresh id would append a duplicate to the chunk list every
+            // tick. "A chunk exists" is not the same as "the segment is
+            // covered" - an insert after the first dump leaves vectors the
+            // existing chunk does not hold, and `seal_index_tail` clears
+            // `ivf_mem` right after this returns, so skipping the dump lost
+            // them.
+            let covered: u64 = catalog::layout::read_index_chunks(
+                self.storage.catalog.store().as_ref(),
+                &db_id.to_string(),
+                &meta.id.to_string(),
+                &index_id.to_string(),
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .find(|(id, _)| *id == segment)
+            .map(|(_, chunks)| chunks.iter().map(|(_, info)| info.row_count).sum())
+            .unwrap_or(0);
+            if covered >= rows {
                 continue;
             }
             let (count, chunk) = self.ivf_chunk(&table, &column, &options, Some(segment))?;

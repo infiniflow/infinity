@@ -216,7 +216,13 @@ impl Engine {
         .unwrap_or_default();
         // The ids each surviving `base_name` already owns; only a chunk no
         // record names (the merged one) takes a fresh id from the counter.
-        let mut next = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
+        //
+        // The counter is **per segment** (`SegmentIndexMeta::next_chunk_id`), so
+        // it is read lazily for the segment being allocated: taking segment 0's
+        // value and handing it to every segment restarts a segment that had
+        // already used 0..19 at 0, and the new chunk overwrote one of its
+        // files.
+        let mut next_by_segment: std::collections::HashMap<u32, u32> = Default::default();
         let mut by_base: std::collections::HashMap<String, u32> = Default::default();
         for (_, chunks) in &existing {
             for (id, info) in chunks {
@@ -232,8 +238,11 @@ impl Engine {
             let chunk_id = match by_base.get(base_name) {
                 Some(id) => *id,
                 None => {
-                    let id = next;
-                    next += 1;
+                    let next = next_by_segment.entry(*segment).or_insert_with(|| {
+                        self.next_index_chunk_id(&set, &index_id.to_string(), *segment)
+                    });
+                    let id = *next;
+                    *next += 1;
                     id
                 }
             };
@@ -281,7 +290,7 @@ impl Engine {
     /// with rows the fetch cannot resolve. This is the reference's
     /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
     /// `ToWalEntry`, `kCompact`).
-    fn populate_compacted_indexes(&self, table: &str, merged_segment: u32) {
+    fn populate_compacted_indexes(&self, table: &str, merged_segment: u32, sources: &[u32]) {
         self.populate_secondary_indexes(table);
         let qualified = self.qualified_table(table);
         let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
@@ -305,12 +314,24 @@ impl Engine {
             };
             crate::engine::state::seal_text_index_unlocked(&shared);
             self.record_sealed_text_chunks(&qualified, &im.column);
-            self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment);
+            self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
         }
     }
 
-    /// Keeps only `merged_segment`'s chunks in one full-text index's list.
-    fn rewrite_text_chunk_segments(&self, table: &str, index_id: u64, merged_segment: u32) {
+    /// Keeps `merged_segment`'s chunks and drops the ones the compaction
+    /// actually retired.
+    ///
+    /// `sources` is what the compaction merged, not "every segment but the
+    /// merged one": `compact_segments` can be asked for a subset, and removing
+    /// an untouched segment's records left its live rows with no registered
+    /// postings.
+    fn rewrite_text_chunk_segments(
+        &self,
+        table: &str,
+        index_id: u64,
+        merged_segment: u32,
+        sources: &[u32],
+    ) {
         let qualified = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
             return;
@@ -329,7 +350,7 @@ impl Engine {
             return;
         };
         for (segment, chunks) in existing {
-            if segment == merged_segment || chunks.is_empty() {
+            if segment == merged_segment || chunks.is_empty() || !sources.contains(&segment) {
                 continue;
             }
             // `RemoveChunkIDs` on a source segment: the chunk files stay until
@@ -659,7 +680,7 @@ impl Engine {
         // The port reloads only the chunks the catalog lists, so the merged
         // segment's rows would otherwise stay in a memory tail and the old
         // chunks (whose row ids the merge retired) would keep answering.
-        self.populate_compacted_indexes(table, next_seg);
+        self.populate_compacted_indexes(table, next_seg, &source_ids);
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
         // The commit is published only when `_visible` drops (end of scope), and

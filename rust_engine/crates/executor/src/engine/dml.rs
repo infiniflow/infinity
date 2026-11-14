@@ -1470,15 +1470,21 @@ impl Engine {
         // `table_schema` is a full catalog read, so it must not be paid per
         // row: probe the index set once per table, and once there is nothing
         // in `hnsw_mem` the hook has nothing to do.
-        let probing = {
+        // Two questions, one pass, and this is the per-row path:
+        // * `topup` - must the catalog be read to materialise a graph this
+        //   registry does not hold yet? Exactly when a probe was asked for and
+        //   has not run (`CREATE INDEX` sets `hnsw_topup`, the probe clears it).
+        // * `probing` - is there any graph to feed? A table with none returns
+        //   here without touching the catalog again.
+        let (topup, probing) = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key.clone()).or_default();
-            if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
-                entry.hnsw_probed = true;
-                true
-            } else {
-                !entry.hnsw_mem.is_empty()
-            }
+            // The first insert on a table has to find out whether it has an
+            // HNSW index at all.
+            let first = entry.hnsw_mem.is_empty() && !entry.hnsw_probed;
+            entry.hnsw_probed |= first;
+            let topup = std::mem::take(&mut entry.hnsw_topup) || first;
+            (topup, topup || !entry.hnsw_mem.is_empty())
         };
         if !probing {
             return;
@@ -1491,15 +1497,16 @@ impl Engine {
         let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
-            // Top up the graphs when the catalog lists an HNSW record the
-            // registry does not hold yet. A second `CREATE INDEX … USING HNSW`
-            // on a column clears `hnsw_probed` (see the `CREATE INDEX` path), so
-            // this re-reads the catalog and the new index gets its own graph -
-            // the reference's `MemIndex` map is keyed by index id, so two
-            // indexes on one column never share one.
-            if entry.hnsw_probed {
-                // The probe above marked the table as examined; a table with
-                // no HNSW index leaves `hnsw_mem` empty forever.
+            // Materialise the graphs the catalog lists, once per table: this
+            // runs on **every inserted row**, so re-reading the catalog here
+            // would make a warm insert cost "rows x every index in the engine".
+            //
+            // A later `CREATE INDEX … USING HNSW` clears `hnsw_probed` (see the
+            // `CREATE INDEX` path) and registers its own id, so the next row
+            // re-probes and the new index gets a graph of its own - the
+            // reference's `MemIndex` map is keyed by index id, so two indexes on
+            // one column never share one.
+            if topup {
                 let Ok(indexes) = self.storage.catalog.list_indexes() else {
                     return;
                 };
@@ -2360,7 +2367,7 @@ impl Engine {
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.id);
                     e.index_pending_bytes.insert(im.id, 0);
-                    e.hnsw_probed = false;
+                    e.hnsw_topup = true;
                 }
             }
         }

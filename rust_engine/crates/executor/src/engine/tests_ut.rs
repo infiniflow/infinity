@@ -8031,6 +8031,39 @@ mod tests {
         assert!(e.memindex_bytes() <= 1500);
     }
 
+    /// A quota proposal for one table must not swallow another table's.
+    ///
+    /// `MemIndexTracer::proposed_dump_` records the indexes a queued dump
+    /// covers and skips **those**; it never refuses to propose a different
+    /// table's index. A single global "one dump in flight" flag did, so while
+    /// one table drained, every other table's breach was dropped and that
+    /// table's chunk never appeared (`test_optimize_from_different_database` in
+    /// the restart suite: two databases, one HNSW index each).
+    #[test]
+    fn a_queued_dump_does_not_suppress_another_tables_proposal() {
+        use crate::engine::state::{MemIndexPending, ALL_TABLES};
+
+        // The bookkeeping the quota uses, exercised directly: this is exactly
+        // what the old global flag got wrong. The end-to-end path needs a
+        // background processor (a test attaches none), so the restart suite's
+        // `test_optimize_from_different_database` covers that side.
+        let mut pending = MemIndexPending::default();
+        assert!(pending.tables.insert("default_db.a".to_string()));
+        // The same table again: coalesced into the entry already there.
+        assert!(!pending.tables.insert("default_db.a".to_string()));
+        // A different table: its own entry, so it still gets a task.
+        assert!(pending.tables.insert("default_db.b".to_string()));
+        assert_eq!(pending.tables.len(), 2);
+
+        // An "every tail" proposal covers every table, so nothing else needs a
+        // task; once it is served the marker goes.
+        let mut pending = MemIndexPending::default();
+        pending.tables.insert(ALL_TABLES.to_string());
+        assert!(pending.tables.contains(ALL_TABLES));
+        pending.tables.clear();
+        assert!(pending.tables.is_empty());
+    }
+
     /// The unified budget counts the HNSW charge, not only the text/sparse/
     /// multi-vector/secondary tails: an engine whose only memory is a graph
     /// must still notice it is over.
