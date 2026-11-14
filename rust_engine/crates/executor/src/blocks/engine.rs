@@ -6231,6 +6231,10 @@ impl Engine {
             // existing chunk does not hold, and `seal_index_tail` clears
             // `ivf_mem` right after this returns, so skipping the dump lost
             // them.
+            // Each IVF dump writes the segment's **whole** vector set, so the
+            // chunks are successive snapshots of it and their row counts must
+            // not be summed (100 rows, then 200, sums to 300). The newest
+            // snapshot is the coverage.
             let covered: u64 = catalog::layout::read_index_chunks(
                 self.storage.catalog.store().as_ref(),
                 &db_id.to_string(),
@@ -6240,7 +6244,7 @@ impl Engine {
             .unwrap_or_default()
             .into_iter()
             .find(|(id, _)| *id == segment)
-            .map(|(_, chunks)| chunks.iter().map(|(_, info)| info.row_count).sum())
+            .and_then(|(_, chunks)| chunks.into_iter().map(|(_, info)| info.row_count).max())
             .unwrap_or(0);
             if covered >= rows {
                 continue;

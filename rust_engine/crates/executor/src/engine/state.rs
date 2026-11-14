@@ -3838,7 +3838,7 @@ impl MultiVectorIndex {
             Some(root) => vec![root.as_path()],
             None => vec![self.dir.as_path()],
         };
-        let mut chunks: Vec<(u64, std::path::PathBuf)> = Vec::new();
+        let mut chunks: Vec<(u64, u64, std::path::PathBuf)> = Vec::new();
         for root in roots {
             let Ok(segments) = std::fs::read_dir(root) else {
                 continue;
@@ -3868,11 +3868,20 @@ impl MultiVectorIndex {
                     else {
                         continue;
                     };
-                    chunks.push((segment, path));
+                    // `seg_<segment>_<chunk>_<rows>.mvec`; sort by the two
+                    // numbers, not by the path. Lexically `seg_0_10_` precedes
+                    // `seg_0_2_`, which handed the newest chunk's rows the older
+                    // chunk's ids.
+                    let ordinal = stem
+                        .strip_prefix("seg_")
+                        .and_then(|rest| rest.split('_').nth(1))
+                        .and_then(|id| id.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    chunks.push((segment, ordinal, path));
                 }
             }
         }
-        chunks.sort();
+        chunks.sort_by_key(|(segment, ordinal, _)| (*segment, *ordinal));
         // A segment can be written by more than one dump, so its chunks each
         // hold a slice of it. Walk them in chunk order and hand each the next
         // `doc_count` of that segment's live rows: requiring every chunk to
@@ -3880,7 +3889,7 @@ impl MultiVectorIndex {
         // fallback (`search` falls through to it when a filter excludes every
         // PLAID candidate) empty for a multi-dump segment.
         let mut cursor: std::collections::HashMap<u64, usize> = Default::default();
-        for (segment, path) in chunks {
+        for (segment, _, path) in chunks {
             let Ok(reader) = storage::multivector_segment::MultiVectorSegmentReader::open(&path)
             else {
                 continue;

@@ -2248,10 +2248,24 @@ impl Engine {
             })
             .unwrap_or(0);
             let mut pairs: Vec<(Key, u32)> = Vec::new();
+            // Every source must be read: skipping an unreadable one and then
+            // replacing the segment's whole chunk list would drop the rows it
+            // held, and its file is deleted below with the others.
+            let mut complete = true;
             for (_, path) in &chunks {
-                if let Ok(reader) = SecondarySegmentReader::open_with_kind(path, kind) {
-                    pairs.extend(reader.pairs());
+                match SecondarySegmentReader::open_with_kind(path, kind) {
+                    Ok(reader) => pairs.extend(reader.pairs()),
+                    Err(_) => {
+                        complete = false;
+                        break;
+                    }
                 }
+            }
+            if !complete {
+                eprintln!(
+                    "[idx] merge {table} idx {index_id} seg {segment}: a source chunk could not be read"
+                );
+                continue;
             }
             if pairs.is_empty() {
                 continue;

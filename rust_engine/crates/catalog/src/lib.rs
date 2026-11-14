@@ -1098,8 +1098,12 @@ impl Catalog {
     ///
     /// [`Self::next_chunk_id`] only reads: two recorders that both read it and
     /// then both append would publish two chunks under one id, and
-    /// `append_index_chunk` overwrites rather than rejecting. The read and the
-    /// write are one batch here, so the id cannot be handed out twice.
+    /// `append_index_chunk` overwrites rather than rejecting.
+    ///
+    /// `counter_lock` serialises the read against the raise, the way
+    /// `create_table_typed` holds it for the table counter: the batch alone is
+    /// an unconditional write, so two callers that read 7 before either wrote
+    /// would both store 8 and both return 7.
     pub fn take_next_chunk_id(
         &self,
         db_id: &str,
@@ -1107,6 +1111,7 @@ impl Catalog {
         index_id: u64,
         segment: u32,
     ) -> Result<u32> {
+        let _counter = self.counter_lock.lock().unwrap();
         let id = self.next_chunk_id(db_id, table_id, index_id, segment)?;
         let tag = storage::catalog_format::catalog_index_segment_tag_key(
             db_id,
