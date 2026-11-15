@@ -258,12 +258,17 @@ impl<'a> Builder<'a> {
         sorted.clear();
         sorted.extend_from_slice(cands);
         out.clear();
+        // Ties break on the vertex id in both directions, as they do in
+        // `search_layer`. A quantized store makes equal distances common
+        // (RaBitQ answers with a quantized estimate), and `sort_unstable` is
+        // free to order equal elements however the input happened to be
+        // laid out — which made the built graph vary between runs.
         if sorted.len() < m {
-            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0).then(b.1.cmp(&a.1)));
             out.extend(sorted.iter().map(|(_, n)| *n));
             return out;
         }
-        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         kept.clear();
         for &(d, node) in sorted.iter() {
             if kept.len() == m {
@@ -366,7 +371,14 @@ impl<'a> Builder<'a> {
             });
         }
         let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
-        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        // Break ties by node id, exactly as the serial path does
+        // (`HnswIndex::search_layer_filtered`). A quantized store makes ties
+        // common: RaBitQ answers with a quantized estimate, so many candidates
+        // land on the same `f32`. `result` is a `BinaryHeap`, whose internal
+        // layout is not a function of its contents, so `drain()` hands the ties
+        // over in an arbitrary order; without this `then` the candidate list -
+        // and therefore the graph it builds - changed from build to build.
+        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         out
     }
 }

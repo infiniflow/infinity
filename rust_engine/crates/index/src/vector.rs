@@ -1362,10 +1362,14 @@ impl HnswIndex {
             entry,
             max_level: top_level,
         });
-        let buckets: Vec<(usize, usize)> = [(base, entry), (entry + 1, n)]
-            .into_iter()
-            .flat_map(|(lo, hi)| crate::parallel_build::buckets_of(lo, hi, threads))
-            .collect();
+        // One split over the whole new range, as `HnswHandler::InsertVecs`
+        // does: `bucket_size = max(kBuildBucketSize, (n - 1) / threads + 1)`.
+        // Splitting `[base, entry)` and `[entry + 1, n)` separately used to
+        // hand a small batch two buckets that then ran concurrently — a 200-row
+        // build raced its own reverse links even though the reference builds
+        // that batch on one thread, and the graph it produced was not
+        // reproducible run to run.
+        let buckets: Vec<(usize, usize)> = crate::parallel_build::buckets_of(base, n, threads);
         {
             let shared = std::sync::Arc::clone(&shared);
             crate::parallel::for_each_blocking(buckets, threads, move |(start, end)| {
