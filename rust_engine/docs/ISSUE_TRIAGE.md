@@ -146,14 +146,15 @@ bucket_size = max(kBuildBucketSize, (n - 1) / threads + 1)
 
 两个并发 bucket 会写彼此的反向边：`connect_neighbors` 在 `list.len() < Mmax` 时直接 `push`，列表内容因此取决于谁先到。200 行的图逐次不同。
 
-item 3 把量化 store 也送进这条路径后，这个偏差第一次变得可观测：`hnsw_encodings_answer_vector_search`（200 行、`encode=rabitq`）本地 20 次里失败 5 次；CI 上 amd64 失败、arm64 通过（两边的线程调度不同）。
+item 3 把量化 store 也送进这条路径后，这个偏差第一次变得可观测：`hnsw_encodings_answer_vector_search`（200 行）在 CI 的 arm64 上失败（amd64 通过，两边线程调度不同）。
 
-修法两步：
+修法三步（前两步不够，第三步才是关键）：
 
 1. 按参考对整个 `[base, n)` 统一切分；
-2. builder 里两处 `sort_unstable_by` 加上按顶点 id 的 tiebreak，与 serial 路径 `search_layer_filtered` 已有的做法一致。量化 store 的距离是估计值，并列很常见，没有 tiebreak 时 `sort_unstable` 对等值元素的顺序取决于输入布局。
+2. builder 里两处 `sort_unstable_by` 加上按顶点 id 的 tiebreak，与 serial 路径 `search_layer_filtered` 已有的做法一致。量化 store 的距离是估计值，并列很常见，没有 tiebreak 时 `sort_unstable` 对等值元素的顺序取决于输入布局；
+3. **entry 顶点必须在它所属的 bucket 内部跳过，而不是把它从区间里切掉。** 第一版把含 entry 的 bucket 拆成前后两段，结果这两段又被并发调度——相邻区间同时飞，反向边的写入顺序依然不定（30 次构建 19 种图）。最终版本让每个 bucket 保持**连续**区间，`build_serial` 在遍历时跳过 entry。
 
-验证：该用例连续 15 次通过（修前 20 次里 5 次失败）。
+验证：plain / LVQ / RaBitQ 各 30 次构建都只得到 **1** 种图（修前分别是 19 / 2 / 2 种）；该用例连续 25 次通过，再加 12 次 CPU 满载下也全部通过；把跳过逻辑去掉后测试立即失败。
 
 ---
 
