@@ -1527,3 +1527,31 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+@pytest.mark.parametrize("sdk", ["embedded", "thrift"])
+def test_index_info_eq_and_hash(request, sdk):
+    """
+    Regression test: IndexInfo equality and hashing must work.
+    The embedded SDK's IndexInfo.__eq__ compared against a nonexistent
+    other.index_name attribute (AttributeError on any ==), and both
+    packages' __hash__ included the params dict directly
+    (TypeError: unhashable type: 'dict').
+    """
+    if sdk == "embedded":
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.index import IndexInfo, IndexType
+    else:
+        from infinity.index import IndexInfo, IndexType
+
+    a = IndexInfo("c1", IndexType.Hnsw, {"M": "16", "ef": "200"})
+    b = IndexInfo("c1", IndexType.Hnsw, {"ef": "200", "M": "16"})
+    c = IndexInfo("c2", IndexType.Hnsw, {"M": "16", "ef": "200"})
+    d = IndexInfo("c1", IndexType.Hnsw)  # no params
+
+    assert a == b
+    assert hash(a) == hash(b)
+    assert a != c
+    assert d == IndexInfo("c1", IndexType.Hnsw)
+    assert hash(d) == hash(IndexInfo("c1", IndexType.Hnsw))
+    assert len({a, b, c, d}) == 3
