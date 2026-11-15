@@ -942,6 +942,27 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 i64_array_idx=indices,
                 f64_array_value=[float(v) for v in values],
             )
+        case dict() if value and all(
+            str(index).isdigit() and isinstance(v, (int, float))
+            for index, v in value.items()
+        ):
+            # A sparse vector may also be written as {index: value}, which is
+            # the form it comes back in from a query; accept it on the way in
+            # too instead of rejecting the SDK's own output.
+            indices = [int(index) for index in value]
+            values = list(value.values())
+            if all(isinstance(v, int) for v in values):
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseIntegerArray,
+                    i64_array_idx=indices,
+                    i64_array_value=values,
+                )
+            else:
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseDoubleArray,
+                    i64_array_idx=indices,
+                    f64_array_value=[float(v) for v in values],
+                )
         case Array():
             children_list = [
                 get_remote_constant_expr_from_python_value(child)
