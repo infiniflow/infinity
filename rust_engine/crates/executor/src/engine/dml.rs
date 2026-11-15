@@ -2004,11 +2004,17 @@ impl Engine {
                         // The segment is written with the lock released: the
                         // tail moves to `TextIndex::inflight`, where queries keep
                         // reading it, so nobody waits for the fsync.
-                        crate::engine::state::seal_text_index_unlocked(&shared);
-                        // The chunk is on disk; its catalog record is what a
-                        // reader goes by, so write it before the rows can be
-                        // queried from a fresh build.
-                        self.record_sealed_text_chunks(table, &column);
+                        //
+                        // The chunk is only reachable through its catalog record,
+                        // so the file and the record are published together under
+                        // the directory's write gate: a build that loaded the
+                        // chunk list between the two would not see the chunk,
+                        // re-index its rows and write the same
+                        // `ft_{base_row_id}` name (`Engine::with_text_dir_gate`).
+                        Self::with_text_dir_gate(&shared, || {
+                            crate::engine::state::seal_text_index_gated(&shared);
+                            self.record_sealed_text_chunks(table, &column);
+                        });
                     }
                     drop(ticket);
                 }

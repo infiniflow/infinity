@@ -1648,7 +1648,7 @@ mod tests {
     }
 
     /// The unsealed segment is written **with the column's lock released**
-    /// (`seal_text_index_unlocked`), so the tail has to stay searchable while its
+    /// (`seal_text_index_gated`), so the tail has to stay searchable while its
     /// segment is on disk: it moves to `TextIndex::inflight`, which every read
     /// path merges after the resident tail.
     ///

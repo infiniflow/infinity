@@ -312,9 +312,15 @@ impl Engine {
             let Some(shared) = shared else {
                 continue;
             };
-            crate::engine::state::seal_text_index_unlocked(&shared);
-            self.record_sealed_text_chunks(&qualified, &im.column);
-            self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
+            // The whole publish - the merged chunk's files, its record and the
+            // records of the segments this compaction retired - under one gate:
+            // a build that loaded the chunk list in between would map a layout
+            // that is torn in two (`Engine::with_text_dir_gate`).
+            Self::with_text_dir_gate(&shared, || {
+                crate::engine::state::seal_text_index_gated(&shared);
+                self.record_sealed_text_chunks(&qualified, &im.column);
+                self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
+            });
         }
     }
 

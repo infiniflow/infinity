@@ -4232,7 +4232,10 @@ impl Engine {
                     .unsealed_segment()
                     .is_some_and(|held| held != segment)
             {
-                crate::engine::state::seal_text_index_unlocked(shared);
+                Self::with_text_dir_gate(shared, || {
+                    crate::engine::state::seal_text_index_gated(shared);
+                    self.record_sealed_text_chunks(table, column);
+                });
             }
             {
                 let mut index = shared.write().unwrap();
@@ -4268,9 +4271,13 @@ impl Engine {
             }
             // Persist the moved rows: the chunk names the new ids, so the next
             // build maps it instead of re-reading the column, and the chunks of
-            // the retired segments are gone from the catalog.
-            crate::engine::state::seal_text_index_unlocked(shared);
-            self.record_sealed_text_chunks(table, column);
+            // the retired segments are gone from the catalog. Files and record
+            // under one gate, or a build loading the list in between re-indexes
+            // and rewrites the same chunk name (`Engine::with_text_dir_gate`).
+            Self::with_text_dir_gate(shared, || {
+                crate::engine::state::seal_text_index_gated(shared);
+                self.record_sealed_text_chunks(table, column);
+            });
             if ft_trace_enabled(&self.table_key(table)) {
                 let g = shared.read().unwrap_or_else(|e| e.into_inner());
                 // The failure this trace exists for: a row is in the tail (so it

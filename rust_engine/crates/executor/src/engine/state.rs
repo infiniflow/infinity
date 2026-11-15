@@ -6174,11 +6174,8 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
     }
 }
 
-/// Marks a document deleted. Its postings and length stay: the reference's
-/// segments keep deleted documents until compaction, so corpus statistics must
-/// still count them; the search paths filter them out by sequence id.
 /// Seals one column's unsealed segment with the write lock **released** for the
-/// file write.
+/// file write, for a caller that holds the directory's write gate.
 ///
 /// The tail moves into `TextIndex::inflight` while it is written, so the rows
 /// stay searchable and a concurrent query never waits for the FST build, the
@@ -6186,19 +6183,19 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
 /// a lock-held seal put in front of every query on the column). A failed write
 /// leaves the tail in flight for the next attempt instead of merging it back
 /// into a tail other writers may have appended to.
-pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
-    // The directory's write gate, taken **before** any index lock: a seal and a
-    // merge, a checkpoint's publish or another instance's rebuild must never
-    // write, rename or unlink one chunk file at the same time. Both sides derive
-    // the chunk's name from its first row id (`ft_{base_row_id}`), so two writers
-    // of one range would choose the same name and the narrower write would win
-    // (`dir_gate`). Cloned out of the instance first, so no index lock is held
-    // while the wait happens.
-    let gate = {
-        let index = shared.read().unwrap();
-        index.gate.clone()
-    };
-    let _serial = gate.lock().unwrap();
+///
+/// A seal is not finished when its files land: the chunk is only reachable once
+/// [`SharedTextIndex`]'s owner writes its **catalog record**
+/// (`Engine::record_sealed_text_chunks`). A build that loaded the chunk list
+/// between the two would not see the chunk, would re-index those rows from the
+/// blocks and would write the same `ft_{base_row_id}` name - narrower, if the
+/// block boundary falls earlier - so the file and its record have to be
+/// published under one gate. Every caller takes it with
+/// [`crate::engine::Engine::with_text_dir_gate`], which is also what keeps a
+/// seal, a merge, a checkpoint's publish and a rebuild from writing, renaming or
+/// unlinking one chunk file at the same time
+/// ([`crate::engine::text_index::dir_gate`]).
+pub(crate) fn seal_text_index_gated(shared: &SharedTextIndex) {
     let job = {
         let mut index = shared.write().unwrap();
         index.claim_seal()

@@ -55,11 +55,15 @@ pub(crate) fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
 /// rows missing after a restart).
 ///
 /// Per directory, process wide: two engines opened on one directory are one
-/// directory on disk. It is only ever held around blocking file I/O and never
-/// across an `await`, so it is a `std::sync::Mutex`. Taken **before** any index
-/// lock - `seal_text_index_unlocked`, `optimize_text_index_unlocked` and the
-/// build all follow that order, and nothing takes it while holding one - which
-/// is what keeps `gate -> index` the only nesting this index has.
+/// directory on disk. One entry per directory is kept for the life of the
+/// process - one per full-text index, so the map is the index count, not a
+/// growing trace of every seal. It is only ever held around blocking file I/O
+/// and never across an `await`, so it is a `std::sync::Mutex`. Taken **before**
+/// any index
+/// lock - `Engine::with_text_dir_gate` (used by every seal),
+/// `optimize_text_index_unlocked` and the build all follow that order, and
+/// nothing takes it while holding one - which is what keeps `gate -> index` the
+/// only nesting this index has.
 pub(crate) fn dir_gate(dir: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
     type Gate = std::sync::Arc<std::sync::Mutex<()>>;
     type Gates = std::sync::Mutex<std::collections::HashMap<String, Gate>>;
