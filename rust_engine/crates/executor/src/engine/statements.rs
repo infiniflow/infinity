@@ -57,6 +57,35 @@ fn run_text_build_hook() {
     });
 }
 
+/// A hook parked at one of the named points inside a compaction's commit: the
+/// arguments are the table and the point.
+#[cfg(test)]
+type CompactionWindowHook = Box<dyn Fn(&str, &str) + Send>;
+
+/// Hook for the window [`Engine::compact_all_segments`] leaves open between
+/// recording the merged segment's chunk and retiring the source segments'
+/// records. Global rather than thread-local: it fires after a commit boundary,
+/// which may be a different thread than the one that started the compaction.
+#[cfg(test)]
+static COMPACTION_WINDOW_HOOK: std::sync::Mutex<Option<CompactionWindowHook>> =
+    std::sync::Mutex::new(None);
+
+/// Installs [`COMPACTION_WINDOW_HOOK`]; the hook gets the table's name and the
+/// point it fired at, so a test parked here is not woken by another test's
+/// compaction (`cargo test` runs the suite in one process, many threads).
+#[cfg(test)]
+pub(crate) fn set_compaction_window_hook(hook: Option<CompactionWindowHook>) {
+    *COMPACTION_WINDOW_HOOK.lock().unwrap() = hook;
+}
+
+#[cfg(test)]
+pub(crate) fn run_compaction_window_hook(table: &str, at: &str) {
+    let hook = COMPACTION_WINDOW_HOOK.lock().unwrap();
+    if let Some(hook) = hook.as_ref() {
+        hook(table, at);
+    }
+}
+
 /// What [`Engine::publish_text_index`] did with a freshly built index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextPublish {
@@ -3939,15 +3968,29 @@ impl Engine {
         // counter the write paths maintain: `row_count` walks the blocks'
         // `version` files, which costs milliseconds on a table of a few blocks
         // and must not run on the query path.
-        let reserved = {
+        //
+        // `live_rows` is the count an abandoned row set is measured against;
+        // `segments` is the layout a catalog chunk has to belong to (the filter
+        // below). Both come from the one snapshot of the table.
+        let (reserved, live_segments) = {
             let tables = self.tables.lock().unwrap();
-            match tables.get(&tkey).and_then(|e| e.live_rows) {
-                Some(n) => n,
-                None => {
-                    drop(tables);
-                    self.row_count(table).unwrap_or(0)
-                }
+            match tables.get(&tkey) {
+                Some(entry) => (
+                    entry.live_rows,
+                    Some(
+                        entry
+                            .segments
+                            .keys()
+                            .copied()
+                            .collect::<std::collections::HashSet<u32>>(),
+                    ),
+                ),
+                None => (None, None),
             }
+        };
+        let reserved = match reserved {
+            Some(n) => n,
+            None => self.row_count(table).unwrap_or(0),
         };
         let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
         if let Some(idx) = cached {
@@ -3966,6 +4009,26 @@ impl Engine {
         let catalog_chunks = self
             .fulltext_catalog_chunks_of(table, index_id)
             .unwrap_or_default();
+        // A chunk is readable only while its `ROW_ID` segment is, and the layout
+        // - not the record set - is what says so: a compaction retires the source
+        // segments' chunk records in a step of its own, after the merged postings
+        // are already recorded, so a build that loaded the list in between mapped
+        // postings of row ids the merge had given up on. Those ids are not
+        // `DELETE`s, so no tombstone covers them: a `MATCH` fills its top-n with
+        // them and answers 0 rows on a table full of matches
+        // (`concurrent_churn_never_empties_a_small_top_n`).
+        //
+        // Filtering here costs nothing when the records are right, and when they
+        // are not it turns a refused publish (the build covers a retired segment)
+        // into a build the cache can keep. A table whose layout is not known yet
+        // is left alone: then there is nothing to compare against.
+        let catalog_chunks: Vec<CatalogChunk> = match &live_segments {
+            Some(live) if !live.is_empty() => catalog_chunks
+                .into_iter()
+                .filter(|chunk| live.contains(&((chunk.base_row_id >> 32) as u32)))
+                .collect(),
+            _ => catalog_chunks,
+        };
         // A chunk has no other place to be, so the index root follows the same
         // index the catalog named; the writer/sealer and the reader agree on
         // `idx_{id}/seg_{n}`.
@@ -4311,6 +4374,9 @@ impl Engine {
         for (index_id, _, _) in &indexes {
             entry.text_built.insert(*index_id, (epoch, built_ts));
         }
+        drop(tables);
+        #[cfg(test)]
+        crate::engine::statements::run_compaction_window_hook(table, "reindex");
     }
 
     /// The sealed chunks the catalog lists for a table's full-text index on

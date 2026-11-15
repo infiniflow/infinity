@@ -1065,6 +1065,162 @@ mod tests {
         assert_eq!(rows(&engine, q).len(), 3, "after the churn");
     }
 
+    /// A compaction moves the rows into a new `ROW_ID` segment and retires the
+    /// source segments' chunk records in a step of its own. A build that read the
+    /// catalog between the two mapped postings of ids the merge had given up on:
+    /// they are not `DELETE`s, nothing filters them, and a `topn=3` answer could
+    /// come back empty on a table full of matches. The layout decides liveness,
+    /// not the record set, so the build maps the live chunk only.
+    #[test]
+    fn a_build_never_maps_the_chunk_of_a_retired_segment() {
+        let q =
+            "SELECT doctitle FROM retired_chunk SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking(
+                "CREATE TABLE retired_chunk (id INTEGER, doctitle VARCHAR, body VARCHAR)",
+            )
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX rc_body ON retired_chunk (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..200 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO retired_chunk VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        let index_id = engine
+            .fulltext_index_id("retired_chunk", "body")
+            .expect("the index is recorded in the catalog");
+        let tkey = engine.table_key("retired_chunk");
+        // Hold the compaction where the merged rows are recorded and the source
+        // segments' records are not retired yet, then force the next query to
+        // rebuild from the catalog's chunk list.
+        let parked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&parked);
+        crate::engine::statements::set_compaction_window_hook(Some(Box::new(
+            move |table: &str, at: &str| {
+                // The suite runs in one process: another test's compaction must not
+                // park this one (or be parked by it).
+                if !table.contains("retired_chunk") || at != "records" {
+                    return;
+                }
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            },
+        )));
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                engine
+                    .compact_all_segments("default_db.retired_chunk")
+                    .expect("the compaction");
+            })
+        };
+        while !parked.load(std::sync::atomic::Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        {
+            let mut tables = engine.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.text.clear();
+                entry.text_built.clear();
+            }
+        }
+        assert_eq!(rows(&engine, q).len(), 3, "during the compaction");
+        // The catalog still names segment 0's chunk, so a build that trusted the
+        // records covered a segment the table no longer has: `publish_text_index`
+        // refuses it and the cache stays empty. A build over live segments only
+        // is the layout's own answer and is cached.
+        {
+            let tables = engine.tables.lock().unwrap();
+            let cached = tables
+                .get(&tkey)
+                .and_then(|entry| entry.text.get(&index_id))
+                .cloned();
+            drop(tables);
+            let cached = cached.expect("the build mapped rows the table no longer has");
+            let index = cached.read().unwrap();
+            for segment in &index.reader.segments {
+                assert_eq!(
+                    (segment.reader.base_row_id() >> 32) as u32,
+                    1,
+                    "a chunk of a retired segment reached the reader"
+                );
+            }
+        }
+        compactor.join().expect("the compactor panicked");
+        crate::engine::statements::set_compaction_window_hook(None);
+        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+    }
+
+    /// A compaction moves the cached postings onto the new row ids **inside** its
+    /// commit, before that commit is published. A statement that starts in that
+    /// window must be answered by an index that agrees with the rows it can see:
+    /// the moved postings name ids of the merged segment, and a reader that reads
+    /// below the merge cannot fetch one of them, so `MATCH ... topn=3` would come
+    /// back with 0 rows on a table full of matches. This pins that ordering (the
+    /// rows reachable first, then the postings), which is what the churn case
+    /// exercises under load.
+    #[test]
+    fn a_statement_started_inside_a_merge_is_answered_by_a_consistent_index() {
+        let q = "SELECT doctitle FROM oldts SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE oldts (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX oldts_body ON oldts (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..200 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO oldts VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        // Park the compaction right after the cached postings moved onto the new
+        // ids, i.e. while its commit is still unpublished.
+        let parked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&parked);
+        crate::engine::statements::set_compaction_window_hook(Some(Box::new(
+            move |table: &str, at: &str| {
+                if !table.contains("oldts") || at != "reindex" {
+                    return;
+                }
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            },
+        )));
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                engine
+                    .compact_all_segments("default_db.oldts")
+                    .expect("the compaction");
+            })
+        };
+        while !parked.load(std::sync::atomic::Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        let inside = rows(&engine, q).len();
+        compactor.join().expect("the compactor panicked");
+        crate::engine::statements::set_compaction_window_hook(None);
+        assert_eq!(
+            inside, 3,
+            "a statement started inside the merge was answered by postings it cannot fetch"
+        );
+        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+    }
+
     /// The seal a merge runs into: a chunk whose write was already in flight when
     /// the merge reindexed the column publishes ids of the segment the merge
     /// retired. A completed seal clears the overridden marks of the rows its

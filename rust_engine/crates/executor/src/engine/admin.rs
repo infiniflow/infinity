@@ -291,6 +291,8 @@ impl Engine {
     /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
     /// `ToWalEntry`, `kCompact`).
     fn populate_compacted_indexes(&self, table: &str, merged_segment: u32, sources: &[u32]) {
+        #[cfg(test)]
+        crate::engine::statements::run_compaction_window_hook(table, "records");
         self.populate_secondary_indexes(table);
         let qualified = self.qualified_table(table);
         let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
