@@ -1214,7 +1214,7 @@ impl Engine {
     /// (`ft_{first_row:016x}.{dic,pos,len,row}`).
     ///
     /// The write runs with the column's lock released
-    /// ([`crate::engine::state::seal_text_index_unlocked`]): a dump must not make
+    /// ([`crate::engine::state::seal_text_index_gated`]): a dump must not make
     /// every query on the column wait for the segment's fsync. The caller holds
     /// `flush_lock`, which serialises dumps and checkpoints but is never taken
     /// on the query path.
@@ -1227,9 +1227,39 @@ impl Engine {
             .get(&key)
             .and_then(|entry| entry.text.get(&index_id).cloned());
         if let Some(shared) = shared {
-            crate::engine::state::seal_text_index_unlocked(&shared);
-            self.record_sealed_text_chunks_of(table, index_id);
+            // Files and record together, or a build in between sees the chunks
+            // without the record and writes over them (`with_text_dir_gate`).
+            Self::with_text_dir_gate(&shared, || {
+                crate::engine::state::seal_text_index_gated(&shared);
+                self.record_sealed_text_chunks_of(table, index_id);
+            });
         }
+    }
+
+    /// Runs `publish` with the index directory's write gate held
+    /// ([`crate::engine::text_index::dir_gate`]).
+    ///
+    /// For the paths that publish a chunk's **files and its catalog record** as
+    /// one step. A seal is only reachable through its record
+    /// (`Engine::record_sealed_text_chunks`), so a build that loaded the chunk
+    /// list between the two would not see the chunk, re-index those rows from the
+    /// blocks and write the same `ft_{base_row_id}` name - narrower, if the block
+    /// boundary falls earlier, which is a lost chunk after the next reopen.
+    ///
+    /// The gate is cloned out of the instance before it is taken, so no index
+    /// lock is held while waiting, and this must not be called while holding
+    /// `tables`, the catalog or an index lock: `gate -> {index, tables,
+    /// catalog}` is the only nesting the text index introduces.
+    pub(crate) fn with_text_dir_gate<R>(
+        shared: &SharedTextIndex,
+        publish: impl FnOnce() -> R,
+    ) -> R {
+        let gate = {
+            let index = shared.read().unwrap_or_else(|poison| poison.into_inner());
+            index.gate.clone()
+        };
+        let _serial = gate.lock().unwrap_or_else(|poison| poison.into_inner());
+        publish()
     }
 
     /// Writes the catalog record for every chunk `column` sealed and has not

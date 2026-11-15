@@ -5089,6 +5089,19 @@ impl Engine {
             };
             let chunks = self.live_chunk_files(&im.table, &im.name, 0, &dir);
             if chunks.len() < 2 {
+                // `INF_FT_TRACE=opt` reports the skip: a table that keeps its
+                // incremental chunks while the test that waits for a merge sees
+                // the files on disk is either not catalogued yet (the count here
+                // comes from `SegmentIndexIDs -> ChunkIDs`) or was never counted.
+                if crate::engine::text_index::ft_trace_enabled("opt") {
+                    eprintln!(
+                        "[OPT] {}.{} skip: {} live chunk(s), {} row(s)",
+                        im.table,
+                        im.name,
+                        chunks.len(),
+                        rows
+                    );
+                }
                 continue;
             }
             let covered = self
@@ -5107,6 +5120,16 @@ impl Engine {
                 .map(|c| c.header.cur_vec_num as usize)
                 .unwrap_or(0);
             if covered >= rows {
+                // The newest chunk already claims every live row: nothing to
+                // merge. `INF_FT_TRACE=opt` prints both numbers, because an
+                // over-counted `rows` (a replayed append buffer added to rows a
+                // chunk already covers) parks the index here for good.
+                if crate::engine::text_index::ft_trace_enabled("opt") {
+                    eprintln!(
+                        "[OPT] {}.{} skip: newest chunk covers {covered} of {rows} row(s)",
+                        im.table, im.name
+                    );
+                }
                 continue;
             }
             // A merge holds the vectors, the rebuilt graph and the encoded

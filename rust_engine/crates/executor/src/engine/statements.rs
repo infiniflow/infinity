@@ -57,6 +57,35 @@ fn run_text_build_hook() {
     });
 }
 
+/// A hook parked at one of the named points inside a compaction's commit: the
+/// arguments are the table and the point.
+#[cfg(test)]
+type CompactionWindowHook = Box<dyn Fn(&str, &str) + Send>;
+
+/// Hook for the window [`Engine::compact_all_segments`] leaves open between
+/// recording the merged segment's chunk and retiring the source segments'
+/// records. Global rather than thread-local: it fires after a commit boundary,
+/// which may be a different thread than the one that started the compaction.
+#[cfg(test)]
+static COMPACTION_WINDOW_HOOK: std::sync::Mutex<Option<CompactionWindowHook>> =
+    std::sync::Mutex::new(None);
+
+/// Installs [`COMPACTION_WINDOW_HOOK`]; the hook gets the table's name and the
+/// point it fired at, so a test parked here is not woken by another test's
+/// compaction (`cargo test` runs the suite in one process, many threads).
+#[cfg(test)]
+pub(crate) fn set_compaction_window_hook(hook: Option<CompactionWindowHook>) {
+    *COMPACTION_WINDOW_HOOK.lock().unwrap() = hook;
+}
+
+#[cfg(test)]
+pub(crate) fn run_compaction_window_hook(table: &str, at: &str) {
+    let hook = COMPACTION_WINDOW_HOOK.lock().unwrap();
+    if let Some(hook) = hook.as_ref() {
+        hook(table, at);
+    }
+}
+
 /// What [`Engine::publish_text_index`] did with a freshly built index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextPublish {
@@ -3824,7 +3853,7 @@ impl Engine {
     /// The catalog id of the full-text index on `column` - the first one when
     /// the column has several, which is what the reference's
     /// `TableIndexMeta::GetIndexBase` resolves for a plain `MATCH TEXT`.
-    fn fulltext_index_id(&self, table: &str, column: &str) -> Option<u64> {
+    pub(crate) fn fulltext_index_id(&self, table: &str, column: &str) -> Option<u64> {
         self.storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
@@ -3846,35 +3875,20 @@ impl Engine {
         self.text_index_build(table, index_id, column, tokenizer)
     }
 
-    /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
+    /// The cached index for `index_id`, when it belongs to the current layout and
+    /// already holds every one of the `reserved` live rows, plus the table's
+    /// `text_epoch` - a build publishes at it.
     ///
-    /// The build reads once, so its postings describe exactly the snapshot the
-    /// statement sees; a merge that commits while it runs therefore invalidates
-    /// the *cache*, never the answer - see [`TextPublish`].
-    fn text_index_build(
+    /// Split out of [`Self::text_index_build`] because the build asks twice: on
+    /// the fast path, and again under the directory's write gate, where another
+    /// build may have published while this one waited for it.
+    fn usable_text_index(
         &self,
-        table: &str,
+        key: &str,
+        tkey: &str,
         index_id: u64,
-        column: &str,
-        tokenizer: TextTokenizer,
-    ) -> Result<SharedTextIndex> {
-        let key = mem_index_key(table, index_id);
-        let tkey = self.table_key(table);
-        // A bulk load that bypasses the DML hooks would leave the index short of
-        // rows; compare against the published row count and rebuild. Prefer the
-        // counter the write paths maintain: `row_count` walks the blocks'
-        // `version` files, which costs milliseconds on a table of a few blocks
-        // and must not run on the query path.
-        let reserved = {
-            let tables = self.tables.lock().unwrap();
-            match tables.get(&tkey).and_then(|e| e.live_rows) {
-                Some(n) => n,
-                None => {
-                    drop(tables);
-                    self.row_count(table).unwrap_or(0)
-                }
-            }
-        };
+        reserved: usize,
+    ) -> (Option<SharedTextIndex>, u64) {
         // Clone the `Arc` and let go of `tables` before the index is locked.
         // A query holds the index's *read* guard while it fetches rows
         // (`search_text_terms`), and that fetch needs `tables`
@@ -3884,7 +3898,7 @@ impl Engine {
         // queues behind the frozen `tables`.
         let (cached, epoch) = {
             let tables = self.tables.lock().unwrap();
-            match tables.get(&tkey) {
+            match tables.get(tkey) {
                 // A cached index built before the last bump belongs to the
                 // layout that bump retired, and one built before the last
                 // visible compaction read the source segments: both name row
@@ -3907,29 +3921,80 @@ impl Engine {
                 None => (None, 0),
             }
         };
-        if let Some(idx) = cached {
-            let (complete, segments, tail, overridden) = {
-                let g = idx.read().unwrap_or_else(|e| e.into_inner());
-                (
-                    g.total_docs(),
-                    g.reader.segments.len(),
-                    g.tails().map(|m| m.pending_docs()).sum::<usize>(),
-                    g.overridden.len(),
-                )
-            };
-            if complete >= reserved {
-                if ft_trace_enabled(&key) {
-                    eprintln!(
-                        "[FT] {key} reuse docs={complete} reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
-                    );
-                }
-                return Ok(idx);
-            }
-            if ft_trace_enabled(&key) {
+        let Some(idx) = cached else {
+            return (None, epoch);
+        };
+        let (complete, segments, tail, overridden) = {
+            let g = idx.read().unwrap_or_else(|e| e.into_inner());
+            (
+                g.total_docs(),
+                g.reader.segments.len(),
+                g.tails().map(|m| m.pending_docs()).sum::<usize>(),
+                g.overridden.len(),
+            )
+        };
+        if complete >= reserved {
+            if ft_trace_enabled(key) {
                 eprintln!(
-                    "[FT] {key} rebuild: cached docs={complete} < reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+                    "[FT] {key} reuse docs={complete} reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
                 );
             }
+            return (Some(idx), epoch);
+        }
+        if ft_trace_enabled(key) {
+            eprintln!(
+                "[FT] {key} rebuild: cached docs={complete} < reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+            );
+        }
+        (None, epoch)
+    }
+
+    /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
+    ///
+    /// The build reads once, so its postings describe exactly the snapshot the
+    /// statement sees; a merge that commits while it runs therefore invalidates
+    /// the *cache*, never the answer - see [`TextPublish`].
+    fn text_index_build(
+        &self,
+        table: &str,
+        index_id: u64,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<SharedTextIndex> {
+        let key = mem_index_key(table, index_id);
+        let tkey = self.table_key(table);
+        // A bulk load that bypasses the DML hooks would leave the index short of
+        // rows; compare against the published row count and rebuild. Prefer the
+        // counter the write paths maintain: `row_count` walks the blocks'
+        // `version` files, which costs milliseconds on a table of a few blocks
+        // and must not run on the query path.
+        //
+        // `live_rows` is the count an abandoned row set is measured against;
+        // `segments` is the layout a catalog chunk has to belong to (the filter
+        // below). Both come from the one snapshot of the table.
+        let (reserved, live_segments) = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(&tkey) {
+                Some(entry) => (
+                    entry.live_rows,
+                    Some(
+                        entry
+                            .segments
+                            .keys()
+                            .copied()
+                            .collect::<std::collections::HashSet<u32>>(),
+                    ),
+                ),
+                None => (None, None),
+            }
+        };
+        let reserved = match reserved {
+            Some(n) => n,
+            None => self.row_count(table).unwrap_or(0),
+        };
+        let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
+        if let Some(idx) = cached {
+            return Ok(idx);
         }
         let schema = self.table_schema(table)?;
         let col = schema
@@ -3944,6 +4009,26 @@ impl Engine {
         let catalog_chunks = self
             .fulltext_catalog_chunks_of(table, index_id)
             .unwrap_or_default();
+        // A chunk is readable only while its `ROW_ID` segment is, and the layout
+        // - not the record set - is what says so: a compaction retires the source
+        // segments' chunk records in a step of its own, after the merged postings
+        // are already recorded, so a build that loaded the list in between mapped
+        // postings of row ids the merge had given up on. Those ids are not
+        // `DELETE`s, so no tombstone covers them: a `MATCH` fills its top-n with
+        // them and answers 0 rows on a table full of matches
+        // (`concurrent_churn_never_empties_a_small_top_n`).
+        //
+        // Filtering here costs nothing when the records are right, and when they
+        // are not it turns a refused publish (the build covers a retired segment)
+        // into a build the cache can keep. A table whose layout is not known yet
+        // is left alone: then there is nothing to compare against.
+        let catalog_chunks: Vec<CatalogChunk> = match &live_segments {
+            Some(live) if !live.is_empty() => catalog_chunks
+                .into_iter()
+                .filter(|chunk| live.contains(&((chunk.base_row_id >> 32) as u32)))
+                .collect(),
+            _ => catalog_chunks,
+        };
         // A chunk has no other place to be, so the index root follows the same
         // index the catalog named; the writer/sealer and the reader agree on
         // `idx_{id}/seg_{n}`.
@@ -3961,17 +4046,62 @@ impl Engine {
         };
         // Cloned because a rejected publish retries the whole build.
         let build_dir = dir.clone();
+        // Every chunk this build writes, and every chunk its load removes, lives
+        // in `build_dir` - which a seal, a merge or another build of the same
+        // column may be writing at the same time. Two writers of one row range
+        // derive the same chunk name (`ft_{base_row_id}`) and the narrower write
+        // wins, so the gate serialises them (`dir_gate`). Taken before the index
+        // exists, so no index lock is held while waiting, and released before the
+        // publish takes `tables`.
+        let gate = crate::engine::text_index::dir_gate(&dir);
+        let serial = gate.lock().unwrap_or_else(|poison| poison.into_inner());
+        // A build that lost the race for the gate would otherwise rebuild the
+        // same column from scratch right after the winner published - six
+        // readers that all missed the cache meant six sequential rebuilds.
+        let (cached, _) = self.usable_text_index(&key, &tkey, index_id, reserved);
+        if let Some(idx) = cached {
+            return Ok(idx);
+        }
         let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
         // only, not for the whole table.
-        let first = index.load_sealed_scoped(&catalog_chunks) as usize;
+        let mut first = index.load_sealed_scoped(&catalog_chunks) as usize;
         if ft_trace_enabled(&key) {
             eprintln!(
                 "[FT] {key} build dir={build_dir} segs_loaded={} first={first} catalog_chunks={}",
                 index.reader.segments.len(),
                 catalog_chunks.len()
             );
+        }
+        // `load_sealed_scoped` hands back where the unsealed rows start, which is
+        // the largest end any chunk covers. That is the right resume point only
+        // while the chunks account for every live row: a chunk that went missing
+        // leaves the rows inside its range unindexed, and resuming past them
+        // never repairs it. A chunk's file name is derived from its first row
+        // id, so two writers publishing one directory can pick the same name and
+        // one write replaces the other - exactly one chunk's worth of rows, live
+        // in the table and absent from the index, and only after a reopen (the
+        // writer's own mmap keeps answering). See
+        // `writers_readers_deletes_and_merges_stay_consistent`.
+        //
+        // A hole alone is legitimate (rows between two seals may have no
+        // postings, or may not exist at all), so it only counts as lost rows
+        // when the chunks are *also* short of the table's live rows. Then the
+        // chunks at and after the hole are dropped and those rows are rebuilt
+        // from the blocks, which keeps the count exact.
+        let covered = index.total_docs();
+        if covered < reserved {
+            if let Some(hole) = index.first_coverage_hole() {
+                let dropped = index.drop_chunks_from(hole);
+                if ft_trace_enabled(&key) {
+                    eprintln!(
+                        "[FT] {key} chunks cover {covered} < reserved {reserved}, hole at row \
+                         {hole}: dropped {dropped} chunk(s), rebuilding from there"
+                    );
+                }
+                first = hole as usize;
+            }
         }
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
@@ -3982,6 +4112,10 @@ impl Engine {
             index_row(&mut index, seq as u64, &text);
             index.maybe_seal(self.memindex_capacity());
         }
+        // The chunks on disk are consistent and complete now; only the publish
+        // touches shared state, and it must not run with the gate held (it takes
+        // `tables`, which the gate may not nest inside).
+        drop(serial);
         let shared = Arc::new(std::sync::RwLock::new(index));
         #[cfg(test)]
         run_text_build_hook();
@@ -4013,12 +4147,38 @@ impl Engine {
         epoch: u64,
         index: SharedTextIndex,
     ) -> TextPublish {
+        // The `ROW_ID` segments the build indexed, read before the table lock:
+        // a query holds the index's read guard while it fetches rows, and that
+        // fetch needs `tables`, so the reverse order is the deadlocking one.
+        let covered = index
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .covered_row_segments();
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
         // by the compaction that renumbers the rows, so the build read ids that
         // now name nothing.
         if entry.text_epoch != epoch {
+            return TextPublish::Renumbered;
+        }
+        // The epoch is not enough: a build can *start* after a compaction bumped
+        // it and still read the pre-merge rows, because the merge's drops are
+        // not visible until it commits. The read ts does not catch that either -
+        // a statement reads at `current_ts() + 1`, and the writers keep
+        // committing past a running merge's ts - so what decides is the layout
+        // the build actually indexed: every `ROW_ID` segment it holds documents
+        // for has to still be listed by the catalog. One that is not is a build
+        // of ids the merge retired, and caching it answers `MATCH` with rows no
+        // block owns (`TestParallelFulltextIndexReadWrite`, `column "doctitle"
+        // is empty`).
+        if !entry.segments.is_empty() && !covered.iter().all(|id| entry.segments.contains_key(id)) {
+            if ft_trace_enabled(tkey) {
+                eprintln!(
+                    "[FT] {tkey}.{index_id} publish refused: build covers retired segments {covered:?}, live {:?}",
+                    entry.segments.keys().collect::<Vec<_>>()
+                );
+            }
             return TextPublish::Renumbered;
         }
         let read_ts = crate::read_ts();
@@ -4039,11 +4199,11 @@ impl Engine {
     /// A merge renumbers every row it takes, so the postings of the kept caches
     /// stop naming live rows the moment it lands. The rows it moved are indexed
     /// here under their new ids - from the row bytes the merge already read, not
-    /// from a scan - and the ids they left are marked overridden
-    /// (`index_delete_row`). Overridden ids are what the sealed read paths skip
-    /// while they iterate (`MergeCursor`), i.e. **before** the top-n cut: leaving
-    /// them in the postings made `MATCH` fill its top-n with rows no fetch can
-    /// resolve and answer "column is empty" on a table full of matches.
+    /// from a scan - and the ids they left are marked overridden. Overridden ids
+    /// are what the read paths skip while they iterate (`MergeCursor`), i.e.
+    /// **before** the top-n cut: leaving them in the postings made `MATCH` fill
+    /// its top-n with rows no fetch can resolve and answer "column is empty" on
+    /// a table full of matches.
     ///
     /// The caches are not dropped for this. Doing that put a full rebuild of the
     /// column on the query path, and a table that keeps taking writes is
@@ -4135,11 +4295,30 @@ impl Engine {
                     .unsealed_segment()
                     .is_some_and(|held| held != segment)
             {
-                crate::engine::state::seal_text_index_unlocked(shared);
+                Self::with_text_dir_gate(shared, || {
+                    crate::engine::state::seal_text_index_gated(shared);
+                    self.record_sealed_text_chunks(table, column);
+                });
             }
             {
                 let mut index = shared.write().unwrap();
                 crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                // Every id this merge left behind is retired: nothing names it any
+                // more, and the row it described now lives under `base + i`.
+                //
+                // A move is not a `DELETE`, so `tombstone_set` knows nothing about
+                // these ids and the read paths would not drop them: the copy of the
+                // posting the merge replaced can still sit in the unsealed tail or
+                // in a spilled run (a seal that was in flight when this ran leaves
+                // its rows in a chunk this drop cannot see), and there it answers
+                // `MATCH` with a row no fetch can resolve - filling a `topn=3`
+                // result with rows the merge retired, i.e. an empty answer on a
+                // table full of matches. Marking them overridden is what
+                // [`MergeCursor`] filters on, **before** the top-n cut.
+                crate::engine::state::retire_row_ids(
+                    &mut index,
+                    rows.iter().map(|(seq, _)| *seq as u64),
+                );
                 // The reference's reader is built from the catalog's live
                 // `SegmentIndexIDs`, so the segments this merge took are simply
                 // not there. Drop them whole: the rows they held were renumbered
@@ -4155,9 +4334,13 @@ impl Engine {
             }
             // Persist the moved rows: the chunk names the new ids, so the next
             // build maps it instead of re-reading the column, and the chunks of
-            // the retired segments are gone from the catalog.
-            crate::engine::state::seal_text_index_unlocked(shared);
-            self.record_sealed_text_chunks(table, column);
+            // the retired segments are gone from the catalog. Files and record
+            // under one gate, or a build loading the list in between re-indexes
+            // and rewrites the same chunk name (`Engine::with_text_dir_gate`).
+            Self::with_text_dir_gate(shared, || {
+                crate::engine::state::seal_text_index_gated(shared);
+                self.record_sealed_text_chunks(table, column);
+            });
             if ft_trace_enabled(&self.table_key(table)) {
                 let g = shared.read().unwrap_or_else(|e| e.into_inner());
                 // The failure this trace exists for: a row is in the tail (so it
@@ -4191,6 +4374,9 @@ impl Engine {
         for (index_id, _, _) in &indexes {
             entry.text_built.insert(*index_id, (epoch, built_ts));
         }
+        drop(tables);
+        #[cfg(test)]
+        crate::engine::statements::run_compaction_window_hook(table, "reindex");
     }
 
     /// The sealed chunks the catalog lists for a table's full-text index on
@@ -7032,6 +7218,43 @@ impl Engine {
                     .fetch_some_rows_with_ids(table, &wanted)?
                     .into_iter()
                     .collect();
+                {
+                    // A hit whose row cannot be resolved ate a top-n slot: the
+                    // postings name an id no block owns (a retired id left in a
+                    // chunk, a cache of a layout the merge moved). The query
+                    // answers short without saying why, so print what would let
+                    // a run be read back (`INF_FT_TRACE`).
+                    let key = index_key(table, &schema[field_specs[0].0]);
+                    if by_id.len() < wanted.len() && ft_trace_enabled(&key) {
+                        let missing: Vec<u64> = wanted
+                            .iter()
+                            .copied()
+                            .filter(|id| !by_id.contains_key(&(*id as usize)))
+                            .collect();
+                        let (segs, built, min_ts, epoch) = {
+                            // `text_built` is keyed by the record's id, not by the
+                            // column: resolve the same record `MATCH` used above.
+                            let index_id = self
+                                .fulltext_record(table, &schema[field_specs[0].0])
+                                .map(|(id, _)| id);
+                            let tables = self.tables.lock().unwrap();
+                            match tables.get(&self.table_key(table)) {
+                                Some(entry) => (
+                                    entry.segments.keys().copied().collect::<Vec<_>>(),
+                                    index_id.and_then(|id| entry.text_built.get(&id)).copied(),
+                                    entry.text_min_ts,
+                                    entry.text_epoch,
+                                ),
+                                None => (Vec::new(), None, 0, 0),
+                            }
+                        };
+                        eprintln!(
+                            "[FT] {key} MATCH unfetchable: topn={} missing={missing:?} read_ts={} epoch={epoch} min_ts={min_ts} built={built:?} live={segs:?}",
+                            wanted.len(),
+                            crate::read_ts()
+                        );
+                    }
+                }
                 let mut out = Vec::new();
                 for (seq, score) in scored {
                     let Some(mut row) = by_id.remove(&seq) else {

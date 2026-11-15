@@ -5275,6 +5275,7 @@ pub(crate) const CLOCK_TICKS_PER_SEC: f64 = 100.0;
 /// field C++'s `SystemInfo::MemoryUsage` (`src/metrics/system_info_impl.cpp:305`)
 /// parses, with `/proc/self/statm` (field 2 = resident pages) as the fallback
 /// for a kernel that does not publish `VmRSS`. Both report the same quantity.
+#[cfg(target_os = "linux")]
 pub(crate) fn process_rss_bytes() -> u64 {
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         for line in status.lines() {
@@ -5300,10 +5301,37 @@ pub(crate) fn process_rss_bytes() -> u64 {
     pages * 4096
 }
 
+/// Resident set size in bytes on the platforms without `/proc`: `ps -o rss=`
+/// reads the same figure from libproc (macOS) / the BSDs' kernel interface and
+/// prints it in KiB. Nothing overflows on the way back to bytes - an RSS is a
+/// `u64` many orders of magnitude larger than any process reaches.
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn process_rss_bytes() -> u64 {
+    let pid = std::process::id().to_string();
+    let Ok(out) = std::process::Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid])
+        .output()
+    else {
+        return 0;
+    };
+    let kb: u64 = String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .unwrap_or(0);
+    kb * 1024
+}
+
 /// Open file descriptors, the way C++'s `SystemInfo::OpenFileCount`
 /// (`src/metrics/system_info_impl.cpp:357`) counts entries in `/proc/<pid>/fd`.
+/// macOS and the BSDs mount the same table at `/dev/fd`, so the count is real
+/// there too instead of a constant zero.
 pub(crate) fn open_file_count() -> u64 {
-    std::fs::read_dir("/proc/self/fd")
+    let path = if cfg!(target_os = "linux") {
+        "/proc/self/fd"
+    } else {
+        "/dev/fd"
+    };
+    std::fs::read_dir(path)
         .map(|entries| entries.filter(|e| e.is_ok()).count() as u64)
         .unwrap_or(0)
 }
@@ -6146,11 +6174,8 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
     }
 }
 
-/// Marks a document deleted. Its postings and length stay: the reference's
-/// segments keep deleted documents until compaction, so corpus statistics must
-/// still count them; the search paths filter them out by sequence id.
 /// Seals one column's unsealed segment with the write lock **released** for the
-/// file write.
+/// file write, for a caller that holds the directory's write gate.
 ///
 /// The tail moves into `TextIndex::inflight` while it is written, so the rows
 /// stay searchable and a concurrent query never waits for the FST build, the
@@ -6158,7 +6183,19 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
 /// a lock-held seal put in front of every query on the column). A failed write
 /// leaves the tail in flight for the next attempt instead of merging it back
 /// into a tail other writers may have appended to.
-pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
+///
+/// A seal is not finished when its files land: the chunk is only reachable once
+/// [`SharedTextIndex`]'s owner writes its **catalog record**
+/// (`Engine::record_sealed_text_chunks`). A build that loaded the chunk list
+/// between the two would not see the chunk, would re-index those rows from the
+/// blocks and would write the same `ft_{base_row_id}` name - narrower, if the
+/// block boundary falls earlier - so the file and its record have to be
+/// published under one gate. Every caller takes it with
+/// [`crate::engine::Engine::with_text_dir_gate`], which is also what keeps a
+/// seal, a merge, a checkpoint's publish and a rebuild from writing, renaming or
+/// unlinking one chunk file at the same time
+/// ([`crate::engine::text_index::dir_gate`]).
+pub(crate) fn seal_text_index_gated(shared: &SharedTextIndex) {
     let job = {
         let mut index = shared.write().unwrap();
         index.claim_seal()
@@ -6178,18 +6215,27 @@ pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
     }
 }
 
-/// Runs one column's chunk merge with the write lock **released**.
+/// Runs one column's chunk merge with the index's write lock **released**.
 ///
-/// The plan is made under the lock from the chunk headers, the files are
-/// rewritten with no lock at all, and the swap back in checks that the chunk
-/// list is still the one the plan was made from. A chunk list that moved (a seal
-/// appended a chunk, another optimize replaced one) is left alone and the merged
-/// files are dropped, so a long merge never blocks a query or a writer and never
-/// loses a chunk that arrived meanwhile.
+/// The plan is made from the chunk headers, the files are rewritten with no
+/// index lock at all (a long merge never blocks a query), and the swap back in
+/// checks that the chunk list is still the one the plan was made from.
+///
+/// The three steps run under the **directory's write gate**, so no seal, no
+/// rebuild and no other merge can land in between: `apply_merge` unlinks the
+/// chunks the plan names, and a list that moved under it would have it delete
+/// files another writer had just published under the same name (`dir_gate`).
+/// Only the lookups this column shares with a query - the index lock itself -
+/// stay outside it.
 pub(crate) fn optimize_text_index_unlocked(
     shared: &SharedTextIndex,
     deleted: &std::collections::HashSet<u64>,
 ) -> crate::Result<usize> {
+    let gate = {
+        let index = shared.read().unwrap();
+        index.gate.clone()
+    };
+    let _serial = gate.lock().unwrap();
     let (plan, dir) = {
         let index = shared.read().unwrap();
         let Some(plan) = index.plan_merge(deleted)? else {
@@ -6197,7 +6243,7 @@ pub(crate) fn optimize_text_index_unlocked(
         };
         (plan, index.dir.clone())
     };
-    // No lock held: whole chunks are rewritten here.
+    // No index lock held: whole chunks are rewritten here.
     let merged = TextIndex::merge_runs(&dir, &plan);
     let mut index = shared.write().unwrap();
     Ok(index.apply_merge(&plan, merged))
@@ -6227,6 +6273,10 @@ pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
 /// `tombstone_set` knows nothing about it. Left in, those postings answer a
 /// `MATCH` with rows no fetch can resolve, and a `topn=3` query reports an empty
 /// column on a table full of matches.
+pub(crate) fn retire_row_ids(index: &mut TextIndex, ids: impl IntoIterator<Item = u64>) {
+    index.overridden.extend(ids);
+}
+
 pub struct EngineOptions {
     /// When `false`, catalog DDL becomes durable only at a checkpoint
     /// (`Engine::flush`), reproducing `NEW_CONFIG_NOWAL_PATH`.

@@ -1978,6 +1978,15 @@ impl Engine {
                         // Crossed into the next `ROW_ID` segment: seal the old
                         // rows in place. This happens once per 2^32 rows, so the
                         // lock-held write costs nothing measurable.
+                        //
+                        // This is the one seal that writes with the index lock
+                        // held, so it must not take the directory's write gate -
+                        // that would invert the `gate -> index` order every other
+                        // writer uses (`crate::engine::text_index::dir_gate`). The
+                        // chunk it writes is named after its own tail's first row
+                        // id, and no concurrent merge or rebuild reaches that tail
+                        // before this seal: both hold the gate and only see the
+                        // tail once it is sealed.
                         index.seal();
                     }
                     for doc in &prepared {
@@ -1995,11 +2004,17 @@ impl Engine {
                         // The segment is written with the lock released: the
                         // tail moves to `TextIndex::inflight`, where queries keep
                         // reading it, so nobody waits for the fsync.
-                        crate::engine::state::seal_text_index_unlocked(&shared);
-                        // The chunk is on disk; its catalog record is what a
-                        // reader goes by, so write it before the rows can be
-                        // queried from a fresh build.
-                        self.record_sealed_text_chunks(table, &column);
+                        //
+                        // The chunk is only reachable through its catalog record,
+                        // so the file and the record are published together under
+                        // the directory's write gate: a build that loaded the
+                        // chunk list between the two would not see the chunk,
+                        // re-index its rows and write the same
+                        // `ft_{base_row_id}` name (`Engine::with_text_dir_gate`).
+                        Self::with_text_dir_gate(&shared, || {
+                            crate::engine::state::seal_text_index_gated(&shared);
+                            self.record_sealed_text_chunks(table, &column);
+                        });
                     }
                     drop(ticket);
                 }

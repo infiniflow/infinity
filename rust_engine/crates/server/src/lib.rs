@@ -268,6 +268,50 @@ pub fn handshake(client_version: i64, assigned_session: i64) -> CommonResponse {
     }
 }
 
+/// Refuses to bind a wildcard address whose **loopback** is already taken.
+///
+/// macOS lets a second socket take the wildcard port while another process holds
+/// `127.0.0.1:<port>` (both sides set `SO_REUSEADDR`), and the kernel then hands
+/// every local client to the *more specific* socket. The engine reports
+/// `serving on 0.0.0.0:<port>` and answers on its LAN address, but
+/// `127.0.0.1:<port>` belongs to somebody else - so the Python and Go SDKs, whose
+/// default host is `127.0.0.1`, hang on the `Connect` handshake instead of
+/// getting a connection error, and `lsof -nP -iTCP:<port>` shows two `LISTEN`
+/// lines. On a developer's machine that somebody else was an IDE port forwarder
+/// holding 23817; every `go test` sat in `Connecting to 127.0.0.1:23817`.
+///
+/// Refusing to start is the only honest answer: clients that reach us through
+/// the wildcard work, clients that reach us through `127.0.0.1` cannot, and they
+/// fail by hanging. Linux already fails the wildcard bind with `EADDRINUSE`, so
+/// this only changes the error a macOS run reports.
+///
+/// The probe has to run **before** the wildcard bind - afterwards it would
+/// collide with our own listener - and it must be dropped again, because the
+/// real bind has to take the port.
+pub(crate) fn reject_taken_loopback(addr: &str) -> Result<()> {
+    let Ok(wildcard) = addr.parse::<std::net::SocketAddr>() else {
+        // A host name: the bind decides.
+        return Ok(());
+    };
+    if !wildcard.ip().is_unspecified() || wildcard.port() == 0 {
+        return Ok(());
+    }
+    let loopback = std::net::SocketAddr::from(([127, 0, 0, 1], wildcard.port()));
+    match std::net::TcpListener::bind(loopback) {
+        Ok(probe) => {
+            drop(probe);
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => Err(Error::Invalid(format!(
+            "cannot serve on {addr}: {loopback} is bound by another process, and every local \
+             client (the SDKs default to 127.0.0.1) would reach that one instead of this server. \
+             Free the port or serve on another one"
+        ))),
+        // AddressNotAvailable and friends: not ours to judge, the bind will say.
+        Err(_) => Ok(()),
+    }
+}
+
 /// A minimal TCP server that handles one `Connect` per connection.
 pub struct Server {
     listener: TcpListener,
@@ -281,6 +325,7 @@ pub struct Server {
 
 impl Server {
     pub fn bind(addr: &str) -> Result<Self> {
+        reject_taken_loopback(addr)?;
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
         let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         Ok(Self {
@@ -8528,6 +8573,32 @@ mod tests {
         write_connect_reply(&mut rbuf, 1, &resp).unwrap();
         let got = read_connect_reply(&mut &rbuf[..]).unwrap();
         assert_eq!(got, resp);
+    }
+
+    /// A wildcard bind must not report success while another process owns the
+    /// loopback: macOS allows both to coexist and sends every `127.0.0.1` client
+    /// to the *other* socket, so the SDKs (which default to `127.0.0.1`) hang in
+    /// `Connect` while the engine looks healthy. This is the dev-box failure the
+    /// check exists for.
+    #[test]
+    fn a_wildcard_bind_refuses_a_loopback_owned_by_someone_else() {
+        let free = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let free_port = free.local_addr().unwrap().port();
+        drop(free);
+        let server = Server::bind(&format!("0.0.0.0:{free_port}"))
+            .expect("a free loopback is not a conflict");
+        assert_eq!(server.local_addr().unwrap(), format!("0.0.0.0:{free_port}"));
+
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let taken_port = taken.local_addr().unwrap().port();
+        let Err(err) = Server::bind(&format!("0.0.0.0:{taken_port}")) else {
+            panic!("a wildcard bind over another process's loopback must be refused");
+        };
+        let msg = err.to_string();
+        assert!(
+            msg.contains(&format!("127.0.0.1:{taken_port}")) && msg.contains("bound by another"),
+            "unexpected error: {msg}"
+        );
     }
 
     #[test]

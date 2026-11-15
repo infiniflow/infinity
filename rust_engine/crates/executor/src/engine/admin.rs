@@ -291,6 +291,8 @@ impl Engine {
     /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
     /// `ToWalEntry`, `kCompact`).
     fn populate_compacted_indexes(&self, table: &str, merged_segment: u32, sources: &[u32]) {
+        #[cfg(test)]
+        crate::engine::statements::run_compaction_window_hook(table, "records");
         self.populate_secondary_indexes(table);
         let qualified = self.qualified_table(table);
         let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
@@ -312,9 +314,15 @@ impl Engine {
             let Some(shared) = shared else {
                 continue;
             };
-            crate::engine::state::seal_text_index_unlocked(&shared);
-            self.record_sealed_text_chunks(&qualified, &im.column);
-            self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
+            // The whole publish - the merged chunk's files, its record and the
+            // records of the segments this compaction retired - under one gate:
+            // a build that loaded the chunk list in between would map a layout
+            // that is torn in two (`Engine::with_text_dir_gate`).
+            Self::with_text_dir_gate(&shared, || {
+                crate::engine::state::seal_text_index_gated(&shared);
+                self.record_sealed_text_chunks(&qualified, &im.column);
+                self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
+            });
         }
     }
 
@@ -689,7 +697,17 @@ impl Engine {
         // row ids this merge retires. Retire those: from `compact_ts` on, only an
         // index built against the merged layout may be served. The rebuild above
         // runs at `u64::MAX`, so it survives; a build a query started during the
-        // merge is refused by `publish_text_index`.
+        // merge is refused by `publish_text_index` - either because it started
+        // before the epoch bump, or because the `ROW_ID` segments it indexed are
+        // the ones this merge retires.
+        //
+        // Only the caches `reindex_compacted_text` moved onto the new ids carry
+        // `compact_ts`; everything else was built from a retired layout. A
+        // `built_ts < compact_ts` test is not enough to see that: a statement
+        // reads at `current_ts() + 1`, so a build that started while this merge
+        // was already running can claim a ts at or above `compact_ts` while it
+        // still read the pre-merge rows (`TestParallelFulltextIndexReadWrite`,
+        // `column "doctitle" is empty`).
         {
             let tkey = self.table_key(table);
             let mut tables = self.tables.lock().unwrap();
