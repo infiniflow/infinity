@@ -2105,6 +2105,22 @@ impl Engine {
                         returns.clone().unwrap_or_default(),
                     ));
                 }
+                // The catalog record stores the `WITH (...)` text as written,
+                // and the C++ engine reads `lsg_config` back with
+                // `LSGConfig::FromString`, which only knows the spelling it
+                // writes itself (`sample_raito`). Accepting `sample_ratio` in SQL
+                // but persisting it verbatim made such a directory abort the C++
+                // engine (`Invalid index parameter type: sample_ratio`), so the
+                // value is normalised to `LSGConfig::ToString` before it is
+                // stored. `LsgConfig::parse` takes both spellings.
+                if let Some(pos) = index_opts
+                    .iter()
+                    .position(|(k, _)| k.eq_ignore_ascii_case("lsg_config"))
+                {
+                    if let Some(config) = index::lsg::LsgConfig::parse(&index_opts[pos].1) {
+                        index_opts[pos].1 = config.to_string();
+                    }
+                }
                 self.ddl_commit_typed(
                     TxnOp::CreateIndex {
                         table: table.clone(),

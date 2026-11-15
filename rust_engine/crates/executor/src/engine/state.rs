@@ -7565,6 +7565,17 @@ pub(crate) fn parse_vec_str(s: &str) -> Vec<f64> {
         .collect()
 }
 
+/// [`parse_vec_str`] straight into `f32`: the HNSW build and its append hook
+/// feed an `f32` graph, and going through `f64` parsed into one vector only to
+/// copy every element into another doubled the work on a 10k-row build.
+pub(crate) fn parse_vec_f32(s: &str) -> Vec<f32> {
+    let t = s.trim().trim_start_matches('[').trim_end_matches(']');
+    t.split([',', ' '])
+        .filter(|x| !x.is_empty())
+        .filter_map(|x| x.parse::<f32>().ok())
+        .collect()
+}
+
 /// Splits a stored multi-vector value into `dims`-sized token rows. Bit
 /// columns are scored as hamming and are not part of the MaxSim index.
 pub(crate) fn parse_multivector_doc(text: &str, dims: usize) -> Option<Vec<Vec<f32>>> {

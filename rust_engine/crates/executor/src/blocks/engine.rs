@@ -4581,6 +4581,13 @@ impl Engine {
     /// `dense_index_building_worker`: the reference's dense-index pool size,
     /// `hardware_concurrency() / 2` clamped to at least 2 (`config_impl.cpp:516-518`).
     pub(crate) fn hnsw_build_workers(&self) -> usize {
+        if let Some(n) = std::env::var("INFINITY_HNSW_BUILD_WORKERS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| *n > 0)
+        {
+            return n;
+        }
         std::thread::available_parallelism()
             .map(|count| count.get() / 2)
             .unwrap_or(1)

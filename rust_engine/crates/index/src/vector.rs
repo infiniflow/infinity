@@ -561,7 +561,7 @@ impl Store {
     }
 
     /// Trains the store's mean/centroid without storing any vector.
-    fn train(&mut self, vectors: &[Vec<f32>]) {
+    fn train<V: AsRef<[f32]>>(&mut self, vectors: &[V]) {
         match self {
             Store::Plain { .. } | Store::SparseIp { .. } => {}
             Store::Lvq(store) => store.train(vectors),
@@ -657,7 +657,11 @@ impl HnswIndex {
     /// Trains LVQ's mean / RaBitQ's centroid and computes the LSG averages
     /// from `vectors`. The caller then feeds the same vectors through
     /// [`HnswIndex::add`], which compresses them with the trained state.
-    pub fn train_store(&mut self, vectors: &[Vec<f32>], lsg: Option<crate::lsg::LsgConfig>) {
+    pub fn train_store<V: AsRef<[f32]> + Sync>(
+        &mut self,
+        vectors: &[V],
+        lsg: Option<crate::lsg::LsgConfig>,
+    ) {
         self.store.train(vectors);
         if let Some(config) = lsg {
             let metric = self.store.metric().into();
@@ -667,6 +671,16 @@ impl HnswIndex {
 
     pub fn lsg(&self) -> Option<&crate::lsg::LsgIndex> {
         self.lsg.as_ref()
+    }
+
+    /// The LVQ store's trained per-dimension mean (`None` for the other
+    /// encodings). A mean of all zeros means the store was never trained, which
+    /// makes every code carry no magnitude.
+    pub fn lvq_mean(&self) -> Option<&[f64]> {
+        match &self.store {
+            Store::Lvq(store) => Some(store.mean()),
+            _ => None,
+        }
     }
 
     pub fn encoding(&self) -> HnswEncoding {
@@ -1241,13 +1255,13 @@ impl HnswIndex {
     /// generator, so its levels are a scheduling outcome. Sampling in insertion
     /// order keeps them a property of the input, which is strictly easier to
     /// reproduce.
-    pub fn add_batch(&mut self, vectors: &[Vec<f32>], threads: usize) -> usize {
+    pub fn add_batch<V: AsRef<[f32]>>(&mut self, vectors: &[V], threads: usize) -> usize {
         if vectors.is_empty() {
             return 0;
         }
         if threads <= 1 {
             for v in vectors {
-                self.add(v);
+                self.add(v.as_ref());
             }
             return vectors.len();
         }
@@ -1261,6 +1275,7 @@ impl HnswIndex {
         // core (measured 99% CPU on a 20000-row index).
         let base = self.store.len();
         for v in vectors {
+            let v = v.as_ref();
             assert_eq!(v.len(), self.dims, "dimension mismatch");
             self.store.push(v);
         }

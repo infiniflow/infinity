@@ -182,13 +182,13 @@ impl RabitqStore {
 
     /// Sets the rotated centroid without storing any code (`Optimize`'s
     /// training half).
-    pub fn train(&mut self, vectors: &[Vec<f32>]) {
+    pub fn train<V: AsRef<[f32]>>(&mut self, vectors: &[V]) {
         if vectors.is_empty() {
             return;
         }
         let mut centroid = vec![0.0f32; self.dim];
         for v in vectors {
-            let p = self.padded(v);
+            let p = self.padded(v.as_ref());
             for (j, x) in p.iter().enumerate() {
                 centroid[j] += x;
             }

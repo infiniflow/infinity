@@ -97,11 +97,11 @@ impl LsgIndex {
     ///
     /// C++ `InsertSampleVec` samples each row independently with probability
     /// `sample_ratio`; the deterministic LCG here keeps a build reproducible.
-    pub fn build(vectors: &[Vec<f32>], metric: Metric, config: LsgConfig) -> Self {
+    pub fn build<V: AsRef<[f32]> + Sync>(vectors: &[V], metric: Metric, config: LsgConfig) -> Self {
         let mut state = 0x9E37_79B9_7F4A_7C15u64;
-        let mut samples: Vec<&Vec<f32>> = Vec::new();
+        let mut samples: Vec<&[f32]> = Vec::new();
         if config.sample_ratio >= 1.0 {
-            samples.extend(vectors.iter());
+            samples.extend(vectors.iter().map(|v| v.as_ref()));
         } else if config.sample_ratio > 0.0 {
             for v in vectors {
                 state = state
@@ -109,32 +109,55 @@ impl LsgIndex {
                     .wrapping_add(1442695040888963407);
                 let r = ((state >> 33) as u32) as f32 / u32::MAX as f32;
                 if r <= config.sample_ratio {
-                    samples.push(v);
+                    samples.push(v.as_ref());
                 }
             }
         }
         if samples.is_empty() {
             // A too-small ratio must not leave the graph unscaled.
-            samples.extend(vectors.iter());
+            samples.extend(vectors.iter().map(|v| v.as_ref()));
         }
         let ls_k = config.ls_k.min(samples.len()).max(1);
-        let mut avg = Vec::with_capacity(vectors.len());
-        for v in vectors {
-            let mut distances: Vec<f32> = samples
-                .iter()
-                .map(|sample| distance(v, sample, metric))
-                .collect();
-            match metric {
-                Metric::L2 => {
-                    distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        // Each row's average is independent of the others, and this loop is the
+        // dominant cost of an LSG build: `rows x samples x dims` distance
+        // computations (100k rows x 25k samples x 128 dims is ~3e11 flops). The
+        // rows are split over the machine's cores; every row keeps its own
+        // sample order, so the averages - and the build - stay reproducible.
+        let row_avg =
+            |v: &[f32]| -> f32 {
+                let mut distances: Vec<f32> = samples
+                    .iter()
+                    .map(|sample| distance(v, sample, metric))
+                    .collect();
+                match metric {
+                    Metric::L2 => distances
+                        .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)),
+                    Metric::Ip | Metric::Cos => distances
+                        .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)),
                 }
-                Metric::Ip | Metric::Cos => {
-                    distances.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal))
+                distances.iter().take(ls_k).sum::<f32>() / ls_k as f32
+            };
+        let workers = std::thread::available_parallelism()
+            .map(|count| count.get())
+            .unwrap_or(1)
+            .clamp(1, 16);
+        let avg: Vec<f32> = if workers == 1 || vectors.len() < 2048 {
+            vectors.iter().map(|v| row_avg(v.as_ref())).collect()
+        } else {
+            let chunk = vectors.len().div_ceil(workers);
+            let mut avg = vec![0.0f32; vectors.len()];
+            std::thread::scope(|scope| {
+                for (slots, part) in avg.chunks_mut(chunk).zip(vectors.chunks(chunk)) {
+                    let row_avg = &row_avg;
+                    scope.spawn(move || {
+                        for (slot, v) in slots.iter_mut().zip(part) {
+                            *slot = row_avg(v.as_ref());
+                        }
+                    });
                 }
-            }
-            let mean = distances.iter().take(ls_k).sum::<f32>() / ls_k as f32;
-            avg.push(mean);
-        }
+            });
+            avg
+        };
         Self {
             avg,
             alpha: config.alpha,

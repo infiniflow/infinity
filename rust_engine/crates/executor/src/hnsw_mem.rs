@@ -51,14 +51,22 @@ impl HnswIndexInMem {
 
     /// `InsertVecs` over a whole batch: the reference stores the batch and
     /// builds it in parallel buckets, one tokio task each.
-    pub fn insert_batch(&mut self, rows: &[(u64, Vec<f32>)], threads: usize) -> bool {
-        let batch: Vec<Vec<f32>> = rows
-            .iter()
-            .filter(|(_, v)| v.len() == self.dims)
-            .map(|(_, v)| v.clone())
-            .collect();
-        if batch.len() != rows.len() {
-            return false;
+    pub fn insert_batch<V: AsRef<[f32]> + Sync>(
+        &mut self,
+        rows: &[(u64, V)],
+        threads: usize,
+    ) -> bool {
+        // Borrowed, not copied: the batch is the caller's `rows` column, and a
+        // 20k x 128 copy here (plus the one the caller used to make) was pure
+        // overhead on the way to the store, which copies each vector once into
+        // its code regardless.
+        let mut batch: Vec<&[f32]> = Vec::with_capacity(rows.len());
+        for (_, v) in rows {
+            let v = v.as_ref();
+            if v.len() != self.dims {
+                return false;
+            }
+            batch.push(v);
         }
         if self.handler.insert_vecs_threaded(batch, threads) != rows.len() {
             return false;

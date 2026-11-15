@@ -3656,8 +3656,7 @@ impl Engine {
         // time made `CREATE INDEX` a serial point-by-point build.
         let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
         for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            let v: Vec<f32> = parse_vec_str(&text).iter().map(|x| *x as f32).collect();
-            rows.push((seq as u64, v));
+            rows.push((seq as u64, parse_vec_f32(&text)));
         }
         let read = t_read.elapsed();
         // The graph of **this** record only: a column may carry several HNSW
@@ -3671,10 +3670,10 @@ impl Engine {
         let t_build = std::time::Instant::now();
         for mem in segments {
             if let Ok(mut mem) = mem.lock() {
-                let batch: Vec<(u64, Vec<f32>)> = rows
+                let batch: Vec<(u64, &Vec<f32>)> = rows
                     .iter()
                     .filter(|(_, v)| v.len() == mem.dims)
-                    .map(|(seq, v)| (*seq, v.clone()))
+                    .map(|(seq, v)| (*seq, v))
                     .collect();
                 if !batch.is_empty() {
                     mem.insert_batch(&batch, self.hnsw_build_workers());

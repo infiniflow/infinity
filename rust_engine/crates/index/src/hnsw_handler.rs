@@ -51,10 +51,14 @@ impl HnswHandler {
     /// serial path.
     pub fn insert_vecs_threaded<I>(&mut self, vectors: I, threads: usize) -> usize
     where
-        I: IntoIterator<Item = Vec<f32>>,
+        I: IntoIterator,
+        I::Item: AsRef<[f32]>,
     {
         let dims = self.index.dims();
-        let batch: Vec<Vec<f32>> = vectors.into_iter().filter(|v| v.len() == dims).collect();
+        let batch: Vec<I::Item> = vectors
+            .into_iter()
+            .filter(|v| v.as_ref().len() == dims)
+            .collect();
         if batch.is_empty() {
             return 0;
         }

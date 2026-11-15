@@ -80,6 +80,18 @@ thread_local! {
 /// C++: the shipped resource root (`InfinityContext::config()` fallback).
 pub const DEFAULT_RESOURCE_PATH: &str = "/usr/share/infinity/resource";
 
+/// The resource root [`AnalyzerPool::instance`] loads its dictionaries from.
+///
+/// `INFINITY_RESOURCE_PATH` names a checkout of the resource tree, the way a
+/// host that does not install to the shipped location points at its copy; it
+/// falls back to [`DEFAULT_RESOURCE_PATH`]. The same variable is what
+/// `crates/analyzer-ffi/tests/c_api.rs` uses, so one setting drives both.
+pub fn resource_path() -> std::path::PathBuf {
+    std::env::var_os("INFINITY_RESOURCE_PATH")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(DEFAULT_RESOURCE_PATH))
+}
+
 /// C++: `AnalyzerPool` (`analyzer_pool.cppm`) — parses an analyzer name and
 /// hands out a fresh analyzer.
 ///
@@ -503,11 +515,12 @@ pub fn is_constructible_analyzer_name(name: &str) -> bool {
 impl AnalyzerPool {
     /// C++: `Singleton<AnalyzerPool>::instance()`.
     ///
-    /// Loads from the shipped resource root; a host that keeps the dictionaries
-    /// elsewhere builds its own with [`Self::with_resource_path`].
+    /// Loads from [`resource_path`] (`INFINITY_RESOURCE_PATH`, else the shipped
+    /// root); a host that needs several roots builds its own with
+    /// [`Self::with_resource_path`].
     pub fn instance() -> &'static AnalyzerPool {
         static INSTANCE: OnceLock<AnalyzerPool> = OnceLock::new();
-        INSTANCE.get_or_init(|| Self::with_resource_path(DEFAULT_RESOURCE_PATH))
+        INSTANCE.get_or_init(|| Self::with_resource_path(resource_path()))
     }
 
     /// A pool whose dictionary-driven families load from `dir`.

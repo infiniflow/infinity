@@ -4853,6 +4853,186 @@ mod tests {
         assert!(recall >= 0.95, "LSG recall@1 = {recall}");
     }
 
+    /// issue.txt #7: `sample_ratio` is accepted in SQL, but the record has to
+    /// carry the spelling the C++ engine parses (`sample_raito`). Persisting the
+    /// input verbatim made a C++ reader abort the directory with `Invalid index
+    /// parameter type: sample_ratio`.
+    #[test]
+    fn create_index_persists_the_reference_lsg_spelling() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sp (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX sp_i ON sp (v) USING HNSW WITH (metric='l2', encode='lvq', \
+             build_type='lsg', lsg_config='sample_ratio=0.25,ls_k=7,alpha=0.5');",
+        )
+        .unwrap();
+        let im = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.name == "sp_i")
+            .expect("the index");
+        let lsg = im
+            .options
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("lsg_config"))
+            .map(|(_, v)| v.clone())
+            .expect("lsg_config is stored in the record");
+        assert_eq!(lsg, "sample_raito = 0.25, ls_k = 7, alpha = 0.5");
+    }
+
+    /// issue.txt at scale: 20k (default) / 100k rows x 128 dims with `LVQ + LSG`
+    /// must train, stay queryable, dump its chunks, and keep its parameters
+    /// across a reopen.
+    ///
+    /// Ignored because it builds a real graph. Scale it with
+    /// `INFINITY_BIG_TEST_ROWS`, pick the encoding with
+    /// `INFINITY_BIG_TEST_ENCODE`, the build type with
+    /// `INFINITY_BIG_TEST_BUILD_TYPE`.
+    #[test]
+    #[ignore = "SLOW: 20k x 128 LVQ+LSG build"]
+    fn large_lvq_lsg_build_stays_stable() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean - the case an untrained LVQ mean
+        // gets wrong (issue.txt #2).
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        fn vector(i: usize) -> Vec<f32> {
+            let mut state = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    state = state
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    BASE[j % BASE.len()] + ((state >> 40) % 1000) as f32 / 10.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BIG_TEST_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20_000);
+        let encode = std::env::var("INFINITY_BIG_TEST_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BIG_TEST_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE big (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+        let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(n);
+        for i in 0..n {
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            dataset.push(vec![
+                Literal::Int(i as i64),
+                Literal::Str(format!("[{text}]")),
+            ]);
+        }
+        let started = std::time::Instant::now();
+        e.insert_literals("default_db.big", None, dataset).unwrap();
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX big_i ON big (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito=0.25,ls_k=7,alpha=0.5');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type}): {:?}",
+            started.elapsed()
+        );
+
+        let info = e.show_index_info("big", "big_i").expect("show_index");
+        eprintln!(
+            "show_index: {} | {} | chunks {}",
+            info.other_parameters, info.store_dir, info.segment_index_count
+        );
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        assert!(
+            info.other_parameters.contains("M = 16"),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+
+        // Self-query: the build has to answer its own rows.
+        let sample = 200usize;
+        let mut hits = 0usize;
+        for k in 0..sample {
+            let i = (k * 197) % n;
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM big SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"),
+            );
+            if got == vec![vec![i.to_string()]] {
+                hits += 1;
+            }
+        }
+        eprintln!("self recall@1: {hits}/{sample}");
+        assert!(
+            hits >= sample * 95 / 100,
+            "self recall {hits}/{sample} is below 95%"
+        );
+
+        // `FLUSH DATA` only dumps the memory segments when the setting says so
+        // (`[storage] flush_dumps_mem_index`).
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let info = e.show_index_info("big", "big_i").expect("after flush");
+        eprintln!("after flush: {} chunks", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM big;"),
+            vec![vec![n.to_string()]]
+        );
+        let info = e.show_index_info("big", "big_i").expect("after reopen");
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+    }
+
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
     /// vectors per the `encode` option and answers the same top-1.
     #[test]
