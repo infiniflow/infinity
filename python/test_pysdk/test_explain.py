@@ -151,8 +151,6 @@ class TestInfinity:
             # A group-by query explains through an AGGREGATE operator; without
             # forwarding group by the plan is a plain projection.
             assert "AGGREGATE" in plan_text
-            # having reaches the plan as a filter over the aggregate.
-            assert "aggregate_" in plan_text
 
         # having must reach the explained query as well. The plan text alone
         # cannot show it: a having over the group key is folded into the

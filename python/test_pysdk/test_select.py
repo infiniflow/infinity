@@ -3848,13 +3848,14 @@ class TestInfinity:
         assert res["c2"].tolist() == [False, True, True]
 
         # an explicit CAST pins the result type: CAST(c2 AS VARCHAR) must stay
-        # a string and must not be bool-coerced
+        # a string and must not be bool-coerced. Read the only column by
+        # position: the two engines name a CAST column differently.
         res, extra_result = (
             table.output(["cast(c2 as varchar)"])
             .sort([["cast(c2 as varchar)", SortType.Asc]])
             .to_df()
         )
-        assert res["cast(c2 as varchar)"].tolist() == ["false", "true", "true"]
+        assert res.iloc[:, 0].tolist() == ["false", "true", "true"]
 
         db_obj.drop_table("test_varchar_bool_like" + suffix, ConflictType.Error)
 
@@ -3891,7 +3892,9 @@ class TestInfinity:
             .sort([["c1", SortType.Asc]])
             .to_df()
         )
-        assert res["cast(c2 as varchar)"].tolist() == ["1:0.5,2:0.3", "[1,2]", "[3:4]"]
+        # The CAST column is the second one by position; its name differs
+        # between the engines.
+        assert res.iloc[:, 1].tolist() == ["1:0.5,2:0.3", "[1,2]", "[3:4]"]
 
         res = db_obj.drop_table("test_varchar_list_sparse_like" + suffix)
         assert res.error_code == ErrorCode.OK

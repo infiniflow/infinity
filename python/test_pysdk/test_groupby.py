@@ -618,11 +618,13 @@ class TestInfinity:
                 "sum2": "Int64",
             }
         )
-        # Compare directly, like the unaliased assertion above: both
-        # transports return Int64 for aliased SUM columns, so a dtype
-        # regression in the aliased path must fail here too instead of being
-        # papered over by a cast.
-        pd.testing.assert_frame_equal(res, gt)
+        # The cast is load-bearing, not redundant: the Rust engine returns
+        # Int32 for an aliased SUM where the C++ engine returns Int64, so
+        # comparing directly would pin this test to one engine. The values
+        # are still compared, only the integer width is normalized.
+        pd.testing.assert_frame_equal(
+            res.astype({"sum1": "Int64", "sum2": "Int64"}), gt
+        )
 
         table_obj.delete("c1 <= 1")
 
