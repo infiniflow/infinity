@@ -28,9 +28,9 @@ from .http_utils import (
     bool_functions,
     default_url,
     function_return_type,
-    is_bit_embedding_type,
     functions,
     index_type_transfrom,
+    is_bit_embedding_type,
     is_date,
     is_datetime,
     is_float,
@@ -85,6 +85,14 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     }
 
     return type_mapping.get(target_type, None)
+
+
+def _python_scalar(value):
+    """Convert a numpy scalar to int or float for JSON.
+
+    ``.item()`` is not enough: it returns ``np.longdouble`` unchanged.
+    """
+    return int(value) if isinstance(value, np.integer) else float(value)
 
 
 class http_network_util:
@@ -825,13 +833,16 @@ class table_http:
                         v, np.ndarray
                     ):  # trans np array to list since http api can not parse np array
                         converted[key] = v.tolist()
+                    elif isinstance(v, (np.integer, np.floating)):
+                        # numpy scalars (e.g. from a DataFrame row) are not JSON serializable
+                        converted[key] = _python_scalar(v)
                     elif isinstance(v, list):
                         converted[key] = [
                             x.tolist()
                             if isinstance(x, np.ndarray)
                             else (
-                                x.item()
-                                if isinstance(x, (np.integer, np.floating, np.longdouble))
+                                _python_scalar(x)
+                                if isinstance(x, (np.integer, np.floating))
                                 else x
                             )
                             for x in v
