@@ -179,13 +179,13 @@ impl LvqStore {
 
     /// Sets the mean/global cache without compressing any vector
     /// (`OptAddVec`'s training half).
-    pub fn train(&mut self, vectors: &[Vec<f32>]) {
+    pub fn train<V: AsRef<[f32]>>(&mut self, vectors: &[V]) {
         if vectors.is_empty() {
             return;
         }
         let mut mean = vec![0.0f64; self.dim];
         for v in vectors {
-            for (j, x) in v.iter().enumerate() {
+            for (j, x) in v.as_ref().iter().enumerate() {
                 if j < mean.len() {
                     mean[j] += *x as f64;
                 }

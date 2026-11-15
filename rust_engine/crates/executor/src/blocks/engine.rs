@@ -3565,6 +3565,11 @@ impl Engine {
     /// The buffered rows among `ids`, looked up once for the whole batch: the
     /// per-row `pending_row` paid a `table_key` (a formatted, lowercased
     /// string) and a lock for every id.
+    ///
+    /// The walk runs over `ids`, not over the buffer: the buffer holds every
+    /// row written since the last checkpoint, so scanning it made a query that
+    /// needs ten rows pay for the whole table (`pending_pos` / the id-sorted
+    /// buffer answer a lookup in O(1)/O(log n)).
     pub(crate) fn buffered_rows_for(
         &self,
         table: &str,
@@ -3578,11 +3583,12 @@ impl Engine {
         if entry.pending_rows.is_empty() {
             return Default::default();
         }
-        entry
-            .pending_rows
-            .iter()
-            .filter(|(seq, _)| ids.contains(seq))
-            .map(|(seq, values)| (*seq, values.clone()))
+        ids.iter()
+            .filter_map(|seq| {
+                entry
+                    .buffered_row(*seq)
+                    .map(|values| (*seq, values.clone()))
+            })
             .collect()
     }
     /// One row of the append buffer. The point-read path must not clone the
@@ -4336,7 +4342,18 @@ impl Engine {
         // A table whose first commit has not reached a checkpoint yet has no
         // block file at all: its rows are in the append buffer, and that is
         // still a readable table.
-        let buffered = self.pending_rows_of(&table);
+        //
+        // An index already named the rows, so the buffer is probed for those
+        // ids only. Cloning the whole buffer here is O(table) per query: a
+        // 200k-row table kept every row in the append buffer until its first
+        // checkpoint, and each KNN query deep-cloned all of them (each row
+        // carrying its embedding text) before dropping all but ten. That was
+        // the query path's cost, not the graph search (measured 33.6 ms vs
+        // 0.38 ms for the same search called directly).
+        let buffered: std::collections::HashMap<usize, Vec<Value>> = match rows_wanted {
+            Some(rows) => self.buffered_rows_for(&table, rows),
+            None => self.pending_rows_of(&table).into_iter().collect(),
+        };
         if blocks.is_empty() && buffered.is_empty() {
             return Err(Error::NotFound(format!("no blocks for table '{table}'")));
         }
@@ -4581,6 +4598,13 @@ impl Engine {
     /// `dense_index_building_worker`: the reference's dense-index pool size,
     /// `hardware_concurrency() / 2` clamped to at least 2 (`config_impl.cpp:516-518`).
     pub(crate) fn hnsw_build_workers(&self) -> usize {
+        if let Some(n) = std::env::var("INFINITY_HNSW_BUILD_WORKERS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| *n > 0)
+        {
+            return n;
+        }
         std::thread::available_parallelism()
             .map(|count| count.get() / 2)
             .unwrap_or(1)

@@ -65,6 +65,11 @@ pub(crate) struct KnnCandidateScan<'a> {
     /// The live row ids, when the caller has them: the coverage check needs the
     /// row set, not the rows, so an indexed query never decodes the table.
     pub live_rows: Option<&'a [usize]>,
+    /// How many live rows the table has, when that is known without counting
+    /// them. The query path passes the published counter, so an indexed query
+    /// can prove the graph covers the table without a warm vector cache - the
+    /// cache is only built for the exact scan now.
+    pub live_count: Option<usize>,
     pub cache: Option<&'a SharedVectorCache>,
     pub topn: usize,
     pub metric: &'a str,
@@ -83,6 +88,9 @@ fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
     if let Some(live) = q.live_rows {
         return labelled == live.len();
     }
+    if let Some(count) = q.live_count {
+        return labelled == count;
+    }
     if let Some(c) = &q.cache {
         return c.read().map(|g| labelled == g.live.len()).unwrap_or(false);
     }
@@ -99,6 +107,13 @@ fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
             .read()
             .map(|g| g.live.iter().all(|s| covered.contains(s)))
             .unwrap_or(false);
+    }
+    // Counting only: the caller's `rows` are still empty at this point (an
+    // indexed query decodes its candidates afterwards), so comparing against
+    // `q.rows` said "covered" for every table - an incomplete probe answered a
+    // short top-k instead of falling back to the exact scan.
+    if let Some(count) = q.live_count {
+        return covered.len() >= count;
     }
     q.rows.iter().all(|(seq, _)| covered.contains(seq))
 }

@@ -928,6 +928,52 @@ mod tests {
         assert_eq!(rows(&engine, q).len(), 120);
     }
 
+    /// A cursor that snapshotted the block set **before** a compaction mirrored the
+    /// merged segment still has to resolve the ids the merge renumbered to.
+    ///
+    /// This is the shape a query hits when it starts before a merge commits but
+    /// reaches the (already renumbered) full-text cache afterwards: the postings
+    /// name the merged segment's ids, the append buffer no longer holds them (the
+    /// block write retired the buffered copies), and the cursor's snapshot does
+    /// not name their block. The block writer puts the files on disk before it
+    /// retires the buffer, so a miss is a stale snapshot and the read retries.
+    #[test]
+    fn a_cursor_from_before_a_block_write_still_resolves_the_merged_rows() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        // The snapshot a statement that started before the merge holds: segment 0,
+        // which the merge is about to retire.
+        let mut cursor = crate::blocks::misc::BlockCursor::new(&engine, "default_db.ch").unwrap();
+        engine.compact_all_segments("default_db.ch").unwrap();
+        // The merge moved the 120 rows of segment 0 to the base of segment 1, and
+        // the block write retired the buffered copies: only the blocks hold them.
+        let merged: Vec<u64> = (0..120).map(|i| (1u64 << 32) + i).collect();
+        let resolved: Vec<usize> = cursor
+            .rows(&merged)
+            .unwrap()
+            .into_iter()
+            .map(|(seq, _)| seq)
+            .collect();
+        assert_eq!(
+            resolved,
+            merged.iter().map(|id| *id as usize).collect::<Vec<_>>()
+        );
+    }
+
     /// `MATCH` asks for a handful of rows (`topn=3`, as the parallel gate does).
     /// A compaction retires every row id it renumbers; a retired id that is
     /// still in the postings takes a `topn` slot the fetch cannot resolve, so
@@ -1645,6 +1691,82 @@ mod tests {
             }
         }
         Vec::new()
+    }
+
+    /// `test_knn_ivf_l2.slt:53-58`, which the conformance gate caught: an IVF
+    /// index built over two blocks, a third block appended, then the same
+    /// query.
+    ///
+    /// Two separate bugs met here. `COPY` never reported its rows to
+    /// `live_rows` (only `INSERT` did, holding the count published by whatever
+    /// ran last), so the coverage gate compared against a count that said four
+    /// rows while the table had twelve - and the memory index that a
+    /// `CREATE INDEX` after a `COPY` leaves behind covers only the last block.
+    /// Together they let an index that holds a third of the table pass as
+    /// "complete" and answer a top-3 from its own four rows (`8, 6, 4`), where
+    /// the exact scan returns the three tied rows `8, 8, 8`.
+    #[test]
+    fn knn_answers_cover_rows_loaded_after_the_index_was_built() {
+        let dir = tempdir().unwrap();
+        let csv = dir.path().join("d4.csv");
+        std::fs::copy(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../test/data/csv/embedding_float_dim4.csv"
+            ),
+            &csv,
+        )
+        .unwrap();
+        let copy = format!(
+            "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        );
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE t (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(&copy).unwrap();
+        // The exact queries are what published a `live_rows` of 4 before the
+        // fix, so they belong in the reproduction.
+        let plain =
+            "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3);";
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["6".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking("CREATE INDEX ix ON t (c2) USING IVF WITH (metric = l2);")
+            .unwrap();
+        let q = "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3) WITH (nprobe = 10);";
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["8".to_string()]
+            ],
+            "a row loaded after the index was built went missing"
+        );
     }
 
     /// `HEADER true` on a CSV import consumes the first line (it is not a
@@ -4851,6 +4973,502 @@ mod tests {
         }
         let recall = hits as f64 / n as f64;
         assert!(recall >= 0.95, "LSG recall@1 = {recall}");
+    }
+
+    /// issue.txt #7: `sample_ratio` is accepted in SQL, but the record has to
+    /// carry the spelling the C++ engine parses (`sample_raito`). Persisting the
+    /// input verbatim made a C++ reader abort the directory with `Invalid index
+    /// parameter type: sample_ratio`.
+    #[test]
+    fn create_index_persists_the_reference_lsg_spelling() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sp (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX sp_i ON sp (v) USING HNSW WITH (metric='l2', encode='lvq', \
+             build_type='lsg', lsg_config='sample_ratio=0.25,ls_k=7,alpha=0.5');",
+        )
+        .unwrap();
+        let im = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.name == "sp_i")
+            .expect("the index");
+        let lsg = im
+            .options
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("lsg_config"))
+            .map(|(_, v)| v.clone())
+            .expect("lsg_config is stored in the record");
+        assert_eq!(lsg, "sample_raito = 0.25, ls_k = 7, alpha = 0.5");
+    }
+
+    /// issue.txt at scale: 20k (default) / 100k rows x 128 dims with `LVQ + LSG`
+    /// must train, stay queryable, dump its chunks, and keep its parameters
+    /// across a reopen.
+    ///
+    /// Ignored because it builds a real graph. Scale it with
+    /// `INFINITY_BIG_TEST_ROWS`, pick the encoding with
+    /// `INFINITY_BIG_TEST_ENCODE`, the build type with
+    /// `INFINITY_BIG_TEST_BUILD_TYPE`.
+    #[test]
+    #[ignore = "SLOW: 20k x 128 LVQ+LSG build"]
+    fn large_lvq_lsg_build_stays_stable() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean - the case an untrained LVQ mean
+        // gets wrong (issue.txt #2).
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        fn vector(i: usize) -> Vec<f32> {
+            let mut state = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    state = state
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    BASE[j % BASE.len()] + ((state >> 40) % 1000) as f32 / 10.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BIG_TEST_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20_000);
+        let encode = std::env::var("INFINITY_BIG_TEST_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BIG_TEST_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE big (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+        let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(n);
+        for i in 0..n {
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            dataset.push(vec![
+                Literal::Int(i as i64),
+                Literal::Str(format!("[{text}]")),
+            ]);
+        }
+        let started = std::time::Instant::now();
+        e.insert_literals("default_db.big", None, dataset).unwrap();
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX big_i ON big (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito=0.25,ls_k=7,alpha=0.5');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type}): {:?}",
+            started.elapsed()
+        );
+
+        let info = e.show_index_info("big", "big_i").expect("show_index");
+        eprintln!(
+            "show_index: {} | {} | chunks {}",
+            info.other_parameters, info.store_dir, info.segment_index_count
+        );
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        assert!(
+            info.other_parameters.contains("M = 16"),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+
+        // Self-query: the build has to answer its own rows.
+        let sample = 200usize;
+        let mut hits = 0usize;
+        for k in 0..sample {
+            let i = (k * 197) % n;
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM big SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"),
+            );
+            if got == vec![vec![i.to_string()]] {
+                hits += 1;
+            }
+        }
+        eprintln!("self recall@1: {hits}/{sample}");
+        assert!(
+            hits >= sample * 95 / 100,
+            "self recall {hits}/{sample} is below 95%"
+        );
+
+        // `FLUSH DATA` only dumps the memory segments when the setting says so
+        // (`[storage] flush_dumps_mem_index`).
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let info = e.show_index_info("big", "big_i").expect("after flush");
+        eprintln!("after flush: {} chunks", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM big;"),
+            vec![vec![n.to_string()]]
+        );
+        let info = e.show_index_info("big", "big_i").expect("after reopen");
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+    }
+
+    /// HNSW at production scale: 200k rows x 128 dims by default, 1M with
+    /// `INFINITY_BENCH_ROWS=1000000`.
+    ///
+    /// Reports what a deployment cares about: build time, recall@10 against a
+    /// brute-force ground truth, query latency p50/p99, and the recall after a
+    /// dump + reopen.
+    ///
+    /// Ignored because it builds a real graph:
+    /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
+    #[test]
+    #[ignore = "BENCH: HNSW production scale"]
+    fn hnsw_production_scale() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean (so an untrained quantizer shows
+        // up) and SIFT-like clusters: 1000 centres, each row a centre plus a
+        // small per-dimension jitter. IID uniform vectors in 128 dims are the
+        // adversarial case for every ANN index (the nearest neighbours are no
+        // closer than the far ones), so they say nothing about production data.
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        const CLUSTERS: usize = 1000;
+        fn next(state: &mut u64) -> u64 {
+            *state = (*state)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            *state >> 40
+        }
+        fn vector(i: usize) -> Vec<f32> {
+            let mut centre = (i % CLUSTERS) as u64;
+            let mut row = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    let c = BASE[j % BASE.len()] + (next(&mut centre) % 1000) as f32 / 10.0;
+                    let jitter = (next(&mut row) % 1000) as f32 / 1000.0 - 0.5;
+                    c + jitter * 4.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BENCH_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200_000);
+        let encode = std::env::var("INFINITY_BENCH_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BENCH_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+        let lsg_ratio = std::env::var("INFINITY_BENCH_LSG_RATIO").unwrap_or_else(|_| "0.01".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+
+        // Insert in chunks: a 1M-row literal batch would hold ~1GB of text at
+        // once. `flat` keeps the vectors for the brute-force ground truth.
+        let mut flat: Vec<f32> = Vec::with_capacity(n * DIMS);
+        let started = std::time::Instant::now();
+        let chunk = 50_000usize;
+        for start in (0..n).step_by(chunk) {
+            let end = (start + chunk).min(n);
+            let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(end - start);
+            for i in start..end {
+                let v = vector(i);
+                let text = v
+                    .iter()
+                    .map(|x| format!("{x:.3}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                dataset.push(vec![
+                    Literal::Int(i as i64),
+                    Literal::Str(format!("[{text}]")),
+                ]);
+                flat.extend_from_slice(&v);
+            }
+            e.insert_literals("default_db.bench", None, dataset)
+                .unwrap();
+        }
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX bench_i ON bench (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito={lsg_ratio},ls_k=10,alpha=1');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type} {lsg_ratio}): {:?}",
+            started.elapsed()
+        );
+        // `HnswIndexInMem::MemUsage`: the graph (links + levels) plus the
+        // encoding's store. Per row is what a deployment budgets with; the
+        // graph is a floor every encoding pays.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let guard = mem.lock().unwrap();
+            let bytes = guard.mem_usage();
+            eprintln!(
+                "index memory ({encode}): {:.1} MiB, {:.0} B/row",
+                bytes as f64 / (1024.0 * 1024.0),
+                bytes as f64 / n as f64
+            );
+        }
+
+        let row = |i: usize| -> &[f32] { &flat[i * DIMS..(i + 1) * DIMS] };
+
+        // Exact top-k over the inserted vectors.
+        let exact_topk = |q: &[f32], k: usize| -> Vec<u64> {
+            let mut best: Vec<(f32, u64)> = (0..n)
+                .map(|i| {
+                    let v = row(i);
+                    let d: f32 = v.iter().zip(q).map(|(a, b)| (a - b) * (a - b)).sum();
+                    (d, i as u64)
+                })
+                .collect();
+            best.select_nth_unstable_by(k, |a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.truncate(k);
+            best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.iter().map(|(_, i)| *i).collect()
+        };
+
+        let queries = 50usize;
+        let k = 10usize;
+        let mut hits = 0usize;
+        let mut answers: Vec<Vec<u64>> = Vec::with_capacity(queries);
+        let mut latencies: Vec<std::time::Duration> = Vec::with_capacity(queries);
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            latencies.push(started.elapsed());
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            hits += got.iter().filter(|id| exact.contains(id)).count();
+            answers.push(got);
+        }
+        let recall = hits as f64 / (queries * k) as f64;
+        latencies.sort();
+        let p50 = latencies[latencies.len() / 2];
+        let p99 = latencies[latencies.len() * 99 / 100];
+        eprintln!("recall@{k}: {recall:.3}; query p50 {p50:?}, p99 {p99:?}");
+
+        // `test_lsg_build_ut.cpp::test1`, at this scale: a scaled graph still
+        // has to find each stored row from its own vector. That is the
+        // reference's own LSG acceptance - it says nothing about recall against
+        // an exhaustive L2 top-10, which `recall@{k}` above reports.
+        let self_queries = 200usize;
+        let mut self_hits = 0usize;
+        for si in 0..self_queries {
+            let i = (si * 197) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            if rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"
+                ),
+            ) == vec![vec![i.to_string()]]
+            {
+                self_hits += 1;
+            }
+        }
+        let self_recall = self_hits as f64 / self_queries as f64;
+        eprintln!("self recall@1: {self_hits}/{self_queries}");
+
+        // For an LSG graph, recall in the space it was built in: the reference
+        // scales a node-to-node distance by `sqrt(avg_i * avg_j) ^ alpha`
+        // (`LSGDistWrapper::Inner`) and returns the *raw* distance for a query
+        // vector, so this number and `recall@{k}` answer different questions.
+        // Comparing the two says whether a low `recall@{k}` is the scaled edge
+        // selection or the graph itself.
+        let scaled_recall: Option<f64> = (|| {
+            let segs = e.hnsw_mem_segments("bench", "v").ok()?;
+            let seg = segs.first()?;
+            let guard = seg.lock().ok()?;
+            let lsg = guard.index().lsg()?.clone();
+            // `avg` is indexed by vertex; the vertex order has to be the row
+            // order for the two to line up.
+            if guard.rows().len() != n
+                || guard
+                    .rows()
+                    .iter()
+                    .enumerate()
+                    .any(|(at, r)| *r != at as u64)
+            {
+                return None;
+            }
+            let mut hits = 0usize;
+            for (qi, got) in answers.iter().enumerate() {
+                let i = (qi * 7919) % n;
+                let q = row(i);
+                let mut best: Vec<(f32, u64)> = (0..n)
+                    .map(|j| {
+                        let v = row(j);
+                        let d: f32 = v.iter().zip(q).map(|(a, b)| (a - b) * (a - b)).sum();
+                        (lsg.adjust(d, i, j), j as u64)
+                    })
+                    .collect();
+                best.select_nth_unstable_by(k, |a, b| a.0.partial_cmp(&b.0).unwrap());
+                best.truncate(k);
+                hits += got
+                    .iter()
+                    .filter(|id| best.iter().any(|(_, j)| j == *id))
+                    .count();
+            }
+            Some(hits as f64 / (queries * k) as f64)
+        })();
+        if let Some(scaled) = scaled_recall {
+            eprintln!("recall@{k} in the LSG-scaled space: {scaled:.3}");
+        }
+
+        // The recall/latency curve a deployment tunes with `WITH (ef = ...)`.
+        // The in-memory graph answers through the same `search_with_ef` the
+        // KNN scan calls, so this is the index path without the SQL overhead.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let graph = mem.lock().unwrap();
+            for ef in [64usize, 128, 256, 512] {
+                let mut curve_hits = 0usize;
+                let mut curve_lat: Vec<std::time::Duration> = Vec::with_capacity(queries);
+                for qi in 0..queries {
+                    let i = (qi * 7919) % n;
+                    let started = std::time::Instant::now();
+                    let got = graph.search_with_ef(row(i), k, Some(ef));
+                    curve_lat.push(started.elapsed());
+                    let exact = exact_topk(row(i), k);
+                    curve_hits += got.iter().filter(|(id, _)| exact.contains(id)).count();
+                }
+                curve_lat.sort();
+                eprintln!(
+                    "ef {ef}: recall@{k} {:.3}, p50 {:?}, p99 {:?}",
+                    curve_hits as f64 / (queries * k) as f64,
+                    curve_lat[curve_lat.len() / 2],
+                    curve_lat[curve_lat.len() * 99 / 100]
+                );
+            }
+        }
+
+        // Dump, reopen, query again: a restart must not change the answers.
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let started = std::time::Instant::now();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        eprintln!("flush + dump: {:?}", started.elapsed());
+        let info = e.show_index_info("bench", "bench_i").expect("show_index");
+        eprintln!("chunks after dump: {}", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let started = std::time::Instant::now();
+        let e = Engine::open(dir.path()).unwrap();
+        eprintln!("reopen: {:?}", started.elapsed());
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM bench;"),
+            vec![vec![n.to_string()]]
+        );
+        let mut after_hits = 0usize;
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            after_hits += got.iter().filter(|id| exact.contains(id)).count();
+        }
+        let after = after_hits as f64 / (queries * k) as f64;
+        eprintln!("recall@{k} after reopen: {after:.3}");
+
+        // A benchmark first: a 200k run reports its numbers and this only fails
+        // when the index answers nothing. The 50k gate below is the regression
+        // check; the 200k+ runs are the measurement.
+        assert!(recall > 0.0 && after > 0.0, "the index answered nothing");
+        if n <= 50_000 && encode == "lvq" {
+            // `build_type=lsg` selects its edges in the scaled space while the
+            // query ranks by raw L2 (`LSGDistWrapper::operator()` returns the
+            // raw distance for a query vector), so its exhaustive-L2 recall is
+            // structurally below a plain graph's - the reference never trains
+            // LSG in a production build, so it never pays this. Gate the plain
+            // build on L2 recall and the scaled build on the reference's own
+            // LSG criterion (each row answers itself).
+            if build_type == "lsg" {
+                assert!(
+                    self_recall >= 0.95,
+                    "LSG self recall@1 {self_recall} is below 0.95"
+                );
+            } else {
+                assert!(recall >= 0.85, "recall@{k} {recall} is below 0.85");
+            }
+            assert!(
+                after >= recall - 0.05,
+                "reopen recall {after} vs {recall} before the restart"
+            );
+        }
     }
 
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
