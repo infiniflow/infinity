@@ -57,6 +57,10 @@ fn spill_load_test() {
 }
 
 /// Files under `dir`, keyed by file name: the sealed segment's bytes.
+/// The chunk files under an index root, keyed by name.
+///
+/// A chunk lives in its segment's directory (`idx_{id}/seg_{n}`), so the walk
+/// descends one level.
 fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
     let mut out = BTreeMap::new();
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -64,6 +68,15 @@ fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
         if path.is_file() {
             let name = path.file_name().unwrap().to_string_lossy().into_owned();
             out.insert(name, std::fs::read(&path).unwrap());
+        } else if path.is_dir() {
+            for file in std::fs::read_dir(&path).unwrap().flatten() {
+                let p = file.path();
+                if !p.is_file() {
+                    continue;
+                }
+                let name = p.file_name().unwrap().to_string_lossy().into_owned();
+                out.insert(name, std::fs::read(&p).unwrap());
+            }
         }
     }
     out
@@ -162,7 +175,7 @@ fn spilled_runs_merge_in_doc_id_order() {
     );
 
     let reader = SegmentIndexReader::open(
-        spill_dir.path().to_str().unwrap(),
+        &storage::invertedindex::format::segment_chunk_dir(spill_dir.path().to_str().unwrap(), 0),
         "ft_0000000000000000",
         0,
         OPTION_FLAG_ALL,
@@ -201,13 +214,15 @@ fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
     index.budget = usize::MAX; // spill by hand, so the run is deterministic
     index_row(&mut index, 5, "alpha beta");
     index_row(&mut index, 6, "filler text");
-    assert!(index.mem.spill(&dir_str));
+    let seg0 = storage::invertedindex::format::segment_chunk_dir(&dir_str, 0);
+    std::fs::create_dir_all(&seg0).unwrap();
+    assert!(index.mem.spill(&seg0));
     assert_eq!(index.mem.runs.len(), 1);
     index_row(&mut index, 5, "gamma delta");
     assert!(index.seal());
 
     let reader =
-        SegmentIndexReader::open(&dir_str, "ft_0000000000000005", 5, OPTION_FLAG_ALL).unwrap();
+        SegmentIndexReader::open(&seg0, "ft_0000000000000005", 5, OPTION_FLAG_ALL).unwrap();
     // Exactly one posting list for doc 5, and it is the second text's.
     assert!(reader.postings("alpha").unwrap().is_empty());
     assert!(reader.postings("beta").unwrap().is_empty());
@@ -292,7 +307,13 @@ fn terms_from_spilled_runs_survive_a_restart() {
         .expect("a sealed dictionary")
         .trim_end_matches(".dic")
         .to_string();
-    let reader = SegmentIndexReader::open(&index_dir, &base_name, 0, OPTION_FLAG_ALL).unwrap();
+    let reader = SegmentIndexReader::open(
+        &storage::invertedindex::format::segment_chunk_dir(&index_dir, 0),
+        &base_name,
+        0,
+        OPTION_FLAG_ALL,
+    )
+    .unwrap();
     assert!(reader.lookup("zebrafish").unwrap().is_some());
 
     // A fresh process finds the terms of the spilled runs again.

@@ -32,7 +32,11 @@ impl Engine {
     fn dumped_secondary_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.secondary.indexes.get(column)?;
+        let index = tables
+            .get(&key)?
+            .secondary
+            .indexes
+            .get(&self.test_secondary_id(table, column))?;
         Some((index.begin_row_id()?, index.row_count()))
     }
 
@@ -46,7 +50,11 @@ impl Engine {
     ) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.secondary.indexes.get(column)?;
+        let index = tables
+            .get(&key)?
+            .secondary
+            .indexes
+            .get(&self.test_secondary_id(table, column))?;
         index.segment_begin_and_count(segment)
     }
 
@@ -57,7 +65,7 @@ impl Engine {
         let tables = self.tables.lock().unwrap();
         tables
             .get(&key)
-            .and_then(|e| e.secondary.disk.get(column))
+            .and_then(|e| e.secondary.disk.get(&self.test_secondary_id(table, column)))
             .map(|chunks| {
                 chunks
                     .iter()

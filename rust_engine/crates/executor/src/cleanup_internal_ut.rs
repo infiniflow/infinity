@@ -181,6 +181,9 @@ fn test_cleanup_index() {
     e.execute_blocking("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
         .unwrap();
     crate::scheduler::block_on(e.flush()).unwrap();
+    // The full-text chunk (and so its `idx_{id}` mirror) comes from the index's
+    // own dump transaction; a checkpoint writes blocks only.
+    crate::scheduler::block_on(e.dump_index_transaction("tb1", "index2")).unwrap();
 
     // A secondary index has no `idx_{id}` mirror in this engine (its chunks
     // live under `<data>/secondary`), so the reference's four captured files
@@ -307,6 +310,9 @@ fn test_cleanup_drop_column() {
         })
         .cloned()
         .collect();
+    // A dropped index keeps its chunk files until `Cleanup` (the reference
+    // writes a marker and leaves the files), so they must survive this sweep:
+    // they are not the dropped column's block files.
     let surviving_paths: Vec<PathBuf> = table_paths
         .iter()
         .filter(|p| {
@@ -314,6 +320,18 @@ fn test_cleanup_drop_column() {
                 .is_none_or(|n| n != "1.col" && n != "col_1_out")
         })
         .cloned()
+        .collect();
+    // `DROP INDEX` only writes the marker; the chunk files stay until
+    // `Cleanup` reclaims them (`CleanChunkIndex`), so they are part of what this
+    // sweep removes.
+    let dropped_index_paths: Vec<PathBuf> = surviving_paths
+        .iter()
+        .filter(|p| p.to_string_lossy().contains("/idx_"))
+        .cloned()
+        .collect();
+    let surviving_paths: Vec<PathBuf> = surviving_paths
+        .into_iter()
+        .filter(|p| !p.to_string_lossy().contains("/idx_"))
         .collect();
     assert!(!dropped_column_files.is_empty());
     assert!(!surviving_paths.is_empty());
@@ -327,6 +345,7 @@ fn test_cleanup_drop_column() {
     // files survive and the schema lost the column.
     check_files(&delete_file_paths, &[]);
     check_files(&dropped_column_files, &surviving_paths);
+    check_files(&dropped_index_paths, &[]);
     assert_eq!(columns(&e, "tb1"), vec!["col1"]);
     assert_eq!(count(&e, "default_db.tb1"), 16384);
     for row in rows(&e, "SELECT col1 FROM tb1;") {
@@ -372,6 +391,16 @@ fn test_cleanup_drop_index_and_checkpoint_and_restart() {
         })
         .cloned()
         .collect();
+    // The dropped index's chunks are reclaimed by the same sweep.
+    let dropped_index_paths: Vec<PathBuf> = surviving_paths
+        .iter()
+        .filter(|p| p.to_string_lossy().contains("/idx_"))
+        .cloned()
+        .collect();
+    let surviving_paths: Vec<PathBuf> = surviving_paths
+        .into_iter()
+        .filter(|p| !p.to_string_lossy().contains("/idx_"))
+        .collect();
     assert!(!dropped_column_files.is_empty());
     e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (col2);")
         .unwrap();
@@ -382,6 +411,7 @@ fn test_cleanup_drop_index_and_checkpoint_and_restart() {
     crate::scheduler::block_on(e.cleanup()).unwrap();
     check_files(&delete_file_paths, &[]);
     check_files(&dropped_column_files, &surviving_paths);
+    check_files(&dropped_index_paths, &[]);
     assert_eq!(columns(&e, "tb1"), vec!["col1"]);
     assert!(e.execute_blocking("SHOW TABLE tb1 INDEX index1;").is_err());
     assert_eq!(count(&e, "default_db.tb1"), 16384);

@@ -8,10 +8,16 @@ use super::*;
 /// the reference's proposed-dump coalescing.
 pub struct DumpMemIndexTask {
     pub(crate) engine: std::sync::Weak<Engine>,
-    pub(crate) pending: Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) pending: Arc<std::sync::Mutex<MemIndexPending>>,
     /// Whether every tail must go, or only the largest one: an explicit quota
     /// check asks for everything, a write-triggered one takes the largest.
     pub(crate) drain_all: bool,
+    /// The table whose batch raised the charge. A write-triggered dump picks
+    /// its victim among **that** table's indexes: choosing across the engine
+    /// let a table that merely held more bytes absorb every breach, and the
+    /// table that had just grown never drained. `None` for an explicit check,
+    /// which drains everything anyway.
+    pub(crate) table: Option<String>,
 }
 
 /// Background `CleanupTask` (`src/storage/bg_task/bg_task.cppm:107-114`).
