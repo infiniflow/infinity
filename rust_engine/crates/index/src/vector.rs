@@ -1329,7 +1329,7 @@ impl HnswIndex {
                 from,
                 top_level,
             );
-            crate::parallel_build::build_serial(&builder, entry, entry + 1);
+            crate::parallel_build::build_serial(&builder, entry, entry + 1, None);
         }
 
         // Phase B: everyone else, in buckets, searching from the finished top.
@@ -1373,16 +1373,17 @@ impl HnswIndex {
         // Phase A already built `entry`, so it must not appear in a bucket: it
         // is the vertex whose neighbour list every other build searched from,
         // and building it a second time replaces that list (and lets reverse
-        // pruning drop links the first build had). Splitting the one bucket that
-        // contains it keeps the boundaries the reference computed. When the
-        // entry came from an older batch it is below `base` and no bucket
-        // contains it, so `entry` only has to be excluded from `[base, n)`.
-        let buckets = crate::parallel_build::build_buckets(base, n, entry, threads);
+        // pruning drop links the first build had). It is skipped inside its
+        // bucket rather than cut out, so every bucket stays one contiguous run
+        // and the boundaries are the reference's. When the entry came from an
+        // older batch it is below `base` and no bucket contains it.
+        let prebuilt = (entry >= base).then_some(entry);
+        let buckets = crate::parallel_build::build_buckets(base, n, prebuilt, threads);
         {
             let shared = std::sync::Arc::clone(&shared);
-            crate::parallel::for_each_blocking(buckets, threads, move |(start, end)| {
+            crate::parallel::for_each_blocking(buckets, threads, move |(start, end, skip)| {
                 let builder = shared.builder();
-                crate::parallel_build::build_serial(&builder, start, end);
+                crate::parallel_build::build_serial(&builder, start, end, skip);
                 Ok(())
             })
             .expect("building a bucket cannot fail");
@@ -2013,33 +2014,43 @@ mod tests {
     fn a_batch_on_a_populated_index_builds_each_vertex_once() {
         // A batch over several buckets where the entry sits in the middle of
         // one of them - the case that used to schedule it twice.
-        let (base, n, entry, threads) = (1200, 5000, 2600, 2);
-        let buckets = crate::parallel_build::build_buckets(base, n, entry, threads);
+        let (base, n, entry, threads) = (1200, 5000, 2600usize, 2);
+        let buckets = crate::parallel_build::build_buckets(base, n, Some(entry), threads);
 
-        let covered: Vec<usize> = buckets.iter().flat_map(|(s, e)| *s..*e).collect();
-        assert!(
-            !covered.contains(&entry),
-            "entry {entry} is scheduled again: {buckets:?}"
-        );
-        let mut expected: Vec<usize> = (base..n).filter(|x| *x != entry).collect();
-        expected.sort_unstable();
-        assert_eq!(covered, expected, "the batch is not covered exactly once");
-
-        // The boundaries are still `buckets_of`'s: the bucket holding the entry
-        // is split, not widened or merged.
+        // Every bucket is one contiguous run, and the batch is covered exactly
+        // once except for the prebuilt vertex. Cutting the entry out (instead
+        // of skipping it inside its bucket) would put two adjacent ranges in
+        // flight, whose reverse-link writes are what makes a build
+        // order-dependent.
         let whole = crate::parallel_build::buckets_of(base, n, threads);
         assert_eq!(
-            buckets.iter().map(|(s, e)| e - s).sum::<usize>(),
-            whole.iter().map(|(s, e)| e - s).sum::<usize>() - 1,
-            "splitting must only remove the one prebuilt vertex"
+            buckets.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole,
+            "bucket boundaries must be the reference's"
         );
-        // A batch whose entry is the last vertex of its bucket, and one where
-        // the entry is already in an older batch (below `base`).
-        for (b, en) in [(base, 2600usize), (base, n - 1), (base, 0)] {
-            for (s, _) in crate::parallel_build::build_buckets(b, n, en, threads) {
-                assert!(s >= b, "bucket starts below the batch: {s} < {b}");
-            }
+        assert_eq!(
+            buckets
+                .iter()
+                .filter_map(|(_, _, skip)| *skip)
+                .collect::<Vec<_>>(),
+            vec![entry],
+            "the prebuilt entry is skipped by exactly one bucket"
+        );
+        for (start, end, skip) in &buckets {
+            assert!(start < end, "empty bucket {start}..{end}");
+            assert!(
+                skip.is_none_or(|p| *start <= p && p < *end),
+                "a bucket skips a vertex outside its range"
+            );
         }
+
+        // An entry from an older batch is below `base`: no bucket skips it.
+        let older = crate::parallel_build::build_buckets(base, n, None, threads);
+        assert_eq!(
+            older.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole
+        );
+        assert!(older.iter().all(|(_, _, skip)| skip.is_none()));
     }
     #[test]
     fn hnsw_recall_vs_flat() {

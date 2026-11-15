@@ -122,11 +122,14 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Runs `Build` for every vertex in `[start, end)`.
-    pub(crate) fn build_range(&self, start: usize, end: usize) {
+    /// Runs `Build` for every vertex in `[start, end)` except `skip`.
+    pub(crate) fn build_range(&self, start: usize, end: usize, skip: Option<usize>) {
         let mut scratch = SearchScratch::new();
         let mut select = SelectScratch::default();
         for node in start..end {
+            if Some(node) == skip {
+                continue;
+            }
             self.build(node, &mut scratch, &mut select);
         }
     }
@@ -415,32 +418,28 @@ pub(crate) fn buckets_of(from: usize, to: usize, threads: usize) -> Vec<(usize, 
 /// the first build established can disappear, and reverse pruning while
 /// rebuilding it can drop other vertices' links to it.
 ///
-/// The boundaries are still the ones [`buckets_of`] computed for
-/// `[from, to)`: the bucket holding `prebuilt` is split in two around it, not
-/// widened or merged, so a batch is still cut the way
-/// `HnswHandler::InsertVecs` cuts it.
+/// `prebuilt` is marked with `skip` rather than cut out of the range, because a
+/// bucket is a **contiguous** running range: splitting one would put two
+/// adjacent ranges in flight, and their reverse-link writes are exactly what
+/// makes a build order-dependent.
 pub(crate) fn build_buckets(
     from: usize,
     to: usize,
-    prebuilt: usize,
+    prebuilt: Option<usize>,
     threads: usize,
-) -> Vec<(usize, usize)> {
+) -> Vec<(usize, usize, Option<usize>)> {
     buckets_of(from, to, threads)
         .into_iter()
-        .flat_map(|(start, end)| {
-            if (start..end).contains(&prebuilt) {
-                vec![(start, prebuilt), (prebuilt + 1, end)]
-            } else {
-                vec![(start, end)]
-            }
+        .map(|(start, end)| {
+            let skip = prebuilt.filter(|p| (start..end).contains(p));
+            (start, end, skip)
         })
-        .filter(|(start, end)| end > start)
         .collect()
 }
 
 /// Builds `[from, to)` on the calling thread.
-pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize) {
-    builder.build_range(from, to);
+pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize, skip: Option<usize>) {
+    builder.build_range(from, to, skip);
 }
 
 /// Orders two candidates the way `CompareMax` does, for tests.
