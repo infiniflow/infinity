@@ -41,7 +41,11 @@ impl Engine {
     fn secondary_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.secondary.indexes.get(column)?;
+        let index = tables
+            .get(&key)?
+            .secondary
+            .indexes
+            .get(&self.test_secondary_id(table, column))?;
         Some((index.begin_row_id()?, index.row_count()))
     }
 
@@ -52,7 +56,7 @@ impl Engine {
         let tables = self.tables.lock().unwrap();
         tables
             .get(&key)
-            .and_then(|e| e.secondary.disk.get(column))
+            .and_then(|e| e.secondary.disk.get(&self.test_secondary_id(table, column)))
             .map(|chunks| {
                 chunks
                     .iter()
@@ -66,7 +70,12 @@ impl Engine {
     fn fulltext_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.text.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .text
+            .get(&self.test_index_id(table, column, "FULLTEXT"))?
+            .read()
+            .ok()?;
         let docs = &index.mem.docs;
         Some((*docs.keys().min()?, docs.len()))
     }
@@ -75,7 +84,12 @@ impl Engine {
     fn hnsw_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.hnsw_mem.get(column)?.lock().ok()?;
+        let index = tables
+            .get(&key)?
+            .hnsw_mem
+            .get(&self.test_index_id(table, column, "HNSW"))?
+            .lock()
+            .ok()?;
         let rows = index.rows();
         Some((*rows.first()?, rows.len()))
     }
@@ -84,7 +98,10 @@ impl Engine {
     fn ivf_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let rows = tables.get(&key)?.ivf_mem.get(column)?;
+        let rows = tables
+            .get(&key)?
+            .ivf_mem
+            .get(&self.test_index_id(table, column, "IVF"))?;
         Some((rows.iter().map(|(seq, _)| *seq).min()?, rows.len()))
     }
 
@@ -92,7 +109,12 @@ impl Engine {
     fn sparse_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.sparse.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .sparse
+            .get(&self.test_index_id(table, column, "BMP"))?
+            .read()
+            .ok()?;
         Some((*index.tail.keys().min()?, index.tail.len()))
     }
 
@@ -101,7 +123,12 @@ impl Engine {
     fn mv_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.mv.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .mv
+            .get(&self.test_index_id(table, column, "EMVB"))?
+            .read()
+            .ok()?;
         Some((*index.tail.keys().min()?, index.tail.len()))
     }
 }

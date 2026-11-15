@@ -38,6 +38,10 @@ pub struct HttpServer {
 
 impl HttpServer {
     pub fn bind(addr: &str, engine: Arc<Engine>) -> Result<Self> {
+        // Same trap as the Thrift port: macOS lets the wildcard bind coexist
+        // with another process's `127.0.0.1` listener and sends every local REST
+        // client there (see `reject_taken_loopback`).
+        crate::reject_taken_loopback(addr)?;
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
         let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         let peer = Arc::new(PeerManager::new(

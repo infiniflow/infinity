@@ -462,7 +462,9 @@ impl Engine {
             )
             .await?;
         if existed {
-            self.drop_text_index_storage(name, None);
+            // `DROP TABLE` clears every kind's registry; each drop owns its own
+            // map (see `drop_index_storage` for the per-record form).
+            self.drop_index_storage(name, DropScope::Table);
         }
         Ok(QueryResult::DroppedTable {
             name: name.to_string(),
@@ -1338,13 +1340,17 @@ impl Engine {
                 // move the secondary-index declarations; the old table entry
                 // (whose registries refer to the old row ids) is dropped and
                 // rebuilt from the renamed rows below.
-                let pairs: Vec<String> = self
-                    .tables
-                    .lock()
-                    .unwrap()
-                    .get(&new_tkey)
-                    .map(|e| e.secondary.indexes.keys().cloned().collect())
-                    .unwrap_or_default();
+                // The indexes to rebuild after the rename, each under its own
+                // catalog id: the registries are keyed by id, so the columns
+                // come from the catalog list.
+                let pairs: Vec<(String, u64)> = self
+                    .storage
+                    .catalog
+                    .indexes_of_table(table)?
+                    .into_iter()
+                    .filter(|i| is_secondary_kind(&i.index_type))
+                    .map(|i| (i.column, i.id))
+                    .collect();
                 let rename_cmd = self.rename_table_command(table, new_name)?;
                 self.ddl_commit_typed(
                     TxnOp::RenameTable {
@@ -1359,8 +1365,8 @@ impl Engine {
                         // needs neither a drop nor a re-create (doing that
                         // stamped it with a new ts and made the catalog differ).
                         self.storage.catalog.rename_table(table, new_name)?;
-                        for column in &pairs {
-                            let _ = self.build_index(new_name, column);
+                        for (column, id) in &pairs {
+                            let _ = self.build_index_of(new_name, column, *id);
                         }
                         Ok(())
                     },
@@ -1446,26 +1452,23 @@ impl Engine {
                     |_| dc_cmd,
                 )
                 .await?;
-                let tkey = self.table_key(table);
-                self.tables
-                    .lock()
-                    .unwrap()
-                    .entry(tkey)
-                    .or_default()
-                    .secondary
-                    .indexes
-                    .remove(column);
-                // remaining indexes now hold stale row ids: rebuild them
-                let remaining: Vec<String> = self
+                // The dropped column's own index records went with the column;
+                // its registry entries are keyed by id, so each kind's drop
+                // resolves them against what the catalog recorded *before* the
+                // drop (it scopes itself to its own kind's records).
+                self.drop_index_storage(table, DropScope::Column(column));
+                // remaining indexes now hold stale row ids: rebuild them, one
+                // catalog record at a time (a column may carry several).
+                let remaining: Vec<(String, u64)> = self
                     .storage
                     .catalog
                     .indexes_of_table(table)?
                     .into_iter()
                     .filter(|i| is_secondary_kind(&i.index_type))
-                    .map(|i| i.column)
+                    .map(|i| (i.column, i.id))
                     .collect();
-                for col in remaining {
-                    self.build_index(table, &col)?;
+                for (col, id) in remaining {
+                    self.build_index_of(table, &col, id)?;
                 }
                 Ok(QueryResult::CreatedTable {
                     id: 0,
@@ -2129,6 +2132,10 @@ impl Engine {
                     },
                 )
                 .await?;
+                // The index's catalog id, which is its identity in every
+                // in-memory registry (the reference keys `MemIndex` by
+                // `(index_id, segment)`); a column may carry several indexes.
+                let created_index_id = self.index_position(table, name).ok().map(|id| id as u64);
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 // The option name is `ANALYZER` in SQL but `analyzer` over the
                 // API (the reference lower-cases every `InitParameter` there),
@@ -2180,7 +2187,14 @@ impl Engine {
                     // the gate it holds (`populate_secondary_indexes`).
                     let gate = self.batch_gate(table);
                     let _held = gate.lock().await;
-                    self.build_index(table, column)?;
+                    // Only the record this statement created: a column may
+                    // already carry another secondary index, and rebuilding that
+                    // one would scan the rows again, append a second chunk set
+                    // and leave its rows covered twice.
+                    match created_index_id {
+                        Some(id) => self.build_index_of(table, column, id)?,
+                        None => self.build_index(table, column)?,
+                    }
                 }
                 // C++ `IndexBuilder`: a full-text or HNSW index is materialised
                 // by `CREATE INDEX`, not by the first query. Building lazily
@@ -2188,7 +2202,9 @@ impl Engine {
                 // did not exist on disk until somebody searched.
                 if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
                     let tokenizer = self.index_tokenizer(table, column);
-                    self.text_index_for(table, column, tokenizer)?;
+                    if let Some(index_id) = created_index_id {
+                        self.text_index_for_id(table, index_id, column, tokenizer)?;
+                    }
                 }
                 if index_type.eq_ignore_ascii_case("HNSW") {
                     // Clear the "already looked for an HNSW index" probe before
@@ -2203,11 +2219,19 @@ impl Engine {
                         let key = self.table_key(table);
                         let mut tables = self.tables.lock().unwrap();
                         let entry = tables.entry(key).or_default();
-                        entry.hnsw_probed = false;
-                        entry.hnsw_mem.remove(column);
+                        entry.hnsw_topup = true;
+                        if let Some(index_id) = created_index_id {
+                            entry.hnsw_mem.remove(&index_id);
+                        }
                     }
                     if has_rows {
-                        self.build_hnsw_index(table, column)?;
+                        // Build **this** record's graph, not every HNSW graph
+                        // on the column (the reference keeps one `MemIndex`
+                        // per index id).
+                        match created_index_id {
+                            Some(id) => self.build_hnsw_index_of(table, column, Some(id))?,
+                            None => self.build_hnsw_index(table, column)?,
+                        }
                     }
                 }
                 // A multi-vector index is materialised when it is created, so
@@ -2223,15 +2247,13 @@ impl Engine {
                         .and_then(|s| s.iter().position(|c| c == column))
                         .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
                         .and_then(|ty| type_dim(&ty));
-                    if let Some(dims) = dims {
-                        // The memory index is built once, with the configs the
-                        // catalog had at that moment; a second index on the same
-                        // column (`USING SMVE` after `USING PLAID`) would
-                        // silently reuse it. The reference keeps one object per
-                        // index, so rebuild when the cached one does not know
-                        // this kind.
-                        self.forget_multivector_index(table, column, index_type);
-                        let _ = self.multivector_index_for(table, column, dims);
+                    if let (Some(dims), Some(index_id)) = (dims, created_index_id) {
+                        // The memory index belongs to **this** catalog record:
+                        // a second index on the same column (`USING SMVE` after
+                        // `USING PLAID`) is a second `MemIndex` in the
+                        // reference, so it is built under its own id and the
+                        // first one keeps its tail and chunks.
+                        let _ = self.multivector_index_by_id(table, column, index_id, dims);
                     }
                 }
                 // The sparse BMP index is materialised the same way.
@@ -2242,22 +2264,24 @@ impl Engine {
                         .and_then(|s| s.iter().position(|c| c == column))
                         .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
                         .map(|ty| sparse_idx_width(&ty));
-                    if let Some(width) = width {
-                        let _ = self.sparse_index_for(table, column, width);
+                    if let (Some(width), Some(index_id)) = (width, created_index_id) {
+                        let _ = self.sparse_index_by_id(table, column, index_id, width);
                     }
                 }
                 // An IVF index keeps a memory segment for rows written before
                 // the next mirror dump.
                 if index_type.eq_ignore_ascii_case("IVF") {
-                    let tkey = self.table_key(table);
-                    self.tables
-                        .lock()
-                        .unwrap()
-                        .entry(tkey)
-                        .or_default()
-                        .ivf_mem
-                        .entry(column.clone())
-                        .or_default();
+                    if let Some(index_id) = created_index_id {
+                        let tkey = self.table_key(table);
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .ivf_mem
+                            .entry(index_id)
+                            .or_default();
+                    }
                 }
                 // `PrepareCommitCreateIndex` -> `PopulateIndex` over every
                 // segment the table already has: the first chunk of a
@@ -2304,21 +2328,17 @@ impl Engine {
                     .unwrap_or_default()
                     .into_iter()
                     .find(|im| im.name == *name)
-                    .map(|im| (im.table, im.column, im.index_type));
+                    .map(|im| (im.table, im.id));
                 if target.is_none() && !*if_exists {
                     return Err(Error::Invalid(format!("index '{name}' does not exist")));
                 }
-                let was_fulltext = target
-                    .as_ref()
-                    .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
-                    .unwrap_or(false);
                 let drop_idx_cmd = self.drop_index_command(name)?;
                 let existed = self
                     .ddl_commit_typed(
                         TxnOp::DropIndex {
                             table: target
                                 .as_ref()
-                                .map(|(table, _, _)| table.clone())
+                                .map(|(table, _)| table.clone())
                                 .unwrap_or_default(),
                             index: name.clone(),
                         },
@@ -2327,8 +2347,12 @@ impl Engine {
                     )
                     .await?;
                 if existed {
-                    if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
-                        self.drop_text_index_storage(&table, Some(&column));
+                    if let Some((table, index_id)) = target {
+                        // The dropped record's registry only: an index id is
+                        // unique within the table, so the other indexes on the
+                        // column (of this kind or any other) keep their graphs,
+                        // tails and readers.
+                        self.drop_index_storage(&table, DropScope::Record(index_id));
                     }
                 }
                 Ok(QueryResult::DroppedIndex {

@@ -316,34 +316,10 @@ mod tests {
         assert_eq!(i32::from_le_bytes(body[0..4].try_into().unwrap()), 4);
     }
 
-    /// Each block maps only its own files, and dropping the mapping takes it
-    /// off the process-wide counter.
-    #[test]
-    fn every_block_maps_only_its_own_files() {
-        let dir = tempfile::tempdir().unwrap();
-        let before = crate::mapped::mapping_count();
-        let mut index = BlockIndex::new(dir.path());
-        for b in 0..4u16 {
-            index
-                .create_block(id(0, b), b as usize, 4, &[column(0, &[b as i32; 4])], 1, 1)
-                .unwrap();
-        }
-        {
-            let mut mapped = Vec::new();
-            for b in 0..4u16 {
-                let (_, block) = index.get_block(&id(0, b)).unwrap();
-                let (body, _) = block.column(0).unwrap();
-                assert_eq!(i32::from_le_bytes(body[0..4].try_into().unwrap()), b as i32);
-                mapped.push(block);
-            }
-            assert_eq!(
-                crate::mapped::mapping_count(),
-                before + 4,
-                "one mapping per block, shared while it is held"
-            );
-        }
-        assert_eq!(crate::mapped::mapping_count(), before);
-    }
+    // "Each block maps only its own files, and dropping the mapping takes it
+    // off the process-wide counter" lives in `tests/mapping_lifecycle.rs`: it
+    // asserts on the process-wide mapping counters, which the parallel unit
+    // tests in this binary would perturb.
 
     /// C++ `BlockIndex::NewInit`: the `version` files are enough to rebuild the
     /// block list and every block's row range.

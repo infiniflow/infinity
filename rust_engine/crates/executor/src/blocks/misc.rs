@@ -1824,8 +1824,12 @@ mod tests {
                 .unwrap();
             e.execute_blocking("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
                 .unwrap();
-            // A flush writes the rows and the HNSW chunk file.
+            // The checkpoint writes the rows; the HNSW chunk comes from its
+            // own `DumpIndex` transaction (`NewTxn::DumpMemIndex`) - the only
+            // place the reference writes an index chunk. A checkpoint never
+            // does (`NewTxn::CheckpointTable`).
             crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_idx")).unwrap();
         }
         // Reopening loads the persisted graph, so the search walks what is on
         // disk rather than scanning every row (plan #70).
@@ -1835,7 +1839,10 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get("default_db.hv")
-                .is_some_and(|t| t.vector.contains_key("v")),
+                .is_some_and(|t| {
+                    let id = e.test_index_id("default_db.hv", "v", "HNSW");
+                    t.vector.contains_key(&id)
+                }),
             "the HNSW graph was not loaded from the mirror"
         );
         let rows = row_strings(
@@ -1976,11 +1983,15 @@ mod tests {
                 "CREATE INDEX pidx ON pc (t) USING PLAID WITH (nbits = 4, n_centroids = 8);",
             )
             .unwrap();
+        // One chunk per `DumpIndex` transaction - the reference's `DumpMemIndex`
+        // is the only index writer; a checkpoint writes blocks only.
         crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction("pc", "pidx")).unwrap();
         engine
             .execute_blocking(&format!("INSERT INTO pc VALUES {};", plaid_rows(200, 260)))
             .unwrap();
         crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction("pc", "pidx")).unwrap();
         engine
     }
 

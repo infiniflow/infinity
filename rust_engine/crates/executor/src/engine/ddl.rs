@@ -113,16 +113,14 @@ impl Engine {
         // drop is the physical removal: the reference's cleanup step has
         // nothing to do here.
         // The C++ block mirror of a dropped table is removed with it, so a
-        // later restart cannot resurrect the data.
+        // later restart cannot resurrect the data. The directory is named by
+        // the ids the catalog recorded (`db_{id}/tbl_{id}`), so it is resolved
+        // rather than searched for.
         if let Some(id) = table_id {
-            let root = self.blocks_root();
-            if let Ok(dbs) = std::fs::read_dir(&root) {
-                for db in dbs.flatten() {
-                    let dir = db.path().join(format!("tbl_{id}"));
-                    if dir.is_dir() {
-                        storage::chunk_store::remove_tree(dir);
-                    }
-                }
+            let db_id = self.database_id_of(&key);
+            let dir = self.blocks_root().join(format!("db_{db_id}/tbl_{id}"));
+            if dir.is_dir() {
+                storage::chunk_store::remove_tree(dir);
             }
         }
         // The table entry (index registries included) was removed above.
@@ -333,27 +331,126 @@ impl Engine {
         Ok(None)
     }
 
-    /// Removes the multi-vector chunks of `table` (or one column) from disk and
-    /// from the cache; called when the table or its index is dropped.
-    pub(crate) fn drop_multivector_storage(&self, table: &str, column: Option<&str>) {
+    /// Drops the in-memory state of `table`'s indexes, as far as `scope`
+    /// reaches.
+    ///
+    /// One entry for every statement that removes an index - `DROP INDEX`
+    /// (`DropScope::Record`), `DROP COLUMN` (`DropScope::Column`) and
+    /// `DROP TABLE` (`DropScope::Table`) - so a new registry only has to be
+    /// added in one place.
+    ///
+    /// There is deliberately **no** index-type parameter: the registries are
+    /// keyed by index id, an id is unique within the table, and each registry
+    /// holds only its own ids. Removing the same id from all of them therefore
+    /// hits at most the one record that owns it, while a type-dispatched version
+    /// has to spell every kind correctly (`SECONDARY` vs `SECONDARYFUNCTIONAL`,
+    /// `EMVB` vs `MULTIVECTOR`) and silently misses the entry when it does not -
+    /// which is how a dropped HNSW graph used to stay registered.
+    ///
+    /// A column scope still resolves through each registry's own kind, because
+    /// there the ids come *from* the catalog and a plain column sweep would hand
+    /// one registry another kind's ids.
+    pub(crate) fn drop_index_storage(&self, table: &str, scope: DropScope<'_>) {
         let tkey = self.table_key(table);
-        // The `Arc`s leave the map under `tables`; their read guards are taken
+        let secondary = scope.ids(|c| self.secondary_index_ids_on_column(table, c));
+        let sparse = scope.ids(|c| self.index_ids_on_column_of_kind(table, c, &["BMP"]));
+        let text = scope.ids(|c| self.index_ids_on_column_of_kind(table, c, &["FULLTEXT"]));
+        let multi = scope.ids(|c| {
+            self.index_ids_on_column_of_kind(table, c, &["PLAID", "SMVE", "EMVB", "MULTIVECTOR"])
+        });
+        // The ids a registry should lose: the scope's list, or - for a table
+        // scope - everything that registry holds right now.
+        fn pick(wanted: &Option<Vec<u64>>, held: Vec<u64>) -> Vec<u64> {
+            match wanted {
+                Some(ids) => ids.clone(),
+                None => held,
+            }
+        }
+
+        // The `Arc`s leave the maps under `tables`; their read guards are taken
         // after it is unlocked. A scan holds one of those guards while it waits
-        // for `tables` (see `Engine::text_index_for`), so locking an index
-        // under `tables` closes a cycle whenever a writer is pending.
-        let removed: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> = {
+        // for `tables` (see `Engine::text_index_for`), so locking an index under
+        // `tables` closes a cycle whenever a writer is pending.
+        let (texts, sparse_indexes, multi_indexes) = {
             let mut tables = self.tables.lock().unwrap();
             let Some(entry) = tables.get_mut(&tkey) else {
                 return;
             };
-            let columns: Vec<String> = match column {
-                Some(c) => vec![c.to_string()],
-                None => entry.mv.keys().cloned().collect(),
-            };
-            columns.iter().filter_map(|c| entry.mv.remove(c)).collect()
+            let secondary_ids = pick(
+                &secondary,
+                entry.secondary.indexes.keys().copied().collect(),
+            );
+            for id in &secondary_ids {
+                entry.secondary.indexes.remove(id);
+                entry.secondary.disk.remove(id);
+                entry.secondary.low.remove(id);
+                entry.secondary.sealing.remove(id);
+                entry.secondary.chunk_meta.remove(id);
+                entry.secondary.disk_backed.remove(id);
+                entry.secondary.declared_types.remove(id);
+            }
+            let sparse_ids = pick(&sparse, entry.sparse.keys().copied().collect());
+            let sparse_indexes: Vec<Arc<std::sync::RwLock<SparseIndex>>> = sparse_ids
+                .iter()
+                .filter_map(|id| entry.sparse.remove(id))
+                .collect();
+            let text_ids = pick(&text, entry.text.keys().copied().collect());
+            // A build that is running right now may target an index being
+            // dropped; the bump keeps it from publishing after the fact.
+            if !text_ids.is_empty() {
+                entry.text_epoch = entry.text_epoch.wrapping_add(1);
+            }
+            for id in &text_ids {
+                entry.text_built.remove(id);
+            }
+            let texts: Vec<SharedTextIndex> = text_ids
+                .iter()
+                .filter_map(|id| entry.text.remove(id))
+                .collect();
+            let multi_ids = pick(&multi, entry.mv.keys().copied().collect());
+            let multi_indexes: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> = multi_ids
+                .iter()
+                .filter_map(|id| entry.mv.remove(id))
+                .collect();
+            // The remaining maps hold no handle to close and no lock to take,
+            // so the same id can be removed from all of them: an index id is
+            // unique within the table, which is what makes the type-free call
+            // correct. HNSW's two are included here - they are not secondary
+            // entries, so keying them off `secondary_ids` left a dropped HNSW
+            // graph registered.
+            let mut any_hnsw = false;
+            for id in secondary_ids
+                .iter()
+                .chain(&sparse_ids)
+                .chain(&text_ids)
+                .chain(&multi_ids)
+            {
+                any_hnsw |= entry.hnsw_mem.remove(id).is_some();
+                entry.index_pending_bytes.remove(id);
+                entry.vector.remove(id);
+                entry.ivf.remove(id);
+                entry.ivf_mem.remove(id);
+            }
+            // The probe is a one-shot "have I looked for an HNSW index yet"
+            // flag; a graph just went away, so the next write probes again.
+            if any_hnsw {
+                entry.hnsw_topup = true;
+            }
+            (texts, sparse_indexes, multi_indexes)
         };
-        for idx in removed {
-            let dir = idx.read().map(|g| g.dir.clone()).ok();
+
+        for index in texts {
+            if let Ok(g) = index.read() {
+                storage::chunk_store::remove_tree(g.dir.clone());
+            }
+        }
+        for index in sparse_indexes {
+            if let Ok(dir) = index.read().map(|g| g.dir.clone()) {
+                storage::chunk_store::remove_tree(dir);
+            }
+        }
+        for index in multi_indexes {
+            let dir = index.read().map(|g| g.dir.clone()).ok();
             if let Some(dir) = dir {
                 if let Ok(entries) = std::fs::read_dir(&dir) {
                     for entry in entries.flatten() {
@@ -365,63 +462,57 @@ impl Engine {
                 }
             }
         }
+        self.recompute_memindex_total();
     }
 
-    /// Removes the sparse chunks of `table` (or one column) from disk and cache.
-    pub(crate) fn drop_sparse_storage(&self, table: &str, column: Option<&str>) {
-        let tkey = self.table_key(table);
-        // See `drop_multivector_storage`: the map is unlocked before the index
-        // is read.
-        let removed: Vec<Arc<std::sync::RwLock<SparseIndex>>> = {
-            let mut tables = self.tables.lock().unwrap();
-            let Some(entry) = tables.get_mut(&tkey) else {
-                return;
-            };
-            let columns: Vec<String> = match column {
-                Some(c) => vec![c.to_string()],
-                None => entry.sparse.keys().cloned().collect(),
-            };
-            columns
-                .iter()
-                .filter_map(|c| entry.sparse.remove(c))
-                .collect()
-        };
-        for idx in removed {
-            if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
-                storage::chunk_store::remove_tree(dir);
-            }
-        }
+    /// Every catalog index id built on `column` of `table`, of **any** kind.
+    ///
+    /// The in-memory registries are keyed by index id (`MemIndex` identity in
+    /// the reference), so a caller that names a column has to resolve it to ids
+    /// first - but an index id is unique within the **table**, not within one
+    /// index type, so a column carrying an `HNSW` and a `BMP` index yields both
+    /// ids here. A caller that owns one kind's registry must use
+    /// [`Self::index_ids_on_column_of_kind`] instead.
+    pub(crate) fn index_ids_on_column(&self, table: &str, column: &str) -> Vec<u64> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|im| im.column == column)
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
+            .collect()
     }
 
-    /// Removes the cached inverted indexes of `table` (or of one column) and
-    /// their sealed segment files. Called when the table or its full-text index
-    /// is dropped, so segments never outlive the catalog entry.
-    pub(crate) fn drop_text_index_storage(&self, table: &str, column: Option<&str>) {
-        let tkey = self.table_key(table);
-        // See `drop_multivector_storage`: the map is unlocked before the
-        // indexes are read.
-        let indexes: Vec<SharedTextIndex> = match self.tables.lock().unwrap().get_mut(&tkey) {
-            Some(entry) => {
-                // A build that is running right now targets the index being
-                // dropped; the bump keeps it from publishing after the fact.
-                entry.text_epoch = entry.text_epoch.wrapping_add(1);
-                let columns: Vec<String> = match column {
-                    Some(c) => vec![c.to_string()],
-                    None => entry.text.keys().cloned().collect(),
-                };
-                columns
-                    .iter()
-                    .filter_map(|c| entry.text.remove(c))
-                    .collect()
-            }
-            None => Vec::new(),
-        };
-        for idx in indexes {
-            if let Ok(g) = idx.read() {
-                storage::chunk_store::remove_tree(g.dir.clone());
-            }
-        }
-        self.drop_multivector_storage(table, column);
-        self.drop_sparse_storage(table, column);
+    /// Every index id of one `kind` on `column`.
+    ///
+    /// `kind` is matched case-insensitively against the record's type, or (for
+    /// "secondary" callers) accepted through `kinds` - see
+    /// [`Self::secondary_index_ids_on_column`] for the secondary family, which
+    /// spans several spellings (`SECONDARY`, `SECONDARYFUNCTIONAL`).
+    pub(crate) fn index_ids_on_column_of_kind(
+        &self,
+        table: &str,
+        column: &str,
+        kinds: &[&str],
+    ) -> Vec<u64> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|im| {
+                im.column == column && kinds.iter().any(|k| im.index_type.eq_ignore_ascii_case(k))
+            })
+            .map(|im| im.id)
+            .filter(|id| *id > 0)
+            .collect()
+    }
+
+    /// The secondary index ids on `column` (both the plain and the functional
+    /// kind, which is the family `is_secondary_kind` names).
+    pub(crate) fn secondary_index_ids_on_column(&self, table: &str, column: &str) -> Vec<u64> {
+        self.index_ids_on_column_of_kind(table, column, &["SECONDARY", "SECONDARYFUNCTIONAL"])
     }
 }
