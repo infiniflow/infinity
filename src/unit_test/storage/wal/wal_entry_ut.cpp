@@ -475,3 +475,346 @@ TEST_F(WalEntryTest, WalListIterator) {
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(replay_entries.size(), 1u);
 }
+
+// Byte offset of every entry of `wal_file_path`, in file order.
+std::vector<i64> WalEntryOffsets(const std::string &wal_file_path) {
+    std::vector<i64> offsets;
+    auto iter = WalEntryIterator::Make(wal_file_path, false);
+    while (iter->HasNext()) {
+        offsets.push_back(iter->GetOffset());
+        if (iter->Next() == nullptr) {
+            break;
+        }
+    }
+    return offsets;
+}
+
+// Flips a byte of the command count of the entry starting at `entry_offset`, so that the entry no longer
+// matches its checksum. The size fields stay intact, so the entry is only rejected once it is read.
+void CorruptEntry(const std::string &wal_file_path, i64 entry_offset) {
+    const i64 offset = entry_offset + static_cast<i64>(sizeof(WalEntryHeader));
+    std::fstream fs(wal_file_path, std::ios::in | std::ios::out | std::ios::binary);
+    EXPECT_TRUE(fs.is_open());
+    if (!fs.is_open()) {
+        return;
+    }
+    fs.seekg(offset);
+    char byte = 0;
+    fs.read(&byte, 1);
+    fs.seekp(offset);
+    byte = static_cast<char>(byte ^ 0xFF);
+    fs.write(&byte, 1);
+}
+
+// Cuts the checkpoint and everything behind it off a freshly mocked WAL file, so that the file holds no
+// checkpoint. Returns the offsets of the four entries left in it.
+std::vector<i64> MockWalFileWithoutCheckpoint(const std::string &wal_file) {
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+    const std::vector<i64> offsets = WalEntryOffsets(wal_file);
+    // ASSERT_* expands to `return;`, which does not compile in a function returning a value, so check
+    // explicitly and bail out: offsets[4] below and the four offsets returned both need this many.
+    if (offsets.size() < 5) {
+        ADD_FAILURE() << "MockWalFile produced " << offsets.size() << " entries in " << wal_file << ", need at least 5";
+        return {};
+    }
+    std::filesystem::resize_file(wal_file, static_cast<size_t>(offsets[4]));
+    return std::vector<i64>(offsets.begin(), std::next(offsets.begin(), 4));
+}
+
+// Builds a WAL pair and drops the checkpoint (and everything behind it) from the newer file, so that the
+// purge has to look for the checkpoint in the older file. Returns the offsets of the entries left in the
+// newer file, which are its first four entries.
+std::vector<i64> MockWalPair(const std::string &newer_wal_file, const std::string &older_wal_file) {
+    MockWalFile(older_wal_file, "catalog", "META_123.full.json");
+    return MockWalFileWithoutCheckpoint(newer_wal_file);
+}
+
+// Drains the iterator and returns the max commit ts of the first checkpoint it reaches.
+TxnTimeStamp ReplayToFirstCheckpoint(WalListIterator &iterator) {
+    TxnTimeStamp max_commit_ts = 0;
+    while (iterator.HasNext()) {
+        auto entry = iterator.Next();
+        if (entry.get() == nullptr) {
+            break;
+        }
+        WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
+        if (entry->IsCheckPoint(checkpoint_cmd)) {
+            max_commit_ts = checkpoint_cmd->max_commit_ts_;
+            break;
+        }
+    }
+    return max_commit_ts;
+}
+
+// Drains the iterator and returns the commit ts of every entry replay sees, in that order.
+std::vector<TxnTimeStamp> DrainWalList(WalListIterator &iterator) {
+    std::vector<TxnTimeStamp> commit_tss;
+    while (iterator.HasNext()) {
+        auto entry = iterator.Next();
+        if (entry.get() == nullptr) {
+            break;
+        }
+        commit_tss.push_back(entry->commit_ts_);
+    }
+    return commit_tss;
+}
+
+// Damage in front of the checkpoint entry must be ignored: replay only reads the entries behind it, and
+// the backward scan that locates the checkpoint must not walk the damaged prefix.
+TEST_F(WalEntryTest, DamagedEntryBeforeCheckpointIsIgnored) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+
+    const std::vector<i64> offsets = WalEntryOffsets(wal_file);
+    ASSERT_FALSE(offsets.empty());
+    const auto size_before = std::filesystem::file_size(wal_file);
+    CorruptEntry(wal_file, offsets[0]);
+
+    WalListIterator iterator({wal_file});
+    EXPECT_EQ(ReplayToFirstCheckpoint(iterator), 123ul);
+    EXPECT_EQ(std::filesystem::file_size(wal_file), size_before);
+}
+
+// Damage in a file that holds no checkpoint: the file is truncated at the first bad entry and replay
+// continues into the older file, which still carries the checkpoint.
+TEST_F(WalEntryTest, DamagedEntryTruncatesWalFile) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::vector<i64> offsets = MockWalPair(wal_file1, wal_file2);
+
+    CorruptEntry(wal_file1, offsets[2]);
+
+    WalListIterator iterator({wal_file1, wal_file2});
+    EXPECT_EQ(ReplayToFirstCheckpoint(iterator), 123ul);
+    EXPECT_EQ(std::filesystem::file_size(wal_file1), static_cast<uintmax_t>(offsets[2]));
+}
+
+// Same as above, but the very first entry is damaged, so nothing survives in the file and it is removed.
+TEST_F(WalEntryTest, DamagedFirstEntryDropsWalFile) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::vector<i64> offsets = MockWalPair(wal_file1, wal_file2);
+
+    CorruptEntry(wal_file1, offsets[0]);
+
+    WalListIterator iterator({wal_file1, wal_file2});
+    EXPECT_EQ(ReplayToFirstCheckpoint(iterator), 123ul);
+    EXPECT_FALSE(std::filesystem::exists(wal_file1));
+    EXPECT_TRUE(std::filesystem::exists(wal_file2));
+}
+
+// Damage behind the checkpoint entry is on the tail replay actually reads, so the checkpoint file itself
+// gets cut too.
+TEST_F(WalEntryTest, DamagedTailAfterCheckpointIsTruncated) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+
+    const std::vector<i64> offsets = WalEntryOffsets(wal_file);
+    ASSERT_EQ(offsets.size(), 6u);
+    CorruptEntry(wal_file, offsets[5]);
+
+    WalListIterator iterator({wal_file});
+    const std::vector<TxnTimeStamp> drained = DrainWalList(iterator);
+    EXPECT_EQ(std::filesystem::file_size(wal_file), static_cast<uintmax_t>(offsets[5]));
+    // The checkpoint entry survived the cut and is replayed along with the four entries behind it.
+    EXPECT_EQ(drained.size(), 5u);
+}
+
+// Two damaged files: the damage in the older one drops it and everything newer than it, so replay restarts
+// from the oldest file only. Leaving the newer files in place would make replay open a file the purge just
+// deleted.
+TEST_F(WalEntryTest, DamagedOlderFileDropsNewerOnes) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::string wal_file3 = std::string(GetFullWalDir()) + "/wal3.log";
+    const std::vector<i64> offsets = MockWalPair(wal_file1, wal_file3);
+    MockWalFileWithoutCheckpoint(wal_file2);
+    ASSERT_EQ(offsets.size(), 4u);
+
+    CorruptEntry(wal_file1, offsets[2]);
+    CorruptEntry(wal_file2, offsets[0]);
+
+    WalListIterator iterator({wal_file1, wal_file2, wal_file3});
+    const std::vector<TxnTimeStamp> drained = DrainWalList(iterator);
+    EXPECT_EQ(std::filesystem::file_size(wal_file1), static_cast<uintmax_t>(offsets[2]));
+    EXPECT_FALSE(std::filesystem::exists(wal_file2));
+    // Only wal_file3 is left, so replay walks its six entries.
+    EXPECT_EQ(drained.size(), 6u);
+}
+
+// No checkpoint is reachable anywhere: the damage is still purged, and no file is dropped from the list
+// because there is no checkpoint to restart from.
+TEST_F(WalEntryTest, NoCheckpointStillPurgesDamage) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::vector<i64> offsets = MockWalFileWithoutCheckpoint(wal_file1);
+    MockWalFileWithoutCheckpoint(wal_file2);
+    ASSERT_EQ(offsets.size(), 4u);
+
+    CorruptEntry(wal_file1, offsets[1]);
+
+    WalListIterator iterator({wal_file1, wal_file2});
+    const std::vector<TxnTimeStamp> drained = DrainWalList(iterator);
+    EXPECT_EQ(std::filesystem::file_size(wal_file1), static_cast<uintmax_t>(offsets[1]));
+    // One entry survives in wal_file1, four in wal_file2.
+    EXPECT_EQ(drained.size(), 5u);
+}
+
+// A file whose last entry was torn by a crash: the iterator stops at the damage instead of spinning on it.
+TEST_F(WalEntryTest, TornTailStopsIteration) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+
+    const std::vector<i64> offsets = WalEntryOffsets(wal_file);
+    ASSERT_GE(offsets.size(), 6u);
+    std::filesystem::resize_file(wal_file, static_cast<size_t>(offsets[5]) + 5);
+
+    auto iter = WalEntryIterator::Make(wal_file, false);
+    const std::vector<std::shared_ptr<WalEntry>> entries = iter->GetAllEntries();
+    EXPECT_EQ(entries.size(), 5u);
+    EXPECT_FALSE(iter->IsGood());
+}
+
+// Overwrites the trailing 4 bytes (the copy of the entry size) of the entry starting at `entry_offset`
+// with a bogus value, leaving the leading size and the checksum intact. This is the "torn trailing size"
+// failure mode: the backward scan trusts the trailing size and is led astray, while the forward scan reads
+// the leading size and cross-checks the trailing one, so it recovers the real boundary.
+void CorruptTrailingSize(const std::string &wal_file, i64 entry_offset, i32 bogus_size) {
+    std::fstream fs(wal_file, std::ios::in | std::ios::out | std::ios::binary);
+    ASSERT_TRUE(fs.is_open());
+    if (!fs.is_open()) {
+        return;
+    }
+    fs.seekp(entry_offset);
+    i32 leading_size = 0;
+    fs.read(reinterpret_cast<char *>(&leading_size), sizeof(leading_size));
+    fs.seekp(entry_offset + leading_size - static_cast<std::streamoff>(sizeof(i32)));
+    fs.write(reinterpret_cast<const char *>(&bogus_size), sizeof(bogus_size));
+    fs.close();
+}
+
+// Corrupting only the trailing size of the LAST entry fools the backward scan into stopping at a frame
+// boundary that is not real. The forward scan reads the leading size and cross-checks the trailing one, so
+// it recovers the real boundary and the file is truncated at the torn entry, keeping everything before it.
+TEST_F(WalEntryTest, CorruptedTrailingSizeIsRecoveredByForwardScan) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+
+    const std::vector<i64> offsets = WalEntryOffsets(wal_file);
+    ASSERT_GE(offsets.size(), 6u);
+    CorruptTrailingSize(wal_file, offsets[5], 1024);
+
+    WalListIterator iterator({wal_file});
+    const std::vector<TxnTimeStamp> drained = DrainWalList(iterator);
+    // The last entry is torn, so the file is cut before it: the four entries in front of the checkpoint
+    // survive, and the checkpoint entry itself is the fifth and is replayed.
+    EXPECT_EQ(std::filesystem::file_size(wal_file), static_cast<uintmax_t>(offsets[5]));
+    EXPECT_EQ(drained.size(), 5u);
+}
+
+// A WAL file that cannot be read must be a RecoverableException, not an UnrecoverableException: the admin
+// SHOW WAL commands inspect WAL files on a running server, where a file that disappears between being
+// listed and being opened is a client error. Checkpointing removes old WAL files, so this is reachable.
+// An empty WAL file is not an error: it simply holds no entries.
+TEST_F(WalEntryTest, EmptyWalFileIsNotAnError) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    {
+        std::ofstream ofs(wal_file, std::ios::binary);
+    }
+
+    auto iter = WalEntryIterator::Make(wal_file, false);
+    EXPECT_TRUE(iter->GetAllEntries().empty());
+    EXPECT_TRUE(iter->IsGood());
+}
+
+// A file too short to even hold an entry size must be reported as empty, not read out of bounds.
+TEST_F(WalEntryTest, FileShorterThanEntrySize) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file = std::string(GetFullWalDir()) + "/wal.log";
+    MockWalFile(wal_file, "catalog", "META_123.full.json");
+    std::filesystem::resize_file(wal_file, 2);
+
+    auto forward_iter = WalEntryIterator::Make(wal_file, false);
+    EXPECT_TRUE(forward_iter->GetAllEntries().empty());
+    EXPECT_FALSE(forward_iter->IsGood());
+
+    auto backward_iter = WalEntryIterator::Make(wal_file, true);
+    EXPECT_TRUE(backward_iter->GetAllEntries().empty());
+    EXPECT_FALSE(backward_iter->IsGood());
+}
+
+// When every WAL file is damaged at its first entry and none of them holds a checkpoint, the purge deletes
+// them all and the list becomes empty. The iterator must then report no entries instead of dereferencing a
+// null iterator.
+TEST_F(WalEntryTest, AllFilesPurgedLeavesEmptyList) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::vector<i64> offsets1 = MockWalFileWithoutCheckpoint(wal_file1);
+    const std::vector<i64> offsets2 = MockWalFileWithoutCheckpoint(wal_file2);
+    ASSERT_EQ(offsets1.size(), 4u);
+    ASSERT_EQ(offsets2.size(), 4u);
+
+    CorruptEntry(wal_file1, offsets1[0]);
+    CorruptEntry(wal_file2, offsets2[0]);
+
+    WalListIterator iterator({wal_file1, wal_file2});
+    // Both files were deleted by the purge because nothing survived in either.
+    EXPECT_FALSE(std::filesystem::exists(wal_file1));
+    EXPECT_FALSE(std::filesystem::exists(wal_file2));
+    // With an empty list the iterator is exhausted and Next() is safe.
+    EXPECT_FALSE(iterator.HasNext());
+    EXPECT_EQ(iterator.Next(), nullptr);
+}
+
+// Damage accumulates across several files: an older damaged file forces replay to start behind every newer
+// file too. Here the checkpoint lives in the oldest file, so the two damaged files ahead of it (one
+// truncated, one deleted) are both dropped and only the checkpoint file survives.
+TEST_F(WalEntryTest, DamageAccumulatesToCheckpointFile) {
+    RemoveDbDirs();
+    std::filesystem::create_directories(GetFullWalDir());
+    const std::string wal_file1 = std::string(GetFullWalDir()) + "/wal.log";
+    const std::string wal_file2 = std::string(GetFullWalDir()) + "/wal2.log";
+    const std::string wal_file3 = std::string(GetFullWalDir()) + "/wal3.log";
+    const std::string wal_file4 = std::string(GetFullWalDir()) + "/wal4.log";
+    const std::vector<i64> offsets1 = MockWalFileWithoutCheckpoint(wal_file1);
+    MockWalFileWithoutCheckpoint(wal_file2);
+    const std::vector<i64> offsets3 = MockWalFileWithoutCheckpoint(wal_file3);
+    MockWalFile(wal_file4, "catalog", "META_123.full.json"); // checkpoint lives here (oldest)
+    ASSERT_EQ(offsets1.size(), 4u);
+    ASSERT_EQ(offsets3.size(), 4u);
+
+    // wal.log: newest, truncated (damage not at offset 0).
+    CorruptEntry(wal_file1, offsets1[2]);
+    // wal3.log: damaged at its first entry, so it is deleted.
+    CorruptEntry(wal_file3, offsets3[0]);
+
+    WalListIterator iterator({wal_file1, wal_file2, wal_file3, wal_file4});
+    // wal.log survives but is truncated before the damaged entry; wal3.log was deleted.
+    EXPECT_EQ(std::filesystem::file_size(wal_file1), static_cast<uintmax_t>(offsets1[2]));
+    EXPECT_TRUE(std::filesystem::exists(wal_file2));
+    EXPECT_FALSE(std::filesystem::exists(wal_file3));
+    // Replay restarts from the oldest file (wal4.log) which still carries the checkpoint.
+    EXPECT_TRUE(std::filesystem::exists(wal_file4));
+    EXPECT_EQ(ReplayToFirstCheckpoint(iterator), 123ul);
+}

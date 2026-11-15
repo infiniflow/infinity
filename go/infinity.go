@@ -24,7 +24,7 @@ import (
 
 // ClientVersion is the version of this Go SDK client
 // This should match the protocol version expected by the server
-const ClientVersion = 37 // version: 0.7.3
+const ClientVersion = 37 // version: 0.7.5
 
 // Connect creates a new connection to Infinity
 // This is a factory function that creates the appropriate connection type based on the URI
@@ -87,7 +87,7 @@ func NewInfinityConnectionWithConfig(address NetworkAddress, conf *thrift.TConfi
 	// Open transport
 	if err := bufferedTransport.Open(); err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to connect to server at %s:%d: %v", address.IP, address.Port, err),
 		)
 	}
@@ -110,7 +110,7 @@ func NewInfinityConnectionWithConfig(address NetworkAddress, conf *thrift.TConfi
 	if err != nil {
 		bufferedTransport.Close()
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to connect: %v", err),
 		)
 	}
@@ -178,6 +178,15 @@ func (c *InfinityConnection) GetSessionID() int64 {
 	return c.sessionID
 }
 
+// SetSessionID adopts an existing session id on this connection.
+//
+// The reference keeps sessions in a static map keyed by id, so a client can
+// reconnect and carry on in the session it opened on a previous socket; only
+// `Disconnect` ends it. This is the setter that makes that possible.
+func (c *InfinityConnection) SetSessionID(sessionID int64) {
+	c.sessionID = sessionID
+}
+
 // CreateDatabase creates a new database
 func (c *InfinityConnection) CreateDatabase(dbName string, conflictType ConflictType, comment string) (*Database, error) {
 	if !c.isConnected {
@@ -212,7 +221,7 @@ func (c *InfinityConnection) CreateDatabase(dbName string, conflictType Conflict
 	resp, err := c.client.CreateDatabase(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create database: %v", err),
 		)
 	}
@@ -243,7 +252,7 @@ func (c *InfinityConnection) ListDatabases() (interface{}, error) {
 	resp, err := c.client.ListDatabase(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to list databases: %v", err),
 		)
 	}
@@ -275,7 +284,7 @@ func (c *InfinityConnection) ShowDatabase(dbName string) (interface{}, error) {
 	resp, err := c.client.ShowDatabase(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show database: %v", err),
 		)
 	}
@@ -321,7 +330,7 @@ func (c *InfinityConnection) DropDatabase(dbName string, conflictType ConflictTy
 	resp, err := c.client.DropDatabase(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to drop database: %v", err),
 		)
 	}
@@ -353,7 +362,7 @@ func (c *InfinityConnection) GetDatabase(dbName string) (*Database, error) {
 	resp, err := c.client.GetDatabase(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to get database: %v", err),
 		)
 	}
@@ -384,7 +393,7 @@ func (c *InfinityConnection) ShowCurrentNode() (interface{}, error) {
 	resp, err := c.client.ShowCurrentNode(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show current node: %v", err),
 		)
 	}
@@ -417,7 +426,7 @@ func (c *InfinityConnection) CreateDatabaseSnapshot(snapshotName string, dbName 
 	resp, err := c.client.CreateDatabaseSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create database snapshot: %v", err),
 		)
 	}
@@ -450,7 +459,7 @@ func (c *InfinityConnection) RestoreDatabaseSnapshot(snapshotName string) (inter
 	resp, err := c.client.RestoreSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to restore database snapshot: %v", err),
 		)
 	}
@@ -482,7 +491,7 @@ func (c *InfinityConnection) CreateSystemSnapshot(snapshotName string) (interfac
 	resp, err := c.client.CreateSystemSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to create system snapshot: %v", err),
 		)
 	}
@@ -515,7 +524,7 @@ func (c *InfinityConnection) RestoreSystemSnapshot(snapshotName string) (interfa
 	resp, err := c.client.RestoreSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to restore system snapshot: %v", err),
 		)
 	}
@@ -546,7 +555,7 @@ func (c *InfinityConnection) ListSnapshots() (interface{}, error) {
 	resp, err := c.client.ListSnapshots(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to list snapshots: %v", err),
 		)
 	}
@@ -578,7 +587,7 @@ func (c *InfinityConnection) ShowSnapshot(snapshotName string) (interface{}, err
 	resp, err := c.client.ShowSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show snapshot: %v", err),
 		)
 	}
@@ -610,7 +619,7 @@ func (c *InfinityConnection) DropSnapshot(snapshotName string) (interface{}, err
 	resp, err := c.client.DropSnapshot(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to drop snapshot: %v", err),
 		)
 	}
@@ -669,7 +678,7 @@ func (c *InfinityConnection) FlushData() error {
 	resp, err := c.client.Flush(ctx, req)
 	if err != nil {
 		return NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to flush data: %v", err),
 		)
 	}
@@ -720,7 +729,7 @@ func (c *InfinityConnection) SetConfig(configName string, configValue interface{
 	resp, err := c.client.SetConfig(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to set config: %v", err),
 		)
 	}
@@ -752,7 +761,7 @@ func (c *InfinityConnection) ShowConfig(configName string) (*ConfigResponse, err
 	resp, err := c.client.ShowConfig(ctx, req)
 	if err != nil {
 		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
+			transportErrorCode(err),
 			fmt.Sprintf("Failed to show config: %v", err),
 		)
 	}

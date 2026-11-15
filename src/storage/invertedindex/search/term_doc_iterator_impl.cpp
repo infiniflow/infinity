@@ -103,7 +103,11 @@ float TermDocIterator::BlockMaxBM25Score() {
 
 bool TermDocIterator::Next(RowID doc_id) {
     assert(doc_id != INVALID_ROWID);
-    if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id)
+    // Early return only when the posting reader is really decoded on doc_id_. After NextShallow() the
+    // block cursor has moved but doc_id_ still holds the old doc (the posting reader position is
+    // invalidated by PostingIterator::SkipTo), and scoring from that state would decode TF from a
+    // mismatched block -- the 473f4fa0 failure. Re-seeking here repairs the state instead.
+    if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id && IsCurrentDocDecoded())
         return true;
     while (true) {
         ++seek_cnt_;
@@ -116,6 +120,16 @@ bool TermDocIterator::Next(RowID doc_id) {
         }
         doc_id = doc_id_ + 1;
     }
+}
+
+bool TermDocIterator::NextNoSkip(RowID doc_id) {
+    assert(doc_id != INVALID_ROWID);
+    if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id && IsCurrentDocDecoded()) {
+        return true;
+    }
+    ++seek_cnt_;
+    doc_id_ = iter_->SeekDoc(doc_id);
+    return doc_id_ != INVALID_ROWID;
 }
 
 bool TermDocIterator::NextShallow(RowID doc_id) {

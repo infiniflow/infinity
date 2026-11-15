@@ -147,7 +147,7 @@ func TestQueryBuilder(t *testing.T) {
 
 	// Build query using Output and execute
 	table.Output([]string{"*"})
-	
+
 	result, err := table.ToResult()
 	if err != nil {
 		t.Fatalf("Failed to execute query: %v", err)

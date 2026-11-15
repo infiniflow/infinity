@@ -1,0 +1,30 @@
+[package]
+name = "executor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rust-stemmers.workspace = true
+common.workspace = true
+storage.workspace = true
+catalog.workspace = true
+txn.workspace = true
+parser.workspace = true
+expression.workspace = true
+analyzer.workspace = true
+planner.workspace = true
+index.workspace = true
+lz4_flex.workspace = true
+arrow-array.workspace = true
+arrow-buffer.workspace = true
+arrow-schema.workspace = true
+parquet.workspace = true
+tokio.workspace = true
+ryu = "1.0"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

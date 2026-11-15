@@ -95,7 +95,13 @@ std::vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const std::string &dir) {
             snapshot_brief.snapshot_name_ = static_cast<std::string>(doc["snapshot_name"].get<std::string_view>().value());
             snapshot_brief.scope_ = (SnapshotScope)(u8)(doc["snapshot_scope"].get<int64_t>().value());
 
-            // snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
+            // The ts the snapshot was taken at. Every scope writes it into the
+            // metadata (`TableSnapshotInfo`/`DatabaseSnapshotInfo`/
+            // `SystemSnapshotInfo::CreateSnapshotMetadataJSON`), so `SHOW
+            // SNAPSHOTS` no longer reports an uninitialized member.
+            if (auto commit_ts = doc["max_commit_ts"].get_uint64(); commit_ts.error() == simdjson::SUCCESS) {
+                snapshot_brief.commit_ts_ = commit_ts.value();
+            }
 
             //            std::filesystem::path compressed_file(snapshot_path);
             //            compressed_file.replace_extension("lz4");

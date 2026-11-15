@@ -638,6 +638,7 @@ nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
     json_res["db_id_str"] = db_id_str_;
     json_res["db_comment"] = db_comment_;
     json_res["db_next_table_id_str"] = db_next_table_id_str_;
+    json_res["max_commit_ts"] = max_commit_ts_;
 
     // Serialize all table snapshots
     for (const auto &table_snapshot : table_snapshots_) {
@@ -652,6 +653,7 @@ nlohmann::json SystemSnapshotInfo::CreateSnapshotMetadataJSON() const {
     json_res["version"] = version_;
     json_res["snapshot_name"] = snapshot_name_;
     json_res["snapshot_scope"] = SnapshotScope::kSystem;
+    json_res["max_commit_ts"] = max_commit_ts_;
 
     // Serialize all database snapshots
     for (const auto &db_snapshot : database_snapshots_) {
@@ -704,6 +706,9 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::
     database_snapshot->db_id_str_ = snapshot_meta_json["db_id_str"];
     database_snapshot->db_comment_ = snapshot_meta_json["db_comment"];
     database_snapshot->db_next_table_id_str_ = snapshot_meta_json["db_next_table_id_str"];
+    if (snapshot_meta_json.contains("max_commit_ts")) {
+        database_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
+    }
 
     // Deserialize table snapshots
     if (snapshot_meta_json.contains("table_snapshots")) {
@@ -788,6 +793,9 @@ std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Dese
     system_snapshot->version_ = snapshot_meta_json["version"];
     system_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
     system_snapshot->scope_ = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+    if (snapshot_meta_json.contains("max_commit_ts")) {
+        system_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
+    }
 
     // Deserialize table snapshots
     if (snapshot_meta_json.contains("database_snapshots")) {

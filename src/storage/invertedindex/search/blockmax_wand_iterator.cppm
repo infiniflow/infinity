@@ -51,7 +51,6 @@ private:
     size_t FindPivotOptimized(float threshold);
     void UpdateScoreUpperBoundPrefixSums();
     bool ShouldSkipSort() const;
-    void OptimizedPartialSort(size_t limit);
     bool TryFastPivotEstimation(float threshold, size_t &estimated_pivot);
 
     // Lucene-inspired MSM optimization methods
@@ -70,7 +69,6 @@ private:
     static constexpr u32 SORT_SKIP_THRESHOLD = 15;  // Reduced threshold for better balance
     static constexpr u32 LAZY_SORT_INTERVAL = 3;    // More frequent sorting for accuracy
     static constexpr u32 FAST_PIVOT_THRESHOLD = 50; // Use fast estimation for very large sets
-    static constexpr u32 PARTIAL_SORT_FACTOR = 3;   // Sort only top 1/3 for large sets
 
     std::vector<f32> score_ub_prefix_sums_; // Prefix sums for fast pivot calculation
     std::vector<size_t> iterator_indices_;  // Cached indices for avoiding pointer chasing

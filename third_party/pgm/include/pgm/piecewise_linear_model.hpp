@@ -38,8 +38,63 @@ namespace pgm::internal {
 
 template<typename T>
 using LargeSigned = typename std::conditional_t<std::is_floating_point_v<T>,
-                                                long double,
+                                                double,
                                                 std::conditional_t<(sizeof(T) < 8), int64_t, __int128>>;
+
+/// A product `dx * dy`, kept as `mantissa * 2^exponent` instead of a `double`.
+///
+/// The model compares cross products of a horizontal difference and a vertical one.
+/// With floating-point keys spanning most of the double range the product overflows
+/// to infinity and `inf - inf` becomes NaN, which would otherwise poison the model.
+/// Keeping the exponent separately makes the comparison overflow-free, and it orders
+/// products exactly like the `double` product would.
+struct ScaledProduct {
+    double mantissa{}; ///< |mantissa| in [0.5, 1), or 0 for a zero product.
+    int exponent{};
+};
+
+inline ScaledProduct scale_product(double dx, double dy) {
+    int dx_exponent = 0;
+    int dy_exponent = 0;
+    double mantissa = std::frexp(dx, &dx_exponent) * std::frexp(dy, &dy_exponent);
+    int exponent = dx_exponent + dy_exponent;
+    // The mantissas are in [0.5, 1), so the product is in [0.25, 1): renormalize it
+    // to make the exponent order match the magnitude order.
+    if (std::fabs(mantissa) < 0.5) {
+        mantissa *= 2;
+        --exponent;
+    }
+    return {mantissa, exponent};
+}
+
+inline int compare_scaled(const ScaledProduct &lhs, const ScaledProduct &rhs) {
+    if (lhs.mantissa == 0 || rhs.mantissa == 0) {
+        if (lhs.mantissa == 0 && rhs.mantissa == 0)
+            return 0;
+        if (lhs.mantissa == 0)
+            return std::signbit(rhs.mantissa) ? 1 : -1;
+        return std::signbit(lhs.mantissa) ? -1 : 1;
+    }
+    const bool lhs_negative = std::signbit(lhs.mantissa);
+    if (lhs_negative != std::signbit(rhs.mantissa))
+        return lhs_negative ? -1 : 1;
+    int magnitude = 0;
+    if (lhs.exponent != rhs.exponent)
+        magnitude = lhs.exponent < rhs.exponent ? -1 : 1;
+    else if (lhs.mantissa != rhs.mantissa)
+        magnitude = lhs.mantissa < rhs.mantissa ? -1 : 1;
+    return lhs_negative ? -magnitude : magnitude;
+}
+
+/// Compares `dx1 * dy1` with `dx2 * dy2`, falling back to the scaled form only when
+/// a product overflows: for finite products this is exactly the `double` result.
+inline int compare_products(double dx1, double dy1, double dx2, double dy2) {
+    const double lhs = dx1 * dy1;
+    const double rhs = dx2 * dy2;
+    if (std::isfinite(lhs) && std::isfinite(rhs))
+        return (lhs > rhs) - (lhs < rhs);
+    return compare_scaled(scale_product(dx1, dy1), scale_product(dx2, dy2));
+}
 
 template<typename X, typename Y>
 class OptimalPiecewiseLinearModel {
@@ -51,11 +106,22 @@ private:
         SX dx{};
         SY dy{};
 
-        bool operator<(const Slope &p) const { return dy * p.dx < dx * p.dy; }
-        bool operator>(const Slope &p) const { return dy * p.dx > dx * p.dy; }
-        bool operator==(const Slope &p) const { return dy * p.dx == dx * p.dy; }
-        bool operator!=(const Slope &p) const { return dy * p.dx != dx * p.dy; }
-        explicit operator long double() const { return dy / (long double) dx; }
+        int compare(const Slope &p) const {
+            if constexpr (std::is_floating_point_v<X>) {
+                // `dy * p.dx` and `dx * p.dy` overflow for keys spanning most of the
+                // double range, so compare them with an exact exponent instead.
+                return compare_products(p.dx, dy, dx, p.dy);
+            } else {
+                auto lhs = dy * p.dx;
+                auto rhs = dx * p.dy;
+                return (lhs > rhs) - (lhs < rhs);
+            }
+        }
+        bool operator<(const Slope &p) const { return compare(p) < 0; }
+        bool operator>(const Slope &p) const { return compare(p) > 0; }
+        bool operator==(const Slope &p) const { return compare(p) == 0; }
+        bool operator!=(const Slope &p) const { return compare(p) != 0; }
+        explicit operator double() const { return dy / (double) dx; }
     };
 
     struct Point {
@@ -75,10 +141,16 @@ private:
     size_t points_in_hull = 0;
     Point rectangle[4];
 
-    auto cross(const Point &O, const Point &A, const Point &B) const {
+    int cross(const Point &O, const Point &A, const Point &B) const {
         auto OA = A - O;
         auto OB = B - O;
-        return OA.dx * OB.dy - OA.dy * OB.dx;
+        if constexpr (std::is_floating_point_v<X>) {
+            return compare_products(OA.dx, OB.dy, OB.dx, OA.dy);
+        } else {
+            auto lhs = OA.dx * OB.dy;
+            auto rhs = OA.dy * OB.dx;
+            return (lhs > rhs) - (lhs < rhs);
+        }
     }
 
 public:
@@ -223,7 +295,7 @@ public:
 
     X get_first_x() const { return first; }
 
-    std::pair<long double, long double> get_intersection() const {
+    std::pair<double, double> get_intersection() const {
         auto &p0 = rectangle[0];
         auto &p1 = rectangle[1];
         auto &p2 = rectangle[2];
@@ -235,14 +307,20 @@ public:
             return {p0.x, p0.y};
 
         auto p0p1 = p1 - p0;
-        auto a = slope1.dx * slope2.dy - slope1.dy * slope2.dx;
-        auto b = (p0p1.dx * slope2.dy - p0p1.dy * slope2.dx) / static_cast<long double>(a);
+        // Scale every horizontal term by the same power of two. `b` is a ratio of
+        // two cross products, so it does not change, and the products stay finite
+        // for keys that span most of the double range.
+        int exponent = 0;
+        std::frexp(std::max({std::fabs(p0p1.dx), std::fabs(slope1.dx), std::fabs(slope2.dx)}), &exponent);
+        const auto scaled = [exponent](double dx) { return std::ldexp(dx, -exponent); };
+        auto a = scaled(slope1.dx) * slope2.dy - slope1.dy * scaled(slope2.dx);
+        auto b = (scaled(p0p1.dx) * slope2.dy - p0p1.dy * scaled(slope2.dx)) / a;
         auto i_x = p0.x + b * slope1.dx;
         auto i_y = p0.y + b * slope1.dy;
         return {i_x, i_y};
     }
 
-    std::pair<long double, SY> get_floating_point_segment(const X &origin) const {
+    std::pair<double, SY> get_floating_point_segment(const X &origin) const {
         if (one_point())
             return {0, (rectangle[0].y + rectangle[1].y) / 2};
 
@@ -252,7 +330,7 @@ public:
             auto intercept_d = slope.dx;
             auto rounding_term = ((intercept_n < 0) ^ (intercept_d < 0) ? -1 : +1) * intercept_d / 2;
             auto intercept = (intercept_n + rounding_term) / intercept_d + rectangle[1].y;
-            return {static_cast<long double>(slope), intercept};
+            return {static_cast<double>(slope), intercept};
         }
 
         auto[i_x, i_y] = get_intersection();
@@ -262,12 +340,12 @@ public:
         return {slope, intercept};
     }
 
-    std::pair<long double, long double> get_slope_range() const {
+    std::pair<double, double> get_slope_range() const {
         if (one_point())
             return {0, 1};
 
-        auto min_slope = static_cast<long double>(rectangle[2] - rectangle[0]);
-        auto max_slope = static_cast<long double>(rectangle[3] - rectangle[1]);
+        auto min_slope = static_cast<double>(rectangle[2] - rectangle[0]);
+        auto max_slope = static_cast<double>(rectangle[3] - rectangle[1]);
         return {min_slope, max_slope};
     }
 };

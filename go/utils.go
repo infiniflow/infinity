@@ -172,3 +172,27 @@ func SearchToString(search *SearchExpr) string {
 	// In the actual implementation, this would convert the search to a string
 	return fmt.Sprintf("%v", search)
 }
+
+// QuoteStringLiteral quotes a value as a string literal for a filter
+// expression. A backslash is passed through unchanged, which is what a regular
+// expression needs, so only the quote itself has to be doubled.
+func QuoteStringLiteral(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+// RegexFilter builds a `regex(column, pattern)` filter expression for
+// Table.Filter.
+//
+// The server evaluates the pattern with RE2. When the column carries a
+// full-text index built with a sparse gram analyzer (`sparsegram-3-12`,
+// optionally `-fold`), the literals the pattern proves mandatory narrow the
+// scan through that index first and the regular expression then verifies the
+// candidates that survive, so the narrowing can only ever remove rows the
+// pattern cannot match. A column without such an index keeps a plain scan.
+//
+// Example:
+//
+//	table.Filter(infinity.RegexFilter("doc", `colou?r of the (sky|sea)`))
+func RegexFilter(column, pattern string) string {
+	return fmt.Sprintf("regex(%s, %s)", column, QuoteStringLiteral(pattern))
+}

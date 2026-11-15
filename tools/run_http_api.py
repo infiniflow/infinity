@@ -35,15 +35,17 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = "")
     )
     process.wait()
     if process.returncode != 0:
-        raise Exception(f"An error occurred: {process.stderr}")
+        raise Exception(f"An error occurred, pytest exit code: {process.returncode}")
 
     print("http api test finished.")
 
 
 if __name__ == "__main__":
-    print("Note: this script must be run under root directory of the project.")
-    current_path = os.getcwd()
-    python_test_dir = current_path + "/python"
+    # Resolve the test tree from this file so the script works from any cwd.
+    # Passing a non-existent path makes pytest skip the conftest.py that
+    # registers --http, which then fails with "unrecognized arguments: --http".
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    python_test_dir = os.path.join(project_root, "python")
     parser = argparse.ArgumentParser(description="Http API Test For Infinity")
     parser.add_argument(
         "-m",
@@ -64,6 +66,9 @@ if __name__ == "__main__":
         test_case = f"{python_test_dir}/test_pysdk/{args.test_case}"
     else:
         test_case = f"{python_test_dir}/test_pysdk"
+    if not os.path.exists(test_case):
+        print(f"Test case path not found: {test_case}")
+        sys.exit(-1)
     print("Start Http API testing...")
     start = time.time()
     try:

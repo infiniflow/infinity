@@ -148,6 +148,19 @@ Status Storage::InitToAdmin() {
             persistence_manager_ =
                 std::make_unique<PersistenceManager>(this, persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
         }
+
+        // In maintenance (admin) mode the storage layer is not fully initialized, but the
+        // catalog DB must be readable for ADMIN introspection commands (e.g. ADMIN SHOW DATABASES).
+        // Open it read-only so those commands can reuse the KVStore traversal instead of re-opening
+        // the RocksDB via DB::OpenForReadOnly (whose DBImplReadOnly destructor asserts on this catalog).
+        if (kv_store_ == nullptr) {
+            kv_store_ = std::make_unique<KVStore>();
+        }
+        Status init_ro_status = kv_store_->InitReadOnly(config_ptr_->CatalogDir());
+        if (!init_ro_status.ok()) {
+            return init_ro_status;
+        }
+
         current_storage_mode_ = StorageMode::kAdmin;
     }
     LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));
@@ -191,6 +204,10 @@ Status Storage::UnInitFromAdmin() {
         if (memory_index_tracer_ != nullptr) {
             memory_index_tracer_.reset();
         }
+
+        // Release the read-only catalog KVStore opened by InitToAdmin. Leaving it alive keeps a
+        // KVInstance with a null transaction_ around, which crashes write paths if it is reused.
+        kv_store_.reset();
 
         current_storage_mode_ = StorageMode::kUnInitialized;
     }
@@ -874,6 +891,15 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     }
     bg_processor_ = std::make_unique<BGTaskProcessor>();
 
+    // The KVStore left over from the admin (read-only) phase is not writable: GetInstance()
+    // returns an instance with a null transaction_ that crashes write paths. Replace it with a
+    // writable KVStore before constructing the txn manager.
+    kv_store_ = std::make_unique<KVStore>();
+    Status kv_store_status = kv_store_->Init(config_ptr_->CatalogDir());
+    if (!kv_store_status.ok()) {
+        return kv_store_status;
+    }
+
     // TODO: new txn manager
     new_txn_mgr_ = std::make_unique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
@@ -1009,7 +1035,7 @@ bool Storage::ConvertJsonIndexFormat() const {
             const std::string &table_id_str = (*table_id_strs)[j];
             const std::string &table_name = (*table_names)[j];
 
-            TableMeta table_meta(db_id_str, table_id_str, table_name, txn);
+            TableMeta table_meta(db_id_str, db_name, table_id_str, table_name, txn);
 
             std::vector<std::string> *index_id_strs = nullptr;
             std::vector<std::string> *index_names = nullptr;

@@ -1,0 +1,21 @@
+[package]
+name = "analyzer-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# The C ABI the Go side links; `rlib` lets the crate's own tests call it.
+name = "rag_analyzer"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+analyzer.workspace = true
+libc = "0.2"
+# The host process tokenizes on many goroutines at once, and the reference's
+# C++ analyzer links jemalloc for the same reason. The allocator itself is
+# declared in `common`, which this crate reaches through `analyzer`, so the
+# `cdylib`/`staticlib` gets mimalloc without a second declaration here.
+
+[lints]
+workspace = true

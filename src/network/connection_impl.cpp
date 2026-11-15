@@ -426,6 +426,17 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             message = *query_result.result_table_->result_msg();
             break;
         }
+        case LogicalNodeType::kFlush:
+        case LogicalNodeType::kCommand: {
+            // A skipped FLUSH DATA / CLEAN DATA carries the reason in result_msg; a normal statement has none.
+            std::string *result_msg = query_result.result_table_->result_msg();
+            if (result_msg != nullptr) {
+                message = *result_msg;
+            } else {
+                message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));
+            }
+            break;
+        }
 
         default: {
             message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));

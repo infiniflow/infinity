@@ -1,0 +1,147 @@
+# Lefthook: the same checks at `git commit` and in CI, modelled on RAGFlow.
+#
+# One-time setup per clone:
+#   lefthook install            # writes .git/hooks/{pre-commit,...}
+#
+# Local commits (default mode) run every job, let the fix-capable ones rewrite
+# the staged files and stage the result again (`stage_fixed`), so what is
+# committed is already formatted.
+#
+# CI (`.github/workflows/rust_engine.yml`, the `quality` job) runs the same
+# jobs on the files a push or a pull request touched with
+# `LEFTHOOK_CHECK_ONLY=1`: the fix-capable jobs only check, no file is
+# modified, and a finding exits non-zero.
+#
+# Every `run:` block is POSIX sh: lefthook executes through /bin/sh, which is
+# dash on most Linux images (no bash-only `[[ ... ]]`).
+pre-commit:
+  parallel: true
+  jobs:
+    # --- text hygiene (the tools/hooks/check_files.py checks) --------------
+    # These three rewrite the whole staged file, and so does `gofmt -w` below
+    # for the Go ones. `pre-commit` runs its jobs in parallel, so a `.go` file
+    # with trailing whitespace could be written by both at once - one write
+    # winning, or a truncated file being staged. They share a `group` with
+    # `parallel: false`, so each file's fixers run one after another.
+    - group:
+        parallel: false
+        jobs:
+          - name: end-of-file-fixer
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py eof {staged_files}
+              else
+                python3 tools/hooks/check_files.py eof --fix {staged_files}
+              fi
+          - name: trailing-whitespace
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py trailing-whitespace {staged_files}
+              else
+                python3 tools/hooks/check_files.py trailing-whitespace --fix {staged_files}
+              fi
+          - name: mixed-line-ending
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py mixed-line-ending {staged_files}
+              else
+                python3 tools/hooks/check_files.py mixed-line-ending --fix {staged_files}
+              fi
+          # `gofmt -l` prints the files it would rewrite and still exits 0, so
+          # the check turns that into a failure itself: lefthook only reads
+          # exit codes. It sits in this group because it rewrites the same
+          # files as the three checks above.
+          - name: gofmt
+            glob: "go/**/*.go"
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                unformatted=$(gofmt -l {staged_files})
+                if [ -n "${unformatted}" ]; then
+                  echo "gofmt would rewrite:"
+                  echo "${unformatted}"
+                  exit 1
+                fi
+              else
+                gofmt -w {staged_files}
+              fi
+    - name: check-yaml
+      run: python3 tools/hooks/check_files.py yaml {staged_files}
+    - name: check-json
+      run: python3 tools/hooks/check_files.py json {staged_files}
+    - name: check-case-conflict
+      run: python3 tools/hooks/check_files.py case-conflict {staged_files}
+    - name: check-merge-conflict
+      run: python3 tools/hooks/check_files.py merge-conflict {staged_files}
+
+    # --- C++: clang-format-20 (AGENTS.md) ----------------------------------
+    # The same exclusions as .hooks/pre-commit: vendored code and the generated
+    # parser are not formatted by the project.
+    - name: clang-format
+      glob: "*.{c,h,hpp,cpp,cppm}"
+      exclude:
+        - "third_party/**"
+        - "cpp/third_party/**"
+        - "src/networker/third_party/**"
+        - "src/parser/lexer.*"
+        - "src/parser/parser.*"
+        - "src/parser/search_parser.*"
+        - "src/parser/expression_parser.*"
+      stage_fixed: true
+      run: |
+        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+          clang-format-20 --dry-run --Werror {staged_files}
+        else
+          clang-format-20 -i {staged_files}
+        fi
+
+    # --- Rust: rustfmt (the rewrite's own gate, rust_engine.yml "quality") --
+    - name: rustfmt
+      glob: "rust_engine/**/*.rs"
+      stage_fixed: true
+      run: |
+        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+          cargo fmt --manifest-path rust_engine/Cargo.toml --all -- --check
+        else
+          cargo fmt --manifest-path rust_engine/Cargo.toml --all
+        fi
+
+    # --- Python: ruff + ruff-format (the configuration is in pyproject.toml) --
+    # `uvx` runs the project's pinned Python tooling without installing it into
+    # the SDK's virtualenv; `uv` is the only package manager this repo uses.
+    - name: ruff
+      glob: "*.py"
+      stage_fixed: true
+      run: |
+        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+          uvx ruff check {staged_files}
+        else
+          uvx ruff check --fix {staged_files}
+        fi
+    - name: ruff-format
+      glob: "*.py"
+      stage_fixed: true
+      run: |
+        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+          uvx ruff format --check {staged_files}
+        else
+          uvx ruff format {staged_files}
+        fi
+
+# CI-only hook: the checks that cost a workspace compile and therefore do not
+# belong on a commit (the same split RAGFlow uses for its web toolchain, which
+# is only run by CI on the files a pull request changed). The rust_engine
+# workflow's quality job runs it over the changed files after the pre-commit
+# hook; formatting is already covered there by the rustfmt job.
+rust-checks:
+  jobs:
+    - name: clippy
+      # clippy takes no file list, so this is whole-workspace; the workflow
+      # only invokes the hook when the change touched Rust. `root` puts cargo
+      # where rust_engine/rust-toolchain.toml (nightly, the index crate uses a
+      # feature) applies.
+      root: "rust_engine/"
+      run: cargo clippy --workspace --all-targets -- -D warnings

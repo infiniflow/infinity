@@ -37,6 +37,7 @@ export class TableMeta {
 public:
     // TableMeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
     TableMeta(const std::string &db_id_str,
+              const std::string &db_name,
               const std::string &table_id_str,
               const std::string &table_name,
               KVInstance *kv_instance,
@@ -44,7 +45,7 @@ public:
               TxnTimeStamp commit_ts,
               MetaCache *meta_cache);
 
-    TableMeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn);
+    TableMeta(const std::string &db_id_str, const std::string &db_name, const std::string &table_id_str, const std::string &table_name, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -100,10 +101,6 @@ public:
     Status GetTableDetail(TableDetail &table_detail);
 
     std::pair<std::string, std::string> GetDBTableName() const { return std::make_pair(db_name_, table_name_); }
-    void SetDBTableName(const std::string &db_name, const std::string &table_name) {
-        db_name_ = db_name;
-        table_name_ = table_name;
-    }
 
     Status AddColumn(const ColumnDef &column_def);
 
@@ -135,6 +132,7 @@ public:
 
     MetaCache *meta_cache() const;
 
+    const std::string &db_name() const;
     const std::string &table_name() const;
 
     u64 db_id() const;
@@ -165,9 +163,9 @@ private:
 
     std::string db_id_str_;
     u64 db_id_{};
+    std::string db_name_{};
     std::string table_id_str_;
     u64 table_id_{};
-    std::string db_name_{};
     std::string table_name_{};
 
     std::optional<std::string> comment_;

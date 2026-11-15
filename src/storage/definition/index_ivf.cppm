@@ -44,6 +44,11 @@ export struct IndexIVFStorageOption {
     Type type_ = Type::kPlain;
     // kPlain
     EmbeddingDataType plain_storage_data_type_ = EmbeddingDataType::kElemInvalid; // float32, float16, bfloat16, int8 or uint8
+    // The two bytes the compiler would leave as padding between the `i8`s above
+    // and the `u32`s below. They are spelled out so the whole struct is
+    // value-initialized: `IndexIVF::WriteAdv` copies it into the WAL with one
+    // `memcpy`, and implicit padding made that blob differ between runs.
+    u8 padding_after_storage_enums_[2] = {0, 0};
     // kScalarQuantization
     u32 scalar_quantization_bits_ = 0; // 4 or 8
     // kProductQuantization
@@ -55,6 +60,10 @@ export struct IndexIVFStorageOption {
 
 export struct IndexIVFOption {
     MetricType metric_ = MetricType::kInvalid;
+    /// The three bytes the compiler would leave as padding before the
+    /// 4-byte-aligned centroid block, spelled out for the same reason as
+    /// `IndexIVFStorageOption::padding_after_storage_enums_`.
+    u8 padding_after_metric_[3] = {0, 0, 0};
     IndexIVFCentroidOption centroid_option_;
     IndexIVFStorageOption storage_option_;
     bool operator==(const IndexIVFOption &) const = default;

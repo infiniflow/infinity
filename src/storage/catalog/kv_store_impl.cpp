@@ -59,9 +59,13 @@ KVInstance::~KVInstance() {
         delete transaction_;
         transaction_ = nullptr;
     }
+    // read_only_db_ is owned by KVStore; do not delete here.
 }
 
 Status KVInstance::Put(const std::string &key, const std::string &value) {
+    if (read_only_db_ != nullptr) {
+        return Status::NotSupport("KVInstance is read-only");
+    }
     //    LOG_TRACE(fmt::format("To put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
@@ -73,6 +77,9 @@ Status KVInstance::Put(const std::string &key, const std::string &value) {
 }
 
 Status KVInstance::Delete(const std::string &key) {
+    if (read_only_db_ != nullptr) {
+        return Status::NotSupport("KVInstance is read-only");
+    }
     //    LOG_TRACE(fmt::format("To delete key: {}", key));
     rocksdb::Status s = transaction_->Delete(key);
     if (!s.ok()) {
@@ -84,14 +91,19 @@ Status KVInstance::Delete(const std::string &key) {
 }
 
 Status KVInstance::Get(const std::string &key, std::string &value) {
-    rocksdb::Status s = transaction_->Get(read_options_, key, &value);
+    rocksdb::Status s;
+    if (read_only_db_ != nullptr) {
+        s = read_only_db_->Get(read_options_, key, &value);
+    } else {
+        s = transaction_->Get(read_options_, key, &value);
+    }
     if (!s.ok()) {
         switch (s.code()) {
             case rocksdb::Status::Code::kNotFound: {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                std::string msg = fmt::format("rocksdb::Transaction::Get key: {}", key);
+                std::string msg = fmt::format("rocksdb::Get key: {}", key);
                 LOG_DEBUG(msg);
                 return Status::RocksDBError(std::move(s), msg);
             }
@@ -117,7 +129,12 @@ Status KVInstance::Get(const std::string &key, std::string &value) {
 //     return Status::OK();
 // }
 
-std::unique_ptr<KVIterator> KVInstance::GetIterator() { return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_)); }
+std::unique_ptr<KVIterator> KVInstance::GetIterator() {
+    if (read_only_db_ != nullptr) {
+        return std::make_unique<KVIterator>(read_only_db_->NewIterator(read_options_));
+    }
+    return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_));
+}
 
 // std::unique_ptr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
 //     if (lower_bound_key != nullptr) {
@@ -132,7 +149,12 @@ std::unique_ptr<KVIterator> KVInstance::GetIterator() { return std::make_unique<
 std::vector<std::pair<std::string, std::string>> KVInstance::GetAllKeyValue() {
     std::vector<std::pair<std::string, std::string>> result;
     rocksdb::ReadOptions read_option;
-    std::unique_ptr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
+    std::unique_ptr<rocksdb::Iterator> iter;
+    if (read_only_db_ != nullptr) {
+        iter.reset(read_only_db_->NewIterator(read_options_));
+    } else {
+        iter.reset(transaction_->GetIterator(read_options_));
+    }
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});
@@ -143,7 +165,8 @@ std::vector<std::pair<std::string, std::string>> KVInstance::GetAllKeyValue() {
 std::string KVInstance::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    std::unique_ptr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
+    std::unique_ptr<rocksdb::Iterator> iter{read_only_db_ != nullptr ? read_only_db_->NewIterator(read_options_)
+                                                                     : transaction_->GetIterator(read_options_)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         auto key = iter->key().ToString();
@@ -158,6 +181,9 @@ std::string KVInstance::ToString() const {
 }
 
 Status KVInstance::Commit() {
+    if (read_only_db_ != nullptr) {
+        return Status::NotSupport("KVInstance is read-only");
+    }
     rocksdb::Status s = transaction_->Commit();
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), "rocksdb::Transaction::Commit");
@@ -169,6 +195,9 @@ Status KVInstance::Commit() {
     return Status::OK();
 }
 Status KVInstance::Rollback() {
+    if (read_only_db_ != nullptr) {
+        return Status::NotSupport("KVInstance is read-only");
+    }
     rocksdb::Status s = transaction_->Rollback();
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), "rocksdb::Transaction::Rollback");
@@ -296,10 +325,51 @@ Status KVStore::Init(const std::string &db_path) {
     return Status::OK();
 }
 
+Status KVStore::InitReadOnly(const std::string &db_path) {
+    db_path_ = db_path;
+    // Note: rocksdb::DB::OpenForReadOnly ignores options_.create_if_missing and never creates the
+    // database. Do not set it here.
+    options_.create_if_missing = false;
+    options_.merge_operator = String2UInt64AddOperator::Create();
+    options_.avoid_flush_during_shutdown = true;
+    options_.manual_wal_flush = true;
+    write_options_.disableWAL = true;
+
+    txn_options_.set_snapshot = true;
+
+    // Admin mode may be entered before any catalog exists (e.g. initial startup as admin, or error
+    // paths that fall back to admin). Since OpenForReadOnly refuses to create a missing database,
+    // create an empty catalog first so the read-only open below succeeds.
+    if (!std::filesystem::exists(fmt::format("{}/CURRENT", db_path_))) {
+        std::unique_ptr<rocksdb::DB> empty_db;
+        rocksdb::Options create_options;
+        create_options.create_if_missing = true;
+        create_options.merge_operator = options_.merge_operator;
+        rocksdb::Status create_s = rocksdb::DB::Open(create_options, db_path_, &empty_db);
+        if (!create_s.ok()) {
+            return Status::RocksDBError(std::move(create_s), fmt::format("rocksdb::DB::Open (create empty catalog) db path: {}", db_path));
+        }
+    }
+
+    // Open the catalog in read-only mode, passing the merge operator set above so RocksDB can
+    // correctly interpret Merge-write keys. Ownership is transferred to read_only_db_.
+    std::unique_ptr<rocksdb::DB> read_only_db;
+    rocksdb::Status s = rocksdb::DB::OpenForReadOnly(options_, db_path_, &read_only_db);
+    if (!s.ok()) {
+        return Status::RocksDBError(std::move(s), fmt::format("rocksdb::DB::OpenForReadOnly db path: {}", db_path));
+    }
+    read_only_db_ = read_only_db.release();
+    return Status::OK();
+}
+
 Status KVStore::Uninit() {
     if (transaction_db_) {
         delete transaction_db_;
         transaction_db_ = nullptr;
+    }
+    if (read_only_db_) {
+        delete read_only_db_;
+        read_only_db_ = nullptr;
     }
     LOG_INFO("KV store is stopped.");
     return Status::OK();
@@ -309,6 +379,10 @@ KVStore::~KVStore() {
     if (transaction_db_) {
         delete transaction_db_;
         transaction_db_ = nullptr;
+    }
+    if (read_only_db_) {
+        delete read_only_db_;
+        read_only_db_ = nullptr;
     }
     LOG_INFO("KV store is stopped.");
 }
@@ -354,6 +428,11 @@ Status KVStore::RestoreFromBackup(const std::string &backup_path, const std::str
 
 std::unique_ptr<KVInstance> KVStore::GetInstance() {
     std::unique_ptr<KVInstance> kv_instance = std::make_unique<KVInstance>();
+    if (read_only_db_ != nullptr) {
+        // Read-only (maintenance mode): no transaction; iterate directly on the read-only DB.
+        kv_instance->read_only_db_ = read_only_db_;
+        return kv_instance;
+    }
     kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
     kv_instance->read_options_.snapshot = kv_instance->transaction_->GetSnapshot();
     return kv_instance;
@@ -419,7 +498,8 @@ Status KVStore::Merge(const std::string &key, const std::string &value, bool dis
 std::string KVStore::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    rocksdb::DB *db = (read_only_db_ != nullptr) ? read_only_db_ : transaction_db_;
+    std::unique_ptr<rocksdb::Iterator> iter{db->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         auto key = iter->key().ToString();
@@ -436,7 +516,8 @@ std::string KVStore::ToString() const {
 size_t KVStore::KeyValueNum() const {
     size_t cnt = 0;
     rocksdb::ReadOptions read_option;
-    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    rocksdb::DB *db = (read_only_db_ != nullptr) ? read_only_db_ : transaction_db_;
+    std::unique_ptr<rocksdb::Iterator> iter{db->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         ++cnt;
@@ -447,7 +528,8 @@ size_t KVStore::KeyValueNum() const {
 std::vector<std::pair<std::string, std::string>> KVStore::GetAllKeyValue() {
     std::vector<std::pair<std::string, std::string>> result;
     rocksdb::ReadOptions read_option;
-    std::unique_ptr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
+    rocksdb::DB *db = (read_only_db_ != nullptr) ? read_only_db_ : transaction_db_;
+    std::unique_ptr<rocksdb::Iterator> iter{db->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});

@@ -1,0 +1,13 @@
+ROWS 20000
+INDEX fulltext build 0.2177
+INDEX fulltext query 0.001836
+INDEX fulltext query_total 0.0918
+INDEX hnsw build 0.2495
+INDEX hnsw query 0.000255
+INDEX hnsw query_total 0.0127
+INDEX secondary build 0.0074
+INDEX secondary query 0.000323
+INDEX secondary query_total 0.0162
+INDEX sparse build 0.0064
+INDEX sparse query 0.000522
+INDEX sparse query_total 0.0261

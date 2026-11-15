@@ -41,6 +41,9 @@ const (
 	ExprTypeParen
 	ExprTypeLike
 	ExprTypeNotLike
+	// ExprTypeIsNull is `col IS NULL`; `IS NOT NULL` is the same type with
+	// InType set to false (the field already distinguishes IN from NOT IN).
+	ExprTypeIsNull
 )
 
 // Expression represents a parsed expression
@@ -107,7 +110,33 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		return parseCaseWhenExpression(expr)
 	}
 
-	// Check for unary NOT with ! operator (before parentheses check)
+	// Check for parentheses - only remove if the entire expression is wrapped
+	// and parentheses are balanced
+	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
+		// Check if the outer parentheses are matched (not just prefix/suffix)
+		if isBalancedParentheses(expr) && isOuterParentheses(expr) {
+			// Remove outer parentheses and parse inner
+			return parseExpressionInternal(expr[1 : len(expr)-1])
+		}
+	}
+
+	// Check for binary operators with lowest precedence (must be before IN/BETWEEN)
+	//
+	// This split has to come before the unary NOT handling below: NOT binds
+	// tighter, so its operand is one expression. Parsing NOT first turned
+	// "a AND NOT (b) AND c" into "a AND NOT (b AND c)", dropping the "c" clause.
+	for _, op := range []string{"OR", "AND"} {
+		if left, right, found := splitByOperator(expr, op); found {
+			return &Expression{
+				Type:     ExprTypeBinary,
+				Operator: strings.ToLower(op),
+				Left:     left,
+				Right:    right,
+			}, nil
+		}
+	}
+
+	// Check for unary NOT with ! operator
 	if strings.HasPrefix(expr, "!") {
 		inner, err := parseExpressionInternal(expr[1:])
 		if err != nil {
@@ -120,7 +149,8 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		}, nil
 	}
 
-	// Check for unary NOT keyword (must be before binary operators)
+	// Check for unary NOT keyword (must be before comparison operators: the
+	// operand of NOT is a comparison, e.g. "NOT a = 1")
 	if strings.HasPrefix(strings.ToUpper(expr), "NOT ") {
 		inner, err := parseExpressionInternal(expr[4:])
 		if err != nil {
@@ -131,28 +161,6 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 			Operator: "not",
 			Left:     inner,
 		}, nil
-	}
-
-	// Check for parentheses - only remove if the entire expression is wrapped
-	// and parentheses are balanced
-	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
-		// Check if the outer parentheses are matched (not just prefix/suffix)
-		if isBalancedParentheses(expr) && isOuterParentheses(expr) {
-			// Remove outer parentheses and parse inner
-			return parseExpressionInternal(expr[1 : len(expr)-1])
-		}
-	}
-
-	// Check for binary operators with lowest precedence (must be before IN/BETWEEN)
-	for _, op := range []string{"OR", "AND"} {
-		if left, right, found := splitByOperator(expr, op); found {
-			return &Expression{
-				Type:     ExprTypeBinary,
-				Operator: strings.ToLower(op),
-				Left:     left,
-				Right:    right,
-			}, nil
-		}
 	}
 
 	// Check for comparison operators
@@ -167,9 +175,11 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		}
 	}
 
-	// Check for arithmetic operators
-	for _, op := range []string{"+", "-", "*", "/", "%"} {
-		if left, right, found := splitByOperator(expr, op); found {
+	// Check for arithmetic operators, lowest precedence group first. Operators
+	// of equal precedence are left associative, so "c1 - c2 - c3" is
+	// "(c1 - c2) - c3": split at the rightmost operator of the group.
+	for _, ops := range [][]string{{"+", "-"}, {"*", "/", "%"}} {
+		if left, right, op, found := splitByLastOperator(expr, ops); found {
 			return &Expression{
 				Type:     ExprTypeBinary,
 				Operator: op,
@@ -187,6 +197,13 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 	// Check for BETWEEN expression (after binary operators to allow AND to work)
 	if betweenExpr := parseBetweenExpression(expr); betweenExpr != nil {
 		return betweenExpr, nil
+	}
+
+	// Check for IS NULL / IS NOT NULL. The predicate is a function of one
+	// column on the server (`is_null` / `is_not_null`), exactly as the Python
+	// SDK encodes it.
+	if isExpr := parseIsNullExpression(expr); isExpr != nil {
+		return isExpr, nil
 	}
 
 	// Check for LIKE / NOT LIKE expression (after binary operators to allow AND to work)
@@ -502,6 +519,42 @@ func parseLikeExpression(expr string) *Expression {
 		}
 	}
 
+	return nil
+}
+
+// parseIsNullExpression parses `expr IS NULL` / `expr IS NOT NULL`.
+//
+// Only the NULL forms are accepted: the reference rejects `IS TRUE`,
+// `IS FALSE` and `IS UNKNOWN` (`utils.py` in the Python SDK does the same), so
+// matching anything else here would let a predicate through that the server
+// cannot answer.
+func parseIsNullExpression(expr string) *Expression {
+	exprUpper := strings.ToUpper(strings.TrimSpace(expr))
+	// `IS NOT NULL` first: it contains `IS NULL` as a suffix.
+	for _, form := range []struct {
+		suffix string
+		isNull bool
+	}{
+		{" IS NOT NULL", false},
+		{" IS NULL", true},
+	} {
+		if !strings.HasSuffix(exprUpper, form.suffix) {
+			continue
+		}
+		leftText := strings.TrimSpace(expr[:len(expr)-len(form.suffix)])
+		if leftText == "" {
+			return nil
+		}
+		left, err := parseExpressionInternal(leftText)
+		if err != nil {
+			return nil
+		}
+		return &Expression{
+			Type:   ExprTypeIsNull,
+			Left:   left,
+			InType: form.isNull,
+		}
+	}
 	return nil
 }
 
@@ -846,6 +899,70 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	}
 
 	return nil, nil, false
+}
+
+// splitByLastOperator splits an expression at the rightmost top-level
+// occurrence of any of the given single-character operators, respecting
+// parentheses and string literals. Splitting at the rightmost operator makes
+// operators of equal precedence left associative.
+func splitByLastOperator(expr string, ops []string) (*Expression, *Expression, string, bool) {
+	expr = strings.TrimSpace(expr)
+
+	var positions []int
+	parenCount := 0
+	inString := false
+	stringQuote := byte(0)
+
+	for i := 0; i < len(expr); i++ {
+		ch := expr[i]
+
+		// Handle string literals
+		if !inString && (ch == '\'' || ch == '"') {
+			inString = true
+			stringQuote = ch
+			continue
+		} else if inString && ch == stringQuote {
+			// Check for escaped quote (e.g., 'it''s')
+			if i+1 < len(expr) && expr[i+1] == stringQuote {
+				i++ // Skip the next quote
+				continue
+			}
+			inString = false
+			stringQuote = 0
+			continue
+		}
+
+		// Skip processing when inside a string literal
+		if inString {
+			continue
+		}
+
+		if ch == '(' {
+			parenCount++
+		} else if ch == ')' {
+			parenCount--
+		} else if parenCount == 0 {
+			for _, op := range ops {
+				if ch == op[0] {
+					positions = append(positions, i)
+					break
+				}
+			}
+		}
+	}
+
+	// Try the rightmost operator first. An operator that leaves an
+	// unparsable side, such as the unary minus in "c1 - -5", is skipped.
+	for j := len(positions) - 1; j >= 0; j-- {
+		i := positions[j]
+		left, err1 := parseExpressionInternal(strings.TrimSpace(expr[:i]))
+		right, err2 := parseExpressionInternal(strings.TrimSpace(expr[i+1:]))
+		if err1 == nil && err2 == nil {
+			return left, right, string(expr[i]), true
+		}
+	}
+
+	return nil, nil, "", false
 }
 
 // isAlpha checks if a byte is an alphabetic character
@@ -1201,6 +1318,22 @@ func convertToThriftParsedExpr(expr *Expression) (*thriftapi.ParsedExpr, error) 
 			funcExpr.Arguments = append(funcExpr.Arguments, thriftArg)
 		}
 		exprType.FunctionExpr = funcExpr
+
+	case ExprTypeIsNull:
+		// `col IS NULL` is `is_null(col)` on the server, and `IS NOT NULL` is
+		// `is_not_null(col)` - the same two functions the Python SDK emits.
+		name := "is_not_null"
+		if expr.InType {
+			name = "is_null"
+		}
+		arg, err := convertToThriftParsedExpr(expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		exprType.FunctionExpr = &thriftapi.FunctionExpr{
+			FunctionName: name,
+			Arguments:    []*thriftapi.ParsedExpr{arg},
+		}
 
 	case ExprTypeLike:
 		// LIKE is represented as a function: like(column, pattern, escape)

@@ -127,6 +127,10 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
             break;
         }
+        case FileAccessMode::kAppend: {
+            fd = open(path.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+            break;
+        }
         case FileAccessMode::kMmapRead: {
             UnrecoverableError("Unsupported now.");
             break;
@@ -225,7 +229,7 @@ Status VirtualStore::MakeDirectory(const std::string &path) {
     return Status::OK();
 }
 
-Status VirtualStore::RemoveDirectory(const std::string &path) {
+void VirtualStore::RemoveDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
@@ -235,7 +239,6 @@ Status VirtualStore::RemoveDirectory(const std::string &path) {
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
-    return Status::OK();
 }
 
 Status VirtualStore::CleanupDirectory(const std::string &path) {
@@ -257,21 +260,6 @@ Status VirtualStore::CleanupDirectory(const std::string &path) {
         UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
     }
     return Status::OK();
-}
-
-void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
-    if (!VirtualStore::Exists(path) || !std::filesystem::is_directory(path)) {
-        return;
-    }
-
-    for (const auto &entry : std::filesystem::directory_iterator(path)) {
-        RecursiveCleanupAllEmptyDir(entry.path());
-    }
-
-    if (std::filesystem::is_empty(path)) {
-        // std::error_code ec;
-        std::filesystem::remove(path);
-    }
 }
 
 Status VirtualStore::Rename(const std::string &old_path, const std::string &new_path) {

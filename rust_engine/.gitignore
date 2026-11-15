@@ -1,0 +1,7 @@
+# Rust engine build artifacts
+/target
+**/target
+
+# local WAL / data written by the CLI during manual runs
+**/wal.log
+**/wal.log.compact

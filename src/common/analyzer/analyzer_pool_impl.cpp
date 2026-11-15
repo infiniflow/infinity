@@ -14,6 +14,8 @@
 
 module;
 
+#include "common/utility/sparse_gram.h"
+
 module infinity_core:analyzer_pool.impl;
 
 import :analyzer_pool;
@@ -32,6 +34,7 @@ import :rag_analyzer;
 import :whitespace_analyzer;
 import :ik_analyzer;
 import :rank_features_analyzer;
+import :sparsegram_analyzer;
 
 import std.compat;
 
@@ -136,7 +139,14 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             return {std::move(analyzer), Status::OK()};
         }
         case Str2Int(RAG.data()): {
-            // rag-{coarse|fine}
+            // rag[-<suffix>]* — each '-'-separated suffix segment is either
+            // "fine" (fine-grained tokenization) or a language name passed to
+            // RAGAnalyzer::SetLanguage(), in any order: e.g. "rag", "rag-fine",
+            // "rag-slovak", "rag-czech-fine", "rag-fine-czech". "slovak" and
+            // "czech" fold diacritics to ASCII and disable stemming; Snowball
+            // language names ("english", "dutch", …) select a stemmer.
+            // Unrecognized segments are silently ignored (SetLanguage keeps
+            // defaults for unknown languages) to stay backward compatible.
             Analyzer *prototype = cache_[RAG].get();
             if (prototype == nullptr) {
                 std::string path;
@@ -155,15 +165,25 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 prototype = analyzer.get();
                 cache_[RAG] = std::move(analyzer);
             }
+            std::unique_ptr<RAGAnalyzer> analyzer = std::make_unique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
             bool fine_grained = false;
             const char *str = name.data();
             while (*str != '\0' && *str != '-') {
                 str++;
             }
-            if (strcmp(str, "-fine") == 0) {
-                fine_grained = true;
+            while (*str == '-') {
+                str++;
+                const char *segment_start = str;
+                while (*str != '\0' && *str != '-') {
+                    str++;
+                }
+                std::string_view segment(segment_start, str - segment_start);
+                if (segment == "fine") {
+                    fine_grained = true;
+                } else if (!segment.empty()) {
+                    analyzer->SetLanguage(std::string(segment));
+                }
             }
-            std::unique_ptr<RAGAnalyzer> analyzer = std::make_unique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }
@@ -328,6 +348,14 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
         }
         case Str2Int(RANKFEATURES.data()): {
             return {std::make_unique<RankFeaturesAnalyzer>(), Status::OK()};
+        }
+        case Str2Int(SPARSEGRAM.data()): {
+            // sparsegram[-<min>[-<max>]][-fold]
+            SparseGramParams params;
+            if (!ParseSparseGramAnalyzerName(name, params)) {
+                return {nullptr, Status::InvalidAnalyzerName(fmt::format("SPARSEGRAM[-min[-max]][-fold], but it is {}.", name))};
+            }
+            return {std::make_unique<SparsegramAnalyzer>(params.min_n, params.max_n, params.fold), Status::OK()};
         }
         default: {
             if (std::filesystem::is_regular_file(name)) {
