@@ -1,3 +1,5 @@
+import struct
+
 import infinity
 import pandas as pd
 import pytest
@@ -242,3 +244,80 @@ class TestNull:
 
         res = db.drop_table("test_null_default" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_null_temporal_columns(self, suffix):
+        """
+        NULL date, time, datetime, timestamp values come back as missing, not as epoch values.
+        """
+        db = self.infinity_obj.get_database("default_db")
+        db.drop_table("test_null_temporal" + suffix, ConflictType.Ignore)
+
+        db.create_table(
+            "test_null_temporal" + suffix,
+            {"id": {"type": "integer"},
+             "d": {"type": "date"},
+             "dt": {"type": "datetime"},
+             "tm": {"type": "time"},
+             "ts": {"type": "timestamp"}},
+            ConflictType.Error,
+        )
+        table = db.get_table("test_null_temporal" + suffix)
+
+        table.insert([{"id": 1, "d": "2024-05-06", "dt": "2024-05-06 07:08:09",
+                       "tm": "07:08:09", "ts": "2024-05-06 07:08:09"}])
+        table.insert([{"id": 2, "d": None, "dt": None, "tm": None, "ts": None}])
+
+        res, _ = table.output(["id", "d", "dt", "tm", "ts"]).to_df()
+        res = res.sort_values("id").reset_index(drop=True)
+        assert list(res.loc[0, ["d", "dt", "tm", "ts"]]) == [
+            "2024-05-06", "2024-05-06 07:08:09", "07:08:09", "2024-05-06 07:08:09"]
+        assert res.loc[1, ["d", "dt", "tm", "ts"]].isna().all()
+
+        res = db.drop_table("test_null_temporal" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def test_null_vector_columns(self, suffix):
+        """
+        NULL embedding, sparse and tensor values come back as missing, not as zeros or empty values.
+        """
+        db = self.infinity_obj.get_database("default_db")
+        db.drop_table("test_null_vector" + suffix, ConflictType.Ignore)
+
+        db.create_table(
+            "test_null_vector" + suffix,
+            {"id": {"type": "integer"},
+             "v": {"type": "vector,4,float"},
+             "sp": {"type": "sparse,100,float,int"},
+             "tn": {"type": "tensor,2,float"}},
+            ConflictType.Error,
+        )
+        table = db.get_table("test_null_vector" + suffix)
+
+        table.insert([{"id": 1, "v": [1.0, 2.0, 3.0, 4.0], "sp": {"3": 0.5},
+                       "tn": [[1.0, 2.0]]}])
+        table.insert([{"id": 2}])
+
+        res, _ = table.output(["id", "v", "sp", "tn"]).to_pl()
+        rows = sorted(res.rows())
+        assert rows[0][1] == [1.0, 2.0, 3.0, 4.0]
+        assert rows[1][1:] == (None, None, None)
+
+        res = db.drop_table("test_null_vector" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+
+def test_thrift_null_temporal_slots_are_not_decoded():
+    """
+    A NULL slot can hold any bytes, including a day count that datetime cannot represent.
+    """
+    from infinity.remote_thrift.infinity_thrift_rpc import ttypes
+    from infinity.remote_thrift.types import column_vector_to_list
+
+    date_bytes = struct.pack("<2i", 19849, 2**31 - 1)
+    assert column_vector_to_list(ttypes.ColumnType.ColumnDate, None, [date_bytes], [True, False]) == [
+        "2024-05-06", pd.NA]
+
+    datetime_bytes = struct.pack("<4i", 19849, 25689, 2**31 - 1, 2**31 - 1)
+    for column_type in (ttypes.ColumnType.ColumnDateTime, ttypes.ColumnType.ColumnTimestamp):
+        assert column_vector_to_list(column_type, None, [datetime_bytes], [True, False]) == [
+            "2024-05-06 07:08:09", pd.NA]

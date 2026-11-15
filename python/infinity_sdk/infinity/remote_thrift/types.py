@@ -218,34 +218,62 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnSparse:
             return parse_sparse_bytes(column_data_type, column_vector)
         case ttypes.ColumnType.ColumnDate:
-            return parse_date_bytes(column_vector)
+            return parse_date_bytes(column_vector, null_bitmap)
         case ttypes.ColumnType.ColumnTime:
-            return parse_time_bytes(column_vector)
+            return parse_time_bytes(column_vector, null_bitmap)
         case ttypes.ColumnType.ColumnDateTime:
-            return parse_datetime_bytes(column_vector)
+            return parse_datetime_bytes(column_vector, null_bitmap)
         case ttypes.ColumnType.ColumnTimestamp:
-            return parse_datetime_bytes(column_vector)
+            return parse_datetime_bytes(column_vector, null_bitmap)
         case ttypes.ColumnType.ColumnInterval:
-            return parse_interval_bytes(column_vector)
+            return parse_interval_bytes(column_vector, null_bitmap)
         case ttypes.ColumnType.ColumnArray:
             return parse_array_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
 
-def parse_date_bytes(column_vector):
+# The server sends NULL cells of these types as zero vectors or empty values
+NULL_AS_EMPTY_COLUMN_TYPES = (
+    ttypes.ColumnType.ColumnEmbedding,
+    ttypes.ColumnType.ColumnMultiVector,
+    ttypes.ColumnType.ColumnTensor,
+    ttypes.ColumnType.ColumnTensorArray,
+    ttypes.ColumnType.ColumnSparse,
+    ttypes.ColumnType.ColumnArray,
+)
+
+
+def mask_null_values(data: list[Any], null_bitmap: list[bool] | None) -> list[Any]:
+    if null_bitmap and len(null_bitmap) == len(data):
+        return [value if is_valid else None for value, is_valid in zip(data, null_bitmap)]
+    return data
+
+
+def is_null_slot(null_bitmap: list[bool] | None, index: int, count: int) -> bool:
+    # NULL slots can hold any bytes, so they are skipped before decoding
+    return bool(null_bitmap) and len(null_bitmap) == count and not null_bitmap[index]
+
+
+def parse_date_bytes(column_vector, null_bitmap: list[bool] | None = None):
     parsed_list = list(struct.unpack(f'<{len(column_vector) // 4}i', column_vector))
     date_list = []
     epoch = date(1970, 1, 1)
-    for value in parsed_list:
+    for i, value in enumerate(parsed_list):
+        if is_null_slot(null_bitmap, i, len(parsed_list)):
+            date_list.append(pd.NA)
+            continue
         date_list.append((epoch + timedelta(days=value)).strftime('%Y-%m-%d'))
     return date_list
 
 
-def parse_time_bytes(column_vector):
+def parse_time_bytes(column_vector, null_bitmap: list[bool] | None = None):
     parsed_list = list(struct.unpack(f'<{len(column_vector) // 4}i', column_vector))
     time_list = []
-    for value in parsed_list:
+    for i, value in enumerate(parsed_list):
+        if is_null_slot(null_bitmap, i, len(parsed_list)):
+            time_list.append(pd.NA)
+            continue
         hours = (value // 3600) % 24
         minutes = (value % 3600) // 60
         seconds = value % 60
@@ -253,21 +281,28 @@ def parse_time_bytes(column_vector):
     return time_list
 
 
-def parse_datetime_bytes(column_vector):
+def parse_datetime_bytes(column_vector, null_bitmap: list[bool] | None = None):
     parsed_list = list(struct.unpack(f'<{len(column_vector) // 4}i', column_vector))
     datetime_list = []
     epoch = datetime(1970, 1, 1)
+    count = len(parsed_list) // 2
     for i in range(0, len(parsed_list), 2):
         if i + 1 < len(parsed_list):
+            if is_null_slot(null_bitmap, i // 2, count):
+                datetime_list.append(pd.NA)
+                continue
             datetime_list.append(
                 (epoch + timedelta(days=parsed_list[i], seconds=parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'))
     return datetime_list
 
 
-def parse_interval_bytes(column_vector):
+def parse_interval_bytes(column_vector, null_bitmap: list[bool] | None = None):
     parsed_list = list(struct.unpack(f'<{len(column_vector) // 4}i', column_vector))
     interval_list = []
-    for value in parsed_list:
+    for i, value in enumerate(parsed_list):
+        if is_null_slot(null_bitmap, i, len(parsed_list)):
+            interval_list.append(pd.NA)
+            continue
         interval_list.append(str(timedelta(seconds=value).total_seconds()) + 's')
     return interval_list
 
@@ -579,6 +614,8 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         column_bitmasks = column_field.bitmasks
 
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors, column_bitmasks)
+        if column_type in NULL_AS_EMPTY_COLUMN_TYPES:
+            data_list = mask_null_values(data_list, column_bitmasks)
         # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type
