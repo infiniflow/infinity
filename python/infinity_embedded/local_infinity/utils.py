@@ -45,11 +45,63 @@ from infinity_embedded.local_infinity.types import build_result, logic_type_to_d
 from infinity_embedded.utils import binary_exp_to_paser_exp
 
 
+def _json_operator_path(path):
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    if isinstance(path, exp.Literal) and path.is_string:
+        key = path.this
+        if key and not any(char in key for char in ".[]"):
+            return "$." + key
+    elif isinstance(path, exp.JSONPath):
+        result = ""
+        for part in path.expressions:
+            if isinstance(part, exp.JSONPathRoot):
+                result += "$"
+            elif isinstance(part, exp.JSONPathKey):
+                key = part.this
+                if not isinstance(key, str) or not key or any(char in key for char in ".[]"):
+                    break
+                result += "." + key
+            elif isinstance(part, exp.JSONPathSubscript) and type(part.this) is int and part.this >= 0:
+                result += f"[{part.this}]"
+            else:
+                break
+        else:
+            if result.startswith("$"):
+                return result
+    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path")
+
+
 def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
         expr.alias_name = cons.alias
         return expr
+
+    elif isinstance(cons, (exp.JSONExtract, exp.JSONExtractScalar)):
+        # JSON operators -> and ->>. sqlglot parses the right side as a
+        # JSONPath node; the server functions take the path as a string.
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = (
+            'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
+
+        path_sql = _json_operator_path(cons.args['expression'])
+        json_source = cons.args['this']
+        while isinstance(json_source, exp.JSONExtract) and not isinstance(json_source, exp.JSONExtractScalar):
+            path_sql = _json_operator_path(json_source.args['expression']) + path_sql[1:]
+            json_source = json_source.args['this']
+        if isinstance(json_source, exp.JSONExtractScalar):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Cannot extract JSON from a scalar result")
+        json_expr = parse_expr(json_source)
+        path_constant = WrapConstantExpr()
+        path_constant.literal_type = LiteralType.kString
+        path_constant.str_value = path_sql
+        path_expr = WrapParsedExpr(ParsedExprType.kConstant)
+        path_expr.constant_expr = path_constant
+
+        func_expr.arguments = [json_expr, path_expr]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
 
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
@@ -268,8 +320,13 @@ def parse_expr(expr):
 
 
 def get_search_optional_filter_from_opt_params(opt_params: dict):
+    """Split search optional parameters into (filter_expr, remaining params).
+
+    The caller's dict is left untouched: the "filter" entry used to be
+    popped out of it, silently changing data owned by the caller.
+    """
     optional_filter = None
-    k_to_pop = []
+    remaining_params = {}
     for k, v in opt_params.items():
         if k.lower() == "filter":
             if optional_filter is not None:
@@ -279,10 +336,9 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                         f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
             optional_filter = traverse_conditions(condition(v))
-            k_to_pop.append(k)
-    for k in k_to_pop:
-        opt_params.pop(k)
-    return optional_filter
+        else:
+            remaining_params[k] = v
+    return optional_filter, remaining_params
 
 
 def get_local_function_expr_from_fde(fde_obj) -> WrapParsedExpr:

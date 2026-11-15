@@ -218,10 +218,10 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if knn_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 tmp_param = InitParameter()
                 tmp_param.param_name = key
                 tmp_param.param_value = value
@@ -268,7 +268,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if opt_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(opt_params)
+            optional_filter, opt_params = get_search_optional_filter_from_opt_params(opt_params)
             for k, v in opt_params.items():
                 params = InitParameter()
                 params.param_name = k
@@ -336,7 +336,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_options is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_options)
+            optional_filter, extra_options = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -364,7 +364,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_option is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
+            optional_filter, extra_option = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = WrapParsedExpr(ParsedExprType.kMatchTensor)
@@ -408,6 +408,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def filter(self, where: str | None) -> InfinityLocalQueryBuilder:
+        if where is None:
+            self._filter = None
+            return self
         where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
@@ -437,6 +440,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def group_by(self, columns: list[str] | str) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._group_by = None
+            return self
         group_by_list = []
         if isinstance(columns, list):
             for column in columns:
@@ -449,18 +455,26 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def having(self, having: str | None) -> InfinityLocalQueryBuilder:
+        if having is None:
+            self._having = None
+            return self
         having_expr = traverse_conditions(condition(having))
         self._having = having_expr
         return self
 
     def output(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._columns = None
+            return self
         self._columns = columns
         select_list: list[WrapParsedExpr] = []
         for column in columns:
-            if isinstance(column, str):
-                column = column.lower()
+            # match the special output tokens case-insensitively, but keep the
+            # original string for parsing: lowercasing the whole expression
+            # would corrupt string literals inside it
+            key = column.lower() if isinstance(column, str) else column
 
-            match column:
+            match key:
                 case "*":
                     column_expr = WrapColumnExpr()
                     column_expr.star = True
@@ -570,6 +584,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def highlight(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._highlight = None
+            return self
         highlight_list: list[WrapParsedExpr] = []
         for column in columns:
             if isinstance(column, str):
@@ -588,6 +605,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None) -> InfinityLocalQueryBuilder:
+        if order_by_expr_list is None:
+            self._sort = None
+            return self
         sort_list: list[WrapOrderByExpr] = []
 
         order_by_expr_str = str

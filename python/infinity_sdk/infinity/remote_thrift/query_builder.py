@@ -241,10 +241,10 @@ class InfinityThriftQueryBuilder(ABC):
         knn_opt_params = []
         optional_filter = None
         if knn_params is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 knn_opt_params.append(InitParameter(key, value))
 
         knn_expr = KnnExpr(
@@ -272,7 +272,9 @@ class InfinityThriftQueryBuilder(ABC):
             self._search = SearchExpr()
             self._search.match_exprs = list()
 
-        optional_filter = None if opt_params is None else get_search_optional_filter_from_opt_params(opt_params)
+        optional_filter = None
+        if opt_params is not None:
+            optional_filter, opt_params = get_search_optional_filter_from_opt_params(opt_params)
         match_sparse_expr = make_match_sparse_expr(
             vector_column_name, sparse_data, metric_type, topn, opt_params, optional_filter
         )
@@ -291,7 +293,7 @@ class InfinityThriftQueryBuilder(ABC):
         match_expr.matching_text = matching_text
         options_text = f"topn={topn}"
         if extra_options is not None:
-            match_expr.filter_expr = get_search_optional_filter_from_opt_params(extra_options)
+            match_expr.filter_expr, extra_options = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -313,7 +315,7 @@ class InfinityThriftQueryBuilder(ABC):
         option_str = f"topn={topn}"
         optional_filter = None
         if extra_option is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
+            optional_filter, extra_option = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = make_match_tensor_expr(
@@ -353,6 +355,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def filter(self, where: str | None) -> InfinityThriftQueryBuilder:
+        if where is None:
+            self._filter = None
+            return self
         where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
@@ -378,6 +383,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
     
     def group_by(self, columns: list[str] | str) -> InfinityThriftQueryBuilder:
+        if columns is None:
+            self._groupby = None
+            return self
         group_by_list: list[ParsedExpr] = []
         if isinstance(columns, list):
             for column in columns:
@@ -389,18 +397,26 @@ class InfinityThriftQueryBuilder(ABC):
         return self
     
     def having(self, having: str | None) -> InfinityThriftQueryBuilder:
+        if having is None:
+            self._having = None
+            return self
         having_expr = traverse_conditions(condition(having))
         self._having = having_expr
         return self
 
     def output(self, columns: list | None) -> InfinityThriftQueryBuilder:
+        if columns is None:
+            self._columns = None
+            return self
         self._columns = columns
         select_list: list[ParsedExpr] = []
         for column in columns:
-            if isinstance(column, str):
-                column = column.lower()
+            # match the special output tokens case-insensitively, but keep the
+            # original string for parsing: lowercasing the whole expression
+            # would corrupt string literals inside it
+            key = column.lower() if isinstance(column, str) else column
 
-            match column:
+            match key:
                 case "*":
                     column_expr = ColumnExpr(star=True, column_name=[])
                     expr_type = ParsedExprType(column_expr=column_expr)
@@ -459,6 +475,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def highlight(self, columns: list | None) -> InfinityThriftQueryBuilder:
+        if columns is None:
+            self._highlight = None
+            return self
         highlight_list: list[ParsedExpr] = []
         for column in columns:
             if isinstance(column, str):
@@ -475,6 +494,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None) -> InfinityThriftQueryBuilder:
+        if order_by_expr_list is None:
+            self._sort = None
+            return self
         sort_list: list[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
             order_by_expr_str = str
@@ -689,10 +711,10 @@ class InfinityThriftQueryBuilder(ABC):
         knn_opt_params = []
         optional_filter = None
         if knn_params is not None:
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 knn_opt_params.append(InitParameter(key, value))
 
         # Create KnnExpr with FDE function as query_embedding_expr
