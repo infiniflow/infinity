@@ -297,11 +297,18 @@ def _parse_not_like(like_node, escape_char=None):
 
 
 def _json_operator_path(path):
-    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax.
+
+    A string literal is already the path the caller wrote, so it passes
+    through untouched: ``json_extract(c3, '$.2')`` names a numeric key, which
+    refuses the ``$.`` rewrite below but is a legal server path. Only the
+    ``->`` / ``->>`` operators, where SQLGlot has parsed the key into a
+    JSONPath, go through the key-by-key rewrite.
+    """
     if isinstance(path, exp.Literal) and path.is_string:
         key = path.this
-        if key and not any(char in key for char in ".[]"):
-            return "$." + key
+        if key:
+            return key if key.startswith("$") else "$." + key
     elif isinstance(path, exp.JSONPath):
         result = ""
         for part in path.expressions:
