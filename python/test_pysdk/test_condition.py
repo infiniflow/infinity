@@ -46,3 +46,24 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+
+def test_condition_like_function_names():
+    # sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True
+    # rather than a Not(Like) wrapper; the traversal must honor the flag.
+    cases = {
+        "c1 LIKE '%test%'": "like",
+        "c1 NOT LIKE '%test%'": "not_like",
+        "c1 LIKE '%test%' ESCAPE '!'": "like",
+        "c1 NOT LIKE '%test%' ESCAPE '!'": "not_like",
+    }
+    for cond_str, expected_func in cases.items():
+        from infinity.remote_thrift.utils import traverse_conditions as remote_traverse
+        res = remote_traverse(condition(cond_str))
+        function = res.type.function_expr
+        assert function.arguments[0].type.column_expr.column_name == ["c1"]
+        assert function.arguments[1].type.constant_expr.str_value == "%test%"
+        assert len(function.arguments) == 3
+        assert function.arguments[2].type.constant_expr.str_value == ("!" if "ESCAPE" in cond_str else "\\")
+        func_name = function.function_name
+        assert func_name == expected_func, f"{cond_str}: got {func_name}, want {expected_func}"
