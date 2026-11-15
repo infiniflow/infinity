@@ -92,3 +92,15 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+@pytest.mark.parametrize("builder_type", ["thrift", "local"])
+def test_query_builder_limit_and_offset_none_clear_clause(builder_type):
+    if builder_type == "local":
+        local_query_builder = pytest.importorskip("infinity_embedded.local_infinity.query_builder")
+        query_builder = local_query_builder.InfinityLocalQueryBuilder(None)
+    else:
+        query_builder = InfinityThriftQueryBuilder(None)
+
+    assert query_builder.limit(3).limit(None)._limit is None
+    assert query_builder.offset(2).offset(None)._offset is None

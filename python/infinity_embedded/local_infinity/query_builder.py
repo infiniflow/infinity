@@ -413,6 +413,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def limit(self, limit: int | None) -> InfinityLocalQueryBuilder:
+        if limit is None:
+            self._limit = None
+            return self
         constant_exp = WrapConstantExpr()
         constant_exp.literal_type = LiteralType.kInteger
         constant_exp.i64_value = limit
@@ -422,6 +425,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def offset(self, offset: int | None) -> InfinityLocalQueryBuilder:
+        if offset is None:
+            self._offset = None
+            return self
         constant_exp = WrapConstantExpr()
         constant_exp.literal_type = LiteralType.kInteger
         constant_exp.i64_value = offset

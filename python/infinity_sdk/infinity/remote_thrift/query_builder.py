@@ -358,6 +358,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def limit(self, limit: int | None) -> InfinityThriftQueryBuilder:
+        if limit is None:
+            self._limit = None
+            return self
         constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=limit)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         limit_expr = ParsedExpr(type=expr_type)
@@ -365,6 +368,9 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def offset(self, offset: int | None) -> InfinityThriftQueryBuilder:
+        if offset is None:
+            self._offset = None
+            return self
         constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=offset)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         offset_expr = ParsedExpr(type=expr_type)
