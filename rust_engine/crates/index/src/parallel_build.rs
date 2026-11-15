@@ -407,6 +407,37 @@ pub(crate) fn buckets_of(from: usize, to: usize, threads: usize) -> Vec<(usize, 
         .collect()
 }
 
+/// The buckets a batch build runs, skipping `prebuilt`.
+///
+/// `prebuilt` is the vertex `HnswIndex::add_batch` built on its own before the
+/// buckets start (Phase A). Scheduling it again would run `Build` on it a
+/// second time, and a rebuild replaces the vertex's neighbour list - so links
+/// the first build established can disappear, and reverse pruning while
+/// rebuilding it can drop other vertices' links to it.
+///
+/// The boundaries are still the ones [`buckets_of`] computed for
+/// `[from, to)`: the bucket holding `prebuilt` is split in two around it, not
+/// widened or merged, so a batch is still cut the way
+/// `HnswHandler::InsertVecs` cuts it.
+pub(crate) fn build_buckets(
+    from: usize,
+    to: usize,
+    prebuilt: usize,
+    threads: usize,
+) -> Vec<(usize, usize)> {
+    buckets_of(from, to, threads)
+        .into_iter()
+        .flat_map(|(start, end)| {
+            if (start..end).contains(&prebuilt) {
+                vec![(start, prebuilt), (prebuilt + 1, end)]
+            } else {
+                vec![(start, end)]
+            }
+        })
+        .filter(|(start, end)| end > start)
+        .collect()
+}
+
 /// Builds `[from, to)` on the calling thread.
 pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize) {
     builder.build_range(from, to);

@@ -1369,7 +1369,15 @@ impl HnswIndex {
         // build raced its own reverse links even though the reference builds
         // that batch on one thread, and the graph it produced was not
         // reproducible run to run.
-        let buckets: Vec<(usize, usize)> = crate::parallel_build::buckets_of(base, n, threads);
+        //
+        // Phase A already built `entry`, so it must not appear in a bucket: it
+        // is the vertex whose neighbour list every other build searched from,
+        // and building it a second time replaces that list (and lets reverse
+        // pruning drop links the first build had). Splitting the one bucket that
+        // contains it keeps the boundaries the reference computed. When the
+        // entry came from an older batch it is below `base` and no bucket
+        // contains it, so `entry` only has to be excluded from `[base, n)`.
+        let buckets = crate::parallel_build::build_buckets(base, n, entry, threads);
         {
             let shared = std::sync::Arc::clone(&shared);
             crate::parallel::for_each_blocking(buckets, threads, move |(start, end)| {
@@ -1986,6 +1994,51 @@ mod tests {
                 recall >= 0.9,
                 "{encoding:?} parallel graph diverged: recall {recall}"
             );
+        }
+    }
+
+    /// A batch added to a non-empty index must not build the entry vertex
+    /// twice.
+    ///
+    /// `add_batch` builds the batch's highest-level vertex first (Phase A) and
+    /// then runs the buckets. Covering `[base, n)` outright scheduled that
+    /// vertex a second time, and a second `Build` replaces its neighbour list -
+    /// so the links Phase A established could disappear, and reverse pruning
+    /// while rebuilding it could drop other vertices' links to it.
+    ///
+    /// Asserted on the bucket plan rather than on the finished graph: whether a
+    /// rebuild actually loses a link depends on the data, so a graph-shaped
+    /// assertion can pass on a broken plan.
+    #[test]
+    fn a_batch_on_a_populated_index_builds_each_vertex_once() {
+        // A batch over several buckets where the entry sits in the middle of
+        // one of them - the case that used to schedule it twice.
+        let (base, n, entry, threads) = (1200, 5000, 2600, 2);
+        let buckets = crate::parallel_build::build_buckets(base, n, entry, threads);
+
+        let covered: Vec<usize> = buckets.iter().flat_map(|(s, e)| *s..*e).collect();
+        assert!(
+            !covered.contains(&entry),
+            "entry {entry} is scheduled again: {buckets:?}"
+        );
+        let mut expected: Vec<usize> = (base..n).filter(|x| *x != entry).collect();
+        expected.sort_unstable();
+        assert_eq!(covered, expected, "the batch is not covered exactly once");
+
+        // The boundaries are still `buckets_of`'s: the bucket holding the entry
+        // is split, not widened or merged.
+        let whole = crate::parallel_build::buckets_of(base, n, threads);
+        assert_eq!(
+            buckets.iter().map(|(s, e)| e - s).sum::<usize>(),
+            whole.iter().map(|(s, e)| e - s).sum::<usize>() - 1,
+            "splitting must only remove the one prebuilt vertex"
+        );
+        // A batch whose entry is the last vertex of its bucket, and one where
+        // the entry is already in an older batch (below `base`).
+        for (b, en) in [(base, 2600usize), (base, n - 1), (base, 0)] {
+            for (s, _) in crate::parallel_build::build_buckets(b, n, en, threads) {
+                assert!(s >= b, "bucket starts below the batch: {s} < {b}");
+            }
         }
     }
     #[test]

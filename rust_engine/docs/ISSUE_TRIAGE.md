@@ -13,7 +13,7 @@
 | 1 | LSG 参数没有接入实际构图 | **参考同样未接线** | 保持现状，记录依据 |
 | 2 | LVQ 存在编码但未执行均值训练 | **参考同样未训练** | 保持现状，记录依据 |
 | 3 | LVQ 构图被强制串行执行 | 端口缺陷 | 已修 |
-| 4 | 构图存在重复复制与转换开销 | 端口缺陷 | 已修 |
+| 4 | 构图存在重复复制与转换开销 | 端口缺陷 | 部分修复（克隆已修；文本往返、查询重算、整批复制未修，见 §3.2） |
 | 5 | `show_index` 成功但参数字段为空 | 端口缺陷 | 已修 |
 | 6 | 仅靠 WAL 恢复时丢失索引参数 | 端口缺陷 | 已修 |
 | 7 | 显式 LSG 配置拼写不兼容，C++ 读取 Rust checkpoint 时 abort | 端口缺陷 | 已修 |
@@ -68,13 +68,23 @@
 
 回归：`index::vector::tests::quantized_batch_build_matches_serial_answers`（LVQ + RaBitQ，4 线程，与串行构建的答案 recall ≥ 0.9，图结构过 `check()`）。
 
-### 3.2 issue 第 4 条：每次点间比较都克隆 LVQ 编码
+### 3.2 issue 第 4 条：每次点间比较都克隆 LVQ 编码（**部分修复**）
 
-`Store::distance_nodes` 在 LVQ 上走 `store.query_at(a)`，这会克隆整条 `LvqData`（含 `Vec<i8>`）；而 `SelectNeighborsHeuristic` 与反向边裁剪对每个候选都调用它一次。
+issue 列了四类开销，本轮只修了第一类；其余三类仍在，见下面的清单。
 
-修法：新增 `LvqStore::record()`（借用）与 `LvqStore::distance_between(&LvqData, &LvqData)`，`distance_nodes` 改成借用两侧记录——对应参考把两个 `const LVQData *` 交给 `LVQDist` 的形态。
+**已修：点间比较的克隆。** `Store::distance_nodes` 在 LVQ 上走 `store.query_at(a)`，这会克隆整条 `LvqData`（含 `Vec<i8>`）；而 `SelectNeighborsHeuristic` 与反向边裁剪对每个候选都调用它一次。修法：新增 `LvqStore::record()`（借用）与 `LvqStore::distance_between(&LvqData, &LvqData)`，`distance_nodes` 改成借用两侧记录——对应参考把两个 `const LVQData *` 交给 `LVQDist` 的形态。
 
 回归：`lvq::tests::borrowed_distance_matches_the_query_path`（三种 metric 下与 `query_at` 路径逐值相等）。
+
+**未修（issue 提到的其余开销）：**
+
+| 开销 | 现状 |
+|---|---|
+| 同一候选与多个邻居比较时重复构造查询编码 | 仍然存在。`distance_to` 对每个 `(query, i)` 调 `Store::distance_query`，RaBitQ 走 `decompress` + `make_query`，每次重算查询向量，没有「外层构造一次、内层复用」的借用形态 |
+| 定宽向量先转文本再解析回浮点 | 仍然存在。`read_block_column_including_deleted` 返回 `Vec<(usize, String)>`，`build_hnsw_index_of` 再 `parse_vec_str` 回 `f32`；索引构建的读路径没有按列直接解码 `f32` 的通道 |
+| 多个调用层再次克隆整批向量 | 仍然存在。`Engine::build_hnsw_index_of` → `HnswMemIndexInMem::insert_batch` → `HnswIndex::add_batch` 各层都 `clone()` 一份 `Vec<Vec<f32>>` |
+
+这三项需要改读列接口与 `insert_batch` 的所有权传递，属于跨层的接口改动，不在本轮范围内；issue 自己也注明「尚未完成独立耗时剖析，不能认定它是主要瓶颈」。
 
 ### 3.3 issue 第 5 条：`show_index` 的参数字段为空
 

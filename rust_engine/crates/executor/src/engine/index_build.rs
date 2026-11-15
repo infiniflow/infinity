@@ -3248,7 +3248,28 @@ impl Engine {
         Some(ShowIndexInfo {
             store_dir: format!("db_{db_id}/tbl_{}/idx_{}", meta.id, im.id),
             segment_index_count: seen.len(),
-            other_parameters: other_params_of(&im.index_type, &im.options),
+            // A BOOL or JSON column is always built low-cardinality
+            // (`NewSecondaryIndexInMem`), whatever the statement asked for, so
+            // the reported text has to say what was built - not merely what the
+            // options list contains. The check is by **this** index's name: a
+            // column may carry two secondary indexes with different
+            // cardinalities, and `secondary_low_cardinality` resolves a column
+            // to the first one, which is what the builder needs but not what
+            // `SHOW INDEX` asks about.
+            other_parameters: other_params_of(&im.index_type, &im.options, || {
+                let column_type = meta
+                    .columns
+                    .iter()
+                    .position(|c| c == &im.column)
+                    .and_then(|at| meta.types.get(at))
+                    .map(|t| t.trim().to_ascii_uppercase())
+                    .unwrap_or_default();
+                column_type.starts_with("BOOL")
+                    || column_type.starts_with("JSON")
+                    || im.options.iter().any(|(key, value)| {
+                        key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
+                    })
+            }),
             column_id,
         })
     }
@@ -3856,7 +3877,15 @@ pub struct ShowIndexInfo {
 /// parameter set, so the spelling and spacing follow the reference exactly.
 /// A kind with no `BuildOtherParamsString` override (secondary functional,
 /// EMVB, PLAID, SMVE) reports the empty string, as the base class does.
-fn other_params_of(index_type: &str, options: &[(String, String)]) -> String {
+///
+/// `low_cardinality` answers the *effective* cardinality for a secondary
+/// index, which is not always what the options said: the builder forces the
+/// low-cardinality store for BOOL and JSON columns.
+fn other_params_of(
+    index_type: &str,
+    options: &[(String, String)],
+    low_cardinality: impl FnOnce() -> bool,
+) -> String {
     let opt = |name: &str| -> Option<&str> {
         options
             .iter()
@@ -3906,9 +3935,7 @@ fn other_params_of(index_type: &str, options: &[(String, String)]) -> String {
         }
         "FULLTEXT" => format!("analyzer = {}", opt("ANALYZER").unwrap_or("")),
         "SECONDARY" | "" => {
-            let low = opt("CARDINALITY")
-                .map(|v| v.eq_ignore_ascii_case("low"))
-                .unwrap_or(false);
+            let low = low_cardinality();
             format!("cardinality = {}", if low { "low" } else { "high" })
         }
         _ => String::new(),
