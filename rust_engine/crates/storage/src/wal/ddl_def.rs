@@ -295,6 +295,10 @@ impl<'a> Reader<'a> {
         let b = self.take(4)?;
         Ok(u32::from_le_bytes(b.try_into().unwrap()))
     }
+    pub(crate) fn u64(&mut self) -> Result<u64> {
+        let b = self.take(8)?;
+        Ok(u64::from_le_bytes(b.try_into().unwrap()))
+    }
     pub(crate) fn f32(&mut self) -> Result<f32> {
         Ok(f32::from_bits(self.u32()?))
     }

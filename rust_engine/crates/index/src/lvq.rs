@@ -96,6 +96,12 @@ impl LvqStore {
         &self.data
     }
 
+    /// The record of one stored vector, borrowed (C++ `GetVec` hands out a
+    /// `const LVQData *`). `None` when `index` is out of range.
+    pub fn record(&self, index: usize) -> Option<&LvqData> {
+        self.data.get(index)
+    }
+
     /// Bytes one compressed vector occupies (C++ `compress_data_size`).
     pub fn record_size(&self) -> usize {
         16 + self.dim
@@ -259,8 +265,18 @@ impl LvqStore {
     /// The LVQ distance used by the HNSW graph (smaller is closer):
     /// squared L2, or the negated cosine/inner product.
     pub fn distance(&self, query: &LvqQuery, index: usize) -> Option<f32> {
-        let q = &query.data;
         let v = self.data.get(index)?;
+        Some(self.distance_between(&query.data, v))
+    }
+
+    /// The distance between two records already in the store, borrowing both.
+    ///
+    /// The graph builder compares a vertex with its neighbours and with the
+    /// candidates of `SelectNeighborsHeuristic` thousands of times; the
+    /// reference hands `LVQDist` two `const LVQData *` and never copies, while
+    /// building an `LvqQuery` here would clone the whole `Vec<i8>` code per
+    /// comparison.
+    pub fn distance_between(&self, q: &LvqData, v: &LvqData) -> f32 {
         let ip: i32 = q
             .code
             .iter()
@@ -270,12 +286,10 @@ impl LvqStore {
         match self.metric {
             Metric::L2 => {
                 let beta = q.bias - v.bias;
-                Some(
-                    q.local.1 + v.local.1 + beta * beta * self.dim as f32
-                        - 2.0 * q.scale * v.scale * ip as f32
-                        + 2.0 * beta * q.local.0
-                        - 2.0 * beta * v.local.0,
-                )
+                q.local.1 + v.local.1 + beta * beta * self.dim as f32
+                    - 2.0 * q.scale * v.scale * ip as f32
+                    + 2.0 * beta * q.local.0
+                    - 2.0 * beta * v.local.0
             }
             Metric::Ip | Metric::Cos => {
                 let (n1_mean, n2_mean) = self.global.unwrap_or((0.0, 0.0));
@@ -287,7 +301,7 @@ impl LvqStore {
                     + (f64::from(q.bias) + f64::from(v.bias)) * n1_mean
                     + f64::from(q.local.1)
                     + f64::from(v.local.1);
-                Some(-(dist as f32))
+                -(dist as f32)
             }
         }
     }
@@ -523,6 +537,31 @@ mod tests {
                     (estimate - truth).abs() <= tolerance,
                     "i {i}: truth {truth}, estimate {estimate}"
                 );
+            }
+        }
+    }
+
+    /// The borrowed two-record distance is exactly the `LvqQuery` one.
+    ///
+    /// `distance_between` is the graph builder's path: it is what
+    /// `Store::distance_nodes` calls for every candidate comparison, so it must
+    /// agree with `distance(&query_at(a))` without materialising the clone
+    /// that `query_at` performs.
+    #[test]
+    fn borrowed_distance_matches_the_query_path() {
+        let dim = 16;
+        let mut rng = Rng(21);
+        let vectors: Vec<Vec<f32>> = (0..32).map(|_| rng.vector(dim, -1.0, 1.0)).collect();
+        for metric in [Metric::L2, Metric::Ip, Metric::Cos] {
+            let mut store = LvqStore::new(dim, metric, metric == Metric::Cos);
+            store.build(&vectors);
+            for a in 0..store.len() {
+                let q = store.query_at(a).expect("record a");
+                for b in 0..store.len() {
+                    let via_query = store.distance(&q, b).expect("record b");
+                    let borrowed = store.distance_between(&q.data, store.record(b).unwrap());
+                    assert_eq!(via_query, borrowed, "{metric:?} a={a} b={b}");
+                }
             }
         }
     }

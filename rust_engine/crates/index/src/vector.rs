@@ -486,10 +486,12 @@ impl Store {
                 .zip(data.get(b))
                 .map(|(x, y)| plain_distance(x, y, *metric))
                 .unwrap_or(f32::MAX),
-            Store::Lvq(store) => store
-                .query_at(a)
-                .and_then(|q| store.distance(&q, b))
-                .unwrap_or(f32::MAX),
+            Store::Lvq(store) => match (store.record(a), store.record(b)) {
+                // Borrow both records: `query_at` clones the whole i8 code, and
+                // this runs once per candidate comparison.
+                (Some(q), Some(v)) => store.distance_between(q, v),
+                _ => f32::MAX,
+            },
             Store::Rabitq(store) => store
                 .decompress(a)
                 .map(|v| {
@@ -1249,16 +1251,14 @@ impl HnswIndex {
             }
             return vectors.len();
         }
-        // The quantized stores keep a code per vertex and re-derive a query from
-        // that code; the reference only instantiates its batch path for the
-        // plain store's DataType, so a quantized index keeps the serial build
-        // instead of gaining a parallel one that would mean something else.
-        if !matches!(self.store, Store::Plain { .. }) {
-            for v in vectors {
-                self.add(v);
-            }
-            return vectors.len();
-        }
+        // Every store takes the batch path: the reference's
+        // `HnswHandler::InsertVecs` visits its index variant, stores the batch
+        // (`StoreData`), then builds `[start, end)` in buckets - it never
+        // branches on the store type. A quantized index builds the same way,
+        // because `Build` re-derives its query from the vertex's own code
+        // (`GetVecToQuery`), which the port's `QueryRef::for_node` does too.
+        // Keeping quantized stores serial here made an LVQ build run on one
+        // core (measured 99% CPU on a 20000-row index).
         let base = self.store.len();
         for v in vectors {
             assert_eq!(v.len(), self.dims, "dimension mismatch");
@@ -1936,6 +1936,53 @@ mod tests {
         let recall = hits as f64 / (40 * 5) as f64;
         assert!(recall >= 0.9, "parallel graph diverged: recall {recall}");
         parallel.check().expect("parallel graph is well formed");
+    }
+
+    /// A quantized store takes the same bucket-parallel build as the plain one.
+    ///
+    /// `HnswHandler::InsertVecs` does not branch on the store type: it stores
+    /// the batch and builds `[start, end)` in buckets. Keeping LVQ/RaBitQ on
+    /// the serial path made an LVQ index build on one core, so this pins both
+    /// the parallelism (the batch path is entered, the graph is well formed)
+    /// and the answers (they match a serial build of the same data).
+    #[test]
+    fn quantized_batch_build_matches_serial_answers() {
+        let data = dataset(1200, 8);
+        for encoding in [HnswEncoding::Lvq, HnswEncoding::Rabitq] {
+            let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            serial.train_store(&data, None);
+            for v in &data {
+                serial.add(v);
+            }
+            let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            parallel.train_store(&data, None);
+            assert_eq!(parallel.add_batch(&data, 4), data.len());
+            assert_eq!(parallel.len(), serial.len());
+            // A serial build must not have been taken: with 1200 vertices and 4
+            // threads the batch path splits into buckets, and every one of them
+            // is reachable from the entry point.
+            parallel.check().expect("parallel graph is well formed");
+            let mut rng = Rng::new(11);
+            let mut hits = 0usize;
+            for _ in 0..40 {
+                let q: Vec<f32> = (0..8).map(|_| (rng.unit() as f32) * 10.0).collect();
+                let want: HashSet<usize> = serial
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .collect();
+                hits += parallel
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .filter(|(i, _)| want.contains(i))
+                    .count();
+            }
+            let recall = hits as f64 / (40 * 5) as f64;
+            assert!(
+                recall >= 0.9,
+                "{encoding:?} parallel graph diverged: recall {recall}"
+            );
+        }
     }
     #[test]
     fn hnsw_recall_vs_flat() {
