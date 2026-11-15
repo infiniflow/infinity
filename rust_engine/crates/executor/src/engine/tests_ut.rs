@@ -1647,6 +1647,82 @@ mod tests {
         Vec::new()
     }
 
+    /// `test_knn_ivf_l2.slt:53-58`, which the conformance gate caught: an IVF
+    /// index built over two blocks, a third block appended, then the same
+    /// query.
+    ///
+    /// Two separate bugs met here. `COPY` never reported its rows to
+    /// `live_rows` (only `INSERT` did, holding the count published by whatever
+    /// ran last), so the coverage gate compared against a count that said four
+    /// rows while the table had twelve - and the memory index that a
+    /// `CREATE INDEX` after a `COPY` leaves behind covers only the last block.
+    /// Together they let an index that holds a third of the table pass as
+    /// "complete" and answer a top-3 from its own four rows (`8, 6, 4`), where
+    /// the exact scan returns the three tied rows `8, 8, 8`.
+    #[test]
+    fn knn_answers_cover_rows_loaded_after_the_index_was_built() {
+        let dir = tempdir().unwrap();
+        let csv = dir.path().join("d4.csv");
+        std::fs::copy(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../test/data/csv/embedding_float_dim4.csv"
+            ),
+            &csv,
+        )
+        .unwrap();
+        let copy = format!(
+            "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        );
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE t (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(&copy).unwrap();
+        // The exact queries are what published a `live_rows` of 4 before the
+        // fix, so they belong in the reproduction.
+        let plain =
+            "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3);";
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["6".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking("CREATE INDEX ix ON t (c2) USING IVF WITH (metric = l2);")
+            .unwrap();
+        let q = "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3) WITH (nprobe = 10);";
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["8".to_string()]
+            ],
+            "a row loaded after the index was built went missing"
+        );
+    }
+
     /// `HEADER true` on a CSV import consumes the first line (it is not a
     /// row) and rejects a header whose column count differs from the table's.
     #[test]
@@ -5123,6 +5199,18 @@ mod tests {
             "build {n} rows ({encode}+{build_type} {lsg_ratio}): {:?}",
             started.elapsed()
         );
+        // `HnswIndexInMem::MemUsage`: the graph (links + levels) plus the
+        // encoding's store. Per row is what a deployment budgets with; the
+        // graph is a floor every encoding pays.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let guard = mem.lock().unwrap();
+            let bytes = guard.mem_usage();
+            eprintln!(
+                "index memory ({encode}): {:.1} MiB, {:.0} B/row",
+                bytes as f64 / (1024.0 * 1024.0),
+                bytes as f64 / n as f64
+            );
+        }
 
         let row = |i: usize| -> &[f32] { &flat[i * DIMS..(i + 1) * DIMS] };
 
@@ -5258,10 +5346,7 @@ mod tests {
                     let got = graph.search_with_ef(row(i), k, Some(ef));
                     curve_lat.push(started.elapsed());
                     let exact = exact_topk(row(i), k);
-                    curve_hits += got
-                        .iter()
-                        .filter(|(id, _)| exact.contains(&(*id as u64)))
-                        .count();
+                    curve_hits += got.iter().filter(|(id, _)| exact.contains(id)).count();
                 }
                 curve_lat.sort();
                 eprintln!(

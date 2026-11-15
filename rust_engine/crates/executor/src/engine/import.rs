@@ -305,6 +305,15 @@ impl Engine {
             // statement opened.
             self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)
                 .await?;
+            // `live_rows` is what the query path's cache freshness and index
+            // coverage gates compare against, and it adds a *delta* to a
+            // published count - so every write path has to report its rows.
+            // `INSERT` does (`note_live_rows` in the commit hook), `COPY` did
+            // not: a table loaded by `COPY` kept the count of whatever last
+            // published it (`row_count`, or a vector cache build over the rows
+            // of the time), which made a stale vector cache look fresh and let
+            // an index that covers part of the table pass the coverage gate.
+            self.note_live_rows(table, staged as isize);
         } else {
             drop(t);
         }
@@ -501,6 +510,9 @@ impl Engine {
         let t3 = std::time::Instant::now();
         let _visible = BottomGuard::new(&self.txn, ts);
         self.note_append(table, rows.len(), true, Some(ts));
+        // The published live-row count, as `INSERT` reports it: the cache
+        // freshness and index coverage gates compare against it.
+        self.note_live_rows(table, rows.len() as isize);
         let segment = (base >> 32) as u32;
         let imported = self.segment_rows(table, segment as usize) as u64;
         self.note_import_rows(table, segment, imported);
