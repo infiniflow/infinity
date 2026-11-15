@@ -3,37 +3,41 @@
 //! It owns an [`HnswHandler`] and the row id of every added vector; the
 //! executor merges it with every sealed `chunk_n.idx`.
 
+use crate::blocks::index_chunk::HnswOptions;
 use index::hnsw_handler::{HnswHandler, KnnSearchOption};
-use index::vector::{HnswEncoding, HnswIndex, Metric};
+use index::lsg::LsgConfig;
+use index::vector::HnswIndex;
 
 pub(crate) struct HnswIndexInMem {
     pub dims: usize,
     handler: HnswHandler,
     /// Row id per added vector (the graph's labels).
     rows: Vec<u64>,
+    /// `IndexHnsw::lsg_config_`, trained into the graph with the first batch.
+    ///
+    /// The memory segment used to ignore `build_type`/`lsg_config` entirely, so
+    /// rows written before the first dump - the whole of a fresh `CREATE INDEX`
+    /// - were scaled by an all-zero LSG average, and `SEARCH MATCH VECTOR`
+    /// answered with visibly lower recall than the same index after a restart.
+    lsg: Option<LsgConfig>,
 }
 
 impl HnswIndexInMem {
     /// `InitAbstractIndexT`: the memory segment uses the index's encoding and
-    /// metric (plain / LVQ / RaBitQ, l2 / ip / cosine).
-    pub fn new_with(
-        dims: usize,
-        m: usize,
-        ef_construction: usize,
-        metric: Metric,
-        encoding: HnswEncoding,
-    ) -> Self {
+    /// metric (plain / LVQ / RaBitQ, l2 / ip / cosine), and its LSG config.
+    pub fn new_with(dims: usize, options: &HnswOptions) -> Self {
         Self {
             dims,
             handler: HnswHandler::from_index(HnswIndex::with_encoding(
                 dims,
-                m,
-                ef_construction,
+                options.m,
+                options.ef_construction,
                 64,
-                metric,
-                encoding,
+                options.metric,
+                options.encoding,
             )),
             rows: Vec::new(),
+            lsg: options.lsg,
         }
     }
 
@@ -68,11 +72,28 @@ impl HnswIndexInMem {
             }
             batch.push(v);
         }
+        self.train_from_first_batch(&batch);
         if self.handler.insert_vecs_threaded(batch, threads) != rows.len() {
             return false;
         }
         self.rows.extend(rows.iter().map(|(seq, _)| *seq));
         true
+    }
+
+    /// `IndexHnsw::InitAbstractIndexT`: the quantizer (LVQ's per-dimension mean,
+    /// RaBitQ's centroid) and the LSG averages are trained from the whole column
+    /// *before* any row is inserted. A code written with an untrained (all-zero)
+    /// mean carries none of the vector's magnitude, and an untrained LSG leaves
+    /// every row scaled by zero.
+    ///
+    /// Only from the first non-empty batch, and only while the store is still
+    /// empty: re-training after rows exist would invalidate their codes.
+    fn train_from_first_batch<V: AsRef<[f32]> + Sync>(&mut self, batch: &[V]) {
+        if batch.is_empty() || !self.handler.is_empty() {
+            return;
+        }
+        let lsg = self.lsg;
+        self.handler.index_mut().train_store(batch, lsg);
     }
 
     /// `Search` with `WITH (ef = ...)` honoured, as the sealed segments do.

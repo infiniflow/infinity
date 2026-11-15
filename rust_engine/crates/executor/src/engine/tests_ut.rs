@@ -5033,6 +5033,225 @@ mod tests {
         }
     }
 
+    /// HNSW at production scale: 200k rows x 128 dims by default, 1M with
+    /// `INFINITY_BENCH_ROWS=1000000`.
+    ///
+    /// Reports what a deployment cares about: build time, recall@10 against a
+    /// brute-force ground truth, query latency p50/p99, and the recall after a
+    /// dump + reopen.
+    ///
+    /// Ignored because it builds a real graph:
+    /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
+    #[test]
+    #[ignore = "BENCH: HNSW production scale"]
+    fn hnsw_production_scale() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean (so an untrained quantizer shows
+        // up) and SIFT-like clusters: 1000 centres, each row a centre plus a
+        // small per-dimension jitter. IID uniform vectors in 128 dims are the
+        // adversarial case for every ANN index (the nearest neighbours are no
+        // closer than the far ones), so they say nothing about production data.
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        const CLUSTERS: usize = 1000;
+        fn next(state: &mut u64) -> u64 {
+            *state = (*state)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            *state >> 40
+        }
+        fn vector(i: usize) -> Vec<f32> {
+            let mut centre = (i % CLUSTERS) as u64;
+            let mut row = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    let c = BASE[j % BASE.len()] + (next(&mut centre) % 1000) as f32 / 10.0;
+                    let jitter = (next(&mut row) % 1000) as f32 / 1000.0 - 0.5;
+                    c + jitter * 4.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BENCH_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200_000);
+        let encode = std::env::var("INFINITY_BENCH_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BENCH_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+        let lsg_ratio = std::env::var("INFINITY_BENCH_LSG_RATIO").unwrap_or_else(|_| "0.01".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+
+        // Insert in chunks: a 1M-row literal batch would hold ~1GB of text at
+        // once. `flat` keeps the vectors for the brute-force ground truth.
+        let mut flat: Vec<f32> = Vec::with_capacity(n * DIMS);
+        let started = std::time::Instant::now();
+        let chunk = 50_000usize;
+        for start in (0..n).step_by(chunk) {
+            let end = (start + chunk).min(n);
+            let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(end - start);
+            for i in start..end {
+                let v = vector(i);
+                let text = v
+                    .iter()
+                    .map(|x| format!("{x:.3}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                dataset.push(vec![
+                    Literal::Int(i as i64),
+                    Literal::Str(format!("[{text}]")),
+                ]);
+                flat.extend_from_slice(&v);
+            }
+            e.insert_literals("default_db.bench", None, dataset)
+                .unwrap();
+        }
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX bench_i ON bench (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito={lsg_ratio},ls_k=10,alpha=1');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type} {lsg_ratio}): {:?}",
+            started.elapsed()
+        );
+
+        let row = |i: usize| -> &[f32] { &flat[i * DIMS..(i + 1) * DIMS] };
+
+        // Exact top-k over the inserted vectors.
+        let exact_topk = |q: &[f32], k: usize| -> Vec<u64> {
+            let mut best: Vec<(f32, u64)> = (0..n)
+                .map(|i| {
+                    let v = row(i);
+                    let d: f32 = v.iter().zip(q).map(|(a, b)| (a - b) * (a - b)).sum();
+                    (d, i as u64)
+                })
+                .collect();
+            best.select_nth_unstable_by(k, |a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.truncate(k);
+            best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.iter().map(|(_, i)| *i).collect()
+        };
+
+        let queries = 50usize;
+        let k = 10usize;
+        let mut hits = 0usize;
+        let mut latencies: Vec<std::time::Duration> = Vec::with_capacity(queries);
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            latencies.push(started.elapsed());
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            hits += got.iter().filter(|id| exact.contains(id)).count();
+        }
+        let recall = hits as f64 / (queries * k) as f64;
+        latencies.sort();
+        let p50 = latencies[latencies.len() / 2];
+        let p99 = latencies[latencies.len() * 99 / 100];
+        eprintln!("recall@{k}: {recall:.3}; query p50 {p50:?}, p99 {p99:?}");
+
+        // The recall/latency curve a deployment tunes with `WITH (ef = ...)`.
+        // The in-memory graph answers through the same `search_with_ef` the
+        // KNN scan calls, so this is the index path without the SQL overhead.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let graph = mem.lock().unwrap();
+            for ef in [64usize, 128, 256, 512] {
+                let mut curve_hits = 0usize;
+                let mut curve_lat: Vec<std::time::Duration> = Vec::with_capacity(queries);
+                for qi in 0..queries {
+                    let i = (qi * 7919) % n;
+                    let started = std::time::Instant::now();
+                    let got = graph.search_with_ef(row(i), k, Some(ef));
+                    curve_lat.push(started.elapsed());
+                    let exact = exact_topk(row(i), k);
+                    curve_hits += got
+                        .iter()
+                        .filter(|(id, _)| exact.contains(&(*id as u64)))
+                        .count();
+                }
+                curve_lat.sort();
+                eprintln!(
+                    "ef {ef}: recall@{k} {:.3}, p50 {:?}, p99 {:?}",
+                    curve_hits as f64 / (queries * k) as f64,
+                    curve_lat[curve_lat.len() / 2],
+                    curve_lat[curve_lat.len() * 99 / 100]
+                );
+            }
+        }
+
+        // Dump, reopen, query again: a restart must not change the answers.
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let started = std::time::Instant::now();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        eprintln!("flush + dump: {:?}", started.elapsed());
+        let info = e.show_index_info("bench", "bench_i").expect("show_index");
+        eprintln!("chunks after dump: {}", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let started = std::time::Instant::now();
+        let e = Engine::open(dir.path()).unwrap();
+        eprintln!("reopen: {:?}", started.elapsed());
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM bench;"),
+            vec![vec![n.to_string()]]
+        );
+        let mut after_hits = 0usize;
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            after_hits += got.iter().filter(|id| exact.contains(id)).count();
+        }
+        let after = after_hits as f64 / (queries * k) as f64;
+        eprintln!("recall@{k} after reopen: {after:.3}");
+
+        // A benchmark first: a 200k run reports its numbers and this only fails
+        // when the index answers nothing. The 50k gate below is the regression
+        // check; the 200k+ runs are the measurement.
+        assert!(recall > 0.0 && after > 0.0, "the index answered nothing");
+        if n <= 50_000 && encode == "lvq" {
+            assert!(recall >= 0.85, "recall@{k} {recall} is below 0.85");
+            assert!(
+                after >= recall - 0.05,
+                "reopen recall {after} vs {recall} before the restart"
+            );
+        }
+    }
+
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
     /// vectors per the `encode` option and answers the same top-1.
     #[test]

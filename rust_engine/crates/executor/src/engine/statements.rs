@@ -3730,28 +3730,11 @@ impl Engine {
                 let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
                     continue;
                 };
-                let opt = |name: &str| -> Option<usize> {
-                    im.options
-                        .iter()
-                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                        .and_then(|(_, v)| v.parse().ok())
-                };
-                let m = opt("M").unwrap_or(16);
-                let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
-                let opt = |name: &str| {
-                    im.options
-                        .iter()
-                        .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                        .map(|(_, v)| v.clone())
-                };
-                let metric =
-                    index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
-                let encoding =
-                    index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+                let options = crate::blocks::index_chunk::HnswOptions::from_options(&im.options);
                 entry.hnsw_mem.insert(
                     im.id,
                     Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                        dims, m, efc, metric, encoding,
+                        dims, &options,
                     ))),
                 );
             }
