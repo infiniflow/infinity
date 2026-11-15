@@ -928,6 +928,52 @@ mod tests {
         assert_eq!(rows(&engine, q).len(), 120);
     }
 
+    /// A cursor that snapshotted the block set **before** a compaction mirrored the
+    /// merged segment still has to resolve the ids the merge renumbered to.
+    ///
+    /// This is the shape a query hits when it starts before a merge commits but
+    /// reaches the (already renumbered) full-text cache afterwards: the postings
+    /// name the merged segment's ids, the append buffer no longer holds them (the
+    /// block write retired the buffered copies), and the cursor's snapshot does
+    /// not name their block. The block writer puts the files on disk before it
+    /// retires the buffer, so a miss is a stale snapshot and the read retries.
+    #[test]
+    fn a_cursor_from_before_a_block_write_still_resolves_the_merged_rows() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        // The snapshot a statement that started before the merge holds: segment 0,
+        // which the merge is about to retire.
+        let mut cursor = crate::blocks::misc::BlockCursor::new(&engine, "default_db.ch").unwrap();
+        engine.compact_all_segments("default_db.ch").unwrap();
+        // The merge moved the 120 rows of segment 0 to the base of segment 1, and
+        // the block write retired the buffered copies: only the blocks hold them.
+        let merged: Vec<u64> = (0..120).map(|i| (1u64 << 32) + i).collect();
+        let resolved: Vec<usize> = cursor
+            .rows(&merged)
+            .unwrap()
+            .into_iter()
+            .map(|(seq, _)| seq)
+            .collect();
+        assert_eq!(
+            resolved,
+            merged.iter().map(|id| *id as usize).collect::<Vec<_>>()
+        );
+    }
+
     /// `MATCH` asks for a handful of rows (`topn=3`, as the parallel gate does).
     /// A compaction retires every row id it renumbers; a retired id that is
     /// still in the postings takes a `topn` slot the fetch cannot resolve, so

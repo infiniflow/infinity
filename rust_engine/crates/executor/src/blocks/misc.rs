@@ -111,6 +111,10 @@ pub(crate) struct BlockCursor<'a> {
     pub(crate) types: Vec<i32>,
     /// `(segment, block)` of the blocks a reader may see.
     pub(crate) visible: std::collections::HashSet<(u32, u16)>,
+    /// The block map `visible` came from: a different `Arc` is a writer that
+    /// rescanned (`BlockCursor::refresh_visible`), the same one cannot hold a
+    /// block the snapshot is missing.
+    pub(crate) index: Option<Arc<std::sync::Mutex<storage::block_index::BlockIndex>>>,
     pub(crate) root: PathBuf,
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
@@ -139,6 +143,7 @@ impl<'a> BlockCursor<'a> {
                     "a column of '{table}' has no C++ block layout, so its rows are not in blocks"
                 ))
             })?;
+        let index = engine.block_index_for(&table);
         let visible = engine
             .visible_block_ids(&table)
             .into_iter()
@@ -153,10 +158,52 @@ impl<'a> BlockCursor<'a> {
             meta,
             types,
             visible,
+            index,
             root: engine.blocks_root(),
             block: None,
             dead,
         })
+    }
+
+    /// Re-reads the visible blocks and the delete journal, if the writer rescanned
+    /// its block map since this cursor was created.
+    ///
+    /// The block writer moves rows from the append buffer into a block **without**
+    /// any ordering against a reader: it writes the block's files and only then
+    /// retires the buffered copies, so a cursor that snapshotted the block set
+    /// before that write sees neither the buffer's row nor the block that now
+    /// holds it. A full-text hit list lands exactly there - a compaction renumbers
+    /// the postings under a statement that started before the merge, and the
+    /// merged rows are the ids the cache names. Re-reading the set is what turns
+    /// the miss back into a hit.
+    ///
+    /// The block writer replaces the table's map with a fresh `Arc` once its files
+    /// are on disk (`write_blocks_mode_with`), so an unchanged `Arc` means no
+    /// block can have been added: the answer stays short and nothing is rescanned.
+    fn refresh_visible(&mut self) -> bool {
+        let Some(index) = self.engine.block_index_for(&self.table) else {
+            return false;
+        };
+        if self
+            .index
+            .as_ref()
+            .is_some_and(|seen| Arc::ptr_eq(seen, &index))
+        {
+            return false;
+        }
+        self.visible = self
+            .engine
+            .visible_block_ids(&self.table)
+            .into_iter()
+            .map(|id| (id.segment_id, id.block_id))
+            .collect();
+        self.dead = self
+            .engine
+            .tombstone_set_at(&self.table, crate::read_ts())
+            .unwrap_or_default();
+        self.index = Some(index);
+        self.block = None;
+        true
     }
 
     /// Many rows at once, in id order.
@@ -164,7 +211,23 @@ impl<'a> BlockCursor<'a> {
     /// The ids are grouped by block and each block is decoded once, instead of
     /// once per row: a 5k-row `UPDATE` names 5k ids that all live in one block,
     /// and decoding the block per id was most of its scan.
+    ///
+    /// A short answer is retried once against a fresh block set (see
+    /// [`Self::refresh_visible`]): a writer that mirrored the rows between this
+    /// cursor's snapshot and this call leaves them in a block the snapshot does
+    /// not name, and the buffered copy is already retired.
     pub(crate) fn rows(&mut self, ids: &[u64]) -> Result<Vec<(usize, Vec<Value>)>> {
+        let mut complete = true;
+        let mut out = self.rows_of(ids, &mut complete)?;
+        if !complete && self.refresh_visible() {
+            out = self.rows_of(ids, &mut complete)?;
+        }
+        Ok(out)
+    }
+
+    /// [`Self::rows`] against the snapshot the cursor holds. `complete` says every
+    /// id was accounted for (decoded, buffered, or deleted).
+    fn rows_of(&mut self, ids: &[u64], complete: &mut bool) -> Result<Vec<(usize, Vec<Value>)>> {
         let mut sorted: Vec<usize> = ids.iter().map(|id| *id as usize).collect();
         sorted.sort_unstable();
         sorted.dedup();
@@ -198,7 +261,11 @@ impl<'a> BlockCursor<'a> {
                 }
                 wanted.insert(*seq);
             }
-            if wanted.is_empty() || !self.visible.contains(&(segment, block_no)) {
+            if wanted.is_empty() {
+                continue;
+            }
+            if !self.visible.contains(&(segment, block_no)) {
+                *complete = false;
                 continue;
             }
             let id = BlockId {
@@ -214,6 +281,7 @@ impl<'a> BlockCursor<'a> {
                 .unwrap_or(true)
             {
                 let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                    *complete = false;
                     continue;
                 };
                 self.block = Some((id, block));
@@ -239,8 +307,12 @@ impl<'a> BlockCursor<'a> {
                 None,
                 Some(&wanted),
             ) else {
+                *complete = false;
                 continue;
             };
+            if rows.len() < wanted.len() {
+                *complete = false;
+            }
             out.extend(rows);
         }
         out.sort_by_key(|(seq, _)| *seq);
@@ -276,7 +348,11 @@ impl<'a> BlockCursor<'a> {
         let block = (offset / DEFAULT_BLOCK_CAPACITY) as u16;
         let slot = offset % DEFAULT_BLOCK_CAPACITY;
         if !self.visible.contains(&(segment, block)) {
-            return Ok(None);
+            // Same race as `rows`: the row may have been mirrored into a block
+            // that the snapshot predates.
+            if !self.refresh_visible() || !self.visible.contains(&(segment, block)) {
+                return Ok(None);
+            }
         }
         let id = BlockId {
             db_id: self.engine.database_id_of(&self.table),
