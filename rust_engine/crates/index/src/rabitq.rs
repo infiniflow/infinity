@@ -672,10 +672,7 @@ mod tests {
             recon_err += e as f64;
             norm_sum += v.iter().map(|x| x * x).sum::<f32>() as f64;
         }
-        eprintln!(
-            "reconstruction MSE / ||v||^2 = {:.3}",
-            recon_err / norm_sum
-        );
+        eprintln!("reconstruction MSE / ||v||^2 = {:.3}", recon_err / norm_sum);
 
         // Estimated vs exact distance.
         let mut sum_rel = 0.0f64;
@@ -788,7 +785,9 @@ mod tests {
         let queries = 40;
         let mut rng = Rng(61);
         let vectors: Vec<Vec<f32>> = (0..n).map(|_| rng.vector(dim, 100.0, 200.0)).collect();
-        let qs: Vec<Vec<f32>> = (0..queries).map(|_| rng.vector(dim, 100.0, 200.0)).collect();
+        let qs: Vec<Vec<f32>> = (0..queries)
+            .map(|_| rng.vector(dim, 100.0, 200.0))
+            .collect();
         let mut store = RabitqStore::new(dim, Metric::L2, 19);
         // The centroid must be trained, otherwise every [100, 200] vector
         // normalizes to nearly the same direction and all recall is noise.
@@ -882,7 +881,15 @@ mod tests {
             est.into_iter().map(|(_, i)| i).collect()
         };
 
-        let configs = [None, Some(0usize), Some(1), Some(2), Some(3), Some(4), Some(5)];
+        let configs = [
+            None,
+            Some(0usize),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            Some(5),
+        ];
         for ex in configs {
             let codes = make_codes(ex);
             let mut hits = 0usize;
@@ -910,10 +917,7 @@ mod tests {
             let mut keep = 0usize;
             for (qi, (qu, qn)) in qry.iter().enumerate() {
                 let order = rank(&codes, qu, *qn);
-                keep += truths[qi]
-                    .iter()
-                    .filter(|i| order[..m].contains(i))
-                    .count();
+                keep += truths[qi].iter().filter(|i| order[..m].contains(i)).count();
             }
             eprintln!(
                 "1-bit top-{m} contains the true top-10: {:.3}",
