@@ -173,6 +173,8 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 | LVQ 均值在建索引路径上不训练 | 参考只在 `DataStore::Optimize()`（`ALTER INDEX … WITH (lvq_avg)`）里算均值；`CREATE INDEX … encode=lvq` 与 `ALTER … (compress_to_lvq)` 产出的 chunk，`mean_` 全是 `0.0`（实测 9 个 chunk 全部零均值）。端口 `train_store` 保留同一条路径，`LvqStore::train`/`build` 供 optimize 与单测使用 | `crates/index/src/lvq.rs`、`crates/index/src/vector.rs` |
 | `lsg_config` 的键名是 `sample_raito` | 参考 `LSGConfig::FromString`/`ToString` 用这个拼写（`index_hnsw_impl.cpp:115`），`show_index` 也原样输出；端口两种拼写都接受，写出参考的 `sample_raito = …, ls_k = …, alpha = …`（含空格、整值不带 `.0`），否则参考读 Rust 写的 catalog 会 `Invalid index parameter type: sample_ratio` 而 abort | `crates/index/src/lsg.rs`、`crates/executor/src/engine/index_build.rs` |
 
+上面四项与 `issue.txt` 其它条目的逐条核验（源码路径、实测数据、处理决定）见 [`ISSUE_TRIAGE.md`](ISSUE_TRIAGE.md)。
+
 ### 5.1 读路径比参考慢（已收窄，未追平）
 
 逐阶段的耗时分布与架构对比见 [`SELECT_CHAIN.md`](SELECT_CHAIN.md)（同一台机、同一份数据、perf 采样）。这里只放结论：
