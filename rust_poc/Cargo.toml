@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "tokio-deadlock",
+    "fst-compat",
+    "fjall-kv",
+    "crash-consistency",
+    "thrift-golden",
+    "slt-runner",
+    "jieba-consistency",
+    "determinism",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"

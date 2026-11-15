@@ -159,18 +159,6 @@ bool BlockMaxWandIterator::ShouldSkipSort() const {
     return iterations_since_sort_ < adaptive_interval;
 }
 
-// Optimized partial sort that only sorts what we need
-void BlockMaxWandIterator::OptimizedPartialSort(size_t limit) {
-    const size_t num_iterators = sorted_iterators_.size();
-    if (limit >= num_iterators) {
-        std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
-    } else {
-        std::partial_sort(sorted_iterators_.begin(), sorted_iterators_.begin() + limit, sorted_iterators_.end(), [](const auto &a, const auto &b) {
-            return a->DocID() < b->DocID();
-        });
-    }
-}
-
 // Aggressively optimized pivot estimation with safety guarantees
 bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estimated_pivot) {
     const size_t num_iterators = sorted_iterators_.size();
@@ -283,15 +271,8 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             next_sort_cnt_++;
             consecutive_skips_ = 0; // Reset consecutive skip counter
 
-            if (num_iterators > SORT_SKIP_THRESHOLD) {
-                // For large keyword sets, use intelligent partial sort
-                size_t sort_limit = num_iterators / PARTIAL_SORT_FACTOR + 5;
-                sort_limit = std::min(sort_limit, num_iterators);
-                OptimizedPartialSort(sort_limit);
-            } else {
-                // For smaller keyword sets, use full sort
-                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
-            }
+            // Full sort required: a partially sorted tail lets BM25Score() run on an iterator whose block was skipped but not decoded.
+            std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
             iterations_since_sort_ = 0;
             prefix_sums_valid_ = false; // Invalidate prefix sums after sorting
         } else {
@@ -329,17 +310,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         } else {
             // Critical: BMW algorithm requires sorted order for correctness
             if (!should_sort) {
-                // We must ensure sorted order for correct pivot calculation
-                // Use a more efficient sort for this critical path
-                if (num_iterators > FAST_PIVOT_THRESHOLD) {
-                    // For very large sets, sort only what we likely need
-                    size_t estimated_limit = std::min(num_iterators, num_iterators / 4 + 10);
-                    OptimizedPartialSort(estimated_limit);
-                } else {
-                    std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) {
-                        return a->DocID() < b->DocID();
-                    });
-                }
+                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
                 iterations_since_sort_ = 0;
                 prefix_sums_valid_ = false;
             }

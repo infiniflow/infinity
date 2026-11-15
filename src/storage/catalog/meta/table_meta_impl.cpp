@@ -46,20 +46,25 @@ import create_index_info;
 namespace infinity {
 
 TableMeta::TableMeta(const std::string &db_id_str,
+                     const std::string &db_name,
                      const std::string &table_id_str,
                      const std::string &table_name,
                      KVInstance *kv_instance,
                      TxnTimeStamp begin_ts,
                      TxnTimeStamp commit_ts,
                      MetaCache *meta_cache)
-    : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), meta_cache_(meta_cache), db_id_str_(db_id_str),
+    : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), meta_cache_(meta_cache), db_id_str_(db_id_str), db_name_(db_name),
       table_id_str_(table_id_str), table_name_(table_name) {
     db_id_ = std::stoull(db_id_str);
     table_id_ = std::stoull(table_id_str);
 }
 
-TableMeta::TableMeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn)
-    : txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str), table_name_(table_name) {
+TableMeta::TableMeta(const std::string &db_id_str,
+                     const std::string &db_name,
+                     const std::string &table_id_str,
+                     const std::string &table_name,
+                     NewTxn *txn)
+    : txn_(txn), db_id_str_(db_id_str), db_name_(db_name), table_id_str_(table_id_str), table_name_(table_name) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
@@ -1108,6 +1113,8 @@ std::tuple<size_t, Status> TableMeta::GetTableRowCount() {
 }
 
 MetaCache *TableMeta::meta_cache() const { return meta_cache_; }
+
+const std::string &TableMeta::db_name() const { return db_name_; }
 
 const std::string &TableMeta::table_name() const { return table_name_; }
 

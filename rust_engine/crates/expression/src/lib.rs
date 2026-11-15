@@ -1,0 +1,1566 @@
+//! `infinity-expression`: scalar expressions and their evaluation over a row.
+//! Seeded with literals, column references and comparisons (M2).
+
+#![forbid(unsafe_code)]
+
+pub mod fde;
+pub mod json;
+pub mod md5;
+pub mod regex;
+pub mod regex_literal;
+pub mod registry;
+pub mod scalar;
+
+use std::cmp::Ordering;
+
+use parser::{AggFunc, BinOp, CmpOp, Literal};
+
+/// A runtime value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Bool(bool),
+    Null,
+}
+
+impl Value {
+    pub fn from_literal(l: &Literal) -> Value {
+        match l {
+            Literal::Int(i) => Value::Int(*i),
+            Literal::Float(f) => Value::Float(*f),
+            Literal::Str(s) => Value::Str(s.clone()),
+            Literal::Null => Value::Null,
+            // Vectors / arrays render as `[a,b,c]` with elements re-joined compactly.
+            Literal::Array(items) => Value::Str(format!("[{}]", items.join(","))),
+            Literal::Vector(items) => {
+                let parts: Vec<String> = items.iter().map(|x| x.to_string()).collect();
+                Value::Str(format!("[{}]", parts.join(",")))
+            }
+        }
+    }
+
+    /// `.slt`-style rendering (REAL fixed 6 decimals, per PoC H).
+    pub fn to_slt_string(&self) -> String {
+        match self {
+            Value::Int(i) => i.to_string(),
+            Value::Float(f) => format!("{f:.6}"),
+            Value::Str(s) => s.clone(),
+            Value::Bool(b) => b.to_string(),
+            Value::Null => "null".to_string(),
+        }
+    }
+
+    /// [`Self::to_slt_string`] without the copy of a `Str` cell: the caller owns
+    /// the value, so a text column's cell moves into the result instead of being
+    /// cloned (20000 rows of a VARCHAR projection paid 20000 extra allocations).
+    pub fn into_slt_string(self) -> String {
+        match self {
+            Value::Str(s) => s,
+            other => other.to_slt_string(),
+        }
+    }
+
+    fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::Int(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    /// Total-ish comparison: numeric vs numeric, string vs string; else `None`.
+    pub fn partial_cmp_value(&self, other: &Value) -> Option<Ordering> {
+        match (self, other) {
+            (Value::Null, _) | (_, Value::Null) => None,
+            (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
+            _ => match (self.as_f64(), other.as_f64()) {
+                (Some(a), Some(b)) => a.partial_cmp(&b),
+                _ => match (self, other) {
+                    (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
+                    // booleans compare against their textual form too
+                    (Value::Bool(b), Value::Str(s2)) => Some(b.to_string().cmp(s2)),
+                    (Value::Str(s2), Value::Bool(b)) => Some(s2.cmp(&b.to_string())),
+                    // implicit numeric coercion: number vs numeric string
+                    (Value::Str(a), other2) => match (a.trim().parse::<f64>(), other2.as_f64()) {
+                        (Ok(f), Some(g)) => f.partial_cmp(&g),
+                        _ => None,
+                    },
+                    (other2, Value::Str(b)) => match (other2.as_f64(), b.trim().parse::<f64>()) {
+                        (Some(f), Ok(g)) => f.partial_cmp(&g),
+                        _ => None,
+                    },
+                    _ => None,
+                },
+            },
+        }
+    }
+}
+
+/// A scalar expression.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
+    Column(usize),
+    Literal(Value),
+    Cmp(Box<Expr>, CmpOp, Box<Expr>),
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
+    Not(Box<Expr>),
+    /// `expr IS [NOT] NULL`.
+    IsNull(Box<Expr>, bool),
+    /// `expr [NOT] LIKE pattern [ESCAPE c]`.
+    Like(Box<Expr>, Box<Expr>, Option<char>, bool),
+    /// `expr [NOT] IN (…)`.
+    In(Box<Expr>, Vec<Expr>, bool),
+    /// `a <op> b` arithmetic.
+    Binary(Box<Expr>, BinOp, Box<Expr>),
+    /// A scalar function call. Build it through [`registry::func`], which rejects
+    /// names this crate does not implement (a typo is a bind-time error, as in the
+    /// reference binder); [`crate::Expr::eval`] only evaluates known names.
+    Func {
+        name: String,
+        args: Vec<Expr>,
+    },
+    /// `filter_text(col, '…', 'opts')` / `filter_fulltext(col, '…', 'opts')`:
+    /// term matching over the given column's text (the third field carries the
+    /// option string).
+    FullText(usize, String, String),
+    /// `regex(col, pattern)`: regular-expression search over a column's text.
+    Regex(usize, Box<Expr>),
+}
+
+impl Expr {
+    pub fn eval(&self, row: &[Value]) -> Value {
+        match self {
+            Expr::Column(i) => row.get(*i).cloned().unwrap_or(Value::Null),
+            Expr::Literal(v) => v.clone(),
+            Expr::Cmp(a, op, b) => {
+                let x = a.eval(row);
+                let y = b.eval(row);
+                match x.partial_cmp_value(&y) {
+                    Some(ord) => {
+                        let r = match op {
+                            CmpOp::Eq => ord == Ordering::Equal,
+                            CmpOp::Ne => ord != Ordering::Equal,
+                            CmpOp::Lt => ord == Ordering::Less,
+                            CmpOp::Le => ord != Ordering::Greater,
+                            CmpOp::Gt => ord == Ordering::Greater,
+                            CmpOp::Ge => ord != Ordering::Less,
+                        };
+                        Value::Bool(r)
+                    }
+                    // A NULL operand makes the comparison unknown (falsy in WHERE).
+                    None => Value::Null,
+                }
+            }
+            // three-valued logic: NULL propagates unless the result is forced
+            Expr::And(a, b) => {
+                let (x, y) = (a.eval(row), b.eval(row));
+                match (x, y) {
+                    (Value::Bool(false), _) | (_, Value::Bool(false)) => Value::Bool(false),
+                    (Value::Bool(true), Value::Bool(true)) => Value::Bool(true),
+                    _ => Value::Null,
+                }
+            }
+            Expr::Or(a, b) => {
+                let (x, y) = (a.eval(row), b.eval(row));
+                match (x, y) {
+                    (Value::Bool(true), _) | (_, Value::Bool(true)) => Value::Bool(true),
+                    (Value::Bool(false), Value::Bool(false)) => Value::Bool(false),
+                    _ => Value::Null,
+                }
+            }
+            Expr::Not(a) => match a.eval(row) {
+                Value::Bool(b) => Value::Bool(!b),
+                _ => Value::Null,
+            },
+            Expr::IsNull(a, neg) => {
+                let is_null = matches!(a.eval(row), Value::Null);
+                Value::Bool(is_null != *neg)
+            }
+            Expr::Like(a, pat, esc, neg) => {
+                let text = match a.eval(row) {
+                    Value::Str(s) => s,
+                    other => other.to_slt_string(),
+                };
+                let pattern = match pat.eval(row) {
+                    Value::Str(s) => s,
+                    other => other.to_slt_string(),
+                };
+                // Infinity escapes with `\` unless ESCAPE says otherwise
+                let e = esc.unwrap_or('\\');
+                Value::Bool(like_match(&text, &pattern, e) != *neg)
+            }
+            Expr::In(a, vals, neg) => {
+                let x = a.eval(row);
+                if matches!(x, Value::Null) {
+                    return Value::Null;
+                }
+                let evaluated: Vec<Value> = vals.iter().map(|v| v.eval(row)).collect();
+                // Compare with implicit numeric coercion (`'90.5' IN (90.5)`).
+                let found = evaluated
+                    .iter()
+                    .any(|v| x.partial_cmp_value(v) == Some(std::cmp::Ordering::Equal));
+                if found {
+                    // a match decides the answer regardless of NULLs in the list
+                    return Value::Bool(!*neg);
+                }
+                if evaluated.iter().any(|v| matches!(v, Value::Null)) {
+                    return Value::Null; // no match + a NULL => unknown
+                }
+                Value::Bool(*neg)
+            }
+            Expr::Binary(a, op, b) => {
+                let x = a.eval(row);
+                let y = b.eval(row);
+                eval_binary(&x, *op, &y)
+            }
+            Expr::Func { name, args } => eval_func(name, args, row),
+            Expr::FullText(i, q, opts) => {
+                let text = match row.get(*i) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => String::new(),
+                };
+                Value::Bool(fulltext_match(&text, q, opts))
+            }
+            Expr::Regex(i, pat) => {
+                let text = match row.get(*i) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => String::new(),
+                };
+                let pattern = match pat.eval(row) {
+                    Value::Str(s) => s,
+                    other => other.to_slt_string(),
+                };
+                Value::Bool(regex::is_match(&text, &pattern))
+            }
+        }
+    }
+
+    /// Convenience: evaluate as a boolean predicate (non-bool/NULL => false).
+    pub fn eval_predicate(&self, row: &[Value]) -> bool {
+        matches!(self.eval(row), Value::Bool(true))
+    }
+}
+
+/// Evaluates `a <op> b` with numeric promotion; NULL propagates.
+/// Sentinel prefix marking an encoded interval string (`<tag><n> <unit>`).
+const INTERVAL_TAG: char = '\u{1}';
+
+fn parse_interval(s: &str) -> Option<(i64, String)> {
+    let rest = s.strip_prefix(INTERVAL_TAG)?;
+    let (n, unit) = rest.split_once(' ')?;
+    Some((n.trim().parse().ok()?, unit.trim().to_ascii_uppercase()))
+}
+
+fn is_leap(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+fn days_in_month(y: i64, m: i64) -> i64 {
+    match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if is_leap(y) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 30,
+    }
+}
+
+/// A parsed date / time / datetime, used for `± INTERVAL` arithmetic.
+struct Dt {
+    y: i64,
+    mo: i64,
+    d: i64,
+    h: i64,
+    mi: i64,
+    s: i64,
+    has_date: bool,
+    has_time: bool,
+}
+
+fn parse_dt(s: &str) -> Option<Dt> {
+    let s = s.trim();
+    let (dp, tp) = if let Some((a, b)) = s.split_once(' ') {
+        (Some(a), Some(b))
+    } else if s.contains(':') {
+        (None, Some(s))
+    } else {
+        (Some(s), None)
+    };
+    let (y, mo, d) = match dp {
+        Some(dp) => {
+            let p: Vec<&str> = dp.split('-').collect();
+            if p.len() != 3 {
+                return None;
+            }
+            (p[0].parse().ok()?, p[1].parse().ok()?, p[2].parse().ok()?)
+        }
+        None => (1970, 1, 1),
+    };
+    let (h, mi, sec) = match tp {
+        Some(tp) => {
+            let p: Vec<&str> = tp.split(':').collect();
+            let g = |i: usize| -> i64 {
+                p.get(i)
+                    .map(|v| v.split('.').next().unwrap_or(v).trim().parse().unwrap_or(0))
+                    .unwrap_or(0)
+            };
+            (g(0), g(1), g(2))
+        }
+        None => (0, 0, 0),
+    };
+    Some(Dt {
+        y,
+        mo,
+        d,
+        h,
+        mi,
+        s: sec,
+        has_date: dp.is_some(),
+        has_time: tp.is_some(),
+    })
+}
+
+impl Dt {
+    fn clamp_day(&mut self) {
+        let dim = days_in_month(self.y, self.mo);
+        if self.d > dim {
+            self.d = dim;
+        }
+    }
+
+    fn add_days(&mut self, n: i64) {
+        let (y, m, d) = civil_from_days(days_from_civil(self.y, self.mo, self.d) + n);
+        self.y = y;
+        self.mo = m;
+        self.d = d;
+    }
+
+    fn add_seconds(&mut self, secs: i64) {
+        let total = self.h * 3600 + self.mi * 60 + self.s + secs;
+        let days = total.div_euclid(86400);
+        let rem = total.rem_euclid(86400);
+        if days != 0 && self.has_date {
+            self.add_days(days);
+        }
+        self.h = rem / 3600;
+        self.mi = (rem % 3600) / 60;
+        self.s = rem % 60;
+    }
+
+    fn add(&mut self, n: i64, unit: &str) -> Option<()> {
+        match unit {
+            "YEAR" | "YEARS" => {
+                self.y += n;
+                self.clamp_day();
+            }
+            "MONTH" | "MONTHS" => {
+                let total = (self.y * 12 + (self.mo - 1)) + n;
+                self.y = total.div_euclid(12);
+                self.mo = total.rem_euclid(12) + 1;
+                self.clamp_day();
+            }
+            "WEEK" | "WEEKS" => self.add_days(n * 7),
+            "DAY" | "DAYS" => self.add_days(n),
+            "HOUR" | "HOURS" => self.add_seconds(n * 3600),
+            "MINUTE" | "MINUTES" => self.add_seconds(n * 60),
+            "SECOND" | "SECONDS" => self.add_seconds(n),
+            _ => return None,
+        }
+        Some(())
+    }
+
+    fn render(&self) -> String {
+        if self.has_date && self.has_time {
+            format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                self.y, self.mo, self.d, self.h, self.mi, self.s
+            )
+        } else if self.has_date {
+            format!("{:04}-{:02}-{:02}", self.y, self.mo, self.d)
+        } else {
+            format!("{:02}:{:02}:{:02}", self.h, self.mi, self.s)
+        }
+    }
+}
+
+/// Applies `date/time ± interval`; returns `None` when neither operand is a
+/// date/time paired with an interval.
+fn datetime_arith(x: &str, op: BinOp, y: &str) -> Option<Value> {
+    let (base, n, unit, sub) = match (parse_interval(x), parse_interval(y)) {
+        (None, Some((n, u))) => (x, n, u, op == BinOp::Sub),
+        (Some((n, u)), None) if op == BinOp::Add => (y, n, u, false),
+        _ => return None,
+    };
+    let mut dt = parse_dt(base)?;
+    dt.add(if sub { -n } else { n }, &unit)?;
+    Some(Value::Str(dt.render()))
+}
+
+fn eval_binary(a: &Value, op: BinOp, b: &Value) -> Value {
+    // date/time ± interval, or interval + date/time
+    if let (Value::Str(x), Value::Str(y)) = (a, b) {
+        if let Some(v) = datetime_arith(x, op, y) {
+            return v;
+        }
+    }
+    let (x, y) = match (a, b) {
+        (Value::Int(x), Value::Int(y)) if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul) => {
+            let v = match op {
+                BinOp::Add => x.wrapping_add(*y),
+                BinOp::Sub => x.wrapping_sub(*y),
+                _ => x.wrapping_mul(*y),
+            };
+            return Value::Int(v);
+        }
+        (Value::Int(x), Value::Int(y)) if op == BinOp::Mod => {
+            return if *y == 0 {
+                Value::Null
+            } else {
+                Value::Int(x % y)
+            }
+        }
+        _ => match (a.as_f64(), b.as_f64()) {
+            (Some(x), Some(y)) => (x, y),
+            _ => return Value::Null,
+        },
+    };
+    Value::Float(match op {
+        BinOp::Add => x + y,
+        BinOp::Sub => x - y,
+        BinOp::Mul => x * y,
+        BinOp::Div => {
+            if y == 0.0 {
+                return Value::Null;
+            }
+            x / y
+        }
+        BinOp::Mod => {
+            if y == 0.0 {
+                return Value::Null;
+            }
+            x % y
+        }
+    })
+}
+
+/// `CAST(value AS type)`; out-of-range / unparseable numeric casts yield NULL.
+/// The leading numeric prefix of `s` (optional sign, digits, optional fraction
+/// and exponent), or `None` when `s` does not start with a number. Mirrors the
+/// implicit string-to-number cast behind `CAST('300test' AS INT)`.
+fn leading_number(s: &str) -> Option<&str> {
+    let t = s.trim_start();
+    let bytes = t.as_bytes();
+    let mut i = 0;
+    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
+        i += 1;
+    }
+    let digits_start = i;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == digits_start {
+        return None;
+    }
+    if i < bytes.len() && bytes[i] == b'.' {
+        let j = i + 1;
+        let mut k = j;
+        while k < bytes.len() && bytes[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > j {
+            i = k;
+        }
+    }
+    if i < bytes.len() && (bytes[i] == b'e' || bytes[i] == b'E') {
+        let mut k = i + 1;
+        if k < bytes.len() && (bytes[k] == b'+' || bytes[k] == b'-') {
+            k += 1;
+        }
+        let d0 = k;
+        while k < bytes.len() && bytes[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > d0 {
+            i = k;
+        }
+    }
+    Some(&t[..i])
+}
+
+fn cast_value(v: &Value, ty: &str) -> Value {
+    if matches!(v, Value::Null) {
+        return Value::Null;
+    }
+    let as_int = |v: &Value| -> Option<i64> {
+        match v {
+            Value::Int(i) => Some(*i),
+            Value::Float(f) => Some(*f as i64),
+            Value::Bool(b) => Some(i64::from(*b)),
+            Value::Str(s) => s
+                .trim()
+                .parse::<i64>()
+                .ok()
+                .or_else(|| leading_number(s).and_then(|p| p.parse::<i64>().ok())),
+            Value::Null => None,
+        }
+    };
+    // C++ casts a floating value to a 32/64-bit integer with `std::nearbyint`
+    // (round half to even); only the narrow integer casts truncate.
+    let as_int_round = |v: &Value| -> Option<i64> {
+        match v {
+            Value::Float(f) => Some(f.round_ties_even() as i64),
+            other => as_int(other),
+        }
+    };
+    let as_float = |v: &Value| -> Option<f64> {
+        match v {
+            Value::Int(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            Value::Bool(b) => Some(f64::from(u8::from(*b))),
+            Value::Str(s) => s
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .or_else(|| leading_number(s).and_then(|p| p.parse::<f64>().ok())),
+            Value::Null => None,
+        }
+    };
+    match ty {
+        "TINYINT" => as_int(v)
+            .and_then(|i| i8::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "SMALLINT" => as_int(v)
+            .and_then(|i| i16::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "INT" | "INTEGER" => as_int_round(v)
+            .and_then(|i| i32::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "BIGINT" => as_int_round(v).map(Value::Int).unwrap_or(Value::Null),
+        "FLOAT" | "REAL" => match as_float(v) {
+            Some(f) => Value::Float((f as f32) as f64),
+            None => Value::Null,
+        },
+        "DOUBLE" => as_float(v).map(Value::Float).unwrap_or(Value::Null),
+        "BOOL" | "BOOLEAN" => match v {
+            Value::Bool(b) => Value::Bool(*b),
+            Value::Str(s) => match s.trim().to_ascii_lowercase().as_str() {
+                "true" | "1" => Value::Bool(true),
+                "false" | "0" => Value::Bool(false),
+                _ => Value::Null,
+            },
+            Value::Int(i) => Value::Bool(*i != 0),
+            _ => Value::Null,
+        },
+        // JSON: re-serialise compactly with sorted keys.
+        "JSON" => match v {
+            Value::Str(s) => match crate::json::parse(s) {
+                Some(j) => Value::Str(j.compact()),
+                None => Value::Str(s.clone()),
+            },
+            other => other.clone(),
+        },
+        // VARCHAR / TEXT / STRING and anything else: render as text.
+        _ => Value::Str(v.to_slt_string()),
+    }
+}
+
+/// Parsed date/time components (`None` when absent from the text form).
+#[derive(Default)]
+struct DtFields {
+    year: Option<i64>,
+    month: Option<i64>,
+    day: Option<i64>,
+    hour: Option<i64>,
+    minute: Option<i64>,
+    second: Option<i64>,
+}
+
+fn dt_fields(s: &str) -> DtFields {
+    let mut f = DtFields::default();
+    let s = s.trim();
+    let (date_part, time_part) = if let Some((a, b)) = s.split_once(' ') {
+        (Some(a), Some(b))
+    } else if s.contains(':') {
+        (None, Some(s))
+    } else {
+        (Some(s), None)
+    };
+    if let Some(d) = date_part {
+        // a leading '-' denotes a BC year
+        let (neg, dd) = match d.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, d),
+        };
+        let mut it = dd.split('-');
+        if let Some(y) = it.next().and_then(|x| x.parse::<i64>().ok()) {
+            f.year = Some(if neg { -y } else { y });
+        }
+        f.month = it.next().and_then(|x| x.parse().ok());
+        f.day = it.next().and_then(|x| x.parse().ok());
+    }
+    if let Some(t) = time_part {
+        let mut it = t.split(':');
+        f.hour = it.next().and_then(|x| x.parse().ok());
+        f.minute = it.next().and_then(|x| x.parse().ok());
+        f.second = it
+            .next()
+            .and_then(|x| x.split('.').next().unwrap_or(x).parse().ok());
+    }
+    f
+}
+
+/// Days since 1970-01-01 (Howard Hinnant's civil algorithm).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Evaluates a date/time component function.
+fn dt_component(s: &str, field: &str) -> Value {
+    let f = dt_fields(s);
+    let int = |o: Option<i64>| o.map(Value::Int).unwrap_or(Value::Null);
+    match field {
+        "YEAR" => int(f.year),
+        "MONTH" | "MON" => int(f.month),
+        "DAY" | "DAYOFMONTH" => int(f.day),
+        "HOUR" => int(f.hour.or(Some(0))),
+        "MINUTE" => int(f.minute.or(Some(0))),
+        "SECOND" => int(f.second.or(Some(0))),
+        "QUARTER" => int(f.month.map(|m| (m - 1) / 3 + 1)),
+        "ERA" => int(f.year.map(|y| i64::from(y > 0))),
+        "CENTURY" => int(f.year.map(|y| {
+            if y > 0 {
+                (y - 1) / 100 + 1
+            } else {
+                -((-y) / 100 + 1)
+            }
+        })),
+        "EPOCH" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                let days = days_from_civil(y, m, d);
+                if f.hour.is_some() {
+                    Value::Int(
+                        days * 86400
+                            + f.hour.unwrap_or(0) * 3600
+                            + f.minute.unwrap_or(0) * 60
+                            + f.second.unwrap_or(0),
+                    )
+                } else {
+                    Value::Int(days)
+                }
+            }
+            _ => Value::Null,
+        },
+        "WEEKOFYEAR" | "WEEK" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => Value::Int(iso_week(y, m, d)),
+            _ => Value::Null,
+        },
+        "DAYOFYEAR" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                Value::Int(days_from_civil(y, m, d) - days_from_civil(y, 1, 1) + 1)
+            }
+            _ => Value::Null,
+        },
+        // weekday: 0 = Sunday … 6 = Saturday
+        "WEEKDAY" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => Value::Int((days_from_civil(y, m, d) + 4).rem_euclid(7)),
+            _ => Value::Null,
+        },
+        // day of week: ISO-8601, 1 = Monday … 7 = Sunday
+        "DAYOFWEEK" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                Value::Int((days_from_civil(y, m, d) + 3).rem_euclid(7) + 1)
+            }
+            _ => Value::Null,
+        },
+        _ => Value::Null,
+    }
+}
+
+/// ISO-8601 week number.
+fn iso_week(y: i64, m: i64, d: i64) -> i64 {
+    let days = days_from_civil(y, m, d);
+    // ISO weekdays: Monday = 1 … Sunday = 7 (1970-01-01 was a Thursday = 4).
+    let dow = (days.rem_euclid(7)) + 4;
+    let dow = if dow > 7 { dow - 7 } else { dow };
+    let thursday = days - (dow - 4);
+    let (ty, _, _) = civil_from_days(thursday);
+    let jan1 = days_from_civil(ty, 1, 1);
+    (thursday - jan1) / 7 + 1
+}
+
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// Tokenises text into lowercase word tokens.
+fn tokens(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
+        .collect()
+}
+
+/// `filter_text` semantics: whitespace-separated terms are AND-ed; `OR`
+/// separates alternatives; every term of a group must appear.
+/// Required number of matching terms for a group of `optional` terms, from a
+/// Lucene `minimum_should_match` spec: a whitespace-separated list of
+/// `[n<]value` clauses evaluated in order (the last applicable one wins), where
+/// `value` is a count, a percentage, or a negative form.
+pub fn minimum_should_match(spec: &str, optional: usize) -> usize {
+    if optional == 0 {
+        return 0;
+    }
+    let clause_value = |value: &str| -> Option<usize> {
+        let (num, pct) = match value.strip_suffix('%') {
+            Some(n) => (n, true),
+            None => (value, false),
+        };
+        let n: i64 = num.trim().parse().ok()?;
+        if pct {
+            let scaled = (optional as f64 * n.unsigned_abs() as f64 / 100.0).floor() as i64;
+            Some(if n < 0 {
+                (optional as i64 - scaled).max(0) as usize
+            } else {
+                scaled.max(0) as usize
+            })
+        } else {
+            Some(if n < 0 {
+                (optional as i64 + n).max(0) as usize
+            } else {
+                n as usize
+            })
+        }
+    };
+    let mut required = 1usize.min(optional);
+    for clause in spec.split_whitespace() {
+        match clause.split_once('<') {
+            Some((cond, rest)) => {
+                let cond: i64 = match cond.trim().parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if optional as i64 > cond {
+                    match clause_value(rest.trim()) {
+                        Some(v) => required = v.min(optional),
+                        None => continue,
+                    }
+                } else {
+                    required = optional;
+                }
+            }
+            None => match clause_value(clause) {
+                Some(v) => required = v.min(optional),
+                None => continue,
+            },
+        }
+    }
+    required
+}
+
+/// `filter_text` / `filter_fulltext` term matching. The query is split into
+/// `OR` groups (the default operator is `or`, so the last group's terms each
+/// count as optional); `operator=and` and `minimum_should_match` refine how
+/// many terms a group must contain.
+fn fulltext_match(text: &str, query: &str, opts: &str) -> bool {
+    let doc = tokens(text);
+    let mut operator_and = false;
+    let mut msm: Option<String> = None;
+    for part in opts.split(';') {
+        if let Some((k, v)) = part.split_once('=') {
+            match k.trim().to_ascii_lowercase().as_str() {
+                "operator" if v.trim().eq_ignore_ascii_case("and") => operator_and = true,
+                "minimum_should_match" => msm = Some(v.trim().to_string()),
+                _ => {}
+            }
+        }
+    }
+    let mut groups: Vec<Vec<String>> = vec![Vec::new()];
+    for w in query.split_whitespace() {
+        if w.eq_ignore_ascii_case("or") {
+            groups.push(Vec::new());
+        } else {
+            groups.last_mut().unwrap().extend(tokens(w));
+        }
+    }
+    groups.iter().filter(|g| !g.is_empty()).any(|g| {
+        let hits = g.iter().filter(|t| doc.iter().any(|d| d == *t)).count();
+        let need = if operator_and {
+            g.len()
+        } else if let Some(m) = &msm {
+            minimum_should_match(m, g.len())
+        } else {
+            1
+        };
+        need > 0 && hits >= need
+    })
+}
+
+/// SQL `LIKE`: `%` matches any run of characters, `_` a single character.
+fn like_match(text: &str, pattern: &str, escape: char) -> bool {
+    let t: Vec<char> = text.chars().collect();
+    // collapse `\c` escapes into a marker so they compare literally
+    let mut p: Vec<char> = Vec::new();
+    let mut it = pattern.chars();
+    while let Some(c) = it.next() {
+        if c == escape {
+            if let Some(next) = it.next() {
+                p.push('\u{1}');
+                p.push(next);
+                continue;
+            }
+        }
+        p.push(c);
+    }
+    // dp[i][j] = p[..j] matches t[..i]
+    let mut dp = vec![vec![false; p.len() + 1]; t.len() + 1];
+    dp[0][0] = true;
+    for j in 1..=p.len() {
+        if p[j - 1] == '%' {
+            dp[0][j] = dp[0][j - 1];
+        }
+    }
+    for i in 1..=t.len() {
+        for j in 1..=p.len() {
+            // an escaped character is matched before `%` / `_` are considered
+            dp[i][j] = if j >= 2 && p[j - 2] == '\u{1}' {
+                dp[i - 1][j - 2] && t[i - 1] == p[j - 1]
+            } else {
+                match p[j - 1] {
+                    '%' => dp[i - 1][j] || dp[i][j - 1],
+                    '_' => dp[i - 1][j - 1],
+                    c => dp[i - 1][j - 1] && t[i - 1] == c,
+                }
+            };
+        }
+    }
+    dp[t.len()][p.len()]
+}
+
+/// Evaluates a scalar function. The name must be one of the functions registered
+/// in [`registry`]: callers construct calls through [`registry::func`], which
+/// rejects an unknown name at bind time instead of letting it evaluate to NULL.
+fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
+    let a0 = || args.first().map(|e| e.eval(row)).unwrap_or(Value::Null);
+    let a1 = || args.get(1).map(|e| e.eval(row)).unwrap_or(Value::Null);
+    match name.to_ascii_uppercase().as_str() {
+        // An interval literal is carried as a tagged string.
+        "INTERVAL" => match a0() {
+            Value::Str(s) => {
+                let (n, unit) = s.trim().split_once(' ').unwrap_or((s.trim(), ""));
+                match n.parse::<i64>() {
+                    Ok(v) => Value::Str(format!("{INTERVAL_TAG}{v} {unit}")),
+                    Err(_) => Value::Null,
+                }
+            }
+            _ => Value::Null,
+        },
+        "EXTRACT" => {
+            let field = match a0() {
+                Value::Str(s) => s.to_ascii_uppercase(),
+                _ => return Value::Null,
+            };
+            let src = match a1() {
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            dt_component(&src, &field)
+        }
+        // The parser rewrites `EXTRACT(<field> FROM x)` to `extract_<field>(x)`.
+        n if n.starts_with("EXTRACT_") => {
+            let field = &n["EXTRACT_".len()..];
+            let src = match a0() {
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            dt_component(&src, field)
+        }
+        "POW" | "POWER" => match (a0().as_f64(), a1().as_f64()) {
+            (Some(x), Some(y)) => Value::Float(x.powf(y)),
+            _ => Value::Null,
+        },
+        "SQRT" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.sqrt()))
+            .unwrap_or(Value::Null),
+        "LN" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.ln()))
+            .unwrap_or(Value::Null),
+        "LOG10" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.log10()))
+            .unwrap_or(Value::Null),
+        "LOG2" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.log2()))
+            .unwrap_or(Value::Null),
+        "EXP" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.exp()))
+            .unwrap_or(Value::Null),
+        "ABS" => match a0() {
+            Value::Int(i) => Value::Int(i.abs()),
+            Value::Float(f) => Value::Float(f.abs()),
+            _ => Value::Null,
+        },
+        "CEIL" | "CEILING" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.ceil()))
+            .unwrap_or(Value::Null),
+        "FLOOR" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.floor()))
+            .unwrap_or(Value::Null),
+        "ROUND" => {
+            let x = a0();
+            // 1-argument ROUND preserves the argument's type; 2-argument ROUND
+            // returns a float, rounded to `n` decimal places (negative `n`
+            // rounds to tens/hundreds/…).
+            if args.len() < 2 {
+                return match x {
+                    Value::Int(i) => Value::Int(i),
+                    Value::Float(f) => Value::Float(f.round()),
+                    _ => Value::Null,
+                };
+            }
+            let xf = match &x {
+                Value::Float(f) => *f,
+                Value::Int(i) => *i as f64,
+                _ => return Value::Null,
+            };
+            let n = match a1() {
+                Value::Int(i) => i,
+                Value::Float(f) => f as i64,
+                _ => 0,
+            };
+            let m = 10f64.powi(n as i32);
+            Value::Float((xf * m).round() / m)
+        }
+        "TRUNC" | "TRUNCATE" => {
+            let Some(xf) = a0().as_f64() else {
+                return Value::Null;
+            };
+            let n = match a1() {
+                Value::Int(i) => i,
+                Value::Float(f) => f as i64,
+                _ => 0,
+            };
+            let m = 10f64.powi(n as i32);
+            let t = (xf * m).trunc() / m;
+            // TRUNC renders exactly `n` decimal places.
+            Value::Str(format!("{t:.prec$}", prec = n.max(0) as usize))
+        }
+        // 1-based position of a substring, or 0 when absent
+        "CHAR_POSITION" | "STRPOS" | "INSTR" => match (a0(), a1()) {
+            (Value::Str(hay), Value::Str(needle)) => match hay.find(&needle) {
+                Some(i) => Value::Int(hay[..i].chars().count() as i64 + 1),
+                None => Value::Int(0),
+            },
+            _ => Value::Null,
+        },
+        "UPPER" => match a0() {
+            Value::Str(s) => Value::Str(s.to_uppercase()),
+            _ => Value::Null,
+        },
+        "LOWER" => match a0() {
+            Value::Str(s) => Value::Str(s.to_lowercase()),
+            _ => Value::Null,
+        },
+        "LENGTH" | "CHAR_LENGTH" | "LEN" => match a0() {
+            Value::Str(s) => Value::Int(s.chars().count() as i64),
+            _ => Value::Null,
+        },
+        "REVERSE" => match a0() {
+            Value::Str(s) => Value::Str(s.chars().rev().collect()),
+            _ => Value::Null,
+        },
+        "TRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim().to_string()),
+            _ => Value::Null,
+        },
+        "LTRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim_start().to_string()),
+            _ => Value::Null,
+        },
+        "RTRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim_end().to_string()),
+            _ => Value::Null,
+        },
+        "SUBSTRING" | "SUBSTR" => match a0() {
+            Value::Str(s) => {
+                let chars: Vec<char> = s.chars().collect();
+                let start = match a1() {
+                    Value::Int(i) if i >= 0 => i as usize,
+                    Value::Int(i) => chars.len().saturating_sub((-i) as usize),
+                    _ => 0,
+                };
+                let len = match args.get(2).map(|e| e.eval(row)) {
+                    Some(Value::Int(i)) if i >= 0 => Some(i as usize),
+                    _ => None,
+                };
+                let end = len
+                    .map(|l| (start + l).min(chars.len()))
+                    .unwrap_or(chars.len());
+                let start = start.min(chars.len());
+                Value::Str(chars[start..end].iter().collect())
+            }
+            _ => Value::Null,
+        },
+        "JSON_EXTRACT"
+        | "JSON_EXTRACT_STRING"
+        | "JSON_EXTRACT_INT"
+        | "JSON_EXTRACT_DOUBLE"
+        | "JSON_EXTRACT_FLOAT"
+        | "JSON_EXTRACT_BOOL"
+        | "JSON_EXTRACT_ISNULL"
+        | "JSON_EXISTS_PATH" => {
+            let doc = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            let path = match a1() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            json::extract_typed(&doc, &path, &name.to_ascii_lowercase())
+        }
+        "JSON_CONTAINS" => {
+            let doc = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            if args.len() == 2 {
+                return json::contains_value(&doc, &a1());
+            }
+            let path = match a1() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            let target = args.get(2).map(|e| e.eval(row)).unwrap_or(Value::Null);
+            json::contains(&doc, &path, &target)
+        }
+        "MD5" => match a0() {
+            Value::Str(s) => Value::Str(md5::md5_hex(&s)),
+            other => Value::Str(md5::md5_hex(&other.to_slt_string())),
+        },
+        "ISNAN" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_nan())),
+        "ISINF" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_infinite())),
+        "ISFINITE" => Value::Bool(
+            matches!(a0(), Value::Float(f) if f.is_finite() || matches!(a0(), Value::Int(_))),
+        ),
+        "IS_NULL" => Value::Bool(matches!(a0(), Value::Null)),
+        "IS_NOT_NULL" => Value::Bool(!matches!(a0(), Value::Null)),
+        "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND" | "QUARTER" | "ERA" | "CENTURY"
+        | "EPOCH" | "WEEKOFYEAR" | "WEEK" | "DAYOFMONTH" | "DAYOFYEAR" | "WEEKDAY"
+        | "DAYOFWEEK" => {
+            let s = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            dt_component(&s, &name.to_ascii_uppercase())
+        }
+        "DATEPART" | "DATE_PART" => {
+            let field = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            let val = match a1() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            dt_component(&val, &field.to_ascii_uppercase())
+        }
+        "PARSE_JSON" => match a0() {
+            Value::Str(s) => match json::parse(&s) {
+                Some(v) => Value::Str(v.compact()),
+                None => Value::Null,
+            },
+            _ => Value::Null,
+        },
+        "CAST" => {
+            let ty = match a1() {
+                Value::Str(s) => s.to_ascii_uppercase(),
+                _ => return Value::Null,
+            };
+            cast_value(&a0(), &ty)
+        }
+        // `registry::func` rejects every other name, so this arm is unreachable for
+        // calls built through it; a hand-built expression still yields NULL rather
+        // than panicking.
+        _ => Value::Null,
+    }
+}
+
+/// Computes an aggregate over `rows`. Empty `cols` means `COUNT(*)`.
+/// `distinct` deduplicates the gathered value tuples first.
+/// NULLs are ignored for `SUM/AVG/MIN/MAX` and for `COUNT(col)`.
+pub fn aggregate(func: AggFunc, cols: &[usize], distinct: bool, rows: &[Vec<Value>]) -> Value {
+    if func == AggFunc::Count && cols.is_empty() {
+        return Value::Int(rows.len() as i64);
+    }
+    if cols.is_empty() {
+        return Value::Int(0);
+    }
+    let mut tuples: Vec<Vec<Value>> = Vec::new();
+    for r in rows {
+        let mut t = Vec::with_capacity(cols.len());
+        let mut ok = true;
+        for &c in cols {
+            match r.get(c) {
+                Some(v) => t.push(v.clone()),
+                None => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok {
+            tuples.push(t);
+        }
+    }
+    if distinct {
+        // Values may hold floats (not `Hash`), so dedupe on their text form.
+        let mut seen = std::collections::HashSet::new();
+        tuples.retain(|t| {
+            let key: Vec<String> = t.iter().map(|v| v.to_slt_string()).collect();
+            seen.insert(key)
+        });
+    }
+    let vals: Vec<&Value> = if cols.len() == 1 {
+        tuples
+            .iter()
+            .map(|t| &t[0])
+            .filter(|v| **v != Value::Null)
+            .collect()
+    } else {
+        tuples.iter().map(|t| &t[0]).collect()
+    };
+
+    match func {
+        AggFunc::Count => {
+            // COUNT(col) ignores NULLs; COUNT(DISTINCT a, b) counts tuples.
+            let n = if cols.len() == 1 {
+                vals.len()
+            } else {
+                tuples.len()
+            };
+            Value::Int(n as i64)
+        }
+        AggFunc::Sum | AggFunc::Avg => {
+            let mut sum = 0f64;
+            let mut all_int = true;
+            for v in &vals {
+                match v {
+                    Value::Int(i) => sum += *i as f64,
+                    Value::Float(f) => {
+                        sum += *f;
+                        all_int = false;
+                    }
+                    _ => {}
+                }
+            }
+            if vals.is_empty() {
+                // SUM/AVG over no non-NULL values is NULL, not zero.
+                return Value::Null;
+            }
+            match func {
+                AggFunc::Sum if all_int => Value::Int(sum as i64),
+                _ => Value::Float(
+                    sum / if func == AggFunc::Avg {
+                        vals.len() as f64
+                    } else {
+                        1.0
+                    },
+                ),
+            }
+        }
+        AggFunc::Min | AggFunc::Max | AggFunc::First | AggFunc::Last => {
+            if matches!(func, AggFunc::First) {
+                return vals.first().map(|v| (*v).clone()).unwrap_or(Value::Null);
+            }
+            if matches!(func, AggFunc::Last) {
+                return vals.last().map(|v| (*v).clone()).unwrap_or(Value::Null);
+            }
+            let mut best: Option<&Value> = None;
+            for v in vals {
+                best = Some(match best {
+                    None => v,
+                    Some(b) => match v.partial_cmp_value(b) {
+                        Some(std::cmp::Ordering::Less) if func == AggFunc::Min => v,
+                        Some(std::cmp::Ordering::Greater) if func == AggFunc::Max => v,
+                        _ => b,
+                    },
+                });
+            }
+            best.cloned().unwrap_or(Value::Null)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row() -> Vec<Value> {
+        vec![Value::Int(1), Value::Str("alice".into()), Value::Float(2.5)]
+    }
+
+    #[test]
+    fn column_and_literal() {
+        assert_eq!(Expr::Column(1).eval(&row()), Value::Str("alice".into()));
+        assert_eq!(Expr::Literal(Value::Int(9)).eval(&row()), Value::Int(9));
+    }
+
+    #[test]
+    fn cast_parses_leading_numeric_prefix() {
+        // A string that starts with digits casts to that prefix; a leading
+        // non-digit yields NULL, as the C++ engine does.
+        assert_eq!(
+            cast_value(&Value::Str("300test".into()), "INT"),
+            Value::Int(300)
+        );
+        assert_eq!(
+            cast_value(&Value::Str("100".into()), "INT"),
+            Value::Int(100)
+        );
+        assert_eq!(cast_value(&Value::Str("Hi200".into()), "INT"), Value::Null);
+        assert_eq!(cast_value(&Value::Str("hello".into()), "INT"), Value::Null);
+        assert_eq!(
+            cast_value(&Value::Str("3.5x".into()), "DOUBLE"),
+            Value::Float(3.5)
+        );
+    }
+
+    #[test]
+    fn sum_over_empty_is_null() {
+        // SUM/AVG over no non-NULL rows is NULL (COUNT is 0).
+        assert_eq!(aggregate(AggFunc::Sum, &[0], false, &[]), Value::Null);
+        assert_eq!(aggregate(AggFunc::Avg, &[0], false, &[]), Value::Null);
+        assert_eq!(aggregate(AggFunc::Count, &[0], false, &[]), Value::Int(0));
+        assert_eq!(aggregate(AggFunc::Min, &[0], false, &[]), Value::Null);
+    }
+
+    #[test]
+    fn interval_arithmetic_and_extract() {
+        let f = |name: &str, args: Vec<Expr>| Expr::Func {
+            name: name.into(),
+            args,
+        };
+        let iv = |spec: &str| f("INTERVAL", vec![Expr::Literal(Value::Str(spec.into()))]);
+        let r: Vec<Value> = vec![];
+        // date + year + month
+        let e = Expr::Binary(
+            Box::new(Expr::Binary(
+                Box::new(Expr::Literal(Value::Str("1970-01-01".into()))),
+                BinOp::Add,
+                Box::new(iv("-100 YEAR")),
+            )),
+            BinOp::Add,
+            Box::new(iv("10 MONTH")),
+        );
+        assert_eq!(e.eval(&r), Value::Str("1870-11-01".into()));
+        // month addition clamps to the last valid day
+        let e2 = Expr::Binary(
+            Box::new(Expr::Literal(Value::Str("2022-01-31".into()))),
+            BinOp::Add,
+            Box::new(iv("1 MONTH")),
+        );
+        assert_eq!(e2.eval(&r), Value::Str("2022-02-28".into()));
+        // timestamp - hours
+        let e3 = Expr::Binary(
+            Box::new(Expr::Literal(Value::Str("6570-12-31 00:00:00".into()))),
+            BinOp::Sub,
+            Box::new(iv("12 HOURS")),
+        );
+        assert_eq!(e3.eval(&r), Value::Str("6570-12-30 12:00:00".into()));
+        // EXTRACT reads the field
+        let ex = f(
+            "EXTRACT",
+            vec![
+                Expr::Literal(Value::Str("hour".into())),
+                Expr::Literal(Value::Str("12:34:56".into())),
+            ],
+        );
+        assert_eq!(ex.eval(&r), Value::Int(12));
+    }
+
+    #[test]
+    fn round_and_trunc_arity() {
+        let f = |name: &str, args: Vec<Expr>| Expr::Func {
+            name: name.into(),
+            args,
+        };
+        let r = vec![Value::Int(125), Value::Null, Value::Null];
+        // 1-arg ROUND preserves the type; 2-arg ROUND yields a float
+        assert_eq!(f("ROUND", vec![Expr::Column(0)]).eval(&r), Value::Int(125));
+        assert_eq!(
+            f(
+                "ROUND",
+                vec![Expr::Column(0), Expr::Literal(Value::Int(-1))]
+            )
+            .eval(&r),
+            Value::Float(130.0)
+        );
+        assert_eq!(
+            f(
+                "ROUND",
+                vec![
+                    Expr::Literal(Value::Float(125.555)),
+                    Expr::Literal(Value::Int(2))
+                ]
+            )
+            .eval(&r),
+            Value::Float(125.56)
+        );
+        // TRUNC renders exactly `n` decimals
+        assert_eq!(
+            f(
+                "TRUNC",
+                vec![
+                    Expr::Literal(Value::Float(2.4)),
+                    Expr::Literal(Value::Int(12))
+                ]
+            )
+            .eval(&r),
+            Value::Str("2.400000000000".into())
+        );
+        assert_eq!(
+            f(
+                "TRUNC",
+                vec![
+                    Expr::Literal(Value::Float(-2.5)),
+                    Expr::Literal(Value::Int(2))
+                ]
+            )
+            .eval(&r),
+            Value::Str("-2.50".into())
+        );
+    }
+
+    #[test]
+    fn comparisons() {
+        let r = row();
+        let gt = Expr::Cmp(
+            Box::new(Expr::Column(0)),
+            CmpOp::Gt,
+            Box::new(Expr::Literal(Value::Int(0))),
+        );
+        assert_eq!(gt.eval(&r), Value::Bool(true));
+        let le = Expr::Cmp(
+            Box::new(Expr::Column(2)),
+            CmpOp::Le,
+            Box::new(Expr::Literal(Value::Float(2.5))),
+        );
+        assert_eq!(le.eval(&r), Value::Bool(true));
+        // mixed int/float compare
+        let eq = Expr::Cmp(
+            Box::new(Expr::Column(0)),
+            CmpOp::Eq,
+            Box::new(Expr::Literal(Value::Float(1.0))),
+        );
+        assert_eq!(eq.eval(&r), Value::Bool(true));
+        // string
+        let se = Expr::Cmp(
+            Box::new(Expr::Column(1)),
+            CmpOp::Eq,
+            Box::new(Expr::Literal(Value::Str("alice".into()))),
+        );
+        assert!(se.eval_predicate(&r));
+    }
+
+    #[test]
+    fn null_comparison_is_unknown() {
+        let e = Expr::Cmp(
+            Box::new(Expr::Literal(Value::Null)),
+            CmpOp::Eq,
+            Box::new(Expr::Literal(Value::Int(1))),
+        );
+        // three-valued logic: the comparison is unknown, hence falsy in a predicate
+        assert_eq!(e.eval(&[]), Value::Null);
+        assert!(!e.eval_predicate(&[]));
+    }
+
+    #[test]
+    fn aggregates() {
+        use AggFunc::*;
+        let rows = vec![
+            vec![Value::Int(1), Value::Str("a".into())],
+            vec![Value::Int(2), Value::Str("b".into())],
+            vec![Value::Int(3), Value::Null],
+        ];
+        assert_eq!(aggregate(Count, &[], false, &rows), Value::Int(3));
+        assert_eq!(aggregate(Count, &[1], false, &rows), Value::Int(2));
+        assert_eq!(aggregate(Sum, &[0], false, &rows), Value::Int(6));
+        assert_eq!(aggregate(Avg, &[0], false, &rows), Value::Float(2.0));
+        assert_eq!(aggregate(Min, &[0], false, &rows), Value::Int(1));
+        assert_eq!(aggregate(Max, &[0], false, &rows), Value::Int(3));
+        assert_eq!(aggregate(Max, &[1], false, &rows), Value::Str("b".into()));
+        assert_eq!(aggregate(First, &[0], false, &rows), Value::Int(1));
+        assert_eq!(aggregate(Last, &[0], false, &rows), Value::Int(3));
+        // DISTINCT over a multi-column tuple
+        let dup = vec![
+            vec![Value::Int(1), Value::Int(9)],
+            vec![Value::Int(1), Value::Int(9)],
+            vec![Value::Int(2), Value::Int(9)],
+        ];
+        assert_eq!(aggregate(Count, &[0, 1], true, &dup), Value::Int(2));
+        assert_eq!(aggregate(Count, &[0, 1], false, &dup), Value::Int(3));
+    }
+
+    #[test]
+    fn scalar_functions() {
+        let row = vec![Value::Float(2.25), Value::Str("Ab".into())];
+        let f = |name: &str, args: Vec<Expr>| Expr::Func {
+            name: name.into(),
+            args,
+        };
+        assert_eq!(
+            f("ROUND", vec![Expr::Column(0), Expr::Literal(Value::Int(1))]).eval(&row),
+            Value::Float(2.3)
+        );
+        assert_eq!(
+            f("SQRT", vec![Expr::Literal(Value::Float(9.0))]).eval(&row),
+            Value::Float(3.0)
+        );
+        assert_eq!(
+            f("UPPER", vec![Expr::Column(1)]).eval(&row),
+            Value::Str("AB".into())
+        );
+        assert_eq!(f("LENGTH", vec![Expr::Column(1)]).eval(&row), Value::Int(2));
+        assert_eq!(f("NOPE", vec![Expr::Column(0)]).eval(&row), Value::Null);
+    }
+
+    #[test]
+    fn like_with_escape() {
+        assert!(like_match("cat%", "cat\\%", '\\'));
+        assert!(!like_match("cat", "cat\\%", '\\'));
+        assert!(like_match("hello_world", "hello\\_%", '\\'));
+        assert!(like_match("hello_x", "hello#_%", '#'));
+        assert!(like_match("hello world", "hello wor%", '\\'));
+        assert!(!like_match("abc", "A_C", 'a')); // LIKE is case-sensitive
+    }
+
+    #[test]
+    fn json_extract_functions() {
+        use crate::json::extract_typed;
+        let doc = r#"{"year":2020,"score":1,"f":1.5,"name":"a","tags":["x","y"],"n":null}"#;
+        assert_eq!(
+            extract_typed(doc, "$.year", "json_extract_int"),
+            Value::Int(2020)
+        );
+        assert_eq!(
+            extract_typed(doc, "$.score", "json_extract_double"),
+            Value::Float(1.0)
+        );
+        // a JSON float is not an int
+        assert_eq!(extract_typed(doc, "$.f", "json_extract_int"), Value::Null);
+        assert_eq!(
+            extract_typed(doc, "$.f", "json_extract_double"),
+            Value::Float(1.5)
+        );
+        assert_eq!(
+            extract_typed(doc, "$.name", "json_extract_string"),
+            Value::Str("a".into())
+        );
+        assert_eq!(
+            extract_typed(doc, "$.tags[1]", "json_extract"),
+            Value::Str("\"y\"".into())
+        );
+        assert_eq!(
+            extract_typed(doc, "$.n", "json_extract_isnull"),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            extract_typed(doc, "$.missing", "json_exists_path"),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            extract_typed(doc, "$.tags", "json_extract"),
+            Value::Str("[\"x\",\"y\"]".into())
+        );
+    }
+
+    /// C++ `DEFAULT_VECTOR_SIZE`.
+    const EXPR_VECTOR_SIZE: i64 = 8192;
+
+    // C++: src/unit_test/executor/expression/new_expression_evaluator_ut.cpp:add_bigint_constant_1
+    #[test]
+    fn expression_evaluator_add_bigint_constant_1() {
+        let expr = Expr::Binary(
+            Box::new(Expr::Column(0)),
+            BinOp::Add,
+            Box::new(Expr::Literal(Value::Int(1))),
+        );
+        // An empty block produces no rows.
+        let empty: Vec<Vec<Value>> = Vec::new();
+        let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
+        assert!(out.is_empty());
+
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE).map(|i| vec![Value::Int(i)]).collect();
+        let out: Vec<i64> = column
+            .iter()
+            .map(|row| match expr.eval(row) {
+                Value::Int(v) => v,
+                other => panic!("expected BigInt, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(out.len(), EXPR_VECTOR_SIZE as usize);
+        for (i, value) in out.iter().enumerate() {
+            assert_eq!(*value, i as i64 + 1);
+        }
+    }
+
+    // C++: src/unit_test/executor/expression/new_expression_evaluator_ut.cpp:subtract_constant_8192_bigint
+    #[test]
+    fn expression_evaluator_subtract_constant_8192_bigint() {
+        let expr = Expr::Binary(
+            Box::new(Expr::Literal(Value::Int(8192))),
+            BinOp::Sub,
+            Box::new(Expr::Column(0)),
+        );
+        let empty: Vec<Vec<Value>> = Vec::new();
+        let out: Vec<Value> = empty.iter().map(|row| expr.eval(row)).collect();
+        assert!(out.is_empty());
+
+        let column: Vec<Vec<Value>> = (0..EXPR_VECTOR_SIZE).map(|i| vec![Value::Int(i)]).collect();
+        let out: Vec<i64> = column
+            .iter()
+            .map(|row| match expr.eval(row) {
+                Value::Int(v) => v,
+                other => panic!("expected BigInt, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(out.len(), EXPR_VECTOR_SIZE as usize);
+        for (i, value) in out.iter().enumerate() {
+            assert_eq!(*value, EXPR_VECTOR_SIZE - i as i64);
+        }
+    }
+}

@@ -34,6 +34,7 @@ import :txn_state;
 import :new_txn;
 import :new_txn_manager;
 import :wal_manager;
+import :virtual_store;
 
 import global_resource_usage;
 import compilation_config;
@@ -117,6 +118,21 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
+        { // every rotated wal file is covered by the checkpoint, so none of them survives it
+            // The flush thread recycles after releasing the commit threads, so poll instead of asserting once.
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (true) {
+                auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+                if (wal_infos.empty()) {
+                    break;
+                }
+                if (std::chrono::steady_clock::now() > deadline) {
+                    ADD_FAILURE() << "Still " << wal_infos.size() << " rotated wal file(s) after the checkpoint";
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        }
         infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG
@@ -150,4 +166,48 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         infinity::GlobalResourceUsage::UnInit();
 #endif
     }
+}
+
+// Reclaiming drops exactly the rotated segments the checkpoint already contains, i.e. those whose max
+// commit ts is below ckp_ts. A segment at ckp_ts itself is not covered, and the current wal.log is
+// never part of the rotated set.
+TEST_P(RecycleLogTest, recycle_deletes_only_covered_segments) {
+    infinity::InfinityContext::instance().UnInit();
+    CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::Init();
+#endif
+    std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    WalManager *wal_manager = storage->wal_manager();
+    const std::string &wal_dir = storage->config()->WALDir();
+
+    constexpr TxnTimeStamp ckp_ts = 100;
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts - 2), 0).ok());
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts), 0).ok());
+    ASSERT_TRUE(VirtualStore::Truncate(wal_dir + "/" + WalFile::WalFilename(ckp_ts + 2), 0).ok());
+
+    wal_manager->RecycleWalFile(ckp_ts);
+
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+        ASSERT_EQ(wal_infos.size(), 2u);
+        std::vector<TxnTimeStamp> remaining;
+        for (const auto &wal_info : wal_infos) {
+            remaining.push_back(wal_info.max_commit_ts_);
+        }
+        std::sort(remaining.begin(), remaining.end());
+        EXPECT_EQ(remaining, (std::vector<TxnTimeStamp>{ckp_ts, ckp_ts + 2}));
+    }
+
+    infinity::InfinityContext::instance().UnInit();
+
+#ifdef INFINITY_DEBUG
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+    infinity::GlobalResourceUsage::UnInit();
+#endif
 }

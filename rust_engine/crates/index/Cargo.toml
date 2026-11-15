@@ -1,0 +1,16 @@
+[package]
+name = "index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+common.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+storage.workspace = true
+
+[lints]
+workspace = true

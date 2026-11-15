@@ -97,6 +97,7 @@ TEST_P(TestTxnTableMeta, table_meta) {
 
     std::unique_ptr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
     TableMeta table_meta(table_info->db_id_,
+                         *table_info->db_name_,
                          table_info->table_id_,
                          *table_info->table_name_,
                          kv_instance.get(),

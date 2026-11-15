@@ -6968,3 +6968,176 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         DropDB();
     }
 }
+
+// Regression test for "the tail of a segment never gets re-indexed after a restart".
+// When the uncovered range started exactly at the end of a partially filled block
+// (block_row_cnt == block_offset), the previous implementation returned immediately and
+// silently skipped every later block, so the rows near the end of the segment stayed
+// invisible forever. ComputeMemIndexGapRanges must cover every block that is not fully
+// covered by dumped chunks.
+TEST_P(TestTxnDumpMemIndex, mem_index_gap_ranges) {
+    const SegmentID segment_id = 0;
+    const size_t block_capacity = 8192;
+    using CoveredRanges = std::vector<std::pair<SegmentOffset, SegmentOffset>>;
+
+    // Block 0 is fully covered (100 rows written, chunk covers up to row 100). The old code
+    // stopped here and returned no range at all for blocks 1..3.
+    {
+        CoveredRanges covered = {{0, 100}};
+        std::vector<BlockID> block_ids = {0, 1, 2, 3};
+        std::vector<size_t> block_row_cnts = {100, 8192, 8192, 4096};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), size_t(3));
+        EXPECT_EQ(ranges[0].first.segment_offset_, 8192u);
+        EXPECT_EQ(ranges[0].second, u64(8192));
+        EXPECT_EQ(ranges[1].first.segment_offset_, 16384u);
+        EXPECT_EQ(ranges[1].second, u64(8192));
+        EXPECT_EQ(ranges[2].first.segment_offset_, 24576u);
+        EXPECT_EQ(ranges[2].second, u64(4096));
+    }
+
+    // The uncovered range starts in the middle of the last block.
+    {
+        CoveredRanges covered = {{0, 25000}};
+        std::vector<BlockID> block_ids = {0, 1, 2, 3};
+        std::vector<size_t> block_row_cnts = {8192, 8192, 8192, 4096};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), size_t(1));
+        EXPECT_EQ(ranges[0].first.segment_offset_, 25000u);
+        EXPECT_EQ(ranges[0].second, u64(28672 - 25000));
+    }
+
+    // Everything is covered: nothing to rebuild.
+    {
+        CoveredRanges covered = {{0, 12288}};
+        std::vector<BlockID> block_ids = {0, 1};
+        std::vector<size_t> block_row_cnts = {8192, 4096};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        EXPECT_TRUE(ranges.empty());
+    }
+
+    // An empty block in the middle must not stop the scan.
+    {
+        CoveredRanges covered = {{0, 100}};
+        std::vector<BlockID> block_ids = {0, 1, 2};
+        std::vector<size_t> block_row_cnts = {100, 0, 500};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), size_t(1));
+        EXPECT_EQ(ranges[0].first.segment_offset_, 16384u);
+        EXPECT_EQ(ranges[0].second, u64(500));
+    }
+
+    // A missing chunk in the middle of the segment (e.g. an aborted dump). This used to be a
+    // fatal "Chunk index row alignment error" at startup; it must be rebuilt instead.
+    {
+        CoveredRanges covered = {{0, 8192}, {24576, 28672}};
+        std::vector<BlockID> block_ids = {0, 1, 2, 3};
+        std::vector<size_t> block_row_cnts = {8192, 8192, 8192, 4096};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), size_t(2));
+        EXPECT_EQ(ranges[0].first.segment_offset_, 8192u);
+        EXPECT_EQ(ranges[0].second, u64(8192));
+        EXPECT_EQ(ranges[1].first.segment_offset_, 16384u);
+        EXPECT_EQ(ranges[1].second, u64(8192));
+    }
+
+    // A chunk that declares a narrower range than it really covers (rows without index entries,
+    // e.g. nullable columns): the undeclared tail must be rebuilt as well.
+    {
+        CoveredRanges covered = {{0, 5000}};
+        std::vector<BlockID> block_ids = {0, 1};
+        std::vector<size_t> block_row_cnts = {8192, 8192};
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), size_t(2));
+        EXPECT_EQ(ranges[0].first.segment_offset_, 5000u);
+        EXPECT_EQ(ranges[0].second, u64(8192 - 5000));
+        EXPECT_EQ(ranges[1].first.segment_offset_, 8192u);
+        EXPECT_EQ(ranges[1].second, u64(8192));
+    }
+}
+
+// Property test: compare the range computation against a naive row-by-row oracle on randomized
+// block layouts and covered-range sets (unsorted, overlapping, out of bounds, empty blocks).
+// The oracle marks every row that is covered by at least one chunk and then walks the rows of
+// each block in order, which is a deliberately different implementation than the sweep used by
+// ComputeMemIndexGapRanges.
+TEST_P(TestTxnDumpMemIndex, mem_index_gap_ranges_matches_row_oracle) {
+    const SegmentID segment_id = 0;
+    const size_t block_capacity = 8192;
+    using CoveredRanges = std::vector<std::pair<SegmentOffset, SegmentOffset>>;
+
+    uint64_t state = 0x9E3779B97F4A7C15ULL;
+    auto next_rand = [&state]() {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        return state;
+    };
+
+    for (int iteration = 0; iteration < 500; ++iteration) {
+        const size_t block_cnt = 1 + next_rand() % 6;
+        std::vector<BlockID> block_ids;
+        std::vector<size_t> block_row_cnts;
+        std::vector<SegmentOffset> block_starts;
+        BlockID next_block_id = 0;
+        for (size_t i = 0; i < block_cnt; ++i) {
+            // Block ids are ascending but not necessarily contiguous: the row offset of a block is
+            // derived from its id, not from its position in the list.
+            block_ids.push_back(next_block_id);
+            next_block_id += static_cast<BlockID>(1 + next_rand() % 3);
+            // A quarter of the blocks are empty: they must not interrupt the scan.
+            const size_t row_cnt = (next_rand() % 4 == 0) ? 0 : static_cast<size_t>(next_rand() % (block_capacity + 1));
+            block_row_cnts.push_back(row_cnt);
+            block_starts.push_back(static_cast<SegmentOffset>(block_ids.back() * block_capacity));
+        }
+        const SegmentOffset max_row = block_starts.back() + block_capacity;
+
+        CoveredRanges covered;
+        const size_t range_cnt = next_rand() % 5;
+        for (size_t i = 0; i < range_cnt; ++i) {
+            const SegmentOffset begin = static_cast<SegmentOffset>(next_rand() % max_row);
+            const SegmentOffset len = static_cast<SegmentOffset>(next_rand() % (block_capacity + 1));
+            covered.emplace_back(begin, begin + len);
+        }
+
+        // Oracle: rebuild the gaps row by row, per block.
+        std::vector<std::pair<SegmentOffset, u64>> expected;
+        for (size_t i = 0; i < block_cnt; ++i) {
+            if (block_row_cnts[i] == 0) {
+                continue;
+            }
+            const SegmentOffset block_start = block_starts[i];
+            const SegmentOffset block_end = block_start + static_cast<SegmentOffset>(block_row_cnts[i]);
+            SegmentOffset cursor = block_start;
+            bool emitting = false;
+            for (SegmentOffset row = block_start; row < block_end; ++row) {
+                bool is_covered = false;
+                for (const auto &[begin, end] : covered) {
+                    if (row >= begin && row < end) {
+                        is_covered = true;
+                        break;
+                    }
+                }
+                if (is_covered) {
+                    if (emitting) {
+                        expected.emplace_back(cursor, static_cast<u64>(row - cursor));
+                        emitting = false;
+                    }
+                } else if (!emitting) {
+                    cursor = row;
+                    emitting = true;
+                }
+            }
+            if (emitting) {
+                expected.emplace_back(cursor, static_cast<u64>(block_end - cursor));
+            }
+        }
+
+        auto ranges = NewTxn::ComputeMemIndexGapRanges(segment_id, covered, block_ids, block_row_cnts, block_capacity);
+        ASSERT_EQ(ranges.size(), expected.size()) << "iteration " << iteration;
+        for (size_t k = 0; k < ranges.size(); ++k) {
+            ASSERT_EQ(ranges[k].first.segment_offset_, expected[k].first) << "iteration " << iteration << " range " << k;
+            ASSERT_EQ(ranges[k].second, expected[k].second) << "iteration " << iteration << " range " << k;
+        }
+    }
+}

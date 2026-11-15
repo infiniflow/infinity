@@ -1,7 +1,6 @@
+# from common import common_values
 import infinity
 from infinity import index
-
-# from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 
@@ -17,9 +16,7 @@ table_obj = db_obj.create_table(
         "c3": {"type": "varchar"},
     },
 )
-res = table_obj.create_index(
-    "index1", index.IndexInfo("c3", index.IndexType.FullText)
-)
+res = table_obj.create_index("index1", index.IndexInfo("c3", index.IndexType.FullText))
 assert res.error_code == ErrorCode.OK
 
 table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])

@@ -24,8 +24,6 @@ import (
 )
 
 // Test constants
-var testLocalHost = infinity.NetworkAddress{IP: "127.0.0.1", Port: 23817}
-
 // Invalid name array for testing
 var invalidNameArray = []string{
 	"[]",
@@ -48,7 +46,7 @@ func generateSuffix(t *testing.T) string {
 
 // setupConnection creates a connection for testing
 func setupConnection(t *testing.T) *infinity.InfinityConnection {
-	conn, err := infinity.Connect(testLocalHost)
+	conn, err := infinity.Connect(TestConfig.URI)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}

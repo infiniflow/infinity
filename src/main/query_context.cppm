@@ -89,7 +89,7 @@ public:
 
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
 
-    bool BeginTxn(const BaseStatement *statement);
+    void BeginTxn(const BaseStatement *statement);
 
     void CommitTxn();
 

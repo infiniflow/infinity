@@ -60,6 +60,9 @@ public:
     Status Rollback();
 
 private:
+    // Read-only (maintenance mode) support: when non-null, this KVInstance reads via a
+    // rocksdb::DB opened with OpenForReadOnly instead of a transaction on a writable DB.
+    rocksdb::DB *read_only_db_{};
     rocksdb::Transaction *transaction_{};
     rocksdb::ReadOptions read_options_;
 };
@@ -72,6 +75,9 @@ public:
     ~KVStore();
 
     Status Init(const std::string &db_path);
+    // Open the catalog DB in read-only mode (used by maintenance/admin mode, where the
+    // storage layer is not fully initialized). Safe to call on an existing catalog.
+    Status InitReadOnly(const std::string &db_path);
     Status Uninit();
     Status Flush();
     Status CreateBackup(const std::string &backup_path, std::vector<rocksdb::BackupInfo> &backup_info_list);
@@ -88,6 +94,9 @@ public:
     size_t KeyValueNum() const;
     std::vector<std::pair<std::string, std::string>> GetAllKeyValue();
     rocksdb::TransactionDB *transaction_db() const { return transaction_db_; }
+    // Return a readable DB handle for catalog introspection: the read-only DB in maintenance
+    // (admin) mode, or the writable transaction DB otherwise. The caller must NOT delete it.
+    rocksdb::DB *ReadableDB() const { return (read_only_db_ != nullptr) ? read_only_db_ : transaction_db_; }
 
     // For UT
     static Status Destroy(const std::string &db_path);
@@ -95,6 +104,7 @@ public:
 private:
     std::string db_path_{};
     rocksdb::TransactionDB *transaction_db_{}; // RocksDB transaction db
+    rocksdb::DB *read_only_db_{};              // read-only DB opened by InitReadOnly (maintenance mode)
     rocksdb::Options options_;
     rocksdb::TransactionDBOptions txn_db_options_;
     rocksdb::TransactionOptions txn_options_;

@@ -21,11 +21,12 @@ import internal_types;
 namespace infinity {
 
 export enum class EarlyTermAlgo {
-    kAuto,    // choose between kNaive, kBatch, kBMW
+    kAuto,    // choose between kNaive, kBatch, kHeapBMW
     kNaive,   // naive or
     kBatch,   // use batch_or if (sum_of_df > total_doc_num / 4) and term nodes under or node achieve a certain number
-    kBMW,     // use bmw if it is "or iterator" on the top level and has only term children
-    kCompare, // compare bmw, batch, naive
+    kBMW,     // legacy sort-based block-max WAND (sorts all sub-iterators every round; kept for A/B)
+    kHeapBMW, // heap-based block-max WAND: same pruning, but no per-round full sort (default)
+    kCompare, // compare bmw(default heap variant), batch, naive
 };
 
 export enum class DocIteratorType : u8 {
@@ -43,6 +44,7 @@ export enum class DocIteratorType : u8 {
     kMustFirstIterator,
     kRankFeatureDocIterator,
     kRankFeaturesDocIterator,
+    kHeapBMWIterator,
 };
 
 export struct DocIteratorEstimateIterateCost {

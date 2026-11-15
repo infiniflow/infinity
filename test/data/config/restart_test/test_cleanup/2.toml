@@ -1,5 +1,5 @@
 [general]
-version = "0.7.3"
+version = "0.7.5"
 time_zone = "utc-8"
 
 [network]
@@ -11,11 +11,11 @@ log_level = "trace"
 persistence_dir = ""
 data_dir = "/var/infinity/data"
 optimize_interval = "0s"
-cleanup_interval = "1s"
+cleanup_interval = "0s"
 compact_interval = "1s"
 
 [buffer]
 [wal]
-checkpoint_interval = "1s"
+checkpoint_interval = "0s"
 
 [resource]

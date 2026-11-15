@@ -36,7 +36,7 @@ namespace infinity {
 LocalFileHandle::~LocalFileHandle() {
     Status status = Sync();
     if (!status.ok()) {
-        return;
+        UnrecoverableError(fmt::format("Fail to sync file {} before closing it: {}", path_, status.message()));
     }
 
     if (fd_ == -1) {
@@ -78,7 +78,7 @@ Status LocalFileHandle::Close() {
 }
 
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
-    if (access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite && access_mode_ != FileAccessMode::kAppend) {
         UnrecoverableError(fmt::format("File: {} isn't open.", path_));
     }
     i64 written = 0;
@@ -146,11 +146,13 @@ std::tuple<char *, size_t, Status> LocalFileHandle::MmapRead(const std::string &
 Status LocalFileHandle::Unmmap(const std::string &name) { return Status::OK(); }
 
 Status LocalFileHandle::Sync() {
-    if (access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite && access_mode_ != FileAccessMode::kAppend) {
         return Status::OK();
     }
 
-    fsync(fd_);
+    if (fsync(fd_) == -1) {
+        return Status::IOError(fmt::format("Can't sync file {}: {}", path_, strerror(errno)));
+    }
     return Status::OK();
 }
 

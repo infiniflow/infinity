@@ -306,7 +306,10 @@ public:
                 term_pairs.emplace_back(term_id, block_offset, score);
             }
         }
-        std::sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
+        // NOTE: must be a stable sort. Ties (the same term appearing in several documents of this
+        // block) have to stay in document order, otherwise the row order inside a term depends on
+        // the implementation of the sort algorithm.
+        std::stable_sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
         std::vector<std::tuple<IdxType, std::vector<BMPBlockOffset>, std::vector<DataType>>> res;
         IdxType last_term_id = -1;

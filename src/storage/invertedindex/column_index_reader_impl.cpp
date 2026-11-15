@@ -207,7 +207,9 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         return index_reader;
     }
 
-    TableMeta table_meta(db_id_str_, table_id_str_, table_name_, txn);
+    // Only the ids are needed here: this path reads index metadata,
+    // so the database name is left empty.
+    TableMeta table_meta(db_id_str_, "", table_id_str_, table_name_, txn);
     std::vector<std::string> *index_id_strs = nullptr;
     std::vector<std::string> *index_name_strs = nullptr;
     {

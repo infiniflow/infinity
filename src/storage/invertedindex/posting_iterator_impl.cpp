@@ -52,6 +52,7 @@ bool PostingIterator::SkipTo(RowID doc_id) {
     if (doc_id > last_doc_id_in_current_block_ or last_doc_id_in_current_block_ == INVALID_ROWID) {
         finish_decode_docid_ = false;
         finish_decode_tf_ = false;
+        current_row_id_ = INVALID_ROWID;
         return posting_decoder_->SkipTo(doc_id,
                                         last_doc_id_in_prev_block_,
                                         lowest_possible_doc_id_in_current_block_,

@@ -1,0 +1,6 @@
+[package]
+name = "slt-runner"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

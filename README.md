@@ -96,7 +96,7 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.7.3
+pip install infinity-sdk==0.7.5
 ```
 
 ### Run a vector search
@@ -117,7 +117,7 @@ print(res)
 
 ## 🔧 Deploy Infinity using binary
 
-If you wish to deploy Infinity using binary with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+If you wish to deploy Infinity using binary with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_server) guide.
 
 ## 🔧 Build from Source
 

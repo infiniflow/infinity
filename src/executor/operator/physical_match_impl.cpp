@@ -89,7 +89,8 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
             case EarlyTermAlgo::kAuto:
             case EarlyTermAlgo::kNaive:
             case EarlyTermAlgo::kBatch:
-            case EarlyTermAlgo::kBMW: {
+            case EarlyTermAlgo::kBMW:
+            case EarlyTermAlgo::kHeapBMW: {
                 // ok
                 break;
             }
@@ -117,12 +118,14 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
         case EarlyTermAlgo::kAuto:
         case EarlyTermAlgo::kNaive:
         case EarlyTermAlgo::kBatch:
-        case EarlyTermAlgo::kBMW: {
+        case EarlyTermAlgo::kBMW:
+        case EarlyTermAlgo::kHeapBMW: {
             query_iterators.query_iter = get_iter(early_term_algo);
             break;
         }
         case EarlyTermAlgo::kCompare: {
-            query_iterators.bmw_iter = get_iter(EarlyTermAlgo::kBMW);
+            // The diff defaults to the heap variant (what kAuto selects)
+            query_iterators.bmw_iter = get_iter(EarlyTermAlgo::kHeapBMW);
             query_iterators.batch_iter = get_iter(EarlyTermAlgo::kBatch);
             query_iterators.naive_iter = get_iter(EarlyTermAlgo::kNaive);
             break;

@@ -87,6 +87,53 @@ func NewIndexInfo(targetName string, indexType IndexType, params map[string]stri
 	}
 }
 
+// SparsegramAnalyzer builds the analyzer name of a sparse gram full-text index.
+//
+// The analyzer emits content-defined n-grams of the whole value instead of
+// tokens, which is what lets RegexFilter use the index: the literals a pattern
+// proves mandatory are turned into gram lookups before the regular expression
+// runs, so the regular expression only verifies candidates. Chinese, Japanese
+// and Korean values additionally get one and two character grams, so a single
+// character or a two character word can narrow as well.
+//
+// minGram is the shortest window considered, in characters (3 by default);
+// maxGram the longest (12 by default, and raising it adds rare, high
+// information grams for little index space); foldCase emits the lowercased form
+// of every gram as well, which a case insensitive pattern needs to use the
+// index at all.
+//
+// The name is stored in the index definition, so changing it means building a
+// new index.
+func SparsegramAnalyzer(minGram, maxGram int, foldCase bool) (string, error) {
+	if minGram < 1 || maxGram < minGram {
+		return "", NewInfinityException(
+			int(ErrorCodeInvalidIndexParam),
+			fmt.Sprintf("Expected 1 <= minGram <= maxGram, but got minGram=%d and maxGram=%d", minGram, maxGram),
+		)
+	}
+	name := fmt.Sprintf("sparsegram-%d-%d", minGram, maxGram)
+	if foldCase {
+		name += "-fold"
+	}
+	return name, nil
+}
+
+// NewSparsegramIndexInfo builds a full-text index that makes RegexFilter use
+// grams, equivalent to NewIndexInfo(targetName, IndexTypeFullText,
+// map[string]string{"analyzer": name}).
+//
+// Example:
+//
+//	info, err := infinity.NewSparsegramIndexInfo("doc", 3, 12, true)
+//	table.CreateIndex("idx", info)
+func NewSparsegramIndexInfo(targetName string, minGram, maxGram int, foldCase bool) (*IndexInfo, error) {
+	analyzer, err := SparsegramAnalyzer(minGram, maxGram, foldCase)
+	if err != nil {
+		return nil, err
+	}
+	return NewIndexInfo(targetName, IndexTypeFullText, map[string]string{"analyzer": analyzer}), nil
+}
+
 func (ii IndexInfo) String() string {
 	return fmt.Sprintf("IndexInfo(%s, %s, %v)", ii.TargetName, ii.IndexType.String(), ii.Params)
 }

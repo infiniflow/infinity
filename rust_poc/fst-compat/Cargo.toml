@@ -1,0 +1,8 @@
+[package]
+name = "fst-compat"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+fst = "0.4"
+crc32fast = "1"

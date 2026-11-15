@@ -39,6 +39,21 @@ public:
     virtual bool NextShallow(RowID doc_id) = 0;
 
     virtual float BM25Score() = 0;
+
+    // True when the posting read position is decoded on DocID(), i.e. score() / BM25Score() may be
+    // called. NextShallow() moves the block cursor without repositioning the posting reader, so after
+    // it returns the iterator becomes "stale": doc_id_ still holds the old doc while the block cursor
+    // (and its skip-list entry) already points at a later block. Scoring such an iterator decodes TF
+    // from a mismatched block, which is the failure class fixed by 473f4fa0 ("number of bits is
+    // unsupported" / "Decode posting FAILED"). Upper-bound-only calls (BlockMaxBM25Score) are still
+    // fine in that state.
+    virtual bool IsCurrentDocDecoded() const { return true; }
+
+    // Positioning only (SeekDoc): skips the "walk docs by local threshold" loop. When the caller
+    // (e.g. block-max WAND) re-checks competitiveness with its own block bounds afterwards,
+    // decoding tf / doc length for every candidate is wasted work. The default implementation
+    // forwards to Next(); non-term iterators can keep it.
+    virtual bool NextNoSkip(RowID doc_id) { return Next(doc_id); }
 };
 
 } // namespace infinity

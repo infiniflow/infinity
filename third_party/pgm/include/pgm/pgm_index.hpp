@@ -104,8 +104,28 @@ protected:
             if (segments.back() == sentinel)
                 --n_segments;
             else {
-                if (segments.back()(sentinel - 1) < last_n)
-                    segments.emplace_back(*std::prev(last) + 1, 0, last_n); // Ensure keys > last are mapped to last_n
+                auto key_after_last = [&]() {
+                    auto last_key = *std::prev(last);
+                    if constexpr (std::is_floating_point_v<K>) {
+                        return std::nextafter(last_key, std::numeric_limits<K>::infinity());
+                    } else {
+                        return static_cast<K>(last_key + 1);
+                    }
+                };
+                // `sentinel - 1` is +inf for floating keys, and `size_t(+inf)` is
+                // undefined, so the segment count would otherwise depend on the
+                // compiler (g++ adds a segment, clang++ does not). Probe the next
+                // representable key instead - the same convention `make_segmentation`
+                // uses.
+                const K probe = [&]() {
+                    if constexpr (std::is_floating_point_v<K>) {
+                        return key_after_last();
+                    } else {
+                        return static_cast<K>(sentinel - 1);
+                    }
+                }();
+                if (segments.back()(probe) < last_n)
+                    segments.emplace_back(key_after_last(), 0, last_n); // Ensure keys > last are mapped to last_n
                 segments.emplace_back(sentinel, 0, last_n);
             }
             return n_segments;
@@ -257,12 +277,21 @@ struct PGMIndex<K, Epsilon, EpsilonRecursive, Floating>::Segment {
      * @return the approximate position of the specified key
      */
     inline size_t operator()(const K &k) const {
-        size_t pos;
+        double delta;
         if constexpr (std::is_same_v<K, int64_t> || std::is_same_v<K, int32_t>)
-            pos = size_t(slope * double(std::make_unsigned_t<K>(k) - key));
+            delta = double(std::make_unsigned_t<K>(k) - key);
         else
-            pos = size_t(slope * double(k - key));
-        return pos + intercept;
+            delta = double(k - key);
+        // `size_t(x)` is undefined for NaN/inf/out-of-range x, which is exactly what
+        // an out-of-range key produces. Saturate instead: both callers clamp the
+        // result with `std::min(..., intercept)`.
+        const double estimate = double(slope) * delta;
+        if (!(estimate < double(std::numeric_limits<size_t>::max())))
+            return std::numeric_limits<size_t>::max();
+        const auto position = size_t(estimate);
+        if (position > std::numeric_limits<size_t>::max() - intercept)
+            return std::numeric_limits<size_t>::max();
+        return position + intercept;
     }
 };
 

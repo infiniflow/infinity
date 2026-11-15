@@ -26,7 +26,7 @@ import (
 func TestConnectionPool(t *testing.T) {
 	// Create a bounded connection pool with 8 warm connections.
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 8,
 		MaxOpen:     8,
 		MaxIdle:     8,
@@ -119,7 +119,7 @@ func TestConnectionPool(t *testing.T) {
 	}
 
 	// Create an external connection (not from pool)
-	externalConn, err := infinity.Connect(testLocalHost)
+	externalConn, err := infinity.Connect(TestConfig.URI)
 	if err != nil {
 		t.Fatalf("Failed to create external connection: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestConnectionPool(t *testing.T) {
 
 func TestConnectionPoolZeroMaxIdle(t *testing.T) {
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 1,
 		MaxOpen:     1,
 		MaxIdle:     0,
@@ -259,7 +259,7 @@ func TestConnectionPoolZeroMaxIdle(t *testing.T) {
 // TestConnectionPoolStats tests pool statistics
 func TestConnectionPoolStats(t *testing.T) {
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 5,
 		MaxOpen:     5,
 		MaxIdle:     5,
@@ -332,7 +332,7 @@ func TestConnectionPoolStats(t *testing.T) {
 func TestConnectionPoolWithDatabaseOperations(t *testing.T) {
 
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 3,
 		MaxOpen:     4,
 		MaxIdle:     4,
@@ -407,7 +407,7 @@ func TestConnectionPoolWithDatabaseOperations(t *testing.T) {
 // TestConnectionPoolMultipleConnections tests getting multiple connections concurrently
 func TestConnectionPoolMultipleConnections(t *testing.T) {
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 3,
 		MaxOpen:     4,
 		MaxIdle:     4,
@@ -476,7 +476,7 @@ func TestConnectionPoolMultipleConnections(t *testing.T) {
 // TestConnectionPoolClosed tests behavior when pool is closed
 func TestConnectionPoolClosed(t *testing.T) {
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 2,
 		MaxOpen:     2,
 		MaxIdle:     2,
@@ -502,7 +502,7 @@ func TestConnectionPoolClosed(t *testing.T) {
 	}
 
 	// Try to put a connection (should fail)
-	conn, err := infinity.Connect(testLocalHost)
+	conn, err := infinity.Connect(TestConfig.URI)
 	if err != nil {
 		t.Fatalf("Failed to create connection: %v", err)
 	}
@@ -525,7 +525,7 @@ func TestConnectionPoolClosed(t *testing.T) {
 // TestConnectionPoolZeroInitialSize tests pool with zero initial size
 func TestConnectionPoolZeroInitialSize(t *testing.T) {
 	config := infinity.ConnectionPoolConfig{
-		URI:         testLocalHost,
+		URI:         TestConfig.URI,
 		InitialSize: 0,
 		MaxOpen:     1,
 		MaxIdle:     1,

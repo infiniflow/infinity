@@ -1,0 +1,85 @@
+# One column, two full-text indexes: a regular analyzer for searching and a
+# sparse gram analyzer for `regex()`. Which index answers is decided per
+# predicate, not per column.
+
+statement ok
+DROP TABLE IF EXISTS regex_multi;
+
+statement ok
+CREATE TABLE regex_multi (id INT, doc VARCHAR);
+
+statement ok
+INSERT INTO regex_multi VALUES (1, 'harmful chemical reaction'), (2, 'chemical processes are harmful'), (3, 'nothing here');
+
+# The sparse gram index is created first and its name sorts before the regular
+# one, so a rule that just took the first index of the column would pick it.
+statement ok
+CREATE INDEX regex_multi_sg ON regex_multi(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');
+
+statement ok
+CREATE INDEX regex_multi_std ON regex_multi(doc) USING FULLTEXT WITH (analyzer='standard');
+
+# A fulltext filter names no index, so it is answered by the regular analyzer:
+# both words must be present, and row 2 has them apart.
+query I rowsort
+SELECT id FROM regex_multi WHERE filter_fulltext('doc', 'harmful chemical', 'operator=and');
+----
+1
+2
+
+# The same filter pointed at the gram index answers differently: it requires the
+# grams of `harmful chemical`, and row 2 does not contain them. The two rows
+# above and the single row here are what shows the unqualified filter did not use
+# the gram index.
+query I rowsort
+SELECT id FROM regex_multi WHERE filter_fulltext('doc@regex_multi_sg', 'harmful chemical', 'operator=and');
+----
+1
+
+# The retrieval searches the regular index too, so row 2 qualifies and the
+# scores order it behind row 1.
+query I
+SELECT id FROM regex_multi SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5');
+----
+1
+2
+
+# `regex()` is answered by the column's sparse gram index, and the plan names it.
+query I rowsort
+SELECT id FROM regex_multi WHERE regex(doc, 'chemical (reaction|processes)');
+----
+1
+2
+
+query T
+EXPLAIN SELECT * FROM regex_multi WHERE regex(doc, 'chemical (reaction|processes)');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex chemical (reaction|processes)
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_multi(default_db.regex_multi)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc@regex_multi_sg', 'chemical ', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
+
+# The retrieval's own filter slot takes the regex as well, on the rows it
+# retrieved from the regular index.
+query I rowsort
+SELECT id FROM regex_multi SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5') WHERE regex(doc, 'chemical');
+----
+1
+2
+
+# A pattern whose literals are all below the analyzer floor has no gram to push
+# down, so the regex answers it alone and the row is still found.
+query I rowsort
+SELECT id FROM regex_multi WHERE regex(doc, 'nothing');
+----
+3
+
+statement ok
+DROP TABLE IF EXISTS regex_multi;

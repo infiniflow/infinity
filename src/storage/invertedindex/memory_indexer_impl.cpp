@@ -186,11 +186,7 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
                 // CommitSync uses try_lock so it is safe and non-blocking if another thread is already committing.
                 CommitSync(100);
             } else {
-                std::unique_lock lock(mutex_);
-                --inflight_tasks_;
-                if (inflight_tasks_ == 0) {
-                    cv_.notify_one();
-                }
+                MarkInvertFailed(task->task_seq_, task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             }
         };
         {
@@ -244,15 +240,14 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
     auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
     inverter->InitAnalyzer(this->analyzer_);
     auto func = [this, task, inverter, append_batch](int id) {
+        bool success = false;
         try {
             size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             term_cnt_ += column_length_sum;
             inverter->MergePrepare();
             inverter->Sort();
             this->ring_sorted_.Put(task->task_seq_, inverter);
-            // Proactively drain the ring to prevent deadlock when the ring fills up.
-            // CommitSync uses try_lock so it is safe and non-blocking if another thread is already committing.
-            CommitSync(100);
+            success = true;
         } catch (const std::exception &e) {
             std::string sample_data;
             for (u32 i = 0; i < std::min(task->row_count_, 3u); ++i) {
@@ -288,6 +283,14 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
                                   task->start_doc_id_,
                                   task->row_offset_,
                                   task->row_count_));
+        }
+        if (success) {
+            // Proactively drain the ring to prevent deadlock when the ring fills up.
+            // CommitSync uses try_lock so it is safe and non-blocking if another thread is already committing.
+            CommitSync(100);
+        } else {
+            // Keeps the ring contiguous and re-inverts this task before the chunk is dumped.
+            MarkInvertFailed(task->task_seq_, task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         }
         {
             std::unique_lock lock(append_batch->mtx_);
@@ -352,12 +355,10 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
                 Commit(false);
             }
         } else {
+            // Release the transaction, but do not pretend the row is indexed: remember the
+            // task so that Dump() re-inverts it (with the same doc ids) before writing the chunk.
             inverter->ReleaseSemas();
-            std::unique_lock lock(mutex_);
-            --inflight_tasks_;
-            if (inflight_tasks_ == 0) {
-                cv_.notify_one();
-            }
+            MarkInvertFailed(task->task_seq_, task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         }
     };
     {
@@ -375,6 +376,123 @@ void MemoryIndexer::InsertGap(u32 row_count) {
 
     std::unique_lock<std::mutex> lock(mutex_);
     doc_count_ += row_count;
+}
+
+void MemoryIndexer::MarkInvertFailed(u64 seq, const std::shared_ptr<ColumnVector> &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
+    // Retry once right here, before the ring slot is filled. The ring still misses this sequence
+    // number, so no later document can have been committed yet and the shared posting writers
+    // only hold smaller doc ids: queueing the recovered inverter therefore keeps every doc list
+    // ordered (doc lists are delta encoded, a smaller doc id appended later would corrupt them).
+    bool recovered = false;
+    std::shared_ptr<ColumnInverter> retry_inverter;
+    try {
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        retry_inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
+        retry_inverter->InitAnalyzer(analyzer_);
+        term_cnt_ += retry_inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
+        retry_inverter->MergePrepare();
+        retry_inverter->Sort();
+        recovered = true;
+        LOG_WARN(fmt::format("MemoryIndexer: re-inverted failed task in place, seq={}, start_doc_id={}, row_count={}", seq, start_doc_id, row_count));
+    } catch (const std::exception &e) {
+        retry_inverter.reset();
+        LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, error: {}", seq, e.what()));
+    } catch (...) {
+        retry_inverter.reset();
+        LOG_ERROR(fmt::format("MemoryIndexer: in-place retry of failed inversion failed, seq={}, unknown error", seq));
+    }
+
+    if (recovered) {
+        // Hand the recovered inverter back to the ring instead of generating the postings here:
+        // CommitSync owns the posting generation, its memory accounting, the generated_doc_end_
+        // watermark and the commit ordering.
+        ring_sorted_.Put(seq, retry_inverter);
+    } else {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            failed_invert_tasks_.push_back(FailedInvertTask{column_vector, row_offset, row_count, start_doc_id});
+        }
+        LOG_ERROR(fmt::format("MemoryIndexer: inversion failed, db={}, table={}, index={}, base_name={}, base_row_id={}, seq={}, start_doc_id={}, "
+                              "row_count={}. Task queued for retry; it will be re-inverted before the chunk is dumped.",
+                              db_name_,
+                              table_name_,
+                              index_name_,
+                              base_name_,
+                              base_row_id_.ToUint64(),
+                              seq,
+                              start_doc_id,
+                              row_count));
+
+        // Fill the hole in the sorted ring with an empty inverter. Ring tracks a contiguous prefix
+        // (off_ground_/off_filled_), so a permanently missing sequence number would block every
+        // later Put() and silently stop the whole index from being committed. The placeholder has
+        // merged_ == 1, so CommitSync accounts it exactly like the task it replaces.
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        auto placeholder = std::make_shared<ColumnInverter>(provider, column_lengths_);
+        placeholder->InitAnalyzer(analyzer_);
+        ring_sorted_.Put(seq, placeholder);
+    }
+    // Proactively drain. If another thread owns the commit lock this is a no-op and the item
+    // stays in the ring; the next CommitSync (or the dump barrier) will pick it up.
+    CommitSync(100);
+}
+
+void MemoryIndexer::RetryFailedInvertTasks() {
+    std::vector<FailedInvertTask> failed_tasks;
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        failed_tasks.swap(failed_invert_tasks_);
+    }
+    if (failed_tasks.empty()) {
+        return;
+    }
+    LOG_WARN(fmt::format("MemoryIndexer: retrying {} failed inversion task(s) before dump, db={}, table={}, index={}, base_row_id={}, doc_count={}",
+                         failed_tasks.size(),
+                         db_name_,
+                         table_name_,
+                         index_name_,
+                         base_row_id_.ToUint64(),
+                         doc_count_));
+    const u32 generated_doc_end = generated_doc_end_.load();
+    for (const FailedInvertTask &failed_task : failed_tasks) {
+        // Doc lists are delta encoded, so a posting can only be appended when every doc already
+        // written has a smaller id. If a later document has been generated since the failure, the
+        // retry would append a smaller id and corrupt the list: refuse to write such a chunk.
+        if (failed_task.start_doc_id_ < generated_doc_end) {
+            UnrecoverableError(fmt::format("MemoryIndexer: failed inversion can no longer be retried in doc order, db={}, table={}, index={}, "
+                                           "base_row_id={}, start_doc_id={}, row_count={}, already generated doc end={}",
+                                           db_name_,
+                                           table_name_,
+                                           index_name_,
+                                           base_row_id_.ToUint64(),
+                                           failed_task.start_doc_id_,
+                                           failed_task.row_count_,
+                                           generated_doc_end));
+        }
+        try {
+            PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+            auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
+            inverter->InitAnalyzer(analyzer_);
+            size_t column_length_sum =
+                inverter->InvertColumn(failed_task.column_vector_, failed_task.row_offset_, failed_task.row_count_, failed_task.start_doc_id_);
+            inverter->MergePrepare();
+            inverter->Sort();
+            inverter->GeneratePosting();
+            term_cnt_ += column_length_sum;
+        } catch (const std::exception &e) {
+            // Do not write a chunk that claims rows it does not contain: fail loudly instead of
+            // silently dropping the rows (a restart will rebuild the uncovered range).
+            UnrecoverableError(fmt::format("MemoryIndexer: retry of failed inversion failed, db={}, table={}, index={}, base_row_id={}, "
+                                           "start_doc_id={}, row_count={}, error: {}",
+                                           db_name_,
+                                           table_name_,
+                                           index_name_,
+                                           base_row_id_.ToUint64(),
+                                           failed_task.start_doc_id_,
+                                           failed_task.row_count_,
+                                           e.what()));
+        }
+    }
 }
 
 void MemoryIndexer::Commit(bool offline) {
@@ -437,6 +555,9 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
         for (auto &inverter : inverters) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
+            // Remember how far the shared posting writers have progressed. Only CommitSync writes
+            // this (under mutex_commit_), so a plain max is enough.
+            generated_doc_end_.store(std::max(generated_doc_end_.load(), inverter->GetBeginDocID() + inverter->GetDocCount()));
 
             inverter->ReleaseSemas();
         }
@@ -486,6 +607,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
+    // All in-flight tasks are committed now. Re-invert the ones that failed, otherwise the
+    // chunk below would claim their row ids while containing none of their postings.
+    RetryFailedInvertTasks();
     std::unique_lock commit_sync_lock(mutex_commit_sync_share_);
 
     std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));

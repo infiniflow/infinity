@@ -17,7 +17,7 @@ package tests
 import (
 	"fmt"
 	"strings"
-// 	"sync"
+	// 	"sync"
 	"testing"
 
 	"github.com/infiniflow/infinity-go-sdk"

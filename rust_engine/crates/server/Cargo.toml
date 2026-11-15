@@ -1,0 +1,71 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# A3: the generated async Thrift service (tools/volo_wire proves the wire is
+# byte-identical; this is the real server).
+volo = "0.12"
+volo-thrift = "0.12"
+pilota = "0.13"
+tokio.workspace = true
+
+common.workspace = true
+executor.workspace = true
+parser.workspace = true
+thrift = "0.17"
+
+[[bin]]
+name = "emit-connect-call"
+path = "src/bin/emit_connect_call.rs"
+
+[[bin]]
+name = "emit-select-columns"
+path = "src/bin/emit_select_columns.rs"
+
+[[bin]]
+name = "emit-select-response"
+path = "src/bin/emit_select_response.rs"
+
+[[bin]]
+name = "handle-create-table"
+path = "src/bin/handle_create_table.rs"
+
+[[bin]]
+name = "handle-select"
+path = "src/bin/handle_select.rs"
+
+[[bin]]
+name = "handle-insert"
+path = "src/bin/handle_insert.rs"
+
+[[bin]]
+name = "handle-list-database"
+path = "src/bin/handle_list_database.rs"
+
+[[bin]]
+name = "handle-delete"
+path = "src/bin/handle_delete.rs"
+
+[[bin]]
+name = "handle-update"
+path = "src/bin/handle_update.rs"
+
+[[bin]]
+name = "handle-show-table"
+path = "src/bin/handle_show_table.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+# The same lints as the workspace, plus one exception: the generated Thrift
+# service (pilota's codegen) uses `unsafe` for its zero-copy helpers, and a
+# command-line lint level cannot be relaxed by an inner `#[allow]`.
+[lints.rust]
+warnings = "deny"
+unsafe_code = "allow"
+
+[build-dependencies]
+volo-build = "0.12"
