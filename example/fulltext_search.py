@@ -25,7 +25,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -78,7 +80,9 @@ try:
 
     res = table_instance.create_index(
         "my_index2",
-        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText, {"analyzer": "rag"}),
+        infinity.index.IndexInfo(
+            "body", infinity.index.IndexType.FullText, {"analyzer": "rag"}
+        ),
         infinity.common.ConflictType.Error,
     )
 
@@ -95,7 +99,8 @@ try:
     for field_index in field_indexes:
         for question in questions:
             qb_result, extra_result = (
-                table_instance.output(["num", "body", "_score"]).highlight(["body"])
+                table_instance.output(["num", "body", "_score"])
+                .highlight(["body"])
                 .match_text(field_index, question, 10)
                 .to_pl()
             )
@@ -106,7 +111,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

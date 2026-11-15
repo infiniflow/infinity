@@ -77,4 +77,7 @@ class TestInfinity:
             self.infinity_obj.set_config("mem_index_capacity", old_value + 1000)
             assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_COMMAND
-            assert e.value.args[1] == "Invalid command: Config mem_index_capacity is read-only"
+            assert (
+                e.value.args[1]
+                == "Invalid command: Config mem_index_capacity is read-only"
+            )

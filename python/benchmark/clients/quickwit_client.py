@@ -193,7 +193,7 @@ class QuickwitClient(BaseClient):
             query = query.lstrip()
             if query.startswith('"'):
                 is_phrase = True
-                match = re.search(r'~(\d+)$', query)
+                match = re.search(r"~(\d+)$", query)
                 if match:
                     is_slop_phrase = True
                     slop = int(match.group(1))
@@ -204,23 +204,19 @@ class QuickwitClient(BaseClient):
                             "match_phrase": {"body": {"query": query, "slop": slop}}
                         },
                         "sort": ["_score"],
-                        "size": self.data["topK"]
+                        "size": self.data["topK"],
                     }
                 else:
                     ret = {
-                        "query": {
-                            "match_phrase": {"body": query}
-                        },
+                        "query": {"match_phrase": {"body": query}},
                         "sort": ["_score"],
-                        "size": self.data["topK"]
+                        "size": self.data["topK"],
                     }
             else:
                 ret = {
-                    "query": {
-                        "query_string": {"query": query, "fields": ["body"]}
-                    },
+                    "query": {"query_string": {"query": query, "fields": ["body"]}},
                     "sort": ["_score"],
-                    "size": self.data["topK"]
+                    "size": self.data["topK"],
                 }
         return ret
 

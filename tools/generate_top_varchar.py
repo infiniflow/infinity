@@ -7,9 +7,11 @@ import string
 def my_get_random_string(i):
     optional_common_prefix = "PrefixExample"
     if i % 3 == 0:
-        return optional_common_prefix + ''.join(random.choices(string.ascii_letters, k=random.randint(1, 97)))
+        return optional_common_prefix + "".join(
+            random.choices(string.ascii_letters, k=random.randint(1, 97))
+        )
     else:
-        return ''.join(random.choices(string.ascii_letters, k=random.randint(1, 97)))
+        return "".join(random.choices(string.ascii_letters, k=random.randint(1, 97)))
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
@@ -28,9 +30,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
     if os.path.exists(csv_path) and os.path.exists(slt_path) and not generate_if_exists:
-        print(f"File {slt_path} and {csv_path} already existed exists. Skip Generating.")
+        print(
+            f"File {slt_path} and {csv_path} already existed exists. Skip Generating."
+        )
         return
-    with (open(csv_path, "w") as top_csv_file, open(slt_path, "w") as top_slt_file):
+    with open(csv_path, "w") as top_csv_file, open(slt_path, "w") as top_slt_file:
         x = [(my_get_random_string(i), i) for i in range(row_n)]
         random.shuffle(x)
         top_csv_file.writelines(f"{s},{i}\n" for s, i in x)
@@ -39,12 +43,12 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write(
-            f"CREATE TABLE {table_name} (c1 varchar, c2 integer);\n")
+        top_slt_file.write(f"CREATE TABLE {table_name} (c1 varchar, c2 integer);\n")
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
         top_slt_file.write(
-            f"COPY {table_name} FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n")
+            f"COPY {table_name} FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n"
+        )
 
         x.sort()
         for lim_off in limit_offset:
@@ -52,7 +56,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
             offset = lim_off[1]
             top_slt_file.write("\nquery I\n")
             top_slt_file.write(
-                f"SELECT * FROM {table_name} order by c1, c2 limit {limit} offset {offset};\n")
+                f"SELECT * FROM {table_name} order by c1, c2 limit {limit} offset {offset};\n"
+            )
             top_slt_file.write("----\n")
 
             limit = min(limit, row_n - offset)
@@ -68,9 +73,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate top data for test")
 
-    parser.add_argument("-g", "--generate", type=bool,
-                        default=False, dest="generate_if_exists", )
-    parser.add_argument("-c", "--copy", type=str,
-                        default="/var/infinity/test_data", dest="copy_dir", )
+    parser.add_argument(
+        "-g",
+        "--generate",
+        type=bool,
+        default=False,
+        dest="generate_if_exists",
+    )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default="/var/infinity/test_data",
+        dest="copy_dir",
+    )
     args = parser.parse_args()
     generate(args.generate_if_exists, args.copy_dir)

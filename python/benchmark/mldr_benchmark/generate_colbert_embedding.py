@@ -8,6 +8,7 @@ python generate_colbert_embedding.py \
 --batch_size 1 \
 --fp16 True \
 """
+
 import os
 from dataclasses import dataclass, field
 
@@ -24,15 +25,30 @@ from transformers import HfArgumentParser
 
 @dataclass
 class ModelArgs:
-    colbert_model: str = field(default="jina-colbert", metadata={'help': 'The name of the colbert model to use.'})
-    fp16: bool = field(default=True, metadata={'help': 'Use fp16 in inference?'})
+    colbert_model: str = field(
+        default="jina-colbert",
+        metadata={"help": "The name of the colbert model to use."},
+    )
+    fp16: bool = field(default=True, metadata={"help": "Use fp16 in inference?"})
 
 
-def generate_multivec(model, corpus: datasets.Dataset, max_passage_length: int, batch_size: int,
-                      begin_pos: int, end_pos: int):
-    result_dict = model.encode(corpus["text"][begin_pos: end_pos], batch_size=batch_size, max_length=max_passage_length,
-                               return_dense=False, return_sparse=False, return_colbert_vecs=True)
-    return result_dict['colbert_vecs']
+def generate_multivec(
+    model,
+    corpus: datasets.Dataset,
+    max_passage_length: int,
+    batch_size: int,
+    begin_pos: int,
+    end_pos: int,
+):
+    result_dict = model.encode(
+        corpus["text"][begin_pos:end_pos],
+        batch_size=batch_size,
+        max_length=max_passage_length,
+        return_dense=False,
+        return_sparse=False,
+        return_colbert_vecs=True,
+    )
+    return result_dict["colbert_vecs"]
 
 
 def main():
@@ -44,10 +60,14 @@ def main():
     languages = check_languages(eval_args.languages)
     if model_args.colbert_model == "jina-colbert":
         if languages != ["en"]:
-            raise ValueError(f"Model {model_args.colbert_model} only supports English language.")
+            raise ValueError(
+                f"Model {model_args.colbert_model} only supports English language."
+            )
     model = get_colbert_model(model_args=model_args)
     print("==================================================")
-    print(f"Start generating colbert embedding with model: {model_args.colbert_model} ...")
+    print(
+        f"Start generating colbert embedding with model: {model_args.colbert_model} ..."
+    )
     if model_args.colbert_model == "BAAI/bge-m3":
         save_dir_name = "bge-m3"
     elif model_args.colbert_model == "colbertv2.0":
@@ -56,28 +76,39 @@ def main():
         save_dir_name = "jina-colbert"
     else:
         raise ValueError(f"Model {model_args.colbert_model} is not supported.")
-    print('Generate embedding of following languages: ', languages)
+    print("Generate embedding of following languages: ", languages)
     for lang in languages:
         print("**************************************************")
-        embedding_save_dir = os.path.join(eval_args.embedding_save_dir, save_dir_name, lang)
+        embedding_save_dir = os.path.join(
+            eval_args.embedding_save_dir, save_dir_name, lang
+        )
         if not os.path.exists(embedding_save_dir):
             os.makedirs(embedding_save_dir)
-        colbert_save_file = os.path.join(embedding_save_dir, f'colbert-{eval_args.begin_pos}-{eval_args.end_pos}.data')
+        colbert_save_file = os.path.join(
+            embedding_save_dir,
+            f"colbert-{eval_args.begin_pos}-{eval_args.end_pos}.data",
+        )
         if os.path.exists(colbert_save_file) and not eval_args.overwrite:
-            print(f'Embedding of {lang} already exists. Skip...')
+            print(f"Embedding of {lang} already exists. Skip...")
             continue
 
         print(f"Start generating embedding of {lang} ...")
         corpus = load_corpus(lang)
 
-        colbert_embeddings = generate_multivec(model=model, corpus=corpus,
-                                               max_passage_length=eval_args.max_passage_length,
-                                               batch_size=eval_args.batch_size, begin_pos=eval_args.begin_pos,
-                                               end_pos=eval_args.end_pos)
+        colbert_embeddings = generate_multivec(
+            model=model,
+            corpus=corpus,
+            max_passage_length=eval_args.max_passage_length,
+            batch_size=eval_args.batch_size,
+            begin_pos=eval_args.begin_pos,
+            end_pos=eval_args.end_pos,
+        )
         save_colbert_list(colbert_embeddings, colbert_save_file)
 
     print("==================================================")
-    print(f"Finish generating colbert embeddings with model: {model_args.colbert_model} ...")
+    print(
+        f"Finish generating colbert embeddings with model: {model_args.colbert_model} ..."
+    )
 
 
 if __name__ == "__main__":

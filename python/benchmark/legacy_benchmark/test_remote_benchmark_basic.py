@@ -29,13 +29,13 @@ def trace_unhandled_exceptions(func):
         try:
             func(*args, **kwargs)
         except Exception:
-            print('Exception in ' + func.__name__)
+            print("Exception in " + func.__name__)
             traceback.print_exc()
 
     return wrapped_func
 
 
-def worker_thread(thread_id, num_iterations, some_function, ip='127.0.0.1', port=9090):
+def worker_thread(thread_id, num_iterations, some_function, ip="127.0.0.1", port=9090):
     infinity_obj = infinity.connect(NetworkAddress(ip, port))
     try:
         for j in range(num_iterations):
@@ -46,11 +46,14 @@ def worker_thread(thread_id, num_iterations, some_function, ip='127.0.0.1', port
         infinity_obj.disconnect()
 
 
-def worker_internal_connection(num_threads, num_iterations, some_function, ip=None, port=None):
+def worker_internal_connection(
+    num_threads, num_iterations, some_function, ip=None, port=None
+):
     threads = []
     for j in range(num_threads):
-        thread = threading.Thread(target=worker_thread, args=(
-            j, num_iterations, some_function, ip, port))
+        thread = threading.Thread(
+            target=worker_thread, args=(j, num_iterations, some_function, ip, port)
+        )
         threads.append(thread)
         thread.start()
 
@@ -64,47 +67,59 @@ def measure_time_internal(num_threads, num_times, some_function, ip=None, port=N
     num_iterations = num_times // num_threads
 
     start_time = time.perf_counter()
-    worker_internal_connection(
-        num_threads, num_iterations, some_function, ip, port)
+    worker_internal_connection(num_threads, num_iterations, some_function, ip, port)
     end_time = time.perf_counter()
 
     elapsed_time = end_time - start_time
     return elapsed_time
 
 
-def execute(some_functions: list, protocols: list, num_threads, num_times) -> pd.DataFrame:
+def execute(
+    some_functions: list, protocols: list, num_threads, num_times
+) -> pd.DataFrame:
     results = pd.DataFrame(
-        columns=['rpc name', 'function', 'qps', 'elapsed_time', 'average_latency', 'num_threads',
-                 'num_times'])
+        columns=[
+            "rpc name",
+            "function",
+            "qps",
+            "elapsed_time",
+            "average_latency",
+            "num_threads",
+            "num_times",
+        ]
+    )
     print("\n")
 
-    for (protocol, ip, port) in protocols:
+    for protocol, ip, port in protocols:
         for some_function in some_functions:
             elapsed_time = measure_time_internal(
-                num_threads, num_times, some_function, ip, port)
+                num_threads, num_times, some_function, ip, port
+            )
             qps = num_times / elapsed_time  # queries per second
             avg_latency = (elapsed_time / num_times) * 1000  # in ms
 
-            results.loc[len(results)] = [protocol,
-                                         some_function.__name__,
-                                         qps,
-                                         elapsed_time,
-                                         avg_latency,
-                                         num_threads,
-                                         num_times]
+            results.loc[len(results)] = [
+                protocol,
+                some_function.__name__,
+                qps,
+                elapsed_time,
+                avg_latency,
+                num_threads,
+                num_times,
+            ]
 
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.width", None)
     return results
 
 
 class TestBenchmark:
-
     def test_measure_time(self):
         @trace_unhandled_exceptions
         def create_database(infinity_obj, port, thread_id, num_iteration):
             res = infinity_obj.create_database(
-                f"my_database_{port}_{thread_id}_{num_iteration}")
+                f"my_database_{port}_{thread_id}_{num_iteration}"
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_database failed: {res.error_msg}")
 
@@ -123,7 +138,8 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def drop_database(infinity_obj, port, thread_id, num_iteration):
             res = infinity_obj.drop_database(
-                f"my_database_{port}_{thread_id}_{num_iteration}")
+                f"my_database_{port}_{thread_id}_{num_iteration}"
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_database failed: {res.error_msg}")
 
@@ -131,66 +147,73 @@ class TestBenchmark:
         def create_table(infinity_obj, port, thread_id, num_iteration):
             res = infinity_obj.get_database("default_db").create_table(
                 f"table_{port}_{thread_id}_{num_iteration}",
-                {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}})
+                {
+                    "c1": {"type": "int", "constraints": ["primary key"]},
+                    "c2": {"type": "float"},
+                },
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
         def insert_table(infinity_obj, port, thread_id, num_iteration):
-            res = (infinity_obj
-                   .get_database("default_db")
-                   .get_table(f"table_{port}_{thread_id}_{num_iteration}")
-                   .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]))
+            res = (
+                infinity_obj.get_database("default_db")
+                .get_table(f"table_{port}_{thread_id}_{num_iteration}")
+                .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"insert_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
         def list_tables(infinity_obj, port, thread_id, num_iteration):
-            (infinity_obj
-             .get_database("default_db")
-             .list_tables())
+            (infinity_obj.get_database("default_db").list_tables())
 
         @trace_unhandled_exceptions
         def select_table(infinity_obj, port, thread_id, num_iteration):
-            res = (infinity_obj
-                   .get_database("default_db")
-                   .get_table(f"table_{port}_{thread_id}_{num_iteration}")
-                   .query_builder()
-                   .output(["*"])
-                   .filter("c1 > 1").to_df())
+            res = (
+                infinity_obj.get_database("default_db")
+                .get_table(f"table_{port}_{thread_id}_{num_iteration}")
+                .query_builder()
+                .output(["*"])
+                .filter("c1 > 1")
+                .to_df()
+            )
             if res is None:
                 raise Exception(f"select_table failed: {res}")
 
         @trace_unhandled_exceptions
         def drop_table(infinity_obj, port, thread_id, num_iteration):
-            res = (infinity_obj
-                   .get_database("default_db")
-                   .drop_table(f"table_{port}_{thread_id}_{num_iteration}"))
+            res = infinity_obj.get_database("default_db").drop_table(
+                f"table_{port}_{thread_id}_{num_iteration}"
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
         def create_index(infinity_obj, port, thread_id, num_iteration):
-            res = (infinity_obj
-                   .get_database("default_db")
-                   .get_table(f"table_{port}_{thread_id}_{num_iteration}")
-                   .create_index("my_index", ["c1"], "IVF_FLAT", None))
+            res = (
+                infinity_obj.get_database("default_db")
+                .get_table(f"table_{port}_{thread_id}_{num_iteration}")
+                .create_index("my_index", ["c1"], "IVF_FLAT", None)
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_index failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
         def drop_index(infinity_obj, port, thread_id, num_iteration):
-            res = (infinity_obj
-                   .get_database("default_db")
-                   .get_table(f"table_{port}_{thread_id}_{num_iteration}")
-                   .drop_index("my_index"))
+            res = (
+                infinity_obj.get_database("default_db")
+                .get_table(f"table_{port}_{thread_id}_{num_iteration}")
+                .drop_index("my_index")
+            )
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_index failed: {res.error_msg}")
 
         ############################################
         # Using the tune
 
-        ip: str = '127.0.0.1'
+        ip: str = "127.0.0.1"
         thread_pool_thrift = ("Thread Pool Thrift", ip, 23817)
         num_threads = 1
         num_times = 10
@@ -198,12 +221,10 @@ class TestBenchmark:
 
         database_functions = [create_database]
 
-        db_df = execute(database_functions, protocols,
-                        num_threads, num_times)
+        db_df = execute(database_functions, protocols, num_threads, num_times)
 
         table_functions = []
-        tbl_df = execute(table_functions, protocols,
-                         num_threads, num_times)
+        tbl_df = execute(table_functions, protocols, num_threads, num_times)
 
         # index_functions = []
         # idx_df = execute(index_functions, protocols, num_threads, num_times)

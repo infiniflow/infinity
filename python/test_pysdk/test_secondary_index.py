@@ -51,13 +51,15 @@ class TestSecondaryIndex:
         This tests the fix for bitmap size calculation in low cardinality scenarios.
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_secondary_low_card_int" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_int" + suffix, ConflictType.Ignore
+        )
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table(
             "test_secondary_low_card_int" + suffix,
             {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert table_obj is not None
 
@@ -71,7 +73,7 @@ class TestSecondaryIndex:
         res = table_obj.create_index(
             "idx_c1",
             index.IndexInfo("c1", index.IndexType.Secondary, {"cardinality": "low"}),
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert res.error_code == ErrorCode.OK
 
@@ -88,7 +90,9 @@ class TestSecondaryIndex:
         # Clean up
         res = table_obj.drop_index("idx_c1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_secondary_low_card_int" + suffix, ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_int" + suffix, ConflictType.Error
+        )
         assert res.error_code == ErrorCode.OK
 
     def test_secondary_index_low_cardinality_bool(self, suffix):
@@ -97,13 +101,15 @@ class TestSecondaryIndex:
         This specifically tests the low cardinality optimization path.
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_secondary_low_card_bool" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_bool" + suffix, ConflictType.Ignore
+        )
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table(
             "test_secondary_low_card_bool" + suffix,
             {"c1": {"type": "bool"}, "c2": {"type": "int"}},
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert table_obj is not None
 
@@ -115,7 +121,7 @@ class TestSecondaryIndex:
         res = table_obj.create_index(
             "idx_c1",
             index.IndexInfo("c1", index.IndexType.Secondary, {"cardinality": "low"}),
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert res.error_code == ErrorCode.OK
 
@@ -130,7 +136,9 @@ class TestSecondaryIndex:
         # Clean up
         res = table_obj.drop_index("idx_c1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_secondary_low_card_bool" + suffix, ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_bool" + suffix, ConflictType.Error
+        )
         assert res.error_code == ErrorCode.OK
 
     def test_secondary_index_low_cardinality_varchar(self, suffix):
@@ -138,13 +146,15 @@ class TestSecondaryIndex:
         Test secondary index with low cardinality varchar data.
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_secondary_low_card_varchar" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_varchar" + suffix, ConflictType.Ignore
+        )
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table(
             "test_secondary_low_card_varchar" + suffix,
             {"c1": {"type": "varchar"}, "c2": {"type": "int"}},
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert table_obj is not None
 
@@ -158,7 +168,7 @@ class TestSecondaryIndex:
         res = table_obj.create_index(
             "idx_c1",
             index.IndexInfo("c1", index.IndexType.Secondary, {"cardinality": "low"}),
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert res.error_code == ErrorCode.OK
 
@@ -175,7 +185,9 @@ class TestSecondaryIndex:
         # Clean up
         res = table_obj.drop_index("idx_c1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_secondary_low_card_varchar" + suffix, ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_secondary_low_card_varchar" + suffix, ConflictType.Error
+        )
         assert res.error_code == ErrorCode.OK
 
     def test_secondary_index_high_cardinality(self, suffix):
@@ -183,13 +195,15 @@ class TestSecondaryIndex:
         Test secondary index with high cardinality data (traditional path).
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_secondary_high_card" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_secondary_high_card" + suffix, ConflictType.Ignore
+        )
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table(
             "test_secondary_high_card" + suffix,
             {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert table_obj is not None
 
@@ -201,7 +215,7 @@ class TestSecondaryIndex:
         res = table_obj.create_index(
             "idx_c1",
             index.IndexInfo("c1", index.IndexType.Secondary),
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert res.error_code == ErrorCode.OK
 
@@ -223,13 +237,15 @@ class TestSecondaryIndex:
         Test inserting data after index creation and verify correctness.
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_secondary_insert_after" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_secondary_insert_after" + suffix, ConflictType.Ignore
+        )
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table(
             "test_secondary_insert_after" + suffix,
             {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert table_obj is not None
 
@@ -241,7 +257,7 @@ class TestSecondaryIndex:
         res = table_obj.create_index(
             "idx_c1",
             index.IndexInfo("c1", index.IndexType.Secondary),
-            ConflictType.Error
+            ConflictType.Error,
         )
         assert res.error_code == ErrorCode.OK
 
@@ -260,5 +276,7 @@ class TestSecondaryIndex:
         # Clean up
         res = table_obj.drop_index("idx_c1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_secondary_insert_after" + suffix, ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_secondary_insert_after" + suffix, ConflictType.Error
+        )
         assert res.error_code == ErrorCode.OK

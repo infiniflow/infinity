@@ -150,17 +150,17 @@ class QdrantClient(BaseClient):
                     points.clear()
                     print(data_id)
                 else:
-                    points.append(models.PointStruct(
-                        id=data_id,
-                        payload={},  # Add any additional payload if necessary
-                        vector={
-                            "text": models.SparseVector(
-                                indices=indices,
-                                values=values
-                            )
-                        },
+                    points.append(
+                        models.PointStruct(
+                            id=data_id,
+                            payload={},  # Add any additional payload if necessary
+                            vector={
+                                "text": models.SparseVector(
+                                    indices=indices, values=values
+                                )
+                            },
+                        )
                     )
-                )
             if points:
                 self.client.upsert(
                     collection_name=self.table_name,
@@ -191,10 +191,7 @@ class QdrantClient(BaseClient):
                 collection_name=self.table_name,
                 query_vector=models.NamedSparseVector(
                     name="text",
-                    vector=models.SparseVector(
-                        indices=indices,
-                        values=values
-                    ),
+                    vector=models.SparseVector(indices=indices, values=values),
                 ),
                 limit=self.data.get("topK", 10),
             )

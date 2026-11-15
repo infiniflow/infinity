@@ -19,7 +19,11 @@ def generate1(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(fvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(fvecs_path) and os.path.exists(slt_path) and not generate_if_exists:
+    if (
+        os.path.exists(fvecs_path)
+        and os.path.exists(slt_path)
+        and not generate_if_exists
+    ):
         print(
             f"File {slt_path} and {fvecs_path} already existed exists. Skip Generating."
         )
@@ -29,9 +33,7 @@ def generate1(generate_if_exists: bool, copy_dir: str):
         slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
         slt_file.write("\n")
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} ( c1 embedding(float, {dim}));\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} ( c1 embedding(float, {dim}));\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
@@ -56,18 +58,20 @@ def generate1(generate_if_exists: bool, copy_dir: str):
         slt_file.write(f"DROP TABLE {table_name};\n")
     random.random()
 
+
 def generate_fvecs(num, dim, filename):
-    with open(
-            os.getcwd() + "/test/data/fvecs/" + filename, "wb"
-    ) as fvecs_file:
+    with open(os.getcwd() + "/test/data/fvecs/" + filename, "wb") as fvecs_file:
         for _ in range(num):
             fvecs_file.write((dim).to_bytes(4, byteorder="little"))
             fvec = np.random.random(dim).astype(np.float32)
             fvec.tofile(fvecs_file)
     fvecs_file.close()
+
+
 def generate(generate_if_exists: bool, copy_dir: str):
     generate1(generate_if_exists, copy_dir)
     generate_fvecs(100, 128, "pysdk_test.fvecs")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate fvecs data for test")

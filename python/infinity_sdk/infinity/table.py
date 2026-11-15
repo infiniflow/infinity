@@ -44,4 +44,6 @@ class ExplainType(Enum):
         elif self is ExplainType.Fragment:
             return ttypes.ExplainType.Fragment
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPLAIN_TYPE, "Unknown explain type")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPLAIN_TYPE, "Unknown explain type"
+            )

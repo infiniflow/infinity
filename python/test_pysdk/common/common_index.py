@@ -16,6 +16,7 @@ class IndexType(Enum):
 
     def to_ttype(self):
         from infinity.common import InfinityException
+
         match self:
             case IndexType.IVF:
                 return ttypes.IndexType.IVF
@@ -34,11 +35,14 @@ class IndexType(Enum):
             case IndexType.PLAID:
                 return ttypes.IndexType.PLAID
             case _:
-                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_TYPE, "Unknown index type"
+                )
 
     def to_local_type(self):
         from infinity_embedded.common import InfinityException
         from infinity_embedded.embedded_infinity_ext import IndexType as LocalIndexType
+
         match self:
             case IndexType.IVF:
                 return LocalIndexType.kIVF
@@ -57,7 +61,9 @@ class IndexType(Enum):
             case IndexType.PLAID:
                 return LocalIndexType.kPLAID
             case _:
-                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_TYPE, "Unknown index type"
+                )
 
 
 class InitParameter:

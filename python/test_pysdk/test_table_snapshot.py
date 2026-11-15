@@ -37,7 +37,9 @@ def setup_class(request, http):
 
     yield
 
-    res = request.cls.infinity_obj.set_config("checkpoint_interval", old_checkpoint_interval)
+    res = request.cls.infinity_obj.set_config(
+        "checkpoint_interval", old_checkpoint_interval
+    )
     assert res.error_code == ErrorCode.OK
 
     request.cls.infinity_obj.disconnect()
@@ -54,21 +56,34 @@ class TestSnapshot:
     LARGE_TABLE_MAX_RETRIES = 5
     LARGE_TABLE_RETRY_DELAY = 3
 
-    def handle_snapshot_result(self, snapshot_result, operation_name="Snapshot operation", skip_on_checkpoint=True):
+    def handle_snapshot_result(
+        self,
+        snapshot_result,
+        operation_name="Snapshot operation",
+        skip_on_checkpoint=True,
+    ):
         """Handle snapshot operation results with consistent error handling"""
         if snapshot_result.error_code == ErrorCode.OK:
             print(f"{operation_name} completed successfully")
             return True
         elif snapshot_result.error_code == ErrorCode.CHECKPOINTING:
             if skip_on_checkpoint:
-                pytest.skip(f"{operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
+                pytest.skip(
+                    f"{operation_name} failed due to checkpointing: {snapshot_result.error_msg}"
+                )
             else:
-                print(f"Warning: {operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
+                print(
+                    f"Warning: {operation_name} failed due to checkpointing: {snapshot_result.error_msg}"
+                )
                 return False
         else:
-            assert False, f"{operation_name} failed with error: {snapshot_result.error_msg}"
+            assert False, (
+                f"{operation_name} failed with error: {snapshot_result.error_msg}"
+            )
 
-    def verify_restored_table_functionality(self, table_name: str, db_obj, expected_row_count: int = None):
+    def verify_restored_table_functionality(
+        self, table_name: str, db_obj, expected_row_count: int = None
+    ):
         """
         Comprehensive test to verify that a restored table functions normally.
         Tests all major operations: search, insert, drop indexes, add indexes, delete data, rename columns.
@@ -92,11 +107,15 @@ class TestSnapshot:
             print(f"   Row count: {row_count}")
 
             if expected_row_count:
-                assert row_count == expected_row_count, f"Expected {expected_row_count} rows, got {row_count}"
+                assert row_count == expected_row_count, (
+                    f"Expected {expected_row_count} rows, got {row_count}"
+                )
 
             # Get column names from table metadata instead of fetching data
             columns_result = restored_table.show_columns()
-            column_names = columns_result["name"].to_list()  # Get column names from polars DataFrame
+            column_names = columns_result[
+                "name"
+            ].to_list()  # Get column names from polars DataFrame
             print(f"   Table columns: {column_names}")
 
         except Exception as e:
@@ -107,22 +126,29 @@ class TestSnapshot:
         print("2. Testing search operations...")
         try:
             # Test full-text search using match_text
-            fts_result, extra_result = restored_table.output(["id", "name"]).match_text("name", "user_1", 5,
-                                                                                        None).to_df()
+            fts_result, extra_result = (
+                restored_table.output(["id", "name"])
+                .match_text("name", "user_1", 5, None)
+                .to_df()
+            )
             print(f"   Full-text search results: {len(fts_result)} rows")
 
             # Test vector similarity search using match_dense
             query_vector = [random.uniform(-1, 1) for _ in range(1)]
-            vector_result, extra_result = restored_table.output(["id", "vector_col"]).match_dense("vector_col",
-                                                                                                  query_vector, "float",
-                                                                                                  "l2", 5).to_df()
+            vector_result, extra_result = (
+                restored_table.output(["id", "vector_col"])
+                .match_dense("vector_col", query_vector, "float", "l2", 5)
+                .to_df()
+            )
             print(f"   Vector similarity search results: {len(vector_result)} rows")
 
             # Test sparse vector search using match_sparse
             sparse_query = SparseVector([1, 2], [0.1, 0.2])
-            sparse_result, extra_result = restored_table.output(["id", "sparse_col"]).match_sparse("sparse_col",
-                                                                                                   sparse_query, "ip",
-                                                                                                   5).to_df()
+            sparse_result, extra_result = (
+                restored_table.output(["id", "sparse_col"])
+                .match_sparse("sparse_col", sparse_query, "ip", 5)
+                .to_df()
+            )
             print(f"   Sparse vector search results: {len(sparse_result)} rows")
 
             restored_table.optimize()
@@ -150,7 +176,9 @@ class TestSnapshot:
             print(f"   Insert result: {insert_result.error_code}")
 
             # Verify insert
-            verify_result, extra_result = restored_table.output(["id", "name"]).filter("id = 999999").to_df()
+            verify_result, extra_result = (
+                restored_table.output(["id", "name"]).filter("id = 999999").to_df()
+            )
             assert len(verify_result) > 0, "Inserted row not found"
             print("   Insert verification: OK")
 
@@ -163,25 +191,31 @@ class TestSnapshot:
         try:
             # List existing indexes
             index_response = restored_table.list_indexes()
-            existing_indexes = index_response.index_names if hasattr(index_response, 'index_names') else []
+            existing_indexes = (
+                index_response.index_names
+                if hasattr(index_response, "index_names")
+                else []
+            )
             print(f"   Existing indexes: {existing_indexes}")
 
             # Drop an index if it exists
-            if 'idx_name_fts' in existing_indexes:
+            if "idx_name_fts" in existing_indexes:
                 drop_result = restored_table.drop_index("idx_name_fts")
                 print(f"   Drop index result: {drop_result.error_code}")
                 # Verify index is dropped
                 remaining_response = restored_table.list_indexes().index_names
                 # remaining_indexes = [index["index_name"] for index in remaining_response]
-                assert 'idx_name_fts' not in remaining_response, "Index not dropped"
+                assert "idx_name_fts" not in remaining_response, "Index not dropped"
                 print("   Index drop verification: OK")
             else:
                 print("   Index 'idx_name_fts' not found, skipping drop test")
 
             # Add a new index
-            new_index_result = restored_table.create_index("idx_test_new",
-                                                           index.IndexInfo("age", index.IndexType.Secondary),
-                                                           ConflictType.Ignore)
+            new_index_result = restored_table.create_index(
+                "idx_test_new",
+                index.IndexInfo("age", index.IndexType.Secondary),
+                ConflictType.Ignore,
+            )
             print(f"   Add new index result: {new_index_result.error_code}")
 
             # # Verify new index
@@ -203,7 +237,9 @@ class TestSnapshot:
             print(f"   Delete result: {delete_result.error_code}")
 
             # Verify deletion
-            verify_delete, extra_result = restored_table.output(["id"]).filter("id = 999999").to_df()
+            verify_delete, extra_result = (
+                restored_table.output(["id"]).filter("id = 999999").to_df()
+            )
             assert len(verify_delete) == 0, "Row not deleted"
             print("   Delete verification: OK")
 
@@ -218,14 +254,18 @@ class TestSnapshot:
             print("   Testing drop column operation...")
 
             # Add a test column first
-            add_columns_result = restored_table.add_columns({"test_col": {"type": "int", "default": 0}})
+            add_columns_result = restored_table.add_columns(
+                {"test_col": {"type": "int", "default": 0}}
+            )
             print(f"   Add column result: {add_columns_result.error_code}")
 
             # Verify column was added by checking the full table structure
             try:
                 columns_result = restored_table.show_columns()
                 column_names = columns_result["name"].to_list()
-                print(f"   Column add verification: OK - table has {len(column_names)} columns")
+                print(
+                    f"   Column add verification: OK - table has {len(column_names)} columns"
+                )
             except Exception as e:
                 print(f"   Column add verification failed: {e}")
 
@@ -277,7 +317,7 @@ class TestSnapshot:
             "is_active": {"type": "bool"},
             "vector_col": {"type": "vector,1,float"},
             "tensor_col": {"type": "tensor,2,float"},
-            "sparse_col": {"type": "sparse,3,float,int16"}
+            "sparse_col": {"type": "sparse,3,float,int16"},
         }
 
         # Create table
@@ -298,19 +338,32 @@ class TestSnapshot:
         # table_obj.create_index("idx_vector_hnsw", index.IndexInfo("vector_col", index.IndexType.Hnsw, {"metric": "cosine", "m": "16", "ef_construction": "200"}), ConflictType.Ignore)
 
         # Full-text search index
-        table_obj.create_index("idx_name_fts", index.IndexInfo("name", index.IndexType.FullText), ConflictType.Ignore)
+        table_obj.create_index(
+            "idx_name_fts",
+            index.IndexInfo("name", index.IndexType.FullText),
+            ConflictType.Ignore,
+        )
 
         # BMP index
-        table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                 {"block_size": "16", "compress_type": "compress"}),
-                               ConflictType.Ignore)
+        table_obj.create_index(
+            "idx_vector_bmp",
+            index.IndexInfo(
+                "sparse_col",
+                index.IndexType.BMP,
+                {"block_size": "16", "compress_type": "compress"},
+            ),
+            ConflictType.Ignore,
+        )
 
         # # EMVB index (for tensors)
         # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
         # IVF index
-        table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}),
-                               ConflictType.Ignore)
+        table_obj.create_index(
+            "idx_vector_ivf",
+            index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}),
+            ConflictType.Ignore,
+        )
 
     def insert_comprehensive_data(self, table_obj, num_rows: int = 1000):
         """Insert comprehensive test data"""
@@ -335,13 +388,15 @@ class TestSnapshot:
         batch_size = 100
         successful_insertions = 0
         for i in range(0, len(data), batch_size):
-            batch = data[i:i + batch_size]
+            batch = data[i : i + batch_size]
             try:
                 result = table_obj.insert(batch)
                 if result.error_code == ErrorCode.OK:
                     successful_insertions += len(batch)
                 else:
-                    print(f"Warning: Batch insertion failed with error: {result.error_msg}")
+                    print(
+                        f"Warning: Batch insertion failed with error: {result.error_msg}"
+                    )
             except Exception as e:
                 print(f"Warning: Exception during batch insertion: {e}")
 
@@ -349,13 +404,17 @@ class TestSnapshot:
         try:
             count_result, _ = table_obj.output(["count(*)"]).to_df()
             actual_count = count_result.iloc[0, 0]
-            print(f"Expected to insert {num_rows} rows, actually inserted {actual_count} rows")
+            print(
+                f"Expected to insert {num_rows} rows, actually inserted {actual_count} rows"
+            )
             if actual_count != num_rows:
-                print(f"Warning: Row count mismatch. Expected {num_rows}, got {actual_count}")
+                print(
+                    f"Warning: Row count mismatch. Expected {num_rows}, got {actual_count}"
+                )
         except Exception as e:
             print(f"Warning: Could not verify row count: {e}")
 
-        return actual_count if 'actual_count' in locals() else successful_insertions
+        return actual_count if "actual_count" in locals() else successful_insertions
 
     # def test_persistence_restore(self, suffix):
     #     """Test basic snapshot create, list, drop operations"""
@@ -378,7 +437,9 @@ class TestSnapshot:
     #     # Drop table
     #     db_obj.drop_table(table_name, ConflictType.Error)
 
-    def create_snapshot_with_retry(self, db_obj, snapshot_name, table_name, max_retries=3, retry_delay=2) -> InfinityException:
+    def create_snapshot_with_retry(
+        self, db_obj, snapshot_name, table_name, max_retries=3, retry_delay=2
+    ) -> InfinityException:
         """Create snapshot with retry logic for checkpoint failures"""
         assert max_retries > 0, "max_retries must be greater than 0"
         snapshot_result = InfinityException(ErrorCode.OK, "")
@@ -391,7 +452,9 @@ class TestSnapshot:
                 snapshot_result = e
                 if e.error_code != ErrorCode.CHECKPOINTING:
                     return snapshot_result
-                print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
+                print(
+                    f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s..."
+                )
                 time.sleep(retry_delay)
         return snapshot_result
 
@@ -411,7 +474,9 @@ class TestSnapshot:
         print(f"Successfully inserted {actual_inserted} out of 100 rows")
 
         # Create snapshot with retry logic
-        snapshot_result = self.create_snapshot_with_retry(db_obj, snapshot_name, table_name)
+        snapshot_result = self.create_snapshot_with_retry(
+            db_obj, snapshot_name, table_name
+        )
         self.handle_snapshot_result(snapshot_result, "Basic snapshot creation")
 
         # List snapshots
@@ -433,7 +498,9 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
 
         # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=actual_inserted)
+        self.verify_restored_table_functionality(
+            table_name, db_obj, expected_row_count=actual_inserted
+        )
 
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
@@ -441,6 +508,7 @@ class TestSnapshot:
 
         # Drop table
         db_obj.drop_table(table_name, ConflictType.Error)
+
     def test_snapshot_large_table(self, suffix):
         """Test snapshot with large table and retry logic"""
         table_name = f"test_large_dataset{suffix}"
@@ -453,29 +521,37 @@ class TestSnapshot:
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
         self._create_indexes(table_obj)
-        actual_inserted = self.insert_comprehensive_data(table_obj,
-                                                         100000)  # 100k rows - should be fine with small dimensions
+        actual_inserted = self.insert_comprehensive_data(
+            table_obj, 100000
+        )  # 100k rows - should be fine with small dimensions
         print(f"Successfully inserted {actual_inserted} out of 100000 rows")
 
         # Check count
         count_result, extra_result = table_obj.output(["count(*)"]).to_df()
         print(f"   Row count: {count_result.iloc[0, 0]}")
-        assert count_result.iloc[
-                   0, 0] == actual_inserted, f"Expected {actual_inserted} rows, got {count_result.iloc[0, 0]}"
+        assert count_result.iloc[0, 0] == actual_inserted, (
+            f"Expected {actual_inserted} rows, got {count_result.iloc[0, 0]}"
+        )
 
         # Measure snapshot creation time with retry logic
         start_time = time.time()
         snapshot_result = self.create_snapshot_with_retry(
-            db_obj, snapshot_name, table_name,
+            db_obj,
+            snapshot_name,
+            table_name,
             max_retries=self.LARGE_TABLE_MAX_RETRIES,
-            retry_delay=self.LARGE_TABLE_RETRY_DELAY
+            retry_delay=self.LARGE_TABLE_RETRY_DELAY,
         )
         snapshot_time = time.time() - start_time
 
-        if self.handle_snapshot_result(snapshot_result, "Large table snapshot creation", skip_on_checkpoint=False):
+        if self.handle_snapshot_result(
+            snapshot_result, "Large table snapshot creation", skip_on_checkpoint=False
+        ):
             print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
         else:
-            pytest.skip(f"Large table snapshot failed due to checkpointing after retries: {snapshot_result.error_msg}")
+            pytest.skip(
+                f"Large table snapshot failed due to checkpointing after retries: {snapshot_result.error_msg}"
+            )
 
         # Drop table
         db_obj.drop_table(table_name, ConflictType.Error)
@@ -491,7 +567,9 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
 
         # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=actual_inserted)
+        self.verify_restored_table_functionality(
+            table_name, db_obj, expected_row_count=actual_inserted
+        )
 
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
@@ -535,11 +613,18 @@ class TestSnapshot:
         for snapshot_name in special_names:
             # Create snapshot with retry logic
             db_obj = self.infinity_obj.get_database("default_db")
-            result = self.create_snapshot_with_retry(db_obj, snapshot_name, table_name, max_retries=3, retry_delay=1)
+            result = self.create_snapshot_with_retry(
+                db_obj, snapshot_name, table_name, max_retries=3, retry_delay=1
+            )
 
-            if not self.handle_snapshot_result(result, f"Snapshot creation with name '{snapshot_name}'",
-                                               skip_on_checkpoint=False):
-                pytest.skip(f"Snapshot with name '{snapshot_name}' failed due to checkpointing: {result.error_msg}")
+            if not self.handle_snapshot_result(
+                result,
+                f"Snapshot creation with name '{snapshot_name}'",
+                skip_on_checkpoint=False,
+            ):
+                pytest.skip(
+                    f"Snapshot with name '{snapshot_name}' failed due to checkpointing: {result.error_msg}"
+                )
 
             db_obj.drop_table(table_name, ConflictType.Error)
 
@@ -551,6 +636,7 @@ class TestSnapshot:
             self.infinity_obj.drop_snapshot(snapshot_name)
 
         db_obj.drop_table(table_name, ConflictType.Error)
+
     def test_restore_table_snapshot_table_exists(self, suffix):
         """Test restore when table already exists"""
         db_obj = self.infinity_obj.get_database("default_db")
@@ -569,12 +655,16 @@ class TestSnapshot:
         db_obj.create_table(
             f"test_table_{suffix}",
             {"c1": {"type": "int", "constraints": ["primary key"]}},
-            ConflictType.Error
+            ConflictType.Error,
         )
 
         # Create snapshot
-        snapshot_result = self.create_snapshot_with_retry(db_obj, f"restore_snap_{suffix}", f"test_table_{suffix}")
-        self.handle_snapshot_result(snapshot_result, "test_restore_table_snapshot_table_exists")
+        snapshot_result = self.create_snapshot_with_retry(
+            db_obj, f"restore_snap_{suffix}", f"test_table_{suffix}"
+        )
+        self.handle_snapshot_result(
+            snapshot_result, "test_restore_table_snapshot_table_exists"
+        )
 
         # Try to restore without dropping original table
         with pytest.raises(InfinityException):
@@ -699,7 +789,10 @@ class TestSnapshot:
                         index_name = f"test_idx_{random.randint(1, 100)}"
                         try:
                             # Try to create index
-                            table_obj.create_index(index_name, index.IndexInfo("name", index.IndexType.FullText))
+                            table_obj.create_index(
+                                index_name,
+                                index.IndexInfo("name", index.IndexType.FullText),
+                            )
                             with state.lock:
                                 state.index_count += 1
                             time.sleep(0.1)
@@ -714,6 +807,7 @@ class TestSnapshot:
                             print(f"Index operation failed: {inner_e}")
                     except Exception as e:
                         import traceback
+
                         print(f"Index thread error: {e}")
                         traceback.print_exc()
                         break
@@ -734,7 +828,9 @@ class TestSnapshot:
                     snapshot_time = end_time - start_time
 
                     if result.error_code == ErrorCode.OK:
-                        print(f"Snapshot created successfully in {snapshot_time:.2f} seconds")
+                        print(
+                            f"Snapshot created successfully in {snapshot_time:.2f} seconds"
+                        )
                         print(f"  - {state.insert_count} inserts performed")
                         print(f"  - {state.update_count} updates performed")
                         print(f"  - {state.delete_count} deletes performed")
@@ -749,7 +845,13 @@ class TestSnapshot:
 
             # Start all threads
             threads = []
-            thread_functions = [insert_thread, update_thread, delete_thread, index_thread, snapshot_thread]
+            thread_functions = [
+                insert_thread,
+                update_thread,
+                delete_thread,
+                index_thread,
+                snapshot_thread,
+            ]
 
             print("Starting modification threads...")
             for func in thread_functions:
@@ -779,7 +881,9 @@ class TestSnapshot:
 
                 # Restore the snapshot
                 restore_result = db_obj.restore_table_snapshot(snapshot_name)
-                assert restore_result.error_code == ErrorCode.OK, f"Snapshot restore failed: {restore_result.error_code}"
+                assert restore_result.error_code == ErrorCode.OK, (
+                    f"Snapshot restore failed: {restore_result.error_code}"
+                )
 
                 self.verify_restored_table_functionality(table_name, db_obj)
             except Exception as e:

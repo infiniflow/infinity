@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is about connecting local infinity instance, creating table, ing data, importing file into a table, and exporting table's data
-'''
+"""
 
 import os
 import sys
@@ -29,7 +29,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -38,12 +40,15 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "name": {"type": "varchar"},
-        "age": {"type": "integer"},
-        "score": {"type": "float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "name": {"type": "varchar"},
+            "age": {"type": "integer"},
+            "score": {"type": "float"},
+        },
+    )
 
     # Insert 10 rows of data into the 'my_table'
     table_instance.insert(
@@ -51,13 +56,13 @@ try:
             {
                 "num": 1,
                 "name": "Tom",
-                "age": 19, 
+                "age": 19,
                 "score": 90.5,
             },
             {
                 "num": 2,
                 "name": "Henry",
-                "age": 20, 
+                "age": 20,
                 "score": 70.0,
             },
             {
@@ -112,12 +117,14 @@ try:
     )
 
     # TODO also show how to export other type of file
-    table_instance.export_data(os.getcwd() + "/export_data.jsonl",
-                               {"file_type": "jsonl", "offset": 2, "limit": 7, "row_limit": 2}, ["num", "name", "score"])
-
+    table_instance.export_data(
+        os.getcwd() + "/export_data.jsonl",
+        {"file_type": "jsonl", "offset": 2, "limit": 7, "row_limit": 2},
+        ["num", "name", "score"],
+    )
 
     infinity_instance.disconnect()
-    print('test done')
+    print("test done")
     sys.exit(0)
 
 except Exception as e:

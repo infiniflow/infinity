@@ -45,6 +45,7 @@ def get_infinity_db():
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
 
+
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
     connection_pool = ConnectionPool(common_values.TEST_LOCAL_HOST)
@@ -80,7 +81,9 @@ def pytest_addoption(parser):
         help="Run integration tests (requires S3 buckets to be setup with access)",
     )
 
+
 log_output_file = "run_parallel_test.log"
+
 
 def pytest_configure(config):
     logger = logging.getLogger("run_parallel_test")
@@ -88,5 +91,7 @@ def pytest_configure(config):
     handler = logging.FileHandler(log_output_file, delay=True)
     logger.addHandler(handler)
     logger.addHandler(logging.StreamHandler())
-    formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
+    )
     handler.setFormatter(formatter)

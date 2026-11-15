@@ -54,8 +54,14 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str, test_file_name: str = None,
-                 loop: int = 1):
+def process_test(
+    sqllogictest_bin: str,
+    slt_dir: str,
+    data_dir: str,
+    copy_dir: str,
+    test_file_name: str = None,
+    loop: int = 1,
+):
     print(f"sqlllogictest-bin path is {sqllogictest_bin}")
     print(f"slt_dir path is {slt_dir}")
     print(f"data_dir path is {data_dir}")
@@ -77,7 +83,9 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
 
                 print("Start running test file: " + file)
                 process = subprocess.run(
-                    [sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    [sqllogictest_bin, file],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 output, error = process.stdout, process.stderr
                 print(f"Output: {output.decode()}")  # Prints the output.
@@ -98,7 +106,9 @@ def copy_all(data_dir, copy_dir):
         os.makedirs(copy_dir)
     for dirpath, dirnames, filenames in os.walk(data_dir):
         # Filter out symlink directories so os.walk will not recurse into them
-        dirnames[:] = [d for d in dirnames if not os.path.islink(os.path.join(dirpath, d))]
+        dirnames[:] = [
+            d for d in dirnames if not os.path.islink(os.path.join(dirpath, d))
+        ]
         for filename in filenames:
             src_path = os.path.join(dirpath, filename)
             # Skip symbolic links to avoid copying link targets or broken links
@@ -122,14 +132,32 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
-    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists")
-    parser.add_argument("-p", "--path", help="path of sqllogictest-rs", type=str, default="sqllogictest", dest="path")
-    parser.add_argument("-t", "--test", help="path of test directory", type=str, default=test_dir, dest="test")
+    parser.add_argument(
+        "-g", "--generate", type=bool, default=False, dest="generate_if_exists"
+    )
+    parser.add_argument(
+        "-p",
+        "--path",
+        help="path of sqllogictest-rs",
+        type=str,
+        default="sqllogictest",
+        dest="path",
+    )
+    parser.add_argument(
+        "-t",
+        "--test",
+        help="path of test directory",
+        type=str,
+        default=test_dir,
+        dest="test",
+    )
     parser.add_argument("--test_case", help="test_case", type=str, default=None)
     parser.add_argument("--loop", type=int, required=False, default=1)
     parser.add_argument("-d", "--data", type=str, default=data_dir, dest="data")
     parser.add_argument("-c", "--copy", type=str, default=copy_dir, dest="copy")
-    parser.add_argument("-jc", "--just_copy", type=bool, default=False, dest="just_copy_all_data")
+    parser.add_argument(
+        "-jc", "--just_copy", type=bool, default=False, dest="just_copy_all_data"
+    )
 
     args = parser.parse_args()
 
@@ -182,7 +210,9 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            process_test(args.path, args.test, args.data, args.copy, args.test_case, args.loop)
+            process_test(
+                args.path, args.test, args.data, args.copy, args.test_case, args.loop
+            )
         except Exception as e:
             print(e)
             sys.exit(-1)
