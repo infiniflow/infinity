@@ -18,6 +18,7 @@
 | 6 | 仅靠 WAL 恢复时丢失索引参数 | 端口缺陷 | 已修 |
 | 7 | 显式 LSG 配置拼写不兼容，C++ 读取 Rust checkpoint 时 abort | 端口缺陷 | 已修 |
 | 8 | Rust 读取 C++ 的 LSG WAL 后，索引不存在 | 端口缺陷 | 已修 |
+| — | *（修第 3 条时发现）* HNSW 的 bucket 划分与参考不一致 | 端口缺陷 | 已修（§3.7） |
 
 第 1、2 条及第 1 条引出的“三份文件逐字节相同”判据，经实测确认是**参考实现自身的行为**，不是端口回归；本轮明确**保持现状**。理由与测量见下文第二节。
 
@@ -118,6 +119,31 @@ index_column_ids   = 1
 实测：Rust 打开参考写出的目录后，三条 HNSW 索引（plain / 默认 LSG / 显式 LSG）全部恢复，`show_index` 与向量查询都正常（`count(*) = 2000`，查询返回 3 行）。
 
 回归：`storage::wal::index_def::tests::hnsw_lsg_body_roundtrips_and_has_the_reference_layout`。
+
+### 3.7 修 item 3 时发现的附加缺陷：HNSW 的 bucket 划分与参考不一致
+
+`HnswIndex::add_batch` 把 `[base, entry)` 与 `[entry + 1, n)` **分别**切 bucket，再把两个列表并发执行。参考的 `HnswHandler::InsertVecs` 是对整个 `[start, end)` 切一次：
+
+```
+bucket_size = max(kBuildBucketSize, (n - 1) / threads + 1)
+```
+
+差别只在小批量上显现：
+
+| 行数 | 参考 | 端口（修前） |
+|---|---|---|
+| 200 | 1 个 bucket，单线程 | 2 个 bucket，并发 |
+
+两个并发 bucket 会写彼此的反向边：`connect_neighbors` 在 `list.len() < Mmax` 时直接 `push`，列表内容因此取决于谁先到。200 行的图逐次不同。
+
+item 3 把量化 store 也送进这条路径后，这个偏差第一次变得可观测：`hnsw_encodings_answer_vector_search`（200 行、`encode=rabitq`）本地 20 次里失败 5 次；CI 上 amd64 失败、arm64 通过（两边的线程调度不同）。
+
+修法两步：
+
+1. 按参考对整个 `[base, n)` 统一切分；
+2. builder 里两处 `sort_unstable_by` 加上按顶点 id 的 tiebreak，与 serial 路径 `search_layer_filtered` 已有的做法一致。量化 store 的距离是估计值，并列很常见，没有 tiebreak 时 `sort_unstable` 对等值元素的顺序取决于输入布局。
+
+验证：该用例连续 15 次通过（修前 20 次里 5 次失败）。
 
 ---
 
