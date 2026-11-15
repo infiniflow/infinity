@@ -3824,7 +3824,7 @@ impl Engine {
     /// The catalog id of the full-text index on `column` - the first one when
     /// the column has several, which is what the reference's
     /// `TableIndexMeta::GetIndexBase` resolves for a plain `MATCH TEXT`.
-    fn fulltext_index_id(&self, table: &str, column: &str) -> Option<u64> {
+    pub(crate) fn fulltext_index_id(&self, table: &str, column: &str) -> Option<u64> {
         self.storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
@@ -4070,7 +4070,7 @@ impl Engine {
         if !entry.segments.is_empty() && !covered.iter().all(|id| entry.segments.contains_key(id)) {
             if ft_trace_enabled(tkey) {
                 eprintln!(
-                    "[FT] {tkey}.{column} publish refused: build covers retired segments {covered:?}, live {:?}",
+                    "[FT] {tkey}.{index_id} publish refused: build covers retired segments {covered:?}, live {:?}",
                     entry.segments.keys().collect::<Vec<_>>()
                 );
             }
@@ -7117,11 +7117,16 @@ impl Engine {
                             .filter(|id| !by_id.contains_key(&(*id as usize)))
                             .collect();
                         let (segs, built, min_ts, epoch) = {
+                            // `text_built` is keyed by the record's id, not by the
+                            // column: resolve the same record `MATCH` used above.
+                            let index_id = self
+                                .fulltext_record(table, &schema[field_specs[0].0])
+                                .map(|(id, _)| id);
                             let tables = self.tables.lock().unwrap();
                             match tables.get(&self.table_key(table)) {
                                 Some(entry) => (
                                     entry.segments.keys().copied().collect::<Vec<_>>(),
-                                    entry.text_built.get(&schema[field_specs[0].0]).copied(),
+                                    index_id.and_then(|id| entry.text_built.get(&id)).copied(),
                                     entry.text_min_ts,
                                     entry.text_epoch,
                                 ),

@@ -709,8 +709,11 @@ mod tests {
             let stale: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
             stale
         };
+        let index_id = e
+            .fulltext_index_id("retired", "body")
+            .expect("the full-text index is recorded in the catalog");
         assert_eq!(
-            e.publish_text_index(&tkey, "body", epoch, stale),
+            e.publish_text_index(&tkey, index_id, epoch, stale),
             crate::engine::statements::TextPublish::Renumbered,
             "a build of the retired segment must not be cached"
         );
@@ -735,7 +738,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&tkey)
-                .and_then(|entry| entry.text.get("body").cloned())
+                .and_then(|entry| entry.text.get(&index_id).cloned())
         };
         assert_eq!(rows(&e, q).len(), 3);
         let first = cached(&e).expect("the build of the merged layout was published");
@@ -1099,12 +1102,15 @@ mod tests {
 
         // The stale copy: segment 0's rows, sealed from a tail that was already
         // being written when the merge renumbered them.
+        let index_id = e
+            .fulltext_index_id("late", "body")
+            .expect("the full-text index is recorded in the catalog");
         let shared = e
             .tables
             .lock()
             .unwrap()
             .get(&e.table_key("late"))
-            .and_then(|entry| entry.text.get("body").cloned())
+            .and_then(|entry| entry.text.get(&index_id).cloned())
             .expect("the merge keeps the cache");
         let (tokenizer, cache_dir) = {
             let g = shared.read().unwrap();
