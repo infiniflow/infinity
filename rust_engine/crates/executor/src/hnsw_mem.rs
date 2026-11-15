@@ -13,12 +13,14 @@ pub(crate) struct HnswIndexInMem {
     handler: HnswHandler,
     /// Row id per added vector (the graph's labels).
     rows: Vec<u64>,
-    /// `IndexHnsw::lsg_config_`, trained into the graph with the first batch.
+    /// `IndexHnsw::lsg_config_`, handed to the store with the first batch.
     ///
-    /// The memory segment used to ignore `build_type`/`lsg_config` entirely, so
-    /// rows written before the first dump - the whole of a fresh `CREATE INDEX`
-    /// - were scaled by an all-zero LSG average, and `SEARCH MATCH VECTOR`
-    /// answered with visibly lower recall than the same index after a restart.
+    /// [`HnswIndex::train_store`] records it and does not activate the scaling,
+    /// exactly as the reference does (see that method's `lsg` section): the
+    /// reference builds an `HnswLSGBuilder` for `build_type=lsg` but never
+    /// calls `InsertSampleVecs`/`InsertLSAvg`/`SetLSGParam` outside its unit
+    /// tests, so its `LSGDistWrapper::avg_` stays null and queries rank by the
+    /// raw distance.
     lsg: Option<LsgConfig>,
 }
 

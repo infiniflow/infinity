@@ -654,19 +654,49 @@ impl HnswIndex {
         }
     }
 
-    /// Trains LVQ's mean / RaBitQ's centroid and computes the LSG averages
-    /// from `vectors`. The caller then feeds the same vectors through
-    /// [`HnswIndex::add`], which compresses them with the trained state.
+    /// Trains LVQ's mean / RaBitQ's centroid from `vectors`. The caller then
+    /// feeds the same vectors through [`HnswIndex::add`], which compresses them
+    /// with the trained state.
+    ///
+    /// # `lsg`
+    ///
+    /// The LSG configuration is accepted and **not applied**, because the
+    /// reference does not apply it either:
+    ///
+    /// * `build_type=lsg` is parsed, validated and persisted
+    ///   (`IndexHnsw::ParseWithSortT`, `IndexHnsw::ToString`), and
+    ///   `HnswHandler`'s constructor does build an `HnswLSGBuilder` for it
+    ///   (`hnsw_handler_impl.cpp:218`, `InitLSGBuilder`).
+    /// * Nothing on a production path ever *trains* it. `InsertSampleVecs`,
+    ///   `InsertLSAvg` and `SetLSGParam` — the three calls that fill `avg_` and
+    ///   install it in `LSGDistWrapper` — appear only in
+    ///   `test_lsg_build_ut.cpp`; `HnswHandler::InsertVecs`
+    ///   (`hnsw_handler.cppm:151`) goes straight from `StoreData` to `Build`,
+    ///   and `new_txn_index_impl.cpp:942` calls exactly that.
+    /// * So `LSGDistWrapper::avg_` stays `nullptr`, its `operator()` returns
+    ///   the raw distance, and a `build_type=lsg` graph in the reference is a
+    ///   plain graph whose catalogue record carries the LSG parameters.
+    ///
+    /// Scaling the edges here instead is not a conservative difference: the
+    /// wrapper returns the *raw* distance for a query vector
+    /// (`v1_i == kInvalidVertex`, `dist_func_lsg_wrapper.cppm:51`), so the
+    /// graph would be organized in the scaled space while queries rank in the
+    /// raw one. Measured on 200k x 128 rows (M=16, ef_construction=200,
+    /// `sample_raito=0.01`, `ls_k=10`, `alpha=1`): recall@10 0.860 with the
+    /// scaling applied against 0.998 without — the port's answers diverged from
+    /// the reference's and from what `metric='l2'` promises.
+    ///
+    /// [`crate::lsg::LsgIndex`] is kept: it is the port of `HnswLSGBuilder` +
+    /// `LSGDistWrapper`, exercised by its own tests against
+    /// `test_lsg_build_ut.cpp`, and [`HnswIndex::adjust`] honours it when a
+    /// graph carries one (a graph loaded with scaling, or a future build that
+    /// trains it).
     pub fn train_store<V: AsRef<[f32]> + Sync>(
         &mut self,
         vectors: &[V],
-        lsg: Option<crate::lsg::LsgConfig>,
+        _lsg: Option<crate::lsg::LsgConfig>,
     ) {
         self.store.train(vectors);
-        if let Some(config) = lsg {
-            let metric = self.store.metric().into();
-            self.lsg = Some(crate::lsg::LsgIndex::build(vectors, metric, config));
-        }
     }
 
     pub fn lsg(&self) -> Option<&crate::lsg::LsgIndex> {
@@ -2411,6 +2441,58 @@ mod reference_suite {
     #[test]
     fn plain_parallel_insert_and_search() {
         parallel_readers(Metric::L2, HnswEncoding::Plain);
+    }
+
+    /// `build_type=lsg` must produce the same graph as a plain build.
+    ///
+    /// The reference parses and persists the LSG parameters and even builds an
+    /// `HnswLSGBuilder` for them, but no production path trains it
+    /// (`InsertSampleVecs`/`InsertLSAvg`/`SetLSGParam` are called only from
+    /// `test_lsg_build_ut.cpp`), so `LSGDistWrapper::avg_` stays null and the
+    /// graph's distances are the raw ones. Applying the scaling instead made
+    /// recall@10 drop from 0.998 to 0.860 at 200k x 128 against the raw-L2
+    /// ground truth, because the wrapper returns the *raw* distance for a
+    /// query vector.
+    #[test]
+    fn lsg_config_leaves_the_graph_plain() {
+        let dims = 32;
+        let n = 300;
+        let data: Vec<Vec<f32>> = (0..n)
+            .map(|i| {
+                let mut state = (i as u64).wrapping_mul(6364136223846793005).wrapping_add(1);
+                (0..dims)
+                    .map(|_| {
+                        state = state
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(1442695040888963407);
+                        (state >> 40) as f32 / 1000.0
+                    })
+                    .collect()
+            })
+            .collect();
+        let build = |lsg: Option<crate::lsg::LsgConfig>| {
+            let mut index =
+                HnswIndex::with_encoding(dims, 8, 64, 32, Metric::L2, HnswEncoding::Plain);
+            index.train_store(&data, lsg);
+            for v in &data {
+                index.add(v);
+            }
+            index
+        };
+        let plain = build(None);
+        let lsg = build(Some(crate::lsg::LsgConfig {
+            sample_ratio: 0.25,
+            ls_k: 7,
+            alpha: 0.5,
+        }));
+        assert!(lsg.lsg().is_none(), "the scaling must not be trained");
+        for q in data.iter().take(32) {
+            assert_eq!(
+                plain.search_with_ef(q, 5, 32),
+                lsg.search_with_ef(q, 5, 32),
+                "the LSG build answered differently from the plain one"
+            );
+        }
     }
 
     /// C++: `HnswAlgTest.test_lvq_2`.

@@ -181,7 +181,7 @@ impl<'a> Builder<'a> {
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
         while cur > q_layer as i64 {
-            ep = self.search_layer_nearest(&query, ep, cur as usize);
+            ep = self.search_layer_nearest(&query, ep, cur as usize, node);
             cur -= 1;
         }
         let mut l = q_layer.min(self.max_level) as i64;
@@ -286,9 +286,21 @@ impl<'a> Builder<'a> {
     }
 
     /// `SearchLayerNearest`: greedy descent on one upper layer.
-    fn search_layer_nearest(&self, q: &QueryRef, start: usize, layer: usize) -> usize {
+    ///
+    /// `self_id` is the vertex being built, and it is the LSG scaling's left
+    /// operand: `Build` passes `vertex_i` to every distance it takes
+    /// (`hnsw_alg.cppm:401`), so a scaled graph descends in the scaled space on
+    /// the upper layers too. Passing `None` here mixed raw and scaled
+    /// distances inside one build.
+    fn search_layer_nearest(
+        &self,
+        q: &QueryRef,
+        start: usize,
+        layer: usize,
+        self_id: usize,
+    ) -> usize {
         let mut cur = start;
-        let mut cur_d = self.distance_to(q, None, cur);
+        let mut cur_d = self.distance_to(q, Some(self_id), cur);
         loop {
             let nodes = self.store.len();
             let next = self.with_neighbors(layer, cur, |list| {
@@ -298,7 +310,7 @@ impl<'a> Builder<'a> {
                     if nb >= nodes {
                         continue;
                     }
-                    let d = self.distance_to(q, None, nb);
+                    let d = self.distance_to(q, Some(self_id), nb);
                     if d < best.1 {
                         best = (nb, d);
                     }

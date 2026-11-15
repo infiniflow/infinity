@@ -96,7 +96,8 @@ impl LsgIndex {
     /// Builds the sample set and the average distances.
     ///
     /// C++ `InsertSampleVec` samples each row independently with probability
-    /// `sample_ratio`; the deterministic LCG here keeps a build reproducible.
+    /// `sample_ratio` (`rand() % 1000 / 1000.0 <= ratio`); the deterministic LCG
+    /// here keeps a build reproducible.
     pub fn build<V: AsRef<[f32]> + Sync>(vectors: &[V], metric: Metric, config: LsgConfig) -> Self {
         let mut state = 0x9E37_79B9_7F4A_7C15u64;
         let mut samples: Vec<&[f32]> = Vec::new();
@@ -107,7 +108,12 @@ impl LsgIndex {
                 state = state
                     .wrapping_mul(6364136223846793005)
                     .wrapping_add(1442695040888963407);
-                let r = ((state >> 33) as u32) as f32 / u32::MAX as f32;
+                // The top 32 bits scaled to `[0, 1)`. Taking `>> 33` and
+                // dividing by `u32::MAX` only reached `[0, 0.5)`, so a
+                // `sample_ratio` of 0.01 sampled 2% of the rows - twice the
+                // sample set (and twice the build's dominant cost) the
+                // statement asked for.
+                let r = ((state >> 32) as u32) as f32 / (u32::MAX as f32 + 1.0);
                 if r <= config.sample_ratio {
                     samples.push(v.as_ref());
                 }

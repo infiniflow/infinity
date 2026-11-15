@@ -70,3 +70,85 @@ tools/run_index_bench.sh index-types 200000 50
 
 驱动本身是 `tools/bench_index_types.py`，它连一个已经在跑的引擎（`127.0.0.1:23817`）；
 `run_index_bench.sh` 负责起停两端（各在自己的网络命名空间里）。
+
+## 规模验收：LSG 语义与查询路径开销（2026-11-15）
+
+口径：单进程内建索引后直接查询（不经重启），数据 `id int, v embedding(float,128)`，
+1000 个簇 + 每维抖动（SIFT-like），`M=16, ef_construction=200, metric='l2', encode='lvq'`，
+`SEARCH MATCH VECTOR` 取 top-10，真值为对同一批向量的穷举 L2 top-10。
+
+```bash
+cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture
+# 规模/编码/构建类型用 INFINITY_BENCH_ROWS / INFINITY_BENCH_ENCODE / INFINITY_BENCH_BUILD_TYPE
+```
+
+### 1. `build_type=lsg` 与参考实现对齐
+
+| 构建 | recall@10 | 重启后 recall@10 | 构图耗时（200k） |
+|---|---:|---:|---:|
+| `plain` | 0.998 | 0.978 | 4.3 s |
+| `lsg`（缩放真正生效，本仓库旧行为） | 0.674 → 0.860\* | 0.936 | 8.7 s |
+| `lsg`（与参考一致：只记录参数） | **0.994** | **0.994** | 4.0 s |
+
+\* 先把采样概率区间和并行构建的贪心下降对齐参考（见下），缩放生效时也只到 0.860，仍显著低于 plain。
+
+1M 行（`INFINITY_BENCH_ROWS=1000000`）下两者已经重合：
+
+| 构建 | recall@10 | 重启后 recall@10 | 图搜索 p50（ef=64） | 构图 |
+|---|---:|---:|---:|---:|
+| `plain` | 0.906 | 0.852 | 165 µs | 28.1 s |
+| `lsg`（与参考一致） | 0.904 | 0.848 | 166 µs | 27.6 s |
+
+结论：参考实现的 `HnswHandler` 会为 `build_type=lsg` 构造 `HnswLSGBuilder`
+（`hnsw_handler_impl.cpp:218`），但**任何生产路径都不训练它**——`InsertSampleVecs` /
+`InsertLSAvg` / `SetLSGParam`（填写 `avg_` 并装进 `LSGDistWrapper` 的三步）只出现在
+`test_lsg_build_ut.cpp`，`HnswHandler::InsertVecs`（`hnsw_handler.cppm:151`）从
+`StoreData` 直接到 `Build`，`new_txn_index_impl.cpp:942` 调的就是它。于是
+`LSGDistWrapper::avg_` 恒为 `nullptr`，`operator()` 返回原始距离
+（`dist_func_lsg_wrapper.cppm:51`：`v1_i == kInvalidVertex` 直接返回 `d`），
+参考版的 lsg 索引就是"带 LSG 参数的 plain 索引"。
+
+在缩放真正生效的情况下，构图在缩放空间选边、查询在原始空间排序，两者不一致，
+L2 召回必然低于 plain——这不是参数没调好，而是语义错配。因此本仓库按参考实现的
+做法处理：`IndexHnsw` 照旧解析/校验/持久化 `lsg_config`，`show_index` 照旧报告，
+但构图不做缩放；`LsgIndex`（`HnswLSGBuilder` + `LSGDistWrapper` 的移植）与其单测保留，
+`HnswIndex::adjust` 在拿到缩放的图上仍然生效。
+
+同时修掉两处与参考不一致的实现细节（这两处只影响"缩放生效"的分支）：
+
+- 采样概率：`(state >> 33) as u32 / u32::MAX` 只覆盖 `[0, 0.5)`，`sample_ratio=0.01`
+  实际采样了 2%（`hnsw_lsg_builder.cppm` 用 `rand() % 1000 / 1000.0`）。改为 `[0, 1)`。
+- 并行构建的 `SearchLayerNearest` 传 `None`，而参考的 `Build` 把 `vertex_i` 传给每一次
+  取距（`hnsw_alg.cppm:401`），即上层下降也用缩放距离。已对齐。
+
+### 2. 查询路径：去掉与表规模成正比的额外开销
+
+200k 行、同一批 50 次查询：
+
+| 指标 | 修复前 | 修复后 |
+|---|---:|---:|
+| 服务端 p50（SQL → top-10） | 33.6 ms | **0.58 ms** |
+| 冷启动首查 | 500 ms+ | 26 ms（一次性计数） |
+| 图搜索本身 p50（`ef=64`，不进 SQL） | 0.09 ms | 0.09 ms |
+
+修复后 p50 不再随表规模增长（同一套语句，LVQ）：
+
+| 行数 | p50 | 冷启动首查 | 图搜索 p50（ef=64） |
+|---|---:|---:|---:|
+| 50k | 0.53 ms | 7.4 ms | 0.07 ms |
+| 200k | 0.58 ms | 23 ms | 0.09 ms |
+| 1M | 0.83 ms | 0.38 s | 0.17 ms |
+
+根因不在图搜索，而在两处"按表规模付费"：
+
+1. `read_blocks_values_at` 无条件克隆整个 append buffer（行尚未 checkpoint 时是整表），
+   每行是深拷贝的 `Vec<Value>`（含 128 维向量文本）——20 万行约 100 MB/次查询。
+   现在候选读取只按 id 探测缓冲（`buffered_rows_for` 改为遍历 ids，走
+   `pending_pos`/按 id 有序缓冲的查找）。
+2. 覆盖判定（"图是否覆盖整表"）依赖热向量缓存，而缓存未建立时 `live_rows` 也还没发布，
+   于是首查判定为"图不完整"→ 回退全表精确扫描，并顺手把整列向量解析进缓存。
+   现在覆盖判定用 `live_count`（发布计数，缺失时用 `row_count` 兜底并发布），
+   精确扫描才建缓存。
+
+剩余常数开销：候选行按列解码 + 结果行按块读取（10 行可能落在 10 个块里，每块按列解码）。
+与参考版 200k 行 0.409 ms（服务端 exec）同一量级。
