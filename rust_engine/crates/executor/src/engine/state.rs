@@ -6187,6 +6187,18 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
 /// leaves the tail in flight for the next attempt instead of merging it back
 /// into a tail other writers may have appended to.
 pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
+    // The directory's write gate, taken **before** any index lock: a seal and a
+    // merge, a checkpoint's publish or another instance's rebuild must never
+    // write, rename or unlink one chunk file at the same time. Both sides derive
+    // the chunk's name from its first row id (`ft_{base_row_id}`), so two writers
+    // of one range would choose the same name and the narrower write would win
+    // (`dir_gate`). Cloned out of the instance first, so no index lock is held
+    // while the wait happens.
+    let gate = {
+        let index = shared.read().unwrap();
+        index.gate.clone()
+    };
+    let _serial = gate.lock().unwrap();
     let job = {
         let mut index = shared.write().unwrap();
         index.claim_seal()
@@ -6206,18 +6218,27 @@ pub(crate) fn seal_text_index_unlocked(shared: &SharedTextIndex) {
     }
 }
 
-/// Runs one column's chunk merge with the write lock **released**.
+/// Runs one column's chunk merge with the index's write lock **released**.
 ///
-/// The plan is made under the lock from the chunk headers, the files are
-/// rewritten with no lock at all, and the swap back in checks that the chunk
-/// list is still the one the plan was made from. A chunk list that moved (a seal
-/// appended a chunk, another optimize replaced one) is left alone and the merged
-/// files are dropped, so a long merge never blocks a query or a writer and never
-/// loses a chunk that arrived meanwhile.
+/// The plan is made from the chunk headers, the files are rewritten with no
+/// index lock at all (a long merge never blocks a query), and the swap back in
+/// checks that the chunk list is still the one the plan was made from.
+///
+/// The three steps run under the **directory's write gate**, so no seal, no
+/// rebuild and no other merge can land in between: `apply_merge` unlinks the
+/// chunks the plan names, and a list that moved under it would have it delete
+/// files another writer had just published under the same name (`dir_gate`).
+/// Only the lookups this column shares with a query - the index lock itself -
+/// stay outside it.
 pub(crate) fn optimize_text_index_unlocked(
     shared: &SharedTextIndex,
     deleted: &std::collections::HashSet<u64>,
 ) -> crate::Result<usize> {
+    let gate = {
+        let index = shared.read().unwrap();
+        index.gate.clone()
+    };
+    let _serial = gate.lock().unwrap();
     let (plan, dir) = {
         let index = shared.read().unwrap();
         let Some(plan) = index.plan_merge(deleted)? else {
@@ -6225,7 +6246,7 @@ pub(crate) fn optimize_text_index_unlocked(
         };
         (plan, index.dir.clone())
     };
-    // No lock held: whole chunks are rewritten here.
+    // No index lock held: whole chunks are rewritten here.
     let merged = TextIndex::merge_runs(&dir, &plan);
     let mut index = shared.write().unwrap();
     Ok(index.apply_merge(&plan, merged))

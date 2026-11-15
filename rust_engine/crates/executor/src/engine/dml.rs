@@ -1978,6 +1978,15 @@ impl Engine {
                         // Crossed into the next `ROW_ID` segment: seal the old
                         // rows in place. This happens once per 2^32 rows, so the
                         // lock-held write costs nothing measurable.
+                        //
+                        // This is the one seal that writes with the index lock
+                        // held, so it must not take the directory's write gate -
+                        // that would invert the `gate -> index` order every other
+                        // writer uses (`crate::engine::text_index::dir_gate`). The
+                        // chunk it writes is named after its own tail's first row
+                        // id, and no concurrent merge or rebuild reaches that tail
+                        // before this seal: both hold the gate and only see the
+                        // tail once it is sealed.
                         index.seal();
                     }
                     for doc in &prepared {

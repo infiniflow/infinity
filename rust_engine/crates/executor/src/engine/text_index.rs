@@ -39,6 +39,39 @@ pub(crate) fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
     *list = out;
 }
 
+/// The one gate every file-level mutation of a full-text index directory takes.
+///
+/// One directory has more writers than one instance: the cached `TextIndex`
+/// seals while it fills, a rebuild seals while it re-indexes, `optimize`
+/// rewrites chunks and unlinks their sources, `dump` and the checkpoint publish
+/// the same names, and a reopen's `load_sealed` removes the chunks it considers
+/// superseded. Those paths took three different locks - `flush_lock` for
+/// dump/checkpoint, the table's `batch_gate` for optimize, **nothing at all** for
+/// a seal or a rebuild - so any two of them could write, rename or unlink one
+/// file at the same time. A chunk is named after its first row id, so two
+/// writers of one range choose the same name and the narrower write wins: the
+/// rows it does not cover never reach the layout the next open reads
+/// (`writers_readers_deletes_and_merges_stay_consistent`, one chunk's worth of
+/// rows missing after a restart).
+///
+/// Per directory, process wide: two engines opened on one directory are one
+/// directory on disk. It is only ever held around blocking file I/O and never
+/// across an `await`, so it is a `std::sync::Mutex`. Taken **before** any index
+/// lock - `seal_text_index_unlocked`, `optimize_text_index_unlocked` and the
+/// build all follow that order, and nothing takes it while holding one - which
+/// is what keeps `gate -> index` the only nesting this index has.
+pub(crate) fn dir_gate(dir: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
+    type Gate = std::sync::Arc<std::sync::Mutex<()>>;
+    type Gates = std::sync::Mutex<std::collections::HashMap<String, Gate>>;
+    static GATES: std::sync::OnceLock<Gates> = std::sync::OnceLock::new();
+    let gates = GATES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let mut gates = gates.lock().unwrap_or_else(|poison| poison.into_inner());
+    gates
+        .entry(dir.to_string())
+        .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
+        .clone()
+}
+
 /// Removes a spill run's transient segment files.
 pub(crate) fn remove_run_files(dir: &str, base_name: &str) {
     // Through the store, so a persistence profile forgets the object parts as
@@ -1189,6 +1222,10 @@ pub(crate) struct TextIndex {
     /// (`Engine::record_sealed_text_chunks`). The record is what a reader has
     /// to go by: `load_sealed_scoped` reads the catalog and nothing else.
     pub(crate) unrecorded: Vec<SealedChunk>,
+    /// The write gate this index's **directory** shares with every other
+    /// instance opened on it ([`dir_gate`]). Held around the file-level work of
+    /// a seal, a merge and a build, never across an index lock.
+    pub(crate) gate: std::sync::Arc<std::sync::Mutex<()>>,
 }
 
 /// One chunk a seal wrote: what its catalog record needs.
@@ -1476,6 +1513,10 @@ impl PosArena {
 
 impl TextIndex {
     pub(crate) fn new(dir: String, tokenizer: TextTokenizer) -> Self {
+        // Looked up before `dir` is moved: every instance on one directory has to
+        // share the gate, which is what makes a seal and a rebuild exclude each
+        // other (`dir_gate`).
+        let gate = dir_gate(&dir);
         Self {
             tokenizer,
             mem: MemoryIndexer::new(),
@@ -1488,6 +1529,7 @@ impl TextIndex {
             inflight: None,
             last_seal_us: 0,
             unrecorded: Vec::new(),
+            gate,
         }
     }
 

@@ -3846,6 +3846,80 @@ impl Engine {
         self.text_index_build(table, index_id, column, tokenizer)
     }
 
+    /// The cached index for `index_id`, when it belongs to the current layout and
+    /// already holds every one of the `reserved` live rows, plus the table's
+    /// `text_epoch` - a build publishes at it.
+    ///
+    /// Split out of [`Self::text_index_build`] because the build asks twice: on
+    /// the fast path, and again under the directory's write gate, where another
+    /// build may have published while this one waited for it.
+    fn usable_text_index(
+        &self,
+        key: &str,
+        tkey: &str,
+        index_id: u64,
+        reserved: usize,
+    ) -> (Option<SharedTextIndex>, u64) {
+        // Clone the `Arc` and let go of `tables` before the index is locked.
+        // A query holds the index's *read* guard while it fetches rows
+        // (`search_text_terms`), and that fetch needs `tables`
+        // (`visible_block_ids` -> `block_index_for`); taking the index lock
+        // under `tables` here closes a cycle as soon as a writer (the appender)
+        // is pending: nobody can make progress, and every later statement
+        // queues behind the frozen `tables`.
+        let (cached, epoch) = {
+            let tables = self.tables.lock().unwrap();
+            match tables.get(tkey) {
+                // A cached index built before the last bump belongs to the
+                // layout that bump retired, and one built before the last
+                // visible compaction read the source segments: both name row
+                // ids nothing owns any more.
+                Some(entry) => (
+                    entry
+                        .text
+                        .get(&index_id)
+                        .filter(|_| {
+                            entry.text_built.get(&index_id).is_some_and(
+                                |(built_epoch, built_ts)| {
+                                    *built_epoch == entry.text_epoch
+                                        && *built_ts >= entry.text_min_ts
+                                },
+                            )
+                        })
+                        .cloned(),
+                    entry.text_epoch,
+                ),
+                None => (None, 0),
+            }
+        };
+        let Some(idx) = cached else {
+            return (None, epoch);
+        };
+        let (complete, segments, tail, overridden) = {
+            let g = idx.read().unwrap_or_else(|e| e.into_inner());
+            (
+                g.total_docs(),
+                g.reader.segments.len(),
+                g.tails().map(|m| m.pending_docs()).sum::<usize>(),
+                g.overridden.len(),
+            )
+        };
+        if complete >= reserved {
+            if ft_trace_enabled(key) {
+                eprintln!(
+                    "[FT] {key} reuse docs={complete} reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+                );
+            }
+            return (Some(idx), epoch);
+        }
+        if ft_trace_enabled(key) {
+            eprintln!(
+                "[FT] {key} rebuild: cached docs={complete} < reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
+            );
+        }
+        (None, epoch)
+    }
+
     /// Builds the index for one column from the rows (see [`Self::text_index_for`]).
     ///
     /// The build reads once, so its postings describe exactly the snapshot the
@@ -3875,61 +3949,9 @@ impl Engine {
                 }
             }
         };
-        // Clone the `Arc` and let go of `tables` before the index is locked.
-        // A query holds the index's *read* guard while it fetches rows
-        // (`search_text_terms`), and that fetch needs `tables`
-        // (`visible_block_ids` -> `block_index_for`); taking the index lock
-        // under `tables` here closes a cycle as soon as a writer (the appender)
-        // is pending: nobody can make progress, and every later statement
-        // queues behind the frozen `tables`.
-        let (cached, epoch) = {
-            let tables = self.tables.lock().unwrap();
-            match tables.get(&tkey) {
-                // A cached index built before the last bump belongs to the
-                // layout that bump retired, and one built before the last
-                // visible compaction read the source segments: both name row
-                // ids nothing owns any more.
-                Some(entry) => (
-                    entry
-                        .text
-                        .get(&index_id)
-                        .filter(|_| {
-                            entry.text_built.get(&index_id).is_some_and(
-                                |(built_epoch, built_ts)| {
-                                    *built_epoch == entry.text_epoch
-                                        && *built_ts >= entry.text_min_ts
-                                },
-                            )
-                        })
-                        .cloned(),
-                    entry.text_epoch,
-                ),
-                None => (None, 0),
-            }
-        };
+        let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
         if let Some(idx) = cached {
-            let (complete, segments, tail, overridden) = {
-                let g = idx.read().unwrap_or_else(|e| e.into_inner());
-                (
-                    g.total_docs(),
-                    g.reader.segments.len(),
-                    g.tails().map(|m| m.pending_docs()).sum::<usize>(),
-                    g.overridden.len(),
-                )
-            };
-            if complete >= reserved {
-                if ft_trace_enabled(&key) {
-                    eprintln!(
-                        "[FT] {key} reuse docs={complete} reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
-                    );
-                }
-                return Ok(idx);
-            }
-            if ft_trace_enabled(&key) {
-                eprintln!(
-                    "[FT] {key} rebuild: cached docs={complete} < reserved={reserved} segs={segments} tail={tail} overridden={overridden}"
-                );
-            }
+            return Ok(idx);
         }
         let schema = self.table_schema(table)?;
         let col = schema
@@ -3961,6 +3983,22 @@ impl Engine {
         };
         // Cloned because a rejected publish retries the whole build.
         let build_dir = dir.clone();
+        // Every chunk this build writes, and every chunk its load removes, lives
+        // in `build_dir` - which a seal, a merge or another build of the same
+        // column may be writing at the same time. Two writers of one row range
+        // derive the same chunk name (`ft_{base_row_id}`) and the narrower write
+        // wins, so the gate serialises them (`dir_gate`). Taken before the index
+        // exists, so no index lock is held while waiting, and released before the
+        // publish takes `tables`.
+        let gate = crate::engine::text_index::dir_gate(&dir);
+        let serial = gate.lock().unwrap_or_else(|poison| poison.into_inner());
+        // A build that lost the race for the gate would otherwise rebuild the
+        // same column from scratch right after the winner published - six
+        // readers that all missed the cache meant six sequential rebuilds.
+        let (cached, _) = self.usable_text_index(&key, &tkey, index_id, reserved);
+        if let Some(idx) = cached {
+            return Ok(idx);
+        }
         let mut index = TextIndex::new(dir, tokenizer.clone());
         // Map the chunks a previous process sealed instead of re-indexing the
         // rows they already cover: a reopened engine pays for the unsealed tail
@@ -4011,6 +4049,10 @@ impl Engine {
             index_row(&mut index, seq as u64, &text);
             index.maybe_seal(self.memindex_capacity());
         }
+        // The chunks on disk are consistent and complete now; only the publish
+        // touches shared state, and it must not run with the gate held (it takes
+        // `tables`, which the gate may not nest inside).
+        drop(serial);
         let shared = Arc::new(std::sync::RwLock::new(index));
         #[cfg(test)]
         run_text_build_hook();
