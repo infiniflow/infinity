@@ -569,6 +569,15 @@ class TestMemIdx:
             idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
             assert len(idx2_dirs) == 2
 
+            # The chunk file appears when the dump writes it; the catalog record
+            # that makes it part of the index follows with the dump's commit.
+            # The runner kills the process as soon as this function returns, and
+            # a kill inside that window leaves a chunk the next open only adopts
+            # at its next dump - part2 then waits 60 s for a merge of chunks the
+            # catalog does not list yet (`assert len(idx2_dirs) == 3`, seen once
+            # in CI with db_3 at two files).
+            time.sleep(3)
+
         part1()
 
         @decorator2
