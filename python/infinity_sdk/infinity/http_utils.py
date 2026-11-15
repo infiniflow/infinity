@@ -213,6 +213,10 @@ def is_list(str):
         return False
 
 
+def is_bit_embedding_type(column_type) -> bool:
+    return isinstance(column_type, str) and re.fullmatch(r"embedding\(bit,\s*\d+\)", column_type.strip().lower()) is not None
+
+
 def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
