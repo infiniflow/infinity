@@ -486,10 +486,12 @@ impl Store {
                 .zip(data.get(b))
                 .map(|(x, y)| plain_distance(x, y, *metric))
                 .unwrap_or(f32::MAX),
-            Store::Lvq(store) => store
-                .query_at(a)
-                .and_then(|q| store.distance(&q, b))
-                .unwrap_or(f32::MAX),
+            Store::Lvq(store) => match (store.record(a), store.record(b)) {
+                // Borrow both records: `query_at` clones the whole i8 code, and
+                // this runs once per candidate comparison.
+                (Some(q), Some(v)) => store.distance_between(q, v),
+                _ => f32::MAX,
+            },
             Store::Rabitq(store) => store
                 .decompress(a)
                 .map(|v| {
@@ -1249,16 +1251,14 @@ impl HnswIndex {
             }
             return vectors.len();
         }
-        // The quantized stores keep a code per vertex and re-derive a query from
-        // that code; the reference only instantiates its batch path for the
-        // plain store's DataType, so a quantized index keeps the serial build
-        // instead of gaining a parallel one that would mean something else.
-        if !matches!(self.store, Store::Plain { .. }) {
-            for v in vectors {
-                self.add(v);
-            }
-            return vectors.len();
-        }
+        // Every store takes the batch path: the reference's
+        // `HnswHandler::InsertVecs` visits its index variant, stores the batch
+        // (`StoreData`), then builds `[start, end)` in buckets - it never
+        // branches on the store type. A quantized index builds the same way,
+        // because `Build` re-derives its query from the vertex's own code
+        // (`GetVecToQuery`), which the port's `QueryRef::for_node` does too.
+        // Keeping quantized stores serial here made an LVQ build run on one
+        // core (measured 99% CPU on a 20000-row index).
         let base = self.store.len();
         for v in vectors {
             assert_eq!(v.len(), self.dims, "dimension mismatch");
@@ -1329,7 +1329,7 @@ impl HnswIndex {
                 from,
                 top_level,
             );
-            crate::parallel_build::build_serial(&builder, entry, entry + 1);
+            crate::parallel_build::build_serial(&builder, entry, entry + 1, None);
         }
 
         // Phase B: everyone else, in buckets, searching from the finished top.
@@ -1362,15 +1362,28 @@ impl HnswIndex {
             entry,
             max_level: top_level,
         });
-        let buckets: Vec<(usize, usize)> = [(base, entry), (entry + 1, n)]
-            .into_iter()
-            .flat_map(|(lo, hi)| crate::parallel_build::buckets_of(lo, hi, threads))
-            .collect();
+        // One split over the whole new range, as `HnswHandler::InsertVecs`
+        // does: `bucket_size = max(kBuildBucketSize, (n - 1) / threads + 1)`.
+        // Splitting `[base, entry)` and `[entry + 1, n)` separately used to
+        // hand a small batch two buckets that then ran concurrently — a 200-row
+        // build raced its own reverse links even though the reference builds
+        // that batch on one thread, and the graph it produced was not
+        // reproducible run to run.
+        //
+        // Phase A already built `entry`, so it must not appear in a bucket: it
+        // is the vertex whose neighbour list every other build searched from,
+        // and building it a second time replaces that list (and lets reverse
+        // pruning drop links the first build had). It is skipped inside its
+        // bucket rather than cut out, so every bucket stays one contiguous run
+        // and the boundaries are the reference's. When the entry came from an
+        // older batch it is below `base` and no bucket contains it.
+        let prebuilt = (entry >= base).then_some(entry);
+        let buckets = crate::parallel_build::build_buckets(base, n, prebuilt, threads);
         {
             let shared = std::sync::Arc::clone(&shared);
-            crate::parallel::for_each_blocking(buckets, threads, move |(start, end)| {
+            crate::parallel::for_each_blocking(buckets, threads, move |(start, end, skip)| {
                 let builder = shared.builder();
-                crate::parallel_build::build_serial(&builder, start, end);
+                crate::parallel_build::build_serial(&builder, start, end, skip);
                 Ok(())
             })
             .expect("building a bucket cannot fail");
@@ -1936,6 +1949,108 @@ mod tests {
         let recall = hits as f64 / (40 * 5) as f64;
         assert!(recall >= 0.9, "parallel graph diverged: recall {recall}");
         parallel.check().expect("parallel graph is well formed");
+    }
+
+    /// A quantized store takes the same bucket-parallel build as the plain one.
+    ///
+    /// `HnswHandler::InsertVecs` does not branch on the store type: it stores
+    /// the batch and builds `[start, end)` in buckets. Keeping LVQ/RaBitQ on
+    /// the serial path made an LVQ index build on one core, so this pins both
+    /// the parallelism (the batch path is entered, the graph is well formed)
+    /// and the answers (they match a serial build of the same data).
+    #[test]
+    fn quantized_batch_build_matches_serial_answers() {
+        let data = dataset(1200, 8);
+        for encoding in [HnswEncoding::Lvq, HnswEncoding::Rabitq] {
+            let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            serial.train_store(&data, None);
+            for v in &data {
+                serial.add(v);
+            }
+            let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            parallel.train_store(&data, None);
+            assert_eq!(parallel.add_batch(&data, 4), data.len());
+            assert_eq!(parallel.len(), serial.len());
+            // A serial build must not have been taken: with 1200 vertices and 4
+            // threads the batch path splits into buckets, and every one of them
+            // is reachable from the entry point.
+            parallel.check().expect("parallel graph is well formed");
+            let mut rng = Rng::new(11);
+            let mut hits = 0usize;
+            for _ in 0..40 {
+                let q: Vec<f32> = (0..8).map(|_| (rng.unit() as f32) * 10.0).collect();
+                let want: HashSet<usize> = serial
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .collect();
+                hits += parallel
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .filter(|(i, _)| want.contains(i))
+                    .count();
+            }
+            let recall = hits as f64 / (40 * 5) as f64;
+            assert!(
+                recall >= 0.9,
+                "{encoding:?} parallel graph diverged: recall {recall}"
+            );
+        }
+    }
+
+    /// A batch added to a non-empty index must not build the entry vertex
+    /// twice.
+    ///
+    /// `add_batch` builds the batch's highest-level vertex first (Phase A) and
+    /// then runs the buckets. Covering `[base, n)` outright scheduled that
+    /// vertex a second time, and a second `Build` replaces its neighbour list -
+    /// so the links Phase A established could disappear, and reverse pruning
+    /// while rebuilding it could drop other vertices' links to it.
+    ///
+    /// Asserted on the bucket plan rather than on the finished graph: whether a
+    /// rebuild actually loses a link depends on the data, so a graph-shaped
+    /// assertion can pass on a broken plan.
+    #[test]
+    fn a_batch_on_a_populated_index_builds_each_vertex_once() {
+        // A batch over several buckets where the entry sits in the middle of
+        // one of them - the case that used to schedule it twice.
+        let (base, n, entry, threads) = (1200, 5000, 2600usize, 2);
+        let buckets = crate::parallel_build::build_buckets(base, n, Some(entry), threads);
+
+        // Every bucket is one contiguous run, and the batch is covered exactly
+        // once except for the prebuilt vertex. Cutting the entry out (instead
+        // of skipping it inside its bucket) would put two adjacent ranges in
+        // flight, whose reverse-link writes are what makes a build
+        // order-dependent.
+        let whole = crate::parallel_build::buckets_of(base, n, threads);
+        assert_eq!(
+            buckets.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole,
+            "bucket boundaries must be the reference's"
+        );
+        assert_eq!(
+            buckets
+                .iter()
+                .filter_map(|(_, _, skip)| *skip)
+                .collect::<Vec<_>>(),
+            vec![entry],
+            "the prebuilt entry is skipped by exactly one bucket"
+        );
+        for (start, end, skip) in &buckets {
+            assert!(start < end, "empty bucket {start}..{end}");
+            assert!(
+                skip.is_none_or(|p| *start <= p && p < *end),
+                "a bucket skips a vertex outside its range"
+            );
+        }
+
+        // An entry from an older batch is below `base`: no bucket skips it.
+        let older = crate::parallel_build::build_buckets(base, n, None, threads);
+        assert_eq!(
+            older.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole
+        );
+        assert!(older.iter().all(|(_, _, skip)| skip.is_none()));
     }
     #[test]
     fn hnsw_recall_vs_flat() {

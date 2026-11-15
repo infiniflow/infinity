@@ -3231,6 +3231,79 @@ impl Engine {
             .and_then(|e| e.comments.get(index).cloned())
     }
 
+    /// Everything `SHOW INDEX`/`ShowIndex` reports beyond the catalog record:
+    /// the index's directory, how many segments carry it, and its
+    /// `BuildOtherParamsString` text.
+    ///
+    /// C++ `TableIndexMeta::GetTableIndexInfo` fills the same three fields from
+    /// the metastore; the port kept them empty strings, which made a created
+    /// index's encoding, build type and LSG config impossible to verify through
+    /// the SDK (and hid a parameter change across a restart).
+    ///
+    /// The directory is `db_{db_id}/tbl_{table_id}/idx_{index_id}`
+    /// (`TableIndexMeta::GetTableIndexDir`) - the same relative path the mirror
+    /// uses under the data root. The segment count is the number of segments
+    /// the index has a record for (`segment_ids_.size()`), which is what the
+    /// reference prints, not the table's segment count.
+    pub fn show_index_info(&self, table: &str, index: &str) -> Option<ShowIndexInfo> {
+        let table = self.table_key(table);
+        let im = self
+            .storage
+            .catalog
+            .index_by_name(&table, index)
+            .ok()
+            .flatten()?;
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)
+            .ok()
+            .flatten()?;
+        let db_id = self.database_id_of(&table);
+        let segments = self.catalog_index_files(&table, im.id);
+        let mut seen: Vec<u32> = segments.iter().map(|(seg, _, _)| *seg).collect();
+        seen.sort_unstable();
+        seen.dedup();
+        // `TableIndexMeta::GetTableIndexInfo` prints `column_def->id_`, the
+        // column's stable id - not its ordinal. The catalog keeps them in
+        // `TableMeta::ids`; an older record with no ids reports nothing rather
+        // than a fabricated number.
+        let column_id = meta
+            .columns
+            .iter()
+            .position(|c| c == &im.column)
+            .and_then(|at| meta.ids.get(at))
+            .map(u64::to_string)
+            .unwrap_or_default();
+        Some(ShowIndexInfo {
+            store_dir: format!("db_{db_id}/tbl_{}/idx_{}", meta.id, im.id),
+            segment_index_count: seen.len(),
+            // A BOOL or JSON column is always built low-cardinality
+            // (`NewSecondaryIndexInMem`), whatever the statement asked for, so
+            // the reported text has to say what was built - not merely what the
+            // options list contains. The check is by **this** index's name: a
+            // column may carry two secondary indexes with different
+            // cardinalities, and `secondary_low_cardinality` resolves a column
+            // to the first one, which is what the builder needs but not what
+            // `SHOW INDEX` asks about.
+            other_parameters: other_params_of(&im.index_type, &im.options, || {
+                let column_type = meta
+                    .columns
+                    .iter()
+                    .position(|c| c == &im.column)
+                    .and_then(|at| meta.types.get(at))
+                    .map(|t| t.trim().to_ascii_uppercase())
+                    .unwrap_or_default();
+                column_type.starts_with("BOOL")
+                    || column_type.starts_with("JSON")
+                    || im.options.iter().any(|(key, value)| {
+                        key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
+                    })
+            }),
+            column_id,
+        })
+    }
+
     /// Every file under an index's C++ mirror directory
     /// (C++ `NewTxn::GetTableIndexFilePaths`).
     pub fn index_files(&self, table: &str, index: &str) -> Vec<PathBuf> {
@@ -3809,4 +3882,92 @@ fn merge_covered_ranges(chunks: &[catalog::layout::SegmentIndex]) -> Vec<(u64, u
         }
     }
     merged
+}
+
+/// The three `TableIndexInfo` fields `ShowIndex` reports but the catalog record
+/// does not hold verbatim.
+pub struct ShowIndexInfo {
+    /// `TableIndexInfo::index_entry_dir_`.
+    pub store_dir: String,
+    /// `TableIndexInfo::segment_index_count_`.
+    pub segment_index_count: usize,
+    /// `TableIndexInfo::index_other_params_`, i.e. the reference's
+    /// `IndexBase::BuildOtherParamsString`.
+    pub other_parameters: String,
+    /// `TableIndexInfo::index_column_ids_`: the indexed column's catalog id
+    /// (`column_def->id_`), as text.
+    pub column_id: String,
+}
+
+/// C++ `IndexBase::BuildOtherParamsString` for the index kinds this port
+/// stores options for (`index_{hnsw,bmp,full_text,secondary}_impl.cpp`).
+///
+/// The text is user-facing: `ShowIndex` returns it unchanged and the manual
+/// acceptance run uses it to confirm that both engines built with one
+/// parameter set, so the spelling and spacing follow the reference exactly.
+/// A kind with no `BuildOtherParamsString` override (secondary functional,
+/// EMVB, PLAID, SMVE) reports the empty string, as the base class does.
+///
+/// `low_cardinality` answers the *effective* cardinality for a secondary
+/// index, which is not always what the options said: the builder forces the
+/// low-cardinality store for BOOL and JSON columns.
+fn other_params_of(
+    index_type: &str,
+    options: &[(String, String)],
+    low_cardinality: impl FnOnce() -> bool,
+) -> String {
+    let opt = |name: &str| -> Option<&str> {
+        options
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.trim().trim_matches(|c| c == '\'' || c == '"'))
+    };
+    match index_type.to_ascii_uppercase().as_str() {
+        "HNSW" => {
+            let metric = match opt("METRIC").unwrap_or("l2").to_ascii_lowercase().as_str() {
+                "cosine" => "cosine",
+                "ip" => "ip",
+                _ => "l2",
+            };
+            let encode = match opt("ENCODE")
+                .unwrap_or("plain")
+                .to_ascii_lowercase()
+                .as_str()
+            {
+                "lvq" => "lvq",
+                "rabitq" => "rabitq",
+                _ => "plain",
+            };
+            let m: u64 = opt("M").and_then(|v| v.parse().ok()).unwrap_or(16);
+            let ef: u64 = opt("EF_CONSTRUCTION")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(200);
+            let mut text = format!(
+                "metric = {metric}, encode_type = {encode}, M = {m}, ef_construction = {ef}"
+            );
+            // `if (lsg_config_)`: present exactly when the statement set it.
+            if let Some(config) = opt("LSG_CONFIG").and_then(index::lsg::LsgConfig::parse) {
+                text.push_str(&format!(", lsg_config = {config}"));
+            }
+            text
+        }
+        "BMP" => {
+            let block_size: u64 = opt("BLOCK_SIZE").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let compress = if opt("COMPRESS_TYPE")
+                .map(|v| v.eq_ignore_ascii_case("raww") || v.eq_ignore_ascii_case("raw"))
+                .unwrap_or(false)
+            {
+                "raw"
+            } else {
+                "compress"
+            };
+            format!("block_size = {block_size}, compress_type = {compress}")
+        }
+        "FULLTEXT" => format!("analyzer = {}", opt("ANALYZER").unwrap_or("")),
+        "SECONDARY" | "" => {
+            let low = low_cardinality();
+            format!("cardinality = {}", if low { "low" } else { "high" })
+        }
+        _ => String::new(),
+    }
 }

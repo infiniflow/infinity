@@ -516,6 +516,13 @@ pub(crate) enum ArmResponse {
         error_msg: String,
         index_type: String,
         columns: String,
+        /// `TableIndexInfo::index_other_params_`; `None` when the index does
+        /// not exist (the reference leaves those response fields unset).
+        other_parameters: Option<String>,
+        store_dir: Option<String>,
+        segment_index_count: Option<String>,
+        /// `TableIndexInfo::index_column_ids_`.
+        column_id: Option<String>,
     },
     ShowDatabase {
         name: String,
@@ -753,20 +760,22 @@ async fn dispatch_arm(
                                 .into_iter()
                                 .find(|im| im.name.eq_ignore_ascii_case(&index_name_owned))?;
                             let comment = eng.index_comment(&probe, &im.name).unwrap_or_default();
-                            Some((im, comment))
+                            let info = eng.show_index_info(&probe, &im.name);
+                            Some((im, comment, info))
                         })
                         .await
                 }
                 None => None,
             };
-            let (code, msg, name, kind, cols, comment) = match found {
-                Some((im, comment)) => (
+            let (code, msg, name, kind, cols, comment, info) = match found {
+                Some((im, comment, info)) => (
                     0i64,
                     "OK".to_string(),
                     im.name,
                     im.index_type,
                     im.column,
                     comment,
+                    info,
                 ),
                 None => (
                     3023i64,
@@ -775,6 +784,7 @@ async fn dispatch_arm(
                     String::new(),
                     String::new(),
                     String::new(),
+                    None,
                 ),
             };
             Ok(ArmResponse::ShowIndex {
@@ -786,6 +796,10 @@ async fn dispatch_arm(
                 error_msg: msg,
                 index_type: kind,
                 columns: cols,
+                other_parameters: info.as_ref().map(|i| i.other_parameters.clone()),
+                store_dir: info.as_ref().map(|i| i.store_dir.clone()),
+                segment_index_count: info.as_ref().map(|i| i.segment_index_count.to_string()),
+                column_id: info.as_ref().map(|i| i.column_id.clone()),
             })
         }
         // Database / table / index lifecycle RPCs that return a plain
@@ -7902,6 +7916,9 @@ pub fn write_show_index_response(
     msg: &str,
     kind: &str,
     columns: &str,
+    other_parameters: &str,
+    store_dir: &str,
+    segment_index_count: &str,
 ) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
     o.write_message_begin(&TMessageIdentifier::new(
@@ -7930,9 +7947,9 @@ pub fn write_show_index_response(
         ("index_column_names", 8i16, columns),
         ("index_column_ids", 9i16, ""),
         ("index_function_info", 10i16, ""),
-        ("other_parameters", 11i16, ""),
-        ("store_dir", 12i16, ""),
-        ("segment_index_count", 13i16, ""),
+        ("other_parameters", 11i16, other_parameters),
+        ("store_dir", 12i16, store_dir),
+        ("segment_index_count", 13i16, segment_index_count),
     ] {
         o.write_field_begin(&TFieldIdentifier::new(name, TType::String, id))
             .map_err(tw)?;

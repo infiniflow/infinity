@@ -25,7 +25,15 @@ impl Default for LsgConfig {
 
 impl LsgConfig {
     /// C++ `LSGConfig::FromString`: `key=value` pairs separated by commas
-    /// (`sample_ratio`, `ls_k`, `alpha`).
+    /// (`sample_raito`, `ls_k`, `alpha`).
+    ///
+    /// The reference spells the ratio key `sample_raito` (a typo it has kept,
+    /// `index_hnsw_impl.cpp:115`) and rejects anything else with
+    /// `InvalidIndexParam`. That spelling is what its catalogue record carries
+    /// (`LSGConfig::ToString`) and what `C++` re-reads, so a port that only
+    /// accepted `sample_ratio` could write records the reference aborts on.
+    /// `sample_ratio` is additionally accepted here: statements written
+    /// against this port before the spelling was aligned used it.
     pub fn parse(text: &str) -> Option<Self> {
         let mut config = Self::default();
         for part in text.split(',') {
@@ -33,7 +41,7 @@ impl LsgConfig {
             let key = key.trim().to_ascii_lowercase();
             let value = value.trim();
             match key.as_str() {
-                "sample_ratio" => config.sample_ratio = value.parse().ok()?,
+                "sample_raito" | "sample_ratio" => config.sample_ratio = value.parse().ok()?,
                 "ls_k" => config.ls_k = value.parse().ok()?,
                 "alpha" => config.alpha = value.parse().ok()?,
                 _ => return None,
@@ -43,11 +51,16 @@ impl LsgConfig {
     }
 }
 
+/// C++ `LSGConfig::ToString`: `sample_raito = <f>, ls_k = <n>, alpha = <f>`.
+///
+/// The spacing and the misspelt key are both the reference's; `show_index`
+/// reports this text and the catalogue stores it, so a port that wrote
+/// `sample_ratio=...` would hand the reference a record it refuses to parse.
 impl std::fmt::Display for LsgConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sample_ratio={},ls_k={},alpha={}",
+            "sample_raito = {}, ls_k = {}, alpha = {}",
             self.sample_ratio, self.ls_k, self.alpha
         )
     }
@@ -200,7 +213,7 @@ mod tests {
 
     #[test]
     fn config_parses_the_reference_format() {
-        let c = LsgConfig::parse("sample_ratio=0.25,ls_k=7,alpha=0.5").unwrap();
+        let c = LsgConfig::parse("sample_raito=0.25,ls_k=7,alpha=0.5").unwrap();
         assert_eq!(
             c,
             LsgConfig {
@@ -209,8 +222,20 @@ mod tests {
                 alpha: 0.5
             }
         );
+        // The pre-alignment spelling is still accepted, so a statement written
+        // against an older build keeps working.
+        assert_eq!(
+            LsgConfig::parse("sample_ratio=0.25,ls_k=7,alpha=0.5"),
+            Some(c)
+        );
         assert_eq!(LsgConfig::parse("bogus=1"), None);
-        assert_eq!(c.to_string(), "sample_ratio=0.25,ls_k=7,alpha=0.5");
+        // `LSGConfig::ToString`'s exact text: misspelt key, spaces around `=`.
+        assert_eq!(c.to_string(), "sample_raito = 0.25, ls_k = 7, alpha = 0.5");
+        // The reference prints a whole alpha without a decimal point.
+        assert_eq!(
+            LsgConfig::default().to_string(),
+            "sample_raito = 0.01, ls_k = 10, alpha = 1"
+        );
     }
 
     #[test]

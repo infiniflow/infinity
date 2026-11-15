@@ -616,6 +616,25 @@ fn err_response(code: i64, msg: &str) -> (u16, String) {
     )
 }
 
+/// The catalog id of `column` on `table`, as `ShowIndex` reports it.
+///
+/// C++ `TableIndexMeta::GetTableIndexInfo` prints
+/// `column_def->id_` (`index_column_ids_`), not the column's position. The port
+/// keeps the ids in `TableMeta::ids`; a table whose record has no ids (an older
+/// directory) reports an empty string rather than a fabricated number.
+fn column_id_of(engine: &Engine, table: &str, column: &str) -> String {
+    let Some(meta) = engine.catalog().get_table_by_name(table).ok().flatten() else {
+        return String::new();
+    };
+    let Some(at) = meta.columns.iter().position(|c| c == column) else {
+        return String::new();
+    };
+    meta.ids
+        .get(at)
+        .map(|id| id.to_string())
+        .unwrap_or_default()
+}
+
 /// 3032 `kNotSupported` (`src/common/status.cppm:83`).
 const NOT_SUPPORTED: i64 = 3032;
 
@@ -2002,18 +2021,36 @@ pub async fn route(
                 .into_iter()
                 .find(|i| i.name.eq_ignore_ascii_case(index));
             match found {
-                Some(i) => (
-                    200,
-                    format!(
-                        "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"{}\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"\",\"store_dir\":\"\",\"segment_index_count\":\"\"}}",
-                        json_escape(&db),
-                        json_escape(&table),
-                        json_escape(&i.name),
-                        json_escape(&engine.index_comment(&full, &i.name).unwrap_or_default()),
-                        json_escape(&i.index_type),
-                        json_escape(&i.column)
-                    ),
-                ),
+                Some(i) => {
+                    // The same three fields `ShowIndex` reports over Thrift:
+                    // they are what a caller uses to confirm the encoding,
+                    // build type and LSG config an index was created with.
+                    let info = engine.show_index_info(&full, &i.name);
+                    let (other, store_dir, seg_count) = match &info {
+                        Some(info) => (
+                            json_escape(&info.other_parameters),
+                            json_escape(&info.store_dir),
+                            info.segment_index_count.to_string(),
+                        ),
+                        None => (String::new(), String::new(), String::new()),
+                    };
+                    (
+                        200,
+                        format!(
+                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"{}\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"{}\",\"index_function_info\":\"\",\"other_parameters\":\"{}\",\"store_dir\":\"{}\",\"segment_index_count\":\"{}\"}}",
+                            json_escape(&db),
+                            json_escape(&table),
+                            json_escape(&i.name),
+                            json_escape(&engine.index_comment(&full, &i.name).unwrap_or_default()),
+                            json_escape(&i.index_type),
+                            json_escape(&i.column),
+                            json_escape(&column_id_of(engine, &full, &i.column)),
+                            other,
+                            store_dir,
+                            seg_count
+                        ),
+                    )
+                }
                 None => err_response(3023, &format!("index '{index}' does not exist")),
             }
         }

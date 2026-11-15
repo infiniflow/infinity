@@ -390,7 +390,9 @@ pub fn index_def_from_json(text: &str) -> Option<storage::wal::index_def::IndexD
             m: as_i64(extract(&doc, ".M")).unwrap_or(0) as u64,
             ef_construction: as_i64(extract(&doc, ".ef_construction")).unwrap_or(0) as u64,
             block_size: as_i64(extract(&doc, ".block_size")).unwrap_or(0) as u64,
-            has_lsg: false,
+            // `IndexHnsw::Serialize` writes this text only when the index has a
+            // config (`if (lsg_config_)`), so its absence is the empty optional.
+            lsg: as_str(extract(&doc, ".lsg_config")).and_then(index::lsg::LsgConfig::parse),
         },
         _ => return None,
     })
@@ -1134,7 +1136,7 @@ fn index_type_text(t: storage::wal::index_def::IndexType) -> &'static str {
 /// only have to name the same values: the option lookup is case-insensitive and
 /// trims quotes.
 fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String)> {
-    use storage::wal::index_def::{IndexDef, MetricType};
+    use storage::wal::index_def::{HnswBuildType, HnswEncodeType, IndexDef, MetricType};
     let pair = |k: &str, v: String| (k.to_string(), v);
     match def {
         IndexDef::Hnsw {
@@ -1142,21 +1144,49 @@ fn index_options(def: &storage::wal::index_def::IndexDef) -> Vec<(String, String
             ef_construction,
             block_size,
             metric_type,
+            encode_type,
+            build_type,
+            lsg,
             ..
-        } => vec![
-            pair("M", m.to_string()),
-            pair("EF_CONSTRUCTION", ef_construction.to_string()),
-            pair("BLOCK_SIZE", block_size.to_string()),
-            pair(
-                "METRIC",
-                match metric_type {
-                    MetricType::Cosine => "cosine",
-                    MetricType::InnerProduct => "ip",
-                    _ => "l2",
-                }
-                .to_string(),
-            ),
-        ],
+        } => {
+            let mut options = vec![
+                pair("M", m.to_string()),
+                pair("EF_CONSTRUCTION", ef_construction.to_string()),
+                pair("BLOCK_SIZE", block_size.to_string()),
+                pair(
+                    "METRIC",
+                    match metric_type {
+                        MetricType::Cosine => "cosine",
+                        MetricType::InnerProduct => "ip",
+                        _ => "l2",
+                    }
+                    .to_string(),
+                ),
+                pair(
+                    "ENCODE",
+                    match encode_type {
+                        HnswEncodeType::Lvq => "lvq",
+                        HnswEncodeType::Rabitq => "rabitq",
+                        _ => "plain",
+                    }
+                    .to_string(),
+                ),
+                pair(
+                    "BUILD_TYPE",
+                    match build_type {
+                        HnswBuildType::Lsg => "lsg",
+                        _ => "plain",
+                    }
+                    .to_string(),
+                ),
+            ];
+            // The record's `lsg_config` text is what the catalogue keeps too, so
+            // replay stores the same spelling the statement would have.
+            if let Some(config) = lsg {
+                options.push(pair("LSG_CONFIG", config.to_string()));
+            }
+            options
+        }
         IndexDef::FullText { analyzer, .. } => vec![pair("ANALYZER", analyzer.clone())],
         IndexDef::Bmp { block_size, .. } => vec![pair("BLOCK_SIZE", block_size.to_string())],
         IndexDef::Emvb {
@@ -1288,5 +1318,67 @@ mod tests {
             }
             other => panic!("expected Secondary, got {other:?}"),
         }
+    }
+
+    /// `IndexHnsw::Serialize`'s record carries `encode_type`, `build_type` and
+    /// the optional `lsg_config` text, and `index_options` has to turn all
+    /// three back into the catalogue options a replayed `CREATE INDEX` would
+    /// have written - otherwise the recovered index comes back as
+    /// `plain + plain` with no LSG config.
+    #[test]
+    fn round_trips_the_hnsw_options_through_a_wal_replay() {
+        use storage::wal::index_def::{HnswBuildType, HnswEncodeType, IndexDef, MetricType};
+        // The exact text the port's catalogue writes for
+        // `USING HNSW WITH (M=16, ef_construction=200, encode=lvq,
+        //  build_type='lsg', lsg_config='sample_raito=0.25,ls_k=7,alpha=0.5')`.
+        let text = r#"{"M":16,"block_size":8192,"build_type":"lsg","column_names":["v"],"ef_construction":200,"encode_type":"lvq","file_name":"t_i","index_comment":"","index_name":"i","index_type":"HNSW","lsg_config":"sample_raito=0.25,ls_k=7,alpha=0.5","metric_type":"l2"}"#;
+        let def = index_def_from_json(text).expect("hnsw record");
+        match &def {
+            IndexDef::Hnsw {
+                encode_type,
+                build_type,
+                lsg,
+                ..
+            } => {
+                assert_eq!(*encode_type, HnswEncodeType::Lvq);
+                assert_eq!(*build_type, HnswBuildType::Lsg);
+                assert_eq!(
+                    *lsg,
+                    Some(index::lsg::LsgConfig {
+                        sample_ratio: 0.25,
+                        ls_k: 7,
+                        alpha: 0.5
+                    })
+                );
+            }
+            other => panic!("expected Hnsw, got {other:?}"),
+        }
+        let opts: std::collections::HashMap<String, String> =
+            index_options(&def).into_iter().collect();
+        assert_eq!(opts.get("ENCODE").map(String::as_str), Some("lvq"));
+        assert_eq!(opts.get("BUILD_TYPE").map(String::as_str), Some("lsg"));
+        assert_eq!(opts.get("METRIC").map(String::as_str), Some("l2"));
+        // The spelling the reference re-reads is `sample_raito`.
+        assert_eq!(
+            opts.get("LSG_CONFIG").map(String::as_str),
+            Some("sample_raito = 0.25, ls_k = 7, alpha = 0.5")
+        );
+
+        // A plain index has no `lsg_config` field at all, and the replay must
+        // not invent one.
+        let plain = r#"{"M":16,"block_size":8192,"build_type":"plain","column_names":["v"],"ef_construction":20,"encode_type":"plain","file_name":"t_p","index_comment":"","index_name":"p","index_type":"HNSW","metric_type":"cosine"}"#;
+        let def = index_def_from_json(plain).expect("plain hnsw record");
+        assert!(matches!(
+            def,
+            IndexDef::Hnsw {
+                metric_type: MetricType::Cosine,
+                lsg: None,
+                ..
+            }
+        ));
+        let opts: std::collections::HashMap<String, String> =
+            index_options(&def).into_iter().collect();
+        assert_eq!(opts.get("ENCODE").map(String::as_str), Some("plain"));
+        assert!(!opts.contains_key("LSG_CONFIG"));
     }
 }

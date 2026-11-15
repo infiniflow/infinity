@@ -122,11 +122,14 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Runs `Build` for every vertex in `[start, end)`.
-    pub(crate) fn build_range(&self, start: usize, end: usize) {
+    /// Runs `Build` for every vertex in `[start, end)` except `skip`.
+    pub(crate) fn build_range(&self, start: usize, end: usize, skip: Option<usize>) {
         let mut scratch = SearchScratch::new();
         let mut select = SelectScratch::default();
         for node in start..end {
+            if Some(node) == skip {
+                continue;
+            }
             self.build(node, &mut scratch, &mut select);
         }
     }
@@ -258,12 +261,17 @@ impl<'a> Builder<'a> {
         sorted.clear();
         sorted.extend_from_slice(cands);
         out.clear();
+        // Ties break on the vertex id in both directions, as they do in
+        // `search_layer`. A quantized store makes equal distances common
+        // (RaBitQ answers with a quantized estimate), and `sort_unstable` is
+        // free to order equal elements however the input happened to be
+        // laid out — which made the built graph vary between runs.
         if sorted.len() < m {
-            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0).then(b.1.cmp(&a.1)));
             out.extend(sorted.iter().map(|(_, n)| *n));
             return out;
         }
-        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         kept.clear();
         for &(d, node) in sorted.iter() {
             if kept.len() == m {
@@ -366,7 +374,14 @@ impl<'a> Builder<'a> {
             });
         }
         let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
-        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        // Break ties by node id, exactly as the serial path does
+        // (`HnswIndex::search_layer_filtered`). A quantized store makes ties
+        // common: RaBitQ answers with a quantized estimate, so many candidates
+        // land on the same `f32`. `result` is a `BinaryHeap`, whose internal
+        // layout is not a function of its contents, so `drain()` hands the ties
+        // over in an arbitrary order; without this `then` the candidate list -
+        // and therefore the graph it builds - changed from build to build.
+        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         out
     }
 }
@@ -395,9 +410,36 @@ pub(crate) fn buckets_of(from: usize, to: usize, threads: usize) -> Vec<(usize, 
         .collect()
 }
 
+/// The buckets a batch build runs, skipping `prebuilt`.
+///
+/// `prebuilt` is the vertex `HnswIndex::add_batch` built on its own before the
+/// buckets start (Phase A). Scheduling it again would run `Build` on it a
+/// second time, and a rebuild replaces the vertex's neighbour list - so links
+/// the first build established can disappear, and reverse pruning while
+/// rebuilding it can drop other vertices' links to it.
+///
+/// `prebuilt` is marked with `skip` rather than cut out of the range, because a
+/// bucket is a **contiguous** running range: splitting one would put two
+/// adjacent ranges in flight, and their reverse-link writes are exactly what
+/// makes a build order-dependent.
+pub(crate) fn build_buckets(
+    from: usize,
+    to: usize,
+    prebuilt: Option<usize>,
+    threads: usize,
+) -> Vec<(usize, usize, Option<usize>)> {
+    buckets_of(from, to, threads)
+        .into_iter()
+        .map(|(start, end)| {
+            let skip = prebuilt.filter(|p| (start..end).contains(p));
+            (start, end, skip)
+        })
+        .collect()
+}
+
 /// Builds `[from, to)` on the calling thread.
-pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize) {
-    builder.build_range(from, to);
+pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize, skip: Option<usize>) {
+    builder.build_range(from, to, skip);
 }
 
 /// Orders two candidates the way `CompareMax` does, for tests.

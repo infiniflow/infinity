@@ -836,3 +836,49 @@ fn infinity_facade_create_database_table_insert_select() {
     e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
     assert_eq!(count(&e, "db1.tb1"), 0);
 }
+
+/// `ShowIndex` reports the **effective** secondary-index cardinality, not what
+/// the statement asked for.
+///
+/// `NewSecondaryIndexInMem` forces the low-cardinality store for BOOL and JSON
+/// columns, so such an index is built low even without
+/// `WITH (cardinality = 'low')`. Reporting `high` there would describe a
+/// configuration the engine never ran.
+#[test]
+fn show_index_reports_the_effective_secondary_cardinality() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    e.execute_blocking("CREATE TABLE t1(flag BOOLEAN, n INT, s VARCHAR);")
+        .unwrap();
+
+    // A BOOL column is forced low even though the statement said nothing.
+    e.execute_blocking("CREATE INDEX b ON t1 (flag);").unwrap();
+    let info = e.show_index_info("t1", "b").expect("bool index");
+    assert_eq!(info.other_parameters, "cardinality = low");
+
+    // An INT column stays high by default, and follows the option when set.
+    e.execute_blocking("CREATE INDEX n1 ON t1 (n);").unwrap();
+    assert_eq!(
+        e.show_index_info("t1", "n1").unwrap().other_parameters,
+        "cardinality = high"
+    );
+    e.execute_blocking("CREATE INDEX n2 ON t1 (n) WITH (cardinality='low');")
+        .unwrap();
+    assert_eq!(
+        e.show_index_info("t1", "n2").unwrap().other_parameters,
+        "cardinality = low"
+    );
+
+    // Other kinds report their own parameters, and the fields the SDK surfaces
+    // are filled rather than empty.
+    e.execute_blocking("CREATE INDEX f ON t1 (s) USING FULLTEXT;")
+        .unwrap();
+    let info = e.show_index_info("t1", "f").expect("fulltext index");
+    assert!(
+        info.other_parameters.starts_with("analyzer = "),
+        "{}",
+        info.other_parameters
+    );
+    assert!(info.store_dir.starts_with("db_"), "{}", info.store_dir);
+    assert_eq!(info.column_id, "2");
+}
