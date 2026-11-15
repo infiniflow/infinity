@@ -2749,36 +2749,24 @@ class TestInfinity:
         )
         print(res.dtypes)
         print(res)
-        if suffix == "_http":
-            pd.testing.assert_frame_equal(
-                res,
-                pd.DataFrame(
-                    {
-                        "c1": (0, 1, 2),
-                        "c2": (
-                            "[0100000000000000]",
-                            "[0000000000000001]",
-                            "[0000000000000011]",
-                        ),
-                        "DISTANCE": (1.0, 1.0, 2.0),
-                    }
-                ).astype({"c1": "Int32", "DISTANCE": "Float32"}),
-            )
-        else:
-            pd.testing.assert_frame_equal(
-                res,
-                pd.DataFrame(
-                    {
-                        "c1": (0, 1, 2),
-                        "c2": (
-                            ["0100000000000000"],
-                            ["0000000000000001"],
-                            ["0000000000000011"],
-                        ),
-                        "DISTANCE": (1.0, 1.0, 2.0),
-                    }
-                ).astype({"c1": "Int32", "DISTANCE": "Float32"}),
-            )
+        # Both transports return a bit embedding as a one-element list holding
+        # the bit string: thrift builds it from the raw bytes, and the HTTP
+        # client's to_result() converts "Embedding(bit, N)" columns the same
+        # way instead of leaving the "[0100...]" JSON form as a bare string.
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame(
+                {
+                    "c1": (0, 1, 2),
+                    "c2": (
+                        ["0100000000000000"],
+                        ["0000000000000001"],
+                        ["0000000000000011"],
+                    ),
+                    "DISTANCE": (1.0, 1.0, 2.0),
+                }
+            ).astype({"c1": "Int32", "DISTANCE": "Float32"}),
+        )
         db_obj.drop_table(
             "test_binary_knn_hamming_distance" + suffix, ConflictType.Error
         )

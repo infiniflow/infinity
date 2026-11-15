@@ -128,32 +128,55 @@ def test_json_operators_embedded(request):
     "key, expected",
     [
         ("a", "$.a"),
-        ("O''Brien", "$.O'Brien"),
+        ("O'Brien", "$.O'Brien"),
         ("a b", "$.a b"),
         ("$.a[0]", "$.a[0]"),
     ],
 )
 def test_json_operator_paths(sdk, operator, key, expected, request):
-    """Both SDKs pass decoded, server-compatible paths to JSON functions."""
-    from sqlglot import parse_one
+    """Both SDKs pass decoded, server-compatible paths to JSON functions.
+
+    The right-hand side is built from the expression API instead of parsing
+    ``c3->'key'``. sqlglot 28.1.0 renders a key holding an apostrophe as
+    ``'O''Brien'`` but cannot tokenize that form back, so building the test
+    through SQL text makes it fail on the tokenizer before it reaches the
+    path conversion this test is about. A key that is already a JSON path
+    gets a ``JSONPath`` node, as the parser would produce for it; every other
+    key is a plain ``JSONPathKey``.
+    """
+    import sqlglot.expressions as exp
+
+    path_expressions = [exp.JSONPathRoot()]
+    if "[" in key:
+        name, _, index = key.partition("[")
+        if name not in ("", "$"):
+            path_expressions.append(exp.JSONPathKey(this=name.removeprefix("$.")))
+        path_expressions.append(exp.JSONPathSubscript(this=int(index.rstrip("]"))))
+    else:
+        path_expressions.append(exp.JSONPathKey(this=key))
+
+    node = (exp.JSONExtractScalar if operator == "->>" else exp.JSONExtract)(
+        this=exp.column("c3"),
+        expression=exp.JSONPath(expressions=path_expressions),
+    )
 
     if sdk == "embedded" and not request.config.getoption("--local-infinity"):
         pytest.skip("embedded-only regression test")
     if sdk == "embedded":
         from infinity_embedded.local_infinity.utils import parse_expr
 
-        function = parse_expr(parse_one(f"c3{operator}'{key}'")).function_expr
-        path = function.arguments[1].constant_expr.str_value
+        function = parse_expr(node).function_expr
+        path_value = function.arguments[1].constant_expr.str_value
         assert function.arguments[0].column_expr.names == ["c3"]
         name = function.func_name
     else:
         from infinity.remote_thrift.utils import parse_expr
 
-        function = parse_expr(parse_one(f"c3{operator}'{key}'")).type.function_expr
-        path = function.arguments[1].type.constant_expr.str_value
+        function = parse_expr(node).type.function_expr
+        path_value = function.arguments[1].type.constant_expr.str_value
         assert function.arguments[0].type.column_expr.column_name == ["c3"]
         name = function.function_name
-    assert path == expected
+    assert path_value == expected
     assert name == ("json_extract_string" if operator == "->>" else "json_extract")
 
 

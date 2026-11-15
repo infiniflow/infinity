@@ -618,9 +618,11 @@ class TestInfinity:
                 "sum2": "Int64",
             }
         )
-        pd.testing.assert_frame_equal(
-            res.astype({"sum1": "Int64", "sum2": "Int64"}), gt
-        )
+        # Compare directly, like the unaliased assertion above: both
+        # transports return Int64 for aliased SUM columns, so a dtype
+        # regression in the aliased path must fail here too instead of being
+        # papered over by a cast.
+        pd.testing.assert_frame_equal(res, gt)
 
         table_obj.delete("c1 <= 1")
 

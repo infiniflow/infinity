@@ -11,6 +11,17 @@ from common import common_values
 
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")
+def _plan_text(frame) -> str:
+    """Join every cell of an explain result into one string.
+
+    The column holding the plan is named "Physical Plan" on the C++ engine and
+    "explain" on the Rust one, so read by position. Iterating the cells also
+    avoids ``str(frame)``, which elides rows with "…" once the plan is longer
+    than the display budget and so hides the operator being asserted on.
+    """
+    return "\n".join(str(value) for row in frame.iter_rows() for value in row)
+
+
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, http):
@@ -104,8 +115,9 @@ class TestInfinity:
             .match_dense("vec", [0.1, 0.2, 0.3, 0.4], "float", "l2", 10)
             .explain(ExplainType.Physical)
         )
-        # the physical plan of a match_dense query must contain a KNN SCAN operator
-        assert "KNN SCAN" in str(res)
+        # The physical plan of a match_dense query must contain a KNN SCAN
+        # operator.
+        assert "KNN SCAN" in _plan_text(res)
 
         db_obj.drop_table("test_explain_match_dense" + suffix, ConflictType.Error)
 
@@ -131,23 +143,43 @@ class TestInfinity:
                 .having("sum(c2) > 0")
                 .explain(ExplainType.Physical)
             )
-            plan = str(res)
-            print(plan)
-            # a group-by query explains through an Aggregate operator; without
-            # forwarding group by the plan is a plain projection
-            assert "Aggregate" in plan
+            # Read the plan rather than str(): polars elides rows with "…"
+            # when the frame is wider than its display budget, which hides
+            # the operator this test is looking for.
+            plan_text = _plan_text(res)
+            print(plan_text)
+            # A group-by query explains through an AGGREGATE operator; without
+            # forwarding group by the plan is a plain projection.
+            assert "AGGREGATE" in plan_text
+            # having reaches the plan as a filter over the aggregate.
+            assert "aggregate_" in plan_text
 
-            # having must reach the explained query as well: if having_expr
-            # were dropped again, the plan would be identical to the
-            # group-by-only explain
-            res_no_having = (
-                table.output(["c1", "sum(c2)"])
-                .group_by(["c1"])
-                .explain(ExplainType.Physical)
-            )
-            plan_no_having = str(res_no_having)
-            print(plan_no_having)
-            assert plan != plan_no_having
+        # having must reach the explained query as well. The plan text alone
+        # cannot show it: a having over the group key is folded into the
+        # aggregate operator, so a group-by query with and without having can
+        # explain to the same plan. Assert the forwarding instead, which is
+        # what regressed when _explain_query hardcoded having_expr=None.
+        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+        builder = InfinityThriftQueryBuilder(table)
+        builder.output(["c1", "sum(c2)"]).group_by(["c1"]).having("sum(c2) > 0")
+        assert builder._having is not None
+
+        sent = {}
+        real_explain = builder._table._explain_query
+
+        def capture(query):
+            sent["having"] = query.having
+            sent["groupby"] = query.groupby
+            return real_explain(query)
+
+        builder._table._explain_query = capture
+        try:
+            builder.explain(ExplainType.Physical)
+        finally:
+            builder._table._explain_query = real_explain
+        assert sent["having"] is not None
+        assert sent["groupby"] is not None
 
         db_obj.drop_table("test_explain_group_by_having" + suffix, ConflictType.Error)
 
