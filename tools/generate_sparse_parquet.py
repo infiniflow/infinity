@@ -47,9 +47,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 start, end = indptr[row_id], indptr[row_id + 1]
                 slt_file.write(f"{row_id} [")
                 for j in range(start, end):
-                    slt_file.write(
-                        f"{indices[j]}:{sparse_format_float(data[j])}"
-                    )
+                    slt_file.write(f"{indices[j]}:{sparse_format_float(data[j])}")
                     if j != end - 1:
                         slt_file.write(",")
                 slt_file.write("]\n")
@@ -66,9 +64,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"COPY {table_name} FROM '{copy_path}' WITH (FORMAT PARQUET);\n"
-        )
+        slt_file.write(f"COPY {table_name} FROM '{copy_path}' WITH (FORMAT PARQUET);\n")
         slt_file.write("\n")
 
         slt_file.write("query I\n")
@@ -77,9 +73,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         write_query()
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"COPY {table_name} TO '{copy_path1}' WITH (FORMAT PARQUET);\n"
-        )
+        slt_file.write(f"COPY {table_name} TO '{copy_path1}' WITH (FORMAT PARQUET);\n")
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")

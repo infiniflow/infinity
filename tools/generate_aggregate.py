@@ -35,9 +35,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 int, c2 float);\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} (c1 int, c2 float);\n")
 
         # select count(*) from test_simple_agg_big
         slt_file.write("\n")
@@ -65,7 +63,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         for _ in range(2):
             for i in sequence:
-                slt_file.write(str(i) + " " + str(i)+".000000")
+                slt_file.write(str(i) + " " + str(i) + ".000000")
                 slt_file.write("\n")
         slt_file.write("\n")
 
@@ -138,7 +136,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # select sum(distinct c1), count(distinct c1) from test_simple_agg_big
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write(f"SELECT sum(distinct c1), count(distinct c1) FROM {table_name};\n")
+        slt_file.write(
+            f"SELECT sum(distinct c1), count(distinct c1) FROM {table_name};\n"
+        )
         slt_file.write("----\n")
         slt_file.write(str(np.sum(sequence)) + " " + str(row_n))
         slt_file.write("\n")
@@ -146,7 +146,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # select sum(distinct c1), count(distinct c2) from test_simple_agg_big
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write(f"SELECT sum(distinct c1), count(distinct c2) FROM {table_name};\n")
+        slt_file.write(
+            f"SELECT sum(distinct c1), count(distinct c2) FROM {table_name};\n"
+        )
         slt_file.write("----\n")
         slt_file.write(str(np.sum(sequence)) + " " + str(row_n))
         slt_file.write("\n")
@@ -154,9 +156,20 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # select sum(distinct c1), count(c2), sum(c1), count(distinct c2) from test_simple_agg_big
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write(f"SELECT sum(distinct c1), count(c2), sum(c1), avg(distinct c2) FROM {table_name};\n")
+        slt_file.write(
+            f"SELECT sum(distinct c1), count(c2), sum(c1), avg(distinct c2) FROM {table_name};\n"
+        )
         slt_file.write("----\n")
-        slt_file.write(str(np.sum(sequence)) + " " + str(row_n * 2) + " " + str(np.sum(sequence) * 2) + " " + str(np.mean(sequence)) + "00000")
+        slt_file.write(
+            str(np.sum(sequence))
+            + " "
+            + str(row_n * 2)
+            + " "
+            + str(np.sum(sequence) * 2)
+            + " "
+            + str(np.mean(sequence))
+            + "00000"
+        )
         slt_file.write("\n")
 
         # select count(distinct c1, c2), count(c2) from test_simple_agg_big
@@ -174,9 +187,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # -------------------------------------
         slt_file.write("\n")
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 SMALLINT, c2 TINYINT);\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} (c1 SMALLINT, c2 TINYINT);\n")
 
         # select count(*) from test_simple_agg_big
         slt_file.write("\n")
@@ -251,8 +262,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate limit data for test")
+    parser = argparse.ArgumentParser(description="Generate limit data for test")
 
     parser.add_argument(
         "-g",

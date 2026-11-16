@@ -140,13 +140,16 @@ class InfinityRunner:
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 self.logger.info(
-                    f"Connection: retrying connection attempt {count + 1} after {sleep_time} seconds, at {current_time}.")
+                    f"Connection: retrying connection attempt {count + 1} after {sleep_time} seconds, at {current_time}."
+                )
             count += 1
             if error == ErrorCode.INFINITY_IS_INITING:
                 continue
             else:
                 if count > try_n:
-                    raise Exception(f"Connection: cannot connect to infinity after {try_n} retries.")
+                    raise Exception(
+                        f"Connection: cannot connect to infinity after {try_n} retries."
+                    )
 
         self.logger.info("Connection: connected to infinity.")
         return infinity_obj
@@ -177,27 +180,30 @@ class InfinityRunner:
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 self.logger.info(
-                    f"Connection pool: retrying connection attempt {i + 1} after {sleep_time} seconds, at {current_time}.")
+                    f"Connection pool: retrying connection attempt {i + 1} after {sleep_time} seconds, at {current_time}."
+                )
         else:
-            raise Exception(f"Connection pool: cannot connect to infinity after {try_n} retries.")
+            raise Exception(
+                f"Connection pool: cannot connect to infinity after {try_n} retries."
+            )
         self.logger.info("Connection pool: connected to infinity.")
         return infinity_pool
 
 
-'''
+"""
 This decorator is used to run a test function with an infinity connection object.
-'''
+"""
 
 
 def infinity_runner_decorator_factory(
-        config_path: str | None,
-        uri: str,
-        infinity_runner: InfinityRunner,
-        *,
-        shutdown_out: bool = False,
-        kill: bool = False,
-        terminate_timeout: int = 60,
-        check_kill: bool = True,
+    config_path: str | None,
+    uri: str,
+    infinity_runner: InfinityRunner,
+    *,
+    shutdown_out: bool = False,
+    kill: bool = False,
+    terminate_timeout: int = 60,
+    check_kill: bool = True,
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -222,20 +228,20 @@ def infinity_runner_decorator_factory(
     return decorator
 
 
-'''
+"""
 This decorator is used to run a test function with an infinity ConnectionPool object.
-'''
+"""
 
 
 def infinity_runner_decorator_factory2(
-        config_path: str | None,
-        uri: str,
-        infinity_runner: InfinityRunner,
-        *,
-        shutdown_out: bool = False,
-        kill: bool = False,
-        terminate_timeout: int = 60,
-        check_kill: bool = True,
+    config_path: str | None,
+    uri: str,
+    infinity_runner: InfinityRunner,
+    *,
+    shutdown_out: bool = False,
+    kill: bool = False,
+    terminate_timeout: int = 60,
+    check_kill: bool = True,
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -243,10 +249,14 @@ def infinity_runner_decorator_factory2(
             infinity_pool = infinity_runner.connect_pool(uri)
             try:
                 result = f(infinity_pool, *args, **kwargs)
-                infinity_runner.logger.info(f"Decorated function {f.__name__} completed successfully")
+                infinity_runner.logger.info(
+                    f"Decorated function {f.__name__} completed successfully"
+                )
                 return result
             except Exception as e:
-                infinity_runner.logger.warning(f"Decorated function {f.__name__} raised exception: {e}")
+                infinity_runner.logger.warning(
+                    f"Decorated function {f.__name__} raised exception: {e}"
+                )
                 raise
             finally:
                 infinity_runner.logger.info(f"Starting cleanup for {f.__name__}")
@@ -254,14 +264,18 @@ def infinity_runner_decorator_factory2(
                     infinity_pool.destroy()
                     infinity_runner.logger.info(f"Pool destroyed for {f.__name__}")
                 except Exception as e:
-                    infinity_runner.logger.warning(f"Pool destroy exception (ignored): {e}")
+                    infinity_runner.logger.warning(
+                        f"Pool destroy exception (ignored): {e}"
+                    )
                     if not shutdown_out:
                         raise
                 try:
                     infinity_runner.uninit(kill, terminate_timeout)
                     infinity_runner.logger.info(f"Uninit completed for {f.__name__}")
                 except Exception as e:
-                    infinity_runner.logger.warning(f"Uninit exception (check_kill={check_kill}): {e}")
+                    infinity_runner.logger.warning(
+                        f"Uninit exception (check_kill={check_kill}): {e}"
+                    )
                     if check_kill:
                         raise
 

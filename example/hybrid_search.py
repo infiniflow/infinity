@@ -96,7 +96,11 @@ try:
         infinity.common.ConflictType.Error,
     )
 
-    res, extra_result = table_instance.output(["num", "body", "vec", "year"]).filter("year < 2024").to_pl()
+    res, extra_result = (
+        table_instance.output(["num", "body", "vec", "year"])
+        .filter("year < 2024")
+        .to_pl()
+    )
     print(res)
     if extra_result is not None:
         print(extra_result)
@@ -114,22 +118,30 @@ try:
     builder.match_sparse(
         "sparse", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3
     )
-    builder = builder.match_text("body", "blooms", 10).filter("year < 2024").fusion(
-        method="match_tensor", topn=3,
-        fusion_params={"field": "tensor", "element_type": "float",
-                       "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
-    ).sort(order_by_expr_list).limit(3)
-    # print(builder.explain(explain_type=ExplainType.Fragment))
-    result, extra_result = (
-        builder.to_pl()
+    builder = (
+        builder.match_text("body", "blooms", 10)
+        .filter("year < 2024")
+        .fusion(
+            method="match_tensor",
+            topn=3,
+            fusion_params={
+                "field": "tensor",
+                "element_type": "float",
+                "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+            },
+        )
+        .sort(order_by_expr_list)
+        .limit(3)
     )
+    # print(builder.explain(explain_type=ExplainType.Fragment))
+    result, extra_result = builder.to_pl()
     if extra_result is not None:
         print(extra_result)
 
     print(result)
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

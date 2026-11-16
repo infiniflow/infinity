@@ -22,7 +22,9 @@ class TestInsertDeleteUpdate:
         threads = []
         end_time = time.time() + kRunningTime
         for i in range(kNumThread):
-            threads.append(Thread(target=random_exec, args=[connection_pool, end_time, i]))
+            threads.append(
+                Thread(target=random_exec, args=[connection_pool, end_time, i])
+            )
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
@@ -36,7 +38,11 @@ class TestInsertDeleteUpdate:
 
 def create_table(db_obj: Database):
     try:
-        db_obj.create_table(table_name, {"tag": {"type": "int"}, "c1": {"type": "vector,4,float"}}, ConflictType.Error)
+        db_obj.create_table(
+            table_name,
+            {"tag": {"type": "int"}, "c1": {"type": "vector,4,float"}},
+            ConflictType.Error,
+        )
     except Exception:
         return
 
@@ -51,12 +57,15 @@ def drop_table(db_obj: Database):
 def create_index(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
-        table_obj.create_index(index_name,
-                               index.IndexInfo("c1", index.IndexType.Hnsw,{
-                                   "M": "16",
-                                   "ef_construction": "50",
-                                   "metric": "l2"
-                               }), ConflictType.Error)
+        table_obj.create_index(
+            index_name,
+            index.IndexInfo(
+                "c1",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "50", "metric": "l2"},
+            ),
+            ConflictType.Error,
+        )
     except Exception:
         return
 
@@ -74,10 +83,19 @@ def insert(db_obj: Database):
         table_obj = db_obj.get_table(table_name)
         value = []
         for i in range(100):
-            value.append({"tag": random.randint(0, 9),
-                          "c1": [random.random(), random.random(), random.random(), random.random()]})
+            value.append(
+                {
+                    "tag": random.randint(0, 9),
+                    "c1": [
+                        random.random(),
+                        random.random(),
+                        random.random(),
+                        random.random(),
+                    ],
+                }
+            )
         table_obj.insert(value)
-        res, extra_result = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
     except Exception:
         return
@@ -94,7 +112,9 @@ def delete(db_obj: Database):
 def update(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
-        table_obj.update(f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}])
+        table_obj.update(
+            f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}]
+        )
     except Exception:
         return
 

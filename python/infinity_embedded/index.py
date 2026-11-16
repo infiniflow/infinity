@@ -50,7 +50,9 @@ class IndexType(Enum):
             case IndexType.PLAID:
                 return LocalIndexType.kPLAID
             case _:
-                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_TYPE, "Unknown index type"
+                )
 
 
 class InitParameter:
@@ -79,7 +81,9 @@ class IndexInfo:
             if isinstance(params, dict):
                 self.params = params
             else:
-                raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{params} should be dictionary type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_PARAM, f"{params} should be dictionary type"
+                )
         else:
             self.params = None
 
@@ -90,7 +94,11 @@ class IndexInfo:
         return self.__str__()
 
     def __eq__(self, other):
-        return self.column_name == other.column_name and self.index_type == other.index_type and self.params == other.params
+        return (
+            self.column_name == other.column_name
+            and self.index_type == other.index_type
+            and self.params == other.params
+        )
 
     def __hash__(self):
         params = tuple(sorted(self.params.items())) if self.params else None
@@ -110,7 +118,9 @@ class IndexInfo:
                     local_init_parameter.param_value = value
                     index_param_list.append(local_init_parameter)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{value} should be string type")
+                    raise InfinityException(
+                        ErrorCode.INVALID_INDEX_PARAM, f"{value} should be string type"
+                    )
 
         index_info_to_use.index_param_list = index_param_list
         return index_info_to_use

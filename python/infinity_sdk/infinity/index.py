@@ -57,7 +57,9 @@ class IndexType(Enum):
             case IndexType.SMVE:
                 return ttypes.IndexType.SMVE
             case _:
-                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_TYPE, "Unknown index type"
+                )
 
 
 class InitParameter:
@@ -79,9 +81,11 @@ SPARSEGRAM_DEFAULT_MIN_GRAM = 3
 SPARSEGRAM_DEFAULT_MAX_GRAM = 12
 
 
-def sparsegram_analyzer(min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
-                        max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
-                        fold_case: bool = False) -> str:
+def sparsegram_analyzer(
+    min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
+    max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
+    fold_case: bool = False,
+) -> str:
     """Build the analyzer name of a sparse gram full-text index.
 
     The analyzer emits content-defined n-grams of the whole value instead of
@@ -110,12 +114,20 @@ def sparsegram_analyzer(min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
     """
     for name, value in (("min_gram", min_gram), ("max_gram", max_gram)):
         if isinstance(value, bool) or not isinstance(value, int):
-            raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{name} should be an integer, but got {value!r}")
+            raise InfinityException(
+                ErrorCode.INVALID_INDEX_PARAM,
+                f"{name} should be an integer, but got {value!r}",
+            )
     if min_gram < 1 or max_gram < min_gram:
-        raise InfinityException(ErrorCode.INVALID_INDEX_PARAM,
-                                f"Expected 1 <= min_gram <= max_gram, but got min_gram={min_gram} and max_gram={max_gram}")
+        raise InfinityException(
+            ErrorCode.INVALID_INDEX_PARAM,
+            f"Expected 1 <= min_gram <= max_gram, but got min_gram={min_gram} and max_gram={max_gram}",
+        )
     if not isinstance(fold_case, bool):
-        raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"fold_case should be a boolean, but got {fold_case!r}")
+        raise InfinityException(
+            ErrorCode.INVALID_INDEX_PARAM,
+            f"fold_case should be a boolean, but got {fold_case!r}",
+        )
     name = f"sparsegram-{min_gram}-{max_gram}"
     return f"{name}-fold" if fold_case else name
 
@@ -128,15 +140,19 @@ class IndexInfo:
             if isinstance(params, dict):
                 self.params = params
             else:
-                raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{params} should be dictionary type")
+                raise InfinityException(
+                    ErrorCode.INVALID_INDEX_PARAM, f"{params} should be dictionary type"
+                )
         else:
             self.params = None
 
     @staticmethod
-    def sparsegram(target_name: str,
-                   min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
-                   max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
-                   fold_case: bool = False) -> "IndexInfo":
+    def sparsegram(
+        target_name: str,
+        min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
+        max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
+        fold_case: bool = False,
+    ) -> "IndexInfo":
         """Build a full-text index that makes `regex()` filters use grams.
 
         Shorthand for ``IndexInfo(target_name, IndexType.FullText,
@@ -147,8 +163,11 @@ class IndexInfo:
             table.create_index("idx", IndexInfo.sparsegram("doc", fold_case=True))
             table.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)"))
         """
-        return IndexInfo(target_name, IndexType.FullText,
-                         {"analyzer": sparsegram_analyzer(min_gram, max_gram, fold_case)})
+        return IndexInfo(
+            target_name,
+            IndexType.FullText,
+            {"analyzer": sparsegram_analyzer(min_gram, max_gram, fold_case)},
+        )
 
     def __str__(self):
         return f"IndexInfo({self.target_name}, {self.index_type}, {self.params})"
@@ -157,7 +176,11 @@ class IndexInfo:
         return self.__str__()
 
     def __eq__(self, other):
-        return self.target_name == other.target_name and self.index_type == other.index_type and self.params == other.params
+        return (
+            self.target_name == other.target_name
+            and self.index_type == other.index_type
+            and self.params == other.params
+        )
 
     def __hash__(self):
         params = tuple(sorted(self.params.items())) if self.params else None
@@ -170,7 +193,9 @@ class IndexInfo:
                 if isinstance(value, str):
                     init_params_list.append(ttypes.InitParameter(key, value))
                 else:
-                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{value} should be string type")
+                    raise InfinityException(
+                        ErrorCode.INVALID_INDEX_PARAM, f"{value} should be string type"
+                    )
 
         column_name = None
         function_expr = None
@@ -181,9 +206,6 @@ class IndexInfo:
             column_name = self.target_name.strip()
 
         index_info = ttypes.IndexInfo(
-            column_name,
-            self.index_type.to_ttype(),
-            init_params_list,
-            function_expr
+            column_name, self.index_type.to_ttype(), init_params_list, function_expr
         )
         return index_info

@@ -2935,6 +2935,13 @@ pub fn normalize_datetime(kind: &str, raw: &str) -> String {
     if kind == "INTERVAL" || kind == "JSON" {
         return raw.trim().to_string();
     }
+    // A NULL keeps its marker. Rendering it through the arms below dropped it
+    // for TIME ("null" has no date part, so the default "00:00:00" replaced it)
+    // and produced "null 00:00:00" for DATETIME/TIMESTAMP; either way the row
+    // read back as an epoch value instead of NULL.
+    if raw.trim().eq_ignore_ascii_case("null") {
+        return "null".to_string();
+    }
     // accept `/` as a date separator, e.g. `DATE '2222/11/11'`
     let s = raw.trim().replace('/', "-");
     let s = s.as_str();
@@ -4345,5 +4352,28 @@ mod tests {
         ] {
             assert!(parse(sql).is_err(), "{sql}");
         }
+    }
+
+    /// One NULL has one stored spelling, whatever the temporal type: the
+    /// marker must survive normalisation instead of being turned into a zero
+    /// date/time, or the row reads back as an epoch value rather than NULL.
+    #[test]
+    fn temporal_null_keeps_one_spelling() {
+        for kind in ["DATE", "TIME", "DATETIME", "TIMESTAMP"] {
+            assert_eq!(normalize_datetime(kind, "null"), "null", "{kind}");
+            assert_eq!(normalize_datetime(kind, "NULL"), "null", "{kind}");
+        }
+    }
+
+    /// A real value is still normalised, so the marker did not swallow the
+    /// ordinary path.
+    #[test]
+    fn temporal_values_still_normalize() {
+        assert_eq!(normalize_datetime("DATE", "2024/5/6"), "2024-05-06");
+        assert_eq!(normalize_datetime("TIME", "7:8:9"), "07:08:09");
+        assert_eq!(
+            normalize_datetime("DATETIME", "2024-5-6 7:8:9"),
+            "2024-05-06 07:08:09"
+        );
     }
 }

@@ -125,13 +125,17 @@ class ElasticsearchClient(BaseClient):
             query = query.lstrip()
             if query.startswith('"'):
                 is_phrase = True
-                match = re.search(r'~(\d+)$', query)
+                match = re.search(r"~(\d+)$", query)
                 if match:
                     is_slop_phrase = True
                     slop = int(match.group(1))
             if is_phrase:
                 if is_slop_phrase:
-                    ret = {"query": {"match_phrase": {"body": {"query": query, "slop": slop}}}}
+                    ret = {
+                        "query": {
+                            "match_phrase": {"body": {"query": query, "slop": slop}}
+                        }
+                    }
                 else:
                     ret = {"query": {"match_phrase": {"body": query}}}
             else:

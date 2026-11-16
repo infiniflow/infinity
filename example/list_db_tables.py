@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
-'''
+"""
 
 import sys
 
@@ -25,11 +25,19 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
-    infinity_instance.create_database("db1", infinity.common.ConflictType.Ignore, "database1")
-    infinity_instance.create_database("db2", infinity.common.ConflictType.Ignore, "database2")
-    infinity_instance.create_database("db3", infinity.common.ConflictType.Ignore, "database3")
+    infinity_instance.create_database(
+        "db1", infinity.common.ConflictType.Ignore, "database1"
+    )
+    infinity_instance.create_database(
+        "db2", infinity.common.ConflictType.Ignore, "database2"
+    )
+    infinity_instance.create_database(
+        "db3", infinity.common.ConflictType.Ignore, "database3"
+    )
 
     res = infinity_instance.list_databases()
     print(res.db_names)
@@ -37,23 +45,39 @@ try:
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("db1")
 
-    table1_object = db_instance.create_table("table1", {
-        "num": {"type": "integer", "constraints": ["PRIMARY KEY"], "comment": "number column"},
-        "body": {"type": "varchar", "comment": "body column"},
-        "vec": {"type": "vector, 4, float", "comment": "vec column"},
-    }, infinity.common.ConflictType.Ignore)
+    table1_object = db_instance.create_table(
+        "table1",
+        {
+            "num": {
+                "type": "integer",
+                "constraints": ["PRIMARY KEY"],
+                "comment": "number column",
+            },
+            "body": {"type": "varchar", "comment": "body column"},
+            "vec": {"type": "vector, 4, float", "comment": "vec column"},
+        },
+        infinity.common.ConflictType.Ignore,
+    )
 
-    db_instance.create_table("table2", {
-        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    }, infinity.common.ConflictType.Ignore)
+    db_instance.create_table(
+        "table2",
+        {
+            "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+        infinity.common.ConflictType.Ignore,
+    )
 
-    db_instance.create_table("table3", {
-        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    }, infinity.common.ConflictType.Ignore)
+    db_instance.create_table(
+        "table3",
+        {
+            "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+        infinity.common.ConflictType.Ignore,
+    )
 
     # For Thrift client, use res.table_names
     res = db_instance.list_tables()
@@ -87,7 +111,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

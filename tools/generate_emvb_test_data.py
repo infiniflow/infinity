@@ -22,9 +22,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
     if os.path.exists(csv_path) and os.path.exists(slt_path) and not generate_if_exists:
-        print(f"File {slt_path} and {csv_path} already existed exists. Skip Generating.")
+        print(
+            f"File {slt_path} and {csv_path} already existed exists. Skip Generating."
+        )
         return
-    with (open(csv_path, "w") as top_csv_file, open(slt_path, "w") as top_slt_file):
+    with open(csv_path, "w") as top_csv_file, open(slt_path, "w") as top_slt_file:
         for i in range(row_n):
             t = []
             for j in range(fix_embedding_num_in_tensor):
@@ -37,13 +39,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write(f"CREATE TABLE {table_name} (c1 integer, c2 TENSOR(FLOAT, {fix_dim}));\n")
+        top_slt_file.write(
+            f"CREATE TABLE {table_name} (c1 integer, c2 TENSOR(FLOAT, {fix_dim}));\n"
+        )
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write(f"COPY {table_name} FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n")
+        top_slt_file.write(
+            f"COPY {table_name} FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n"
+        )
         top_slt_file.write("\nstatement ok\n")
         top_slt_file.write(f"CREATE INDEX idx1 ON {table_name} (c2) USING EMVB WITH ")
-        top_slt_file.write(f"(pq_subspace_num = {pq_subspace_num}, pq_subspace_bits = {pq_subspace_bits});\n")
+        top_slt_file.write(
+            f"(pq_subspace_num = {pq_subspace_num}, pq_subspace_bits = {pq_subspace_bits});\n"
+        )
         query_vec = [0] * fix_dim
         query_vec[0] = 1
         query_vec[1] = 1
@@ -54,8 +62,12 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write(f"SELECT c1 FROM {table_name} SEARCH MATCH TENSOR")
         top_slt_file.write(f" (c2, {query_vec}, 'float', 'maxsim', 'topn=10');\n")
         top_slt_file.write("\nstatement ok\n")
-        top_slt_file.write(f"SELECT c1 FROM {table_name} SEARCH MATCH TENSOR (c2, {query_vec}")
-        top_slt_file.write(", 'float', 'maxsim', 'topn=10;emvb_threshold_first=0.4;emvb_threshold_final=0.5');\n")
+        top_slt_file.write(
+            f"SELECT c1 FROM {table_name} SEARCH MATCH TENSOR (c2, {query_vec}"
+        )
+        top_slt_file.write(
+            ", 'float', 'maxsim', 'topn=10;emvb_threshold_first=0.4;emvb_threshold_final=0.5');\n"
+        )
         top_slt_file.write("\n# test small mem index of exhaustive scan")
         insert_vec = [0] * fix_dim
         insert_vec[0] = 2 * row_n
@@ -63,7 +75,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
         insert_vec[2] = 2 * row_n
         insert_vec[3] = 2 * row_n
         top_slt_file.write("\nstatement ok\n")
-        top_slt_file.write(f"INSERT INTO {table_name} VALUES ({row_n}, {insert_vec});\n")
+        top_slt_file.write(
+            f"INSERT INTO {table_name} VALUES ({row_n}, {insert_vec});\n"
+        )
         top_slt_file.write("\nquery I\n")
         top_slt_file.write(f"SELECT c1 FROM {table_name} SEARCH MATCH TENSOR")
         top_slt_file.write(f" (c2, {query_vec}, 'float', 'maxsim', 'topn=1');\n")
@@ -76,7 +90,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate test data for emvb")
 
-    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists", )
-    parser.add_argument("-c", "--copy", type=str, default="/var/infinity/test_data", dest="copy_dir", )
+    parser.add_argument(
+        "-g",
+        "--generate",
+        type=bool,
+        default=False,
+        dest="generate_if_exists",
+    )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default="/var/infinity/test_data",
+        dest="copy_dir",
+    )
     args = parser.parse_args()
     generate(args.generate_if_exists, args.copy_dir)

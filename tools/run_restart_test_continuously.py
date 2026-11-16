@@ -1,11 +1,10 @@
-
 import argparse
 import os
 import sys
 import time
 
 # TEST_SEC = 3600 # 1 hour
-TEST_SEC = 10 # run once
+TEST_SEC = 10  # run once
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Restart Test Continuously")
@@ -32,7 +31,9 @@ if __name__ == "__main__":
     test_fail = False
     while (time.time() - begin_time) < test_sec and not test_fail:
         print(f"Test {test_i}")
-        ret = os.system(f"python3 tools/run_restart_test.py --infinity_path={infinity_path} --marker=slow")
+        ret = os.system(
+            f"python3 tools/run_restart_test.py --infinity_path={infinity_path} --marker=slow"
+        )
         if ret != 0:
             test_fail = True
             print(f"Test {test_i} failed")

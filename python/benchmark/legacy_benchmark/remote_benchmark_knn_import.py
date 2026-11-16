@@ -22,21 +22,64 @@ from infinity.common import LOCAL_HOST, ConflictType
 from infinity.errors import ErrorCode
 
 
-def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
+def import_data(
+    path,
+    dataset: str,
+    m: int,
+    ef_construction: int,
+    build_type: str,
+    encode_type: str,
+    compress_type: str,
+):
     print(f"dataset: {dataset}, m: {m}, ef_construction: {ef_construction}")
     if dataset == "sift_1m":
-        import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, build_type, encode_type, compress_type)
+        import_sift_1m(
+            path + "/sift_base.fvecs",
+            m,
+            ef_construction,
+            build_type,
+            encode_type,
+            compress_type,
+        )
     elif dataset == "sift_10k":
-        import_sift_1m(path + "/sift10k_base.fvecs", m, ef_construction, build_type, encode_type, compress_type)
+        import_sift_1m(
+            path + "/sift10k_base.fvecs",
+            m,
+            ef_construction,
+            build_type,
+            encode_type,
+            compress_type,
+        )
     elif dataset == "gist_1m":
-        import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, build_type, encode_type, compress_type)
+        import_gist_1m(
+            path + "/gist_base.fvecs",
+            m,
+            ef_construction,
+            build_type,
+            encode_type,
+            compress_type,
+        )
     elif dataset == "msmarco_1m":
-        import_msmarco_1m(path + "/msmarco_base.fvecs", m, ef_construction, build_type, encode_type, compress_type)
+        import_msmarco_1m(
+            path + "/msmarco_base.fvecs",
+            m,
+            ef_construction,
+            build_type,
+            encode_type,
+            compress_type,
+        )
     else:
         raise Exception("Invalid data set")
 
 
-def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
+def import_sift_1m(
+    path,
+    m: int,
+    ef_construction: int,
+    build_type: str,
+    encode_type: str,
+    compress_type: str,
+):
     infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
 
@@ -65,7 +108,14 @@ def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_t
     print(f"Create index on sift_1m cost time: {dur} s")
 
 
-def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
+def import_gist_1m(
+    path,
+    m: int,
+    ef_construction: int,
+    build_type: str,
+    encode_type: str,
+    compress_type: str,
+):
     infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
 
@@ -94,7 +144,14 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
     print(f"Create index on gist_1m cost time: {dur} s")
 
 
-def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
+def import_msmarco_1m(
+    path,
+    m: int,
+    ef_construction: int,
+    build_type: str,
+    encode_type: str,
+    compress_type: str,
+):
     infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
 
@@ -123,7 +180,14 @@ def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encod
     print(f"Create index on msmarco_1m cost time: {dur} s")
 
 
-def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
+def create_index(
+    table_obj,
+    m: int,
+    ef_construction: int,
+    build_type: str,
+    encode_type: str,
+    compress_type: str,
+):
     res = table_obj.drop_index("hnsw_index", ConflictType.Ignore)
 
     assert res.error_code == ErrorCode.OK
@@ -138,9 +202,9 @@ def create_index(table_obj, m: int, ef_construction: int, build_type: str, encod
                 "ef_construction": str(ef_construction),
                 "metric": "l2",
                 "build_type": build_type,
-                "encode": encode_type
+                "encode": encode_type,
             },
-        )
+        ),
     )
 
     assert res.error_code == ErrorCode.OK
@@ -161,13 +225,27 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--data", type=str, default="sift_1m", dest="data_set")
     parser.add_argument("--m", type=int, default=16, dest="m")
     parser.add_argument("--efc", type=int, default=200, dest="ef_construction")
-    parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
-    parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
-    parser.add_argument("-C", "--compress", type=str, default="plain", dest="compress_type")  # plain, lvq, rabitq
+    parser.add_argument(
+        "-b", "--build", type=str, default="plain", dest="build_type"
+    )  # plain, lsg
+    parser.add_argument(
+        "-e", "--encode", type=str, default="lvq", dest="encode_type"
+    )  # plain, lvq
+    parser.add_argument(
+        "-C", "--compress", type=str, default="plain", dest="compress_type"
+    )  # plain, lvq, rabitq
 
     args = parser.parse_args()
 
     data_dir = current_path + "/test/data/benchmark/" + args.data_set
     print(f"Data Dir: {data_dir}")
 
-    import_data(data_dir, args.data_set, args.m, args.ef_construction, args.build_type, args.encode_type, args.compress_type)
+    import_data(
+        data_dir,
+        args.data_set,
+        args.m,
+        args.ef_construction,
+        args.build_type,
+        args.encode_type,
+        args.compress_type,
+    )

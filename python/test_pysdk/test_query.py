@@ -40,33 +40,60 @@ class TestInfinity:
         db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
         db.create_table(
-            "my_table", {
-                "num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
-            ConflictType.Error)
+            "my_table",
+            {
+                "num": {"type": "integer"},
+                "body": {"type": "varchar"},
+                "vec": {"type": "vector,5,float"},
+            },
+            ConflictType.Error,
+        )
 
         table = RemoteTable(conn, "default_db", "my_table")
         res = table.insert(
-            [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
+            [
+                {
+                    "num": 1,
+                    "body": "undesirable, unnecessary, and harmful",
+                    "vec": [1.0] * 5,
+                }
+            ]
+        )
         assert res.error_code == ErrorCode.OK
         res = table.insert(
-            [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
+            [
+                {
+                    "num": 2,
+                    "body": "publisher=US National Office for Harmful Algal Blooms",
+                    "vec": [4.0] * 5,
+                }
+            ]
+        )
         assert res.error_code == ErrorCode.OK
         res = table.insert(
-            [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
+            [
+                {
+                    "num": 3,
+                    "body": "in the case of plants, growth and chemical",
+                    "vec": [7.0] * 5,
+                }
+            ]
+        )
         assert res.error_code == ErrorCode.OK
 
-        res = table.create_index("my_index",
-                                 index.IndexInfo("body",
-                                                 index.IndexType.FullText),
-                                 ConflictType.Error)
+        res = table.create_index(
+            "my_index",
+            index.IndexInfo("body", index.IndexType.FullText),
+            ConflictType.Error,
+        )
         assert res.error_code == ErrorCode.OK
 
         # Create a query builder
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["num", "body"])
-        query_builder.match_dense('vec', [3.0] * 5, 'float', 'ip', 2)
-        query_builder.match_text('body', 'harmful', 2, None)
-        query_builder.fusion(method='rrf', topn=10, fusion_params=None)
+        query_builder.match_dense("vec", [3.0] * 5, "float", "ip", 2)
+        query_builder.match_text("body", "harmful", 2, None)
+        query_builder.fusion(method="rrf", topn=10, fusion_params=None)
         res, extra_result = query_builder.to_df()
         print(res)
         res = table.drop_index("my_index", ConflictType.Error)
@@ -82,10 +109,10 @@ class TestInfinity:
     def test_query_builder(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_query_builder",
-                          conflict_type=ConflictType.Ignore)
+        db_obj.drop_table("test_query_builder", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error)
+            "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error
+        )
         query_builder = table_obj.query_builder
         res = query_builder.output(["*"]).to_df()
         print(res)
@@ -97,7 +124,9 @@ class TestInfinity:
 @pytest.mark.parametrize("builder_type", ["thrift", "local"])
 def test_query_builder_limit_and_offset_none_clear_clause(builder_type):
     if builder_type == "local":
-        local_query_builder = pytest.importorskip("infinity_embedded.local_infinity.query_builder")
+        local_query_builder = pytest.importorskip(
+            "infinity_embedded.local_infinity.query_builder"
+        )
         query_builder = local_query_builder.InfinityLocalQueryBuilder(None)
     else:
         query_builder = InfinityThriftQueryBuilder(None)
@@ -112,8 +141,16 @@ def test_query_builder_limit_and_offset_none_clear_clause(builder_type):
         # SQL cannot be None", and only group_by had a None guard. None now
         # clears the clause, matching limit(None)/offset(None).
         from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
         qb = InfinityThriftQueryBuilder(None)
-        for clause in (qb.output, qb.highlight, qb.filter, qb.having, qb.group_by, qb.sort):
+        for clause in (
+            qb.output,
+            qb.highlight,
+            qb.filter,
+            qb.having,
+            qb.group_by,
+            qb.sort,
+        ):
             clause(None)
         assert qb._columns is None and qb._highlight is None
         assert qb._filter is None and qb._having is None
@@ -124,9 +161,19 @@ def test_query_builder_limit_and_offset_none_clear_clause(builder_type):
 
         if not request.config.getoption("--local-infinity"):
             pytest.skip("embedded part needs the embedded engine")
-        from infinity_embedded.local_infinity.query_builder import InfinityLocalQueryBuilder
+        from infinity_embedded.local_infinity.query_builder import (
+            InfinityLocalQueryBuilder,
+        )
+
         qb = InfinityLocalQueryBuilder(None)
-        for clause in (qb.output, qb.highlight, qb.filter, qb.having, qb.group_by, qb.sort):
+        for clause in (
+            qb.output,
+            qb.highlight,
+            qb.filter,
+            qb.having,
+            qb.group_by,
+            qb.sort,
+        ):
             clause(None)
         assert qb._columns is None and qb._highlight is None
         assert qb._filter is None and qb._having is None

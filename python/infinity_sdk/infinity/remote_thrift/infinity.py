@@ -43,13 +43,18 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
 
     def __del__(self):
         try:
-            if hasattr(self, '_is_connected') and self._is_connected:
+            if hasattr(self, "_is_connected") and self._is_connected:
                 self.disconnect()
         except Exception:
             pass  # Ignore errors in destructor
 
     @name_validity_check("db_name", "DB")
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error, comment: str = None):
+    def create_database(
+        self,
+        db_name: str,
+        conflict_type: ConflictType = ConflictType.Error,
+        comment: str = None,
+    ):
         create_database_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:
             create_database_conflict = ttypes.CreateConflict.Error
@@ -58,9 +63,13 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Replace:
             create_database_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
 
-        res = self._client.create_database(db_name=db_name, conflict_type=create_database_conflict, comment=comment)
+        res = self._client.create_database(
+            db_name=db_name, conflict_type=create_database_conflict, comment=comment
+        )
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
@@ -82,16 +91,22 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("db_name", "DB")
-    def drop_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error):
+    def drop_database(
+        self, db_name: str, conflict_type: ConflictType = ConflictType.Error
+    ):
         drop_database_conflict: ttypes.DropConflict
         if conflict_type == ConflictType.Error:
             drop_database_conflict = ttypes.DropConflict.Error
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = ttypes.DropConflict.Ignore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
 
-        res = self._client.drop_database(db_name=db_name, conflict_type=drop_database_conflict)
+        res = self._client.drop_database(
+            db_name=db_name, conflict_type=drop_database_conflict
+        )
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -126,7 +141,9 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def alter_index(self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions):
+    def alter_index(
+        self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions
+    ):
         res = self._client.alter_index(db_name, table_name, alter_index_opt)
         if res.error_code == ErrorCode.OK:
             return res
@@ -158,14 +175,18 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     def create_database_snapshot(self, snapshot_name: str, db_name: str):
-        res = self._client.create_database_snapshot(snapshot_name=snapshot_name, db_name=db_name)
+        res = self._client.create_database_snapshot(
+            snapshot_name=snapshot_name, db_name=db_name
+        )
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
     def restore_database_snapshot(self, snapshot_name: str):
-        res = self._client.restore_snapshot(snapshot_name=snapshot_name, scope="database")
+        res = self._client.restore_snapshot(
+            snapshot_name=snapshot_name, scope="database"
+        )
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -231,7 +252,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
                 error_code=res.error_code,
                 error_msg=res.error_msg,
                 config_name=res.config_name,
-                config_value=config_value
+                config_value=config_value,
             )
         else:
             raise InfinityException(res.error_code, res.error_msg)

@@ -11,6 +11,7 @@ def pytest_configure():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+
 def pytest_addoption(parser):
     parser.addoption(
         "--infinity_path",

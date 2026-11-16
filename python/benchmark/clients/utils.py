@@ -56,6 +56,7 @@ def gt_read_all(filename: str):
             gt.append(row)
     return topk, gt
 
+
 def calculate_recall(gt, query_res):
     correct = 0
     for gt_row, query_row in zip(gt, query_res):

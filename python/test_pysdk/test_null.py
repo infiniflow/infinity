@@ -11,6 +11,7 @@ from infinity.errors import ErrorCode
 def setup_class(request, http):
     if http:
         from infinity.infinity_http import infinity_http
+
         request.cls.infinity_obj = infinity_http()
     else:
         request.cls.infinity_obj = infinity.connect()
@@ -30,9 +31,11 @@ class TestNull:
 
         db.create_table(
             "test_null_omit" + suffix,
-            {"a": {"type": "integer"},
-             "b": {"type": "varchar"},
-             "c": {"type": "integer", "constraints": ["not null"]}},
+            {
+                "a": {"type": "integer"},
+                "b": {"type": "varchar"},
+                "c": {"type": "integer", "constraints": ["not null"]},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_omit" + suffix)
@@ -44,22 +47,26 @@ class TestNull:
         res, _ = table.output(["a", "b", "c"]).to_df()
         pd.testing.assert_frame_equal(
             res,
-            pd.DataFrame({
-                "a": pd.array([pd.NA, 100], dtype="Int32"),
-                "b": pd.array([pd.NA, pd.NA], dtype="string"),
-                "c": pd.array([1, 2], dtype="Int32"),
-            }),
+            pd.DataFrame(
+                {
+                    "a": pd.array([pd.NA, 100], dtype="Int32"),
+                    "b": pd.array([pd.NA, pd.NA], dtype="string"),
+                    "c": pd.array([1, 2], dtype="Int32"),
+                }
+            ),
         )
 
         # IS NULL on integer column
         res, _ = table.output(["a", "b", "c"]).filter("a IS NULL").to_df()
         pd.testing.assert_frame_equal(
             res,
-            pd.DataFrame({
-                "a": pd.array([pd.NA], dtype="Int32"),
-                "b": pd.array([pd.NA], dtype="string"),
-                "c": pd.array([1], dtype="Int32"),
-            }),
+            pd.DataFrame(
+                {
+                    "a": pd.array([pd.NA], dtype="Int32"),
+                    "b": pd.array([pd.NA], dtype="string"),
+                    "c": pd.array([1], dtype="Int32"),
+                }
+            ),
         )
 
         # IS NOT NULL on varchar column
@@ -78,9 +85,11 @@ class TestNull:
 
         db.create_table(
             "test_null_val" + suffix,
-            {"id": {"type": "integer"},
-             "name": {"type": "varchar"},
-             "score": {"type": "float"}},
+            {
+                "id": {"type": "integer"},
+                "name": {"type": "varchar"},
+                "score": {"type": "float"},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_val" + suffix)
@@ -94,11 +103,13 @@ class TestNull:
         print(res)
         pd.testing.assert_frame_equal(
             res.sort_values("id").reset_index(drop=True),
-            pd.DataFrame({
-                "id": pd.array([1, 2, 3, 4], dtype="Int32"),
-                "name": pd.array(["Alice", pd.NA, "Bob", pd.NA], dtype="string"),
-                "score": pd.array([90.5, pd.NA, pd.NA, 60.0], dtype="Float32"),
-            }),
+            pd.DataFrame(
+                {
+                    "id": pd.array([1, 2, 3, 4], dtype="Int32"),
+                    "name": pd.array(["Alice", pd.NA, "Bob", pd.NA], dtype="string"),
+                    "score": pd.array([90.5, pd.NA, pd.NA, 60.0], dtype="Float32"),
+                }
+            ),
         )
 
         res = db.drop_table("test_null_val" + suffix, ConflictType.Error)
@@ -113,9 +124,11 @@ class TestNull:
 
         db.create_table(
             "test_null_pred" + suffix,
-            {"id": {"type": "integer"},
-             "name": {"type": "varchar"},
-             "score": {"type": "integer"}},
+            {
+                "id": {"type": "integer"},
+                "name": {"type": "varchar"},
+                "score": {"type": "integer"},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_pred" + suffix)
@@ -191,8 +204,10 @@ class TestNull:
 
         db.create_table(
             "test_null_nn" + suffix,
-            {"a": {"type": "integer"},
-             "b": {"type": "integer", "constraints": ["not null"]}},
+            {
+                "a": {"type": "integer"},
+                "b": {"type": "integer", "constraints": ["not null"]},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_nn" + suffix)
@@ -206,10 +221,12 @@ class TestNull:
         res, _ = table.output(["*"]).to_df()
         pd.testing.assert_frame_equal(
             res,
-            pd.DataFrame({
-                "a": pd.array([2], dtype="Int32"),
-                "b": pd.array([2], dtype="Int32"),
-            }),
+            pd.DataFrame(
+                {
+                    "a": pd.array([2], dtype="Int32"),
+                    "b": pd.array([2], dtype="Int32"),
+                }
+            ),
         )
 
         res = db.drop_table("test_null_nn" + suffix, ConflictType.Error)
@@ -224,8 +241,7 @@ class TestNull:
 
         db.create_table(
             "test_null_default" + suffix,
-            {"id": {"type": "integer"},
-             "val": {"type": "varchar", "default": None}},
+            {"id": {"type": "integer"}, "val": {"type": "varchar", "default": None}},
             ConflictType.Error,
         )
         table = db.get_table("test_null_default" + suffix)
@@ -236,10 +252,12 @@ class TestNull:
         res, _ = table.output(["*"]).to_df()
         pd.testing.assert_frame_equal(
             res.sort_values("id").reset_index(drop=True),
-            pd.DataFrame({
-                "id": pd.array([1, 2], dtype="Int32"),
-                "val": pd.array([pd.NA, "hello"], dtype="string"),
-            }),
+            pd.DataFrame(
+                {
+                    "id": pd.array([1, 2], dtype="Int32"),
+                    "val": pd.array([pd.NA, "hello"], dtype="string"),
+                }
+            ),
         )
 
         res = db.drop_table("test_null_default" + suffix, ConflictType.Error)
@@ -254,23 +272,38 @@ class TestNull:
 
         db.create_table(
             "test_null_temporal" + suffix,
-            {"id": {"type": "integer"},
-             "d": {"type": "date"},
-             "dt": {"type": "datetime"},
-             "tm": {"type": "time"},
-             "ts": {"type": "timestamp"}},
+            {
+                "id": {"type": "integer"},
+                "d": {"type": "date"},
+                "dt": {"type": "datetime"},
+                "tm": {"type": "time"},
+                "ts": {"type": "timestamp"},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_temporal" + suffix)
 
-        table.insert([{"id": 1, "d": "2024-05-06", "dt": "2024-05-06 07:08:09",
-                       "tm": "07:08:09", "ts": "2024-05-06 07:08:09"}])
+        table.insert(
+            [
+                {
+                    "id": 1,
+                    "d": "2024-05-06",
+                    "dt": "2024-05-06 07:08:09",
+                    "tm": "07:08:09",
+                    "ts": "2024-05-06 07:08:09",
+                }
+            ]
+        )
         table.insert([{"id": 2, "d": None, "dt": None, "tm": None, "ts": None}])
 
         res, _ = table.output(["id", "d", "dt", "tm", "ts"]).to_df()
         res = res.sort_values("id").reset_index(drop=True)
         assert list(res.loc[0, ["d", "dt", "tm", "ts"]]) == [
-            "2024-05-06", "2024-05-06 07:08:09", "07:08:09", "2024-05-06 07:08:09"]
+            "2024-05-06",
+            "2024-05-06 07:08:09",
+            "07:08:09",
+            "2024-05-06 07:08:09",
+        ]
         assert res.loc[1, ["d", "dt", "tm", "ts"]].isna().all()
 
         res = db.drop_table("test_null_temporal" + suffix, ConflictType.Error)
@@ -285,16 +318,19 @@ class TestNull:
 
         db.create_table(
             "test_null_vector" + suffix,
-            {"id": {"type": "integer"},
-             "v": {"type": "vector,4,float"},
-             "sp": {"type": "sparse,100,float,int"},
-             "tn": {"type": "tensor,2,float"}},
+            {
+                "id": {"type": "integer"},
+                "v": {"type": "vector,4,float"},
+                "sp": {"type": "sparse,100,float,int"},
+                "tn": {"type": "tensor,2,float"},
+            },
             ConflictType.Error,
         )
         table = db.get_table("test_null_vector" + suffix)
 
-        table.insert([{"id": 1, "v": [1.0, 2.0, 3.0, 4.0], "sp": {"3": 0.5},
-                       "tn": [[1.0, 2.0]]}])
+        table.insert(
+            [{"id": 1, "v": [1.0, 2.0, 3.0, 4.0], "sp": {"3": 0.5}, "tn": [[1.0, 2.0]]}]
+        )
         table.insert([{"id": 2}])
 
         res, _ = table.output(["id", "v", "sp", "tn"]).to_pl()
@@ -314,10 +350,15 @@ def test_thrift_null_temporal_slots_are_not_decoded():
     from infinity.remote_thrift.types import column_vector_to_list
 
     date_bytes = struct.pack("<2i", 19849, 2**31 - 1)
-    assert column_vector_to_list(ttypes.ColumnType.ColumnDate, None, [date_bytes], [True, False]) == [
-        "2024-05-06", pd.NA]
+    assert column_vector_to_list(
+        ttypes.ColumnType.ColumnDate, None, [date_bytes], [True, False]
+    ) == ["2024-05-06", pd.NA]
 
     datetime_bytes = struct.pack("<4i", 19849, 25689, 2**31 - 1, 2**31 - 1)
-    for column_type in (ttypes.ColumnType.ColumnDateTime, ttypes.ColumnType.ColumnTimestamp):
-        assert column_vector_to_list(column_type, None, [datetime_bytes], [True, False]) == [
-            "2024-05-06 07:08:09", pd.NA]
+    for column_type in (
+        ttypes.ColumnType.ColumnDateTime,
+        ttypes.ColumnType.ColumnTimestamp,
+    ):
+        assert column_vector_to_list(
+            column_type, None, [datetime_bytes], [True, False]
+        ) == ["2024-05-06 07:08:09", pd.NA]

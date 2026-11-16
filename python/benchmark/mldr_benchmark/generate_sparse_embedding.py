@@ -8,6 +8,7 @@ python generate_sparse_embedding.py \
 --batch_size 1 \
 --fp16 True \
 """
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -20,7 +21,7 @@ from transformers import HfArgumentParser
 
 @dataclass
 class ModelArgs:
-    fp16: bool = field(default=True, metadata={'help': 'Use fp16 in inference?'})
+    fp16: bool = field(default=True, metadata={"help": "Use fp16 in inference?"})
 
 
 def get_model(model_args: ModelArgs):
@@ -28,11 +29,23 @@ def get_model(model_args: ModelArgs):
     return model
 
 
-def generate_sparse(model: BGEM3FlagModel, corpus: datasets.Dataset, max_passage_length: int, batch_size: int,
-                    begin_pos: int, end_pos: int):
-    result_dict = model.encode(corpus["text"][begin_pos: end_pos], batch_size=batch_size, max_length=max_passage_length,
-                               return_dense=False, return_sparse=True, return_colbert_vecs=False)
-    sparse_dict = result_dict['lexical_weights']
+def generate_sparse(
+    model: BGEM3FlagModel,
+    corpus: datasets.Dataset,
+    max_passage_length: int,
+    batch_size: int,
+    begin_pos: int,
+    end_pos: int,
+):
+    result_dict = model.encode(
+        corpus["text"][begin_pos:end_pos],
+        batch_size=batch_size,
+        max_length=max_passage_length,
+        return_dense=False,
+        return_sparse=True,
+        return_colbert_vecs=False,
+    )
+    sparse_dict = result_dict["lexical_weights"]
     result = []
     for one_dict in sparse_dict:
         one_result = {}
@@ -43,7 +56,7 @@ def generate_sparse(model: BGEM3FlagModel, corpus: datasets.Dataset, max_passage
 
 
 def save_result(sparse_embeddings, sparse_save_file: str):
-    with open(sparse_save_file, 'w') as f:
+    with open(sparse_save_file, "w") as f:
         json.dump(sparse_embeddings, f)
 
 
@@ -58,22 +71,30 @@ def main():
     print("==================================================")
     print("Start generating sparse embedding with model: BAAI/bge-m3")
 
-    print('Generate embedding of following languages: ', languages)
+    print("Generate embedding of following languages: ", languages)
     for lang in languages:
         print("**************************************************")
-        embedding_save_dir = os.path.join(eval_args.embedding_save_dir, 'bge-m3', lang)
+        embedding_save_dir = os.path.join(eval_args.embedding_save_dir, "bge-m3", lang)
         if not os.path.exists(embedding_save_dir):
             os.makedirs(embedding_save_dir)
-        sparse_save_file = os.path.join(embedding_save_dir, f'sparse-{eval_args.begin_pos}-{eval_args.end_pos}.json')
+        sparse_save_file = os.path.join(
+            embedding_save_dir, f"sparse-{eval_args.begin_pos}-{eval_args.end_pos}.json"
+        )
         if os.path.exists(sparse_save_file) and not eval_args.overwrite:
-            print(f'Embedding of {lang} already exists. Skip...')
+            print(f"Embedding of {lang} already exists. Skip...")
             continue
 
         print(f"Start generating embedding of {lang} ...")
         corpus = load_corpus(lang)
 
-        sparse_embeddings = generate_sparse(model=model, corpus=corpus, max_passage_length=eval_args.max_passage_length,
-            batch_size=eval_args.batch_size, begin_pos=eval_args.begin_pos, end_pos=eval_args.end_pos)
+        sparse_embeddings = generate_sparse(
+            model=model,
+            corpus=corpus,
+            max_passage_length=eval_args.max_passage_length,
+            batch_size=eval_args.batch_size,
+            begin_pos=eval_args.begin_pos,
+            end_pos=eval_args.end_pos,
+        )
         save_result(sparse_embeddings, sparse_save_file)
 
     print("==================================================")

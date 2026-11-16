@@ -94,7 +94,7 @@ class TestFullText:
 
             gt_res = (
                 gt_table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
@@ -150,7 +150,9 @@ class TestFullText:
                             .to_result()
                         )
                         gt_data_dict, _, _ = gt_res
-                        logging.info(f"work_func cur_insert_n: {cur_insert_n}, gt_data_dict: {gt_data_dict}")
+                        logging.info(
+                            f"work_func cur_insert_n: {cur_insert_n}, gt_data_dict: {gt_data_dict}"
+                        )
 
                         def t1(gt_data_dict):
                             logging.info(f"search at {cur_insert_n}")
@@ -178,7 +180,9 @@ class TestFullText:
                         qu.put((t1, gt_data_dict, search_time))
 
                 except Exception:
-                    logging.exception("work_func exception, cur_insert_n: {cur_insert_n}")
+                    logging.exception(
+                        "work_func exception, cur_insert_n: {cur_insert_n}"
+                    )
                     got_exception = True
                     break
 
@@ -404,7 +408,7 @@ class TestFullText:
             logging.info(f"part1 inserted {enwiki_size} rows and created index")
             res = (
                 table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
@@ -423,7 +427,7 @@ class TestFullText:
             table_obj = db_obj.get_table(table_name)
             res = (
                 table_obj.output(["id"])
-                    .match_text(
+                .match_text(
                     fields="body",
                     matching_text=matching_text,
                     topn=10,
@@ -465,9 +469,7 @@ class TestFullText:
                 (2, "Anarchism theory"),
             ]
             for rid, body in sample:
-                table_obj.insert([
-                    {"id": rid, "body": body}
-                ])
+                table_obj.insert([{"id": rid, "body": body}])
 
             # Create two fulltext indexes on same column
             res1 = table_obj.create_index(

@@ -24,9 +24,7 @@ def generate_test_varchar(
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} ( c1 int, c2 varchar);\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} ( c1 int, c2 varchar);\n")
         slt_file.write("\n")
 
         slt_file.write("query I\n")
@@ -118,13 +116,13 @@ def generate(generate_if_exists, copy_dir: str):
     slt_path = slt_dir + "/test_big_embedding.slt"
     csv_path = csv_dir + "/big_embedding.csv"
     copy_path = copy_dir + "/big_embedding.csv"
-    generate_test_embedding(slt_path, csv_path, copy_path,
-                            row_n, dim, generate_if_exists)
+    generate_test_embedding(
+        slt_path, csv_path, copy_path, row_n, dim, generate_if_exists
+    )
     slt_path = slt_dir + "/test_big_varchar.slt"
     csv_path = csv_dir + "/big_varchar.csv"
     copy_path = copy_dir + "/big_varchar.csv"
-    generate_test_varchar(slt_path, csv_path, copy_path,
-                          row_n, dim, generate_if_exists)
+    generate_test_varchar(slt_path, csv_path, copy_path, row_n, dim, generate_if_exists)
 
 
 if __name__ == "__main__":

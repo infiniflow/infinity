@@ -27,10 +27,11 @@ def generate(num_rows: int = 9999):
     dst_fp = f"./test/data/csv/enwiki_embedding_plus_{num_rows}.csv"
 
     # Categories: A, B, C, D
-    categories = ['A', 'B', 'C', 'D']
+    categories = ["A", "B", "C", "D"]
 
     # Generate sparse vector: 100 random indices out of 1024, with int values 1-100
     import random
+
     random.seed(42)
 
     def generate_sparse(row_id):
@@ -41,7 +42,7 @@ def generate(num_rows: int = 9999):
         return sorted_pairs
 
     with open(src_fp) as src:
-        with open(dst_fp, 'w') as dst:
+        with open(dst_fp, "w") as dst:
             for i, line in enumerate(src):
                 if i >= num_rows:
                     break
@@ -49,12 +50,12 @@ def generate(num_rows: int = 9999):
                 original = line.rstrip()
 
                 # Generate 2048-dim vector (all values = i)
-                vector_2048 = '[' + ', '.join([str(i)] * 2048) + ']'
+                vector_2048 = "[" + ", ".join([str(i)] * 2048) + "]"
 
                 # Generate multi-vector (2 vectors, each 1024-dim, total 2048 values)
                 # Format: [[1,2,...,1024], [1,2,...,1024]]
-                embedding_1024 = '[' + ', '.join([str(i)] * 1024) + ']'
-                multi_vector = f'[{embedding_1024}, {embedding_1024}]'
+                embedding_1024 = "[" + ", ".join([str(i)] * 1024) + "]"
+                multi_vector = f"[{embedding_1024}, {embedding_1024}]"
 
                 # Category (cycle through A, B, C, D)
                 category = categories[i % 4]
@@ -62,7 +63,7 @@ def generate(num_rows: int = 9999):
                 # Generate sparse vector (100 elements out of 1024, with int values 1-100)
                 sparse_pairs = generate_sparse(i)
                 sparse_parts = [f"{idx}:{val}" for idx, val in sparse_pairs]
-                sparse_str = '[' + ', '.join(sparse_parts) + ']'
+                sparse_str = "[" + ", ".join(sparse_parts) + "]"
 
                 # Combine: original + num + vector + multi_vector + category + sparse
                 new_line = f"{original}\t{i}\t{vector_2048}\t{multi_vector}\t{category}\t{sparse_str}\n"

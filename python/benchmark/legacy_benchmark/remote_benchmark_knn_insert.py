@@ -14,11 +14,11 @@ from infinity.remote_thrift.table import RemoteTable
 
 def fvecs_read_all(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -27,11 +27,11 @@ def fvecs_read_all(filename):
 
 
 def fvecs_read(filename):
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 yield list(vec)
             except struct.error:
@@ -120,15 +120,14 @@ def insert_gist_1m(path):
 def create_index(table_name):
     conn = ThriftInfinityClient(LOCAL_HOST)
     table = RemoteTable(conn, "default_db", table_name)
-    res = table.create_index("hnsw_index",
-                             index.IndexInfo("col1",
-                                             index.IndexType.Hnsw,
-                                             {
-                                                 "m": "16",
-                                                 "ef_construction": "200",
-                                                 "metric": "l2",
-                                                 "encode": "lvq"
-                                             }))
+    res = table.create_index(
+        "hnsw_index",
+        index.IndexInfo(
+            "col1",
+            index.IndexType.Hnsw,
+            {"m": "16", "ef_construction": "200", "metric": "l2", "encode": "lvq"},
+        ),
+    )
 
     assert res.error_code == ErrorCode.OK
 
@@ -186,7 +185,9 @@ def process_pool(threads, path, table_name):
         dur = end - start
         total_time += dur
 
-    print(f"Import sift_1m cost time: {total_time} s, tps: {total_count * 1.0 / total_time}")
+    print(
+        f"Import sift_1m cost time: {total_time} s, tps: {total_count * 1.0 / total_time}"
+    )
 
     start = time.time()
     create_index(table_name)
@@ -196,7 +197,9 @@ def process_pool(threads, path, table_name):
 
 
 def insert_data(threads, data_set, path):
-    if not os.path.exists(path + "/sift_base.fvecs") and not os.path.exists(path + "/gist_base.fvecs"):
+    if not os.path.exists(path + "/sift_base.fvecs") and not os.path.exists(
+        path + "/gist_base.fvecs"
+    ):
         raise Exception("Invalid data set")
     if data_set == "sift_1m":
         data_path = path + "/sift_base.fvecs"
@@ -216,7 +219,7 @@ def insert_data(threads, data_set, path):
             insert_gist_1m(data_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     current_path = os.getcwd()
     parent_path = os.path.dirname(current_path)
     parent_path = os.path.dirname(parent_path)
@@ -231,7 +234,7 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='sift_1m',
+        default="sift_1m",
         # default='gist_1m',
         dest="data_set",
     )
@@ -240,7 +243,7 @@ if __name__ == '__main__':
         "-t",
         "--thread",
         type=int,
-        default='1',
+        default="1",
         dest="threads",
     )
 

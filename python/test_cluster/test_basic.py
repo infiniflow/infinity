@@ -10,7 +10,7 @@ def test_admin(cluster: InfinityCluster):
         assert infinity1 is not None
         res = infinity1.show_current_node()
         print(res.node_name)
-        assert (res.node_role == "admin")
+        assert res.node_role == "admin"
 
 
 def test_standalone(cluster: InfinityCluster):

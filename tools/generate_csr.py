@@ -37,9 +37,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} ( c1 SPARSE(FLOAT, {max_dim}));\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} ( c1 SPARSE(FLOAT, {max_dim}));\n")
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")

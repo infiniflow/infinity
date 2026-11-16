@@ -16,6 +16,7 @@ class SimpleEmbeddingGenerator:
         def gen(insert: int):
             for i in range(insert):
                 yield [i, [0.1, 0.2, 0.3, 0.4]]
+
         return gen
 
     def index():
@@ -39,6 +40,7 @@ class SimpleVarcharGenerator:
                     yield [i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"]
                 else:
                     yield [i, "test"]
+
         return gen
 
     def index():
@@ -56,6 +58,7 @@ class SimpleTensorGenerator:
                     yield [i, [0.1, 0.2, 0.3, 0.4]]
                 else:
                     yield [i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]]
+
         return gen
 
 
@@ -84,6 +87,7 @@ class EnwikiGenerator:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -163,6 +167,7 @@ class LChYDataGenerato:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -213,26 +218,42 @@ class MultiIndexTypesGenerator:
             "vector_col": {"type": "vector,2048,float"},
             "multi_vector_col": {"type": "multivector,1024,float"},
             "category": {"type": "varchar"},
-            "sparse_col": {"type": "sparse,1024,float,int16"}
+            "sparse_col": {"type": "sparse,1024,float,int16"},
         }
 
     def index():
         return [
             index.IndexInfo("body", index.IndexType.FullText),
             index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
-            index.IndexInfo("vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "8", "compress_type": "compress"}),
-            index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
+            index.IndexInfo(
+                "vector_col",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "50", "metric": "l2"},
+            ),
+            index.IndexInfo(
+                "multi_vector_col",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "50", "metric": "l2"},
+            ),
+            index.IndexInfo(
+                "sparse_col",
+                index.IndexType.BMP,
+                {"block_size": "8", "compress_type": "compress"},
+            ),
+            index.IndexInfo(
+                "category", index.IndexType.Secondary, {"cardinality": "low"}
+            ),
         ]
 
     K_NUM_ROWS = 9999
+
     def generate_import_file() -> str:
         filepath = f"test/data/csv/enwiki_embedding_plus_{MultiIndexTypesGenerator.K_NUM_ROWS}.csv"
         if os.path.exists(filepath):
             return filepath
         print(f"CSV file not found: {filepath}. Generating...")
         from tools.generate_wiki_embedding_plus import generate
+
         generate(MultiIndexTypesGenerator.K_NUM_ROWS)
         return filepath
 
@@ -248,7 +269,9 @@ class MultiIndexTypesGenerator:
     @staticmethod
     def generate_random_row(num: int):
         vec = np.array([random.random() for _ in range(2048)], dtype=np.float32)
-        multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
+        multivec = np.array(
+            [[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32
+        )
         sparse_indices = [j for j in range(1024) if random.random() > 0.9]
         if not sparse_indices:
             sparse_indices = [0, 1, 2]
@@ -260,10 +283,12 @@ class MultiIndexTypesGenerator:
             "docdate": "01-JAN-2024 00:00:00.000",
             "body": f"test_text_{num}_{random.choice(MultiIndexTypesGenerator.K_TEXT_WORDS)}",
             "num": num,
-            "category": MultiIndexTypesGenerator.K_CATEGORIES[num % len(MultiIndexTypesGenerator.K_CATEGORIES)],
+            "category": MultiIndexTypesGenerator.K_CATEGORIES[
+                num % len(MultiIndexTypesGenerator.K_CATEGORIES)
+            ],
             "vector_col": vec,
             "multi_vector_col": multivec,
-            "sparse_col": sparse_vec
+            "sparse_col": sparse_vec,
         }
 
 

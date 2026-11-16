@@ -27,7 +27,6 @@ def is_port_in_use(port: int) -> bool:
 
 
 class BaseInfinityRunner:
-
     def __init__(
         self,
         node_name: str,
@@ -146,9 +145,7 @@ class InfinityRunner(BaseInfinityRunner):
 
 
 class InfinityCluster:
-    def __init__(
-        self, executable_path: str, *, test_name: str = None
-    ):
+    def __init__(self, executable_path: str, *, test_name: str = None):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
