@@ -4284,12 +4284,55 @@ impl Engine {
                 out.push_null();
                 continue;
             }
+            // A tensor / multivector / sparse / array cell is a slot into the
+            // column's outline: the value exists only as text, and `Utf8` is the
+            // buffer its declared type maps to (`column_buffer`). Declining the
+            // column here made a one-column projection of such a table fall back
+            // to the whole operator chain (`try_projection` -> `None`), which is
+            // what the multivector round-trip test catches. The row path decodes
+            // the same slots (`decode_rows_of`), so both agree on the text.
+            if kind != OutlineKind::None {
+                let text = match kind {
+                    OutlineKind::Tensor => {
+                        let at = row * 8;
+                        decode_tensor_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::TensorArray => {
+                        let at = row * 8;
+                        decode_tensorarray_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::Sparse => {
+                        let at = row * 16;
+                        decode_sparse_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 16).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::Array => {
+                        let at = row * 8;
+                        decode_array_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::None => None,
+                };
+                out.push_value(&text.map(parse_owned_value).unwrap_or(Value::Null));
+                continue;
+            }
             // A text column is written straight into its buffer: the cell never
             // becomes a `Value` and, for varchar, never a `String` either.
             if matches!(out, ColumnData::Utf8 { .. }) {
-                if kind != OutlineKind::None {
-                    return None;
-                }
                 let ColumnData::Utf8 { text, .. } = out else {
                     unreachable!()
                 };
