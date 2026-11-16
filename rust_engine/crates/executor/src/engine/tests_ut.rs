@@ -11235,6 +11235,60 @@ mod tests {
         assert_eq!(e.row_count("pit").unwrap(), 1200);
     }
 
+    /// One chunk name is one record.
+    ///
+    /// A build that re-indexed rows past the chunks the catalog lists seals the
+    /// same `ft_{base_row_id}` a concurrent writer seals a moment later, and the
+    /// queue it leaves behind is drained by a **later** seal - long after the
+    /// catalog already named that file. A second record makes
+    /// `load_sealed_scoped` map one file twice: its documents are counted twice,
+    /// so `total_docs` - the number the cache's reuse guard compares against
+    /// `live_rows` - stops being the number of rows the index can answer for. A
+    /// cache that is short one document then passes the guard and `MATCH` answers
+    /// short for good, with every file on disk intact.
+    #[test]
+    fn a_chunk_name_gets_one_record() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Only the dump below may write a chunk.
+        e.set_memindex_capacity(0);
+        e.execute_blocking("CREATE TABLE once (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX once_idx ON once (body) USING FULLTEXT")
+            .unwrap();
+        e.execute_blocking("INSERT INTO once VALUES (0, 'alpha'), (1, 'alpha');")
+            .unwrap();
+        // The dump seals the tail and records it (`DumpMemIndex`).
+        crate::scheduler::block_on(e.dump_index_transaction("once", "once_idx")).unwrap();
+        let index_id = e.test_index_id("once", "body", "FULLTEXT");
+        let recorded = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
+        assert_eq!(recorded.len(), 1, "the dump records the chunk it sealed");
+        // The same file, queued again: what a build's `unrecorded` holds once a
+        // writer had already recorded the range it sealed.
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values())
+                .next()
+                .cloned()
+                .expect("the column's index")
+        };
+        shared
+            .write()
+            .unwrap()
+            .unrecorded
+            .push(crate::engine::text_index::SealedChunk {
+                segment: (recorded[0].base_row_id >> 32) as u32,
+                base_name: recorded[0].base_name.clone(),
+                base_row_id: recorded[0].base_row_id,
+                row_count: 2,
+            });
+        e.record_sealed_text_chunks_of("once", index_id);
+        let after = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
+        assert_eq!(after.len(), 1, "one chunk name took two records: {after:?}");
+    }
+
     /// The engine's lock order is `batch_gate -> tables -> index` for a writer
     /// and `index(read) -> tables` for a query (a query fetches its hit rows
     /// while it still holds the column's read guard — `text_index_for`'s comment
@@ -11249,6 +11303,29 @@ mod tests {
     /// failure after a timeout instead of hanging.
     #[test]
     fn concurrent_insert_query_seal_and_optimize_do_not_deadlock() {
+        concurrent_seal_and_optimize_once();
+    }
+
+    /// The same scenario, repeated. The one failure seen in CI (`35` of `36`
+    /// indexed rows) needs one specific interleaving of a seal, a merge and an
+    /// insert, so a single round cannot find it; `#[ignore]` keeps the cost off
+    /// the default lane.
+    #[test]
+    #[ignore = "stress: repeated rounds of the concurrent seal/optimize scenario"]
+    fn ignored_stress_concurrent_seal_and_optimize() {
+        std::thread::scope(|scope| {
+            for lane in 0..6 {
+                scope.spawn(move || {
+                    for round in 0..25 {
+                        eprintln!("seal/optimize stress lane {lane} round {round}");
+                        concurrent_seal_and_optimize_once();
+                    }
+                });
+            }
+        });
+    }
+
+    fn concurrent_seal_and_optimize_once() {
         const WRITERS: usize = 3;
         const READERS: usize = 3;
         const PER_WRITER: usize = 12;
@@ -11324,14 +11401,49 @@ mod tests {
             rows(&e, "SELECT count(*) FROM mix;"),
             vec![vec![(WRITERS * PER_WRITER).to_string()]]
         );
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);"
-            )
-            .len(),
-            WRITERS * PER_WRITER
-        );
+        let scanned: Vec<String> = rows(&e, "SELECT id FROM mix;")
+            .into_iter()
+            .flatten()
+            .collect();
+        let mut matched: Vec<String> = rows(
+            &e,
+            "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+        )
+        .into_iter()
+        .flatten()
+        .collect();
+        matched.sort();
+        // Name the ids, not just the count: the difference between a lost
+        // posting (a seal or a merge dropped a chunk) and a hit whose row the
+        // block read could not resolve is exactly *which* row went missing.
+        let missing: Vec<&String> = scanned
+            .iter()
+            .filter(|id| matched.binary_search(id).is_err())
+            .collect();
+        if !missing.is_empty() {
+            // Name the row *and* say where it went: a document absent from every
+            // source, one that is there but retired, and one the block read could
+            // not resolve are three different bugs, and the count alone cannot
+            // tell them apart. A reopen answers the last question - whether the
+            // cache in this process is the only thing that is short.
+            let ids: Vec<u64> = missing.iter().filter_map(|id| id.parse().ok()).collect();
+            let index_id = e.fulltext_index_id("mix", "body").unwrap_or_default();
+            let state = e.text_index_state("mix", index_id, &ids);
+            let after_reopen = Engine::open(dir.path()).ok().map(|fresh| {
+                rows(
+                    &fresh,
+                    "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+                )
+                .len()
+            });
+            panic!(
+                "the full-text index lost rows {missing:?} (scanned {}, matched {} of {})\n\
+                 matched={matched:?}\n{state}\nmatched after a reopen={after_reopen:?}",
+                scanned.len(),
+                matched.len(),
+                WRITERS * PER_WRITER
+            );
+        }
     }
 
     /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —
