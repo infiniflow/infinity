@@ -2101,24 +2101,32 @@ pub async fn route(
             match run_ast(engine, stmt, "").await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
-                    // the SDK renders every value under its column name
-                    let mut out = String::new();
-                    if let Some(first) = rows.first() {
-                        for (i, v) in first.iter().enumerate() {
+                    // A plan is one row per line, and the SDK joins every row
+                    // under its column name, so emit them all. Sending only
+                    // rows.first() truncated the plan to its header line, which
+                    // is why a match_dense explain never showed its KNN SCAN.
+                    let mut out: Vec<String> = Vec::with_capacity(rows.len());
+                    for row in &rows {
+                        let mut entry = String::new();
+                        for (i, v) in row.iter().enumerate() {
                             let name = cols.get(i).cloned().unwrap_or_else(|| "explain".into());
                             if i > 0 {
-                                out.push(',');
+                                entry.push(',');
                             }
-                            out.push_str(&format!(
+                            entry.push_str(&format!(
                                 "{{\"{}\":\"{}\"}}",
                                 json_escape(&name),
                                 json_escape(v)
                             ));
                         }
+                        out.push(entry);
                     }
                     (
                         200,
-                        format!("{{\"error_code\":0,\"error_msg\":\"OK\",\"output\":[{out}]}}"),
+                        format!(
+                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"output\":[{}]}}",
+                            out.join(",")
+                        ),
                     )
                 }
                 Err(e) => e,
