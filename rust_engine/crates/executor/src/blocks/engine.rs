@@ -5004,10 +5004,18 @@ impl Engine {
             let Some((count, chunk)) = built else {
                 continue;
             };
-            // `GetAndSetNextChunkID`: the counter the catalog keeps, raised past
-            // every record this segment already names. Only ever forward, so an
-            // id a merge or `Cleanup` retired never comes back.
-            let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
+            // `GetAndSetNextChunkID`: take the id and raise the counter in one
+            // batch, before the chunk is written. Reading it here and recording
+            // it below handed the same id out twice when the process died in
+            // between: the orphan `chunk_N.idx` was still on disk, so the next
+            // dump wrote its chunk over it instead of appending a new one.
+            let chunk_id = self
+                .storage
+                .catalog
+                .take_next_chunk_id(&set.db_id, &set.table_id, index_id as u64, *segment)
+                .unwrap_or_else(|_| {
+                    self.next_index_chunk_id(&set, &index_id.to_string(), *segment)
+                });
             let name = format!("chunk_{chunk_id}.idx");
             storage::definition::format::write_synced(&dir.join(name), &chunk).map_err(|e| {
                 Error::Io {
@@ -5492,6 +5500,17 @@ impl Engine {
                 for (id, path) in &chunks {
                     if id != keep {
                         let _ = storage::chunk_store::remove_file(path);
+                    }
+                }
+                // A dump writes `chunk_{id}.idx` and records it afterwards, so a
+                // kill in that window leaves a file no record names. The kept
+                // chunk covers every row, so a file below its id can never be
+                // read again - sweep it instead of letting it pile up. Ids are
+                // taken monotonically, so a dump writing right now is always
+                // above `keep` and is left alone.
+                for (id, path) in hnsw_chunks(&dir) {
+                    if id < *keep {
+                        let _ = storage::chunk_store::remove_file(&path);
                     }
                 }
             }
