@@ -192,17 +192,23 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     } while (!last_status.ok() && (!rollback_done || rollback_status.ok()) && IsRetriableDumpFailure(last_status) && dump_count < kDumpMaxAttempts &&
              !stopping_.load(std::memory_order_relaxed));
 
-    if (!last_status.ok()) {
-        // Terminal drop. Release the tracer reservation so the next capacity
-        // trigger can re-propose this mem index: only DumpDone (from PostCommit)
-        // removes entries from proposed_dump_ otherwise, so a dropped task pins
-        // the mem index there forever and it never persists until restart.
+    // Release the reservation this task was proposed with, on every exit
+    // path. On a clean success DumpDone (from PostCommit) has already removed
+    // the matching entry, so this is a no-op. On a terminal drop it is the
+    // actual release. On a success after a generation switch - an append
+    // installed a newer mem index for the segment, the rollback restore of
+    // the popped generation failed (only logged), and a later attempt dumped
+    // or skipped the newer generation - nothing else removes the popped
+    // generation's entry, which would pin its memory charge until restart.
+    {
         auto *storage = InfinityContext::instance().storage();
         if (storage != nullptr) {
             if (auto *memindex_tracer = storage->memindex_tracer(); memindex_tracer != nullptr) {
                 memindex_tracer->DumpFailed(db_name, table_name, index_name, segment_id, begin_row_id);
             }
         }
+    }
+    if (!last_status.ok()) {
         LOG_ERROR(fmt::format("Dump mem index {}.{}.{} in segment: {} dropped after {} attempts: {}. Tracer reservation released; the next "
                               "capacity trigger will re-propose it.",
                               db_name,
