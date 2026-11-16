@@ -196,6 +196,7 @@ mkdir -p .scratch/manual/{ft,ft33,knn,bytes,bin}
 | `unit` | `cargo test --workspace`、cli smoke、Gate A 基线 | 单测证明不了 33M 的资源和 IO 行为 |
 | `build` | 参考版（builder 镜像，amd64/arm64）+ 重写版 | 产出 `bin-<engine>-<arch>` 制品，手工可直接用 |
 | `restart` | Gate C 重启用例（`-m "not slow"`） | 手工补 33M 的长时间导入和内存 |
+| `soak` | 夜间 kill -9：8,388,609 行、随机打断 COPY × 5、索引 point lookup 无缺口、重启耗时门限（`rust_engine/scripts/soak_kill9.sh`，**不** continue-on-error） | 33M 互读与长时间导入仍是手工；`slow` 里那条 `test_insert.py --loop 3` 是小表且 continue-on-error |
 | `sdk` | 未改的 Python SDK 打两个引擎（nightly/手动） | 不涉及大数据索引 |
 | `cross_engine` | `test_cross_engine_compat` + `test_cross_engine_bytes_*` | 手工跑同一套 + 8.39M HUGE + 33M 互读 |
 | `slow` | miri / ASan / ignored / parallel / kill -9 循环；重导入 5.toml | 5.toml 仍是 `continue-on-error`，是手工 FT-2 的直接动因 |

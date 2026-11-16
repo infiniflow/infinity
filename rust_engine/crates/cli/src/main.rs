@@ -12,6 +12,8 @@
 //!   create-table, list-tables, put, get, recover, dump-catalog, smoke
 //!   import-csv, bench, knn-bench, fulltext-bench, conformance
 
+#![forbid(unsafe_code)]
+
 mod config;
 mod fulltext_bench;
 

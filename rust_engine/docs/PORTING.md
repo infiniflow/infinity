@@ -103,12 +103,32 @@
 
 ### 2.8 `unsafe` 的边界
 
-除 `storage` 与 `cli`，每个 crate 都是 `#![forbid(unsafe_code)]`。剩下两处 `unsafe` 是刻意的：
+`#![forbid(unsafe_code)]`：`common`、`parser`、`planner`、`expression`、`catalog`、
+`txn`、`index`、`executor`、`analyzer`、`cli`（CLI 早先用 glibc `malloc_trim` 的那处 FFI
+已搬进 `storage`，现在整个 crate 没有 `unsafe`）。剩两处例外：
 
-- **`memmap2::Mmap::map`**（`storage` 的 `mapped::MappedFile`：封存索引段与封存块文件都走它）：`memmap2` 的 API 是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽然能消掉它，但会把整段读进堆（RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。`storage` 因此保持 `#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`，并逐处写 SAFETY 注释（段/块一旦封存不可变，映射期间文件不会被改写）。
-- **`malloc_trim` / `posix_fadvise`**（`storage` 与 CLI 的 `trim_allocator`、`drop_file_cache`）：只能 FFI。它们服务于内存观测与长导入的 page cache 边界（Gate C），作用域极小、无指针、无生命周期，属于可接受的"测试/运维向"unsafe。
+- **`storage`：`#![deny(unsafe_code)]` + 每处 `#[allow(unsafe_code)]`**：8 个 allow =
+  7 个带 `// SAFETY:` 的调用点 + 1 个 `posix_fadvise` 的 `extern` 声明（`unsafe` 表达式与
+  `// SAFETY:` 都是 7 条）。两类：
+  - **`memmap2::Mmap::map`**（4 处：`buffer/mapped.rs` 两处、`secondary_index/secondary_lowcard.rs`、
+    `secondary_index/secondary_segment_pgm.rs`）：封存索引段与封存块文件都走它。`memmap2` 的 API
+    是 `unsafe`，因为映射可能比 `File` 活得久。改成 `std::fs::read` 虽能消掉它，但会把整段读进堆
+    （RSS）、失去惰性分页与 page cache 回收——首轮实测这类改动会明显拖慢大表扫描，**不再考虑**。
+  - **`mi_collect` / `malloc_trim` / `posix_fadvise`**（`lib.rs` 的 `trim_allocator`、`drop_file_cache`）：
+    只能 FFI。进程的实际分配器是 `common` 的 `mimalloc`，所以生效的是 `mi_collect`；`malloc_trim`
+    只在 glibc 下编译。它们服务于内存观测与长导入的 page cache 边界（Gate C），无指针、无生命周期。
+- **`server`：`#![deny(unsafe_code)]`**，唯一的 `allow` 在一个只含
+  `include!(".../volo_gen.rs")` 的 `mod generated` 上——`volo` 生成的 codec 里有 `unsafe`，
+  手写模块一个都没有（`ring_buffer` 的共享靠 `Arc<Mutex<..>>`，不碰裸指针）。
+- **`analyzer-ffi`：不设 crate 级属性**，它本身就是 C ABI（`unsafe extern "C"` + 裸指针入参），
+  边界就是这一层。
 
-判断标准：**性能敏感的映射必须保留**；只有"无指针、无别名、仅调用一个系统函数"的窄 FFI 才允许，且必须写清楚为什么不能用安全 API 表达。
+判断标准：**性能敏感的映射必须保留**；只有"无指针、无别名、仅调用一个系统函数"的窄 FFI 才允许，
+且必须写清楚为什么不能用安全 API 表达。
+
+SIMD 侧同样核对过：向量化走 `std::simd`（`storage/src/simd.rs`、`common/src/simd/`），
+没有 `std::arch` intrinsics；只有 `is_x86_feature_detected!` 做运行期特性分发，那是安全宏。
+这也是 `rust-toolchain.toml` 钉 nightly 的唯一原因。
 
 ## 3 当前状态
 

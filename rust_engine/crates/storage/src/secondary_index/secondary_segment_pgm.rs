@@ -1970,7 +1970,6 @@ impl SecondarySegmentReader {
         self.row_count
     }
 
-    #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
         Self::open_with_kind(path, KeyKind::U64)
     }

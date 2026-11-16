@@ -521,7 +521,20 @@ async fn handle_connection_async(stream: tokio::net::TcpStream, engine: Arc<Engi
                 // The statement is awaited through the engine's async entry,
                 // so no `spawn_blocking` wraps `Engine::execute` here
                 // (plan 6.12.4 step 3).
-                let out = simple_query_response_async(&engine, &sql).await;
+                // The per-request panic boundary: a panicking statement answers
+                // with an `E` frame for this query instead of killing the
+                // connection; restarting the instance is the deployment's call.
+                let out = match executor::panic_guard::guard_async(simple_query_response_async(
+                    &engine, &sql,
+                ))
+                .await
+                {
+                    Ok(out) => out,
+                    Err(payload) => encode_simple_query(Err(executor::panic_guard::to_error(
+                        payload,
+                    )
+                    .to_string())),
+                };
                 writer
                     .write_all(&out)
                     .await
@@ -672,6 +685,24 @@ mod tests {
         assert_eq!(handler.writer[0], b'E');
         let body = &handler.writer[5..];
         assert_eq!(body, b"SERROR\0CC00000\0Mboom\0\0");
+    }
+
+    /// A panicking statement answers with an `E` frame, and the next query on
+    /// the same engine still answers: the connection is not dropped and nothing
+    /// exits the process.
+    #[test]
+    fn a_panicking_query_answers_with_an_error_frame() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+
+        executor::panic_guard::arm_injected_panic();
+        let failed = executor::block_on(simple_query_response_async(&engine, "SELECT 1;"));
+        assert_eq!(failed[0], b'E', "an error frame, not a dropped connection");
+        let text = String::from_utf8_lossy(&failed);
+        assert!(text.contains("injected panic"), "{text}");
+
+        let ok = executor::block_on(simple_query_response_async(&engine, "SELECT 1;"));
+        assert_eq!(ok[0], b'T', "the next query gets its row description");
     }
 
     #[test]

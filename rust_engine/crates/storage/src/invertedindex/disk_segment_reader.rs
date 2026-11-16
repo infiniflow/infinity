@@ -554,9 +554,10 @@ pub struct SegmentIndexReader {
 impl SegmentIndexReader {
     /// Opens `{dir}/{base_name}.{dic,pos,len}` and validates the set.
     ///
-    /// The mapping is the only `unsafe` operation in this crate: a segment is
-    /// immutable once sealed, so the mapped region cannot change underneath the
-    /// reader (rebuilds write a new base name instead of overwriting).
+    /// The mapping is the one `unsafe` operation on this path (see PORTING.md
+    /// §2.8): a segment is immutable once sealed, so the mapped region cannot
+    /// change underneath the reader (rebuilds write a new base name instead of
+    /// overwriting).
     ///
     /// Validation, in the order it costs:
     ///

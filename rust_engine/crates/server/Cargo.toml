@@ -59,6 +59,9 @@ path = "src/bin/handle_show_table.rs"
 
 [dev-dependencies]
 tempfile = "3"
+# `testing` arms `panic_guard::arm_injected_panic`, which the front ends' panic
+# boundaries are tested with (see `service::tests`).
+executor = { workspace = true, features = ["testing"] }
 
 # The same lints as the workspace, plus one exception: the generated Thrift
 # service (pilota's codegen) uses `unsafe` for its zero-copy helpers, and a
