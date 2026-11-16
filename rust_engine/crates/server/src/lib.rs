@@ -3003,8 +3003,16 @@ fn array_levels(text: &str) -> Vec<i32> {
     let mut out = Vec::new();
     let mut cur = text.trim().to_string();
     while cur.to_ascii_uppercase().starts_with("ARRAY(") {
+        // Strip exactly one closing paren: the inner type still carries the
+        // ones that belong to it. `trim_end_matches(')')` removed all of them,
+        // so ARRAY(ARRAY(ARRAY(VARCHAR))) collapsed to "ARRAY(ARRAY(VARCHAR"
+        // and the levels came out as [Array, Array, Array] with no VARCHAR --
+        // the leaf was then packed as an array of numbers.
         let inner = match cur.find('(') {
-            Some(i) => cur[i + 1..].trim_end_matches(')').trim().to_string(),
+            Some(i) => {
+                let rest = &cur[i + 1..];
+                rest.strip_suffix(')').unwrap_or(rest).trim().to_string()
+            }
             None => break,
         };
         let (logic, _col) = element_type_meta(&inner);
@@ -8492,6 +8500,21 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `ARRAY(ARRAY(ARRAY(VARCHAR)))` has three levels and a VARCHAR leaf.
+    /// Stripping every trailing paren at once collapsed the nesting, so the
+    /// leaf was packed as a number and the thrift client's unpack failed.
+    #[test]
+    fn array_levels_keep_the_nesting_and_the_leaf_type() {
+        // 21 = ColumnArray, 9 = ColumnVarchar.
+        assert_eq!(
+            array_levels("ARRAY(ARRAY(ARRAY(VARCHAR)))"),
+            vec![21, 21, 9]
+        );
+        assert_eq!(array_levels("ARRAY(INT)"), vec![3]);
+        assert_eq!(array_levels("ARRAY(ARRAY(INT))"), vec![21, 3]);
+        assert!(array_levels("INT").is_empty());
+    }
 
     /// An array cell is rendered `[1,2]` by the engine but `{1,2}` in the SLT
     /// form. Splitting must respect both bracket kinds: with only braces
