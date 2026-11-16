@@ -906,6 +906,13 @@ pub(crate) fn encode_row(row: &[Literal], types: &[String]) -> String {
 pub(crate) fn encode_cell_stored(v: &Literal, ty: Option<&String>) -> String {
     {
         let s = v.to_slt_string();
+        // A `NULL` is a null bit in storage and no type may re-spell it: the
+        // datetime normaliser fills a missing time part, so `null` came back as
+        // the text `null 00:00:00` - a value, not a NULL
+        // (`test_null_temporal_columns`).
+        if matches!(v, Literal::Null) {
+            return s;
+        }
         match ty {
             // Rows are stored as text, but the reference stores the typed
             // value, so the text has to round-trip exactly: `to_slt_string`
@@ -977,20 +984,29 @@ pub(crate) fn encode_cell_stored(v: &Literal, ty: Option<&String>) -> String {
 ///
 /// True for the types whose [`encode_cell_stored`] arm returns `s` untouched -
 /// which includes a float vector and a varchar, the wide columns an insert
-/// spends its time on. False for the types that rewrite the value (float
-/// digit normalisation, array braces, JSON compaction, datetime spelling,
-/// sparse re-spelling, bit packing, tensor reshaping), where the stored text has
-/// to be produced by [`encode_cell_stored`].
+/// spends its time on. False for the types that rewrite the value (float digit
+/// normalisation, array braces, JSON compaction, datetime spelling, sparse
+/// re-spelling, bit packing, tensor reshaping), where the stored text has to be
+/// produced by [`encode_cell_stored`].
+///
+/// A `TENSOR`/`MULTIVECTOR` is **never** the display form: `to_slt_string`
+/// renders the flat element list (`[0,1,…,15]`) while storage keeps the
+/// sub-vector shape (`[[0,…,15]]`, or one row per sub-vector). Treating the two
+/// as the same dropped the outer level, which is exactly what
+/// `test_insert_tensor`/`test_insert_multivector` caught.
 pub(crate) fn stored_text_is_display(ty: &str) -> bool {
     if is_float_type(ty)
         || is_array_type(ty)
         || is_json_type(ty)
         || is_datetime_type(ty)
         || is_sparse_type(ty)
+        || is_tensor_type(ty)
     {
         return false;
     }
-    if is_embedding_type(ty) || is_tensor_type(ty) {
+    if is_embedding_type(ty) {
+        // `EMBEDDING`/`VECTOR` keep the rendered list; only the bit form is
+        // packed and an integer element type truncates.
         return !is_bit_type(ty) && !declared_elem_is_int(ty);
     }
     true
