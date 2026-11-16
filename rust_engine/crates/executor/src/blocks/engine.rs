@@ -4345,7 +4345,10 @@ impl Engine {
                     raw_outline,
                     text,
                 )?;
-                out.set_last_valid(ok);
+                // The cell is in the text buffer, so the bitmap owes one bit:
+                // appended here it stays the same length as the buffer, which a
+                // "patch the last bit" call could not guarantee.
+                out.push_valid(ok);
                 continue;
             }
             let value = match kind {

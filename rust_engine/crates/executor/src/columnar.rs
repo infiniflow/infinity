@@ -485,11 +485,10 @@ impl ColumnData {
                 valid.push(true);
                 return;
             }
-            ColumnData::Bool { values, valid } => {
-                values.push(i != 0);
-                valid.push(true);
-                return;
-            }
+            // A boolean column that receives an integer becomes an integer
+            // column: storing `i != 0` would turn 5 into 1 and lose the value.
+            // The widening below keeps the `true`s it already holds as `1`s.
+            ColumnData::Bool { .. } => {}
             // A text column keeps the integer as text, the way `push_float`
             // does. Falling through to the widening below only recursed: a text
             // column has nothing left to widen to, so `push_int` called itself
@@ -502,8 +501,9 @@ impl ColumnData {
             // below does that and keeps the nulls it already counted.
             ColumnData::Empty { .. } => {}
         }
-        // Reached only by an `Int32` the value does not fit in and by the empty
-        // column: both become `Int64`, and the retry takes that arm above.
+        // Reached by an `Int32` the value does not fit in, by a boolean column
+        // turning into an integer one, and by the empty column: all become
+        // `Int64`, and the retry takes that arm above.
         self.widen_to_int64();
         self.push_int(i);
     }
@@ -581,14 +581,16 @@ impl ColumnData {
         }
     }
 
-    /// Records whether the cell just appended is present.
+    /// Appends one validity bit without a value.
     ///
     /// The block decoder writes a varchar cell straight into the text buffer
     /// (`decode_text_cell`) and only then learns whether the cell is the SQL
-    /// NULL marker, so validity is filled in after the fact.
-    pub fn set_last_valid(&mut self, valid: bool) {
-        let last = self.len().saturating_sub(1);
-        self.valid_mut().set(last, valid);
+    /// NULL marker, so the bit trails the value. Overwriting the last bit would
+    /// not work: [`Bitmap::set`] ignores an index the bitmap never recorded, so
+    /// the bitmap would stay shorter than the buffer and every cell would read
+    /// as present.
+    pub fn push_valid(&mut self, valid: bool) {
+        self.valid_mut().push(valid);
     }
 
     fn valid_mut(&mut self) -> &mut Bitmap {
@@ -918,7 +920,13 @@ impl Batch {
     /// Appends one row; the block grows a column when the row is wider.
     pub fn push_row(&mut self, row: &[Value]) {
         while self.data.len() < row.len() {
-            self.data.push(ColumnData::empty());
+            let mut column = ColumnData::empty();
+            // The block already holds rows: the new column owes one cell per
+            // row, or the cell pushed below lands on row 0.
+            for _ in 0..self.row_count {
+                column.push_null();
+            }
+            self.data.push(column);
         }
         for (c, value) in row.iter().enumerate() {
             self.data[c].push_value(value);
@@ -936,7 +944,14 @@ impl Batch {
             return;
         }
         while self.data.len() < other.data.len() {
-            self.data.push(ColumnData::empty());
+            let mut column = ColumnData::empty();
+            // Same backfill as `push_row`: a column born next to existing rows
+            // starts NULL in all of them, or `append` below would shift the new
+            // cells up.
+            for _ in 0..self.row_count {
+                column.push_null();
+            }
+            self.data.push(column);
         }
         for (c, column) in other.data.iter().enumerate() {
             self.data[c].append(column);
@@ -1017,10 +1032,11 @@ fn declared_base(declared: &str) -> String {
 ///
 /// One pass, no per-column `Vec` of cell references: this runs over the whole
 /// result set when the rows come out of the operator chain.
-fn column_for_rows(rows: &[Vec<Value>], c: usize) -> ColumnData {
+pub(crate) fn column_for_rows(rows: &[Vec<Value>], c: usize) -> ColumnData {
     let mut text = false;
     let mut float = false;
     let mut bools = true;
+    let mut exact = true;
     let mut any = false;
     for cell in rows.iter().filter_map(|row| row.get(c)) {
         match cell {
@@ -1036,7 +1052,12 @@ fn column_for_rows(rows: &[Vec<Value>], c: usize) -> ColumnData {
                 any = true;
             }
             Value::Bool(_) => any = true,
-            Value::Int(_) => {
+            Value::Int(i) => {
+                // An integer and a float in one column force the column to
+                // `f64`, which holds `i` exactly only up to 2^53.
+                if i.unsigned_abs() > (1u64 << 53) {
+                    exact = false;
+                }
                 bools = false;
                 any = true;
             }
@@ -1052,8 +1073,18 @@ fn column_for_rows(rows: &[Vec<Value>], c: usize) -> ColumnData {
         };
     }
     if float {
-        return ColumnData::Float64 {
-            values: Vec::new(),
+        // Mixed integers and floats whose integers do not survive `f64` exactly
+        // go to text: `i as f64` would hand back a different number
+        // (`9223372036854775807` becomes `...808`), and text is the only buffer
+        // that keeps both kinds as they are.
+        if exact {
+            return ColumnData::Float64 {
+                values: Vec::new(),
+                valid: Bitmap::new(),
+            };
+        }
+        return ColumnData::Utf8 {
+            text: Utf8Column::default(),
             valid: Bitmap::new(),
         };
     }
@@ -1152,6 +1183,45 @@ mod tests {
         column.push_value(&Value::Int(big));
         assert_eq!(column.value_at(0), Value::Int(7));
         assert_eq!(column.value_at(1), Value::Int(big));
+    }
+
+    #[test]
+    fn a_column_born_late_keeps_the_rows_aligned() {
+        // A wider row grows the block: the new column has to start with one
+        // NULL per row already there, or the cell lands on row 0.
+        let mut batch = Batch::empty(1);
+        batch.push_row(&[Value::Int(1)]);
+        batch.push_row(&[Value::Int(2)]);
+        batch.push_row(&[Value::Int(3), Value::Str("c".into())]);
+        assert_eq!(batch.row(0).unwrap(), vec![Value::Int(1), Value::Null]);
+        assert_eq!(batch.row(1).unwrap(), vec![Value::Int(2), Value::Null]);
+        assert_eq!(
+            batch.row(2).unwrap(),
+            vec![Value::Int(3), Value::Str("c".into())]
+        );
+
+        // The same for a wider block appended onto a narrower one.
+        let mut wide = Batch::empty(2);
+        wide.push_row(&[Value::Int(10), Value::Str("x".into())]);
+        let mut narrow = Batch::empty(1);
+        narrow.push_row(&[Value::Int(1)]);
+        narrow.append(&wide);
+        assert_eq!(narrow.row(0).unwrap(), vec![Value::Int(1), Value::Null]);
+        assert_eq!(
+            narrow.row(1).unwrap(),
+            vec![Value::Int(10), Value::Str("x".into())]
+        );
+    }
+
+    #[test]
+    fn an_integer_keeps_its_value_in_a_boolean_column() {
+        // `true`/`false` in the buffer, then an integer: the column turns into
+        // integers, because `i != 0` would have stored 5 as 1.
+        let mut column = ColumnData::new("BOOL");
+        column.push_value(&Value::Bool(true));
+        column.push_value(&Value::Int(5));
+        assert_eq!(column.value_at(0), Value::Int(1));
+        assert_eq!(column.value_at(1), Value::Int(5));
     }
 
     #[test]

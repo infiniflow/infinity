@@ -6513,16 +6513,62 @@ fn normalize_for_code(code: i32, column: &ColumnData) -> Option<ColumnData> {
         }
         (false, ColumnData::Bool { .. }) if code == 0 => None,
         (false, current) if code == 0 => {
-            let cells: Vec<Value> = (0..current.len())
-                .map(|r| match current.value_at(r) {
+            // Built as a boolean buffer explicitly: `from_values` infers the
+            // type, and an all-NULL column came back `Int64`, which is packed
+            // eight bytes wide under a `BOOL` code.
+            let mut column = ColumnData::new("BOOL");
+            for r in 0..current.len() {
+                let cell = match current.value_at(r) {
                     Value::Null => Value::Null,
                     Value::Bool(b) => Value::Bool(b),
                     Value::Int(i) => Value::Bool(i != 0),
                     Value::Float(f) => Value::Bool(f != 0.0),
                     Value::Str(s) => Value::Bool(matches!(s.trim(), "true" | "TRUE" | "1")),
-                })
-                .collect();
-            Some(ColumnData::from_values(&cells))
+                };
+                column.push_value(&cell);
+            }
+            Some(column)
+        }
+        // An integer code packing a buffer of another family: the width comes
+        // from the code, so the buffer has to be integer first - the packer
+        // writes a `Bool` cell as one byte and a `Float64` as eight whatever the
+        // code says.
+        (false, current @ (ColumnData::Bool { .. } | ColumnData::Float64 { .. }))
+            if (1..=4).contains(&code) =>
+        {
+            let mut column = ColumnData::new("BIGINT");
+            for r in 0..current.len() {
+                let cell = match current.value_at(r) {
+                    Value::Null => Value::Null,
+                    Value::Bool(b) => Value::Int(i64::from(b)),
+                    Value::Float(f) => Value::Int(f as i64),
+                    Value::Int(n) => Value::Int(n),
+                    Value::Str(_) => Value::Null,
+                };
+                column.push_value(&cell);
+            }
+            Some(column)
+        }
+        // A float code packing an integer or boolean buffer: same reasoning, the
+        // packer's integer arms write the integer width for codes 5..8.
+        (
+            false,
+            current @ (ColumnData::Bool { .. }
+            | ColumnData::Int32 { .. }
+            | ColumnData::Int64 { .. }),
+        ) if (5..=8).contains(&code) => {
+            let mut column = ColumnData::new("DOUBLE");
+            for r in 0..current.len() {
+                let cell = match current.value_at(r) {
+                    Value::Null => Value::Null,
+                    Value::Bool(b) => Value::Float(if b { 1.0 } else { 0.0 }),
+                    Value::Int(n) => Value::Float(n as f64),
+                    Value::Float(f) => Value::Float(f),
+                    Value::Str(_) => Value::Null,
+                };
+                column.push_value(&cell);
+            }
+            Some(column)
         }
         (false, ColumnData::Utf8 { .. }) if (1..=4).contains(&code) => {
             let cells: Vec<Value> = (0..column.len())
@@ -8725,6 +8771,51 @@ mod tests {
         // `label` is declared VARCHAR but holds integers: they are sent as text.
         assert_eq!(fields[3].column_type, 9);
         assert_eq!(fields[3].column_vectors[0], text_chunk(&["9", "10"]));
+    }
+
+    /// The declared type decides the cell width, so a buffer of another family
+    /// is converted before packing: an all-NULL `BOOL` column still goes out one
+    /// byte per cell, an `INT` column holding booleans four, and a `DOUBLE`
+    /// column holding integers eight as `f64` rather than as `i64`.
+    #[test]
+    fn a_batch_packs_across_type_families() {
+        let columns = vec!["c".to_string()];
+        let bool_types = vec!["BOOL".to_string()];
+
+        // `from_values` inferred `Int64` from two NULLs and wrote eight bytes
+        // per cell under a one-byte code.
+        let all_null = Batch::from_rows(vec![vec![Value::Null], vec![Value::Null]]);
+        let fields = column_fields_from_batch(&columns, &bool_types, &all_null);
+        assert_eq!(fields[0].column_type, 0);
+        assert_eq!(fields[0].column_vectors[0], vec![0u8, 0u8]);
+        assert_eq!(fields[0].bitmasks, vec![false, false]);
+
+        // Integers under a `BOOL` code are truth values, one byte each.
+        let ints = Batch::from_rows(vec![vec![Value::Int(0)], vec![Value::Int(5)]]);
+        assert!(matches!(ints.data[0], ColumnData::Int64 { .. }));
+        let fields = column_fields_from_batch(&columns, &bool_types, &ints);
+        assert_eq!(fields[0].column_type, 0);
+        assert_eq!(fields[0].column_vectors[0], vec![0u8, 1u8]);
+
+        // Booleans under an `INT` code take the code's four bytes.
+        let bools = Batch::from_rows(vec![vec![Value::Bool(true)], vec![Value::Bool(false)]]);
+        assert!(matches!(bools.data[0], ColumnData::Bool { .. }));
+        let int_types = vec!["INT".to_string()];
+        let fields = column_fields_from_batch(&columns, &int_types, &bools);
+        assert_eq!(fields[0].column_type, 3);
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&1i32.to_le_bytes());
+        expected.extend_from_slice(&0i32.to_le_bytes());
+        assert_eq!(fields[0].column_vectors[0], expected);
+
+        // Integers under a `DOUBLE` code are packed as floats.
+        let double_types = vec!["DOUBLE".to_string()];
+        let fields = column_fields_from_batch(&columns, &double_types, &ints);
+        assert_eq!(fields[0].column_type, 6);
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&0.0f64.to_le_bytes());
+        expected.extend_from_slice(&5.0f64.to_le_bytes());
+        assert_eq!(fields[0].column_vectors[0], expected);
     }
 
     /// `ARRAY(ARRAY(ARRAY(VARCHAR)))` has three levels and a VARCHAR leaf.

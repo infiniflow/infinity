@@ -288,16 +288,13 @@ impl Engine {
                 &meta.id.to_string(),
             )?;
             let covered = merge_covered_ranges(&chunks);
-            let covered_rows: u64 = covered.iter().map(|(begin, end)| end - begin).sum();
-            // Every row is sealed: nothing for this index to recover.
-            //
-            // The table's live rows, not the blocks' row count: rows a restart
-            // replayed from the WAL have not reached a block, so the block count
-            // reads "all covered" while those rows are missing from the index.
-            let total_rows = self.row_count(&table)? as u64;
-            if covered_rows >= total_rows {
-                continue;
-            }
+            // The rows themselves decide whether anything is missing: a span
+            // holds every slot it covers, deleted ones included, so counting
+            // them against the live row count could call an index complete while
+            // live row ids inside no span are missing from it. The gap filter
+            // below is the only honest test - it skips the ids the chunks hold
+            // and keeps the rest, deleted rows included, exactly as `AppendIndex`
+            // does.
             if !rows.contains_key(&table) {
                 let fetched = self.fetch_rows_including_deleted_from(&table, 0)?;
                 rows.insert(table.clone(), fetched);

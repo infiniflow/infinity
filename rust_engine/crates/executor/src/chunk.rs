@@ -13,7 +13,7 @@
 use ::common::{Error, Result};
 use expression::Value;
 
-use crate::columnar::{Batch, ColumnData};
+use crate::columnar::{column_for_rows, Batch, ColumnData};
 
 /// `DEFAULT_BLOCK_CAPACITY` / `DEFAULT_VECTOR_SIZE`
 /// (`src/common/default_values.cppm:58`): the row count of one chunk.
@@ -146,10 +146,10 @@ impl DataChunk {
     /// Drops every row, keeping the columns and their capacity.
     pub fn reset(&mut self) {
         for column in &mut self.columns {
-            if let ColumnData::Int64 { values, valid } = column {
-                values.clear();
-                *valid = crate::columnar::Bitmap::new();
-            }
+            // Every variant, not just the one this buffer happens to hold: a
+            // reused chunk hands out its old cells when a column keeps its
+            // values, and a pending `Empty { nulls }` would count as a row.
+            *column = column.same_shape_empty();
         }
         self.row_count = 0;
     }
@@ -198,25 +198,12 @@ impl DataChunk {
     /// A chunk whose columns already carry the types the rows ask for, so the
     /// first `push_row` does not have to widen them.
     fn typed(column_count: usize, rows: &[Vec<Value>]) -> DataChunk {
-        let probe = Batch::from_rows(
-            rows.iter()
-                .take(1)
-                .map(|r| {
-                    let mut row = r.clone();
-                    row.resize(column_count, Value::Null);
-                    row
-                })
-                .collect(),
-        );
-        let columns = if probe.data.len() == column_count {
-            probe
-                .data
-                .into_iter()
-                .map(|c| ColumnData::empty_like(&c))
-                .collect::<Vec<_>>()
-        } else {
-            (0..column_count).map(|_| ColumnData::empty()).collect()
-        };
+        // Every column is typed from all the rows, not from the first one: a
+        // leading NULL says nothing about the column, and a probe that saw only
+        // NULL typed it `i64`, so later `true`s were stored as `1`.
+        let columns = (0..column_count)
+            .map(|c| ColumnData::empty_like(&column_for_rows(rows, c)))
+            .collect();
         DataChunk {
             columns,
             capacity: DEFAULT_VECTOR_SIZE,
@@ -334,6 +321,49 @@ mod tests {
         assert_eq!(chunk.row_count(), 0);
         assert_eq!(chunk.available_capacity(), DEFAULT_VECTOR_SIZE);
         assert_eq!(chunk.column_count(), 2);
+    }
+
+    #[test]
+    fn reset_clears_every_column_before_reuse() {
+        let mut chunk = DataChunk::new(2);
+        chunk.push_row(&row(0)).unwrap();
+        chunk.push_row(&row(1)).unwrap();
+        chunk.reset();
+        chunk
+            .push_row(&[Value::Int(9), Value::Str("new".into())])
+            .unwrap();
+        assert_eq!(chunk.row_count(), 1);
+        assert_eq!(
+            chunk.row(0),
+            Some(vec![Value::Int(9), Value::Str("new".into())]),
+            "a reused chunk must not expose the rows it held before"
+        );
+    }
+
+    #[test]
+    fn reset_drops_the_pending_nulls_of_an_untyped_column() {
+        let mut chunk = DataChunk::new(1);
+        chunk.push_row(&[Value::Null]).unwrap();
+        chunk.push_row(&[Value::Null]).unwrap();
+        chunk.reset();
+        chunk.push_row(&[Value::Str("a".into())]).unwrap();
+        assert_eq!(chunk.row_count(), 1);
+        assert_eq!(chunk.get(0, 0), Some(Value::Str("a".into())));
+    }
+
+    #[test]
+    fn a_leading_null_does_not_type_the_column() {
+        // Typing from the first row alone read all-NULL as `i64`, and the
+        // booleans after it were stored as `1`/`0`.
+        let rows = vec![
+            vec![Value::Null],
+            vec![Value::Bool(true)],
+            vec![Value::Bool(false)],
+        ];
+        let chunk = DataChunk::from_rows(1, rows).pop().unwrap();
+        assert_eq!(chunk.get(0, 0), Some(Value::Null));
+        assert_eq!(chunk.get(1, 0), Some(Value::Bool(true)));
+        assert_eq!(chunk.get(2, 0), Some(Value::Bool(false)));
     }
 
     #[test]

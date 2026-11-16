@@ -5233,23 +5233,31 @@ impl Engine {
         // Every row is sealed already: the gap this rebuild exists for is empty,
         // and the scan below would only rediscover that by decoding the whole
         // column again - which is what made a reopen of a fully dumped table
-        // read every row of a sparse column. `recover_mem_index` guards
-        // HNSW/IVF/fulltext with the same comparison; `scanned_rows` still
-        // reports the table, because `is_complete` asks whether this index saw
-        // it, not how many postings it holds.
+        // read every row of a sparse column. `scanned_rows` still reports the
+        // table, because `is_complete` asks whether this index saw it, not how
+        // many postings it holds.
         //
-        // The count to compare against is the table's **live** rows, not the
-        // blocks': a restart replays rows that never reached a block, so a
-        // block-derived count read "25 of 25 covered" on a 35-row table and the
-        // ten buffered rows stayed out of the index (`test_mem_bmp`: five `4`s
-        // where the index covers seven).
+        // A span counts every slot it holds, deleted ones included, so the sum
+        // only proves coverage when the table has no holes; the live row count
+        // is the yardstick, and the slot count says whether it can be trusted.
+        // Both halves matter: comparing spans with the *blocks'* row count read
+        // "25 of 25 covered" on a table whose last ten rows were still in the
+        // WAL (`test_mem_bmp` kept five `4`s where the index covers seven), and
+        // comparing them with the live count alone would let rows deleted from
+        // inside a span stand in for live rows nobody indexed.
         let covered_rows: u64 = covered
             .values()
             .flat_map(|spans| spans.iter())
             .map(|(begin, end)| end - begin)
             .sum();
         let live_rows = reserved as u64;
-        if live_rows > 0 && covered_rows >= live_rows {
+        let slot_rows: u64 = self
+            .segment_row_counts(table)
+            .iter()
+            .map(|(_, rows)| *rows)
+            .sum();
+        let holeless = slot_rows == live_rows;
+        if holeless && live_rows > 0 && covered_rows >= live_rows {
             index.scanned_rows = reserved;
             index.seal();
             let shared = Arc::new(std::sync::RwLock::new(index));

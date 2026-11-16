@@ -9917,6 +9917,96 @@ mod tests {
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 
+    /// A NULL text cell keeps its slot through the columnar block read: the
+    /// decoder writes the cell into the text buffer and then appends its
+    /// validity bit, so the bitmap stays as long as the buffer and `NULL` does
+    /// not come back as an empty string.
+    #[test]
+    fn a_null_text_cell_survives_the_block_reader() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE n (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO n VALUES (1,'a'),(2,NULL),(3,'c');")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        // The flush moved every row into a block; a projection now reads the
+        // block's columns (`decode_block_column`) instead of the buffer.
+        e.invalidate_row_cache("n");
+        let items = [SelectItem::Column("name".to_string())];
+        let projected = e
+            .try_projection("n", &items)
+            .unwrap()
+            .expect("the block answers a text projection");
+        assert_eq!(projected.data[0].valid().to_vec(), vec![true, false, true]);
+        assert_eq!(projected.row(0).unwrap(), vec![Value::Str("a".into())]);
+        assert_eq!(projected.row(1).unwrap(), vec![Value::Null]);
+        assert_eq!(projected.row(2).unwrap(), vec![Value::Str("c".into())]);
+        assert_eq!(
+            rows(&e, "SELECT name FROM n;"),
+            vec![
+                vec!["a".to_string()],
+                vec!["null".to_string()],
+                vec!["c".to_string()],
+            ]
+        );
+    }
+
+    /// A projection over rows that are still in the append buffer reads each
+    /// cell from its **table** column, not from its position in the SELECT list:
+    /// a non-prefix (`SELECT b`) and a reordered (`SELECT b, a`) projection used
+    /// to hand back `a`, shifted by one.
+    #[test]
+    fn projection_reads_buffered_rows_in_select_order() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE q (a INT, b VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO q VALUES (1,'x'),(2,'y');")
+            .unwrap();
+        // No flush: the rows are only in the buffer, which is the path that
+        // builds the block with `block_of`. The `INSERT` left a decoded row
+        // cache behind and a projection would rather use that, so invalidate it
+        // the way a write does.
+        e.invalidate_row_cache("q");
+        let only_b = [SelectItem::Column("b".to_string())];
+        let projected = e
+            .try_projection("q", &only_b)
+            .unwrap()
+            .expect("the buffer answers a one-column projection");
+        assert_eq!(projected.row(0).unwrap(), vec![Value::Str("x".into())]);
+        assert_eq!(projected.row(1).unwrap(), vec![Value::Str("y".into())]);
+
+        let reordered = [
+            SelectItem::Column("b".to_string()),
+            SelectItem::Column("a".to_string()),
+        ];
+        let projected = e
+            .try_projection("q", &reordered)
+            .unwrap()
+            .expect("the buffer answers a reordered projection");
+        assert_eq!(
+            projected.row(0).unwrap(),
+            vec![Value::Str("x".into()), Value::Int(1)]
+        );
+        assert_eq!(
+            projected.row(1).unwrap(),
+            vec![Value::Str("y".into()), Value::Int(2)]
+        );
+
+        assert_eq!(
+            rows(&e, "SELECT b FROM q;"),
+            vec![vec!["x".to_string()], vec!["y".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT b, a FROM q;"),
+            vec![
+                vec!["x".to_string(), "1".to_string()],
+                vec!["y".to_string(), "2".to_string()],
+            ]
+        );
+    }
+
     /// Wide vector-like cells are kept in an append-only sidecar; the KV row
     /// holds only a short reference, and reads (including after restart)
     /// reconstruct the original value.
