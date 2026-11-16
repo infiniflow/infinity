@@ -490,19 +490,21 @@ impl ColumnData {
                 valid.push(true);
                 return;
             }
-            ColumnData::Utf8 { .. } => {}
-            ColumnData::Empty { .. } => {
-                *self = ColumnData::Int64 {
-                    values: Vec::new(),
-                    valid: Bitmap::new(),
-                };
+            // A text column keeps the integer as text, the way `push_float`
+            // does. Falling through to the widening below only recursed: a text
+            // column has nothing left to widen to, so `push_int` called itself
+            // forever (a stack overflow, not an error).
+            ColumnData::Utf8 { .. } => {
+                self.push_text(Value::Int(i).to_slt_string());
+                return;
             }
+            // An empty column adopts a type on its first value; `widen_to_int64`
+            // below does that and keeps the nulls it already counted.
+            ColumnData::Empty { .. } => {}
         }
-        if self.kind() == Kind::Int32 {
-            self.widen_to_int64();
-        } else {
-            self.widen_to_text();
-        }
+        // Reached only by an `Int32` the value does not fit in and by the empty
+        // column: both become `Int64`, and the retry takes that arm above.
+        self.widen_to_int64();
         self.push_int(i);
     }
 

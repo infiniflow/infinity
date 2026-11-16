@@ -29,7 +29,9 @@ fn best(e: &Engine, sql: &str, runs: usize) -> (Duration, usize) {
 }
 
 fn main() {
-    let dir = std::env::args().nth(1).unwrap_or_else(|| "/tmp/result-bench".into());
+    let dir = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "/tmp/result-bench".into());
     let n: usize = std::env::args()
         .nth(2)
         .and_then(|s| s.parse().ok())
@@ -41,7 +43,9 @@ fn main() {
     let mut i = 0;
     while i < n {
         let batch = (n - i).min(100);
-        let vals: Vec<String> = (0..batch).map(|j| format!("({}, 'v{}')", i + j, i + j)).collect();
+        let vals: Vec<String> = (0..batch)
+            .map(|j| format!("({}, 'v{}')", i + j, i + j))
+            .collect();
         e.execute_blocking(&format!("INSERT INTO t VALUES {};", vals.join(", ")))
             .expect("insert");
         i += batch;

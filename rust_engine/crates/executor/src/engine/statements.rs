@@ -3049,7 +3049,10 @@ impl Engine {
         // columns the query names and the block is handed over as it is. No row
         // is built, so nothing is decoded twice.
         if predicate.is_none() && rows.is_none() {
-            let wanted: Vec<usize> = indices.iter().filter_map(|i| pos.get(*i).copied()).collect();
+            let wanted: Vec<usize> = indices
+                .iter()
+                .filter_map(|i| pos.get(*i).copied())
+                .collect();
             if wanted.len() == indices.len() {
                 if let Some(mut batch) = self.read_columns_batch(table, &wanted, None) {
                     if batch.data.len() == wanted.len() {
@@ -3561,7 +3564,10 @@ impl Engine {
             .collect();
         for row in &rows {
             for (c, column) in data.iter_mut().enumerate() {
-                match row.get(c) {
+                // The rows keep the table's width: the cells this projection
+                // does not read are `Null` in them, so the column a result
+                // buffer wants is `wanted[c]`, not `c`.
+                match row.get(wanted[c]) {
                     Some(value) => column.push_value(value),
                     None => column.push_null(),
                 }
@@ -5231,18 +5237,20 @@ impl Engine {
         // HNSW/IVF/fulltext with the same comparison; `scanned_rows` still
         // reports the table, because `is_complete` asks whether this index saw
         // it, not how many postings it holds.
-        let total_rows: u64 = self
-            .segment_row_counts(table)
-            .iter()
-            .map(|(_, rows)| *rows)
-            .sum();
+        //
+        // The count to compare against is the table's **live** rows, not the
+        // blocks': a restart replays rows that never reached a block, so a
+        // block-derived count read "25 of 25 covered" on a 35-row table and the
+        // ten buffered rows stayed out of the index (`test_mem_bmp`: five `4`s
+        // where the index covers seven).
         let covered_rows: u64 = covered
             .values()
             .flat_map(|spans| spans.iter())
             .map(|(begin, end)| end - begin)
             .sum();
-        if total_rows > 0 && covered_rows >= total_rows {
-            index.scanned_rows = total_rows as usize;
+        let live_rows = reserved as u64;
+        if live_rows > 0 && covered_rows >= live_rows {
+            index.scanned_rows = reserved;
             index.seal();
             let shared = Arc::new(std::sync::RwLock::new(index));
             self.tables

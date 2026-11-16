@@ -290,11 +290,11 @@ impl Engine {
             let covered = merge_covered_ranges(&chunks);
             let covered_rows: u64 = covered.iter().map(|(begin, end)| end - begin).sum();
             // Every row is sealed: nothing for this index to recover.
-            let total_rows: u64 = self
-                .segment_row_counts(&table)
-                .iter()
-                .map(|(_, rows)| *rows)
-                .sum();
+            //
+            // The table's live rows, not the blocks' row count: rows a restart
+            // replayed from the WAL have not reached a block, so the block count
+            // reads "all covered" while those rows are missing from the index.
+            let total_rows = self.row_count(&table)? as u64;
             if covered_rows >= total_rows {
                 continue;
             }
