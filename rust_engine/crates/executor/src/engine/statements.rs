@@ -3986,6 +3986,76 @@ impl Engine {
         self.text_index_build(table, index_id, column, tokenizer)
     }
 
+    /// Where the documents of `probe` live in the cached index of `index_id`,
+    /// for a concurrent test that answered short.
+    ///
+    /// A `MATCH` that returns fewer rows than the table holds has exactly three
+    /// shapes, and they are told apart by looking at one row: the document is
+    /// **missing** from every source (a seal wrote a chunk that spans the row
+    /// without a document for it, or a rebuild resumed past it), it is **there
+    /// but retired** (`overridden`), or it is there and the row could not be
+    /// fetched (the block side, not this index). The counts alone cannot say
+    /// which: `total_docs` is what decides whether the cache is reused at all.
+    #[cfg(test)]
+    pub(crate) fn text_index_state(&self, table: &str, index_id: u64, probe: &[u64]) -> String {
+        let tkey = self.table_key(table);
+        let (shared, live_rows, epoch, built) = {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&tkey) else {
+                return format!("{table}: no table entry");
+            };
+            (
+                entry.text.get(&index_id).cloned(),
+                entry.live_rows,
+                entry.text_epoch,
+                entry.text_built.get(&index_id).copied(),
+            )
+        };
+        let Some(shared) = shared else {
+            return format!("{table}#{index_id}: nothing cached (live_rows={live_rows:?})");
+        };
+        let index = shared.read().unwrap_or_else(|e| e.into_inner());
+        let mut out = format!(
+            "{table}#{index_id} epoch={epoch} built={built:?} live_rows={live_rows:?} \
+             total_docs={} overridden={} pending_publish={:?} inflight={}",
+            index.total_docs(),
+            index.overridden.len(),
+            index.pending_publish,
+            index.inflight.is_some(),
+        );
+        for (at, segment) in index.reader.segments.iter().enumerate() {
+            out.push_str(&format!(
+                "\n  seg{at} {} span={} live={} range={:?}",
+                segment.reader.base_name(),
+                segment.docs,
+                segment.live_docs,
+                segment.reader.row_range(),
+            ));
+        }
+        for (at, tail) in index.tails().enumerate() {
+            out.push_str(&format!(
+                "\n  tail{at} docs={} loop_range={:?}",
+                tail.pending_docs(),
+                tail.row_range,
+            ));
+        }
+        for row in probe {
+            let in_tail = index.tails().any(|tail| tail.docs.contains_key(row));
+            let chunks: Vec<&str> = index
+                .reader
+                .segments
+                .iter()
+                .filter(|segment| segment.reader.doc_len_of_row(*row).is_some())
+                .map(|segment| segment.reader.base_name())
+                .collect();
+            out.push_str(&format!(
+                "\n  row {row}: overridden={} in_tail={in_tail} in_chunks={chunks:?}",
+                index.overridden.contains(row),
+            ));
+        }
+        out
+    }
+
     /// The cached index for `index_id`, when it belongs to the current layout and
     /// already holds every one of the `reserved` live rows, plus the table's
     /// `text_epoch` - a build publishes at it.
