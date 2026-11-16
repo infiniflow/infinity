@@ -2997,9 +2997,10 @@ fn parse_array_elements(cell: &str) -> Vec<String> {
     out
 }
 
-/// The `ColumnType` of each nesting level of an `ARRAY(…)` type, outermost
-/// first. `ARRAY(ARRAY(INT))` → `[21, 3]` (an array of arrays of int).
-fn array_levels(text: &str) -> Vec<i32> {
+/// [`array_levels`] with each level's type text, which a leaf level needs to
+/// know its width: `ARRAY(VECTOR(4,float))` packs each element as four floats,
+/// not as text.
+fn array_level_types(text: &str) -> Vec<(i32, String)> {
     let mut out = Vec::new();
     let mut cur = text.trim().to_string();
     while cur.to_ascii_uppercase().starts_with("ARRAY(") {
@@ -3016,22 +3017,22 @@ fn array_levels(text: &str) -> Vec<i32> {
             None => break,
         };
         let (logic, _col) = element_type_meta(&inner);
-        out.push(logic_to_column_type(logic));
+        out.push((logic_to_column_type(logic), inner.clone()));
         cur = inner;
     }
     out
 }
 
 /// Appends one array value packed for the given per-level `ColumnType`s.
-fn pack_array_value(chunk: &mut Vec<u8>, levels: &[i32], text: &str) {
+fn pack_array_value(chunk: &mut Vec<u8>, levels: &[(i32, String)], text: &str) {
     let elems = parse_array_elements(text);
     chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
-    let Some((&head, rest)) = levels.split_first() else {
+    let Some(((head, head_type), rest)) = levels.split_first() else {
         return;
     };
     for e in &elems {
         if rest.is_empty() {
-            pack_array_element(chunk, head, e);
+            pack_array_element(chunk, *head, head_type, e);
         } else {
             pack_array_value(chunk, rest, e);
         }
@@ -3039,7 +3040,12 @@ fn pack_array_value(chunk: &mut Vec<u8>, levels: &[i32], text: &str) {
 }
 
 /// Appends one scalar array element packed for its `ColumnType`.
-fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str) {
+fn pack_array_element(
+    chunk: &mut Vec<u8>,
+    element_column_type: i32,
+    element_type_text: &str,
+    text: &str,
+) {
     let t = text.trim();
     match element_column_type {
         0 => chunk.push(if t.eq_ignore_ascii_case("true") { 1 } else { 0 }),
@@ -3051,6 +3057,19 @@ fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str)
         6 => chunk.extend_from_slice(&t.parse::<f64>().unwrap_or(0.0).to_le_bytes()),
         7 => {
             chunk.extend_from_slice(&f32_to_f16_bits(t.parse::<f32>().unwrap_or(0.0)).to_le_bytes())
+        }
+        10 => {
+            // ColumnEmbedding: a run of raw elements with no per-element count,
+            // sized by the declared dimension. Writing it as text (the default
+            // arm below) desynchronised the reader, which then took the next
+            // level's count as float data.
+            if let Some((dim, elem)) = embedding_info(element_type_text) {
+                let mut values = parse_array_elements(t);
+                values.resize(dim as usize, String::new());
+                for v in values.iter().take(dim as usize) {
+                    pack_scalar_element(chunk, elem, v);
+                }
+            }
         }
         16 => chunk.extend_from_slice(&date_to_days(t).unwrap_or(0).to_le_bytes()),
         17 => chunk.extend_from_slice(&time_to_secs(t).unwrap_or(0).to_le_bytes()),
@@ -3064,6 +3083,32 @@ fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str)
             chunk.extend_from_slice(&(t.len() as u32).to_le_bytes());
             chunk.extend_from_slice(t.as_bytes());
         }
+    }
+}
+
+/// Appends one embedding element (`ElementType` code) as raw little-endian
+/// bytes, matching what the SDK reads for that element type.
+fn pack_scalar_element(chunk: &mut Vec<u8>, element_type_code: i32, text: &str) {
+    let t = text.trim();
+    match element_type_code {
+        0 => chunk.push(if t == "1" || t.eq_ignore_ascii_case("true") {
+            1
+        } else {
+            0
+        }),
+        1 | 2 => chunk.push(t.parse::<i8>().unwrap_or(0) as u8),
+        3 => chunk.extend_from_slice(&t.parse::<i16>().unwrap_or(0).to_le_bytes()),
+        4 => chunk.extend_from_slice(&t.parse::<i32>().unwrap_or(0).to_le_bytes()),
+        5 => chunk.extend_from_slice(&t.parse::<i64>().unwrap_or(0).to_le_bytes()),
+        6 => chunk.extend_from_slice(&t.parse::<f32>().unwrap_or(0.0).to_le_bytes()),
+        7 => chunk.extend_from_slice(&t.parse::<f64>().unwrap_or(0.0).to_le_bytes()),
+        8 => {
+            chunk.extend_from_slice(&f32_to_f16_bits(t.parse::<f32>().unwrap_or(0.0)).to_le_bytes())
+        }
+        9 => chunk.extend_from_slice(
+            &((t.parse::<f32>().unwrap_or(0.0).to_bits() >> 16) as u16).to_le_bytes(),
+        ),
+        _ => chunk.extend_from_slice(&t.parse::<f32>().unwrap_or(0.0).to_le_bytes()),
     }
 }
 
@@ -3202,7 +3247,7 @@ pub fn rows_to_column_fields_typed(
                 let text = value.map(cell_text);
                 let cell = text.as_deref();
                 masks.push(cell.is_some());
-                let levels = array_levels(declared);
+                let levels = array_level_types(declared);
                 match cell {
                     Some(c) => pack_array_value(&mut chunk, &levels, c),
                     None => chunk.extend_from_slice(&0u32.to_le_bytes()),
@@ -8506,14 +8551,16 @@ mod tests {
     /// leaf was packed as a number and the thrift client's unpack failed.
     #[test]
     fn array_levels_keep_the_nesting_and_the_leaf_type() {
+        let cols =
+            |t: &str| -> Vec<i32> { array_level_types(t).into_iter().map(|(c, _)| c).collect() };
         // 21 = ColumnArray, 9 = ColumnVarchar.
-        assert_eq!(
-            array_levels("ARRAY(ARRAY(ARRAY(VARCHAR)))"),
-            vec![21, 21, 9]
-        );
-        assert_eq!(array_levels("ARRAY(INT)"), vec![3]);
-        assert_eq!(array_levels("ARRAY(ARRAY(INT))"), vec![21, 3]);
-        assert!(array_levels("INT").is_empty());
+        assert_eq!(cols("ARRAY(ARRAY(ARRAY(VARCHAR)))"), vec![21, 21, 9]);
+        assert_eq!(cols("ARRAY(INT)"), vec![3]);
+        assert_eq!(cols("ARRAY(ARRAY(INT))"), vec![21, 3]);
+        assert!(cols("INT").is_empty());
+        // The leaf keeps the type text a packer needs for its width.
+        let leaf = array_level_types("ARRAY(VECTOR(4,FLOAT))");
+        assert_eq!(leaf.last().unwrap().1, "VECTOR(4,FLOAT)");
     }
 
     /// An array cell is rendered `[1,2]` by the engine but `{1,2}` in the SLT
