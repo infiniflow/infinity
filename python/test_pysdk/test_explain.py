@@ -110,9 +110,10 @@ class TestInfinity:
             res = table.output(["c1", "sum(c2)"]).group_by(["c1"]).having("sum(c2) > 0").explain(ExplainType.Physical)
             plan = str(res)
             print(plan)
-            # a group-by query explains through an Aggregate operator; without
-            # forwarding group by the plan is a plain projection
-            assert "Aggregate" in plan
+            # a group-by query explains through an aggregate operator; without
+            # forwarding group by the plan is a plain projection. The operator
+            # label is upper case on the reference engine, so compare loosely.
+            assert "aggregate" in plan.lower()
 
             # having must reach the explained query as well: if having_expr
             # were dropped again, the plan would be identical to the
