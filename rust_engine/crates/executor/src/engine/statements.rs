@@ -2305,7 +2305,7 @@ impl Engine {
     /// [`QueryResult`] renders cells as text, but `INSERT … SELECT` and
     /// `CREATE TABLE … AS SELECT` must preserve values (and NULLs) before
     /// casting them to the target schema.
-    pub(crate) fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    pub(crate) fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Batch)> {
         self.run_select_with_ctes(stmt, &HashMap::new())
     }
 
@@ -2316,7 +2316,7 @@ impl Engine {
         &self,
         stmt: &Statement,
         outer_ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    ) -> Result<(Vec<String>, Batch)> {
         let mut cte_scope = outer_ctes.clone();
         if let Statement::Select { ctes, .. } = stmt {
             for cte in ctes {
@@ -2336,7 +2336,8 @@ impl Engine {
                     }
                     columns = cte.columns.clone();
                 }
-                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows));
+                // A CTE is a relation the operators scan, so it is kept as rows.
+                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows.rows()));
             }
         }
         let Statement::Select {
@@ -2395,7 +2396,10 @@ impl Engine {
                             .cloned()
                             .flatten()
                             .unwrap_or_else(|| "count(star)".to_string());
-                        return Ok((vec![name], vec![vec![Value::Int(n as i64)]]));
+                        return Ok((
+                            vec![name],
+                            Batch::from_rows(vec![vec![Value::Int(n as i64)]]),
+                        ));
                     }
                 }
             }
@@ -2595,6 +2599,9 @@ impl Engine {
         // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
         // A derived table's rows are the scan source from the start.
         let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
+        // A plain projection answered by the block mirror arrives as a block, not
+        // as rows: `direct_projection` hands it over untouched.
+        let mut override_block: Option<Batch> = None;
         if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
             let pred = match where_pred.as_ref() {
                 Some(p) => Some(planner::predicate_expr(p, &tables[0].1)?),
@@ -2628,7 +2635,7 @@ impl Engine {
             && !*distinct
         {
             if let Some(t) = from.as_ref() {
-                override_rows = self.try_projection(t, items)?;
+                override_block = self.try_projection(t, items)?;
             }
         }
         // `ROW_ID()` outside a SEARCH exposes the row's sequence number
@@ -2895,6 +2902,7 @@ impl Engine {
         let (columns, mut rows) = self.run_plan(
             plan,
             override_rows,
+            override_block,
             source_columns,
             candidate,
             unmatchable,
@@ -2903,15 +2911,23 @@ impl Engine {
             rough_filter_done,
         )?;
         if *distinct {
+            // `DISTINCT` is the one step here that wants whole rows: the
+            // samples are compared on their text form, and the surviving rows
+            // are compacted out of the buffers by mask.
             let mut seen = std::collections::HashSet::new();
-            rows.retain(|r| {
-                seen.insert(
-                    r.iter()
-                        .map(|v| v.to_slt_string())
-                        .collect::<Vec<_>>()
-                        .join("\u{1f}"),
-                )
-            });
+            let keep: Vec<bool> = rows
+                .rows()
+                .iter()
+                .map(|r| {
+                    seen.insert(
+                        r.iter()
+                            .map(|v| v.to_slt_string())
+                            .collect::<Vec<_>>()
+                            .join("\u{1f}"),
+                    )
+                })
+                .collect();
+            rows.retain(&keep);
         }
         Ok((columns, rows))
     }
@@ -2932,8 +2948,38 @@ impl Engine {
         &self,
         plan: &LogicalPlan,
         rows: &mut Option<Vec<Vec<Value>>>,
+        block: &mut Option<Batch>,
         source_columns: Option<&Vec<String>>,
-    ) -> Option<(Vec<String>, Vec<Vec<Value>>)> {
+    ) -> Option<(Vec<String>, Batch)> {
+        // `SELECT *` (every column, in order, no expression) reaches the
+        // executor as a bare scan: the columns the scan names are the result, so
+        // the block reader is the whole plan.
+        if let LogicalPlan::Scan { table, columns } = plan {
+            if block.is_some() || rows.is_some() {
+                return None;
+            }
+            // Only the `SELECT *` shape: the scan names the table's leading
+            // columns in schema order. A reordered or widened list is a
+            // projection the operators must apply.
+            let schema = self.table_schema(table).ok()?;
+            if !columns
+                .iter()
+                .enumerate()
+                .all(|(i, name)| schema.get(i) == Some(name))
+            {
+                return None;
+            }
+            let pos: Vec<usize> = match source_columns {
+                Some(full) => columns
+                    .iter()
+                    .map(|name| full.iter().position(|c| c == name))
+                    .collect::<Option<Vec<_>>>()?,
+                None => (0..columns.len()).collect(),
+            };
+            let mut batch = self.read_columns_batch(table, &pos, None)?;
+            batch.columns = columns.clone();
+            return Some((columns.clone(), batch));
+        }
         let LogicalPlan::Projection {
             input,
             exprs,
@@ -2989,6 +3035,30 @@ impl Engine {
             },
             _ => return None,
         };
+        // The block mirror already answered this projection: it holds exactly
+        // the output columns, so the plan's projection is an identity over it.
+        if let Some(mut projected) = block.take() {
+            if projected.width() == indices.len() {
+                projected.columns = names.clone();
+                return Some((names.clone(), projected));
+            }
+            *block = Some(projected);
+        }
+        // A select list that is nothing but columns, with no predicate, is a
+        // column selection: the block reader fills the typed buffers of the
+        // columns the query names and the block is handed over as it is. No row
+        // is built, so nothing is decoded twice.
+        if predicate.is_none() && rows.is_none() {
+            let wanted: Vec<usize> = indices.iter().filter_map(|i| pos.get(*i).copied()).collect();
+            if wanted.len() == indices.len() {
+                if let Some(mut batch) = self.read_columns_batch(table, &wanted, None) {
+                    if batch.data.len() == wanted.len() {
+                        batch.columns = names.clone();
+                        return Some((names.clone(), batch));
+                    }
+                }
+            }
+        }
         // Only now that the shape is known is the materialised row set taken:
         // it is the caller's, and a plan this function declines must keep it.
         let mut filtered = false;
@@ -3087,7 +3157,9 @@ impl Engine {
                 })
                 .collect()
         };
-        Some((names.clone(), out))
+        let mut batch = Batch::from_rows(out);
+        batch.columns = names.clone();
+        Some((names.clone(), batch))
     }
 
     pub(crate) fn fetch_rows(&self, table: &str) -> Result<Vec<Vec<Value>>> {
@@ -3390,7 +3462,7 @@ impl Engine {
         &self,
         table: &str,
         items: &[SelectItem],
-    ) -> Result<Option<Vec<Vec<Value>>>> {
+    ) -> Result<Option<Batch>> {
         let table = if table.contains('.') {
             table.to_string()
         } else {
@@ -3451,34 +3523,55 @@ impl Engine {
         if !self.wide_text_columns(table) {
             if let Some(rows) = self.buffered_rows_values(table, Some(&wanted)) {
                 let deleted = self.tombstone_set(table)?;
-                return Ok(Some(
-                    rows.into_iter()
-                        .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
-                        .map(|(_, cells)| cells)
-                        .collect(),
-                ));
+                let kept: Vec<Vec<Value>> = rows
+                    .into_iter()
+                    .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+                    .map(|(_, cells)| cells)
+                    .collect();
+                return Ok(Some(self.block_of(table, &wanted, kept)?));
             }
         }
-        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, &[]) else {
+        // The block mirror is already columnar: fill the typed buffers of the
+        // selected columns and hand the block over. The reader applies the
+        // tombstones and the append buffer itself, so nothing here rebuilds a
+        // row.
+        let Some(batch) = self.read_columns_batch(table, &wanted, None) else {
             return Ok(None);
         };
         // The files alone hold `snapshot.len()` rows; the append buffer adds
         // the ones the commits since the checkpoint wrote. Fewer than the
         // snapshot means the mirror was rewritten under us.
-        if snapshot.as_ref().is_some_and(|s| rows.len() < s.len()) {
+        if snapshot.as_ref().is_some_and(|s| batch.row_count < s.len()) {
             return Ok(None);
         }
-        // The projected read already carries the append buffer's rows over the
-        // blocks (`read_blocks_selected`), so the row set is the one the
-        // full scan returns; only the tombstones the files do not mark yet have
-        // to be dropped here.
-        let deleted = self.tombstone_set(table)?;
-        let out: Vec<Vec<Value>> = rows
-            .into_iter()
-            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
-            .map(|(_, cells)| cells)
+        Ok(Some(batch))
+    }
+
+    /// Builds a result block out of already materialised rows of the columns
+    /// `wanted`, typed from the table's declared types.
+    fn block_of(&self, table: &str, wanted: &[usize], rows: Vec<Vec<Value>>) -> Result<Batch> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&self.qualified_table(table))?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let mut data: Vec<ColumnData> = wanted
+            .iter()
+            .map(|pos| ColumnData::new(meta.types.get(*pos).map(String::as_str).unwrap_or("")))
             .collect();
-        Ok(Some(out))
+        for row in &rows {
+            for (c, column) in data.iter_mut().enumerate() {
+                match row.get(c) {
+                    Some(value) => column.push_value(value),
+                    None => column.push_null(),
+                }
+            }
+        }
+        let columns = wanted
+            .iter()
+            .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
+            .collect();
+        Ok(Batch::new(columns, data, rows.len()))
     }
 
     /// The sidecar holding a table's wide (blob-referenced) cells.

@@ -438,7 +438,8 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let query = query.clone();
-        let (source_columns, rows) = self.run_select(&query)?;
+        let (source_columns, block) = self.run_select(&query)?;
+        let rows = block.rows();
         // The reference only ever got as far as constants: `PhysicalInsert`
         // sends each projected expression through
         // `ExpressionState::CreateState`, which has no case for a column

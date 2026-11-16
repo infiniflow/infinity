@@ -33,7 +33,8 @@ impl Engine {
             return Err(Error::Invalid("a derived table must be a SELECT".into()));
         }
         let qualified = self.qualify_tables(&stmt);
-        self.run_select(&qualified)
+        let (columns, rows) = self.run_select(&qualified)?;
+        Ok((columns, rows.rows()))
     }
 
     /// Runs a scalar/`EXISTS` subquery, returning typed rows. The SQL text is
@@ -65,7 +66,8 @@ impl Engine {
         }
         let visible: Vec<String> = ctes.keys().cloned().collect();
         let stmt = self.qualify_tables_in(&stmt, &visible);
-        self.run_select_with_ctes(&stmt, ctes)
+        let (columns, rows) = self.run_select_with_ctes(&stmt, ctes)?;
+        Ok((columns, rows.rows()))
     }
 
     /// C++ `QueryBinder::BindSubquery` + `CorrelatedExpressionsDetector`: the
@@ -2724,13 +2726,13 @@ impl Engine {
                 // server needs to keep 100k connections in flight.
                 let Some(engine) = self.engine_handle() else {
                     let (columns, rows) = self.run_select(stmt)?;
-                    return Ok(QueryResult::values(columns, rows));
+                    return Ok(QueryResult::Rows { columns, rows });
                 };
                 let stmt = stmt.clone();
                 let (columns, rows) = crate::scheduler::scheduler()
                     .spawn_blocking(move || engine.run_select(&stmt))
                     .await?;
-                Ok(QueryResult::values(columns, rows))
+                Ok(QueryResult::Rows { columns, rows })
             }
         }
     }
@@ -2746,13 +2748,14 @@ impl Engine {
         &self,
         plan: LogicalPlan,
         mut override_rows: Option<Vec<Vec<Value>>>,
+        override_block: Option<Batch>,
         source_columns: Option<Vec<String>>,
         candidate: Option<planner::index_scan::IndexScanCandidate>,
         unmatchable: bool,
         fulltext_substring: bool,
         catalog: Option<planner::index_scan::IndexCatalog>,
         rough_filter_done: bool,
-    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    ) -> Result<(Vec<String>, Batch)> {
         // The index filter was built over the scan layout that still contains
         // the pushed-down columns; remember how those map onto the row before
         // `LazyLoad` drops them (C++ keeps the column bound in the index scan).
@@ -2812,7 +2815,10 @@ impl Engine {
         // the operator chain.
         if !cacheable && candidate.is_none() && !unmatchable && !fulltext_substring {
             let mut rows = override_rows.take();
-            if let Some(out) = self.direct_projection(&plan, &mut rows, source_columns.as_ref()) {
+            let mut block = override_block;
+            if let Some(out) =
+                self.direct_projection(&plan, &mut rows, &mut block, source_columns.as_ref())
+            {
                 return Ok(out);
             }
             override_rows = rows;
@@ -2882,7 +2888,13 @@ impl Engine {
             crate::chunk::DEFAULT_VECTOR_SIZE,
         );
         source.set_unmatchable(unmatchable);
-        crate::operator::run_operators(operators, names, &mut source)
+        // The operators exchange chunks and merge them into rows; the block the
+        // result carries is built from those rows once, at the fragment's
+        // boundary (an expression, a sort or an aggregate works on rows).
+        let (names, rows) = crate::operator::run_operators(operators, names, &mut source)?;
+        let mut block = Batch::from_rows(rows);
+        block.columns = names.clone();
+        Ok((names, block))
     }
 }
 

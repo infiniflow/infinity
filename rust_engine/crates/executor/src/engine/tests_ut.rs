@@ -3318,6 +3318,7 @@ mod tests {
             .run_plan(
                 plan,
                 None,
+                None,
                 Some(vec!["a".to_string(), "b".to_string()]),
                 None,
                 false,
@@ -3357,7 +3358,7 @@ mod tests {
             names: vec!["sum".to_string()],
         };
         let (columns, rows) = e
-            .run_plan(plan, None, None, None, false, false, None, false)
+            .run_plan(plan, None, None, None, None, false, false, None, false)
             .unwrap();
         assert_eq!(columns, vec!["sum".to_string()]);
         assert_eq!(rows, vec![vec![Value::Int(3)], vec![Value::Int(7)]]);
@@ -9910,8 +9911,9 @@ mod tests {
             .unwrap();
         let projected = e.try_projection("p", &items).unwrap().unwrap();
         assert_eq!(projected.len(), 4);
-        assert_eq!(projected[3][0], Value::Int(4));
-        assert_eq!(projected[3][1], Value::Str("d".into()));
+        let last = projected.row(3).unwrap();
+        assert_eq!(last[0], Value::Int(4));
+        assert_eq!(last[1], Value::Str("d".into()));
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 

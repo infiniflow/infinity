@@ -428,6 +428,15 @@ impl ColumnData {
         }
     }
 
+    /// [`ColumnData::push_value`] that also takes a text cell over instead of
+    /// cloning it.
+    pub fn push_value_owned(&mut self, value: Value) {
+        match value {
+            Value::Str(cell) => self.push_text(cell),
+            other => self.push_value(&other),
+        }
+    }
+
     /// Appends SQL NULL, keeping the slot.
     pub fn push_null(&mut self) {
         match self {
@@ -873,18 +882,22 @@ impl Batch {
     pub fn from_rows(rows: Vec<Vec<Value>>) -> Self {
         let width = rows.iter().map(Vec::len).max().unwrap_or(0);
         let mut data: Vec<ColumnData> = (0..width).map(|c| column_for_rows(&rows, c)).collect();
-        for row in &rows {
-            for (c, column) in data.iter_mut().enumerate() {
-                match row.get(c) {
-                    Some(value) => column.push_value(value),
-                    None => column.push_null(),
-                }
+        let row_count = rows.len();
+        // The rows are consumed: a text cell moves into its buffer instead of
+        // being cloned, which is one allocation per varchar cell.
+        for row in rows {
+            let width = row.len();
+            for (c, value) in row.into_iter().enumerate() {
+                data[c].push_value_owned(value);
+            }
+            for column in data.iter_mut().skip(width) {
+                column.push_null();
             }
         }
         Self {
             columns: Vec::new(),
             data,
-            row_count: rows.len(),
+            row_count,
         }
     }
 
@@ -999,25 +1012,50 @@ fn declared_base(declared: &str) -> String {
 
 /// The column type the rows ask for: text if any cell is text, float if any is
 /// a float, bool only when every non-null cell is a bool, otherwise `i64`.
+///
+/// One pass, no per-column `Vec` of cell references: this runs over the whole
+/// result set when the rows come out of the operator chain.
 fn column_for_rows(rows: &[Vec<Value>], c: usize) -> ColumnData {
-    let cells: Vec<&Value> = rows
-        .iter()
-        .filter_map(|row| row.get(c))
-        .filter(|v| !matches!(v, Value::Null))
-        .collect();
-    if cells.iter().any(|v| matches!(v, Value::Str(_))) {
+    let mut text = false;
+    let mut float = false;
+    let mut bools = true;
+    let mut any = false;
+    for cell in rows.iter().filter_map(|row| row.get(c)) {
+        match cell {
+            Value::Null => {}
+            Value::Str(_) => {
+                text = true;
+                bools = false;
+                any = true;
+            }
+            Value::Float(_) => {
+                float = true;
+                bools = false;
+                any = true;
+            }
+            Value::Bool(_) => any = true,
+            Value::Int(_) => {
+                bools = false;
+                any = true;
+            }
+        }
+        if text {
+            break;
+        }
+    }
+    if text {
         return ColumnData::Utf8 {
             text: Utf8Column::default(),
             valid: Bitmap::new(),
         };
     }
-    if cells.iter().any(|v| matches!(v, Value::Float(_))) {
+    if float {
         return ColumnData::Float64 {
             values: Vec::new(),
             valid: Bitmap::new(),
         };
     }
-    if !cells.is_empty() && cells.iter().all(|v| matches!(v, Value::Bool(_))) {
+    if any && bools {
         return ColumnData::Bool {
             values: Vec::new(),
             valid: Bitmap::new(),
