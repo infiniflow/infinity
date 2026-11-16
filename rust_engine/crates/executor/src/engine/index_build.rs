@@ -3810,7 +3810,19 @@ impl Engine {
         if full.is_empty() {
             return;
         }
-        let _serial = self.storage.flush_lock.blocking_read();
+        // Non-blocking on purpose. This runs in a commit's **bottom half**, i.e.
+        // while that commit owns the table's bottom gate, and a checkpoint takes
+        // `flush_lock` for writing *before* it asks for the same gate. Waiting
+        // for the read here therefore closes a cycle - commit -> flush_lock,
+        // checkpoint -> bottom gate - and the two threads park forever with no
+        // error: a 5000-row insert stalled on its third batch, right after a
+        // background checkpoint started. A skipped seal is harmless: the tail
+        // stays in memory (rows are in the blocks and the WAL), the next insert
+        // after the checkpoint retries, and the sealed copy a later dump writes
+        // covers the same rows.
+        let Ok(_serial) = self.storage.flush_lock.try_read() else {
+            return;
+        };
         // Only this table's full columns: sealing every table's every index
         // made one insert's dump cost the whole catalog, and a suite with a
         // thousand tables spent the run inside `list_indexes`.

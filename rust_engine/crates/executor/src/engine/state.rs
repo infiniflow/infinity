@@ -971,6 +971,31 @@ pub(crate) fn encode_cell_stored(v: &Literal, ty: Option<&String>) -> String {
     }
 }
 
+/// Whether a column's stored text is byte-for-byte its display text, so an
+/// insert can reuse the one rendering it already has instead of formatting the
+/// cell a second time.
+///
+/// True for the types whose [`encode_cell_stored`] arm returns `s` untouched -
+/// which includes a float vector and a varchar, the wide columns an insert
+/// spends its time on. False for the types that rewrite the value (float
+/// digit normalisation, array braces, JSON compaction, datetime spelling,
+/// sparse re-spelling, bit packing, tensor reshaping), where the stored text has
+/// to be produced by [`encode_cell_stored`].
+pub(crate) fn stored_text_is_display(ty: &str) -> bool {
+    if is_float_type(ty)
+        || is_array_type(ty)
+        || is_json_type(ty)
+        || is_datetime_type(ty)
+        || is_sparse_type(ty)
+    {
+        return false;
+    }
+    if is_embedding_type(ty) || is_tensor_type(ty) {
+        return !is_bit_type(ty) && !declared_elem_is_int(ty);
+    }
+    true
+}
+
 /// The reference's CSV cell parser for integer columns:
 /// `ColumnVector::AppendByStringView` → `DataType::StringToValue<TinyIntT>`.
 ///

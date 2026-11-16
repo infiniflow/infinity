@@ -71,23 +71,73 @@ fn reorder_row_text(
     out.join("\t")
 }
 
-/// One row's cells, either owned (decoded from a block, or a replayed journal
-/// entry) or borrowed from the write's row set.
+/// One row's cells, either owned or borrowed from the write's row set.
 ///
 /// The mirror copies nothing it does not have to: a bulk `COPY` publishes its
 /// rows and mirrors them straight after, so every cell is already in `extra`
 /// and borrowing is the whole win (18% of the profile was `Vec<Value>::clone`).
+///
+/// A block this write re-mirrors already holds its cells **as the text the file
+/// stores**, so they stay text ([`RowCells::Stored`]). Parsing them back into
+/// `Value`s only for the writer to render them again doubled a block's footprint
+/// at exactly the moment the rewrite had the block decoded anyway: on a table
+/// with a 2048-dim vector that was 130 MB of `String` and 130 MB of `Value` for
+/// one 8192-row block, twice per checkpoint, and the pages counted against the
+/// peak.
 pub(crate) enum RowCells<'a> {
     Borrowed(&'a Vec<Value>),
-    Owned(Vec<Value>),
+    /// Cells a block file already stores, owned by this write.
+    OwnedStored(Vec<String>),
 }
 
-impl std::ops::Deref for RowCells<'_> {
-    type Target = Vec<Value>;
-    fn deref(&self) -> &Vec<Value> {
+impl RowCells<'_> {
+    /// One cell's stored text, rendered only for a row that is still `Value`s.
+    fn cell_text(&self, col: usize) -> std::borrow::Cow<'_, str> {
         match self {
-            RowCells::Borrowed(values) => values,
-            RowCells::Owned(values) => values,
+            RowCells::Borrowed(values) => value_cell_text(values, col),
+            RowCells::OwnedStored(cells) => stored_cell_text(cells, col),
+        }
+    }
+}
+
+fn value_cell_text(values: &[Value], col: usize) -> std::borrow::Cow<'_, str> {
+    match values.get(col) {
+        Some(value) => std::borrow::Cow::Owned(mirror_cell_text(value)),
+        None => std::borrow::Cow::Borrowed(""),
+    }
+}
+
+fn stored_cell_text(cells: &[String], col: usize) -> std::borrow::Cow<'_, str> {
+    match cells.get(col) {
+        Some(cell) => std::borrow::Cow::Borrowed(cell.as_str()),
+        None => std::borrow::Cow::Borrowed(""),
+    }
+}
+
+/// Where the block writer gets one cell's stored text.
+///
+/// The encoder walks a block column by column, so a caller never has to flatten
+/// its rows into `Vec<Vec<String>>`: the mirror hands over `RowCells` (the
+/// block's own text where it has one) and the schema paths hand over rows that
+/// are already text.
+trait CellSource {
+    fn cell(&self, row: usize, col: usize) -> std::borrow::Cow<'_, str>;
+}
+
+impl CellSource for &[Vec<String>] {
+    fn cell(&self, row: usize, col: usize) -> std::borrow::Cow<'_, str> {
+        match self.get(row) {
+            Some(cells) => stored_cell_text(cells, col),
+            None => std::borrow::Cow::Borrowed(""),
+        }
+    }
+}
+
+impl CellSource for &[(usize, RowCells<'_>)] {
+    fn cell(&self, row: usize, col: usize) -> std::borrow::Cow<'_, str> {
+        match self.get(row) {
+            Some((_, cells)) => cells.cell_text(col),
+            None => std::borrow::Cow::Borrowed(""),
         }
     }
 }
@@ -251,10 +301,10 @@ impl Engine {
         let from_block: std::collections::HashSet<usize> =
             held.iter().map(|(seq, _)| *seq).collect();
         for (seq, cells) in held {
-            out.push((
-                seq,
-                RowCells::Owned(cells.iter().map(|cell| parse_value(cell)).collect()),
-            ));
+            // The block's stored text is exactly what the writer needs: parsing
+            // it into `Value`s and rendering it back was two copies of every
+            // cell for no change in the bytes.
+            out.push((seq, RowCells::OwnedStored(cells)));
         }
         // Everything else in the window: the rows this write is publishing.
         out.extend(
@@ -817,19 +867,20 @@ impl Engine {
                         .map(|(seq, _)| *seq)
                         .filter(|seq| !deleted_at.contains_key(seq)),
                 );
-                let texts: Vec<Vec<String>> = chunk
-                    .iter()
-                    .map(|(_, row): &(usize, RowCells)| row.iter().map(mirror_cell_text).collect())
-                    .collect();
                 // A block opened by `COPY` keeps the reference's import-time
                 // bitmap coverage (see `ColumnBody::build_with`).
                 let bitmap_bits = self.block_bitmap_bits(&table, slot_base, chunk.len());
-                let block_columns = self.encode_block_columns(
+                // No row-major `texts` copy: the encoder walks the cells column
+                // by column, so a block's whole row set stays as the block
+                // already decoded it. The copy was 130 MB for one 8192-row block
+                // of 2048-dim vectors, held next to the decode and the packed
+                // columns at the peak of every checkpoint.
+                let block_columns = self.encode_block_columns_rows(
                     &encode_meta.types,
                     &encode_meta.ids,
                     &types,
                     &layouts,
-                    &texts,
+                    &chunk,
                     bitmap_bits,
                 )?;
                 let batches =
@@ -916,7 +967,17 @@ impl Engine {
                     let mut block_filters =
                         crate::fast_rough_filter::Filters::new(&encode_meta.types);
                     for (_, cells) in &chunk {
-                        block_filters.add_row(cells);
+                        // A filter is built once per sealed block, so a row that
+                        // is still stored text can pay the parse here rather than
+                        // hold a second copy of the block at every checkpoint.
+                        match cells {
+                            RowCells::Borrowed(values) => block_filters.add_row(values.as_slice()),
+                            RowCells::OwnedStored(values) => {
+                                let parsed: Vec<Value> =
+                                    values.iter().map(|cell| parse_value(cell)).collect();
+                                block_filters.add_row(&parsed)
+                            }
+                        }
                     }
                     // `segment_meta->begin_ts()` is the creating transaction's
                     // begin ts, one below its commit ts - the same for every
@@ -1127,6 +1188,55 @@ impl Engine {
         chunk: &[Vec<String>],
         bitmap_bits: Option<usize>,
     ) -> Result<Vec<BlockColumn>> {
+        self.encode_block_columns_with(
+            declared,
+            column_ids,
+            types,
+            layouts,
+            chunk.len(),
+            bitmap_bits,
+            chunk,
+        )
+    }
+
+    /// [`Self::encode_block_columns`] for rows that are not all text yet.
+    ///
+    /// The mirror's rows are either the block's own stored text or `Value`s
+    /// from the journal; the encoder asks for one cell at a time, so neither
+    /// shape has to be flattened into `Vec<Vec<String>>` first.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn encode_block_columns_rows(
+        &self,
+        declared: &[String],
+        column_ids: &[u64],
+        types: &[i32],
+        layouts: &[ColumnLayout],
+        chunk: &[(usize, RowCells<'_>)],
+        bitmap_bits: Option<usize>,
+    ) -> Result<Vec<BlockColumn>> {
+        self.encode_block_columns_with(
+            declared,
+            column_ids,
+            types,
+            layouts,
+            chunk.len(),
+            bitmap_bits,
+            chunk,
+        )
+    }
+
+    /// The one column-at-a-time encoder both entry points above share.
+    #[allow(clippy::too_many_arguments)]
+    fn encode_block_columns_with<S: CellSource>(
+        &self,
+        declared: &[String],
+        column_ids: &[u64],
+        types: &[i32],
+        layouts: &[ColumnLayout],
+        row_count: usize,
+        bitmap_bits: Option<usize>,
+        rows: S,
+    ) -> Result<Vec<BlockColumn>> {
         let mut block_columns = Vec::with_capacity(types.len());
         for (col, column_type) in types.iter().enumerate() {
             let kind = outline_kind(&declared[col]);
@@ -1134,12 +1244,13 @@ impl Engine {
             // upper-cases the type string, so the per-cell call allocated
             // 16.7 M `String`s on an 8 M-row `COPY`.
             let shape = embedding_shape(&declared[col]);
-            let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
+            let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(row_count);
             // Self-outlining columns build their own outline; the generic
             // packer produces one for varchar/json.
             let mut self_outline = Vec::new();
-            for row in chunk {
-                let text = row.get(col).map(String::as_str).unwrap_or("");
+            for row in 0..row_count {
+                let text = rows.cell(row, col);
+                let text = text.as_ref();
                 match kind {
                     OutlineKind::Tensor => {
                         slots.push(encode_tensor_slot(&declared[col], text, &mut self_outline)?)
@@ -4374,17 +4485,12 @@ impl Engine {
         // decoding that follows is not (plan 6.13.2).
         let mut candidates: Vec<(usize, BlockId)> = Vec::new();
         for (at, id) in blocks.into_iter().enumerate() {
-            let BlockId {
-                segment_id,
-                block_id: block_index,
-                ..
-            } = id;
             if !resolved.is_empty() {
                 // Skip a block the prefilter rules out without reading a single
                 // column file.
                 let key = format!(
                     "blk|{}|{}|{}|{}|fast_rough_filter",
-                    db_id, meta.id, segment_id, block_index
+                    db_id, meta.id, id.segment_id, id.block_id
                 );
                 if let Ok(Some(record)) = self.storage.catalog.store().get(key.as_bytes()) {
                     if let Some(filters) = crate::fast_rough_filter::Filters::decode(&record) {
