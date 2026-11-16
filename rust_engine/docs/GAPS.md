@@ -205,6 +205,6 @@ SDK driver（20,000 行，未 checkpoint，8 次最好值）：参考 insert 0.2
 
 仍然慢的原因（详见 `SELECT_CHAIN.md` §6）：
 
-1. **扫描与算子边界仍在按行取用**：块解码已经写进类型化列缓冲（`columnar::ColumnData`：`Int32`/`Int64`/`Float64`/`Bool`/`Utf8{offsets,data}` + 位图），纯投影与 thrift 打包全程不碰 `Value`；但表达式求值（`filter`/`sort`/`aggregate`/`project` 的表达式列）仍按行把 cell 物化成 `Value` 再算，perf 里的 malloc/free 主要来自这里。
+1. **扫描与算子边界仍在按行取用**：块解码已经写进类型化列缓冲（`columnar::ColumnData`：`Int32`/`Int64`/`Float64`/`Bool`/`Utf8{offsets,data}` + 位图），纯投影与 thrift 打包全程不碰 `Value`；`WHERE` 的谓词已按列求值（`columnar_filter::predicate_mask` + `ColumnData::cmp_mask`/`bool_mask`/`null_mask`：六个比较、`AND`/`OR`/`NOT`、`IS [NOT] NULL`、布尔列，三值掩码；`LIKE`/`IN`/函数/两列比较仍回落逐行），`ORDER BY` 的普通列键也已按列（`columnar_order::sort_key` 零拷贝借用缓冲，表达式键才逐行），见 `SELECT_CHAIN.md` §6。但**`GROUP BY` 键、聚合参数、投影里的表达式列**仍按行把 cell 物化成 `Value` 再算，perf 里的 malloc/free 主要来自这里。
 2. **文本型列必须解析**：varchar/json/date 只有文本形态；`SELECT id, name` 的解码 7.9 ms 里约 5.7 ms 是 varchar 这一列（现在是往 `Utf8Column` 的 `data`/`offsets` 里直接写，不再逐 cell 分配 `String`）。
-3. 继续往下要**按列求值**：把 `Expr::eval(&[Value])` 换成按列向量化的求值，这一步不动结果模型（结果已经是 `DataBlock`），只动表达式层。
+3. 继续往下要**把剩下的表达式点按列化**：`filter` 谓词与 `ORDER BY` 普通列键这两刀已经落地（`columnar_filter`、`columnar_order`，见 `SELECT_CHAIN.md` §6 的前后对比），剩下三个点位在逐行——`GROUP BY` 键与聚合参数（`operator/aggregate.rs`）、投影里的表达式列（`operator/project.rs`）、以及算子链 `operator/filter.rs`（`DataChunk` 仍是行式；`tests_ut.rs` 里 `ORDER BY ... LIMIT` 走的就是这条 `PhysicalSort`/`compare_rows` 路径，键仍按 `Value` 比较）。这一步不动结果模型（结果已经是 `DataBlock`），只动表达式层。

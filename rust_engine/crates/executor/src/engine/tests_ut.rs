@@ -1684,6 +1684,61 @@ mod tests {
         );
         assert_eq!(batch("SELECT id FROM si WHERE id > 10;").row_count, 19989);
     }
+
+    /// `ORDER BY` on the columnar batch path sorts by the borrowed column
+    /// buffers (`columnar_order`) rather than by a row-at-a-time key. Keys are
+    /// unique here on purpose: ties (and NULLs, which tie with everything) are
+    /// covered by `columnar_order`'s own equivalence test, and what this test
+    /// guards is the wiring - the right column, the right direction, and
+    /// `LIMIT`/`OFFSET` applied *after* the permutation.
+    #[test]
+    fn the_columnar_select_orders_by_a_column() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ob (id INT, name VARCHAR);")
+            .unwrap();
+        // Inserted out of order, so a path that forgot to sort would be caught.
+        let values: Vec<String> = (0..300)
+            .map(|i| {
+                let id = (i * 7919) % 300;
+                format!("({id}, 'n-{id:03}')")
+            })
+            .collect();
+        e.execute_blocking(&format!("INSERT INTO ob VALUES {};", values.join(", ")))
+            .unwrap();
+        let batch = |sql: &str| {
+            e.select_columns(sql)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{sql} did not take the columnar path"))
+        };
+        let ids = |sql: &str| -> Vec<i64> {
+            batch(sql)
+                .rows()
+                .iter()
+                .map(|row| match row[0] {
+                    expression::Value::Int(v) => v,
+                    ref other => panic!("{sql}: expected an integer id, got {other:?}"),
+                })
+                .collect()
+        };
+        let ascending: Vec<i64> = (0..300).collect();
+        let descending: Vec<i64> = (0..300).rev().collect();
+        assert_eq!(ids("SELECT id FROM ob ORDER BY id;"), ascending);
+        assert_eq!(ids("SELECT id FROM ob ORDER BY id DESC;"), descending);
+        // The varchar key orders by bytes, and `n-010` < `n-100`.
+        assert_eq!(ids("SELECT id FROM ob ORDER BY name;"), ascending);
+        assert_eq!(ids("SELECT id FROM ob ORDER BY name DESC;"), descending);
+        // Sort first, then the window: `LIMIT` must not pick the first rows of
+        // the *unsorted* buffer.
+        assert_eq!(
+            ids("SELECT id FROM ob ORDER BY id LIMIT 5 OFFSET 10;"),
+            (10..15).collect::<Vec<i64>>()
+        );
+        assert_eq!(
+            ids("SELECT id FROM ob WHERE id > 100 ORDER BY id DESC LIMIT 3;"),
+            vec![299, 298, 297]
+        );
+    }
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
         for r in e.execute_blocking(sql).unwrap() {
             if let QueryResult::Rows { .. } = r {

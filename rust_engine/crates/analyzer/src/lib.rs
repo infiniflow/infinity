@@ -10,6 +10,8 @@
 //! come from the resource root handed to each `load` (the reference's
 //! `/usr/share/infinity/resource`).
 
+#![forbid(unsafe_code)]
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};

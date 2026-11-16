@@ -47,10 +47,13 @@ mod cleanup_rollback_txn_ut;
 #[cfg(test)]
 mod cleanup_ut;
 pub mod columnar;
+mod columnar_filter;
+mod columnar_order;
 #[cfg(test)]
 mod compact_replay_ut;
 #[cfg(test)]
 mod conflict_check_ut;
+pub mod panic_guard;
 pub use blocks as cpp_blocks;
 pub mod data_table;
 mod deferred_catalog;

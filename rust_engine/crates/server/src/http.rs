@@ -3341,7 +3341,20 @@ async fn handle_async(
     }
     let body = String::from_utf8_lossy(&buf[header_end..]).to_string();
 
-    let (status, resp_body) = route(&engine, &peer, &method, &path, &body).await;
+    // The per-request panic boundary: a panic in any route answers as a 500
+    // envelope for this request, so the connection loop and the process keep
+    // serving. Restarting after a panic is the deployment's decision.
+    let (status, resp_body) = match executor::panic_guard::guard_async(route(
+        &engine, &peer, &method, &path, &body,
+    ))
+    .await
+    {
+        Ok(out) => out,
+        Err(payload) => {
+            let e = executor::panic_guard::to_error(payload);
+            err_response(e.status_code(), &e.to_string())
+        }
+    };
     let reason = if status == 200 { "OK" } else { "Error" };
     let response = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -3407,6 +3420,30 @@ mod tests {
             executor::block_on(route(&engine, &peer, "GET", "/nope", "")).0,
             404
         );
+    }
+
+    /// A panicking statement answers as an error envelope for that request, and
+    /// the next request on the same engine still succeeds (`/query` is the only
+    /// route that runs caller-supplied SQL text).
+    #[test]
+    fn a_panicking_query_answers_and_the_front_end_keeps_serving() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        let peer = leader();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
+        let body = "{\"sql\":\"SELECT * FROM t;\"}";
+
+        executor::panic_guard::arm_injected_panic();
+        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/query", body));
+        assert_eq!(s, 500, "{b}");
+        assert!(b.contains("injected panic"), "{b}");
+
+        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/query", body));
+        assert_eq!(s, 200, "{b}");
+        assert!(b.contains("\"rows\""), "{b}");
     }
 
     /// `/configs` (`ShowConfigsHandler`, `ShowConfigHandler`,

@@ -11,6 +11,20 @@
 //! CLI, the `.slt` runner, the HTTP and postgres writers).
 
 use expression::Value;
+use parser::CmpOp;
+
+/// Whether an [`std::cmp::Ordering`] satisfies `op` (the `Cmp` truth table).
+fn order_matches(ord: std::cmp::Ordering, op: CmpOp) -> bool {
+    use std::cmp::Ordering;
+    match op {
+        CmpOp::Eq => ord == Ordering::Equal,
+        CmpOp::Ne => ord != Ordering::Equal,
+        CmpOp::Lt => ord == Ordering::Less,
+        CmpOp::Le => ord != Ordering::Greater,
+        CmpOp::Gt => ord == Ordering::Greater,
+        CmpOp::Ge => ord != Ordering::Less,
+    }
+}
 
 /// A validity bitmap: one bit per row, set means the cell is present.
 ///
@@ -688,10 +702,112 @@ impl ColumnData {
 
     /// The rows whose value equals `value` (a NULL never matches).
     pub fn equality_mask(&self, value: &Value) -> Vec<bool> {
-        let eq = |v: &Value| v.partial_cmp_value(value) == Some(std::cmp::Ordering::Equal);
-        (0..self.len())
-            .map(|i| self.valid().get(i) && eq(&self.value_at(i)))
-            .collect()
+        match self.cmp_mask(CmpOp::Eq, value) {
+            Some(mask) => mask.into_iter().map(|k| k == Some(true)).collect(),
+            // A pairing `cmp_mask` does not evaluate: the row path decides.
+            None => (0..self.len())
+                .map(|i| {
+                    self.valid().get(i)
+                        && self.value_at(i).partial_cmp_value(value)
+                            == Some(std::cmp::Ordering::Equal)
+                })
+                .collect(),
+        }
+    }
+
+    /// `col <op> value` over the whole column, three-valued.
+    ///
+    /// `None` (for the mask as a whole) means this pairing is not evaluated
+    /// here; the caller falls back to `Expr::eval`, which is why coverage can
+    /// grow without any call site changing. An invalid cell is `None` (unknown),
+    /// never `false`, so `NOT (c = 1)` keeps the row out exactly like the row
+    /// path does.
+    ///
+    /// The comparison is `Value::partial_cmp_value`'s, quirks included: numbers
+    /// compare as `f64` (two `i64`s past 2^53 that round to the same float are
+    /// equal), and a numeric column against a numeric *string* parses the
+    /// string. Being bit-compatible with the row path is the point - a "more
+    /// exact" `i64` compare would answer differently from every existing test.
+    pub fn cmp_mask(&self, op: CmpOp, value: &Value) -> Option<Vec<Option<bool>>> {
+        // Any comparison against NULL is unknown, whatever the column holds.
+        if matches!(value, Value::Null) {
+            return Some(vec![None; self.len()]);
+        }
+        let literal_number = match value {
+            Value::Int(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            Value::Str(s) => s.trim().parse::<f64>().ok(),
+            _ => None,
+        };
+        let mask = |valid: &Bitmap, len: usize, decide: &dyn Fn(usize) -> Option<bool>| {
+            (0..len)
+                .map(|i| if valid.get(i) { decide(i) } else { None })
+                .collect::<Vec<Option<bool>>>()
+        };
+        match self {
+            ColumnData::Int32 { values, valid } => {
+                let rhs = literal_number?;
+                Some(mask(valid, values.len(), &|i| {
+                    f64::from(values[i])
+                        .partial_cmp(&rhs)
+                        .map(|o| order_matches(o, op))
+                }))
+            }
+            ColumnData::Int64 { values, valid } => {
+                let rhs = literal_number?;
+                Some(mask(valid, values.len(), &|i| {
+                    (values[i] as f64)
+                        .partial_cmp(&rhs)
+                        .map(|o| order_matches(o, op))
+                }))
+            }
+            ColumnData::Float64 { values, valid } => {
+                let rhs = literal_number?;
+                Some(mask(valid, values.len(), &|i| {
+                    values[i].partial_cmp(&rhs).map(|o| order_matches(o, op)) // NaN stays unknown
+                }))
+            }
+            ColumnData::Bool { values, valid } => {
+                let Value::Bool(rhs) = value else {
+                    return None;
+                };
+                Some(mask(valid, values.len(), &|i| {
+                    Some(order_matches(values[i].cmp(rhs), op))
+                }))
+            }
+            ColumnData::Utf8 { text, valid } => {
+                // Text vs a number parses each *cell* in the row path, so it is
+                // left to the fallback; text vs `true`/`false` compares the
+                // rendering, as `partial_cmp_value` does.
+                let rhs = match value {
+                    Value::Str(s) => std::borrow::Cow::Borrowed(s.as_str()),
+                    Value::Bool(b) => std::borrow::Cow::Owned(b.to_string()),
+                    _ => return None,
+                };
+                Some(mask(valid, text.len(), &|i| {
+                    Some(order_matches(text.get(i).cmp(rhs.as_ref()), op))
+                }))
+            }
+            // No type yet: nothing to compare against (the first push decides).
+            ColumnData::Empty { .. } => None,
+        }
+    }
+
+    /// The column read as a predicate: `Bool` cells only, invalid = unknown.
+    pub fn bool_mask(&self) -> Option<Vec<Option<bool>>> {
+        match self {
+            ColumnData::Bool { values, valid } => Some(
+                (0..values.len())
+                    .map(|i| valid.get(i).then(|| values[i]))
+                    .collect(),
+            ),
+            _ => None,
+        }
+    }
+
+    /// `IS NULL` per row.
+    pub fn null_mask(&self) -> Vec<bool> {
+        (0..self.len()).map(|i| !self.valid().get(i)).collect()
     }
 
     /// Keeps the cells in `keep` (a mask over the current rows), compacting the

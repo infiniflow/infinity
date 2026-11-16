@@ -475,7 +475,11 @@ impl Engine {
     }
 
     pub async fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
-        self.execute_parsed(parse(sql)?, sql).await
+        // The parse is part of the request: a panic in the lexer must answer
+        // with an error too, not unwind the caller's task.
+        let parsed = crate::panic_guard::guard(|| parse(sql))
+            .unwrap_or_else(|payload| Err(crate::panic_guard::to_error(payload)))?;
+        self.execute_parsed(parsed, sql).await
     }
 
     /// Runs statements the caller has **already parsed**.
@@ -493,6 +497,22 @@ impl Engine {
         stmts: Vec<Statement>,
         text: &str,
     ) -> Result<Vec<QueryResult>> {
+        // The single choke point every front end goes through (SQL text or an
+        // AST): a panic in the statement chain becomes this request's error
+        // here, so a front end only ever sees `Err`. Whether the instance should
+        // be restarted afterwards is the deployment's call, not the engine's.
+        crate::panic_guard::guard_async(self.execute_statements(stmts, text))
+            .await
+            .unwrap_or_else(|payload| Err(crate::panic_guard::to_error(payload)))
+    }
+
+    /// [`Self::execute_parsed`] without the panic boundary.
+    async fn execute_statements(
+        &self,
+        stmts: Vec<Statement>,
+        text: &str,
+    ) -> Result<Vec<QueryResult>> {
+        crate::panic_guard::inject_statement_panic();
         let mut out = Vec::new();
         for s in stmts {
             // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
@@ -841,22 +861,14 @@ impl Engine {
         };
 
         if let Some(pred) = &predicate {
-            // `col = constant` is answered straight off the column.
-            let mut mask: Option<Vec<bool>> = None;
-            if let Expr::Cmp(a, parser::CmpOp::Eq, b) = pred {
-                let (col, value) = match (&**a, &**b) {
-                    (Expr::Column(i), Expr::Literal(v)) => (Some(*i), Some(v)),
-                    (Expr::Literal(v), Expr::Column(i)) => (Some(*i), Some(v)),
-                    _ => (None, None),
-                };
-                if let (Some(pos), Some(value)) = (col, value) {
-                    if let Some(c) = needed.iter().position(|p| *p == pos) {
-                        mask = Some(batch.data[c].equality_mask(value));
-                    }
-                }
-            }
-            let mask = match mask {
-                Some(mask) => mask,
+            // Column-at-a-time first: `col <op> constant`, `AND`/`OR`/`NOT`,
+            // `IS [NOT] NULL` and a boolean column are answered straight off the
+            // decoded buffers (`crate::columnar_filter`). Everything else - LIKE,
+            // `IN`, functions, a comparison of two columns - stays on the row
+            // path, which is where `eval_predicate` is defined.
+            let column_of = |pos: usize| needed.iter().position(|p| *p == pos);
+            let mask = match crate::columnar_filter::predicate_mask(pred, &batch, &column_of) {
+                Some(mask) => crate::columnar_filter::matches(&mask),
                 None => {
                     let mut mask = Vec::with_capacity(batch.row_count);
                     for r in 0..batch.row_count {
@@ -873,25 +885,52 @@ impl Engine {
 
         if !keys.is_empty() && batch.row_count > 1 {
             let mut order: Vec<usize> = (0..batch.row_count).collect();
-            let mut sort_keys: Vec<Vec<Value>> = Vec::with_capacity(keys.len());
-            for (key, _) in &keys {
-                let mut column = Vec::with_capacity(batch.row_count);
-                for r in 0..batch.row_count {
-                    fill_row(&mut scratch, &batch, r);
-                    column.push(key.eval(&scratch));
+            let column_of = |pos: usize| needed.iter().position(|p| *p == pos);
+            // A key that is a plain column is read straight off its decoded
+            // buffer (`crate::columnar_order`): no row materialisation, no
+            // `Value` clone, and varchar keys are borrowed rather than copied per
+            // row. An expression key (`ORDER BY a + b`) keeps the row path.
+            let sort_keys: Option<Vec<crate::columnar_order::SortKey>> = keys
+                .iter()
+                .map(|(key, _)| crate::columnar_order::sort_key(key, &batch, &column_of))
+                .collect();
+            match sort_keys {
+                Some(sort_keys) => {
+                    order.sort_by(|a, b| {
+                        for (k, (_, asc)) in keys.iter().enumerate() {
+                            let Some(ord) = sort_keys[k].compare(*a, *b) else {
+                                continue;
+                            };
+                            if ord != std::cmp::Ordering::Equal {
+                                return if *asc { ord } else { ord.reverse() };
+                            }
+                        }
+                        a.cmp(b)
+                    });
                 }
-                sort_keys.push(column);
-            }
-            order.sort_by(|a, b| {
-                for (k, (_, asc)) in keys.iter().enumerate() {
-                    let ord = sort_keys[k][*a].partial_cmp_value(&sort_keys[k][*b]);
-                    let Some(ord) = ord else { continue };
-                    if ord != std::cmp::Ordering::Equal {
-                        return if *asc { ord } else { ord.reverse() };
+                None => {
+                    let mut values: Vec<Vec<Value>> = Vec::with_capacity(keys.len());
+                    for (key, _) in &keys {
+                        let mut column = Vec::with_capacity(batch.row_count);
+                        for r in 0..batch.row_count {
+                            fill_row(&mut scratch, &batch, r);
+                            column.push(key.eval(&scratch));
+                        }
+                        values.push(column);
                     }
+                    order.sort_by(|a, b| {
+                        for (k, (_, asc)) in keys.iter().enumerate() {
+                            let Some(ord) = values[k][*a].partial_cmp_value(&values[k][*b]) else {
+                                continue;
+                            };
+                            if ord != std::cmp::Ordering::Equal {
+                                return if *asc { ord } else { ord.reverse() };
+                            }
+                        }
+                        a.cmp(b)
+                    });
                 }
-                a.cmp(b)
-            });
+            }
             batch.permute(&order);
         }
 

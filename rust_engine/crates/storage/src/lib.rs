@@ -8,11 +8,12 @@
 //! Invariants preserved from C++ (see plan 附录 A): the substrates are separate;
 //! MVCC is timestamp-array based (not KV snapshots); WAL writes are serialized.
 
-// `#![deny(unsafe_code)]` with per-site `#[allow(unsafe_code)]`: the only
-// `unsafe` here is `mmap` (mapping an index segment is far cheaper than reading
-// it into the heap - see PORTING.md §2.8) and two narrow FFI calls
-// (`malloc_trim`, `posix_fadvise`) that keep RSS and the page cache bounded
-// during large imports. Every site documents why no safe API can express it.
+// `#![deny(unsafe_code)]` with per-site `#[allow(unsafe_code)]`: the `unsafe`
+// here is `mmap` (mapping a segment is far cheaper than reading it into the heap
+// - see PORTING.md §2.8) plus three narrow FFI entry points (`mi_collect`,
+// `malloc_trim`, `posix_fadvise`) that keep RSS and the page cache bounded
+// during large imports. Every call site carries a SAFETY note saying why no safe
+// API can express it.
 #![deny(unsafe_code)]
 // The workspace pins a nightly toolchain (see `rust-toolchain.toml`) because
 // `std::simd` is still unstable: the posting decoder unpacks fastpfor's four

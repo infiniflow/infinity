@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+# `panic_guard::arm_injected_panic` — makes the next statement panic so the front
+# ends' panic boundaries (thrift / HTTP / PG) can be exercised end to end.
+# Never enabled in a shipped build.
+testing = []
+
 [dependencies]
 rust-stemmers.workspace = true
 common.workspace = true

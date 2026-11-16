@@ -58,8 +58,8 @@
 
 1. **结果是列式类型化块**：`QueryResult::Rows` 载 `columnar::Batch`（每列一条类型化缓冲 + null 位图），协议层按列打包 `ColumnField`；`Value` 行只在 CLI / `.slt` / HTTP / postgres 出口（`rows_text()`）和算子边界出现。
 2. **投影（含 `*`、标量表达式）走列式缓冲**：`Engine::select_columns` 把单表 `SELECT` 绑到表的列上——列名、`*`、`SelectItem::Expr`（`QueryBinder::bind_expression`）——由 `read_columns_batch` 按**列**解码进 `ColumnData`（`Int`/`Float`/`Bool`/`Text`）+ 每列有效位图；表达式列在逐行求值后按**全部取值**定类型（整型/浮点/文本混合不会截断）。
-3. **`WHERE` 在列缓冲上求值**：谓词按 `predicate_expr` 绑定，用一个复用的行缓冲逐行求值（`col = 常量` 直接按列 `equality_mask`，不建行），只保留命中的行；块 `version` 里没有的删除按 tombstone 过滤。
-4. **`ORDER BY` / `LIMIT` / `OFFSET` 也在列上**：排序键逐行求值后做置换，`LIMIT`/`OFFSET` 是切片；文本列 `ColumnData::Text` 是一段字节 + 偏移（`TextColumn { data, ends }`），不是每 cell 一个 `String`。
+3. **`WHERE` 在列缓冲上求值**：谓词按 `predicate_expr` 绑定，`columnar_filter::predicate_mask` 直接在 `ColumnData` 上出**三值掩码**（`col <op> 常量` 六个比较、`AND`/`OR`/`NOT`、`IS [NOT] NULL`、布尔列本身当谓词），`matches` 投影成保留位；`NULL` 是"未知"而不是 `false`，所以 `NOT (c > 4)` 对 `c IS NULL` 的行仍然不命中。`LIKE`/`IN`/函数/两列比较等形状返回 `None`，回落到复用行缓冲的 `eval_predicate`。块 `version` 里没有的删除按 tombstone 过滤。
+4. **`ORDER BY` / `LIMIT` / `OFFSET` 也在列上**：排序键若是普通列，`columnar_order::sort_key` 直接**借用**该列缓冲（`i32` 按 `i32` 比、`i64` 按 `f64` 比、文本按字节比，都不建键向量、不 clone `Value`），排完只置换列缓冲；`ORDER BY a + b` 这类表达式键才回落到逐行求值。`LIMIT`/`OFFSET` 是切片；文本列 `ColumnData::Text` 是一段字节 + 偏移（`TextColumn { data, ends }`），不是每 cell 一个 `String`。
 
 仍是行式路径的：连接、聚合 / `GROUP BY`、`DISTINCT`、CTE、`SEARCH MATCH`、客户端要 `total_hits` 的查询，以及列类型是 embedding / tensor / tensorarray / sparse / array / multivector 的表（这些编码各有自己的 wire 形式；列式路径只认标量与文本类型，白名单之外一律回落）。
 
@@ -72,6 +72,37 @@
 | `SELECT id, name` | 15.52–17.70 ms | 17.06–17.50 ms |
 
 同机、两台引擎背靠背各跑一轮；机器上有 IDE/浏览器，绝对值 ±20%，看同一轮内的比值。三条查询在最近的几轮里都已经与参考同量级（`SELECT id` 与点查多数轮次更快）。
+
+**按列谓词（`columnar_filter`）前后对比**：同一台机、同一份 40,000 行 `bench_t(id INT, name VARCHAR)`、同一个流程（新数据目录 → `tools/bench_sdk_driver.py` 插入 40,000 行 → 每个用例取 7 次最好值），只换二进制。改造前的数字来自 `equality_mask` + 逐行 `eval_predicate`，改造后来自 `predicate_mask`：
+
+| 谓词（`output(['id'])`） | 改造前 | 改造后 |
+|---|---|---|
+| `id = 39999`（Gate E 第三段） | 3.19 ms | **1.68 ms** |
+| `id = 39999`（本机复测） | 1.148 ms | 1.167 ms |
+| `id > 10` | 2.642 ms | 2.405 ms |
+| `id >= 10 AND id <= 20` | 2.437 ms | **1.424 ms** |
+| `id > 10 AND name > 'row-1'` | 6.218 ms | **3.709 ms** |
+| `id > 10 OR id < 5` | 3.524 ms | 2.601 ms |
+| `NOT id = 7` | 2.754 ms | 2.070 ms |
+| `name = 'row-5'` | 2.589 ms | 2.396 ms |
+| `output(['id','name'])` + `id > 10` | 31.399 ms | 31.783 ms |
+
+单字段的点查已经落在 SDK 往返的地板价（±20% 内看不出差别），收益在**组合谓词**上（-25% … -45%）：省掉的是逐行 `fill_row` 把整行 cell 物化成 `Value`、以及 `NOT`/`AND` 反复走行式三值逻辑。`output(['id','name'])` 那条被 40,000 行 varchar 投影支配，谓词不是瓶颈。
+
+注意：重启（`kill -9` 后重开）会把数据从 WAL 重放成内存索引，同一批查询在那份数据上要 7–9 ms —— 这不是回归，比对时必须用同一个流程造数据。
+
+**`ORDER BY` 键（`columnar_order`）前后对比**：同一套流程（新目录 → 插入 40,000 行 `bench_t(id INT, name VARCHAR)` → best-of-7），走 thrift `Select`（即 `select_columns`），HTTP/CLI 的算子模型不受影响：
+
+| 查询（`output(['id'])`） | 改造前 | 改造后 |
+|---|---|---|
+| `ORDER BY id` | 2.54 ms | 2.14 ms |
+| `ORDER BY id DESC` | 2.52 ms | 2.25 ms |
+| `ORDER BY name` | 5.60 ms | 4.93 ms |
+| `ORDER BY id, name DESC` | 5.85 ms | **3.21 ms**（-45%） |
+| `WHERE id > 100 ORDER BY id` | 2.84 ms | 2.27 ms |
+| `ORDER BY id LIMIT 10` | 1.54 ms | **1.03 ms**（-33%） |
+
+省掉的是两件事：每个键一整遍 `fill_row`（`ORDER BY c1, c2` 就是 2×行数 的整行物化）和 varchar 键每行的 `String` clone；键现在是**借用**列缓冲的零拷贝视图（`i32` 按 `i32`、`i64` 按 `f64`、文本按字节），排完只做一次 `permute`。单键的百分比小，是因为 4 万行的 thrift 打包本身就占了 1–2 ms。
 
 ## 7 写路径（参考 vs 端口）
 

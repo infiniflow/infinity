@@ -124,50 +124,60 @@ impl Service {
             // exempt). Without this check a client that kept a stale id after
             // `Disconnect` kept working, because `ListDatabase` and friends
             // ignored the id they were handed.
-            let out = match engine.as_ref() {
-                Some(eng) if sid != 0 => {
-                    if !matches!(name, "Connect" | "Disconnect")
-                        && !sessions.read().unwrap().contains_key(&sid)
-                    {
-                        Ok(ArmResponse::Common(crate::CommonResponse {
-                            error_code: 3034, // kSessionNotFound
-                            error_msg: format!("Session id: {sid} isn't found"),
-                            session_id: sid,
-                        }))
-                    } else {
-                        // The session scope must wrap the **awaited** statement:
-                        // the chain suspends on the WAL, the allocator, the
-                        // bottom half and the CPU pool, and a task-local scope
-                        // keeps the binding across those suspensions (a
-                        // thread-local would not).
-                        eng.with_session_async(
-                            sid,
-                            dispatch_arm(
-                                name,
-                                &buf,
-                                engine.clone(),
-                                &sessions,
-                                &next_session,
-                                &peer,
+            // The per-request panic boundary: a panic anywhere in the arm (the
+            // session table's lock, the statement chain, the reply assembly)
+            // answers as this RPC's error instead of unwinding the handler task
+            // and dropping the client's connection. The process keeps serving;
+            // whether the instance should be restarted after a panic is the
+            // deployment's decision (`Restart=always`, container policy).
+            let out = executor::panic_guard::guard_async(async {
+                match engine.as_ref() {
+                    Some(eng) if sid != 0 => {
+                        if !matches!(name, "Connect" | "Disconnect")
+                            && !sessions.read().unwrap().contains_key(&sid)
+                        {
+                            Ok(ArmResponse::Common(crate::CommonResponse {
+                                error_code: 3034, // kSessionNotFound
+                                error_msg: format!("Session id: {sid} isn't found"),
+                                session_id: sid,
+                            }))
+                        } else {
+                            // The session scope must wrap the **awaited**
+                            // statement: the chain suspends on the WAL, the
+                            // allocator, the bottom half and the CPU pool, and a
+                            // task-local scope keeps the binding across those
+                            // suspensions (a thread-local would not).
+                            eng.with_session_async(
                                 sid,
-                            ),
+                                dispatch_arm(
+                                    name,
+                                    &buf,
+                                    engine.clone(),
+                                    &sessions,
+                                    &next_session,
+                                    &peer,
+                                    sid,
+                                ),
+                            )
+                            .await
+                        }
+                    }
+                    _ => {
+                        dispatch_arm(
+                            name,
+                            &buf,
+                            engine.clone(),
+                            &sessions,
+                            &next_session,
+                            &peer,
+                            0,
                         )
                         .await
                     }
                 }
-                _ => {
-                    dispatch_arm(
-                        name,
-                        &buf,
-                        engine.clone(),
-                        &sessions,
-                        &next_session,
-                        &peer,
-                        0,
-                    )
-                    .await
-                }
-            };
+            })
+            .await
+            .unwrap_or_else(|payload| Err(executor::panic_guard::to_error(payload)));
             if let Some(eng) = engine.as_ref() {
                 eng.end_statement();
             }
@@ -1147,5 +1157,55 @@ impl vg::InfinityService for Service {
             as_show_config,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The boundary [`Service::run`] wraps every RPC in: a panicking request
+    /// comes back as a value, not as an unwind that kills the handler task and
+    /// drops the client's connection.
+    #[test]
+    fn a_panicking_request_becomes_an_error_value() {
+        let out = executor::block_on(executor::panic_guard::guard_async::<(), _>(async {
+            if std::hint::black_box(true) {
+                panic!("boom in a request");
+            }
+        }));
+        let payload = out.expect_err("a panic must not unwind the handler task");
+        let message = executor::panic_guard::message(payload.as_ref());
+        assert!(message.contains("boom in a request"), "{message}");
+    }
+
+    /// A statement that panics deep in the engine answers with an error, and the
+    /// same instance keeps serving the next statement: the reply changes, the
+    /// process does not. (Whether it should be restarted afterwards is the
+    /// deployment's decision, so nothing here exits.)
+    #[test]
+    fn a_statement_panic_is_answered_and_the_engine_keeps_serving() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1);")
+            .unwrap();
+        assert!(engine.execute_blocking("SELECT * FROM t;").is_ok());
+
+        executor::panic_guard::arm_injected_panic();
+        let failed = executor::block_on(engine.execute("SELECT * FROM t;"))
+            .expect_err("a panicking statement must answer with an error");
+        assert!(failed.to_string().contains("injected panic"), "{failed}");
+
+        // The same engine, in the same process: reads still answer, writes still
+        // commit.
+        assert!(engine.execute_blocking("SELECT * FROM t;").is_ok());
+        assert!(engine.execute_blocking("INSERT INTO t VALUES (2);").is_ok());
+        assert_eq!(
+            engine.execute_blocking("SELECT * FROM t;").unwrap().len(),
+            1,
+            "one Select response"
+        );
     }
 }

@@ -657,7 +657,6 @@ pub struct EmvbReader {
 }
 
 impl EmvbReader {
-    #[allow(unsafe_code)]
     pub fn open(path: &Path) -> Result<Self, FormatError> {
         // The chunk store owns the bytes: a persistence profile may hold this
         // file only as an object part.

@@ -310,7 +310,6 @@ pub struct BmpReader {
 }
 
 impl BmpReader {
-    #[allow(unsafe_code)]
     pub fn open(path: &Path, width: IdxWidth) -> Result<Self, FormatError> {
         // The chunk store owns the bytes: a persistence profile may hold this
         // file only as an object part.

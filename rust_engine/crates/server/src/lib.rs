@@ -14,6 +14,8 @@
 //!
 //! The byte-level golden for `CommonResponse` is established in PoC D.
 
+#![deny(unsafe_code)]
+
 pub mod http;
 pub mod peer;
 pub mod pg;
@@ -21,7 +23,13 @@ pub mod ring_buffer;
 pub mod service;
 
 // The async service generated from `thrift/infinity.thrift` (plan §6.3.2).
-include!(concat!(env!("OUT_DIR"), "/volo_gen.rs"));
+// `volo`'s codec is the one place here that needs `unsafe`; the crate keeps
+// `deny` (not `forbid`) so this module alone can opt back in.
+#[allow(unsafe_code)]
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/volo_gen.rs"));
+}
+pub use generated::volo_gen;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};

@@ -553,6 +553,64 @@ jobs:
           tail -n 500 restart_test_infinity.log.* 2>/dev/null || true
           tail -n 200 /var/infinity/log/*.log 2>/dev/null || true
 
+  soak:
+    # Gate C, nightly: `kill -9` lands in the middle of a COPY on a table with
+    # more than one segment (8,388,609 rows), then the run proves that the rows
+    # the engine had already answered are still there, that the secondary index
+    # still answers them (a restart must index the memory tail on top of the
+    # published chunks, not drop it), and that the restart stays inside a
+    # wall-clock budget.
+    #
+    # What this adds over what is already there: `restart` restarts *on purpose*
+    # (shutdown then start) on a small dataset, and `slow`'s "Repeated kill -9
+    # cycles" is `test_insert.py --loop 3` - small table, and `continue-on-error`,
+    # so a crash regression there never reddened a night. This job kills the
+    # process *while it is writing*, on 8.4 M rows, and fails the night.
+    #
+    # Everything speaks `POST /query`, so the job needs neither the SDK nor
+    # pytest - just the binary, curl and python3.
+    #
+    # amd64 only: one round loads 8.4 M rows, and nothing here is
+    # architecture-specific enough to buy a second lane every night (arm64 still
+    # runs `restart` and `slow`).
+    name: soak (kill -9)
+    needs: build
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          name: bin-amd64
+          path: bin
+      - name: Prepare the resources and the data directory
+        # Same layout the `restart` lane installs: the analyzer dictionary lives
+        # in /usr/share/infinity/resource, and the engine still touches
+        # /var/infinity for its log directory.
+        run: |
+          sudo mkdir -p /usr/share/infinity/resource /var/infinity
+          sudo cp -r resource/. /usr/share/infinity/resource/
+          sudo chown -R "${USER}" /usr/share/infinity /var/infinity
+      - name: Kill -9 soak
+        env:
+          INFINITY_SERVER_BIN: ${{ github.workspace }}/bin/infinity
+        run: |
+          chmod +x "${INFINITY_SERVER_BIN}"
+          bash rust_engine/scripts/soak_kill9.sh --dir="${RUNNER_TEMP}/soak-kill9"
+      - name: Soak logs
+        if: always()
+        run: |
+          ls -la "${RUNNER_TEMP}/soak-kill9" 2>/dev/null || true
+          tail -n 40 "${RUNNER_TEMP}/soak-kill9"/server-*.log 2>/dev/null || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: soak-logs
+          path: ${{ runner.temp }}/soak-kill9/*.log
+
   parallel:
     # Gate D on a pull request: the concurrency suite drives a live server with
     # several clients at once. It used to run nightly inside `slow` with
