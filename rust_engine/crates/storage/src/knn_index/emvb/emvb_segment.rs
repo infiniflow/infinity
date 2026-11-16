@@ -136,14 +136,24 @@ fn train_residual_pq(
     dims: usize,
     subspace_num: usize,
     bits: u32,
-    residuals: &[Vec<f32>],
+    mut residuals: Vec<Vec<f32>>,
     rotation: &OpqRotation,
 ) -> ResidualPq {
     let subspace_num = subspace_num.max(1);
     let width = dims.div_ceil(subspace_num);
     let k = 1usize << bits.min(8);
-    // `OPQ::AddEmbeddings` / `OPQ::Train`: quantize `x·R`, not `x`.
-    let residuals: Vec<Vec<f32>> = residuals.iter().map(|r| rotation.rotate(r)).collect();
+    // `OPQ::AddEmbeddings` / `OPQ::Train`: quantize `x·R`, not `x`. Rotated in
+    // place through one scratch vector: collecting a rotated copy per residual
+    // doubled this phase's heap (a 64 MiB segment paid another 64 MiB here).
+    let mut scratch = vec![0.0f32; dims];
+    for r in &mut residuals {
+        if r.len() == dims {
+            rotation.rotate_into(r, &mut scratch);
+            r.copy_from_slice(&scratch);
+        } else {
+            *r = rotation.rotate(r);
+        }
+    }
     let mut centroids = Vec::with_capacity(subspace_num * k * width);
     let mut norms = Vec::with_capacity(subspace_num * k);
     // Sample so training stays bounded on large segments.
@@ -431,15 +441,17 @@ pub fn build_emvb_with(
     }
     // `EMVBIndex::Train` ends with `product_quantizer_->Train(residuals, n, 20)`,
     // i.e. `OPQ::Train` with 20 iterations.
-    let residual_refs: Vec<&[f32]> = residuals.iter().map(|v| v.as_slice()).collect();
-    let rotation = OpqRotation::train(
-        dims,
-        subspace_num,
-        1usize << subspace_bits.min(16),
-        &residual_refs,
-        20,
-    );
-    let pq = train_residual_pq(dims, subspace_num, subspace_bits, &residuals, &rotation);
+    let rotation = {
+        let residual_refs: Vec<&[f32]> = residuals.iter().map(|v| v.as_slice()).collect();
+        OpqRotation::train(
+            dims,
+            subspace_num,
+            1usize << subspace_bits.min(16),
+            &residual_refs,
+            20,
+        )
+    };
+    let pq = train_residual_pq(dims, subspace_num, subspace_bits, residuals, &rotation);
 
     // The codebook layout is `subspace_num * k * sub_dim`.
     let sub_dim = dims.div_ceil(pq.subspace_num);

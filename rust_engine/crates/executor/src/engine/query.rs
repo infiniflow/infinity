@@ -1828,6 +1828,7 @@ impl Engine {
                             from: Some(t),
                             join,
                             group_by,
+                            having,
                             order_by,
                             search,
                             ..
@@ -1845,6 +1846,7 @@ impl Engine {
                                     items,
                                     table: t,
                                     group_by,
+                                    having: having.as_deref(),
                                     order_by,
                                 },
                             ))
@@ -1854,6 +1856,7 @@ impl Engine {
                             from: Some(t),
                             join,
                             group_by,
+                            having,
                             order_by,
                             search,
                             ..
@@ -1867,6 +1870,7 @@ impl Engine {
                                     items,
                                     table: t,
                                     group_by,
+                                    having: having.as_deref(),
                                     order_by,
                                 },
                             ))

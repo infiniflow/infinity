@@ -20,16 +20,33 @@
 // (which would need `unsafe`) nor a bit-at-a-time scalar loop.
 #![feature(portable_simd)]
 
-/// Releases free heap pages back to the OS (glibc). A no-op on other targets.
+/// Releases free heap pages back to the OS, on every target.
 /// Long imports allocate per-batch buffers; without this the allocator retains
 /// them and RSS looks like a leak (Gate C).
 ///
-/// Only glibc's heap is trimmed: the shipping binary makes mimalloc the global
-/// allocator (`mimalloc::MiMalloc`), whose pages `malloc_trim` cannot see.
-/// mimalloc hands freed segments back to the OS on its own purge timer, so
-/// this call is simply a no-op there.
+/// The shipping binary makes mimalloc the global allocator
+/// (`mimalloc::MiMalloc` in `common`), whose pages `malloc_trim` cannot see and
+/// whose purge timer only runs for *segments*, not for the freed arenas a
+/// checkpoint or a memory-index dump leaves behind. On Linux glibc reclaims
+/// those when it feels enough pressure, which is why the gate's peak looked
+/// allocator-dependent; on macOS nothing ever asks, so RSS only ratcheted up.
+/// `mi_collect(true)` purges the free pages of the calling thread's heap and
+/// its arenas, which is mimalloc's own `mi_collect` entry point
+/// (mimalloc.h) - the same call its `free` path defers.
 #[allow(unsafe_code)]
 pub fn trim_allocator() {
+    // The workspace has exactly one allocator (`common`): mimalloc. Linking is
+    // per binary, and every binary that reaches this crate pulls `common` in,
+    // so the symbol resolves wherever this is called.
+    unsafe extern "C" {
+        fn mi_collect(force: bool);
+    }
+    // SAFETY: `mi_collect` only returns pages mimalloc already owns and has
+    // marked free; it cannot touch a live allocation.
+    unsafe {
+        mi_collect(true);
+    }
+    // Belt and braces for a build where mimalloc is not the global allocator.
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
         unsafe extern "C" {

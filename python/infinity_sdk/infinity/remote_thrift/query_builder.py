@@ -718,6 +718,11 @@ class InfinityThriftQueryBuilder(ABC):
             sort=self._sort,
             explain_type=explain_type,
         )
+        # The builder is owned by the table and reused by the next chained
+        # call, so `explain()` has to clear it like `to_result()` does -
+        # otherwise the next query on the same table inherits this one's
+        # `having`/`search`/... clauses.
+        self.reset()
         return self._table._explain_query(query)
 
     def _handle_fde_match_dense(

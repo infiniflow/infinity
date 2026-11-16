@@ -8437,6 +8437,14 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
                 }
                 ip.read_list_end().map_err(tw)?;
             }
+            // 5 highlight_list, 6 search_expr, 7 where_expr, 8 group_by_list,
+            // 9 having_expr, 10 limit_expr, 11 offset_expr, 12 sort_list,
+            // 13 explain_type - the same ids `SelectRequest` uses.
+            //
+            // Only a subset used to be read, so `explain()` of a `match_dense`
+            // query came back as a plain table scan (the SDK test
+            // `test_explain_with_match_dense` caught it) and `having` was
+            // dropped from an explained group-by.
             Some(5) if f.field_type == TType::List => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {

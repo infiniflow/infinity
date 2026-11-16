@@ -5883,6 +5883,9 @@ mod tests {
 
     /// ColBERTSaR mode, end to end: residual-free chunks and the same lifecycle
     /// guarantees.
+    ///
+    /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_index_lifecycle_is_coherent() {
         plaid_lifecycle(true);
@@ -6812,6 +6815,10 @@ mod tests {
     /// (`PlaidIndex::TrainQueryAwareCentroids`) and **no residual storage**, so
     /// the chunk holds no quantizer and no packed residual. The mode travels in
     /// the chunk, so a reload restores it.
+    ///
+    /// `#[ignore]`d for the unit lane: the ColBERT-SaR training it builds is the
+    /// slowest case of the crate. `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
         let dir = tempdir().unwrap();

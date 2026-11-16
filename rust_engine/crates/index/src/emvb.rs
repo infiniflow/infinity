@@ -212,6 +212,26 @@ impl OpqRotation {
         mul_row(&self.matrix, self.dims, v)
     }
 
+    /// `v·R` written into `out`, which must be `dims` long.
+    ///
+    /// The same mapping as [`Self::rotate`] without the per-vector allocation,
+    /// so a caller rotating a whole segment can reuse one scratch vector.
+    pub fn rotate_into(&self, v: &[f32], out: &mut [f32]) {
+        if self.matrix.len() != self.dims * self.dims || out.len() < self.dims {
+            let n = v.len().min(out.len());
+            out[..n].copy_from_slice(&v[..n]);
+            return;
+        }
+        let n = self.dims.min(v.len());
+        for (col, slot) in out[..self.dims].iter_mut().enumerate() {
+            let mut acc = 0.0f32;
+            for row in 0..n {
+                acc += v[row] * self.matrix[row * self.dims + col];
+            }
+            *slot = acc;
+        }
+    }
+
     /// `OPQ::Save`'s trailing block: `dim * dim` raw `f32`s.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.matrix.len() * 4);

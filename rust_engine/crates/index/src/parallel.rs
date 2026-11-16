@@ -307,7 +307,16 @@ where
 /// `runtime` so spawned tasks land there, then parks until they finish.
 fn drive_on<F: Future>(runtime: &Handle, future: F) -> F::Output {
     if let Ok(current) = Handle::try_current() {
-        if current.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+        // A blocking-pool thread carries the handle but not a task id, and
+        // `inside_a_blocking_body` is exactly that test. `block_in_place` there
+        // does **not** hand the core over: it re-queues its continuation as one
+        // more blocking task and waits for a thread to pick it up. With every
+        // thread of the pool parked in `block_in_place` - the shape a checkpoint
+        // produces once a table's index dump fans out - nothing can ever pick
+        // it up, and the whole engine stops with no error logged.
+        if current.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
+            && !inside_a_blocking_body()
+        {
             return tokio::task::block_in_place(|| current.block_on(future));
         }
     }
@@ -328,10 +337,12 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
     use tokio::runtime::{Handle, RuntimeFlavor};
 
     if let Ok(handle) = Handle::try_current() {
-        if handle.runtime_flavor() == RuntimeFlavor::MultiThread {
+        // Only a real worker may block in place: on a blocking-pool thread
+        // `block_in_place` queues its continuation back onto that same pool and
+        // waits for a free thread, which is the pool it is already occupying.
+        if handle.runtime_flavor() == RuntimeFlavor::MultiThread && !inside_a_blocking_body() {
             // On a worker this hands the core to a replacement so the spawned
-            // tasks keep being polled; on a blocking-pool thread it is a plain
-            // call and the park below is what waits.
+            // tasks keep being polled.
             return tokio::task::block_in_place(|| handle.block_on(future));
         }
     }

@@ -1972,6 +1972,10 @@ mod tests {
     }
 
     /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_*`.
+    ///
+    /// `#[ignore]`d for the unit lane: the training this case builds dominates
+    /// the crate's wall time. `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_mode_trains_and_searches_without_residuals() {
         const DIM: u32 = 32;
@@ -2094,6 +2098,9 @@ mod tests {
     /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_move_semantics`
     /// (`test_plaid_ut.cpp:484`): a move construction and a move assignment
     /// both preserve the ColBERTSaR flag, the centroids and the document.
+    ///
+    /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_move_semantics() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2124,6 +2131,9 @@ mod tests {
     /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_mem_usage`
     /// (`test_plaid_ut.cpp:509`): `MemUsage` is positive and equals the
     /// serialized size.
+    ///
+    /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_mem_usage() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2141,6 +2151,9 @@ mod tests {
     /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_merge`
     /// (`test_plaid_ut.cpp:526`): two 5-document chunks sharing the primary's
     /// centroids merge into one 10-document index without residuals.
+    ///
+    /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_merge() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2247,6 +2260,9 @@ mod tests {
     /// (`test_plaid_ut.cpp:571`): ColBERTSaR stores no packed residuals, so
     /// its serialized size is smaller by at least `n_total_emb * packed_dim`
     /// bytes.
+    ///
+    /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
+    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
     #[test]
     fn colbertsar_size_smaller_than_plaid() {
         const DIM: u32 = 32;

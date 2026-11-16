@@ -140,13 +140,18 @@ class TestInfinity:
         table.insert({"c1": "world", "c2": 2.0})
         table.insert({"c1": "hello", "c2": 3.0})
 
+        query = table.output(["c1", "sum(c2)"]).group_by(["c1"]).having("sum(c2) > 0")
+        # having must reach the explained query: the thrift builder handed the
+        # server a hardcoded having_expr=None, dropping the clause. The builder
+        # clears itself inside explain(), so assert the forwarding before asking
+        # for the plan. The HTTP client builds its request inline and owns no
+        # builder.
+        if suffix != "_http":
+            assert query.query_builder._having is not None
+            assert query.query_builder._groupby is not None
+
         with pl.Config(fmt_str_lengths=1000):
-            res = (
-                table.output(["c1", "sum(c2)"])
-                .group_by(["c1"])
-                .having("sum(c2) > 0")
-                .explain(ExplainType.Physical)
-            )
+            res = query.explain(ExplainType.Physical)
             # Read the plan rather than str(): polars elides rows with "…"
             # when the frame is wider than its display budget, which hides
             # the operator this test is looking for.
@@ -155,17 +160,6 @@ class TestInfinity:
             # A group-by query explains through an AGGREGATE operator; without
             # forwarding group by the plan is a plain projection.
             assert "AGGREGATE" in plan_text
-
-        # having must reach the explained query as well. The plan text alone
-        # cannot show it: a having over the group key is folded into the
-        # aggregate operator, so a group-by query with and without having can
-        # explain to the same plan. Assert the forwarding instead, which is
-        # what regressed when _explain_query hardcoded having_expr=None. The
-        # HTTP client builds its request inline, so this only applies to the
-        # thrift builder, where the regression was.
-        if suffix != "_http":
-            assert table.query_builder._having is not None
-            assert table.query_builder._groupby is not None
 
         db_obj.drop_table("test_explain_group_by_having" + suffix, ConflictType.Error)
 

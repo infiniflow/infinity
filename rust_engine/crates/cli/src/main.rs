@@ -306,20 +306,15 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     std::process::exit(0);
 }
 
-/// Releases free heap pages back to the OS (glibc). A no-op elsewhere.
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
+/// Releases free heap pages back to the OS, on every target.
+///
+/// This used to be glibc's `malloc_trim` behind a Linux-only `cfg`, which made
+/// it a no-op on macOS *and* on Linux (where mimalloc, not glibc, owns the
+/// heap). See [`storage::trim_allocator`]: it now purges mimalloc's free pages
+/// everywhere.
 fn trim_allocator() {
-    unsafe extern "C" {
-        fn malloc_trim(pad: usize) -> i32;
-    }
-    // SAFETY: glibc's `malloc_trim` only returns already-free heap pages.
-    unsafe {
-        malloc_trim(0);
-    }
+    storage::trim_allocator();
 }
-
-#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
-fn trim_allocator() {}
 
 /// `SELECT ROW_ID() FROM <table> SEARCH MATCH VECTOR (...)` — the statement
 /// `knn_query_benchmark` issues (`topn_ = topk`, `ef` as an option).

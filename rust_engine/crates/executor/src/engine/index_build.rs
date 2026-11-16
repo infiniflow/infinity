@@ -1185,6 +1185,12 @@ impl Engine {
         {
             self.seal_multivector_index(&table, meta.id);
         }
+        // Every arm above builds a segment-sized transient (posting batches, a
+        // graph, a codeword table). Hand it back on the thread that built it;
+        // the periodic trigger only fires every checkpoint interval, so without
+        // this the peak of a dump stays resident until then (and on macOS,
+        // forever).
+        storage::trim_allocator();
     }
 
     /// Drops one multi-vector index's cached instance so the next query
@@ -3776,6 +3782,7 @@ impl Engine {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
+        let mut dumped = false;
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("HNSW") || !full.contains(&im.id) {
                 continue;
@@ -3787,6 +3794,7 @@ impl Engine {
                 continue;
             }
             if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+                dumped = true;
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.id);
@@ -3794,6 +3802,14 @@ impl Engine {
                     e.hnsw_topup = true;
                 }
             }
+        }
+        // A dump builds the new chunk's graph and buffers while the old graph is
+        // still mapped; on the insert path that transient is what made RSS jump
+        // by ~1 GB on the batch that crossed `mem_index_capacity`, and it never
+        // came back (mimalloc keeps freed pages, and its purge timer only runs
+        // for segments). Purge it here, on the thread that allocated it.
+        if dumped {
+            storage::trim_allocator();
         }
     }
 
@@ -3810,13 +3826,29 @@ impl Engine {
         if full.is_empty() {
             return;
         }
-        let _serial = self.storage.flush_lock.blocking_read();
+        // Non-blocking on purpose. This runs in a commit's **bottom half**, i.e.
+        // while that commit owns the table's bottom gate, and a checkpoint takes
+        // `flush_lock` for writing *before* it asks for the same gate. Waiting
+        // for the read here therefore closes a cycle - commit -> flush_lock,
+        // checkpoint -> bottom gate - and the two threads park forever with no
+        // error: a 5000-row insert stalled on its third batch, right after a
+        // background checkpoint started. A skipped seal is harmless: the tail
+        // stays in memory (rows are in the blocks and the WAL), the next insert
+        // after the checkpoint retries, and the sealed copy a later dump writes
+        // covers the same rows.
+        let Ok(_serial) = self.storage.flush_lock.try_read() else {
+            return;
+        };
         // Only this table's full columns: sealing every table's every index
         // made one insert's dump cost the whole catalog, and a suite with a
         // thousand tables spent the run inside `list_indexes`.
         for id in full {
             self.seal_secondary_indexes_of(table, id);
         }
+        // The keys and the sealed chunk are transient; hand them back here so
+        // the batch that sealed does not leave its peak resident (see
+        // `dump_hnsw_over_capacity`).
+        storage::trim_allocator();
     }
 
     /// The secondary-index columns of `table` whose memory tail reached the

@@ -649,6 +649,10 @@ mod tests {
 
     /// Diagnostic: how far the estimator is from the exact distance, against
     /// what the 1-bit code can theoretically carry.
+    ///
+    /// Prints metrics and asserts nothing, so it stays out of the unit lane;
+    /// `--ignored` still runs it.
+    #[ignore = "diagnostic: prints metrics, asserts nothing"]
     #[test]
     fn diag_estimator_accuracy() {
         let dim = 128;
@@ -731,6 +735,10 @@ mod tests {
 
     /// Diagnostic: recall@10 of the estimator against the recall@10 of ranking
     /// by the reconstructed vector (centroid + norm * sign code).
+    ///
+    /// Prints a table, asserts nothing, and ranks among the slowest cases in
+    /// the lane; `--ignored` still runs it.
+    #[ignore = "diagnostic: prints metrics, asserts nothing"]
     #[test]
     fn diag_ranking_quality() {
         let dim = 128;
@@ -778,6 +786,10 @@ mod tests {
 
     /// Diagnostic: what extra magnitude bits per dimension would buy, on the
     /// same data and the same rotation. `ex = 0` is the shipped 1-bit code.
+    ///
+    /// Prints a table, asserts nothing, and is the slowest case of the crate in
+    /// the lane; `--ignored` still runs it.
+    #[ignore = "diagnostic: prints metrics, asserts nothing"]
     #[test]
     fn diag_extra_bits() {
         let dim = 128;

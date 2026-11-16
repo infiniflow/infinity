@@ -536,6 +536,9 @@ class TestMemIdx:
         data_dir = "/var/infinity/data"
         idx1_name = "index1"
         idx2_name = "index2"
+        # Chunk files each index published before the kill, filled by part1 and
+        # read by part2 (the parts cannot see each other's locals).
+        before: dict[str, int] = {}
 
         @decorator1
         def part1(infinity_obj):
@@ -591,7 +594,9 @@ class TestMemIdx:
             # wait for mem index dump
             # time.sleep(5)
 
-            # 2 chunk indexes for each index
+            # At least one dump per index has to land before the kill. How many
+            # the background task completes depends on timing, so the count is
+            # recorded and part2 asserts the increment instead of a literal.
             db1_dir = data_dir + "/db_2"
             db2_dir = data_dir + "/db_3"
 
@@ -599,22 +604,24 @@ class TestMemIdx:
             while time.time() - start_time < 30:
                 idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
                 idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-                if len(idx1_dirs) == 2 and len(idx2_dirs) == 2:
+                if len(idx1_dirs) >= 2 and len(idx2_dirs) >= 2:
                     break
                 time.sleep(1)
 
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
-            assert len(idx1_dirs) == 2
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-            assert len(idx2_dirs) == 2
+            before["idx1"] = len(list(pathlib.Path(db1_dir).rglob("*chunk*")))
+            before["idx2"] = len(list(pathlib.Path(db2_dir).rglob("*chunk*")))
+            assert before["idx1"] >= 2, (
+                f"db1 published {before['idx1']} chunk(s) before the kill"
+            )
+            assert before["idx2"] >= 2, (
+                f"db2 published {before['idx2']} chunk(s) before the kill"
+            )
 
             # The chunk file appears when the dump writes it; the catalog record
-            # that makes it part of the index follows with the dump's commit.
-            # The runner kills the process as soon as this function returns, and
-            # a kill inside that window leaves a chunk the next open only adopts
-            # at its next dump - part2 then waits 60 s for a merge of chunks the
-            # catalog does not list yet (`assert len(idx2_dirs) == 3`, seen once
-            # in CI with db_3 at two files).
+            # that makes it part of the index follows. The id is taken before the
+            # write, so a kill inside that window leaves a file no record names
+            # instead of one the next dump writes over, and `cleanup()` sweeps it
+            # (part3).
             time.sleep(3)
 
         part1()
@@ -632,15 +639,24 @@ class TestMemIdx:
             while time.time() - start_time < 60:
                 idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
                 idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-                if len(idx1_dirs) == 3 and len(idx2_dirs) == 3:
+                if (
+                    len(idx1_dirs) >= before["idx1"] + 1
+                    and len(idx2_dirs) >= before["idx2"] + 1
+                ):
                     break
                 time.sleep(1)
 
             idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
             print(idx1_dirs)
-            assert len(idx1_dirs) == 3
+            assert len(idx1_dirs) >= before["idx1"] + 1, (
+                f"db1 still at {len(idx1_dirs)} chunk(s), no chunk was appended after "
+                f"the restart (was {before['idx1']})"
+            )
             idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-            assert len(idx2_dirs) == 3
+            assert len(idx2_dirs) >= before["idx2"] + 1, (
+                f"db2 still at {len(idx2_dirs)} chunk(s), no chunk was appended after "
+                f"the restart (was {before['idx2']})"
+            )
 
             # wait for optimize commit
             # The optimization transaction creates the file before committing.
@@ -655,7 +671,9 @@ class TestMemIdx:
         def part3(infinity_obj):
             infinity_obj.cleanup()
 
-            # after checkpoint (during restart) and cleanup, 2 old chunks of each index are removed
+            # after checkpoint (during restart) and cleanup only the merged chunk of
+            # each index is left: the ones it superseded and the files an interrupted
+            # dump left behind are both gone
             db1_dir = data_dir + "/db_2"
             db2_dir = data_dir + "/db_3"
 

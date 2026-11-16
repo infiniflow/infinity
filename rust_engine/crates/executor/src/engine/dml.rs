@@ -632,12 +632,21 @@ impl Engine {
         // to be handed out in commit-ts order (`TxnAllocator::Process` ->
         // `PrepareAppend` only ever runs after `GetWriteCommitTS`).
         let types = self.column_types(table)?;
+        // Render each cell's display text **once** for the whole batch. It used
+        // to be rendered three times - for the check below, for the append/WAL
+        // text and again for the index hooks - and on a table with a 2048-dim
+        // vector that is three passes over 4096 floats per row (the profile put
+        // 40% of an insert in the first of them alone).
+        let cells: Vec<Vec<String>> = rows
+            .iter()
+            .map(|row| row.iter().map(|cell| cell.to_slt_string()).collect())
+            .collect();
         // tensor-like values must match the declared dimension, and
         // sparse values must be in range
-        for row in &rows {
+        for row in &cells {
             for (i, cell) in row.iter().enumerate() {
                 if let Some(t) = types.get(i) {
-                    validate_insert_value(t, cell.to_slt_string().trim())?;
+                    validate_insert_value(t, cell.trim())?;
                 }
             }
         }
@@ -654,14 +663,10 @@ impl Engine {
         // whole statement. The batch is capped at `TEXT_BATCH_ROWS` so a big
         // `COPY` keeps the bounded shape (it tokenises a chunk at a time inside
         // the gate).
-        let (mut prepared_text, prepared_cells) = if rows.len() <= Self::TEXT_BATCH_ROWS {
-            let cells: Vec<Vec<String>> = rows
-                .iter()
-                .map(|row| row.iter().map(|cell| cell.to_slt_string()).collect())
-                .collect();
-            (self.prepare_text_terms(table, &cells), Some(cells))
+        let mut prepared_text = if rows.len() <= Self::TEXT_BATCH_ROWS {
+            self.prepare_text_terms(table, &cells)
         } else {
-            (None, None)
+            None
         };
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
@@ -694,15 +699,30 @@ impl Engine {
                 table: table.to_string(),
             }
         });
-        let mut encoded_rows: Vec<String> = Vec::with_capacity(rows.len());
-        for row in rows.iter() {
-            // The rows are written by the bottom half, not by this batch: the
-            // reference writes them in `AppendInBlock` and only then publishes,
-            // so a reader never sees a row whose index entry is still missing.
-            // Replay rebuilds the same keys from the WAL block
-            // (`append_writes`).
-            encoded_rows.push(self.encode_row_stored(table, row, &types)?);
-        }
+        // The stored row text is a tab-join of the cells above wherever storage
+        // keeps the display form (a float vector is one of those), and the
+        // stored form of the columns where it does not (a multivector is
+        // reshaped, a sparse vector re-spelled). Reusing the display string
+        // keeps the append buffer from formatting every vector element twice.
+        let encoded_rows: Vec<String> = rows
+            .iter()
+            .zip(&cells)
+            .map(|(row, rendered)| {
+                let mut text = String::new();
+                for (i, cell) in row.iter().enumerate() {
+                    if i > 0 {
+                        text.push('\t');
+                    }
+                    match types.get(i) {
+                        Some(ty) if !stored_text_is_display(ty) => {
+                            text.push_str(&encode_cell_stored(cell, Some(ty)))
+                        }
+                        _ => text.push_str(rendered.get(i).map(String::as_str).unwrap_or("")),
+                    }
+                }
+                text
+            })
+            .collect();
         // Emit the reference `WalCmdAppendV2` (real typed columns) when the
         // table's types are covered; otherwise the transaction writes the
         // text-column block through `build_commands`.
@@ -764,7 +784,9 @@ impl Engine {
         // written below, right after the rows reach the buffer.
         let append_record = range.append;
         let row_count = rows.len();
+        let bottom_row_count = rows.len();
         let bottom_rows = rows;
+        let bottom_cells = cells;
         let bottom_encoded = encoded_rows;
         // The gate now covers the **critical section only**: the index entries
         // and the block append of this commit. Everything above it - validation,
@@ -791,7 +813,7 @@ impl Engine {
                 engine.note_import_rows(
                     &bottom_table,
                     segment,
-                    (base as u64 & 0xffff_ffff) + bottom_rows.len() as u64,
+                    (base as u64 & 0xffff_ffff) + bottom_row_count as u64,
                 );
             }
             // With no index of any kind in memory there is nothing to maintain;
@@ -802,19 +824,15 @@ impl Engine {
                 || engine.has_index_declaration(&bottom_table)
             {
                 let index_table = bottom_table.clone();
-                let index_rows: Vec<(usize, Vec<String>)> = match prepared_cells {
-                    // Reuse the cells the pre-gate tokeniser already rendered.
-                    Some(cells) => cells
-                        .into_iter()
-                        .enumerate()
-                        .map(|(k, cells)| (base + k, cells))
-                        .collect(),
-                    None => bottom_rows
-                        .iter()
-                        .enumerate()
-                        .map(|(k, row)| (base + k, row.iter().map(|v| v.to_slt_string()).collect()))
-                        .collect(),
-                };
+                // The cells rendered once above are the index's input too: the
+                // full-text hook tokenises them, the multi-value/sparse/vector
+                // hooks parse their own column and the secondary hook decodes
+                // only the columns it indexes.
+                let index_rows: Vec<(usize, Vec<String>)> = bottom_cells
+                    .into_iter()
+                    .enumerate()
+                    .map(|(k, cells)| (base + k, cells))
+                    .collect();
                 // The index work runs on **this table's** bottom worker: every
                 // index has its own lock and two tables share none, so a
                 // directory with a hundred thousand tables keeps its index
@@ -822,25 +840,23 @@ impl Engine {
                 // thread (the reference's `MemIndexAppender` is a single
                 // thread, which is the one structural deviation here).
                 let schema = engine.table_schema(&index_table).unwrap_or_default();
-                // One pass for the whole batch: the per-row form resolved the
-                // table key and took the registry lock once per row.
-                //
-                // The cells come from `bottom_rows` (real `Value`s), not from
-                // the rendered text: a `NULL` must reach the index as
-                // `Value::Null`, because `value_to_tail_keys` skips it - a
-                // string form would make it an ordinary key
-                // (`SecondaryIndexInMemT::InsertInner` skips the null bit).
-                let values: Vec<Vec<Value>> = bottom_rows
-                    .iter()
-                    .map(|row| row.iter().map(Value::from_literal).collect())
-                    .collect();
-                engine.update_secondary_indexes_batch(&index_table, base, &values, &schema);
                 // One batch: the full-text terms of the whole append are
                 // tokenised without the column lock and inserted under it once.
                 let batch: Vec<(usize, &[String])> = index_rows
                     .iter()
                     .map(|(seq, texts)| (*seq, texts.as_slice()))
                     .collect();
+                // A `NULL` must reach a secondary index as `Value::Null`
+                // (`value_to_tail_keys` skips it). The batch form converts the
+                // indexed column of each row only: converting the whole row
+                // copied every vector as text (23% of an insert for an index on
+                // `num`).
+                engine.update_secondary_indexes_batch_rows(
+                    &index_table,
+                    base,
+                    &bottom_rows,
+                    &schema,
+                );
                 // The row ids are known now: point the pre-tokenised batch at
                 // the allocated range. A column that gained an index after the
                 // batch was tokenised is not covered and is tokenised here.
@@ -865,7 +881,7 @@ impl Engine {
             // 4.2): one table's delta, not a scan of every table.
             engine.refresh_memindex_charge(&bottom_table);
             engine.bump_writes(&bottom_table);
-            engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
+            engine.note_live_rows(&bottom_table, bottom_row_count as isize);
             engine.append_row_cache(&bottom_table, base, &bottom_encoded);
             // No row key for the multi-value/tensor tables either: their WAL
             // frame is decoded back into row text by `block::to_data_block`
@@ -874,10 +890,13 @@ impl Engine {
             // `AppendInBlock`: this batch's rows go into the block's buffer -
             // they are the batch's only copy, there is no `row:` key to read
             // them back from.
-            let published: Vec<(usize, String)> = bottom_encoded
+            // Borrowed, not cloned: the buffer parses each row and keeps the
+            // values, so the batch's text does not need a second full copy
+            // (2048-dim rows: ~80 MB per 5000-row batch).
+            let published: Vec<(usize, &str)> = bottom_encoded
                 .iter()
                 .enumerate()
-                .map(|(k, text)| (base + k, text.clone()))
+                .map(|(k, text)| (base + k, text.as_str()))
                 .collect();
             engine.publish_encoded_rows(&bottom_table, &published)?;
             // The rows are readable now (`AppendInBlock`), so the record may
@@ -1276,13 +1295,17 @@ impl Engine {
     /// Each key is the column's **order-preserving encoding**
     /// (`Key::ordered_bytes`) - the same domain a sealed chunk uses - so the
     /// memory tail is ordered like the column (a range scan slices it instead
-    /// of decoding every key) and a dump can write its keys out directly. The
-    /// tails are cloned out under the table lock and appended to outside it.
-    pub(crate) fn update_secondary_indexes_batch(
+    /// of decoding every key) and a dump can write its keys out directly.
+    ///
+    /// The input is the batch's **literals**, converted one row at a time but
+    /// only at the indexed positions: the value form converted every column of
+    /// every row (`Value::from_literal` renders a vector as text), which was 23%
+    /// of an insert even when the only index was on `num`.
+    pub(crate) fn update_secondary_indexes_batch_rows(
         &self,
         table: &str,
         base: usize,
-        rows: &[Vec<Value>],
+        rows: &[Vec<Literal>],
         schema: &[String],
     ) {
         if rows.is_empty() {
@@ -1292,21 +1315,29 @@ impl Engine {
         if targets.is_empty() {
             return;
         }
-        for (k, values) in rows.iter().enumerate() {
+        for (k, row) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
             for target in &targets {
-                let Some(value) = values.get(target.pos) else {
+                let Some(literal) = row.get(target.pos) else {
                     continue;
                 };
-                // A JSON document contributes one key per flattened term, a
-                // functional index one per evaluated row and every other column
-                // exactly one.
+                // `NULL` stays `Value::Null` (`value_to_tail_keys` skips it)
+                // and a float keeps its exact digits - both of which a text
+                // round-trip would change.
+                let value = Value::from_literal(literal);
                 let keys = match &target.func {
-                    None => value_to_tail_keys(&target.declared, value),
-                    Some(func) => match functional_value(func, target.pos, values) {
-                        Some(value) => value_to_key(&target.declared, &value),
-                        None => Vec::new(),
-                    },
+                    None => value_to_tail_keys(&target.declared, &value),
+                    Some(func) => {
+                        // A functional index reads one column
+                        // (`functional_parts` rejects anything else), so only
+                        // that position needs a value.
+                        let mut row = vec![Value::Null; target.pos + 1];
+                        row[target.pos] = value;
+                        match functional_value(func, target.pos, &row) {
+                            Some(value) => value_to_key(&target.declared, &value),
+                            None => Vec::new(),
+                        }
+                    }
                 };
                 for key in keys {
                     target.index.insert(&key, seq);
