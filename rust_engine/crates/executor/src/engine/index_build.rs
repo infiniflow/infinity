@@ -1321,11 +1321,37 @@ impl Engine {
             table_id: table_meta.id.to_string(),
             segments: Vec::new(),
         };
+        // A chunk name **is** its identity (`ft_{base_row_id}`), so one name can
+        // only ever have one record. The same file is sealed under a name more
+        // than once - a build that re-indexed rows past the recorded chunks seals
+        // the range a concurrent writer seals a moment later, a retried seal
+        // rewrites its own - and a second record makes `load_sealed_scoped` map
+        // one file twice. The documents are then counted twice, and `total_docs`
+        // (the number the cache's reuse guard compares against `live_rows`) stops
+        // being the number of rows the index can answer for: a cache that is
+        // short one document passes the guard and `MATCH` answers short for good,
+        // with nothing on disk looking wrong. `republish_text_chunks` already
+        // resolves a name to its existing id for the same reason.
+        let recorded: std::collections::HashSet<String> = catalog::layout::read_index_chunks(
+            self.storage.catalog.store().as_ref(),
+            &set.db_id,
+            &set.table_id,
+            &index_id.to_string(),
+        )
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|(_, chunks)| chunks)
+        .filter(|(_, info)| !info.base_name.is_empty())
+        .map(|(_, info)| info.base_name)
+        .collect();
         // The `TextIndex` *is* this index's `MemIndex` (the registry is keyed
         // by index id), so its queue holds exactly the chunks it sealed - no
         // second index's records are written, and no files are copied into
         // another directory.
         for chunk in &sealed {
+            if recorded.contains(&chunk.base_name) {
+                continue;
+            }
             // Take the id **and** raise the counter in one batch: reading it
             // here and appending below let two recorders of one index read the
             // same value and publish two chunks under one id
