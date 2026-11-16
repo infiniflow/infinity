@@ -36,22 +36,14 @@ export struct TryCastBoolean {
     }
 };
 
-//  // Cast BooleanT to other VarcharT type
-//  template <>
-//  inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
-//     if (source) {
-//         constexpr u16 TRUE_LEN = 4;
-//         std::memcpy(target.short_.data_, "true", TRUE_LEN);
-//         std::memset(target.short_.data_ + TRUE_LEN, 0, VARCHAR_INLINE_LEN - TRUE_LEN);
-//         target.length_ = TRUE_LEN;
-//     } else {
-//         constexpr u16 FALSE_LEN = 5;
-//         std::memcpy(target.short_.data_, "false", FALSE_LEN);
-//         std::memset(target.short_.data_ + FALSE_LEN, 0, VARCHAR_INLINE_LEN - FALSE_LEN);
-//         target.length_ = FALSE_LEN;
-//     }
-//     return true;
-// }
+// Cast BooleanT to other VarcharT type
+template <>
+inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
+    const std::string_view text = source ? "true" : "false";
+    target.length_ = static_cast<u32>(text.size());
+    std::memcpy(target.short_.data_, text.data(), target.length_);
+    return true;
+}
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {

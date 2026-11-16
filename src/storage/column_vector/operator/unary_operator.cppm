@@ -47,11 +47,36 @@ public:
                 UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
+                // A compact-bit input reaches this branch with a non-boolean
+                // result when a boolean column is cast to another type, e.g.
+                // CAST(bool_col AS VARCHAR). The bit-packed helpers below
+                // produce booleans, so read the input element by element and
+                // let the operator write the real result type. The old code
+                // rejected that combination with UnrecoverableError, which
+                // aborted the whole server on an ordinary SELECT.
+                if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT>) {
+                    UnrecoverableError("kCompactBit input should be BooleanT.");
+                } else if constexpr (!std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
+                    if (result->vector_type() != ColumnVectorType::kFlat) {
+                        UnrecoverableError("Casting a kCompactBit input needs a flat result.");
+                    }
+                    for (size_t i = 0; i < count; ++i) {
+                        if (nullable && !input_null->IsTrue(i)) {
+                            result_null->SetFalse(i);
+                            continue;
+                        }
+                        Operator::template Execute<BooleanT, ResultType>(input->buffer_->GetCompactBit(i),
+                                                                         result_ptr[i],
+                                                                         result_null.get(),
+                                                                         i,
+                                                                         state_ptr_input,
+                                                                         state_ptr);
+                    }
+                    result->Finalize(count);
+                    return;
+                }
                 if (result->vector_type() != ColumnVectorType::kCompactBit) {
                     UnrecoverableError("Target vector type isn't kCompactBit.");
-                }
-                if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    UnrecoverableError("kCompactBit should match with BooleanT.");
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     ExecuteBooleanWithNull<Operator>(input, result, count, state_ptr_input, state_ptr);
