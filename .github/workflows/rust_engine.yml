@@ -206,6 +206,12 @@ jobs:
   unit:
     # The workspace's own tests on both architectures. The analyzer tests load
     # /usr/share/infinity/resource, so the submodule is installed first.
+    #
+    # Cases that cost seconds each are `#[ignore]`d instead of run here, so the
+    # lane stays short: the ColBERT-SaR training ports (`colbertsar_*` in index
+    # and executor) dominate its wall time, and the `rabitq::tests::diag_*`
+    # cases print metrics without asserting anything. The `slow` job runs the
+    # whole set with `--ignored`.
     name: unit (${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     env:
@@ -873,7 +879,9 @@ jobs:
             -p storage --lib
       - name: Ignored tests (perf probes, long replay loops)
         # These mirror the reference's DISABLED_/SLOW_ gtests, which
-        # slow_tests.yml runs nightly. They are reported rather than gated for
+        # slow_tests.yml runs nightly, plus the cases the unit lane drops for
+        # its wall time: the ColBERT-SaR training ports and the `rabitq::tests::diag_*`
+        # diagnostics. They are reported rather than gated for
         # now: at least `new_catalog_index_internal_ut::disabled_slow_test_populate_index`
         # fails on the port (fulltext_tail is None where the case expects
         # (0, 16384)), and that predates the current work. Flip this to a gate
