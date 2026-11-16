@@ -2072,20 +2072,21 @@ pub async fn route(
                         .collect()
                 })
                 .unwrap_or_else(|| vec!["*".into()]);
-            let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
-            // The inner SELECT is built as an AST and then wrapped, so a
-            // `filter` the client sent is parsed once as a predicate.
-            let inner = match docs_select(
-                &Json::Obj(vec![
-                    (
-                        "output".into(),
-                        Json::Arr(output.into_iter().map(Json::Str).collect()),
-                    ),
-                    ("filter".into(), Json::Str(filter.to_string())),
-                ]),
-                &db,
-                &table,
-            ) {
+            // The inner SELECT is built from the request the client sent, so
+            // every clause explain can forward -- search, group_by, having,
+            // sort, limit, offset -- reaches the plan. Passing only `output`
+            // and `filter` silently explained a plain table scan, so a
+            // match_dense query explained without its KNN SCAN operator.
+            let mut inner_body = match doc {
+                Json::Obj(entries) => entries.clone(),
+                _ => Vec::new(),
+            };
+            inner_body.retain(|(k, _)| k != "output" && k != "explain_type");
+            inner_body.push((
+                "output".into(),
+                Json::Arr(output.into_iter().map(Json::Str).collect()),
+            ));
+            let inner = match docs_select(&Json::Obj(inner_body), &db, &table) {
                 Ok(s) => s,
                 Err(e) => return e,
             };
