@@ -8378,6 +8378,16 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
                 }
                 ip.read_list_end().map_err(tw)?;
             }
+            Some(5) if f.field_type == TType::List => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    if let PExpr::Column(c) = read_pexpr(ip)? {
+                        req.highlight.push(c);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(6) if f.field_type == TType::Struct => req.search = read_search_expr(ip)?,
             Some(7) if f.field_type == TType::Struct => req.where_pred = read_where(ip)?,
             Some(8) if f.field_type == TType::List => {
                 let l = ip.read_list_begin().map_err(tw)?;
@@ -8386,9 +8396,15 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
                 }
                 ip.read_list_end().map_err(tw)?;
             }
+            Some(9) if f.field_type == TType::Struct => req.having = read_where(ip)?,
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     req.limit = Some(n);
+                }
+            }
+            Some(11) if f.field_type == TType::Struct => {
+                if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
+                    req.offset = Some(n);
                 }
             }
             Some(12) => req.order_by = read_order_by(ip)?,
