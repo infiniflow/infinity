@@ -3941,7 +3941,6 @@ impl Engine {
             .iter()
             .map(|pos| column_buffer(&meta.types[*pos]))
             .collect();
-        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
         let mut out_of_order = false;
         let mut last = 0usize;
         let mut shown_slots: Vec<usize> = Vec::new();
@@ -3990,7 +3989,6 @@ impl Engine {
                     *pos,
                     &shown_slots,
                     &mut data[out],
-                    &mut valid[out],
                 )?;
             }
         }
@@ -4027,14 +4025,8 @@ impl Engine {
                 seqs.push(seq);
                 for (out, pos) in wanted.iter().enumerate() {
                     match values.get(*pos) {
-                        Some(v) if !matches!(v, Value::Null) => {
-                            data[out].push_value(v);
-                            valid[out].push(true);
-                        }
-                        _ => {
-                            data[out].push_value(&Value::Null);
-                            valid[out].push(false);
-                        }
+                        Some(v) => data[out].push_value(v),
+                        None => data[out].push_null(),
                     }
                 }
             }
@@ -4047,14 +4039,8 @@ impl Engine {
         if !dead.is_empty() && !seqs.is_empty() {
             let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(&(*s as u64))).collect();
             if keep.iter().any(|k| !k) {
-                for k in 0..wanted.len() {
-                    data[k].retain(&keep);
-                    let mut at = 0usize;
-                    valid[k].retain(|_| {
-                        let v = keep.get(at).copied().unwrap_or(false);
-                        at += 1;
-                        v
-                    });
+                for column in data.iter_mut() {
+                    column.retain(&keep);
                 }
                 seqs = seqs
                     .into_iter()
@@ -4071,19 +4057,15 @@ impl Engine {
             for column in &mut data {
                 *column = permute_column(column, &order);
             }
-            for v in &mut valid {
-                *v = order.iter().map(|i| v[*i]).collect();
-            }
         }
-        Some(Batch {
-            columns: wanted
+        Some(Batch::new(
+            wanted
                 .iter()
                 .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
                 .collect(),
             data,
-            valid,
             row_count,
-        })
+        ))
     }
     /// The rows at `rows` only, decoded in rowid order, as typed column
     /// buffers.
@@ -4142,7 +4124,6 @@ impl Engine {
             .iter()
             .map(|pos| column_buffer(&meta.types[*pos]))
             .collect();
-        let mut valid: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
         let mut count = 0usize;
 
         let mut at = 0usize;
@@ -4192,7 +4173,6 @@ impl Engine {
                         .iter()
                         .map(|pos| column_buffer(&meta.types[*pos]))
                         .collect();
-                    let mut vals: Vec<Vec<bool>> = vec![Vec::new(); wanted.len()];
                     for (o, pos) in wanted.iter().enumerate() {
                         Self::decode_block_column(
                             &meta.ids,
@@ -4202,10 +4182,9 @@ impl Engine {
                             *pos,
                             &shown,
                             &mut cols[o],
-                            &mut vals[o],
                         )?;
                     }
-                    Some((cols, vals, shown))
+                    Some((cols, shown))
                 });
             // The decoder emits only the *shown* slots of this run, in
             // ascending slot order, so the k-th shown slot is the k-th row of
@@ -4213,7 +4192,7 @@ impl Engine {
             // every later row, so each slot is mapped through the same
             // visibility the decoder used - not through its own position.
             let visible_run: Vec<Option<usize>> = match &decoded {
-                Some((_, _, shown)) => {
+                Some((_, shown)) => {
                     let mut emitted = 0usize;
                     slots
                         .iter()
@@ -4240,12 +4219,8 @@ impl Engine {
                 for (o, pos) in wanted.iter().enumerate() {
                     let cell = if is_dead {
                         None
-                    } else if let (Some((cols, vals, _)), Some(ri)) = (&decoded, run_index) {
-                        if vals[o].get(ri).copied() == Some(false) {
-                            Some(Value::Null)
-                        } else {
-                            Some(cols[o].value_at(ri))
-                        }
+                    } else if let (Some((cols, _)), Some(ri)) = (&decoded, run_index) {
+                        Some(cols[o].value_at(ri))
                     } else {
                         // Either the block does not hold this slot at all (the
                         // row was written after the last checkpoint, so its
@@ -4259,29 +4234,22 @@ impl Engine {
                         buffered.get(&s).and_then(|v| v.get(*pos).cloned())
                     };
                     match cell {
-                        Some(v) if !matches!(v, Value::Null) => {
-                            data[o].push_value(&v);
-                            valid[o].push(true);
-                        }
-                        _ => {
-                            data[o].push_value(&Value::Null);
-                            valid[o].push(false);
-                        }
+                        Some(v) => data[o].push_value(&v),
+                        None => data[o].push_null(),
                     }
                 }
             }
             at = end;
         }
 
-        Some(Batch {
-            columns: wanted
+        Some(Batch::new(
+            wanted
                 .iter()
                 .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
                 .collect(),
             data,
-            valid,
-            row_count: count,
-        })
+            count,
+        ))
     }
     /// Appends one column of a decoded block to `out`, skipping the rows the
     /// version hides.
@@ -4297,7 +4265,6 @@ impl Engine {
         // rows, not the block's whole window.
         slots: &[usize],
         out: &mut ColumnData,
-        valid: &mut Vec<bool>,
     ) -> Option<()> {
         let column_type = types.get(pos)?;
         let column_id = ids.get(pos).copied().unwrap_or(pos as u64);
@@ -4314,17 +4281,59 @@ impl Engine {
             let null = body.null_bitmap.len() > row / 8
                 && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0;
             if null {
-                out.push_value(&Value::Null);
-                valid.push(false);
+                out.push_null();
+                continue;
+            }
+            // A tensor / multivector / sparse / array cell is a slot into the
+            // column's outline: the value exists only as text, and `Utf8` is the
+            // buffer its declared type maps to (`column_buffer`). Declining the
+            // column here made a one-column projection of such a table fall back
+            // to the whole operator chain (`try_projection` -> `None`), which is
+            // what the multivector round-trip test catches. The row path decodes
+            // the same slots (`decode_rows_of`), so both agree on the text.
+            if kind != OutlineKind::None {
+                let text = match kind {
+                    OutlineKind::Tensor => {
+                        let at = row * 8;
+                        decode_tensor_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::TensorArray => {
+                        let at = row * 8;
+                        decode_tensorarray_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::Sparse => {
+                        let at = row * 16;
+                        decode_sparse_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 16).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::Array => {
+                        let at = row * 8;
+                        decode_array_value(
+                            &type_text[pos],
+                            body.data.get(at..at + 8).unwrap_or(&[]),
+                            raw_outline,
+                        )
+                    }
+                    OutlineKind::None => None,
+                };
+                out.push_value(&text.map(parse_owned_value).unwrap_or(Value::Null));
                 continue;
             }
             // A text column is written straight into its buffer: the cell never
             // becomes a `Value` and, for varchar, never a `String` either.
-            if matches!(out, ColumnData::Text(_)) {
-                if kind != OutlineKind::None {
-                    return None;
-                }
-                let ColumnData::Text(text) = out else {
+            if matches!(out, ColumnData::Utf8 { .. }) {
+                let ColumnData::Utf8 { text, .. } = out else {
                     unreachable!()
                 };
                 let ok = decode_text_cell(
@@ -4336,7 +4345,10 @@ impl Engine {
                     raw_outline,
                     text,
                 )?;
-                valid.push(ok);
+                // The cell is in the text buffer, so the bitmap owes one bit:
+                // appended here it stays the same length as the buffer, which a
+                // "patch the last bit" call could not guarantee.
+                out.push_valid(ok);
                 continue;
             }
             let value = match kind {
@@ -4375,13 +4387,7 @@ impl Engine {
                 },
                 _ => return None,
             };
-            if let Value::Str(text) = value {
-                out.push_text(text);
-                valid.push(true);
-            } else {
-                valid.push(!matches!(value, Value::Null));
-                out.push_value(&value);
-            }
+            out.push_value(&value);
         }
         Some(())
     }

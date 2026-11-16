@@ -72,18 +72,7 @@ impl Default for HnswOptions {
 
 /// `column` reordered by `order`.
 pub(crate) fn permute_column(column: &ColumnData, order: &[usize]) -> ColumnData {
-    match column {
-        ColumnData::Int(v) => ColumnData::Int(order.iter().map(|i| v[*i]).collect()),
-        ColumnData::Float(v) => ColumnData::Float(order.iter().map(|i| v[*i]).collect()),
-        ColumnData::Bool(v) => ColumnData::Bool(order.iter().map(|i| v[*i]).collect()),
-        ColumnData::Text(v) => {
-            let mut out = crate::columnar::TextColumn::default();
-            for i in order {
-                out.push(v.get(*i));
-            }
-            ColumnData::Text(out)
-        }
-    }
+    column.permute(order)
 }
 
 impl Default for PlaidOptions {

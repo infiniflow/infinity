@@ -916,10 +916,10 @@ impl Engine {
                     .ok_or_else(|| Error::Invalid(format!("No system variable: {key}")))?
             }
         };
-        Ok(QueryResult::Rows {
-            columns: vec!["value".to_string()],
-            rows: vec![vec![Value::Str(value)]],
-        })
+        Ok(QueryResult::values(
+            vec!["value".to_string()],
+            vec![vec![Value::Str(value)]],
+        ))
     }
 
     /// Tasks queued or running on the attached `BGTaskProcessor`; `0` when the
@@ -951,14 +951,14 @@ impl Engine {
                 ]
             })
             .collect();
-        Ok(QueryResult::Rows {
-            columns: vec![
+        Ok(QueryResult::values(
+            vec![
                 "database".to_string(),
                 "dir".to_string(),
                 "comment".to_string(),
             ],
-            rows: text_rows(rows),
-        })
+            text_rows(rows),
+        ))
     }
 
     /// `SHOW TABLES [FROM <db>]`: the reference's eight columns
@@ -992,8 +992,8 @@ impl Engine {
             })
             .collect();
         rows.sort_by(|a, b| a[1].cmp(&b[1]));
-        Ok(QueryResult::Rows {
-            columns: vec![
+        Ok(QueryResult::values(
+            vec![
                 "database".to_string(),
                 "table".to_string(),
                 "id".to_string(),
@@ -1003,8 +1003,8 @@ impl Engine {
                 "create_ts".to_string(),
                 "comment".to_string(),
             ],
-            rows: text_rows(rows),
-        })
+            text_rows(rows),
+        ))
     }
 
     /// Rotates and prunes the WAL without touching the KV store. Called by the

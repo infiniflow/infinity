@@ -32,8 +32,9 @@
 
 重启后 `Engine::open` 末尾调用 `recover_mem_index`：用 catalog 的 chunk 覆盖（`base_row_id`/`row_count` 合并成
 升序区间）与块内行求差，只把没被 chunk 覆盖的行喂回内存索引。各 kind 的恢复路径：HNSW / IVF 直接插回内存段；fulltext
-走 `text_index_for`（`load_sealed` 映射已有 chunk，再从第一个未覆盖行重建）；二级索引由 `rebuild_indexes` 的
-`build_index` 全量重建；多值与稀疏没有独立的 chunk 映射，在首次查询时整表重建。
+走 `text_index_for`（`load_sealed` 映射已有 chunk，再从第一个未覆盖行重建）；二级索引走 `load_secondary_index`，
+同样映射已发布的 chunk、只索引未被覆盖的行（只有 `id == 0` 的手写记录没有目录可映射，才回退到 `build_index` 全量重建）；
+多值与稀疏没有独立的 chunk 映射，在首次查询时整表重建 —— 这是重启后唯一仍为 O(表行数) 的一条路径。
 
 **影响**：flush 之后索引尾巴仍在内存里（只由配额、按批容量或显式 `DumpIndex` 落盘），崩溃不丢行（行在块和 WAL 里），
 代价是重启时多做一次 gap 重建。checkpoint 的索引镜像（`flush_blocks`）会写 chunk 文件却没有 ts 可写，这类「有文件、
@@ -46,7 +47,9 @@
 **本节没有未接线项。** 这一层的现状：
 
 - **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_blocks` → `write_blocks`）写，`COPY` 例外（见下）。KV 里**没有任何行键**：`row:` 既不写也不读，`del:` 只剩事务命令流里的名字（`wal_delete_key`，用于构造 `WalCmdDeleteV2` 与行级冲突判定），不落盘；行侧车（`persistence/rowdata_*.bin`）与 `persistence/` 里的行记录一并去掉（该目录只剩参考版形状的空目录）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。
-- **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`storage::buffer::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在；`[buffer] buffer_manager_size` 仍被解析（C++ 配置要能加载）但被忽略，索引缓冲用内置 8 GiB 预算，`SHOW BUFFERS` 一行 = 一个映射。
+- **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`storage::buffer::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在。`[buffer] buffer_manager_size` 仍然生效：
+`infinity --config` 把它交给 `Engine::set_buffer_budget`，作为解码后的 HNSW chunk 与块映射表的**同一个**上限（内建默认 8 GiB，
+配置为 0 或不配才用默认），`SHOW BUFFERS` 一行 = 一个映射。
 - **cleanup 的活段判据**是 `visible_block_ids()`（块索引，跨重启有效），不是 `segment_ids()`（分配器，重开目录后为空；用它会把每个 `idx_*/seg_{n}` 当死段删掉）。
 - **行号的次序**：冲突检查之后、写 WAL 之前按 `commit_ts` 分配（`TxnManager::begin_write` / `commit_at_deferred_with`，对应参考的 `wait_conflict_ck_` / `SubmitForAllocation`），checkpoint 的上界是 `current_ts`（已完成的 commit_ts），块的窗口按 `append_totals` + `append_ts` 裁到 `ts <= 上界`，块内 id 必须是窗口的稠密前缀。
 - **多值 / 张量表的读路径**：这类表的解码文本形式在写入与扫描两条路上不稳定，`wide_text_columns` 只用来关掉「直接读 buffer 的 `Value`」快路径，改走块解码；不再保留文本行副本。
@@ -196,11 +199,12 @@ SDK driver（20,000 行，未 checkpoint，8 次最好值）：参考 insert 0.2
 5. **缓冲区不再绕文本**（`buffered_rows_values`），且只克隆投影要的 cell。
 6. **列体每列切分一次**、`EMBEDDING` 形状每列解析一次：块读从 O(行数 × 块字节) 降下来（40,000 行 179 ms → 30 ms）。
 7. **等值谓词在读出时执行**（`read_blocks_filtered_values`）：`col = 常量` 在行缓冲上求值，被拒的行不再各自分配。
+8. **结果是 `DataBlock`，不再是 `Value` 行**：`QueryResult::Rows` 载 `columnar::Batch`（每列一条类型化缓冲 + 位图），块解码直接写进缓冲、纯投影原样交出缓冲、thrift `SelectResponse` 按列打包；谓词 `col = 常量` 走 `ColumnData::equality_mask`、墓碑走 `ColumnData::retain`，都只动列。算子边界（filter/sort/aggregate/project）按需把 cell 物化成 `Value`，CLI / `.slt` / HTTP / postgres 出口用 `Batch::rows()` / `text_rows()`。
 
 块级 prefilter 与参考一致：`blk|…|fast_rough_filter` / `seg|…|fast_rough_filter` 只在段**封存**时写（import、compact、段写满 8,388,608 行），扫描读这些记录剪枝；未封存段两边都没有统计，端口不另做进程内缓存。
 
 仍然慢的原因（详见 `SELECT_CHAIN.md` §6）：
 
-1. **`Value` 行缓冲 vs 类型化列缓冲**：参考的扫描产出 `ColumnVector`（连续 `i32` + null 位图），协议层整块 `memcpy`；端口是 `Vec<Vec<Value>>`，每 cell 一个 24 字节枚举、每行一次分配。`SELECT id` 的 3.77 ms 里解码 2.1 ms，perf 里约一半在 malloc/free。
-2. **文本型列必须解析**：varchar/json/date 只有文本形态；`SELECT id, name` 的解码 7.9 ms 里约 5.7 ms 是 varchar 这一列。
-3. 这两条要根治得把结果与扫描都换成类型化列缓冲、表达式按列求值 —— 即把 `Value` 模型换成 `DataBlock` 模型（见 `chunk.rs` 的设计说明），属于另一层改造。
+1. **扫描与算子边界仍在按行取用**：块解码已经写进类型化列缓冲（`columnar::ColumnData`：`Int32`/`Int64`/`Float64`/`Bool`/`Utf8{offsets,data}` + 位图），纯投影与 thrift 打包全程不碰 `Value`；但表达式求值（`filter`/`sort`/`aggregate`/`project` 的表达式列）仍按行把 cell 物化成 `Value` 再算，perf 里的 malloc/free 主要来自这里。
+2. **文本型列必须解析**：varchar/json/date 只有文本形态；`SELECT id, name` 的解码 7.9 ms 里约 5.7 ms 是 varchar 这一列（现在是往 `Utf8Column` 的 `data`/`offsets` 里直接写，不再逐 cell 分配 `String`）。
+3. 继续往下要**按列求值**：把 `Expr::eval(&[Value])` 换成按列向量化的求值，这一步不动结果模型（结果已经是 `DataBlock`），只动表达式层。

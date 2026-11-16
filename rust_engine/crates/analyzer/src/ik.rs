@@ -111,11 +111,14 @@ impl IKAnalyzer {
 mod ik_analyzer_tests {
     use super::*;
 
-    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+    /// `INFINITY_RESOURCE_PATH` or the shipped root.
+    fn resource_dir() -> std::path::PathBuf {
+        crate::core::resource_path()
+    }
 
     #[test]
     fn test1() {
-        let resource = Path::new(RESOURCE_DIR);
+        let resource = resource_dir();
         if !resource.is_dir() {
             panic!("Resource directory doesn't exist: {}", resource.display());
         }

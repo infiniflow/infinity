@@ -20,10 +20,8 @@ fn result(e: &Engine, sql: &str) -> QueryResult {
 }
 
 /// Rows as display text, for assertions.
-fn texts(rows: &[Vec<crate::Value>]) -> Vec<Vec<String>> {
-    rows.iter()
-        .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
-        .collect()
+fn texts(rows: &crate::Batch) -> Vec<Vec<String>> {
+    rows.text_rows()
 }
 
 fn select_rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {

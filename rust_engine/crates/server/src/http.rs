@@ -2697,9 +2697,8 @@ pub async fn route(
                 Ok(result) => {
                     let value = match result {
                         QueryResult::Rows { rows, .. } => rows
-                            .first()
-                            .and_then(|r| r.first())
-                            .map(|v| v.to_slt_string())
+                            .row(0)
+                            .and_then(|r| r.first().map(|v| v.to_slt_string()))
                             .unwrap_or_default(),
                         _ => String::new(),
                     };
@@ -3086,9 +3085,8 @@ pub async fn route(
             match engine.show_variable(name, executor::Scope::Global) {
                 Ok(QueryResult::Rows { rows, .. }) => {
                     let value = rows
-                        .first()
-                        .and_then(|r| r.first())
-                        .map(|v| v.to_slt_string())
+                        .row(0)
+                        .and_then(|r| r.first().map(|v| v.to_slt_string()))
                         .unwrap_or_default();
                     (
                         200,

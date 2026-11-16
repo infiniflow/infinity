@@ -466,15 +466,7 @@ pub(crate) fn block_of(seq: usize) -> (u32, u16) {
 
 /// The buffer a column of `declared` type is decoded into.
 pub(crate) fn column_buffer(declared: &str) -> ColumnData {
-    let t = declared.trim().to_ascii_uppercase();
-    let base = t.split('(').next().unwrap_or("").trim();
-    match base {
-        "BOOL" | "BOOLEAN" => ColumnData::Bool(Vec::new()),
-        "FLOAT" | "DOUBLE" | "FLOAT16" | "BFLOAT16" => ColumnData::Float(Vec::new()),
-        "TINYINT" | "SMALLINT" | "INT" | "INTEGER" | "BIGINT" | "UINT8" | "UINT16" | "UINT32"
-        | "UINT64" => ColumnData::Int(Vec::new()),
-        _ => ColumnData::Text(crate::columnar::TextColumn::default()),
-    }
+    ColumnData::new(declared)
 }
 
 pub(crate) fn decode_value(
@@ -620,7 +612,7 @@ pub(crate) fn decode_text_cell(
     body: &[u8],
     row: usize,
     outline: &[u8],
-    text: &mut crate::columnar::TextColumn,
+    text: &mut crate::columnar::Utf8Column,
 ) -> Option<bool> {
     match layout {
         ColumnLayout::VarLen(16) => {

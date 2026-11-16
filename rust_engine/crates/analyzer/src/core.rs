@@ -1927,19 +1927,24 @@ mod tests {
 #[cfg(test)]
 mod analyzer_pool_tests {
     use super::*;
-    use std::path::Path;
 
     /// A missing resource directory is a hard failure rather than a skip,
     /// matching the reference: CI always mounts it, so skipping would turn a
     /// broken resource setup into a green run.
-    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+    ///
+    /// `INFINITY_RESOURCE_PATH` names a resource checkout
+    /// (`~/codebase/workspace/resource` on a dev box); the shipped
+    /// `/usr/share/infinity/resource` otherwise.
+    fn resource_dir() -> std::path::PathBuf {
+        super::resource_path()
+    }
 
     /// Coarse tokenization keeps this as one token, fine-grained tokenization
     /// splits it into "中华" + "人民共和国".
     const GRAIN_PROBE: &str = "中华人民共和国";
 
     fn resource_available() -> bool {
-        Path::new(RESOURCE_DIR).is_dir()
+        resource_dir().is_dir()
     }
 
     /// C++: `AnalyzerPoolTest::GetRAGAnalyzer`.
@@ -1968,13 +1973,14 @@ mod analyzer_pool_tests {
     /// third_party/darts/darts.h), so this pins the port to it.
     #[test]
     fn test_rag_trie_rebuild_matches_the_shipped_file() {
-        let root = Path::new(RESOURCE_DIR);
+        let root = resource_dir();
         if !root.is_dir() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
-        let built = build_trie(root).expect("build the trie");
+        let built = build_trie(&root).expect("build the trie");
         let shipped_path = root.join("rag/huqie.trie");
         let shipped = std::fs::read(&shipped_path)
             .unwrap_or_else(|err| panic!("read {}: {err}", shipped_path.display()));
@@ -1992,7 +1998,8 @@ mod analyzer_pool_tests {
     fn test_rag_converts_traditional_before_segmenting() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let traditional = get_rag_analyzer("rag").expect("rag analyzer");
@@ -2023,7 +2030,8 @@ mod analyzer_pool_tests {
     fn test_rag_default_is_english_and_coarse() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let analyzer = get_rag_analyzer("rag").expect("rag analyzer");
@@ -2044,7 +2052,8 @@ mod analyzer_pool_tests {
     fn test_rag_fine_keeps_english_stemming() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let analyzer = get_rag_analyzer("rag-fine").expect("rag-fine analyzer");
@@ -2060,7 +2069,8 @@ mod analyzer_pool_tests {
     fn test_rag_slovak_folds_and_disables_stemming() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let analyzer = get_rag_analyzer("rag-slovak").expect("rag-slovak analyzer");
@@ -2080,7 +2090,8 @@ mod analyzer_pool_tests {
     fn test_rag_czech_folds_and_disables_stemming() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let analyzer = get_rag_analyzer("rag-czech").expect("rag-czech analyzer");
@@ -2101,7 +2112,8 @@ mod analyzer_pool_tests {
     fn test_rag_language_and_fine_in_both_orders() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         let expected = vec![
@@ -2130,7 +2142,8 @@ mod analyzer_pool_tests {
     fn test_rag_unknown_segment_falls_back_to_legacy() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         // Unknown languages, an empty segment and a stray trailing '-' must not
@@ -2165,7 +2178,8 @@ mod analyzer_pool_tests {
     fn test_rag_analyzers_are_independent() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzer cannot be loaded"
+                "Resource directory {} not available; the analyzer cannot be loaded",
+                resource_dir().display()
             );
         }
         // Every GetAnalyzer() call copies the cached prototype; a
@@ -2392,7 +2406,8 @@ mod analyzer_pool_tests {
     fn analyzer_suffixes_reach_the_constructed_analyzers() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzers cannot be loaded"
+                "Resource directory {} not available; the analyzers cannot be loaded",
+                resource_dir().display()
             );
         }
         let terms = |name: &str, text: &str| -> Vec<String> {
@@ -2444,7 +2459,8 @@ mod analyzer_pool_tests {
     fn test_analyzer_families_construct() {
         if !resource_available() {
             panic!(
-                "Resource directory {RESOURCE_DIR} not available; the analyzers cannot be loaded"
+                "Resource directory {} not available; the analyzers cannot be loaded",
+                resource_dir().display()
             );
         }
         let cases: &[(&str, Option<&str>)] = &[
@@ -2624,7 +2640,10 @@ mod analyzer_pool_tests {
     #[test]
     fn test_japanese_analyzer_segments_with_ipadic() {
         if !resource_available() {
-            panic!("Resource directory {RESOURCE_DIR} not available; ipadic cannot be loaded");
+            panic!(
+                "Resource directory {} not available; ipadic cannot be loaded",
+                resource_dir().display()
+            );
         }
         let analyzer = AnalyzerPool::instance().get_analyzer("japanese").unwrap();
 
@@ -2649,7 +2668,10 @@ mod analyzer_pool_tests {
     #[test]
     fn test_japanese_analyzer_lowercases_alphabet_runs() {
         if !resource_available() {
-            panic!("Resource directory {RESOURCE_DIR} not available; ipadic cannot be loaded");
+            panic!(
+                "Resource directory {} not available; ipadic cannot be loaded",
+                resource_dir().display()
+            );
         }
         let analyzer = AnalyzerPool::instance().get_analyzer("japanese").unwrap();
         assert_eq!(
@@ -2667,7 +2689,10 @@ mod analyzer_pool_tests {
     #[test]
     fn test_korean_analyzer_segments_with_ko_dic() {
         if !resource_available() {
-            panic!("Resource directory {RESOURCE_DIR} not available; ko-dic cannot be loaded");
+            panic!(
+                "Resource directory {} not available; ko-dic cannot be loaded",
+                resource_dir().display()
+            );
         }
         let analyzer = AnalyzerPool::instance().get_analyzer("korean").unwrap();
 
@@ -2695,9 +2720,12 @@ mod analyzer_pool_tests {
     #[test]
     fn test_opencc_converts_traditional_to_simplified() {
         if !resource_available() {
-            panic!("Resource directory {RESOURCE_DIR} not available; opencc cannot be loaded");
+            panic!(
+                "Resource directory {} not available; opencc cannot be loaded",
+                resource_dir().display()
+            );
         }
-        let converter = OpenCcConverter::load(RESOURCE_DIR).unwrap();
+        let converter = OpenCcConverter::load(resource_dir()).unwrap();
         assert_eq!(converter.convert("漢字測試"), "汉字测试");
         assert_eq!(converter.convert("臺灣大學的學生"), "台湾大学的学生");
         assert_eq!(converter.convert("這個問題很難解決"), "这个问题很难解决");
@@ -2714,7 +2742,10 @@ mod analyzer_pool_tests {
     #[test]
     fn test_traditional_analyzer_converts_then_segments() {
         if !resource_available() {
-            panic!("Resource directory {RESOURCE_DIR} not available; opencc cannot be loaded");
+            panic!(
+                "Resource directory {} not available; opencc cannot be loaded",
+                resource_dir().display()
+            );
         }
         let chinese = AnalyzerPool::instance().get_analyzer("chinese").unwrap();
         let traditional = AnalyzerPool::instance()
@@ -2766,10 +2797,12 @@ mod rag_analyzer_tests {
     use std::process::Command;
 
     /// The reference fixture: a missing resource directory is a hard failure.
-    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+    fn resource_dir() -> std::path::PathBuf {
+        super::resource_path()
+    }
 
     fn load_analyzer() -> RAGAnalyzer {
-        RAGAnalyzer::load(RESOURCE_DIR).expect("RAGAnalyzer load")
+        RAGAnalyzer::load(resource_dir()).expect("RAGAnalyzer load")
     }
 
     fn repo_root() -> PathBuf {
@@ -3225,11 +3258,14 @@ mod rag_regex_tests {
 mod chinese_analyzer_tests {
     use super::*;
 
-    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+    /// `INFINITY_RESOURCE_PATH` or the shipped root.
+    fn resource_dir() -> std::path::PathBuf {
+        super::resource_path()
+    }
 
     #[test]
     fn test1() {
-        let resource = Path::new(RESOURCE_DIR);
+        let resource = resource_dir();
         if !resource.is_dir() {
             panic!("Resource directory doesn't exist: {}", resource.display());
         }

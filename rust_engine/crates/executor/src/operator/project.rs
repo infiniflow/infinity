@@ -51,7 +51,7 @@ impl Projection {
         let mut out = DataChunk::with_capacity(self.exprs.len(), block.capacity());
         for row in 0..block.row_count() {
             let input: Vec<_> = (0..block.column_count())
-                .map(|column| block.get(row, column).cloned().unwrap_or(Value::Null))
+                .map(|column| block.get(row, column).unwrap_or(Value::Null))
                 .collect();
             let projected: Vec<_> = self.exprs.iter().map(|expr| expr.eval(&input)).collect();
             out.push_row(&projected)?;

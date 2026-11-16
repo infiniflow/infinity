@@ -4,24 +4,43 @@ impl QueryResult {
     /// This result's rows as display text (what a `.slt` file or the CLI shows).
     pub fn rows_text(&self) -> Vec<Vec<String>> {
         match self {
-            QueryResult::Rows { rows, .. } => rows
-                .iter()
-                .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
-                .collect(),
+            QueryResult::Rows { rows, .. } => rows.text_rows(),
             _ => Vec::new(),
         }
     }
 
-    /// A result set whose rows are already display text (`SHOW`, `DESCRIBE`,
-    /// `EXPLAIN`, ...): each cell becomes a `Value::Str`, which renders back to
-    /// exactly the same text.
-    pub fn text(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
+    /// This result's rows, materialised from the column buffers.
+    pub fn rows_values(&self) -> Vec<Vec<Value>> {
+        match self {
+            QueryResult::Rows { rows, .. } => rows.rows(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// A result set built from `Value` rows: the columns are typed from what the
+    /// rows hold (`i64`, `f64`, `bool`, text) and the cells go into buffers.
+    pub fn values(columns: Vec<String>, rows: Vec<Vec<Value>>) -> Self {
+        let mut batch = Batch::from_rows(rows);
+        batch.columns = columns.clone();
         QueryResult::Rows {
             columns,
-            rows: rows
-                .into_iter()
+            rows: batch,
+        }
+    }
+
+    /// A result set whose rows are already display text (`SHOW`, `DESCRIBE`,
+    /// `EXPLAIN`, ...): each cell becomes a text cell, which renders back to
+    /// exactly the same text.
+    pub fn text(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
+        let mut batch = Batch::from_rows(
+            rows.into_iter()
                 .map(|r| r.into_iter().map(Value::Str).collect())
                 .collect(),
+        );
+        batch.columns = columns.clone();
+        QueryResult::Rows {
+            columns,
+            rows: batch,
         }
     }
 }
@@ -2028,15 +2047,15 @@ impl Engine {
                 ]
             })
             .collect();
-        Ok(QueryResult::Rows {
-            columns: vec![
+        Ok(QueryResult::values(
+            vec![
                 "name".to_string(),
                 "type".to_string(),
                 "default".to_string(),
                 "comment".to_string(),
             ],
-            rows: text_rows(rows),
-        })
+            text_rows(rows),
+        ))
     }
 
     /// `AppendInBlock` for the rows a statement just committed.
@@ -2286,7 +2305,7 @@ impl Engine {
     /// [`QueryResult`] renders cells as text, but `INSERT … SELECT` and
     /// `CREATE TABLE … AS SELECT` must preserve values (and NULLs) before
     /// casting them to the target schema.
-    pub(crate) fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    pub(crate) fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Batch)> {
         self.run_select_with_ctes(stmt, &HashMap::new())
     }
 
@@ -2297,7 +2316,7 @@ impl Engine {
         &self,
         stmt: &Statement,
         outer_ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    ) -> Result<(Vec<String>, Batch)> {
         let mut cte_scope = outer_ctes.clone();
         if let Statement::Select { ctes, .. } = stmt {
             for cte in ctes {
@@ -2317,7 +2336,8 @@ impl Engine {
                     }
                     columns = cte.columns.clone();
                 }
-                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows));
+                // A CTE is a relation the operators scan, so it is kept as rows.
+                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows.rows()));
             }
         }
         let Statement::Select {
@@ -2376,7 +2396,10 @@ impl Engine {
                             .cloned()
                             .flatten()
                             .unwrap_or_else(|| "count(star)".to_string());
-                        return Ok((vec![name], vec![vec![Value::Int(n as i64)]]));
+                        return Ok((
+                            vec![name],
+                            Batch::from_rows(vec![vec![Value::Int(n as i64)]]),
+                        ));
                     }
                 }
             }
@@ -2576,6 +2599,9 @@ impl Engine {
         // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
         // A derived table's rows are the scan source from the start.
         let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
+        // A plain projection answered by the block mirror arrives as a block, not
+        // as rows: `direct_projection` hands it over untouched.
+        let mut override_block: Option<Batch> = None;
         if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
             let pred = match where_pred.as_ref() {
                 Some(p) => Some(planner::predicate_expr(p, &tables[0].1)?),
@@ -2609,7 +2635,7 @@ impl Engine {
             && !*distinct
         {
             if let Some(t) = from.as_ref() {
-                override_rows = self.try_projection(t, items)?;
+                override_block = self.try_projection(t, items)?;
             }
         }
         // `ROW_ID()` outside a SEARCH exposes the row's sequence number
@@ -2876,6 +2902,7 @@ impl Engine {
         let (columns, mut rows) = self.run_plan(
             plan,
             override_rows,
+            override_block,
             source_columns,
             candidate,
             unmatchable,
@@ -2884,15 +2911,23 @@ impl Engine {
             rough_filter_done,
         )?;
         if *distinct {
+            // `DISTINCT` is the one step here that wants whole rows: the
+            // samples are compared on their text form, and the surviving rows
+            // are compacted out of the buffers by mask.
             let mut seen = std::collections::HashSet::new();
-            rows.retain(|r| {
-                seen.insert(
-                    r.iter()
-                        .map(|v| v.to_slt_string())
-                        .collect::<Vec<_>>()
-                        .join("\u{1f}"),
-                )
-            });
+            let keep: Vec<bool> = rows
+                .rows()
+                .iter()
+                .map(|r| {
+                    seen.insert(
+                        r.iter()
+                            .map(|v| v.to_slt_string())
+                            .collect::<Vec<_>>()
+                            .join("\u{1f}"),
+                    )
+                })
+                .collect();
+            rows.retain(&keep);
         }
         Ok((columns, rows))
     }
@@ -2913,8 +2948,38 @@ impl Engine {
         &self,
         plan: &LogicalPlan,
         rows: &mut Option<Vec<Vec<Value>>>,
+        block: &mut Option<Batch>,
         source_columns: Option<&Vec<String>>,
-    ) -> Option<(Vec<String>, Vec<Vec<Value>>)> {
+    ) -> Option<(Vec<String>, Batch)> {
+        // `SELECT *` (every column, in order, no expression) reaches the
+        // executor as a bare scan: the columns the scan names are the result, so
+        // the block reader is the whole plan.
+        if let LogicalPlan::Scan { table, columns } = plan {
+            if block.is_some() || rows.is_some() {
+                return None;
+            }
+            // Only the `SELECT *` shape: the scan names the table's leading
+            // columns in schema order. A reordered or widened list is a
+            // projection the operators must apply.
+            let schema = self.table_schema(table).ok()?;
+            if !columns
+                .iter()
+                .enumerate()
+                .all(|(i, name)| schema.get(i) == Some(name))
+            {
+                return None;
+            }
+            let pos: Vec<usize> = match source_columns {
+                Some(full) => columns
+                    .iter()
+                    .map(|name| full.iter().position(|c| c == name))
+                    .collect::<Option<Vec<_>>>()?,
+                None => (0..columns.len()).collect(),
+            };
+            let mut batch = self.read_columns_batch(table, &pos, None)?;
+            batch.columns = columns.clone();
+            return Some((columns.clone(), batch));
+        }
         let LogicalPlan::Projection {
             input,
             exprs,
@@ -2970,6 +3035,33 @@ impl Engine {
             },
             _ => return None,
         };
+        // The block mirror already answered this projection: it holds exactly
+        // the output columns, so the plan's projection is an identity over it.
+        if let Some(mut projected) = block.take() {
+            if projected.width() == indices.len() {
+                projected.columns = names.clone();
+                return Some((names.clone(), projected));
+            }
+            *block = Some(projected);
+        }
+        // A select list that is nothing but columns, with no predicate, is a
+        // column selection: the block reader fills the typed buffers of the
+        // columns the query names and the block is handed over as it is. No row
+        // is built, so nothing is decoded twice.
+        if predicate.is_none() && rows.is_none() {
+            let wanted: Vec<usize> = indices
+                .iter()
+                .filter_map(|i| pos.get(*i).copied())
+                .collect();
+            if wanted.len() == indices.len() {
+                if let Some(mut batch) = self.read_columns_batch(table, &wanted, None) {
+                    if batch.data.len() == wanted.len() {
+                        batch.columns = names.clone();
+                        return Some((names.clone(), batch));
+                    }
+                }
+            }
+        }
         // Only now that the shape is known is the materialised row set taken:
         // it is the caller's, and a plan this function declines must keep it.
         let mut filtered = false;
@@ -3068,7 +3160,9 @@ impl Engine {
                 })
                 .collect()
         };
-        Some((names.clone(), out))
+        let mut batch = Batch::from_rows(out);
+        batch.columns = names.clone();
+        Some((names.clone(), batch))
     }
 
     pub(crate) fn fetch_rows(&self, table: &str) -> Result<Vec<Vec<Value>>> {
@@ -3371,7 +3465,7 @@ impl Engine {
         &self,
         table: &str,
         items: &[SelectItem],
-    ) -> Result<Option<Vec<Vec<Value>>>> {
+    ) -> Result<Option<Batch>> {
         let table = if table.contains('.') {
             table.to_string()
         } else {
@@ -3432,34 +3526,58 @@ impl Engine {
         if !self.wide_text_columns(table) {
             if let Some(rows) = self.buffered_rows_values(table, Some(&wanted)) {
                 let deleted = self.tombstone_set(table)?;
-                return Ok(Some(
-                    rows.into_iter()
-                        .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
-                        .map(|(_, cells)| cells)
-                        .collect(),
-                ));
+                let kept: Vec<Vec<Value>> = rows
+                    .into_iter()
+                    .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+                    .map(|(_, cells)| cells)
+                    .collect();
+                return Ok(Some(self.block_of(table, &wanted, kept)?));
             }
         }
-        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, &[]) else {
+        // The block mirror is already columnar: fill the typed buffers of the
+        // selected columns and hand the block over. The reader applies the
+        // tombstones and the append buffer itself, so nothing here rebuilds a
+        // row.
+        let Some(batch) = self.read_columns_batch(table, &wanted, None) else {
             return Ok(None);
         };
         // The files alone hold `snapshot.len()` rows; the append buffer adds
         // the ones the commits since the checkpoint wrote. Fewer than the
         // snapshot means the mirror was rewritten under us.
-        if snapshot.as_ref().is_some_and(|s| rows.len() < s.len()) {
+        if snapshot.as_ref().is_some_and(|s| batch.row_count < s.len()) {
             return Ok(None);
         }
-        // The projected read already carries the append buffer's rows over the
-        // blocks (`read_blocks_selected`), so the row set is the one the
-        // full scan returns; only the tombstones the files do not mark yet have
-        // to be dropped here.
-        let deleted = self.tombstone_set(table)?;
-        let out: Vec<Vec<Value>> = rows
-            .into_iter()
-            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
-            .map(|(_, cells)| cells)
+        Ok(Some(batch))
+    }
+
+    /// Builds a result block out of already materialised rows of the columns
+    /// `wanted`, typed from the table's declared types.
+    fn block_of(&self, table: &str, wanted: &[usize], rows: Vec<Vec<Value>>) -> Result<Batch> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&self.qualified_table(table))?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let mut data: Vec<ColumnData> = wanted
+            .iter()
+            .map(|pos| ColumnData::new(meta.types.get(*pos).map(String::as_str).unwrap_or("")))
             .collect();
-        Ok(Some(out))
+        for row in &rows {
+            for (c, column) in data.iter_mut().enumerate() {
+                // The rows keep the table's width: the cells this projection
+                // does not read are `Null` in them, so the column a result
+                // buffer wants is `wanted[c]`, not `c`.
+                match row.get(wanted[c]) {
+                    Some(value) => column.push_value(value),
+                    None => column.push_null(),
+                }
+            }
+        }
+        let columns = wanted
+            .iter()
+            .map(|pos| meta.columns.get(*pos).cloned().unwrap_or_default())
+            .collect();
+        Ok(Batch::new(columns, data, rows.len()))
     }
 
     /// The sidecar holding a table's wide (blob-referenced) cells.
@@ -5112,6 +5230,46 @@ impl Engine {
             }
         }
         let covered = index.load_sealed(&catalog_chunks);
+        // Every row is sealed already: the gap this rebuild exists for is empty,
+        // and the scan below would only rediscover that by decoding the whole
+        // column again - which is what made a reopen of a fully dumped table
+        // read every row of a sparse column. `scanned_rows` still reports the
+        // table, because `is_complete` asks whether this index saw it, not how
+        // many postings it holds.
+        //
+        // A span counts every slot it holds, deleted ones included, so the sum
+        // only proves coverage when the table has no holes; the live row count
+        // is the yardstick, and the slot count says whether it can be trusted.
+        // Both halves matter: comparing spans with the *blocks'* row count read
+        // "25 of 25 covered" on a table whose last ten rows were still in the
+        // WAL (`test_mem_bmp` kept five `4`s where the index covers seven), and
+        // comparing them with the live count alone would let rows deleted from
+        // inside a span stand in for live rows nobody indexed.
+        let covered_rows: u64 = covered
+            .values()
+            .flat_map(|spans| spans.iter())
+            .map(|(begin, end)| end - begin)
+            .sum();
+        let live_rows = reserved as u64;
+        let slot_rows: u64 = self
+            .segment_row_counts(table)
+            .iter()
+            .map(|(_, rows)| *rows)
+            .sum();
+        let holeless = slot_rows == live_rows;
+        if holeless && live_rows > 0 && covered_rows >= live_rows {
+            index.scanned_rows = reserved;
+            index.seal();
+            let shared = Arc::new(std::sync::RwLock::new(index));
+            self.tables
+                .lock()
+                .unwrap()
+                .entry(tkey)
+                .or_default()
+                .sparse
+                .insert(index_id, shared.clone());
+            return Ok(shared);
+        }
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -5660,8 +5818,9 @@ impl Engine {
         Some(len)
     }
 
-    /// Configured byte budget of the in-memory index buffers (built in at
-    /// 8 GiB; the reference's `[buffer] buffer_manager_size` is ignored).
+    /// Configured byte budget of the in-memory index buffers: the reference's
+    /// `[buffer] buffer_manager_size` when the config sets it, the built-in
+    /// 8 GiB when it does not (`Engine::set_buffer_budget`).
     pub fn buffer_memory_limit(&self) -> usize {
         self.context
             .buffer_budget
