@@ -2960,7 +2960,13 @@ fn array_info(text: &str) -> Option<(i32, i32, PhysicalWire)> {
 /// top-level elements, keeping nested `{…}` groups intact.
 fn parse_array_elements(cell: &str) -> Vec<String> {
     let t = cell.trim();
-    let inner = if t.starts_with('{') && t.ends_with('}') && t.len() >= 2 {
+    // The engine renders an array as `[1,2]`; the reference's SLT form uses
+    // braces. Accept either, and track both depths, otherwise a bracketed cell
+    // is split at its inner commas and the nesting is lost -- an
+    // ARRAY(ARRAY(ARRAY(INT))) column then decodes into garbage.
+    let inner = if t.len() >= 2
+        && ((t.starts_with('{') && t.ends_with('}')) || (t.starts_with('[') && t.ends_with(']')))
+    {
         &t[1..t.len() - 1]
     } else {
         t
@@ -2970,11 +2976,11 @@ fn parse_array_elements(cell: &str) -> Vec<String> {
     let mut cur = String::new();
     for ch in inner.chars() {
         match ch {
-            '{' => {
+            '{' | '[' => {
                 depth += 1;
                 cur.push(ch);
             }
-            '}' => {
+            '}' | ']' => {
                 depth -= 1;
                 cur.push(ch);
             }
@@ -8486,6 +8492,26 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An array cell is rendered `[1,2]` by the engine but `{1,2}` in the SLT
+    /// form. Splitting must respect both bracket kinds: with only braces
+    /// tracked, `[[1,2],[3,4]]` split at its inner commas and an
+    /// ARRAY(ARRAY(ARRAY(INT))) column decoded into garbage.
+    #[test]
+    fn array_elements_split_at_the_outer_level_in_either_bracket_kind() {
+        assert_eq!(parse_array_elements("{1,2}"), vec!["1", "2"]);
+        assert_eq!(parse_array_elements("[1,2]"), vec!["1", "2"]);
+        assert_eq!(
+            parse_array_elements("[[1,2],[3,4]]"),
+            vec!["[1,2]", "[3,4]"]
+        );
+        assert_eq!(
+            parse_array_elements("{{{1,2},{3,4}},{{5,6}}}"),
+            vec!["{{1,2},{3,4}}", "{{5,6}}"]
+        );
+        assert_eq!(parse_array_elements("[[[]]]"), vec!["[[]]"]);
+        assert!(parse_array_elements("[]").is_empty());
+    }
 
     /// `RENAME TO` carries a client-supplied name; the text path let the parser
     /// reject one that is not a name. `123` tokenises as a number, so it must
