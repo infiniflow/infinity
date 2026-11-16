@@ -102,11 +102,16 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
     }
 }
 
-void MemIndexTracer::DumpFailed(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+void MemIndexTracer::DumpFailed(const std::string &db_name,
+                                const std::string &table_name,
+                                const std::string &index_name,
+                                SegmentID segment_id,
+                                RowID begin_row_id) {
     std::lock_guard lck(mtx_);
     for (auto iter = proposed_dump_.begin(); iter != proposed_dump_.end(); ++iter) {
         const ProposedDumpEntry &entry = iter->second;
-        if (entry.db_name_ == db_name && entry.table_name_ == table_name && entry.index_name_ == index_name && entry.segment_id_ == segment_id) {
+        if (entry.db_name_ == db_name && entry.table_name_ == table_name && entry.index_name_ == index_name && entry.segment_id_ == segment_id &&
+            entry.begin_row_id_ == begin_row_id) {
             if (proposed_dump_size_ >= entry.mem_used_) {
                 proposed_dump_size_ -= entry.mem_used_;
             } else {
@@ -150,6 +155,7 @@ std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
             entry.table_name_ = mem_index_detail->table_name_;
             entry.index_name_ = mem_index_detail->index_name_;
             entry.segment_id_ = mem_index_detail->segment_id_;
+            entry.begin_row_id_ = mem_index_detail->begin_row_id_;
             proposed_dump_[mem_index_detail->mem_index_] = entry;
             proposed_dump_size_ += mem_index_detail->mem_used_;
         }

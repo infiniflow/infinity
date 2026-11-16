@@ -67,6 +67,10 @@ struct ProposedDumpEntry {
     std::string table_name_{};
     std::string index_name_{};
     SegmentID segment_id_{};
+    // Generation identity: an append during a dump can install a newer mem
+    // index for the same segment, and both can hold reservations. Matching
+    // only the four name/segment fields could release the wrong generation.
+    RowID begin_row_id_{};
 };
 
 export class MemIndexTracer {
@@ -91,7 +95,8 @@ public:
     // Releases the reservation recorded for the identified mem index when its
     // dump task is terminally dropped (attempts exhausted, non-retriable
     // failure, or shutdown), so the next capacity trigger can re-propose it.
-    void DumpFailed(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
+    void
+    DumpFailed(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, RowID begin_row_id);
 
     std::vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
 

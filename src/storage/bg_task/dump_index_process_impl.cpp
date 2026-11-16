@@ -119,7 +119,9 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     // pre-commit failure left a stale value behind.
     Status last_status = Status::Ignore();
     i64 dump_count = 0;
+    bool rollback_done = false;
     do {
+        rollback_done = false;
         if (dump_count > 0) {
             // Backoff between attempts: lock contention with a concurrent
             // optimize transaction is the expected failure, and an immediate
@@ -138,7 +140,6 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id, begin_row_id);
         if (status.ok()) {
             commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
-            last_status = commit_status;
             if (!commit_status.ok()) {
                 LOG_ERROR(fmt::format("Commit dump mem index {}.{}.{} in segment {} failed: {}",
                                       db_name,
@@ -166,10 +167,15 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
                     bg_task_info->status_list_.emplace_back(commit_status.message());
                 }
             }
+            // Assigned after the consumers above: Status::operator=(Status &)
+            // moves the message out of the source, so an earlier assignment
+            // would leave commit_status.message() null for the diagnostics.
+            last_status = commit_status;
         } else {
             LOG_ERROR(
                 fmt::format("Dump mem index {}.{}.{} in segment: {} failed: {}", db_name, table_name, index_name, segment_id, status.message()));
             rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
+            rollback_done = true;
             if (!rollback_status.ok()) {
                 UnrecoverableError(rollback_status.message());
             }
@@ -183,7 +189,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         if (!bg_task_info->task_info_list_.empty()) {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
-    } while (!last_status.ok() && rollback_status.ok() && IsRetriableDumpFailure(last_status) && dump_count < kDumpMaxAttempts &&
+    } while (!last_status.ok() && (!rollback_done || rollback_status.ok()) && IsRetriableDumpFailure(last_status) && dump_count < kDumpMaxAttempts &&
              !stopping_.load(std::memory_order_relaxed));
 
     if (!last_status.ok()) {
@@ -194,7 +200,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         auto *storage = InfinityContext::instance().storage();
         if (storage != nullptr) {
             if (auto *memindex_tracer = storage->memindex_tracer(); memindex_tracer != nullptr) {
-                memindex_tracer->DumpFailed(db_name, table_name, index_name, segment_id);
+                memindex_tracer->DumpFailed(db_name, table_name, index_name, segment_id, begin_row_id);
             }
         }
         LOG_ERROR(fmt::format("Dump mem index {}.{}.{} in segment: {} dropped after {} attempts: {}. Tracer reservation released; the next "
