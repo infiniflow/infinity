@@ -13,6 +13,7 @@
 //! ```
 
 use crate::mapped::MappedFile;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use crate::format::FormatError;
@@ -21,39 +22,64 @@ const MAGIC: &[u8; 8] = b"IMVEC\x01\0\0";
 const HEADER_LEN: usize = 8 + 4 + 4 + 8;
 
 /// Writes one segment's multi-vector column.
+///
+/// The body is streamed through a `BufWriter` rather than assembled in one
+/// `Vec`: building the file in memory cost a second copy of the segment (the
+/// `Vec` doubles while growing, so a 64 MiB chunk peaked around 190 MiB) at the
+/// exact moment `seal` already holds every token row. The header's offsets
+/// pointer is computed from the document lengths, which keeps the layout
+/// byte-identical to the previous in-memory form.
 pub fn write_multivector_segment(
     path: &Path,
     dims: usize,
     docs: &[Vec<Vec<f32>>],
 ) -> Result<(), FormatError> {
-    let mut out = Vec::new();
-    out.extend_from_slice(MAGIC);
-    out.extend_from_slice(&(dims as u32).to_le_bytes());
-    out.extend_from_slice(&(docs.len() as u32).to_le_bytes());
-    let offs_at = out.len();
-    out.extend_from_slice(&0u64.to_le_bytes());
+    let io = |e: std::io::Error| FormatError::Io(format!("{}: {e}", path.display()));
 
-    let mut offsets: Vec<u64> = Vec::with_capacity(docs.len());
+    let mut body = 0usize;
     for doc in docs {
-        offsets.push(out.len() as u64);
-        out.extend_from_slice(&(doc.len() as u32).to_le_bytes());
-        for token in doc {
-            for v in token {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-        }
+        body += 4 + doc.iter().map(|t| t.len() * 4).sum::<usize>();
     }
-    let offs = out.len() as u64;
-    for o in &offsets {
-        out.extend_from_slice(&o.to_le_bytes());
-    }
-    out[offs_at..offs_at + 8].copy_from_slice(&offs.to_le_bytes());
+    let offs_at = HEADER_LEN as u64;
+    let offs = offs_at + body as u64;
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;
     }
-    std::fs::write(path, out).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
+    let file = std::fs::File::create(path).map_err(io)?;
+    let mut out = BufWriter::with_capacity(1 << 20, file);
+
+    out.write_all(MAGIC).map_err(io)?;
+    out.write_all(&(dims as u32).to_le_bytes()).map_err(io)?;
+    out.write_all(&(docs.len() as u32).to_le_bytes())
+        .map_err(io)?;
+    out.write_all(&offs.to_le_bytes()).map_err(io)?;
+
+    // One reusable token buffer: `dims * 4` bytes, instead of a heap `Vec` per
+    // token or a `write_all` per float.
+    let mut token_bytes: Vec<u8> = Vec::with_capacity(dims * 4);
+    let mut offsets: Vec<u64> = Vec::with_capacity(docs.len());
+    let mut at = offs_at;
+    for doc in docs {
+        offsets.push(at);
+        out.write_all(&(doc.len() as u32).to_le_bytes())
+            .map_err(io)?;
+        at += 4;
+        for token in doc {
+            token_bytes.clear();
+            token_bytes.reserve(token.len() * 4);
+            for v in token {
+                token_bytes.extend_from_slice(&v.to_le_bytes());
+            }
+            out.write_all(&token_bytes).map_err(io)?;
+            at += token_bytes.len() as u64;
+        }
+    }
+    for o in &offsets {
+        out.write_all(&o.to_le_bytes()).map_err(io)?;
+    }
+    out.flush().map_err(io)
 }
 
 /// A multi-vector segment mapped read-only.
