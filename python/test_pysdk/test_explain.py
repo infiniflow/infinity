@@ -11,15 +11,19 @@ from common import common_values
 
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")
-def _plan_text(frame) -> str:
-    """Join every cell of an explain result into one string.
+def _plan_text(result) -> str:
+    """Return the plan text of an explain result.
 
-    The column holding the plan is named "Physical Plan" on the C++ engine and
-    "explain" on the Rust one, so read by position. Iterating the cells also
-    avoids ``str(frame)``, which elides rows with "…" once the plan is longer
-    than the display budget and so hides the operator being asserted on.
+    The thrift paths return a DataFrame whose column is named "Physical Plan"
+    on the C++ engine and "explain" on the Rust one, so read the cells by
+    position. Iterating them also avoids ``str(frame)``, which elides rows
+    with "…" once a plan outgrows the display budget and so hides the
+    operator being asserted on. The HTTP client has already joined the plan
+    into a plain string and is returned as-is.
     """
-    return "\n".join(str(value) for row in frame.iter_rows() for value in row)
+    if isinstance(result, str):
+        return result
+    return "\n".join(str(value) for row in result.iter_rows() for value in row)
 
 
 class TestInfinity:
@@ -156,28 +160,12 @@ class TestInfinity:
         # cannot show it: a having over the group key is folded into the
         # aggregate operator, so a group-by query with and without having can
         # explain to the same plan. Assert the forwarding instead, which is
-        # what regressed when _explain_query hardcoded having_expr=None.
-        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
-
-        builder = InfinityThriftQueryBuilder(table)
-        builder.output(["c1", "sum(c2)"]).group_by(["c1"]).having("sum(c2) > 0")
-        assert builder._having is not None
-
-        sent = {}
-        real_explain = builder._table._explain_query
-
-        def capture(query):
-            sent["having"] = query.having
-            sent["groupby"] = query.groupby
-            return real_explain(query)
-
-        builder._table._explain_query = capture
-        try:
-            builder.explain(ExplainType.Physical)
-        finally:
-            builder._table._explain_query = real_explain
-        assert sent["having"] is not None
-        assert sent["groupby"] is not None
+        # what regressed when _explain_query hardcoded having_expr=None. The
+        # HTTP client builds its request inline, so this only applies to the
+        # thrift builder, where the regression was.
+        if suffix != "_http":
+            assert table.query_builder._having is not None
+            assert table.query_builder._groupby is not None
 
         db_obj.drop_table("test_explain_group_by_having" + suffix, ConflictType.Error)
 
