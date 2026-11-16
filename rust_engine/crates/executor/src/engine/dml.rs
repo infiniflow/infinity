@@ -890,10 +890,13 @@ impl Engine {
             // `AppendInBlock`: this batch's rows go into the block's buffer -
             // they are the batch's only copy, there is no `row:` key to read
             // them back from.
-            let published: Vec<(usize, String)> = bottom_encoded
+            // Borrowed, not cloned: the buffer parses each row and keeps the
+            // values, so the batch's text does not need a second full copy
+            // (2048-dim rows: ~80 MB per 5000-row batch).
+            let published: Vec<(usize, &str)> = bottom_encoded
                 .iter()
                 .enumerate()
-                .map(|(k, text)| (base + k, text.clone()))
+                .map(|(k, text)| (base + k, text.as_str()))
                 .collect();
             engine.publish_encoded_rows(&bottom_table, &published)?;
             // The rows are readable now (`AppendInBlock`), so the record may

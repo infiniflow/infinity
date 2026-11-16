@@ -1185,6 +1185,12 @@ impl Engine {
         {
             self.seal_multivector_index(&table, meta.id);
         }
+        // Every arm above builds a segment-sized transient (posting batches, a
+        // graph, a codeword table). Hand it back on the thread that built it;
+        // the periodic trigger only fires every checkpoint interval, so without
+        // this the peak of a dump stays resident until then (and on macOS,
+        // forever).
+        storage::trim_allocator();
     }
 
     /// Drops one multi-vector index's cached instance so the next query
@@ -3776,6 +3782,7 @@ impl Engine {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
+        let mut dumped = false;
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("HNSW") || !full.contains(&im.id) {
                 continue;
@@ -3787,6 +3794,7 @@ impl Engine {
                 continue;
             }
             if self.dump_hnsw_index(&im.table, &im.name).is_ok() {
+                dumped = true;
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
                     e.hnsw_mem.remove(&im.id);
@@ -3794,6 +3802,14 @@ impl Engine {
                     e.hnsw_topup = true;
                 }
             }
+        }
+        // A dump builds the new chunk's graph and buffers while the old graph is
+        // still mapped; on the insert path that transient is what made RSS jump
+        // by ~1 GB on the batch that crossed `mem_index_capacity`, and it never
+        // came back (mimalloc keeps freed pages, and its purge timer only runs
+        // for segments). Purge it here, on the thread that allocated it.
+        if dumped {
+            storage::trim_allocator();
         }
     }
 
@@ -3829,6 +3845,10 @@ impl Engine {
         for id in full {
             self.seal_secondary_indexes_of(table, id);
         }
+        // The keys and the sealed chunk are transient; hand them back here so
+        // the batch that sealed does not leave its peak resident (see
+        // `dump_hnsw_over_capacity`).
+        storage::trim_allocator();
     }
 
     /// The secondary-index columns of `table` whose memory tail reached the
