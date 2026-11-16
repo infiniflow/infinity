@@ -12,7 +12,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -29,9 +29,11 @@ fn columns(engine: &Engine, table: &str) -> Vec<String> {
 }
 
 fn setup(engine: &Engine, db: &str, table: &str, defs: &str) {
-    engine.execute(&format!("CREATE DATABASE {db};")).unwrap();
     engine
-        .execute(&format!("CREATE TABLE {db}.{table} ({defs});"))
+        .execute_blocking(&format!("CREATE DATABASE {db};"))
+        .unwrap();
+    engine
+        .execute_blocking(&format!("CREATE TABLE {db}.{table} ({defs});"))
         .unwrap();
 }
 
@@ -52,7 +54,7 @@ fn test_add_columns() {
     setup(&e, "db1", "tb1", "col1 INT");
 
     append_ints(&e, "db1.tb1", 8192, 1);
-    e.execute(
+    e.execute_blocking(
         "ALTER TABLE db1.tb1 ADD COLUMN \
          (col2 VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyz');",
     )
@@ -78,10 +80,10 @@ fn test_add_columns() {
     );
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2"]);
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1"]);
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 }
 
 /// C++ `column_ut.cpp:179` (`alter_column`): add two columns then drop an
@@ -92,27 +94,27 @@ fn alter_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col4"]);
     // The table is still readable through the surviving columns.
-    e.execute("INSERT INTO db1.tb1 (col1, col4) VALUES (1, 'a');")
+    e.execute_blocking("INSERT INTO db1.tb1 (col1, col4) VALUES (1, 'a');")
         .unwrap();
     assert_eq!(
         rows(&e, "SELECT col1, col4 FROM db1.tb1;"),
         vec![vec!["1".to_string(), "a".to_string()]]
     );
 
-    e.execute("DROP TABLE db1.tb1;").unwrap();
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:250` (`add_column_and_drop_db`): the added column lives
@@ -123,20 +125,20 @@ fn add_column_and_drop_db() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3"]);
 
-    e.execute("DROP DATABASE db1;").unwrap();
-    assert!(e.execute("USE db1;").is_err());
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    assert!(e.execute_blocking("USE db1;").is_err());
     // Adding to the dropped table fails.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
+        .execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .is_err());
     // Recreating the database does not resurrect the table or its column.
-    e.execute("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
     assert!(rows(&e, "SHOW TABLES FROM db1;").is_empty());
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:434` (`add_column_and_drop_table`): an added column is
@@ -147,14 +149,14 @@ fn add_column_and_drop_table() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .unwrap();
-    e.execute("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
     assert!(e
-        .execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
+        .execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .is_err());
     assert!(!e.table_exists("db1.tb1"));
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:740` (`add_column_and_add_column`): distinct adds both
@@ -169,19 +171,19 @@ fn add_column_and_add_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
     // Duplicate column name (the reference's second add) is rejected.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
+        .execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR);")
         .is_err());
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3", "col4"]);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:1030` (`drop_column_and_drop_db`): dropping a column
@@ -193,17 +195,17 @@ fn drop_column_and_drop_db() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1"]);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .is_err());
-    e.execute("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
     assert!(rows(&e, "SHOW TABLES FROM db1;").is_empty());
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:1165` (`drop_column_and_drop_table`): the column drop and
@@ -215,15 +217,15 @@ fn drop_column_and_drop_table() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
-    e.execute("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .is_err());
     assert!(!e.table_exists("db1.tb1"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `column_ut.cpp:1453` (`drop_column_and_add_column`): drop col2 then add
@@ -234,22 +236,22 @@ fn drop_column_and_add_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR");
 
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col4"]);
 
     // The opposite interleaving: add col3 first, then drop col2.
-    e.execute("CREATE TABLE db1.tb2 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE db1.tb2 (col1 INT, col2 VARCHAR);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb2 ADD COLUMN (col3 VARCHAR);")
+    e.execute_blocking("ALTER TABLE db1.tb2 ADD COLUMN (col3 VARCHAR);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb2 DROP COLUMN (col2);")
+    e.execute_blocking("ALTER TABLE db1.tb2 DROP COLUMN (col2);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb2"), vec!["col1", "col3"]);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// Reproduction of `test/sql/ddl/alter/drop_column_with_index.slt`: the
@@ -267,19 +269,20 @@ fn drop_column_keeps_index_row_ids_in_sync() {
         "tb1",
         "a INT, b VARCHAR, c EMBEDDING(float, 4), d SPARSE(float, 30000), e INT",
     );
-    e.execute("CREATE INDEX idx_b ON db1.tb1 (b) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX idx_b ON db1.tb1 (b) USING FULLTEXT;")
         .unwrap();
-    e.execute("CREATE INDEX idx_c ON db1.tb1 (c) USING Hnsw WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX idx_c ON db1.tb1 (c) USING Hnsw WITH (metric = l2);")
         .unwrap();
-    e.execute("CREATE INDEX idx_d ON db1.tb1 (d) USING BMP WITH (block_size = 16);")
+    e.execute_blocking("CREATE INDEX idx_d ON db1.tb1 (d) USING BMP WITH (block_size = 16);")
         .unwrap();
-    e.execute(
+    e.execute_blocking(
         "INSERT INTO db1.tb1 VALUES \
          (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0], 1);",
     )
     .unwrap();
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (e);").unwrap();
-    e.execute(
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (e);")
+        .unwrap();
+    e.execute_blocking(
         "INSERT INTO db1.tb1 VALUES \
          (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0]);",
     )
@@ -329,7 +332,7 @@ fn drop_column_keeps_index_row_ids_in_sync() {
         vec![vec!["1".to_string()]]
     );
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 /// different columns leaves the third; dropping an already-dropped column
 /// fails and leaves the remaining schema untouched.
@@ -340,20 +343,20 @@ fn drop_column_and_drop_column() {
     setup(&e, "db1", "tb1", "col1 INT, col2 VARCHAR, col3 VARCHAR");
 
     // Two committed drops of different columns.
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .unwrap();
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col2"]);
 
     // Dropping the same names again fails.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .is_err());
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col3);")
         .is_err());
     assert_eq!(columns(&e, "db1.tb1"), vec!["col2"]);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }

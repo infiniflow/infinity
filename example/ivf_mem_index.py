@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is about connecting to the local infinity instance, creating table, inserting data, creating ivf index, and searching data
-'''
+"""
 
 import sys
 import time
@@ -26,7 +26,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -69,7 +71,7 @@ try:
     # SELECT c1 FROM my_table SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3)
     data_dict, data_type_dict, _ = (
         table_obj.output(["c1"])
-        .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe" : "100"})
+        .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe": "100"})
         .to_result()
     )
     print(data_dict["c1"])
@@ -77,7 +79,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

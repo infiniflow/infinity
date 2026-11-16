@@ -41,12 +41,13 @@ __all__ = [
     "InfinityException",
     "LocalInfinityConnection",
     "NetworkAddress",
-    "connect"
+    "connect",
 ]
 
 
-
-def connect(uri=LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH) -> InfinityConnection:
+def connect(
+    uri=LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH
+) -> InfinityConnection:
     if isinstance(uri, str) and len(uri) != 0:
         return LocalInfinityConnection(uri, config_path)
     else:

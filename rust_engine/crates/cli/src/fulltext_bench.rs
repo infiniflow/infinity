@@ -176,7 +176,7 @@ fn run_queries(e: &Engine) -> common::Result<()> {
         let mut hits = 0;
         for i in 0..repeat {
             let t = Instant::now();
-            let rs = e.execute(&sql)?;
+            let rs = e.execute_blocking(&sql)?;
             let elapsed = t.elapsed();
             if i == 0 {
                 first = elapsed;
@@ -201,8 +201,8 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
         run_queries(&e)?;
         return Ok(());
     }
-    let _ = e.execute(&format!("DROP TABLE IF EXISTS {TABLE};"));
-    e.execute(&format!(
+    let _ = e.execute_blocking(&format!("DROP TABLE IF EXISTS {TABLE};"));
+    e.execute_blocking(&format!(
         "CREATE TABLE {TABLE} (id VARCHAR, title VARCHAR, text VARCHAR);"
     ))?;
 
@@ -221,7 +221,7 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
         None => format!("CREATE INDEX {INDEX} ON {TABLE} (text) USING FULLTEXT;"),
     };
     let t = Instant::now();
-    e.execute(&create_index_sql)?;
+    e.execute_blocking(&create_index_sql)?;
     let create_index = t.elapsed();
     match checkpoint_cost(&e)? {
         Some(flush) => {
@@ -304,6 +304,6 @@ fn checkpoint_cost(e: &Engine) -> common::Result<Option<std::time::Duration>> {
         return Ok(None);
     }
     let t = Instant::now();
-    e.flush()?;
+    executor::block_on(e.flush())?;
     Ok(Some(t.elapsed()))
 }

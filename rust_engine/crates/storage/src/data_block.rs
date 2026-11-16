@@ -1064,44 +1064,75 @@ impl Column {
         let rows = self.size();
         let constant = self.vector_type() == ColumnVectorType::Constant;
         let value_rows = if constant { 1 } else { rows };
+        // Reserve a sensible size up front: the branches below append row by
+        // row, and without this a 5000-row batch grows the buffer through many
+        // reallocations (each copying everything written so far). A dense
+        // fixed-width column is the common case; strings reserve only their
+        // slot array and let the heap grow.
+        let fixed_width = match self {
+            Column::Bool(_) | Column::TinyInt(_) => 1,
+            Column::SmallInt(_) => 2,
+            Column::Int32(_) | Column::Float32(_) | Column::Date(_) | Column::Time(_) => 4,
+            Column::Int(_) | Column::Float(_) | Column::Decimal(_) => 8,
+            Column::DateTime(_) | Column::Timestamp(_) | Column::RowId(_) => 8,
+            Column::Interval(_) => 5,
+            Column::Uuid(_) => 16,
+            Column::Str(_) | Column::Bytes(_) | Column::Json(_) => 8,
+            Column::HugeInt(_) | Column::Embedding(_) | Column::Array(_) | Column::Mixed(_) => 8,
+        };
+        out.reserve(9 + rows.div_ceil(8) + value_rows * fixed_width);
         out.push(self.tag());
         out.push(u8::from(constant));
         out.extend_from_slice(&(rows as u32).to_le_bytes());
-        let mut bitmap = vec![0u8; rows.div_ceil(8)];
+        // Build the validity bitmap in place instead of in a scratch `Vec`.
+        let bitmap_at = out.len();
+        out.resize(bitmap_at + rows.div_ceil(8), 0);
         for row in 0..rows {
             if self.row_is_valid(row) {
-                bitmap[row / 8] |= 1 << (row % 8);
+                out[bitmap_at + row / 8] |= 1 << (row % 8);
             }
         }
-        out.extend_from_slice(&bitmap);
 
         macro_rules! write_pod {
-            ($c:expr, $conv:expr) => {
+            ($c:expr, $conv:expr, $w:expr) => {{
+                // Fixed-width: write one contiguous block instead of one
+                // `extend_from_slice` per row.
+                let at = out.len();
+                out.resize(at + value_rows * $w, 0);
                 for row in 0..value_rows {
-                    out.extend_from_slice(&$conv(value_at($c, row)));
+                    let bytes = $conv(value_at($c, row));
+                    out[at + row * $w..at + (row + 1) * $w].copy_from_slice(&bytes);
                 }
-            };
+            }};
         }
         match self {
-            Column::Bool(c) => write_pod!(c, |v: bool| [u8::from(v)]),
-            Column::TinyInt(c) => write_pod!(c, |v: i8| v.to_le_bytes()),
-            Column::SmallInt(c) => write_pod!(c, |v: i16| v.to_le_bytes()),
-            Column::Int32(c) => write_pod!(c, |v: i32| v.to_le_bytes()),
-            Column::Int(c) => write_pod!(c, |v: i64| v.to_le_bytes()),
-            Column::Float32(c) => write_pod!(c, |v: f32| v.to_bits().to_le_bytes()),
-            Column::Float(c) => write_pod!(c, |v: f64| v.to_bits().to_le_bytes()),
+            Column::Bool(c) => write_pod!(c, |v: bool| [u8::from(v)], 1),
+            Column::TinyInt(c) => write_pod!(c, |v: i8| v.to_le_bytes(), 1),
+            Column::SmallInt(c) => write_pod!(c, |v: i16| v.to_le_bytes(), 2),
+            Column::Int32(c) => write_pod!(c, |v: i32| v.to_le_bytes(), 4),
+            Column::Int(c) => write_pod!(c, |v: i64| v.to_le_bytes(), 8),
+            Column::Float32(c) => write_pod!(c, |v: f32| v.to_bits().to_le_bytes(), 4),
+            Column::Float(c) => write_pod!(c, |v: f64| v.to_bits().to_le_bytes(), 8),
             Column::Str(c) => {
                 for row in 0..value_rows {
                     let value = value_at(c, row);
-                    out.extend_from_slice(&(value.len() as u32).to_le_bytes());
-                    out.extend_from_slice(value.as_bytes());
+                    // One grown-by-exactly reservation per value instead of two
+                    // `extend_from_slice` calls: the second used to re-check
+                    // (and possibly realloc) capacity for every row.
+                    let bytes = value.as_bytes();
+                    let at = out.len();
+                    out.resize(at + 4 + bytes.len(), 0);
+                    out[at..at + 4].copy_from_slice(&(bytes.len() as u32).to_le_bytes());
+                    out[at + 4..].copy_from_slice(bytes);
                 }
             }
             Column::Bytes(c) => {
                 for row in 0..value_rows {
                     let value = value_at(c, row);
-                    out.extend_from_slice(&(value.len() as u32).to_le_bytes());
-                    out.extend_from_slice(&value);
+                    let at = out.len();
+                    out.resize(at + 4 + value.len(), 0);
+                    out[at..at + 4].copy_from_slice(&(value.len() as u32).to_le_bytes());
+                    out[at + 4..].copy_from_slice(&value);
                 }
             }
             Column::Json(c) => {
@@ -1118,8 +1149,8 @@ impl Column {
                     out.extend_from_slice(&value.scale.to_le_bytes());
                 }
             }
-            Column::Date(c) => write_pod!(c, |v: ::common::DateT| v.value.to_le_bytes()),
-            Column::Time(c) => write_pod!(c, |v: ::common::TimeT| v.value.to_le_bytes()),
+            Column::Date(c) => write_pod!(c, |v: ::common::DateT| v.value.to_le_bytes(), 4),
+            Column::Time(c) => write_pod!(c, |v: ::common::TimeT| v.value.to_le_bytes(), 4),
             Column::DateTime(c) => {
                 for row in 0..value_rows {
                     let value = value_at(c, row);

@@ -69,18 +69,18 @@ fn minio_upload_meta_to_s3() {
 
     let src = tempdir().unwrap();
     let engine = Engine::open(src.path()).unwrap();
-    engine.execute("CREATE DATABASE db1;").unwrap();
+    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
     engine
-        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     engine
-        .execute("INSERT INTO db1.tb1 VALUES (1, 'abcdefghijklmnopqrstuvwxyz');")
+        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'abcdefghijklmnopqrstuvwxyz');")
         .unwrap();
 
     // Checkpoint with the real object store: `data` is mirrored by `flush`,
     // the catalog and row store by the checkpoint itself.
     engine.set_object_store(std::sync::Arc::new(client.clone()));
-    engine.checkpoint_to_object_store().unwrap();
+    crate::scheduler::block_on(engine.checkpoint_to_object_store()).unwrap();
 
     let remote_files = client.list_objects("").unwrap();
     assert!(
@@ -122,7 +122,10 @@ fn minio_upload_meta_to_s3() {
     assert_eq!(restored.mirror_block_row_count("db1.tb1").unwrap(), 1);
 
     let mut rows = Vec::new();
-    for result in restored.execute("SELECT col1, col2 FROM db1.tb1;").unwrap() {
+    for result in restored
+        .execute_blocking("SELECT col1, col2 FROM db1.tb1;")
+        .unwrap()
+    {
         if let crate::QueryResult::Rows { .. } = result {
             rows = result.rows_text();
         }

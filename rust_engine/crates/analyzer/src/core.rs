@@ -1,7 +1,72 @@
 use super::*;
 
+/// rustc's FxHash, seeded per process.
+///
+/// The stem cache is looked up once per token, and SipHash on a short word cost
+/// ~11% of a bulk full-text insert (measured). The keys, though, are the
+/// **tokens of the documents being indexed** - text a client supplies - so a
+/// fixed FxHash would let a caller build ones that all land in the same initial
+/// buckets and turn every lookup into a long probe chain. The seed removes that
+/// determinism while keeping the multiply-shift mixing that made FxHash fast.
+pub(crate) struct FxHasher {
+    hash: u64,
+}
+
+/// The per-process seed every [`FxHasher`] starts from (`RandomState` gives a
+/// fresh, unpredictable value).
+fn fx_seed() -> u64 {
+    use std::hash::{BuildHasher, Hasher};
+    static SEED: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *SEED.get_or_init(|| {
+        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+        h.write_u64(0x9E37_79B9_7F4A_7C15);
+        h.finish()
+    })
+}
+
+impl Default for FxHasher {
+    fn default() -> Self {
+        Self { hash: fx_seed() }
+    }
+}
+
+impl std::hash::Hasher for FxHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
+        let mut rest = bytes;
+        while rest.len() >= 8 {
+            let word = u64::from_ne_bytes(rest[..8].try_into().unwrap());
+            self.hash = (self.hash.rotate_left(5) ^ word).wrapping_mul(SEED);
+            rest = &rest[8..];
+        }
+        for byte in rest {
+            self.hash = (self.hash.rotate_left(5) ^ u64::from(*byte)).wrapping_mul(SEED);
+        }
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+}
+
+/// [`FxHasher`] with the per-process seed, as a `BuildHasher`.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct FxBuildHasher;
+
+impl std::hash::BuildHasher for FxBuildHasher {
+    type Hasher = FxHasher;
+    fn build_hasher(&self) -> FxHasher {
+        FxHasher::default()
+    }
+}
+
+/// A map keyed by short strings with [`FxHasher`].
+type FastMap<K, V> = HashMap<K, V, FxBuildHasher>;
+
 /// `algorithm -> (word -> stem)`, one map per algorithm seen on this thread.
-type StemMemo = Vec<(rust_stemmers::Algorithm, HashMap<Box<str>, Box<str>>)>;
+type StemMemo = Vec<(rust_stemmers::Algorithm, FastMap<Box<str>, Box<str>>)>;
 
 thread_local! {
     pub(crate) static STEM_MEMO: std::cell::RefCell<StemMemo> =
@@ -14,6 +79,18 @@ thread_local! {
 
 /// C++: the shipped resource root (`InfinityContext::config()` fallback).
 pub const DEFAULT_RESOURCE_PATH: &str = "/usr/share/infinity/resource";
+
+/// The resource root [`AnalyzerPool::instance`] loads its dictionaries from.
+///
+/// `INFINITY_RESOURCE_PATH` names a checkout of the resource tree, the way a
+/// host that does not install to the shipped location points at its copy; it
+/// falls back to [`DEFAULT_RESOURCE_PATH`]. The same variable is what
+/// `crates/analyzer-ffi/tests/c_api.rs` uses, so one setting drives both.
+pub fn resource_path() -> std::path::PathBuf {
+    std::env::var_os("INFINITY_RESOURCE_PATH")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(DEFAULT_RESOURCE_PATH))
+}
 
 /// C++: `AnalyzerPool` (`analyzer_pool.cppm`) — parses an analyzer name and
 /// hands out a fresh analyzer.
@@ -181,7 +258,7 @@ pub(crate) fn memoized_stem<R>(
         let index = match maps.iter().position(|(a, _)| *a == algorithm) {
             Some(index) => index,
             None => {
-                maps.push((algorithm, HashMap::new()));
+                maps.push((algorithm, FastMap::default()));
                 maps.len() - 1
             }
         };
@@ -438,11 +515,12 @@ pub fn is_constructible_analyzer_name(name: &str) -> bool {
 impl AnalyzerPool {
     /// C++: `Singleton<AnalyzerPool>::instance()`.
     ///
-    /// Loads from the shipped resource root; a host that keeps the dictionaries
-    /// elsewhere builds its own with [`Self::with_resource_path`].
+    /// Loads from [`resource_path`] (`INFINITY_RESOURCE_PATH`, else the shipped
+    /// root); a host that needs several roots builds its own with
+    /// [`Self::with_resource_path`].
     pub fn instance() -> &'static AnalyzerPool {
         static INSTANCE: OnceLock<AnalyzerPool> = OnceLock::new();
-        INSTANCE.get_or_init(|| Self::with_resource_path(DEFAULT_RESOURCE_PATH))
+        INSTANCE.get_or_init(|| Self::with_resource_path(resource_path()))
     }
 
     /// A pool whose dictionary-driven families load from `dir`.

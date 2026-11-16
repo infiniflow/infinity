@@ -8,7 +8,7 @@ from numpy import dtype
 
 
 def test_tc1(cluster: InfinityCluster):
-    '''
+    """
     tc1:
     n1: admin
     n2: admin
@@ -38,7 +38,7 @@ def test_tc1(cluster: InfinityCluster):
     drop t1 on n1;
     show table on n1 & n2;
     shutdown all nodes;
-    '''
+    """
     with cluster:
         cluster.add_node("node1", "conf/leader.toml")
         cluster.add_node("node2", "conf/follower.toml")
@@ -46,20 +46,20 @@ def test_tc1(cluster: InfinityCluster):
         cluster.set_leader("node1")
         infinity1 = cluster.client("node1")
         res = infinity1.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         cluster.set_follower("node2")
         infinity2 = cluster.client("node2")
         res = infinity1.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
         res = infinity1.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
 
         table_name = "table1"
         db1 = infinity1.get_database("default_db")
@@ -96,11 +96,11 @@ def test_tc1(cluster: InfinityCluster):
         cluster.set_admin("node1")
         time.sleep(1)
         res = infinity2.show_node("node1")
-        assert (res.node_status == "timeout")
+        assert res.node_status == "timeout"
         res = infinity2.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
 
         table_name = "table2"
         db2 = infinity2.get_database("default_db")
@@ -114,32 +114,32 @@ def test_tc1(cluster: InfinityCluster):
         cluster.set_leader("node1")
         time.sleep(1)
         res = infinity1.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         try:
             infinity1.show_node("node2")
         except InfinityException as e:
             print(e)
-            assert (e.error_code == 7019)  # Not found node2
+            assert e.error_code == 7019  # Not found node2
 
         res = infinity2.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "lost connection")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "lost connection"
         # reconnect leader and check the status
         cluster.set_admin("node2")
         cluster.set_follower("node2")
         time.sleep(1)
         res = infinity1.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
         res = infinity2.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         table_name = "table1"
         db1 = infinity1.get_database("default_db")
@@ -166,7 +166,7 @@ def test_tc1(cluster: InfinityCluster):
             infinity1.show_node("node2")
         except InfinityException as e:
             print(e)
-            assert (e.error_code == 7019)  # Not found node2
+            assert e.error_code == 7019  # Not found node2
         try:
             table2.insert([{"c1": 1, "c2": [1.0, 2.0, 3.0, 4.0]}])
         except InfinityException as e:
@@ -175,13 +175,13 @@ def test_tc1(cluster: InfinityCluster):
         cluster.set_follower("node2")
         time.sleep(1)
         res = infinity1.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
         res = infinity2.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         res, extra_result = table1.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
@@ -189,7 +189,7 @@ def test_tc1(cluster: InfinityCluster):
         pd.testing.assert_frame_equal(res, res_gt)
 
         res = db1.drop_table(table_name, ConflictType.Ignore)
-        assert (res.error_code == ErrorCode.OK)
+        assert res.error_code == ErrorCode.OK
 
         try:
             db1.show_table(table_name)
@@ -207,7 +207,7 @@ def test_tc1(cluster: InfinityCluster):
 
 
 def test_tc2(cluster: InfinityCluster):
-    '''
+    """
     tc2:
     n1: admin
     n2: admin
@@ -220,7 +220,7 @@ def test_tc2(cluster: InfinityCluster):
     n3->learner
     n4->learner
     show nodes on n1 & n2 & n3 & n4
-    '''
+    """
     with cluster:
         cluster.add_node("node1", "conf/leader.toml")
         cluster.add_node("node2", "conf/follower.toml")
@@ -261,21 +261,21 @@ def test_tc2(cluster: InfinityCluster):
         time.sleep(4)
         for server in [infinity1, infinity2, infinity3, infinity4]:
             res = server.show_node("node1")
-            assert (res.node_name == "node1")
-            assert (res.node_role == "leader")
-            assert (res.node_status == "alive")
+            assert res.node_name == "node1"
+            assert res.node_role == "leader"
+            assert res.node_status == "alive"
             res = server.show_node("node2")
-            assert (res.node_name == "node2")
-            assert (res.node_role == "follower")
-            assert (res.node_status == "alive")
+            assert res.node_name == "node2"
+            assert res.node_role == "follower"
+            assert res.node_status == "alive"
             res = server.show_node("node3")
-            assert (res.node_name == "node3")
-            assert (res.node_role == "learner")
-            assert (res.node_status == "alive")
+            assert res.node_name == "node3"
+            assert res.node_role == "learner"
+            assert res.node_status == "alive"
             res = server.show_node("node4")
-            assert (res.node_name == "node4")
-            assert (res.node_role == "learner")
-            assert (res.node_status == "alive")
+            assert res.node_name == "node4"
+            assert res.node_role == "learner"
+            assert res.node_status == "alive"
 
         for server in [infinity1, infinity2, infinity3, infinity4]:
             db = server.get_database("default_db")
@@ -284,7 +284,7 @@ def test_tc2(cluster: InfinityCluster):
             pd.testing.assert_frame_equal(res, res_gt)
 
         res = db1.drop_table(table_name)
-        assert (res.error_code == ErrorCode.OK)
+        assert res.error_code == ErrorCode.OK
 
         time.sleep(1)
         cluster.remove_node("node4")

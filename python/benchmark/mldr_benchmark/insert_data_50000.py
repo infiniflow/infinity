@@ -32,17 +32,24 @@ class InfinityClientForInsert:
     def __init__(self):
         self.test_db_name = "default_db"
         self.test_table_name_prefix = "mldr_test_table_text_dense_sparse_"
-        self.test_table_schema = {"docid_col": {"type": "varchar"}, "fulltext_col": {"type": "varchar"},
-                                  "dense_col": {"type": "vector,1024,float"},
-                                  "sparse_col": {"type": "sparse,250002,float,int"}}
+        self.test_table_schema = {
+            "docid_col": {"type": "varchar"},
+            "fulltext_col": {"type": "varchar"},
+            "dense_col": {"type": "vector,1024,float"},
+            "sparse_col": {"type": "sparse,250002,float,int"},
+        }
         self.infinity_obj = infinity.connect(LOCAL_HOST)
-        self.infinity_db = self.infinity_obj.create_database(self.test_db_name, ConflictType.Ignore)
+        self.infinity_db = self.infinity_obj.create_database(
+            self.test_db_name, ConflictType.Ignore
+        )
         self.infinity_table = None
 
     def create_test_table(self, language_suffix: str):
         table_name = self.test_table_name_prefix + language_suffix
         self.infinity_db.drop_table(table_name, ConflictType.Ignore)
-        self.infinity_table = self.infinity_db.create_table(table_name, self.test_table_schema)
+        self.infinity_table = self.infinity_db.create_table(
+            table_name, self.test_table_schema
+        )
         print("Create table successfully.")
 
     def main(self):
@@ -74,22 +81,38 @@ class InfinityClientForInsert:
             buffer = []
             for row_pos in range(begin_idx, end_idx):
                 if row_pos == dense_pos_part_end:
-                    dense_pos_part_begin, dense_pos_part_end = dense_part_begin_ends[dense_pair_id_next]
+                    dense_pos_part_begin, dense_pos_part_end = dense_part_begin_ends[
+                        dense_pair_id_next
+                    ]
                     dense_pair_id_next += 1
-                    dense_base_name = f"dense-{dense_pos_part_begin}-{dense_pos_part_end}.fvecs"
-                    dense_data = fvecs_read_yield(os.path.join(dense_embedding_dir, dense_base_name))
+                    dense_base_name = (
+                        f"dense-{dense_pos_part_begin}-{dense_pos_part_end}.fvecs"
+                    )
+                    dense_data = fvecs_read_yield(
+                        os.path.join(dense_embedding_dir, dense_base_name)
+                    )
                 if row_pos == sparse_pos_part_end:
-                    sparse_pos_part_begin, sparse_pos_part_end = sparse_part_begin_ends[sparse_pair_id_next]
+                    sparse_pos_part_begin, sparse_pos_part_end = sparse_part_begin_ends[
+                        sparse_pair_id_next
+                    ]
                     sparse_pair_id_next += 1
-                    sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
-                    sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
+                    sparse_base_name = (
+                        f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
+                    )
+                    sparse_data = read_mldr_sparse_embedding_yield(
+                        os.path.join(sparse_embedding_dir, sparse_base_name)
+                    )
                 docid_str = docid_list[row_pos]
                 insert_dense_data = next(dense_data)
                 insert_sparse_data = next(sparse_data)
-                if int(docid_str.split('-')[-1]) >= 189796:
+                if int(docid_str.split("-")[-1]) >= 189796:
                     continue
-                insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": insert_dense_data, "sparse_col": SparseVector(**insert_sparse_data)}
+                insert_dict = {
+                    "docid_col": docid_str,
+                    "fulltext_col": corpus_text_list[row_pos],
+                    "dense_col": insert_dense_data,
+                    "sparse_col": SparseVector(**insert_sparse_data),
+                }
                 buffer.append(insert_dict)
             if len(buffer) > 0:
                 self.infinity_table.insert(buffer)
@@ -103,29 +126,38 @@ class InfinityClientForInsert:
         ft_params = []
         if lang == "zh":
             ft_params.append(index.InitParameter("analyzer", "chinese"))
-        res = self.infinity_table.create_index("ft_index",
-                                               index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params),
-                                               ConflictType.Error)
+        res = self.infinity_table.create_index(
+            "ft_index",
+            index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params),
+            ConflictType.Error,
+        )
         assert res.error_code == ErrorCode.OK
         print("Finish creating fulltext index.")
         print("Start creating Hnsw index...")
-        res = self.infinity_table.create_index("hnsw_index", index.IndexInfo("dense_col", index.IndexType.Hnsw,
-                                                                             {
-                                                                                 "m": "16",
-                                                                                 "ef_construction": "1000",
-                                                                                 "metric": "ip",
-                                                                                 "encode": "lvq"
-                                                                             }),
-                                               ConflictType.Error)
+        res = self.infinity_table.create_index(
+            "hnsw_index",
+            index.IndexInfo(
+                "dense_col",
+                index.IndexType.Hnsw,
+                {"m": "16", "ef_construction": "1000", "metric": "ip", "encode": "lvq"},
+            ),
+            ConflictType.Error,
+        )
         assert res.error_code == ErrorCode.OK
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
-        res = self.infinity_table.create_index("bmp_index", index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                            {
-                                                                                "block_size": "8",
-                                                                                "compress_type": "compress",
-                                                                            }),
-                                               ConflictType.Error)
+        res = self.infinity_table.create_index(
+            "bmp_index",
+            index.IndexInfo(
+                "sparse_col",
+                index.IndexType.BMP,
+                {
+                    "block_size": "8",
+                    "compress_type": "compress",
+                },
+            ),
+            ConflictType.Error,
+        )
         assert res.error_code == ErrorCode.OK
         self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})
         print("Finish creating BMP index.")

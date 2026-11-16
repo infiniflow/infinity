@@ -17,7 +17,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(sort_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(sort_path) and os.path.exists(slt_path) and not generate_if_exists:
+    if (
+        os.path.exists(sort_path)
+        and os.path.exists(slt_path)
+        and not generate_if_exists
+    ):
         print(
             f"File {slt_path} and {sort_path} already existed exists. Skip Generating."
         )
@@ -27,9 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
         slt_file.write("\n")
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 int, c2 int);\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} (c1 int, c2 int);\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
@@ -38,8 +40,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write(
-            f"SELECT * FROM {table_name} order by c1, c2;\n")
+        slt_file.write(f"SELECT * FROM {table_name} order by c1, c2;\n")
         slt_file.write("----\n")
 
         random_integers = np.random.randint(low=1, high=row_n, size=row_n)

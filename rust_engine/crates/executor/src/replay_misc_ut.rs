@@ -50,7 +50,7 @@ fn replay_append0() {
     let e = h::reopen(e, dir.path());
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 8);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
     assert_eq!(e.block_visible_range("db1.tb1", 0, 0), Some((0, 8)));
 }
@@ -136,7 +136,7 @@ fn disabled_slow_test_replay_append_with_index() {
         "CREATE INDEX index2 ON default_db.tb1 (col2) USING fulltext;",
     );
     h::append(&e, "default_db.tb1", alternating_block());
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 8192);
     h::ok(&e, "SHOW TABLE default_db.tb1 INDEX index1;");
@@ -153,7 +153,7 @@ fn disabled_slow_test_populate_index() {
     h::ok(&e, "CREATE INDEX index1 ON default_db.tb1 (col1);");
     for _ in 0..2 {
         h::append(&e, "default_db.tb1", alternating_block());
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 16384);
@@ -183,7 +183,7 @@ fn replay_import0() {
         ),
         vec![vec!["16384"]]
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let blocks: usize = e
         .segment_ids("default_db.tb1")
         .into_iter()
@@ -238,7 +238,7 @@ fn replay_index_drop_index() {
 
     let e = h::reopen(e, dir.path());
     assert!(e
-        .execute("SHOW TABLE default_db.tb1 INDEX index1;")
+        .execute_blocking("SHOW TABLE default_db.tb1 INDEX index1;")
         .is_err());
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 8192);
 }
@@ -300,7 +300,7 @@ fn txn_manager_timestamps() {
     // Conflicting drop: the first commits, the second fails.
     h::ok(&e, "CREATE DATABASE db1;");
     h::ok(&e, "DROP DATABASE db1;");
-    assert!(e.execute("DROP DATABASE db1;").is_err());
+    assert!(e.execute_blocking("DROP DATABASE db1;").is_err());
     let after = e.current_ts();
     assert!(after >= commit1);
 

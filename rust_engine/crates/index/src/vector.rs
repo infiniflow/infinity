@@ -486,10 +486,12 @@ impl Store {
                 .zip(data.get(b))
                 .map(|(x, y)| plain_distance(x, y, *metric))
                 .unwrap_or(f32::MAX),
-            Store::Lvq(store) => store
-                .query_at(a)
-                .and_then(|q| store.distance(&q, b))
-                .unwrap_or(f32::MAX),
+            Store::Lvq(store) => match (store.record(a), store.record(b)) {
+                // Borrow both records: `query_at` clones the whole i8 code, and
+                // this runs once per candidate comparison.
+                (Some(q), Some(v)) => store.distance_between(q, v),
+                _ => f32::MAX,
+            },
             Store::Rabitq(store) => store
                 .decompress(a)
                 .map(|v| {
@@ -559,7 +561,7 @@ impl Store {
     }
 
     /// Trains the store's mean/centroid without storing any vector.
-    fn train(&mut self, vectors: &[Vec<f32>]) {
+    fn train<V: AsRef<[f32]>>(&mut self, vectors: &[V]) {
         match self {
             Store::Plain { .. } | Store::SparseIp { .. } => {}
             Store::Lvq(store) => store.train(vectors),
@@ -652,19 +654,63 @@ impl HnswIndex {
         }
     }
 
-    /// Trains LVQ's mean / RaBitQ's centroid and computes the LSG averages
-    /// from `vectors`. The caller then feeds the same vectors through
-    /// [`HnswIndex::add`], which compresses them with the trained state.
-    pub fn train_store(&mut self, vectors: &[Vec<f32>], lsg: Option<crate::lsg::LsgConfig>) {
+    /// Trains LVQ's mean / RaBitQ's centroid from `vectors`. The caller then
+    /// feeds the same vectors through [`HnswIndex::add`], which compresses them
+    /// with the trained state.
+    ///
+    /// # `lsg`
+    ///
+    /// The LSG configuration is accepted and **not applied**, because the
+    /// reference does not apply it either:
+    ///
+    /// * `build_type=lsg` is parsed, validated and persisted
+    ///   (`IndexHnsw::ParseWithSortT`, `IndexHnsw::ToString`), and
+    ///   `HnswHandler`'s constructor does build an `HnswLSGBuilder` for it
+    ///   (`hnsw_handler_impl.cpp:218`, `InitLSGBuilder`).
+    /// * Nothing on a production path ever *trains* it. `InsertSampleVecs`,
+    ///   `InsertLSAvg` and `SetLSGParam` — the three calls that fill `avg_` and
+    ///   install it in `LSGDistWrapper` — appear only in
+    ///   `test_lsg_build_ut.cpp`; `HnswHandler::InsertVecs`
+    ///   (`hnsw_handler.cppm:151`) goes straight from `StoreData` to `Build`,
+    ///   and `new_txn_index_impl.cpp:942` calls exactly that.
+    /// * So `LSGDistWrapper::avg_` stays `nullptr`, its `operator()` returns
+    ///   the raw distance, and a `build_type=lsg` graph in the reference is a
+    ///   plain graph whose catalogue record carries the LSG parameters.
+    ///
+    /// Scaling the edges here instead is not a conservative difference: the
+    /// wrapper returns the *raw* distance for a query vector
+    /// (`v1_i == kInvalidVertex`, `dist_func_lsg_wrapper.cppm:51`), so the
+    /// graph would be organized in the scaled space while queries rank in the
+    /// raw one. Measured on 200k x 128 rows (M=16, ef_construction=200,
+    /// `sample_raito=0.01`, `ls_k=10`, `alpha=1`): recall@10 0.860 with the
+    /// scaling applied against 0.998 without — the port's answers diverged from
+    /// the reference's and from what `metric='l2'` promises.
+    ///
+    /// [`crate::lsg::LsgIndex`] is kept: it is the port of `HnswLSGBuilder` +
+    /// `LSGDistWrapper`, exercised by its own tests against
+    /// `test_lsg_build_ut.cpp`, and [`HnswIndex::adjust`] honours it when a
+    /// graph carries one (a graph loaded with scaling, or a future build that
+    /// trains it).
+    pub fn train_store<V: AsRef<[f32]> + Sync>(
+        &mut self,
+        vectors: &[V],
+        _lsg: Option<crate::lsg::LsgConfig>,
+    ) {
         self.store.train(vectors);
-        if let Some(config) = lsg {
-            let metric = self.store.metric().into();
-            self.lsg = Some(crate::lsg::LsgIndex::build(vectors, metric, config));
-        }
     }
 
     pub fn lsg(&self) -> Option<&crate::lsg::LsgIndex> {
         self.lsg.as_ref()
+    }
+
+    /// The LVQ store's trained per-dimension mean (`None` for the other
+    /// encodings). A mean of all zeros means the store was never trained, which
+    /// makes every code carry no magnitude.
+    pub fn lvq_mean(&self) -> Option<&[f64]> {
+        match &self.store {
+            Store::Lvq(store) => Some(store.mean()),
+            _ => None,
+        }
     }
 
     pub fn encoding(&self) -> HnswEncoding {
@@ -1239,28 +1285,27 @@ impl HnswIndex {
     /// generator, so its levels are a scheduling outcome. Sampling in insertion
     /// order keeps them a property of the input, which is strictly easier to
     /// reproduce.
-    pub fn add_batch(&mut self, vectors: &[Vec<f32>], threads: usize) -> usize {
+    pub fn add_batch<V: AsRef<[f32]>>(&mut self, vectors: &[V], threads: usize) -> usize {
         if vectors.is_empty() {
             return 0;
         }
         if threads <= 1 {
             for v in vectors {
-                self.add(v);
+                self.add(v.as_ref());
             }
             return vectors.len();
         }
-        // The quantized stores keep a code per vertex and re-derive a query from
-        // that code; the reference only instantiates its batch path for the
-        // plain store's DataType, so a quantized index keeps the serial build
-        // instead of gaining a parallel one that would mean something else.
-        if !matches!(self.store, Store::Plain { .. }) {
-            for v in vectors {
-                self.add(v);
-            }
-            return vectors.len();
-        }
+        // Every store takes the batch path: the reference's
+        // `HnswHandler::InsertVecs` visits its index variant, stores the batch
+        // (`StoreData`), then builds `[start, end)` in buckets - it never
+        // branches on the store type. A quantized index builds the same way,
+        // because `Build` re-derives its query from the vertex's own code
+        // (`GetVecToQuery`), which the port's `QueryRef::for_node` does too.
+        // Keeping quantized stores serial here made an LVQ build run on one
+        // core (measured 99% CPU on a 20000-row index).
         let base = self.store.len();
         for v in vectors {
+            let v = v.as_ref();
             assert_eq!(v.len(), self.dims, "dimension mismatch");
             self.store.push(v);
         }
@@ -1316,7 +1361,8 @@ impl HnswIndex {
 
         // Phase A: the top vertex, alone, starting from an older vertex (or, in
         // an empty index, from itself - it then has nothing to link to, which is
-        // what the reference's first `Build` does too).
+        // what the reference's first `Build` does too). It must be finished
+        // before the buckets start: every other vertex searches from it.
         if entry != from {
             let builder = crate::parallel_build::Builder::new(
                 &self.store,
@@ -1328,26 +1374,75 @@ impl HnswIndex {
                 from,
                 top_level,
             );
-            crate::parallel_build::build_parallel_range(&builder, entry, entry + 1, 1);
+            crate::parallel_build::build_serial(&builder, entry, entry + 1, None);
         }
 
         // Phase B: everyone else, in buckets, searching from the finished top.
-        let builder = crate::parallel_build::Builder::new(
-            &self.store,
-            self.lsg.as_ref(),
-            self.m,
-            self.ef_construction,
-            &levels,
-            &links,
+        //
+        // A bucket is pure graph construction over memory, so it is the
+        // **blocking unit**: one tokio task per bucket, `threads` permits on a
+        // semaphore, and the build itself on the blocking pool. The caller is
+        // free to run this from a runtime worker - `for_each_blocking` parks it
+        // while the tasks run - and nothing else is moved across a thread.
+        //
+        // The index's own fields are moved into the shared state (the store and
+        // the LSG index are read by every bucket; the graph is written under
+        // per-vertex locks) and taken back once every bucket has joined, so a
+        // build never leaves the index half-owned.
+        let store = std::sync::Arc::new(std::mem::replace(
+            &mut self.store,
+            Store::Plain {
+                metric: Metric::L2,
+                data: crate::vector::PlainVecs::default(),
+            },
+        ));
+        let lsg = self.lsg.take().map(std::sync::Arc::new);
+        let shared = std::sync::Arc::new(crate::parallel_build::SharedBuild {
+            store,
+            lsg,
+            levels: std::sync::Arc::new(levels),
+            links: std::sync::Arc::new(links),
+            m: self.m,
+            ef_construction: self.ef_construction,
             entry,
-            top_level,
-        );
-        for (lo, hi) in [(base, entry), (entry + 1, n)] {
-            if lo < hi {
-                crate::parallel_build::build_parallel_range(&builder, lo, hi, threads);
-            }
+            max_level: top_level,
+        });
+        // One split over the whole new range, as `HnswHandler::InsertVecs`
+        // does: `bucket_size = max(kBuildBucketSize, (n - 1) / threads + 1)`.
+        // Splitting `[base, entry)` and `[entry + 1, n)` separately used to
+        // hand a small batch two buckets that then ran concurrently — a 200-row
+        // build raced its own reverse links even though the reference builds
+        // that batch on one thread, and the graph it produced was not
+        // reproducible run to run.
+        //
+        // Phase A already built `entry`, so it must not appear in a bucket: it
+        // is the vertex whose neighbour list every other build searched from,
+        // and building it a second time replaces that list (and lets reverse
+        // pruning drop links the first build had). It is skipped inside its
+        // bucket rather than cut out, so every bucket stays one contiguous run
+        // and the boundaries are the reference's. When the entry came from an
+        // older batch it is below `base` and no bucket contains it.
+        let prebuilt = (entry >= base).then_some(entry);
+        let buckets = crate::parallel_build::build_buckets(base, n, prebuilt, threads);
+        {
+            let shared = std::sync::Arc::clone(&shared);
+            crate::parallel::for_each_blocking(buckets, threads, move |(start, end, skip)| {
+                let builder = shared.builder();
+                crate::parallel_build::build_serial(&builder, start, end, skip);
+                Ok(())
+            })
+            .expect("building a bucket cannot fail");
         }
-        self.links = links
+        let shared = std::sync::Arc::try_unwrap(shared)
+            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"));
+        self.store = std::sync::Arc::try_unwrap(shared.store)
+            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"));
+        self.lsg = shared.lsg.map(|lsg| {
+            std::sync::Arc::try_unwrap(lsg)
+                .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"))
+        });
+        self.links = std::sync::Arc::try_unwrap(shared.links)
+            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"))
             .into_iter()
             .map(|layer| {
                 layer
@@ -1356,7 +1451,8 @@ impl HnswIndex {
                     .collect()
             })
             .collect();
-        self.levels = levels;
+        self.levels = std::sync::Arc::try_unwrap(shared.levels)
+            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"));
         self.max_level = max_level;
         vectors.len()
     }
@@ -1899,6 +1995,108 @@ mod tests {
         assert!(recall >= 0.9, "parallel graph diverged: recall {recall}");
         parallel.check().expect("parallel graph is well formed");
     }
+
+    /// A quantized store takes the same bucket-parallel build as the plain one.
+    ///
+    /// `HnswHandler::InsertVecs` does not branch on the store type: it stores
+    /// the batch and builds `[start, end)` in buckets. Keeping LVQ/RaBitQ on
+    /// the serial path made an LVQ index build on one core, so this pins both
+    /// the parallelism (the batch path is entered, the graph is well formed)
+    /// and the answers (they match a serial build of the same data).
+    #[test]
+    fn quantized_batch_build_matches_serial_answers() {
+        let data = dataset(1200, 8);
+        for encoding in [HnswEncoding::Lvq, HnswEncoding::Rabitq] {
+            let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            serial.train_store(&data, None);
+            for v in &data {
+                serial.add(v);
+            }
+            let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
+            parallel.train_store(&data, None);
+            assert_eq!(parallel.add_batch(&data, 4), data.len());
+            assert_eq!(parallel.len(), serial.len());
+            // A serial build must not have been taken: with 1200 vertices and 4
+            // threads the batch path splits into buckets, and every one of them
+            // is reachable from the entry point.
+            parallel.check().expect("parallel graph is well formed");
+            let mut rng = Rng::new(11);
+            let mut hits = 0usize;
+            for _ in 0..40 {
+                let q: Vec<f32> = (0..8).map(|_| (rng.unit() as f32) * 10.0).collect();
+                let want: HashSet<usize> = serial
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .collect();
+                hits += parallel
+                    .search_with_ef(&q, 5, 100)
+                    .into_iter()
+                    .filter(|(i, _)| want.contains(i))
+                    .count();
+            }
+            let recall = hits as f64 / (40 * 5) as f64;
+            assert!(
+                recall >= 0.9,
+                "{encoding:?} parallel graph diverged: recall {recall}"
+            );
+        }
+    }
+
+    /// A batch added to a non-empty index must not build the entry vertex
+    /// twice.
+    ///
+    /// `add_batch` builds the batch's highest-level vertex first (Phase A) and
+    /// then runs the buckets. Covering `[base, n)` outright scheduled that
+    /// vertex a second time, and a second `Build` replaces its neighbour list -
+    /// so the links Phase A established could disappear, and reverse pruning
+    /// while rebuilding it could drop other vertices' links to it.
+    ///
+    /// Asserted on the bucket plan rather than on the finished graph: whether a
+    /// rebuild actually loses a link depends on the data, so a graph-shaped
+    /// assertion can pass on a broken plan.
+    #[test]
+    fn a_batch_on_a_populated_index_builds_each_vertex_once() {
+        // A batch over several buckets where the entry sits in the middle of
+        // one of them - the case that used to schedule it twice.
+        let (base, n, entry, threads) = (1200, 5000, 2600usize, 2);
+        let buckets = crate::parallel_build::build_buckets(base, n, Some(entry), threads);
+
+        // Every bucket is one contiguous run, and the batch is covered exactly
+        // once except for the prebuilt vertex. Cutting the entry out (instead
+        // of skipping it inside its bucket) would put two adjacent ranges in
+        // flight, whose reverse-link writes are what makes a build
+        // order-dependent.
+        let whole = crate::parallel_build::buckets_of(base, n, threads);
+        assert_eq!(
+            buckets.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole,
+            "bucket boundaries must be the reference's"
+        );
+        assert_eq!(
+            buckets
+                .iter()
+                .filter_map(|(_, _, skip)| *skip)
+                .collect::<Vec<_>>(),
+            vec![entry],
+            "the prebuilt entry is skipped by exactly one bucket"
+        );
+        for (start, end, skip) in &buckets {
+            assert!(start < end, "empty bucket {start}..{end}");
+            assert!(
+                skip.is_none_or(|p| *start <= p && p < *end),
+                "a bucket skips a vertex outside its range"
+            );
+        }
+
+        // An entry from an older batch is below `base`: no bucket skips it.
+        let older = crate::parallel_build::build_buckets(base, n, None, threads);
+        assert_eq!(
+            older.iter().map(|(s, e, _)| (*s, *e)).collect::<Vec<_>>(),
+            whole
+        );
+        assert!(older.iter().all(|(_, _, skip)| skip.is_none()));
+    }
     #[test]
     fn hnsw_recall_vs_flat() {
         let data = dataset(400, 8);
@@ -2243,6 +2441,58 @@ mod reference_suite {
     #[test]
     fn plain_parallel_insert_and_search() {
         parallel_readers(Metric::L2, HnswEncoding::Plain);
+    }
+
+    /// `build_type=lsg` must produce the same graph as a plain build.
+    ///
+    /// The reference parses and persists the LSG parameters and even builds an
+    /// `HnswLSGBuilder` for them, but no production path trains it
+    /// (`InsertSampleVecs`/`InsertLSAvg`/`SetLSGParam` are called only from
+    /// `test_lsg_build_ut.cpp`), so `LSGDistWrapper::avg_` stays null and the
+    /// graph's distances are the raw ones. Applying the scaling instead made
+    /// recall@10 drop from 0.998 to 0.860 at 200k x 128 against the raw-L2
+    /// ground truth, because the wrapper returns the *raw* distance for a
+    /// query vector.
+    #[test]
+    fn lsg_config_leaves_the_graph_plain() {
+        let dims = 32;
+        let n = 300;
+        let data: Vec<Vec<f32>> = (0..n)
+            .map(|i| {
+                let mut state = (i as u64).wrapping_mul(6364136223846793005).wrapping_add(1);
+                (0..dims)
+                    .map(|_| {
+                        state = state
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(1442695040888963407);
+                        (state >> 40) as f32 / 1000.0
+                    })
+                    .collect()
+            })
+            .collect();
+        let build = |lsg: Option<crate::lsg::LsgConfig>| {
+            let mut index =
+                HnswIndex::with_encoding(dims, 8, 64, 32, Metric::L2, HnswEncoding::Plain);
+            index.train_store(&data, lsg);
+            for v in &data {
+                index.add(v);
+            }
+            index
+        };
+        let plain = build(None);
+        let lsg = build(Some(crate::lsg::LsgConfig {
+            sample_ratio: 0.25,
+            ls_k: 7,
+            alpha: 0.5,
+        }));
+        assert!(lsg.lsg().is_none(), "the scaling must not be trained");
+        for q in data.iter().take(32) {
+            assert_eq!(
+                plain.search_with_ef(q, 5, 32),
+                lsg.search_with_ef(q, 5, 32),
+                "the LSG build answered differently from the plain one"
+            );
+        }
     }
 
     /// C++: `HnswAlgTest.test_lvq_2`.

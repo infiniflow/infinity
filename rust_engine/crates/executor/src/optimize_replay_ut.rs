@@ -29,7 +29,7 @@ fn optimize_index_rollback() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
@@ -45,7 +45,7 @@ fn optimize_index_rollback() {
 
     // committed optimize
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
         h::rows(
@@ -69,14 +69,16 @@ fn optimize_index_then_drop_database() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
     h::ok(&e, "DROP DATABASE db1;");
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
-    assert!(e.execute("INSERT INTO db1.tb1 VALUES (1, 'x');").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e
+        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/optimize_index_ut.cpp:392`
@@ -89,13 +91,13 @@ fn optimize_index_then_drop_table() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
 
     h::ok(&e, "DROP TABLE db1.tb1;");
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute("SELECT * FROM db1.tb1;").is_err());
+    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/optimize_index_ut.cpp:540`
@@ -109,7 +111,7 @@ fn optimize_index_then_drop_index() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
 
@@ -135,12 +137,12 @@ fn disabled_slow_optimize_index_and_optimize_index() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
@@ -157,10 +159,10 @@ fn disabled_slow_optimize_index_and_dump_index() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
@@ -177,7 +179,7 @@ fn optimize_index_then_add_column() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
 
@@ -201,13 +203,13 @@ fn optimize_index_then_drop_column() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
 
     // Indexed column: blocked by the index.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
         .is_err());
     h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);");
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
@@ -224,7 +226,7 @@ fn optimize_index_then_rename_table() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
 
@@ -244,7 +246,7 @@ fn disabled_slow_optimize_index_and_compact_all_segments() {
     h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(&e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
     e.optimize_indexes().unwrap();
     e.compact_all_segments("db1.tb1").unwrap();
@@ -262,7 +264,7 @@ fn prepare_replay(e: &Engine) {
     h::ok(e, "CREATE INDEX index1 ON db1.tb1 (col1);");
     for _ in 0..2 {
         h::append_repeated(e, "db1.tb1", 1, "abcdefghijklmnopqrstuvwxyz", 8192);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
 }
 
@@ -275,7 +277,7 @@ fn disabled_slow_test_optimize_commit() {
     let e = Engine::open(dir.path()).unwrap();
     prepare_replay(&e);
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);

@@ -37,16 +37,23 @@ class LocalInfinityConnection(InfinityConnection, ABC):
                 logging.warning(f"Directory {uri} not found, try to create it")
                 os.makedirs(uri)
             except OSError as e:
-                raise InfinityException(ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found and create failed: {e}")
+                raise InfinityException(
+                    ErrorCode.DIR_NOT_FOUND,
+                    f"Directory {uri} not found and create failed: {e}",
+                )
         if os.path.isdir(uri):
             if os.access(uri, os.R_OK | os.W_OK):
                 self._client = LocalInfinityClient(uri, config_path)
                 self._is_connected = True
             else:
-                raise InfinityException(ErrorCode.UNEXPECTED_ERROR,
-                                        f"Directory {uri} does not have read or write permissions")
+                raise InfinityException(
+                    ErrorCode.UNEXPECTED_ERROR,
+                    f"Directory {uri} does not have read or write permissions",
+                )
         else:
-            raise InfinityException(ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found")
+            raise InfinityException(
+                ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found"
+            )
 
         self.db_name = "default_db"
 
@@ -55,11 +62,16 @@ class LocalInfinityConnection(InfinityConnection, ABC):
             self.disconnect()
 
     def check_connect(self):
-        if (self._is_connected is False):
+        if self._is_connected is False:
             raise Exception("Local infinity is not connected")
 
     @name_validity_check("db_name", "DB")
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error, comment: str = None):
+    def create_database(
+        self,
+        db_name: str,
+        conflict_type: ConflictType = ConflictType.Error,
+        comment: str = None,
+    ):
         self.check_connect()
         create_database_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
@@ -69,7 +81,9 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Replace:
             create_database_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
         res = self._client.create_database(db_name, create_database_conflict, comment)
 
         if res.error_code == ErrorCode.OK:
@@ -127,7 +141,9 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
 
         res = self._client.drop_database(db_name, drop_database_conflict)
         if res.error_code == ErrorCode.OK:

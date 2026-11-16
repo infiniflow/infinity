@@ -23,7 +23,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -52,23 +52,23 @@ fn append_block(engine: &Engine, table: &str) {
 fn cleanup_removes_the_dropped_table_files() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
-    e.execute("CREATE TABLE tb2 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb2 (col1 INT, col2 VARCHAR);")
         .unwrap();
     append_block(&e, "default_db.tb1");
     append_block(&e, "default_db.tb2");
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let exist_paths = e.table_files("default_db.tb1");
     let delete_paths = e.table_files("default_db.tb2");
     assert!(!exist_paths.is_empty(), "tb1 has no data files");
     assert!(!delete_paths.is_empty(), "tb2 has no data files");
 
-    e.execute("DROP TABLE default_db.tb2;").unwrap();
-    e.flush().unwrap();
+    e.execute_blocking("DROP TABLE default_db.tb2;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     // `TransactionType::kCleanup` (the reference waits for its bg task).
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 
     for path in &delete_paths {
         assert!(!path.exists(), "dropped table file survived: {path:?}");
@@ -89,22 +89,24 @@ fn background_cleanup_task_removes_dropped_files() {
     let dir = tempdir().unwrap();
     let engine = Arc::new(Engine::open(dir.path()).unwrap());
     engine
-        .execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     engine
-        .execute("CREATE TABLE tb2 (col1 INT, col2 VARCHAR);")
+        .execute_blocking("CREATE TABLE tb2 (col1 INT, col2 VARCHAR);")
         .unwrap();
     append_block(&engine, "default_db.tb1");
     append_block(&engine, "default_db.tb2");
-    engine.flush().unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
 
     let exist_paths = engine.table_files("default_db.tb1");
     let delete_paths = engine.table_files("default_db.tb2");
     assert!(!exist_paths.is_empty(), "tb1 has no data files");
     assert!(!delete_paths.is_empty(), "tb2 has no data files");
 
-    engine.execute("DROP TABLE default_db.tb2;").unwrap();
-    engine.flush().unwrap();
+    engine
+        .execute_blocking("DROP TABLE default_db.tb2;")
+        .unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
 
     let processor = Arc::new(BGTaskProcessor::new(1));
     processor.start();
@@ -154,7 +156,7 @@ fn start_background_tasks_sets_processor() {
 fn compact_reduces_the_segment_count() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
 
     // `segment_sizes = {1, 10}`: one segment holding one block, then ten more.
@@ -183,12 +185,12 @@ fn compact_reduces_the_segment_count() {
 /// `{col1 INT, col2 VARCHAR}` plus a secondary index on `col1`
 /// (`DumpMemIndexTaskTest` fixture).
 fn secondary_fixture(engine: &Engine) {
-    engine.execute("CREATE DATABASE db1;").unwrap();
+    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
     engine
-        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     engine
-        .execute("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
         .unwrap();
 }
 
@@ -199,8 +201,10 @@ impl BgTask for CountTask {
         "CountTask"
     }
 
-    fn run(self: Box<Self>) {
-        self.0.fetch_add(1, Ordering::SeqCst);
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        })
     }
 }
 
@@ -229,8 +233,10 @@ impl BgTask for PanickingTask {
         "PanickingTask"
     }
 
-    fn run(self: Box<Self>) {
-        panic!("task failure");
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            panic!("task failure");
+        })
     }
 }
 
@@ -321,7 +327,7 @@ fn dump_index_task_row_cnt_exceed_memory_quota() {
         vec![(0, 8192 * 2), (8192 * 2, 8192)]
     );
 
-    engine.execute("DROP DATABASE db1;").unwrap();
+    engine.execute_blocking("DROP DATABASE db1;").unwrap();
     processor.stop();
 }
 
@@ -350,5 +356,5 @@ fn dump_index_task_row_cnt_exceed_memindex_capacity() {
         vec![(0, 8192), (8192, 8192)]
     );
 
-    engine.execute("DROP DATABASE db1;").unwrap();
+    engine.execute_blocking("DROP DATABASE db1;").unwrap();
 }

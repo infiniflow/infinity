@@ -18,30 +18,56 @@ pre-commit:
   parallel: true
   jobs:
     # --- text hygiene (the tools/hooks/check_files.py checks) --------------
-    - name: end-of-file-fixer
-      stage_fixed: true
-      run: |
-        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
-          python3 tools/hooks/check_files.py eof {staged_files}
-        else
-          python3 tools/hooks/check_files.py eof --fix {staged_files}
-        fi
-    - name: trailing-whitespace
-      stage_fixed: true
-      run: |
-        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
-          python3 tools/hooks/check_files.py trailing-whitespace {staged_files}
-        else
-          python3 tools/hooks/check_files.py trailing-whitespace --fix {staged_files}
-        fi
-    - name: mixed-line-ending
-      stage_fixed: true
-      run: |
-        if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
-          python3 tools/hooks/check_files.py mixed-line-ending {staged_files}
-        else
-          python3 tools/hooks/check_files.py mixed-line-ending --fix {staged_files}
-        fi
+    # These three rewrite the whole staged file, and so does `gofmt -w` below
+    # for the Go ones. `pre-commit` runs its jobs in parallel, so a `.go` file
+    # with trailing whitespace could be written by both at once - one write
+    # winning, or a truncated file being staged. They share a `group` with
+    # `parallel: false`, so each file's fixers run one after another.
+    - group:
+        parallel: false
+        jobs:
+          - name: end-of-file-fixer
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py eof {staged_files}
+              else
+                python3 tools/hooks/check_files.py eof --fix {staged_files}
+              fi
+          - name: trailing-whitespace
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py trailing-whitespace {staged_files}
+              else
+                python3 tools/hooks/check_files.py trailing-whitespace --fix {staged_files}
+              fi
+          - name: mixed-line-ending
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                python3 tools/hooks/check_files.py mixed-line-ending {staged_files}
+              else
+                python3 tools/hooks/check_files.py mixed-line-ending --fix {staged_files}
+              fi
+          # `gofmt -l` prints the files it would rewrite and still exits 0, so
+          # the check turns that into a failure itself: lefthook only reads
+          # exit codes. It sits in this group because it rewrites the same
+          # files as the three checks above.
+          - name: gofmt
+            glob: "go/**/*.go"
+            stage_fixed: true
+            run: |
+              if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
+                unformatted=$(gofmt -l {staged_files})
+                if [ -n "${unformatted}" ]; then
+                  echo "gofmt would rewrite:"
+                  echo "${unformatted}"
+                  exit 1
+                fi
+              else
+                gofmt -w {staged_files}
+              fi
     - name: check-yaml
       run: python3 tools/hooks/check_files.py yaml {staged_files}
     - name: check-json

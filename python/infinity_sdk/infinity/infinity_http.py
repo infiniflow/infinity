@@ -30,6 +30,7 @@ from .http_utils import (
     function_return_type,
     functions,
     index_type_transfrom,
+    is_bit_embedding_type,
     is_date,
     is_datetime,
     is_float,
@@ -61,7 +62,7 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     if not cast_expr.lower().startswith("cast("):
         return None
 
-    match = re.search(r"\)\s*AS\s+(\w+)\s*\)$", cast_expr, re.IGNORECASE)
+    match = re.search(r"\bAS\s+(\w+)\s*\)$", cast_expr, re.IGNORECASE)
     if not match:
         return None
 
@@ -84,6 +85,14 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     }
 
     return type_mapping.get(target_type, None)
+
+
+def _python_scalar(value):
+    """Convert a numpy scalar to int or float for JSON.
+
+    ``.item()`` is not enough: it returns ``np.longdouble`` unchanged.
+    """
+    return int(value) if isinstance(value, np.integer) else float(value)
 
 
 class http_network_util:
@@ -654,6 +663,7 @@ class table_http:
         d = self.net.set_up_data([], {"new_table_name": new_table_name})
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
+        self.table_name = new_table_name
         return database_result()
 
     def show_columns(self):
@@ -804,36 +814,50 @@ class table_http:
         else:
             values = [values]
 
+        # Convert to the HTTP API format without mutating the caller's data:
+        # the caller may reuse the same rows (retry, second table, later inserts).
+        converted_values = []
         for value in values:
             if isinstance(value, dict):
+                converted = {}
                 for key in value:
-                    if isinstance(value[key], FDE):
+                    v = value[key]
+                    if isinstance(v, FDE):
                         # Convert FDE object to HTTP API format
-                        fde_obj = value[key]
-                        value[key] = {
+                        converted[key] = {
                             "function": "fde",
-                            "tensor_data": fde_obj.tensor_data,
-                            "target_dimension": fde_obj.target_dimension,
+                            "tensor_data": v.tensor_data,
+                            "target_dimension": v.target_dimension,
                         }
                     elif isinstance(
-                        value[key], np.ndarray
+                        v, np.ndarray
                     ):  # trans np array to list since http api can not parse np array
-                        value[key] = value[key].tolist()
-                    elif isinstance(value[key], list):
-                        for idx in range(len(value[key])):
-                            if isinstance(value[key][idx], np.ndarray):
-                                value[key][idx] = value[key][idx].tolist()
-                            elif isinstance(
-                                value[key][idx],
-                                (np.integer, np.floating, np.longdouble),
-                            ):
-                                value[key][idx] = value[key][idx].item()
-                    elif isinstance(value[key], SparseVector):
-                        value[key] = value[key].to_dict()
+                        converted[key] = v.tolist()
+                    elif isinstance(v, (np.integer, np.floating)):
+                        # numpy scalars (e.g. from a DataFrame row) are not JSON serializable
+                        converted[key] = _python_scalar(v)
+                    elif isinstance(v, list):
+                        converted[key] = [
+                            x.tolist()
+                            if isinstance(x, np.ndarray)
+                            else (
+                                _python_scalar(x)
+                                if isinstance(x, (np.integer, np.floating))
+                                else x
+                            )
+                            for x in v
+                        ]
+                    elif isinstance(v, SparseVector):
+                        converted[key] = v.to_dict()
+                    else:
+                        converted[key] = v
+                converted_values.append(converted)
+            else:
+                converted_values.append(value)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.net.set_up_header(["accept", "content-type"])
-        r = self.net.request(url, "post", h, values)
+        r = self.net.request(url, "post", h, converted_values)
         self.net.raise_exception(r)
         return database_result()
 
@@ -960,11 +984,6 @@ class table_http_result:
         self._output = output
         self._highlight = []
         self._filter = ""
-        self._fusion = []
-        self._knn = []
-        self._match = []
-        self._match_tensor = []
-        self._match_sparse = []
         self._search_exprs = []
         self._sort = []
         self._group_by = []
@@ -1049,16 +1068,8 @@ class table_http_result:
         tmp = {}
         if len(self._filter):
             tmp["filter"] = self._filter
-        if len(self._fusion):
-            tmp["fusion"] = self._fusion
-        if len(self._knn):
-            tmp["knn"] = self._knn
-        if len(self._match):
-            tmp["match"] = self._match
-        if len(self._match_tensor):
-            tmp["match_tensor"] = self._match_tensor
-        if len(self._match_sparse):
-            tmp["match_sparse"] = self._match_sparse
+        if len(self._search_exprs):
+            tmp["search"] = self._search_exprs
         if len(self._output):
             tmp["output"] = self._output
         if len(self._highlight):
@@ -1101,6 +1112,8 @@ class table_http_result:
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None):
+        if order_by_expr_list is None:
+            return self
         for order_by_expr in order_by_expr_list:
             tmp = {}
             if len(order_by_expr) != 2:
@@ -1191,10 +1204,23 @@ class table_http_result:
         topn: int,
         opt_params: dict | None = None,
     ):
+        if isinstance(sparse_data, SparseVector):
+            sparse_dict = sparse_data.to_dict()
+        elif isinstance(sparse_data, dict):
+            if len(sparse_data) == 0:
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION, "Empty sparse vector"
+                )
+            sparse_dict = sparse_data
+        else:
+            raise InfinityException(
+                ErrorCode.INVALID_CONSTANT_TYPE,
+                f"Invalid sparse data type {type(sparse_data)}",
+            )
         tmp_match_sparse = {
             "match_method": "sparse",
             "fields": vector_column_name,
-            "query_vector": sparse_data.to_dict(),
+            "query_vector": sparse_dict,
             "metric_type": distance_type,
             "topn": topn,
         }
@@ -1241,11 +1267,14 @@ class table_http_result:
                 "query_tensor": fusion_params["query_tensor"],
                 "element_type": fusion_params["element_type"],
             }
-            # handle left params
-            fusion_params.pop("field")
-            fusion_params.pop("query_tensor")
-            fusion_params.pop("element_type")
-            tmp_new_params.update(fusion_params)
+            # handle left params without mutating the caller's dict
+            tmp_new_params.update(
+                {
+                    k: v
+                    for k, v in fusion_params.items()
+                    if k not in ("field", "query_tensor", "element_type")
+                }
+            )
             tmp_fusion_expr["params"] = tmp_new_params
         else:
             if fusion_params is not None:
@@ -1290,8 +1319,22 @@ class table_http_result:
                 if len(tup) == line_i + 1:
                     continue
 
-                if v is None or isinstance(v, (int, float)):
+                # A varchar cell, or a CAST(... AS VARCHAR) result, is text: never parse it
+                # as a list or a sparse vector, whatever it looks like.
+                declared_type = col_types.get(col_name)
+                if declared_type is None:
+                    is_varchar = _parse_cast_target_type(col_name) == "string"
+                else:
+                    is_varchar = declared_type.lower() == "varchar"
+                if v is None or isinstance(v, (int, float)) or is_varchar:
                     new_tup = tup + (v,)
+                elif (
+                    is_bit_embedding_type(col_types.get(col_name))
+                    and v.startswith("[")
+                    and v.endswith("]")
+                ):
+                    # "[01000000]" is a bit string, not a number; keep it like the thrift client does
+                    new_tup = tup + ([v[1:-1]],)
                 elif is_list(v) and not is_json_function(col_name):
                     # Don't parse lists for JSON extraction functions - keep them as strings
                     new_tup = tup + (ast.literal_eval(v),)
@@ -1301,12 +1344,29 @@ class table_http_result:
                     sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
-                    if v.lower() == "true":
-                        v = True
-                    elif v.lower() == "false":
-                        v = False
-                    elif v.lower() == "none":  # Convert string "None" to Python None
-                        v = None
+                    # The HTTP server serializes boolean columns as the strings
+                    # "true"/"false". Only coerce when the column is actually boolean
+                    # (or has no declared type, e.g. an expression), so varchar cells
+                    # that happen to contain "true"/"false"/"None" are not corrupted.
+                    col_type = col_types.get(col_name)
+                    if col_type is None:
+                        # No declared type: an expression column. An explicit
+                        # CAST pins the result type (e.g. CAST(c1 AS VARCHAR)
+                        # must stay a string), so only coerce when the cast
+                        # target is boolean or there is no cast at all.
+                        cast_dtype = _parse_cast_target_type(col_name)
+                        coerce_bool = cast_dtype is None or cast_dtype == "boolean"
+                    else:
+                        coerce_bool = col_type.lower() in ("bool", "boolean")
+                    if coerce_bool:
+                        if v.lower() == "true":
+                            v = True
+                        elif v.lower() == "false":
+                            v = False
+                        elif (
+                            v.lower() == "none"
+                        ):  # Convert string "None" to Python None
+                            v = None
                     new_tup = tup + (v,)
                 df_dict[col_name] = new_tup
             line_i += 1

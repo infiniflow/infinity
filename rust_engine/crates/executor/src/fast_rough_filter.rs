@@ -183,10 +183,15 @@ fn bound_of(variant: u8, value: &Value) -> Option<Bound> {
 /// The raw bytes of a string value, for the comparisons `SetToTruncate`'s
 /// callers make: they compare the **full** input string against the stored
 /// (truncated) view.
-fn text_bytes(value: &Value) -> Vec<u8> {
+/// The bytes of a cell, borrowed when it is already text.
+///
+/// A VARCHAR column's bound update only compares and truncates, so copying the
+/// string per cell was pure waste - and it is the filter's innermost loop, run
+/// once per cell of every block written.
+fn text_bytes(value: &Value) -> std::borrow::Cow<'_, [u8]> {
     match value {
-        Value::Str(s) => s.as_bytes().to_vec(),
-        other => other.to_slt_string().into_bytes(),
+        Value::Str(s) => std::borrow::Cow::Borrowed(s.as_bytes()),
+        other => std::borrow::Cow::Owned(other.to_slt_string().into_bytes()),
     }
 }
 
@@ -395,12 +400,12 @@ impl Filters {
                 // sentinel filler (0x7f for the min, 0x00 for the max).
                 let text = text_bytes(value);
                 if let Bound::Text(current) = *min {
-                    if text.as_slice() < current.view() {
+                    if text.as_ref() < current.view() {
                         *min = Bound::Text(current.truncate(&text));
                     }
                 }
                 if let Bound::Text(current) = *max {
-                    if text.as_slice() > current.view() {
+                    if text.as_ref() > current.view() {
                         *max = Bound::Text(current.truncate(&text));
                     }
                 }

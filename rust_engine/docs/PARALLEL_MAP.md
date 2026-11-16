@@ -147,6 +147,10 @@ checkpoint 的切面由它自己的 ts 决定，不需要与 DDL 互斥：`flush
 
 加锁顺序固定为 `ddl_lock → bottom_gate(table)`：`ddl_lock` 只圈住 capture，`add_column_files` 在提交阶段（capture 之外）取该表的 bottom gate，`write_blocks_mode` 取同一把（已在 bottom 里则跳过）。快照恢复持 `ddl_lock` 且只**读**块（`restore_blocks`），快照创建写块但不持 `ddl_lock`，两者都不成环。
 
+`FLUSH DATA`（SQL 与 Thrift/HTTP 的 `Flush` 都走 `Engine::flush`）默认与参考一样只做 checkpoint（不封存内存索引尾巴，见 `flush_storage` 的注释）；`[storage] flush_dumps_mem_index = true` 时，`Engine::flush` 在 checkpoint 返回后逐个索引跑 `DumpMemIndex` 事务，再 `drop_index_caches` + `reload_vector_indexes`。dump 事务取 `flush_lock` 的**读**侧（checkpoint 取写侧），所以这一步必须在 `flush_storage` 返回之后（写锁不可重入、读侧只在 dump 期间持有）。批量路径只读一次 catalog（`dump_index_meta`/`publish_index_chunk`），不再每索引重扫索引表——N 张表时那是 O(N²)。封存是否并行由 `INFINITY_FLUSH_DUMP_CONCURRENCY`（默认 1）决定：实测 64 表×256 行串行 1.51 s / 8 线程 1.87 s（小尾巴的成本在每索引那笔事务的固定开销上，而提交顺序本来就串行），16 表×4096 行 144 ms / 117 ms（封存本身有活干才划算）。该开关默认关闭：参考的 flush 不 dump，跨引擎字节门禁在 `flush_data()` 之后比目录。 并行化与异步化的整体计划见 `docs/PARALLEL_ASYNC.md`。
+
+内存索引的预算是一个**全局**数字（`Engine::memindex_bytes`）：fulltext / sparse / multi-vector / 二级 / HNSW 的计费（`index_pending_bytes`）/ IVF 行都计入，`enforce_memindex_quota` 用它和 `memindex_memory_quota` 比——按索引用配额会让 `表数 × quota` 的量同时驻留。HNSW 只取计费量，不叠加 `mem_usage()`（两套计数会重复计同一批行）；PLAID / SMVE / EMVB 尾部不计入：它们是整列常驻对象，`seal` 不释放，计进去会让每次检查都超限、反复 dump。
+
 块里缺少本次写入的列时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
 
 验证：`replay_of_the_test_alter_complex_sequence_around_a_checkpoint`（把 checkpoint 依次放在每一步之后）、`concurrent_column_changes_leave_no_side_effect_behind`、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。`a_checkpoint_through_a_column_change_keeps_the_block_readable` 是同一竞态的 50 轮压测（checkpoint 在另一线程），当前 `#[ignore]`：慢机上仍能复现一条 replay 侧的列-时刻错配，原因与观测写在该用例的注释里。

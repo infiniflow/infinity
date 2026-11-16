@@ -96,9 +96,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"COPY {table_name} FROM '{copy_path}' WITH (FORMAT PARQUET);\n"
-        )
+        slt_file.write(f"COPY {table_name} FROM '{copy_path}' WITH (FORMAT PARQUET);\n")
         slt_file.write("\n")
 
         slt_file.write("query I\n")
@@ -107,9 +105,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         write_query()
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"COPY {table_name} TO '{copy_path1}' WITH (FORMAT PARQUET);\n"
-        )
+        slt_file.write(f"COPY {table_name} TO '{copy_path1}' WITH (FORMAT PARQUET);\n")
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")

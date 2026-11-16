@@ -9,8 +9,8 @@ import numpy as np
 
 class MyFormatter(string.Formatter):
     def format_field(self, value, format_spec):
-        if format_spec == 'm':
-            return super().format_field(value, 'e').replace('e+', 'e')
+        if format_spec == "m":
+            return super().format_field(value, "e").replace("e+", "e")
         else:
             return super().format_field(value, format_spec)
 
@@ -47,9 +47,12 @@ def get_random_data():
         rand_1 = np.random.rand(row_n, 2)
         all_multivector_centers = np.zeros((row_n, 3), dtype=np.float32)
         for i in range(row_n):
-            all_multivector_centers[i, :] = get_sphere_point(radius, rand_1[i][0], rand_1[i][1])
-        all_multivectors = np.repeat(all_multivector_centers[:, np.newaxis, :], num_in_row, axis=1) + (
-                np.random.rand(row_n, num_in_row, 3).astype(np.float32) - 0.5)
+            all_multivector_centers[i, :] = get_sphere_point(
+                radius, rand_1[i][0], rand_1[i][1]
+            )
+        all_multivectors = np.repeat(
+            all_multivector_centers[:, np.newaxis, :], num_in_row, axis=1
+        ) + (np.random.rand(row_n, num_in_row, 3).astype(np.float32) - 0.5)
         assert all_multivectors.shape == (row_n, num_in_row, 3)
         assert all_multivectors.dtype == np.float32
         assert all_multivector_centers.shape == (row_n, 3)
@@ -62,12 +65,14 @@ def get_random_data():
             distance_pair = []
             for j in range(row_n):
                 diff = all_multivectors[j] - query_v
-                l2_d = np.sum(diff ** 2, axis=1)
+                l2_d = np.sum(diff**2, axis=1)
                 distance_pair.append((j, np.min(l2_d)))
             # sort by distance
             distance_pair.sort(key=lambda x: x[1])
             for j in range(min(row_n - 1, top_n[pos])):
-                if (distance_pair[j + 1][1] - distance_pair[j][1]) / distance_pair[j + 1][1] < require_min_diff:
+                if (distance_pair[j + 1][1] - distance_pair[j][1]) / distance_pair[
+                    j + 1
+                ][1] < require_min_diff:
                     good_diff = False
                     break
             if not good_diff:
@@ -80,7 +85,7 @@ def get_random_data():
 def get_multivector_str_not_quoted(mv: np.ndarray):
     assert mv.ndim == 2
     assert mv.shape[1] == 3
-    return '[' + (",".join([f"[{v[0]},{v[1]},{v[2]}]" for v in mv])) + ']'
+    return "[" + (",".join([f"[{v[0]},{v[1]},{v[2]}]" for v in mv])) + "]"
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
@@ -99,24 +104,52 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(csv_path) and os.path.exists(slt_path) and os.path.exists(slt_path_hnsw) and not generate_if_exists:
-        print(f"File {slt_path}, {slt_path_hnsw} and {csv_path} already existed. Skip Generating.")
+    if (
+        os.path.exists(csv_path)
+        and os.path.exists(slt_path)
+        and os.path.exists(slt_path_hnsw)
+        and not generate_if_exists
+    ):
+        print(
+            f"File {slt_path}, {slt_path_hnsw} and {csv_path} already existed. Skip Generating."
+        )
         return
     # generate data
     all_multivector_centers, all_multivectors, distance_results = get_random_data()
     # test method:
     # 1. insert row [0, 20)
-    insert_val_1 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(20)])
+    insert_val_1 = ",".join(
+        [
+            f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})"
+            for i in range(20)
+        ]
+    )
     # 2. import row [20, 980)
     with open(csv_path, "w") as multivector_scan_csv_file:
-        multivector_scan_csv_file.writelines(f'{i},"{get_multivector_str_not_quoted(all_multivectors[i])}"\n' for i in range(20, 980))
+        multivector_scan_csv_file.writelines(
+            f'{i},"{get_multivector_str_not_quoted(all_multivectors[i])}"\n'
+            for i in range(20, 980)
+        )
     # 3. insert row [980, 1000)
-    insert_val_3 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(980, 1000)])
+    insert_val_3 = ",".join(
+        [
+            f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})"
+            for i in range(980, 1000)
+        ]
+    )
     # 4. dense scan for row in query_data
-    with open(slt_path, "w") as multivector_scan_slt_file, open(slt_path_hnsw, "w") as multivector_hnsw_slt_file:
+    with (
+        open(slt_path, "w") as multivector_scan_slt_file,
+        open(slt_path_hnsw, "w") as multivector_hnsw_slt_file,
+    ):
+
         def write_twice(statement: str, output_table_name: bool = False):
-            multivector_scan_slt_file.write(statement.format(table_name) if output_table_name else statement)
-            multivector_hnsw_slt_file.write(statement.format(table_name_hnsw) if output_table_name else statement)
+            multivector_scan_slt_file.write(
+                statement.format(table_name) if output_table_name else statement
+            )
+            multivector_hnsw_slt_file.write(
+                statement.format(table_name_hnsw) if output_table_name else statement
+            )
 
         write_twice("statement ok\n")
         write_twice("DROP TABLE IF EXISTS {};\n", True)
@@ -125,13 +158,17 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # create hnsw index for table_name_hnsw
         multivector_hnsw_slt_file.write("\nstatement ok\n")
         multivector_hnsw_slt_file.write(
-            f'CREATE INDEX idx ON {table_name_hnsw} (c2) USING HNSW WITH (M = 16, ef_construction = 200, metric = l2);\n')
+            f"CREATE INDEX idx ON {table_name_hnsw} (c2) USING HNSW WITH (M = 16, ef_construction = 200, metric = l2);\n"
+        )
         # 1. insert row [0, 20)
         write_twice("\nstatement ok\n")
         write_twice(f"INSERT INTO \u007b\u007d VALUES {insert_val_1};\n", True)
         # 2. import row [20, 980)
         write_twice("\nstatement ok\n")
-        write_twice(f"COPY \u007b\u007d FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n", True)
+        write_twice(
+            f"COPY \u007b\u007d FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n",
+            True,
+        )
         # 3. insert row [980, 1000)
         write_twice("\nstatement ok\n")
         write_twice(f"INSERT INTO \u007b\u007d VALUES {insert_val_3};\n", True)
@@ -139,8 +176,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
         write_twice("\n# multivector scan\n")
         for i, q_id in enumerate(query_data):
             write_twice("\nquery I\n")
-            query_v = np.array2string(all_multivector_centers[q_id], separator=',',
-                                      formatter={'float': lambda x: fmt.format_field(x, 'm')})
+            query_v = np.array2string(
+                all_multivector_centers[q_id],
+                separator=",",
+                formatter={"float": lambda x: fmt.format_field(x, "m")},
+            )
             query_str = f"SELECT c1 FROM \u007b\u007d SEARCH MATCH VECTOR (c2, {query_v}, 'float', 'l2', {top_n[i]});\n"
             write_twice(query_str, True)
             write_twice("----\n")
@@ -154,7 +194,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate data for multivector test")
-    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists", )
-    parser.add_argument("-c", "--copy", type=str, default="/var/infinity/test_data", dest="copy_dir", )
+    parser.add_argument(
+        "-g",
+        "--generate",
+        type=bool,
+        default=False,
+        dest="generate_if_exists",
+    )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default="/var/infinity/test_data",
+        dest="copy_dir",
+    )
     args = parser.parse_args()
     generate(args.generate_if_exists, args.copy_dir)

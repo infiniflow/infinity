@@ -127,7 +127,6 @@ std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &e
         }
     } else {
         std::string expr_name = expr.GetName();
-        UnrecoverableError(fmt::format("Need to add support for {} in order_binder.", expr_name));
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
             auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];
@@ -146,7 +145,11 @@ std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &e
         }
 
         if (column_id == -1) {
-            UnrecoverableError(fmt::format("{} isn't found in project list.", expr_name));
+            // A sort key that is not a projection entry (a CAST expression,
+            // say) cannot be turned into a column reference. Report it as a
+            // statement error: UnrecoverableError here aborted the whole
+            // server, and the code below it was unreachable because of that.
+            RecoverableError(Status::SyntaxError(fmt::format("ORDER BY expression {} isn't found in project list.", expr_name)));
         }
     }
 

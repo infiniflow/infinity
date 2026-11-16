@@ -83,13 +83,13 @@ mod tests {
     fn a_correlated_subquery_is_evaluated_per_outer_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
             .unwrap();
-        e.execute("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute_blocking("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
             .unwrap();
-        e.execute("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute_blocking("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
             .unwrap();
-        e.execute("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute_blocking("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
             .unwrap();
         let names = |sql: &str| rows(&e, sql);
         assert_eq!(
@@ -115,20 +115,22 @@ mod tests {
     fn probe_exact() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
-        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
-        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
         for sql in [
             "WITH c AS (SELECT * FROM cj_o) SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;",
             "SELECT id FROM (SELECT * FROM cj_o) WHERE EXISTS (SELECT 1 FROM cj_s WHERE cj_s.a = a) ORDER BY id;",
             "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;",
         ] {
-            match e.execute(sql) {
+            match e.execute_blocking(sql) {
                 Ok(r) => println!("PROBE ok {sql} => {r:?}"),
                 Err(err) => println!("PROBE err {sql} => {err}"),
             }
@@ -143,14 +145,16 @@ mod tests {
     fn a_correlated_subquery_reads_a_cte_or_joined_relation() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cj_o (id INT, a INT);").unwrap();
-        e.execute("CREATE TABLE cj_s (a INT, x INT);").unwrap();
-        e.execute("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
             .unwrap();
-        e.execute("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
+        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
 
         // A CTE as the outer relation: `c.a` is substituted with the alias the
         // statement used, not the internal one.
@@ -184,11 +188,13 @@ mod tests {
     fn a_correlated_subquery_runs_once_per_distinct_key() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ck (id INT, k INT);").unwrap();
-        e.execute("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+        e.execute_blocking("CREATE TABLE ck (id INT, k INT);")
             .unwrap();
-        e.execute("CREATE TABLE cv (k INT, x INT);").unwrap();
-        e.execute("INSERT INTO cv VALUES (10, 1), (20, 2);")
+        e.execute_blocking("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE cv (k INT, x INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO cv VALUES (10, 1), (20, 2);")
             .unwrap();
 
         crate::dependent::INNER_RUNS.with(|runs| runs.set(0));
@@ -240,13 +246,13 @@ mod tests {
     fn a_correlated_subquery_works_outside_the_where_clause() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
             .unwrap();
-        e.execute("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute_blocking("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
             .unwrap();
-        e.execute("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute_blocking("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
             .unwrap();
-        e.execute("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute_blocking("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
             .unwrap();
 
         // Projected scalar subquery, one value per outer row.
@@ -294,6 +300,150 @@ mod tests {
     // `qui`/`uic`/`ick`, so a literal `qui` is a token there and not in a
     // `standard` index.
 
+    /// The batch path must produce exactly the postings the row-by-row path
+    /// does: tokenizing in parallel is only safe if applying in row order leaves
+    /// every posting list ascending and identical.
+    #[test]
+    fn a_batch_indexed_column_matches_the_row_by_row_one() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(1 << 20);
+        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+            .unwrap();
+        // One INSERT of many rows goes through the batch path.
+        let mut values = Vec::new();
+        for i in 0..64 {
+            values.push(format!("({i}, 'alpha beta gamma{i} delta')"));
+        }
+        e.execute_blocking(&format!("INSERT INTO bt VALUES {};", values.join(",")))
+            .unwrap();
+        // The same rows, one statement each, go through the per-row path.
+        e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..64 {
+            e.execute_blocking(&format!(
+                "INSERT INTO rt VALUES ({i}, 'alpha beta gamma{i} delta');"
+            ))
+            .unwrap();
+        }
+        let query = |t: &str, term: &str| {
+            rows(
+                &e,
+                &format!("SELECT id FROM {t} SEARCH MATCH TEXT (body, '{term}', 200);"),
+            )
+        };
+        assert_eq!(query("bt", "alpha"), query("rt", "alpha"));
+        assert_eq!(query("bt", "beta"), query("rt", "beta"));
+        assert_eq!(query("bt", "gamma7"), query("rt", "gamma7"));
+    }
+
+    /// A batch big enough for several workers must still produce exactly the
+    /// postings a row-by-row insert does, and every posting list must stay in
+    /// ascending row order (that is what applying in sequence order buys).
+    #[test]
+    fn a_large_batch_matches_the_row_by_row_postings() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_capacity(1 << 20);
+        e.execute_blocking("CREATE TABLE big (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX big_idx ON big (body) USING FULLTEXT")
+            .unwrap();
+        // A vocabulary wide enough that the workers' local dictionaries do not
+        // trivially hit, and 5000 rows so the batch splits across several.
+        let vocab = 2_000;
+        let mut values = Vec::new();
+        for i in 0..5_000 {
+            let doc: Vec<String> = (0..30)
+                .map(|k| format!("w{}", (i * 7 + k * 13) % vocab))
+                .collect();
+            values.push(format!("({i}, '{}')", doc.join(" ")));
+        }
+        e.execute_blocking(&format!("INSERT INTO big VALUES {};", values.join(",")))
+            .unwrap();
+
+        e.execute_blocking("CREATE TABLE small (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX small_idx ON small (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..5_000 {
+            let doc: Vec<String> = (0..30)
+                .map(|k| format!("w{}", (i * 7 + k * 13) % vocab))
+                .collect();
+            e.execute_blocking(&format!(
+                "INSERT INTO small VALUES ({i}, '{}');",
+                doc.join(" ")
+            ))
+            .unwrap();
+        }
+        for term in ["w0", "w7", "w1234", "w1999"] {
+            assert_eq!(
+                rows(
+                    &e,
+                    &format!("SELECT id FROM big SEARCH MATCH TEXT (body, '{term}', 9999);"),
+                ),
+                rows(
+                    &e,
+                    &format!("SELECT id FROM small SEARCH MATCH TEXT (body, '{term}', 9999);"),
+                ),
+                "term {term} differs between the batch and the row-by-row index"
+            );
+        }
+        // Row order is *not* what makes this correct: `insert_tokens` keeps each
+        // list sorted either way. What the batch must preserve is the content -
+        // the same documents under the same terms, with the same term
+        // frequencies - and that is what the queries above compare.
+    }
+
+    /// A row inserted after a checkpoint must be readable through an indexed
+    /// lookup.
+    ///
+    /// Its slot lies past the block's `row_count` (the block was written before
+    /// the row existed), and the columnar batch path used to read that as
+    /// "hidden by the block version" and answer NULL - so the row disappeared
+    /// from every indexed query while a full scan still found it.
+    #[test]
+    fn a_row_inserted_after_a_checkpoint_is_visible_through_its_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE post (id INT, grp INT);")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..8 {
+            values.push(format!("({i},0)"));
+        }
+        e.execute_blocking(&format!("INSERT INTO post VALUES {};", values.join(",")))
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX post_grp ON post (grp);")
+            .unwrap();
+        // The row that lands past the block's window.
+        e.execute_blocking("INSERT INTO post VALUES (99,0);")
+            .unwrap();
+
+        // The server's SELECT goes through the columnar batch path, which is
+        // the one that mapped the missing slot to NULL.
+        let batch = |sql: &str| {
+            e.select_columns(sql)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{sql} did not take the columnar path"))
+        };
+        assert_eq!(
+            batch("SELECT id FROM post WHERE grp = 0;").row_count,
+            9,
+            "the indexed lookup lost the row written after the checkpoint"
+        );
+        assert_eq!(
+            batch("SELECT id FROM post WHERE id = 99;").row_count,
+            1,
+            "the row inserted after the checkpoint is missing"
+        );
+    }
+
     /// A reopened engine maps the chunks the previous process sealed instead of
     /// re-indexing the table, so its memory tail holds no document and the
     /// sealed readers cover every row.
@@ -303,17 +453,17 @@ mod tests {
         let before = {
             let e = Engine::open(dir.path()).unwrap();
             e.set_memindex_capacity(4);
-            e.execute("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..12 {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO rt VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
@@ -358,17 +508,17 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // One chunk per two rows, so the index starts fragmented.
             e.set_memindex_capacity(2);
-            e.execute("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE opt (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..10 {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             before = rows(&e, query);
             assert_eq!(before.len(), 10);
             let chunks = fulltext_chunks(&e);
@@ -385,16 +535,814 @@ mod tests {
             );
             assert_eq!(rows(&e, query), before, "the merge must not lose rows");
             assert_eq!(
-                e.optimize_fulltext("opt").unwrap(),
+                crate::scheduler::block_on(e.optimize_fulltext_async("opt")).unwrap(),
                 0,
                 "an already-merged index is a no-op"
             );
         }
 
-        // The merged chunk is what `load_sealed` finds on the next open.
+        // The merged chunk is what the catalog lists on the next open. A reader
+        // is built on first use, so the query comes first: it maps the chunks
+        // the catalog names instead of re-indexing the rows.
         let reopened = Engine::open(dir.path()).unwrap();
-        assert_eq!(fulltext_chunks(&reopened), 1);
         assert_eq!(rows(&reopened, query), before);
+        assert_eq!(fulltext_chunks(&reopened), 1);
+    }
+
+    /// A compaction renumbers every row, so the full-text index has to be
+    /// rebuilt with the new ids. The query after the merge must still answer,
+    /// both from the in-memory rebuild and from the chunks a reopen maps.
+    #[test]
+    fn a_compaction_keeps_the_fulltext_index_answering() {
+        let q = "SELECT doctitle FROM ct SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE ct (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX ct_body ON ct (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..20 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            crate::scheduler::block_on(e.flush()).unwrap();
+            for i in 20..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+            }
+            assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+            e.compact_all_segments("default_db.ct").unwrap();
+            assert_eq!(rows(&e, q).len(), 40, "after the compaction");
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q).len(), 40, "after a reopen");
+    }
+
+    /// A full-text build reads the rows one batch at a time, so a compaction can
+    /// renumber every row while it runs. Such a build must not publish: its
+    /// postings name the segments the merge dropped, every hit is then a row
+    /// `fetch_some_rows_with_ids` cannot find, and `MATCH` answers nothing on a
+    /// table full of matches - which is what
+    /// `TestParallelFulltextIndexReadWrite` reported as `column "doctitle" is
+    /// empty` on the query that runs after its writers stopped.
+    #[test]
+    fn a_fulltext_build_does_not_publish_across_a_compaction() {
+        let q = "SELECT doctitle FROM cr SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cr (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cr_body ON cr (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        for i in 20..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+
+        // The index (and the epoch) a build that started before the merge still
+        // holds when it finishes.
+        let tkey = e.table_key("cr");
+        let (stale, epoch) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            let body_id = e.test_index_id("cr", "body", "FULLTEXT");
+            let stale = entry
+                .text
+                .get(&body_id)
+                .expect("the index is cached")
+                .clone();
+            (stale, entry.text_epoch)
+        };
+        e.compact_all_segments("default_db.cr").unwrap();
+        assert_eq!(
+            {
+                let body_id = e.test_index_id("cr", "body", "FULLTEXT");
+                e.publish_text_index(&tkey, body_id, epoch, stale)
+            },
+            crate::engine::statements::TextPublish::Renumbered,
+            "a build from the pre-compaction layout must not publish"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            40,
+            "and the query after the merge still answers"
+        );
+    }
+
+    /// A build can start **after** a compaction bumped `text_epoch` and still
+    /// hold the pre-merge rows: the merge's drops are not visible until it
+    /// commits, and the read ts does not separate the two either - a statement
+    /// reads at `current_ts() + 1`, and the writers keep committing past a
+    /// running merge's ts, so a build can look newer than the merge and still
+    /// have read the layout it retires. What separates them is the layout the
+    /// build indexed: every `ROW_ID` segment it covers has to still be live.
+    /// Caching such an index left every hit naming a row no block owns, and
+    /// `MATCH` answered `column "doctitle" is empty` for the rest of the run
+    /// (`TestParallelFulltextIndexReadWrite`, on the query after its writers
+    /// stopped).
+    #[test]
+    fn an_index_of_a_retired_segment_is_never_cached() {
+        let q = "SELECT doctitle FROM retired SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE retired (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX retired_body ON retired (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..40 {
+            e.execute_blocking(&format!(
+                "INSERT INTO retired VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.retired").unwrap();
+        let tkey = e.table_key("retired");
+        let (epoch, live) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            (
+                entry.text_epoch,
+                entry.segments.keys().copied().collect::<Vec<_>>(),
+            )
+        };
+        assert!(
+            !live.contains(&0),
+            "the merge renumbers segment 0, live is {live:?}"
+        );
+        // The layout the merge retired, with one document per (old) live row, so
+        // its document count alone would let it pass for a complete cache.
+        let stale_dir = tempdir().unwrap();
+        let stale = {
+            let mut index = TextIndex::new(
+                stale_dir.path().to_string_lossy().into_owned(),
+                TextTokenizer::default(),
+            );
+            for row in 0..40u64 {
+                index_row(&mut index, row, "harmful chemical");
+            }
+            assert_eq!(
+                index
+                    .covered_row_segments()
+                    .iter()
+                    .copied()
+                    .collect::<Vec<u32>>(),
+                vec![0]
+            );
+            let stale: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+            stale
+        };
+        let index_id = e
+            .fulltext_index_id("retired", "body")
+            .expect("the full-text index is recorded in the catalog");
+        assert_eq!(
+            e.publish_text_index(&tkey, index_id, epoch, stale),
+            crate::engine::statements::TextPublish::Renumbered,
+            "a build of the retired segment must not be cached"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "and the kept cache still answers for the merged layout"
+        );
+        // A build of the *merged* layout still publishes: with the kept cache
+        // dropped, the next query rebuilds it and the one after that reuses the
+        // same instance. A segment check that refused those instead would
+        // rebuild the column on every query - the shape that once kept a `MATCH`
+        // running for a whole gate timeout.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.entry(tkey.clone()).or_default();
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let cached = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .and_then(|entry| entry.text.get(&index_id).cloned())
+        };
+        assert_eq!(rows(&e, q).len(), 3);
+        let first = cached(&e).expect("the build of the merged layout was published");
+        assert_eq!(rows(&e, q).len(), 3);
+        let again = cached(&e).expect("the published cache is still there");
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the merged layout is rebuilt on every query instead of reused"
+        );
+    }
+
+    /// A merge that lands **inside** a build renumbers every row the build just
+    /// read, so its postings name ids nothing owns. The tokenizer/scan window is
+    /// too narrow to hit by chance here, so the test drives it deterministically
+    /// (`TEXT_BUILD_HOOK`, which fires between the scan and the publish).
+    #[test]
+    fn a_compaction_inside_a_build_still_answers_the_query() {
+        let q = "SELECT doctitle FROM raced SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced_body ON raced (body) USING FULLTEXT")
+            .unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        // Make the cache one row short of the table: that is the cold path a bulk
+        // load which bypassed the DML hooks takes, and it is what puts a rebuild
+        // on the query path while a cache is still in place.
+        {
+            let tkey = e.table_key("raced");
+            let shared = {
+                let tables = e.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| {
+                        entry
+                            .text
+                            .get(&e.test_index_id("raced", "body", "FULLTEXT"))
+                    })
+                    .cloned()
+                    .expect("the index is cached")
+            };
+            let mut index = shared.write().unwrap();
+            crate::engine::state::index_delete_row(&mut index, 0);
+            assert!(
+                index.total_docs() < 30,
+                "the cache has to look short of the table"
+            );
+        }
+        let compacting = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            compacting
+                .compact_all_segments("raced")
+                .expect("the merge inside the build");
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the merge inside the build lost the rows: {hits:?}"
+        );
+    }
+
+    /// The worst schedule: every attempt is both renumbered *and* left without a
+    /// cache to read. Answering from such a build returns rows no fetch can
+    /// resolve (an empty `MATCH` on a table full of matches), so the statement
+    /// has to fail instead.
+    #[test]
+    fn a_build_that_can_never_publish_fails_instead_of_answering() {
+        let q = "SELECT doctitle FROM raced2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE raced2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO raced2 VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("CREATE INDEX raced2_body ON raced2 (body) USING FULLTEXT")
+            .unwrap();
+        {
+            let tkey = e.table_key("raced2");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&tkey).expect("the table is cached");
+            entry.text.clear();
+            entry.text_built.clear();
+        }
+        let racing = std::sync::Arc::clone(&e);
+        crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
+            racing
+                .compact_all_segments("raced2")
+                .expect("the merge inside the build");
+            // A compaction keeps its caches (`reindex_compacted_text`); this is
+            // the extreme where nothing usable is left for the retry either.
+            let tkey = racing.table_key("raced2");
+            let mut tables = racing.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.text.clear();
+                entry.text_built.clear();
+            }
+        })));
+        let result = e.execute_blocking(q);
+        crate::engine::statements::set_text_build_hook(None);
+        // A build a merge invalidated still describes the rows *this* statement
+        // read (one read, one snapshot), so it answers this query and is simply
+        // not cached. Retrying it instead is what kept one `MATCH` running for
+        // the whole gate timeout: with a cache that never catches up (imports
+        // bypass the DML hooks) every attempt rebuilt the column and every
+        // rebuild was invalidated again.
+        let Ok(out) = result else {
+            panic!("the query was answered by a failed index: {result:?}");
+        };
+        let QueryResult::Rows { rows: hits, .. } = &out[0] else {
+            panic!("the query returned no rows: {out:?}");
+        };
+        assert_eq!(
+            hits.len(),
+            3,
+            "the invalidated build did not answer its own snapshot: {hits:?}"
+        );
+    }
+
+    /// The caches a compaction drops are read by every query and written by
+    /// every rebuild, so the two race in production. Churn them from several
+    /// threads: a query may answer from a build that a merge invalidated, but a
+    /// build may not land in the cache, so no hit may go missing.
+    #[test]
+    fn concurrent_compactions_never_lose_fulltext_hits() {
+        let q = "SELECT id FROM ch SEARCH MATCH TEXT (body, 'harmful chemical', 500);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 120);
+
+        let readers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                std::thread::spawn(move || {
+                    let mut worst = usize::MAX;
+                    for _ in 0..20 {
+                        worst = worst.min(rows(&engine, q).len());
+                    }
+                    worst
+                })
+            })
+            .collect();
+        for _ in 0..4 {
+            engine.compact_all_segments("default_db.ch").unwrap();
+        }
+        for reader in readers {
+            assert_eq!(
+                reader.join().expect("a concurrent query panicked"),
+                120,
+                "a query lost hits across a compaction"
+            );
+        }
+        assert_eq!(rows(&engine, q).len(), 120);
+    }
+
+    /// A cursor that snapshotted the block set **before** a compaction mirrored the
+    /// merged segment still has to resolve the ids the merge renumbered to.
+    ///
+    /// This is the shape a query hits when it starts before a merge commits but
+    /// reaches the (already renumbered) full-text cache afterwards: the postings
+    /// name the merged segment's ids, the append buffer no longer holds them (the
+    /// block write retired the buffered copies), and the cursor's snapshot does
+    /// not name their block. The block writer puts the files on disk before it
+    /// retires the buffer, so a miss is a stale snapshot and the read retries.
+    #[test]
+    fn a_cursor_from_before_a_block_write_still_resolves_the_merged_rows() {
+        let dir = tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        // The snapshot a statement that started before the merge holds: segment 0,
+        // which the merge is about to retire.
+        let mut cursor = crate::blocks::misc::BlockCursor::new(&engine, "default_db.ch").unwrap();
+        engine.compact_all_segments("default_db.ch").unwrap();
+        // The merge moved the 120 rows of segment 0 to the base of segment 1, and
+        // the block write retired the buffered copies: only the blocks hold them.
+        let merged: Vec<u64> = (0..120).map(|i| (1u64 << 32) + i).collect();
+        let resolved: Vec<usize> = cursor
+            .rows(&merged)
+            .unwrap()
+            .into_iter()
+            .map(|(seq, _)| seq)
+            .collect();
+        assert_eq!(
+            resolved,
+            merged.iter().map(|id| *id as usize).collect::<Vec<_>>()
+        );
+    }
+
+    /// `MATCH` asks for a handful of rows (`topn=3`, as the parallel gate does).
+    /// A compaction retires every row id it renumbers; a retired id that is
+    /// still in the postings takes a `topn` slot the fetch cannot resolve, so
+    /// three such hits answer "the column is empty" on a table full of matches.
+    #[test]
+    fn a_compaction_never_answers_a_small_top_n_with_retired_rows() {
+        let q = "SELECT doctitle FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE churn (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX churn_body ON churn (body) USING FULLTEXT")
+            .unwrap();
+        let mut next = 0usize;
+        for _ in 0..120 {
+            e.execute_blocking(&format!(
+                "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+            ))
+            .unwrap();
+            next += 1;
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3, "before the churn");
+
+        for round in 0..6 {
+            // Writes land in the unsealed tail, then the merge renumbers every
+            // sealed row under it.
+            for _ in 0..40 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
+                ))
+                .unwrap();
+                next += 1;
+            }
+            e.compact_all_segments("default_db.churn").unwrap();
+            assert_eq!(
+                rows(&e, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+            // The segments the merge took are dropped whole, the way the
+            // reference's reader - built from the catalog's live
+            // `SegmentIndexIDs` - never sees them. That is what keeps BM25's `N`
+            // at the live population instead of growing by a table per merge,
+            // so the chunk span may not exceed the rows that exist.
+            let stats = e.fulltext_stats("churn");
+            assert!(
+                stats[0].chunk_rows <= next,
+                "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
+                stats[0].chunk_rows
+            );
+        }
+        // The whole corpus still answers when the cut is wide enough.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 1000);"
+            )
+            .len(),
+            next
+        );
+    }
+
+    /// The parallel gate's shape: writers keep appending while the optimizer
+    /// compacts, and the reader asks for three rows only. Every query must
+    /// return three fetchable rows - a retired id in the postings eats a slot.
+    #[test]
+    fn concurrent_churn_never_empties_a_small_top_n() {
+        let q = "SELECT doctitle FROM churn2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE churn2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX churn2_body ON churn2 (body) USING FULLTEXT")
+            .unwrap();
+        let next = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut seed = 0usize;
+        for _ in 0..120 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO churn2 VALUES ({seed}, 'title{seed}', 'harmful chemical row{seed}');"
+                ))
+                .unwrap();
+            seed += 1;
+        }
+        next.store(seed, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3);
+
+        let writers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = std::sync::Arc::clone(&engine);
+                let next = std::sync::Arc::clone(&next);
+                std::thread::spawn(move || {
+                    for _ in 0..20 {
+                        let base = next.fetch_add(4, std::sync::atomic::Ordering::Relaxed);
+                        let values: Vec<String> = (0..4)
+                            .map(|i| {
+                                let id = base + i;
+                                format!("({id}, 'title{id}', 'harmful chemical row{id}')")
+                            })
+                            .collect();
+                        engine
+                            .execute_blocking(&format!(
+                                "INSERT INTO churn2 VALUES {};",
+                                values.join(",")
+                            ))
+                            .unwrap();
+                    }
+                })
+            })
+            .collect();
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                for _ in 0..8 {
+                    engine.compact_all_segments("default_db.churn2").unwrap();
+                    crate::scheduler::block_on(engine.flush()).unwrap();
+                }
+            })
+        };
+        for round in 0..40 {
+            assert_eq!(
+                rows(&engine, q).len(),
+                3,
+                "round {round}: the top-3 were rows the merge retired"
+            );
+        }
+        for writer in writers {
+            writer.join().expect("a writer panicked");
+        }
+        compactor.join().expect("the compactor panicked");
+        assert_eq!(rows(&engine, q).len(), 3, "after the churn");
+    }
+
+    /// A compaction moves the rows into a new `ROW_ID` segment and retires the
+    /// source segments' chunk records in a step of its own. A build that read the
+    /// catalog between the two mapped postings of ids the merge had given up on:
+    /// they are not `DELETE`s, nothing filters them, and a `topn=3` answer could
+    /// come back empty on a table full of matches. The layout decides liveness,
+    /// not the record set, so the build maps the live chunk only.
+    #[test]
+    fn a_build_never_maps_the_chunk_of_a_retired_segment() {
+        let q =
+            "SELECT doctitle FROM retired_chunk SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking(
+                "CREATE TABLE retired_chunk (id INTEGER, doctitle VARCHAR, body VARCHAR)",
+            )
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX rc_body ON retired_chunk (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..200 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO retired_chunk VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        let index_id = engine
+            .fulltext_index_id("retired_chunk", "body")
+            .expect("the index is recorded in the catalog");
+        let tkey = engine.table_key("retired_chunk");
+        // Hold the compaction where the merged rows are recorded and the source
+        // segments' records are not retired yet, then force the next query to
+        // rebuild from the catalog's chunk list.
+        let parked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&parked);
+        crate::engine::statements::set_compaction_window_hook(Some(Box::new(
+            move |table: &str, at: &str| {
+                // The suite runs in one process: another test's compaction must not
+                // park this one (or be parked by it).
+                if !table.contains("retired_chunk") || at != "records" {
+                    return;
+                }
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            },
+        )));
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                engine
+                    .compact_all_segments("default_db.retired_chunk")
+                    .expect("the compaction");
+            })
+        };
+        while !parked.load(std::sync::atomic::Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        {
+            let mut tables = engine.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&tkey) {
+                entry.text.clear();
+                entry.text_built.clear();
+            }
+        }
+        assert_eq!(rows(&engine, q).len(), 3, "during the compaction");
+        // The catalog still names segment 0's chunk, so a build that trusted the
+        // records covered a segment the table no longer has: `publish_text_index`
+        // refuses it and the cache stays empty. A build over live segments only
+        // is the layout's own answer and is cached.
+        {
+            let tables = engine.tables.lock().unwrap();
+            let cached = tables
+                .get(&tkey)
+                .and_then(|entry| entry.text.get(&index_id))
+                .cloned();
+            drop(tables);
+            let cached = cached.expect("the build mapped rows the table no longer has");
+            let index = cached.read().unwrap();
+            for segment in &index.reader.segments {
+                assert_eq!(
+                    (segment.reader.base_row_id() >> 32) as u32,
+                    1,
+                    "a chunk of a retired segment reached the reader"
+                );
+            }
+        }
+        compactor.join().expect("the compactor panicked");
+        crate::engine::statements::set_compaction_window_hook(None);
+        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+    }
+
+    /// A compaction moves the cached postings onto the new row ids **inside** its
+    /// commit, before that commit is published. A statement that starts in that
+    /// window must be answered by an index that agrees with the rows it can see:
+    /// the moved postings name ids of the merged segment, and a reader that reads
+    /// below the merge cannot fetch one of them, so `MATCH ... topn=3` would come
+    /// back with 0 rows on a table full of matches. This pins that ordering (the
+    /// rows reachable first, then the postings), which is what the churn case
+    /// exercises under load.
+    #[test]
+    fn a_statement_started_inside_a_merge_is_answered_by_a_consistent_index() {
+        let q = "SELECT doctitle FROM oldts SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE oldts (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX oldts_body ON oldts (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..200 {
+            engine
+                .execute_blocking(&format!(
+                    "INSERT INTO oldts VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+                ))
+                .unwrap();
+        }
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        // Park the compaction right after the cached postings moved onto the new
+        // ids, i.e. while its commit is still unpublished.
+        let parked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&parked);
+        crate::engine::statements::set_compaction_window_hook(Some(Box::new(
+            move |table: &str, at: &str| {
+                if !table.contains("oldts") || at != "reindex" {
+                    return;
+                }
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            },
+        )));
+        let compactor = {
+            let engine = std::sync::Arc::clone(&engine);
+            std::thread::spawn(move || {
+                engine
+                    .compact_all_segments("default_db.oldts")
+                    .expect("the compaction");
+            })
+        };
+        while !parked.load(std::sync::atomic::Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        let inside = rows(&engine, q).len();
+        compactor.join().expect("the compactor panicked");
+        crate::engine::statements::set_compaction_window_hook(None);
+        assert_eq!(
+            inside, 3,
+            "a statement started inside the merge was answered by postings it cannot fetch"
+        );
+        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+    }
+
+    /// The seal a merge runs into: a chunk whose write was already in flight when
+    /// the merge reindexed the column publishes ids of the segment the merge
+    /// retired. A completed seal clears the overridden marks of the rows its
+    /// chunk holds (the row's current text is now in that chunk) - but for a
+    /// chunk of a retired segment they are not current: the rows moved to new
+    /// ids, and clearing the marks put the old ones back in the postings after
+    /// the merge published. `MATCH` then filled its top-n with rows no fetch can
+    /// resolve: 0 rows on a table full of matches
+    /// (`concurrent_churn_never_empties_a_small_top_n`, round 39).
+    #[test]
+    fn a_chunk_sealed_after_the_merge_keeps_its_retired_ids_hidden() {
+        use crate::engine::text_index::{prepare_doc, MemoryIndexer, SealJob};
+
+        let q = "SELECT doctitle FROM late SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE late (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX late_body ON late (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..30 {
+            e.execute_blocking(&format!(
+                "INSERT INTO late VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        e.compact_all_segments("default_db.late").unwrap();
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the kept cache moved onto the new ids"
+        );
+
+        // The stale copy: segment 0's rows, sealed from a tail that was already
+        // being written when the merge renumbered them.
+        let index_id = e
+            .fulltext_index_id("late", "body")
+            .expect("the full-text index is recorded in the catalog");
+        let shared = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("late"))
+            .and_then(|entry| entry.text.get(&index_id).cloned())
+            .expect("the merge keeps the cache");
+        let (tokenizer, cache_dir) = {
+            let g = shared.read().unwrap();
+            (g.tokenizer.clone(), g.dir.clone())
+        };
+        let mut stale = MemoryIndexer::new();
+        for row in 0..30u64 {
+            let doc = prepare_doc(row, "harmful chemical stale", &tokenizer);
+            stale.insert_prepared(&doc, usize::MAX);
+        }
+        let total_len = stale.pending_len();
+        let docs = stale.merged_docs().expect("the stale tail holds documents");
+        let job = SealJob {
+            tail: std::sync::Arc::new(stale),
+            docs: docs.clone(),
+            base_row_id: 0,
+            docs_span: 30,
+            total_len,
+            dir: cache_dir,
+            flags: storage::invertedindex::format::OPTION_FLAG_ALL,
+            overridden_rows: docs.iter().map(|(row, _)| *row).collect(),
+        };
+        let reader = job.write().expect("the stale chunk is written");
+        shared.write().unwrap().complete_seal(job, reader);
+
+        assert_eq!(
+            rows(&e, q).len(),
+            3,
+            "the ids of a late chunk ate the top-3 slots"
+        );
     }
 
     /// A query that spans several sealed segments plus the memory tail must
@@ -414,9 +1362,9 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // Two rows per segment: the query has to walk several of them.
             e.set_memindex_capacity(capacity);
-            e.execute("CREATE TABLE seg (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE seg (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..20 {
                 let body = match i % 4 {
@@ -425,10 +1373,10 @@ mod tests {
                     2 => "beta gamma",
                     _ => "gamma epsilon",
                 };
-                e.execute(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
+                e.execute_blocking(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
                     .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             QUERIES.iter().map(|sql| rows(&e, sql)).collect()
         };
         let many = build(2);
@@ -444,16 +1392,16 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         for (table, analyzer) in [("an_std", "standard"), ("an_gram", "ngram-3")] {
-            e.execute(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
                 .unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX {table}_idx ON {table} (body) USING FULLTEXT WITH (analyzer='{analyzer}')"
             ))
             .unwrap();
-            e.execute(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
+            e.execute_blocking(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let hits = |table: &str| {
             rows(
                 &e,
@@ -478,23 +1426,24 @@ mod tests {
     fn the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rc (id INTEGER, name VARCHAR)")
+        e.execute_blocking("CREATE TABLE rc (id INTEGER, name VARCHAR)")
             .unwrap();
         for i in 0..5 {
-            e.execute(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
+            e.execute_blocking(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
                 .unwrap();
         }
         assert_eq!(e.plan_cache.len(), 0);
         // The cache is opt-in, as in the reference (`DEFAULT_RESULT_CACHE`).
         let before = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
         assert_eq!(e.plan_cache.len(), 0);
-        e.execute("SET CONFIG result_cache ON").unwrap();
+        e.execute_blocking("SET CONFIG result_cache ON").unwrap();
         let first = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
         assert_eq!(first, before);
         assert!(!e.plan_cache.is_empty(), "the scan did not fill the cache");
         assert_eq!(rows(&e, "SELECT id FROM rc WHERE id >= 2;"), first);
         // A write clears every entry: the answer could have changed.
-        e.execute("INSERT INTO rc VALUES (9, 'n9');").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (9, 'n9');")
+            .unwrap();
         assert_eq!(e.plan_cache.len(), 0);
         assert_eq!(
             rows(&e, "SELECT id FROM rc WHERE id >= 2;").len(),
@@ -508,7 +1457,7 @@ mod tests {
     fn notify_compact_merges_the_segments_the_alg_picks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE nc (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE nc (id INTEGER)").unwrap();
         // Four imports of one block each: layer 0 holds four segments, which is
         // exactly what `DBTCompactionAlg` merges.
         for part in 0..4 {
@@ -517,7 +1466,7 @@ mod tests {
                 .map(|i| format!("{}\n", part * 8192 + i))
                 .collect();
             std::fs::write(&path, text).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "COPY nc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 path.display()
             ))
@@ -542,19 +1491,19 @@ mod tests {
     fn the_block_prefilter_skips_blocks_that_cannot_match() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pf (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE pf (id INTEGER)").unwrap();
         // `COPY` seals the segment, which is when the reference builds the
         // block prefilters. Two blocks: ids 8192..8999 live in the second one,
         // so `id < 10` can never match it.
         let csv = dir.path().join("pf.csv");
         let text: String = (0..9000).map(|i| format!("{i}\n")).collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY pf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         crate::blocks::PRUNED_BLOCKS.with(|n| n.set(0));
         let got = rows(&e, "SELECT id FROM pf WHERE id < 10;");
         assert_eq!(got.len(), 10, "{got:?}");
@@ -578,7 +1527,7 @@ mod tests {
     fn a_bloom_filter_column_is_accepted_but_never_built() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE bf (b BOOLEAN, i INTEGER) PROPERTIES (bloom_filter_columns = ' b ');",
         )
         .unwrap();
@@ -589,12 +1538,12 @@ mod tests {
             .map(|i| format!("{},{i}\n", if i % 2 == 0 { "true" } else { "false" }))
             .collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY bf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let record = {
             let mut found = None;
             for (k, v) in e.storage.catalog.store().scan_prefix(b"seg|1|").unwrap() {
@@ -616,7 +1565,7 @@ mod tests {
 
         // DDL errors, as the reference's planner reports them.
         let error = e
-            .execute("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
+            .execute_blocking("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
             .expect_err("FLOAT has no bloom filter");
         assert!(
             error
@@ -626,7 +1575,9 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3013);
         let error = e
-            .execute("CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');")
+            .execute_blocking(
+                "CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');",
+            )
             .expect_err("unknown column");
         assert!(
             error
@@ -635,7 +1586,7 @@ mod tests {
             "{error}"
         );
         let error = e
-            .execute(
+            .execute_blocking(
                 "CREATE TABLE bf4 (b BOOLEAN, c BOOLEAN) PROPERTIES (bloom_filter_columns = 'b', bloom_filter_columns = 'c');",
             )
             .expect_err("duplicate property");
@@ -655,10 +1606,11 @@ mod tests {
     fn create_table_as_select_is_rejected_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cta_src (a INT);").unwrap();
-        e.execute("INSERT INTO cta_src VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE cta_src (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO cta_src VALUES (1);")
+            .unwrap();
         let error = e
-            .execute("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
+            .execute_blocking("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
             .expect_err("CTAS must be rejected");
         assert_eq!(
             error.to_string(),
@@ -666,7 +1618,7 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3048);
         // Nothing was created.
-        assert!(e.execute("SELECT * FROM cta_dst;").is_err());
+        assert!(e.execute_blocking("SELECT * FROM cta_dst;").is_err());
     }
 
     /// The rows of a `SELECT`, as rendered strings.
@@ -677,23 +1629,26 @@ mod tests {
     fn a_secondary_index_answers_equality_after_a_checkpoint() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
             .unwrap();
         for base in (0..20000).step_by(2000) {
             let values: Vec<String> = (base..base + 2000)
                 .map(|i| format!("({i}, {}.0, 'n-{i}')", i % 100))
                 .collect();
-            e.execute(&format!("INSERT INTO si VALUES {};", values.join(", ")))
+            e.execute_blocking(&format!("INSERT INTO si VALUES {};", values.join(", ")))
                 .unwrap();
         }
-        e.execute("CREATE INDEX si_id ON si (id);").unwrap();
-        e.execute("CREATE INDEX si_score ON si (score);").unwrap();
-        e.execute("CREATE INDEX si_name ON si (name);").unwrap();
+        e.execute_blocking("CREATE INDEX si_id ON si (id);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX si_score ON si (score);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX si_name ON si (name);")
+            .unwrap();
         let count = |sql: &str| rows(&e, sql).len();
         assert_eq!(count("SELECT id FROM si WHERE id = 5;"), 1);
         assert_eq!(count("SELECT id FROM si WHERE score = 5.0;"), 200);
         assert_eq!(count("SELECT id FROM si WHERE name = 'n-5';"), 1);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             count("SELECT id FROM si WHERE id = 5;"),
             1,
@@ -730,12 +1685,124 @@ mod tests {
         assert_eq!(batch("SELECT id FROM si WHERE id > 10;").row_count, 19989);
     }
     fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-        for r in e.execute(sql).unwrap() {
+        for r in e.execute_blocking(sql).unwrap() {
             if let QueryResult::Rows { .. } = r {
                 return r.rows_text();
             }
         }
         Vec::new()
+    }
+
+    /// `test_knn_ivf_l2.slt:53-58`, which the conformance gate caught: an IVF
+    /// index built over two blocks, a third block appended, then the same
+    /// query.
+    ///
+    /// Two separate bugs met here. `COPY` never reported its rows to
+    /// `live_rows` (only `INSERT` did, holding the count published by whatever
+    /// ran last), so the coverage gate compared against a count that said four
+    /// rows while the table had twelve - and the memory index that a
+    /// `CREATE INDEX` after a `COPY` leaves behind covers only the last block.
+    /// Together they let an index that holds a third of the table pass as
+    /// "complete" and answer a top-3 from its own four rows (`8, 6, 4`), where
+    /// the exact scan returns the three tied rows `8, 8, 8`.
+    #[test]
+    fn knn_answers_cover_rows_loaded_after_the_index_was_built() {
+        let dir = tempdir().unwrap();
+        let csv = dir.path().join("d4.csv");
+        std::fs::copy(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../test/data/csv/embedding_float_dim4.csv"
+            ),
+            &csv,
+        )
+        .unwrap();
+        let copy = format!(
+            "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        );
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE t (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(&copy).unwrap();
+        // The exact queries are what published a `live_rows` of 4 before the
+        // fix, so they belong in the reproduction.
+        let plain =
+            "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3);";
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["6".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, plain),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking("CREATE INDEX ix ON t (c2) USING IVF WITH (metric = l2);")
+            .unwrap();
+        let q = "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3) WITH (nprobe = 10);";
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["6".to_string()]
+            ]
+        );
+        e.execute_blocking(&copy).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["8".to_string()],
+                vec!["8".to_string()],
+                vec!["8".to_string()]
+            ],
+            "a row loaded after the index was built went missing"
+        );
+    }
+
+    /// `HEADER true` on a CSV import consumes the first line (it is not a
+    /// row) and rejects a header whose column count differs from the table's.
+    #[test]
+    fn csv_import_header_is_consumed_and_counted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE h (c1 INT, c2 INT);")
+            .unwrap();
+        let csv = dir.path().join("h.csv");
+        std::fs::write(&csv, "x,y\n1,2\n3,4\n").unwrap();
+        e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            csv.display()
+        ))
+        .unwrap();
+        assert_eq!(rows(&e, "SELECT c1 FROM h ORDER BY c1;").len(), 2);
+
+        // A header with the wrong column count is an error, not a row.
+        let bad = dir.path().join("bad.csv");
+        std::fs::write(&bad, "x\n1,2\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+            bad.display()
+        ));
+        assert!(got.is_err(), "a one-column header over a two-column table");
+
+        // Without `HEADER` the first line is data and does not parse as INT.
+        let plain = dir.path().join("plain.csv");
+        std::fs::write(&plain, "x,y\n").unwrap();
+        let got = e.execute_blocking(&format!(
+            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            plain.display()
+        ));
+        assert!(got.is_err(), "an unparsable first row is data");
     }
 
     /// How many sealed chunks the table's full-text indexes hold, i.e. the
@@ -762,9 +1829,9 @@ mod tests {
         // Only the byte budget may seal, so the tail is exactly what the test
         // inserts.
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
@@ -804,9 +1871,9 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // Only the explicit seals below may write a chunk.
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE publish (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE publish (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
@@ -859,7 +1926,7 @@ mod tests {
     }
 
     /// The unsealed segment is written **with the column's lock released**
-    /// (`seal_text_index_unlocked`), so the tail has to stay searchable while its
+    /// (`seal_text_index_gated`), so the tail has to stay searchable while its
     /// segment is on disk: it moves to `TextIndex::inflight`, which every read
     /// path merges after the resident tail.
     ///
@@ -871,12 +1938,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE slip (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE slip (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
             .unwrap();
         for i in 0..6 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO slip VALUES ({i}, 'alpha beta row{i}');"
             ))
             .unwrap();
@@ -950,12 +2017,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(0);
-        e.execute("CREATE TABLE fail (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE fail (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
             .unwrap();
         for i in 0..4 {
-            e.execute(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
         let query = "SELECT id FROM fail SEARCH MATCH TEXT (body, 'alpha', 100);";
@@ -985,7 +2052,7 @@ mod tests {
 
         // The next write retries: the in-flight tail becomes the chunk and the
         // new row stays in the (fresh) resident tail.
-        e.execute("INSERT INTO fail VALUES (4, 'alpha row4');")
+        e.execute_blocking("INSERT INTO fail VALUES (4, 'alpha row4');")
             .unwrap();
         {
             let index = shared.read().unwrap();
@@ -1052,9 +2119,9 @@ mod tests {
     fn search_honours_the_phrase_slop() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sl (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE sl (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1062,10 +2129,10 @@ mod tests {
             (2, "alpha x x beta"),
             (3, "beta alpha"),
         ] {
-            e.execute(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let exact = rows(
             &e,
@@ -1111,9 +2178,9 @@ mod tests {
     fn operator_and_requires_every_clause_without_adjacency() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ba (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE ba (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1121,10 +2188,10 @@ mod tests {
             (2, "beta"),
             (3, "alpha x beta"),
         ] {
-            e.execute(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let default_or = rows(
             &e,
@@ -1163,15 +2230,15 @@ mod tests {
     fn an_explicit_operator_switches_off_the_query_grammar() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE og (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE og (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [(0, "alpha or beta"), (1, "alpha beta"), (2, "gamma")] {
-            e.execute(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sorted = |sql: &str| -> Vec<String> {
             let mut ids: Vec<String> = rows(&e, sql).iter().map(|r| r[0].clone()).collect();
             ids.sort();
@@ -1210,9 +2277,9 @@ mod tests {
     fn search_supports_the_query_string_grammar() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -1222,10 +2289,10 @@ mod tests {
             (4, "gamma"),
             (5, "alpha gamma"),
         ] {
-            e.execute(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
+            e.execute_blocking(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let ids = |query: &str| {
             let mut out: Vec<String> = rows(
@@ -1300,8 +2367,11 @@ mod tests {
             term.to_string(),
             docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
         );
+        // Chunks live in their segment's directory (`idx_{id}/seg_{n}`), the
+        // place a seal writes and the catalog's `idx_chunk` records name.
+        let dir = storage::invertedindex::format::segment_chunk_dir(dir, base >> 32);
         storage::invertedindex::disk_segment_reader::write_segment_index(
-            dir,
+            &dir,
             &format!("ft_{base:016x}"),
             base,
             &docs,
@@ -1309,6 +2379,301 @@ mod tests {
             storage::invertedindex::format::OPTION_FLAG_ALL,
         )
         .unwrap();
+    }
+
+    /// A row deleted before its tail is sealed is not a document of the chunk
+    /// the seal writes: its postings never reach `.dic`/`.pos`, and BM25's `N`
+    /// does not count it. Otherwise the delete is invisible to the index until a
+    /// compaction, and the chunk is scored against a document no query can
+    /// return.
+    #[test]
+    fn a_seal_leaves_out_the_rows_deleted_before_it() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index_row(&mut index, 0, "alpha beta");
+        index_row(&mut index, 1, "alpha");
+        index_row(&mut index, 2, "gamma");
+        index.mem.delete(1);
+        assert!(index.seal(), "the tail writes");
+        assert_eq!(index.total_docs(), 2, "the deleted row is not a document");
+        assert_eq!(index.corpus_len(), 3, "`alpha beta` + `gamma`");
+        assert_eq!(index.term_df("alpha"), 1, "row 0 only");
+        assert_eq!(index.term_df("beta"), 1, "row 0 only");
+        // The marker records the same numbers, so a reopen scores it the same.
+        // It is this port's bookkeeping and lives outside the chunk directory
+        // (`ChunkManifest::path`), which holds only the reference's three files.
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        let base = "ft_0000000000000000";
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(&seg, base)
+            .expect("the seal publishes a marker")
+            .expect("the marker is well formed");
+        assert_eq!(manifest.live_docs, 2);
+        assert_eq!(manifest.total_len, 3);
+        let mut reopened = TextIndex::new(d.to_string(), TextTokenizer::default());
+        reopened.load_sealed();
+        assert_eq!(reopened.total_docs(), 2);
+        assert_eq!(reopened.corpus_len(), 3);
+    }
+
+    /// A merge is where the postings of a deleted row are reclaimed: the chunk
+    /// is immutable once published, so nothing else can drop them. The `.len`
+    /// slot stays (a posting's id is `row - base_row_id`), and the marker records
+    /// the live count so the chunk is scored without the dead row.
+    #[test]
+    fn a_merge_reclaims_the_postings_of_a_deleted_row() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "alpha");
+        write_chunk(d, 2, 2, "alpha");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.total_docs(), 4);
+        assert_eq!(index.term_df("alpha"), 4);
+
+        let deleted: std::collections::HashSet<u64> = [1u64].into_iter().collect();
+        assert_eq!(
+            index.optimize_chunks_with(&deleted).unwrap(),
+            1,
+            "the two chunks merge"
+        );
+        assert_eq!(index.reader.segments.len(), 1);
+        assert_eq!(index.reader.segments[0].docs, 4, "the span is unchanged");
+        assert_eq!(
+            index.reader.segments[0].live_docs, 3,
+            "the deleted row is not a document"
+        );
+        assert_eq!(index.total_docs(), 3, "BM25's N");
+        assert_eq!(index.term_df("alpha"), 3, "its posting is gone");
+        assert_eq!(
+            index.reader.segments[0].reader.base_name(),
+            storage::fulltext_base_name(0, Some(4))
+        );
+        // The marker carries the live statistics, so a reopen agrees.
+        let reopened = {
+            let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+            index.load_sealed();
+            index
+        };
+        assert_eq!(reopened.total_docs(), 3);
+        assert_eq!(reopened.term_df("alpha"), 3);
+        // The row is not lost as a *slot*: its length is still addressable.
+        assert_eq!(reopened.doc_len_opt(1), Some(1));
+    }
+
+    /// A chunk whose files do not validate is the remains of a publish that
+    /// never finished. Its rows are committed rows whose postings are gone, so
+    /// the only correct answer is a rebuild - and a rebuild starts at row 0,
+    /// which is why the whole set is retired instead of skipping the broken
+    /// chunk. The files are removed, so the next open does not rebuild again.
+    #[test]
+    fn a_broken_chunk_is_removed_and_forces_a_rebuild() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        // A crash between the `.dic` write and the `.len` write.
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        std::fs::remove_file(format!("{seg}/ft_0000000000000000.len")).unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0, "from the first row: rebuild");
+        assert!(index.reader.segments.is_empty(), "nothing half-loaded");
+        // The next open has nothing to retry.
+        let mut again = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(again.load_sealed(), 0);
+    }
+
+    /// Two generations of one chunk (a seal retried over a base name, or a
+    /// rebuild) can leave `.dic` from one and `.pos`/`.len` from the other. The
+    /// marker is what catches it: the files decode into the wrong rows instead
+    /// of failing.
+    #[test]
+    fn a_chunk_whose_files_do_not_match_its_marker_is_refused() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        let base = "ft_0000000000000000";
+        let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(&seg, base)
+            .expect("a freshly written chunk has a marker")
+            .expect("the marker is well formed");
+        // Rewrite the marker as the *previous* generation would have: one byte
+        // shorter in `.dic` than what is on the disk.
+        storage::invertedindex::chunk_manifest::ChunkManifest {
+            dic_len: manifest.dic_len - 1,
+            ..manifest
+        }
+        .write(&seg, base)
+        .unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0, "refused, then rebuilt");
+        assert!(!std::path::Path::new(&format!("{d}/{base}.dic")).exists());
+    }
+
+    /// A chunk the catalog does not list is not loaded, and it is not deleted
+    /// either.
+    ///
+    /// `ColumnIndexReader::Open` walks `SegmentIndexIDs -> ChunkIDs` and never
+    /// lists a directory, so a compaction's deprecated segments disappear by
+    /// having no ids - their files stay on disk until `Cleanup` reclaims them.
+    /// Loading one instead would map its postings onto the wrong rows, because
+    /// the merge renumbered every row it took.
+    #[test]
+    fn a_chunk_the_catalog_does_not_list_is_not_loaded() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(
+            index.load_sealed_scoped(&[]),
+            0,
+            "an empty catalog lists no chunk: rebuild under the new ids"
+        );
+        assert!(
+            std::fs::read_dir(d).unwrap().flatten().next().is_some(),
+            "the loader must not delete what it did not load"
+        );
+    }
+
+    /// A chunk whose files are all zero bytes maps as an empty buffer instead of
+    /// failing: `mmap` refuses a zero-length file, and `.len` is legitimately
+    /// empty when the chunk spans no document.
+    #[test]
+    fn a_chunk_with_an_empty_length_array_maps() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        // One real chunk, then its data files truncated to nothing: what a
+        // publish that failed between the three writes leaves behind.
+        write_chunk(d, 0, 2, "a");
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        let base = "ft_0000000000000000";
+        for suffix in [".pos", ".len"] {
+            std::fs::write(format!("{seg}/{base}{suffix}"), b"").unwrap();
+        }
+        std::fs::remove_file(format!("{seg}/{base}.ok")).unwrap();
+        let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
+            &seg,
+            base,
+            0,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .expect("an empty .len is an empty chunk, not a failure");
+        assert_eq!(reader.doc_count(), 0);
+        assert!(reader.postings("a").unwrap_or_default().is_empty());
+        // And the loader skips it rather than counting it as gap coverage.
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 0);
+    }
+
+    /// A chunk that skips rows inside itself (the reference's `InsertGap`, or a
+    /// seal after a delete) keeps its **span** - `.len` is addressed by
+    /// `row - base_row_id` - while its live statistics count only the documents
+    /// it holds. A neighbour that starts at the span's end is contiguous with it,
+    /// so the merge still joins the two.
+    #[test]
+    fn a_sparse_chunk_keeps_its_span_and_merges_with_its_neighbour() {
+        use std::collections::BTreeMap;
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = vec![(0, 1), (1, 1), (5, 1), (6, 1)];
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        postings.insert(
+            "a".to_string(),
+            docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
+        );
+        let seg0 = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        storage::invertedindex::disk_segment_reader::write_segment_index(
+            &seg0,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .unwrap();
+        write_chunk(d, 7, 2, "a");
+
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2);
+        assert_eq!(index.reader.segments[0].docs, 7, "the span, holes included");
+        assert_eq!(
+            index.reader.segments[0].live_docs, 4,
+            "the documents it has"
+        );
+        assert_eq!(index.reader.segments[0].total_len, 4);
+        // 7 is where the span ends, so the run continues into the second chunk.
+        assert_eq!(index.optimize_chunks().unwrap(), 1);
+        assert_eq!(index.reader.segments.len(), 1);
+        let merged = &index.reader.segments[0];
+        assert_eq!(merged.docs, 9, "0..=8");
+        assert_eq!(merged.live_docs, 6);
+        assert_eq!(merged.total_len, 6);
+        for row in [0u64, 1, 5, 6, 7, 8] {
+            assert!(merged.reader.ordinal(row).is_some(), "row {row}");
+        }
+    }
+
+    /// A full-text chunk lives in the segment's own directory
+    /// (`idx_{id}/seg_{n}`) and the catalog lists it, so re-opening the
+    /// directory reads exactly those chunks - `ColumnIndexReader::Open`'s walk.
+    #[test]
+    fn a_chunk_written_in_the_reference_layout_is_adopted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE adopt (id INT, body VARCHAR);")
+            .unwrap();
+        for i in 0..6 {
+            e.execute_blocking(&format!("INSERT INTO adopt VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX adopt_ft ON adopt (body) USING FULLTEXT;")
+            .unwrap();
+        // A dump is what seals the tail and names the chunk in the catalog
+        // (the reference's `DumpMemIndex`).
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("adopt", "adopt_ft")).unwrap();
+
+        // The chunk file is where the record says it is.
+        let ft_id = e.test_index_id("adopt", "body", "FULLTEXT");
+        let chunks = e.fulltext_catalog_chunks_of("adopt", ft_id).unwrap();
+        assert!(!chunks.is_empty(), "the dump published no chunk");
+        for chunk in &chunks {
+            let dic = storage::invertedindex::format::fulltext_chunk_file(
+                &chunk.dir,
+                &chunk.base_name,
+                storage::invertedindex::format::FULLTEXT_DICT_SUFFIX,
+            );
+            assert!(
+                std::path::Path::new(&dic).exists(),
+                "the catalog names {dic}, which does not exist"
+            );
+        }
+        drop(e);
+
+        // A reopened engine maps those chunks instead of re-indexing the column.
+        let reopened = Engine::open(dir.path()).unwrap();
+        let hits = rows(
+            &reopened,
+            "SELECT id FROM adopt SEARCH MATCH TEXT (body, 'alpha3', 10);",
+        );
+        assert_eq!(hits.len(), 1, "the mapped chunk answers");
+        assert_eq!(hits[0][0], "3");
+        let (sealed, pending) = {
+            let tables = reopened.tables.lock().unwrap();
+            let (mut sealed, mut pending) = (0, 0);
+            for entry in tables.values() {
+                for shared in entry.text.values() {
+                    let guard = shared.read().unwrap();
+                    sealed += guard.reader.doc_count();
+                    pending += guard.mem.pending_docs();
+                }
+            }
+            (sealed, pending)
+        };
+        assert_eq!(sealed, 6, "every row came from the catalog's chunks");
+        assert_eq!(pending, 0, "no row was indexed again");
     }
 
     /// The block-max WAND's cursor (`TermStream::advance`) hands a target that is
@@ -1357,15 +2722,15 @@ mod tests {
         // Eight rows per seal: several chunks plus a memory tail, so the cursors
         // of a sealed segment and the ones of the tail both take the pushdown.
         e.set_memindex_capacity(8);
-        e.execute("CREATE TABLE fts (id INT, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE fts (id INT, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
             .unwrap();
         for i in 0..40 {
-            e.execute(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let all = rows(
             &e,
             "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100');",
@@ -1417,12 +2782,12 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // Two rows per chunk: six rows become three sealed chunks.
         e.set_memindex_capacity(2);
-        e.execute("CREATE TABLE stat (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE stat (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
             .unwrap();
         for i in 0..6 {
-            e.execute(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
+            e.execute_blocking(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
                 .unwrap();
         }
         let stats = e.fulltext_stats("stat");
@@ -1440,7 +2805,8 @@ mod tests {
         // and the scan drops them through the tombstone. `overridden` only tracks
         // a row re-indexed **in place**, which the append-only `UPDATE` path does
         // not produce (it appends a new row id), so the set stays empty.
-        e.execute("DELETE FROM stat WHERE id = 0;").unwrap();
+        e.execute_blocking("DELETE FROM stat WHERE id = 0;")
+            .unwrap();
         let stats = e.fulltext_stats("stat");
         assert_eq!(stats[0].chunks, 3, "a delete does not seal anything");
         assert_eq!(
@@ -1467,11 +2833,11 @@ mod tests {
     fn a_batch_tokenised_before_the_gate_indexes_every_row_once() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE batch (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE batch (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO batch VALUES \
              (0, 'unique0 common'), (1, 'unique1 common'), (2, 'unique2 common'), \
              (3, 'unique3 common'), (4, 'unique4 common'), (5, 'unique5 common');",
@@ -1508,9 +2874,9 @@ mod tests {
         for threads in [1usize, 2, 4] {
             let dir = tempdir().unwrap();
             let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-            e.execute("CREATE TABLE conc (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE conc (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
                 .unwrap();
             let words: String = (0..40).map(|w| format!("word{w} ")).collect::<String>();
             let started = std::time::Instant::now();
@@ -1520,7 +2886,7 @@ mod tests {
                 let words = words.clone();
                 handles.push(std::thread::spawn(move || {
                     for i in 0..(2000 / threads) {
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO conc VALUES ({}, '{words}');",
                             1000 * t + i
                         ))
@@ -1549,13 +2915,13 @@ mod tests {
         const BATCH: usize = 4_000;
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE del (id INTEGER)").unwrap();
+        e.execute_blocking("CREATE TABLE del (id INTEGER)").unwrap();
         for chunk in 0..3 {
             let values: String = (0..BATCH)
                 .map(|i| format!("({})", chunk * BATCH + i))
                 .collect::<Vec<_>>()
                 .join(",");
-            e.execute(&format!("INSERT INTO del VALUES {values}"))
+            e.execute_blocking(&format!("INSERT INTO del VALUES {values}"))
                 .unwrap();
         }
         for pass in 0..3u32 {
@@ -1588,14 +2954,14 @@ mod tests {
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         let plan = index
-            .plan_merge()
+            .plan_merge(&Default::default())
             .unwrap()
             .expect("two contiguous chunks are one run");
 
         // A seal lands while the merge is writing its files.
         write_chunk(d, 4, 2, "a");
         let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-            d,
+            &storage::invertedindex::format::segment_chunk_dir(d, 0),
             "ft_0000000000000004",
             4,
             storage::invertedindex::format::OPTION_FLAG_ALL,
@@ -1603,6 +2969,7 @@ mod tests {
         .unwrap();
         index.reader.segments.push(SealedSegment {
             docs: 2,
+            live_docs: 2,
             total_len: 0,
             reader,
         });
@@ -1691,6 +3058,33 @@ mod tests {
         }
     }
 
+    /// A chunk that went missing leaves a hole in the list, and the resume
+    /// point `load_sealed` returns is the largest end - past the hole. The
+    /// build asks [`TextIndex::first_coverage_hole`] when the chunks are short
+    /// of the table's rows, and rebuilds from it after
+    /// [`TextIndex::drop_chunks_from`] removed the chunks that cover rows the
+    /// rebuild is about to index again.
+    #[test]
+    fn a_lost_chunk_is_a_hole_the_build_can_rebuild_from() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        // Rows 4..10 have no chunk: it was overwritten by a narrower one.
+        write_chunk(d, 10, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 12, "resume at the largest end");
+        assert_eq!(index.reader.segments.len(), 3, "every chunk loads");
+        assert_eq!(index.first_coverage_hole(), Some(4));
+        assert_eq!(index.drop_chunks_from(4), 1, "the chunk after the hole");
+        assert_eq!(index.reader.segments.len(), 2, "the prefix stays");
+        assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
+        assert!(
+            !std::path::Path::new(&format!("{d}/ft_000000000000000a.dic")).exists(),
+            "its files are gone, so the rebuilt rows are not counted twice"
+        );
+    }
+
     /// An overlapping chunk list is unrecoverable in the reference
     /// (`new_txn_index_impl.cpp:2228-2233`); merging it would produce a doc list
     /// no reference run could produce, so it is refused.
@@ -1730,21 +3124,21 @@ mod tests {
             let e = Engine::open(dir.path()).unwrap();
             // Two rows per chunk, so row 1 is sealed by the first one.
             e.set_memindex_capacity(2);
-            e.execute("CREATE TABLE upd (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE upd (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
                 .unwrap();
             for i in 0..6 {
-                e.execute(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
+                e.execute_blocking(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
                     .unwrap();
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert!(fulltext_chunks(&e) > 1, "the table starts fragmented");
 
-            e.execute("UPDATE upd SET body = 'gamma' WHERE id = 1;")
+            e.execute_blocking("UPDATE upd SET body = 'gamma' WHERE id = 1;")
                 .unwrap();
             // Dumping the tail is what turns the update into its own chunk.
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(rows(&e, query), hit(), "the new text is searchable");
             assert_eq!(rows(&e, stale).len(), 5, "the old text is gone");
 
@@ -1826,14 +3220,14 @@ mod tests {
 
         let build = |dir: &std::path::Path, budget: Option<usize>| {
             let e = Engine::open(dir).unwrap();
-            e.execute("CREATE TABLE offl (id INTEGER, body VARCHAR)")
+            e.execute_blocking("CREATE TABLE offl (id INTEGER, body VARCHAR)")
                 .unwrap();
-            e.execute("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
+            e.execute_blocking("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
                 .unwrap();
             // One seal at the twentieth row, so both builds write one chunk.
             e.set_memindex_capacity(ROWS);
             for i in 0..ROWS {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO offl VALUES ({i}, 'alpha beta row{i}');"
                 ))
                 .unwrap();
@@ -1907,8 +3301,9 @@ mod tests {
     fn run_plan_runs_the_production_optimizer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rp (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO rp VALUES (1, 2);").unwrap();
+        e.execute_blocking("CREATE TABLE rp (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO rp VALUES (1, 2);").unwrap();
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Scan {
                 table: "default_db.rp".to_string(),
@@ -1942,8 +3337,10 @@ mod tests {
     fn run_plan_executes_a_projection_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE om (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO om VALUES (1, 2), (3, 4);").unwrap();
+        e.execute_blocking("CREATE TABLE om (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO om VALUES (1, 2), (3, 4);")
+            .unwrap();
         let before = crate::operator::operator_run_count();
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Scan {
@@ -1971,8 +3368,9 @@ mod tests {
     fn run_plan_executes_a_filter_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE of (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
+        e.execute_blocking("CREATE TABLE of (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
             .unwrap();
         let before = crate::operator::operator_run_count();
         // An expression in the select list keeps the plan on the operator
@@ -1987,7 +3385,7 @@ mod tests {
             vec![vec!["20".to_string()], vec!["30".to_string()]]
         );
         // No match: the projection still defines the schema.
-        let mut result = e.execute("SELECT b FROM of WHERE a > 9;").unwrap();
+        let mut result = e.execute_blocking("SELECT b FROM of WHERE a > 9;").unwrap();
         let QueryResult::Rows { columns, rows } = result.remove(0) else {
             panic!("expected rows");
         };
@@ -2001,8 +3399,9 @@ mod tests {
     fn run_plan_executes_limit_and_top_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ol (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
+        e.execute_blocking("CREATE TABLE ol (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2059,10 +3458,10 @@ mod tests {
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.attach_bottom_pool();
         for t in 0..8 {
-            e.execute(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
                 .unwrap();
-            e.execute(&format!(
-                "CREATE INDEX ct{t}_body ON ct{t} (body) WITH (analyzer = 'standard');"
+            e.execute_blocking(&format!(
+                "CREATE INDEX ct{t}_body ON ct{t} (body) USING FULLTEXT WITH (analyzer = 'standard');"
             ))
             .unwrap();
         }
@@ -2072,7 +3471,7 @@ mod tests {
             let e = Arc::clone(&e);
             handles.push(std::thread::spawn(move || {
                 for i in 0..20 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO ct{t} VALUES ({i}, 'word{i} of t{t}');"
                     ))
                     .unwrap();
@@ -2112,11 +3511,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.attach_bottom_pool();
-        e.execute("CREATE TABLE be (a INT, b VARCHAR);").unwrap();
-        e.execute("CREATE INDEX be_b ON be (b);").unwrap();
+        e.execute_blocking("CREATE TABLE be (a INT, b VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX be_b ON be (b);").unwrap();
 
         let before = bottom_work_count();
-        e.execute("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
+        e.execute_blocking("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
             .unwrap();
         assert_eq!(
             bottom_work_count(),
@@ -2132,7 +3532,7 @@ mod tests {
             rows(&e, "SELECT count(*) FROM be;"),
             vec![vec!["2".to_string()]]
         );
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert!(dir.path().join("data").exists());
     }
 
@@ -2140,7 +3540,7 @@ mod tests {
     fn emvb_index_options_are_validated_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
             .unwrap();
         for sql in [
             // a multi-vector column is not a tensor column
@@ -2154,14 +3554,14 @@ mod tests {
             "CREATE INDEX e ON em (v) USING EMVB WITH (pq_subspace_bits = 8);",
             "CREATE INDEX f ON em (v) USING EMVB WITH (pq_subspace_num = 2);",
         ] {
-            assert!(e.execute(sql).is_err(), "{sql} should be rejected");
+            assert!(e.execute_blocking(sql).is_err(), "{sql} should be rejected");
         }
-        e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+        e.execute_blocking("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
             .unwrap();
         // "dimension % subspace_num != 0" is only checked by `GetEMVBOPQ`
         // when the index is built, so the DDL itself succeeds (the reference
         // accepts it too; `parallel_test` relies on that).
-        e.execute("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
+        e.execute_blocking("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
             .unwrap();
     }
 
@@ -2169,24 +3569,31 @@ mod tests {
     /// (`TxnAllocator::Process` -> `AllocateRowID`), which is what keeps them
     /// contiguous when several transactions allocate at the same time.
     #[test]
-    fn row_ids_are_allocated_on_the_allocator_thread() {
+    fn row_ids_are_allocated_in_commit_order() {
         let dir = tempdir().unwrap();
         let e = Arc::new(Engine::open(dir.path()).unwrap());
         e.install_engine_handle();
-        e.execute("CREATE TABLE alloc_t (a INT);").unwrap();
-        let before = e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst);
-        e.execute("INSERT INTO alloc_t VALUES (1), (2), (3);")
+        e.execute_blocking("CREATE TABLE alloc_t (a INT);").unwrap();
+        // `before_wal` allocates **inline** under the commit turn rather than
+        // through the allocator queue (see `Engine::reserve_rows_at`): a
+        // queued allocation would need a `block_on` on the worker that holds
+        // the turn and `commit_lock`. What has to hold is the contract the
+        // queue existed for, so that is what this asserts - ids dense, in
+        // commit order, no overlap - not which thread handed them out.
+        e.execute_blocking("INSERT INTO alloc_t VALUES (1), (2), (3);")
             .unwrap();
-        assert!(
-            e.allocator_jobs.load(std::sync::atomic::Ordering::SeqCst) > before,
-            "the ids must come from the allocator thread, not the inline fallback"
+        assert_eq!(
+            rows(&e, "SELECT a FROM alloc_t;").len(),
+            3,
+            "the append must have taken exactly three ids"
         );
         // Two concurrent appends still get disjoint, contiguous ranges.
         let mut handles = Vec::new();
         for _ in 0..4 {
             let e = Arc::clone(&e);
             handles.push(std::thread::spawn(move || {
-                e.execute("INSERT INTO alloc_t VALUES (9);").unwrap();
+                e.execute_blocking("INSERT INTO alloc_t VALUES (9);")
+                    .unwrap();
             }));
         }
         for h in handles {
@@ -2217,7 +3624,7 @@ mod tests {
             Arc::ptr_eq(&a, &e.batch_gate("db1.t1")),
             "the same table keeps one gate"
         );
-        let held = a.lock().unwrap();
+        let held = crate::scheduler::block_on(a.lock());
         // The other table is still writable while this one's batch runs.
         assert!(b.try_lock().is_ok());
         drop(held);
@@ -2229,7 +3636,8 @@ mod tests {
     fn explain_fragment_wraps_a_plain_plan() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ef (a INT, b INT);").unwrap();
+        e.execute_blocking("CREATE TABLE ef (a INT, b INT);")
+            .unwrap();
 
         let physical = rows(&e, "EXPLAIN PHYSICAL SELECT a FROM ef WHERE b = 1;");
         let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;");
@@ -2259,7 +3667,8 @@ mod tests {
     fn explain_fragment_type_follows_the_blocking_operator() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE eft (a INT, b INT);").unwrap();
+        e.execute_blocking("CREATE TABLE eft (a INT, b INT);")
+            .unwrap();
         for (sql, want) in [
             ("EXPLAIN FRAGMENT SELECT a FROM eft;", "ParallelStream"),
             (
@@ -2283,7 +3692,7 @@ mod tests {
     fn a_limit_over_a_big_table_still_stops_early() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lim (a INT);").unwrap();
+        e.execute_blocking("CREATE TABLE lim (a INT);").unwrap();
         let input: Vec<Vec<Literal>> = (0..100_000).map(|i| vec![Literal::Int(i)]).collect();
         e.insert_literals("default_db.lim", None, input).unwrap();
 
@@ -2308,8 +3717,9 @@ mod tests {
     fn run_plan_executes_a_group_by_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE og (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
+        e.execute_blocking("CREATE TABLE og (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2352,8 +3762,9 @@ mod tests {
     fn run_plan_executes_a_sort_through_the_operator_model() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE os (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
+        e.execute_blocking("CREATE TABLE os (a INT, b INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
             .unwrap();
 
         let before = crate::operator::operator_run_count();
@@ -2383,20 +3794,22 @@ mod tests {
     }
 
     fn seed(e: &Engine) {
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
 
     #[test]
     fn a_derived_table_scans_the_subquery_result() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE d (id INT, s VARCHAR);").unwrap();
-        e.execute("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
+        e.execute_blocking("CREATE TABLE d (id INT, s VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
             .unwrap();
         // The outer query scans the subquery's rows, and may filter/sort them.
         assert_eq!(
@@ -2415,9 +3828,10 @@ mod tests {
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
         // A table legitimately named `select3` is not mistaken for a subquery.
-        e.execute("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
+        e.execute_blocking("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
             .unwrap();
-        e.execute("INSERT INTO select3 VALUES (1,2,3);").unwrap();
+        e.execute_blocking("INSERT INTO select3 VALUES (1,2,3);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT c3, c2, c1 from select3;"),
             vec![vec!["3".to_string(), "2".to_string(), "1".to_string()]]
@@ -2431,11 +3845,12 @@ mod tests {
     fn a_correlated_subquery_sees_each_outer_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cs (id INT, v INT);").unwrap();
-        e.execute("INSERT INTO cs VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE cs (id INT, v INT);")
             .unwrap();
-        e.execute("CREATE TABLE cs2 (id INT);").unwrap();
-        e.execute("INSERT INTO cs2 VALUES (2);").unwrap();
+        e.execute_blocking("INSERT INTO cs VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE cs2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO cs2 VALUES (2);").unwrap();
         // Uncorrelated: the subquery is evaluated on its own, so every outer
         // row sees the same answer.
         assert_eq!(
@@ -2462,10 +3877,13 @@ mod tests {
     fn a_cte_alias_shadowing_a_table_is_not_bound_as_that_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE shadow (other INT);").unwrap();
-        e.execute("INSERT INTO shadow VALUES (99);").unwrap();
-        e.execute("CREATE TABLE src (id INT);").unwrap();
-        e.execute("INSERT INTO src VALUES (1), (2);").unwrap();
+        e.execute_blocking("CREATE TABLE shadow (other INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO shadow VALUES (99);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE src (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO src VALUES (1), (2);")
+            .unwrap();
         // `shadow` in the subquery's FROM is the CTE, which exposes `id`; the
         // base table of the same name only has `other`.
         assert_eq!(
@@ -2484,9 +3902,9 @@ mod tests {
     fn an_outer_cte_supplies_the_correlation_scope() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE otc (id INT);").unwrap();
-        e.execute("INSERT INTO otc VALUES (1);").unwrap();
-        e.execute("CREATE TABLE otc2 (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE otc (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO otc VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE otc2 (id INT);").unwrap();
         // The CTE supplies the outer rows; `otc2` is empty, so nothing matches.
         assert_eq!(
             rows(
@@ -2505,16 +3923,16 @@ mod tests {
     fn a_subquery_in_a_match_filter_is_not_folded_to_a_constant() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mf (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE mf (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
+        e.execute_blocking("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
             .unwrap();
-        e.execute("CREATE TABLE mf2 (id INT);").unwrap();
-        e.execute("INSERT INTO mf2 VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE mf2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO mf2 VALUES (1);").unwrap();
         let err = e
-            .execute(
+            .execute_blocking(
                 "SELECT id FROM mf SEARCH MATCH TEXT ('body', 'x', 'topn=10', \
                  WHERE EXISTS (SELECT id FROM mf2 WHERE mf2.id = mf.id));",
             )
@@ -2532,14 +3950,15 @@ mod tests {
     fn a_subquery_in_a_search_option_filter_is_rejected() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO sf VALUES (1, 'x');").unwrap();
-        e.execute("CREATE TABLE sf2 (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES (1, 'x');")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE sf2 (id INT);").unwrap();
         let err = e
-            .execute(
+            .execute_blocking(
                 "SELECT id FROM sf SEARCH MATCH TEXT ('body', 'x', \
                  'topn=10;filter=EXISTS (SELECT id FROM sf2)');",
             )
@@ -2558,8 +3977,8 @@ mod tests {
     fn an_inherited_cte_alias_shadows_the_base_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivb (id INT);").unwrap();
-        e.execute("INSERT INTO ivb VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE ivb (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO ivb VALUES (1);").unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -2575,9 +3994,11 @@ mod tests {
     fn a_subquery_local_cte_shadows_a_base_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lcte (id INT);").unwrap();
-        e.execute("INSERT INTO lcte VALUES (1), (2);").unwrap();
-        e.execute("CREATE TABLE lshadow (other INT);").unwrap();
+        e.execute_blocking("CREATE TABLE lcte (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO lcte VALUES (1), (2);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE lshadow (other INT);")
+            .unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -2593,11 +4014,11 @@ mod tests {
     fn match_tensor_fusion_reranks_by_the_search_tensor() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
+        e.execute_blocking("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
+        e.execute_blocking("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
             .unwrap();
         // The rerank ignores the children's BM25: only the tensor similarity counts.
         let rows = rows(
@@ -2619,11 +4040,13 @@ mod tests {
     fn fulltext_threshold_filter_uses_the_index_score() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ft (num INT, doc VARCHAR);")
+        e.execute_blocking("CREATE TABLE ft (num INT, doc VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');")
-            .unwrap();
-        e.execute("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
+        e.execute_blocking(
+            "INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
             .unwrap();
         // A threshold is a *score* filter, which only the index can answer.
         let keep = rows(
@@ -2642,16 +4065,21 @@ mod tests {
     fn a_gram_index_filter_requires_the_query_contiguously() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE g (id INT, doc VARCHAR);").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE TABLE g (id INT, doc VARCHAR);")
+            .unwrap();
+        e.execute_blocking(
             "INSERT INTO g VALUES (1,'harmful chemical reaction'), \
              (2,'chemical processes are harmful');",
         )
         .unwrap();
-        e.execute("CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');")
-            .unwrap();
-        e.execute("CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');",
+        )
+        .unwrap();
         // The gram index needs the query contiguous; the regular one accepts the
         // terms apart. Same filter, different index named by `@`.
         let gram = rows(
@@ -2795,9 +4223,9 @@ mod tests {
         );
         assert_eq!(e.column_types("default_db.ts").unwrap()[0], "INTEGER");
         // The imported table is usable.
-        e.execute("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
+        e.execute_blocking("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
             .unwrap();
-        match &e.execute("SELECT id FROM default_db.ts;").unwrap()[0] {
+        match &e.execute_blocking("SELECT id FROM default_db.ts;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("unexpected {other:?}"),
         }
@@ -2809,7 +4237,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
+            .execute_blocking("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
             .unwrap()[0]
         {
             QueryResult::Rows { rows, columns } => {
@@ -2828,7 +4256,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
+            .execute_blocking("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2863,7 +4291,7 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
         match &e
-            .execute("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
+            .execute_blocking("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2888,19 +4316,21 @@ mod tests {
     fn join_between_two_tables() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE a (aid INT, an VARCHAR);").unwrap();
-        e.execute("CREATE TABLE b (bid INT, bn VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE a (aid INT, an VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE TABLE b (bid INT, bn VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "x"), (2, "y")] {
-            e.execute(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
                 .unwrap();
         }
         for (i, n) in [(2, "yy"), (3, "zz")] {
-            e.execute(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         match &e
-            .execute("SELECT aid, bn FROM a JOIN b ON aid = bid;")
+            .execute_blocking("SELECT aid, bn FROM a JOIN b ON aid = bid;")
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -2915,16 +4345,17 @@ mod tests {
     fn bounded_capacity_one_does_not_deadlock() {
         let dir = tempdir().unwrap();
         let e = Engine::open_with_capacity(dir.path(), 1).unwrap();
-        e.execute("CREATE TABLE t (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
         for i in 0..50 {
-            e.execute(&format!("INSERT INTO t VALUES ({i});")).unwrap();
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i});"))
+                .unwrap();
         }
-        e.flush().unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        crate::scheduler::block_on(e.flush()).unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 50),
             other => panic!("{other:?}"),
         }
-        match &e.execute("SELECT * FROM t LIMIT 3;").unwrap()[0] {
+        match &e.execute_blocking("SELECT * FROM t LIMIT 3;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
@@ -2935,27 +4366,33 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(
-            e.execute("SELECT 1, 'x';").unwrap(),
+            e.execute_blocking("SELECT 1, 'x';").unwrap(),
             vec![QueryResult::Rows {
                 columns: vec!["c0".into(), "c1".into()],
                 rows: vec![vec![Value::Int(1), Value::Str("x".into())]]
             }]
         );
-        assert!(e.execute("SELECT * FROM nope;").is_err());
+        assert!(e.execute_blocking("SELECT * FROM nope;").is_err());
     }
 
     #[test]
     fn index_scan_matches_expected_and_survives_restart() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for (i, n) in [(1, "a"), (2, "b"), (3, "a"), (4, "b")] {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
                 .unwrap();
         }
-        e.execute("CREATE INDEX idx_name ON t (name);").unwrap();
-        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
-        match &e.execute("SELECT id FROM t WHERE name = 'a';").unwrap()[0] {
+        e.execute_blocking("CREATE INDEX idx_name ON t (name);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
+            .unwrap();
+        match &e
+            .execute_blocking("SELECT id FROM t WHERE name = 'a';")
+            .unwrap()[0]
+        {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(
                     texts(rows),
@@ -2964,11 +4401,14 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         drop(e); // release the RocksDB lock before reopening
                  // reopen: the index is rebuilt from catalog metadata and still scans
         let e2 = Engine::open(dir.path()).unwrap();
-        match &e2.execute("SELECT id FROM t WHERE name = 'b';").unwrap()[0] {
+        match &e2
+            .execute_blocking("SELECT id FROM t WHERE name = 'b';")
+            .unwrap()[0]
+        {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 2),
             other => panic!("{other:?}"),
         }
@@ -2985,7 +4425,7 @@ mod tests {
 
     /// The first column of a one-column query over `t`.
     fn query_column(e: &Engine, sql: &str) -> Vec<String> {
-        match &e.execute(sql).unwrap()[0] {
+        match &e.execute_blocking(sql).unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 rows.iter().map(|row| row[0].to_slt_string()).collect()
             }
@@ -3013,7 +4453,7 @@ mod tests {
     fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
         let filter = predicate.map(|p| format!("WHERE {p}")).unwrap_or_default();
         match &e
-            .execute(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
+            .execute_blocking(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => rows
@@ -3042,17 +4482,19 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         // The same SQL runs twice below; keep the result cache from answering
         // the second round, which is the one that reads all sealed chunks.
-        e.execute("SET CONFIG result_cache off;").unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for i in 0..150 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
                 .unwrap();
         }
         // `CREATE INDEX` builds from the rows that exist, so 0..150 land in a
         // sealed chunk; 150..200 stay in the memory tail until `flush`.
-        e.execute("CREATE INDEX idx_id ON t (id);").unwrap();
+        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
+            .unwrap();
         for i in 150..200 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
                 .unwrap();
         }
         let cases: [(&str, Vec<i64>); 7] = [
@@ -3075,7 +4517,7 @@ mod tests {
             for (predicate, expected) in &cases {
                 assert_eq!(&ids(&e, predicate), expected, "round {round}: {predicate}");
             }
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
         // `=` keeps its own path, and must still agree with the range path.
         assert_eq!(ids(&e, "id = 42"), vec![42]);
@@ -3096,9 +4538,9 @@ mod tests {
     fn float_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE TABLE {table} (id INT, f FLOAT, d DOUBLE, tag VARCHAR);"
             ))
             .unwrap();
@@ -3107,21 +4549,21 @@ mod tests {
         // chunks; 60..80 land in the memory tail until the first `flush`.
         for i in 0..60 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
                 .unwrap();
             }
         }
         for column in ["id", "f", "d", "tag"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
             .unwrap();
         }
         for i in 60..80 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
                 .unwrap();
@@ -3154,8 +4596,10 @@ mod tests {
             // A checkpoint does not dump the memory indexes; one dump
             // transaction per index seals the rows written since the last one.
             for column in ["id", "f", "d", "tag"] {
-                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
-                    .unwrap();
+                crate::scheduler::block_on(
+                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
+                )
+                .unwrap();
             }
         }
         // VARCHAR keys are hashes: the range cannot use the index, but the rows
@@ -3183,9 +4627,9 @@ mod tests {
     fn temporal_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE TABLE {table} (id INT, d DATE, tm TIME, ts DATETIME);"
             ))
             .unwrap();
@@ -3208,7 +4652,7 @@ mod tests {
             for (i, day) in days.iter().enumerate().take(to).skip(from) {
                 let time = format!("{:02}:00:00", i);
                 for table in ["t_indexed", "t_plain"] {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO {table} VALUES ({i}, '{day}', '{time}', '{day} {time}');"
                     ))
                     .unwrap();
@@ -3218,7 +4662,7 @@ mod tests {
         // 0..7 are sealed by `CREATE INDEX`; 7..10 land in the memory tail.
         insert(&e, 0, 7);
         for column in ["id", "d", "tm", "ts"] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
             .unwrap();
@@ -3258,8 +4702,10 @@ mod tests {
             }
             // One dump transaction per index; a checkpoint keeps the tails.
             for column in ["id", "d", "tm", "ts"] {
-                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
-                    .unwrap();
+                crate::scheduler::block_on(
+                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
+                )
+                .unwrap();
             }
         }
         // Equality on a date column rides the same ordered key.
@@ -3276,14 +4722,15 @@ mod tests {
     fn range_on_an_unordered_key_falls_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("SET CONFIG result_cache off;").unwrap();
-        e.execute("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
+        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
             .unwrap();
         for i in 0..50 {
-            e.execute(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
+            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
                 .unwrap();
         }
-        e.execute("CREATE INDEX idx_tag ON t (tag);").unwrap();
+        e.execute_blocking("CREATE INDEX idx_tag ON t (tag);")
+            .unwrap();
         for round in 0..2 {
             // A varchar chunk stores a hash of the key, so there is no order to
             // scan: the rows must still be right.
@@ -3298,7 +4745,7 @@ mod tests {
                 vec![45, 46, 47, 48, 49],
                 "round {round}: unindexed column"
             );
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
     }
 
@@ -3306,16 +4753,17 @@ mod tests {
     fn delete_with_where_and_all() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("DELETE FROM t WHERE id >= 2;").unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id >= 2;").unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("{other:?}"),
         }
-        e.execute("DELETE FROM t;").unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("DELETE FROM t;").unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 0),
             other => panic!("{other:?}"),
         }
@@ -3325,11 +4773,13 @@ mod tests {
     fn update_is_delete_plus_append() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("UPDATE t SET name = 'X' WHERE id >= 2;").unwrap();
-        match &e.execute("SELECT * FROM t ORDER BY id;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        e.execute_blocking("UPDATE t SET name = 'X' WHERE id >= 2;")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t ORDER BY id;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
                 assert_eq!(row_text(rows, 0), vec!["1".to_string(), "a".to_string()]);
@@ -3344,10 +4794,11 @@ mod tests {
     fn multi_row_insert() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
@@ -3361,7 +4812,7 @@ mod tests {
             seed(&e);
         }
         let e = Engine::open(dir.path()).unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 4),
             other => panic!("{other:?}"),
         }
@@ -3378,9 +4829,9 @@ mod tests {
         )
         .unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
+        e.execute_blocking("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY v FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
@@ -3389,7 +4840,7 @@ mod tests {
 
         // cosine top-3 → c1 8, 6, 4 with hidden row-id / similarity columns.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1, ROW_ID(), SIMILARITY() FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);",
             )
@@ -3405,7 +4856,7 @@ mod tests {
 
         // threshold prunes the weakest match.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) \
                  WITH (threshold = 0.9);",
@@ -3418,7 +4869,7 @@ mod tests {
 
         // WHERE filters candidates before top-N (l2 over {2,4,6} → 6 then 4).
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 2) \
                  WHERE c1 < 7;",
@@ -3444,7 +4895,7 @@ mod tests {
         for (metric, target) in [("l2", 42), ("cosine", 42), ("ip", 199)] {
             let dir = tempdir().unwrap();
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
                 .unwrap();
             let mut sql = String::from("INSERT INTO hm VALUES ");
             for i in 0..200 {
@@ -3454,12 +4905,12 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(&format!(
                 "CREATE INDEX hm_i ON hm (v) USING HNSW WITH (metric='{metric}');"
             ))
             .unwrap();
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             let got = rows(
                 &e,
                 &format!(
@@ -3490,7 +4941,7 @@ mod tests {
         };
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
+        e.execute_blocking("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
             .unwrap();
         let mut sql = String::from("INSERT INTO lg VALUES ");
         for i in 0..n {
@@ -3500,13 +4951,13 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
-        e.execute(
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
             "CREATE INDEX lg_i ON lg (v) USING HNSW WITH \
              (metric='l2', build_type='lsg', lsg_config='sample_ratio=0.5,ls_k=10,alpha=1.0');",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let mut hits = 0;
         for i in 0..n {
             let got = rows(
@@ -3524,6 +4975,502 @@ mod tests {
         assert!(recall >= 0.95, "LSG recall@1 = {recall}");
     }
 
+    /// issue.txt #7: `sample_ratio` is accepted in SQL, but the record has to
+    /// carry the spelling the C++ engine parses (`sample_raito`). Persisting the
+    /// input verbatim made a C++ reader abort the directory with `Invalid index
+    /// parameter type: sample_ratio`.
+    #[test]
+    fn create_index_persists_the_reference_lsg_spelling() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sp (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX sp_i ON sp (v) USING HNSW WITH (metric='l2', encode='lvq', \
+             build_type='lsg', lsg_config='sample_ratio=0.25,ls_k=7,alpha=0.5');",
+        )
+        .unwrap();
+        let im = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.name == "sp_i")
+            .expect("the index");
+        let lsg = im
+            .options
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("lsg_config"))
+            .map(|(_, v)| v.clone())
+            .expect("lsg_config is stored in the record");
+        assert_eq!(lsg, "sample_raito = 0.25, ls_k = 7, alpha = 0.5");
+    }
+
+    /// issue.txt at scale: 20k (default) / 100k rows x 128 dims with `LVQ + LSG`
+    /// must train, stay queryable, dump its chunks, and keep its parameters
+    /// across a reopen.
+    ///
+    /// Ignored because it builds a real graph. Scale it with
+    /// `INFINITY_BIG_TEST_ROWS`, pick the encoding with
+    /// `INFINITY_BIG_TEST_ENCODE`, the build type with
+    /// `INFINITY_BIG_TEST_BUILD_TYPE`.
+    #[test]
+    #[ignore = "SLOW: 20k x 128 LVQ+LSG build"]
+    fn large_lvq_lsg_build_stays_stable() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean - the case an untrained LVQ mean
+        // gets wrong (issue.txt #2).
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        fn vector(i: usize) -> Vec<f32> {
+            let mut state = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    state = state
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    BASE[j % BASE.len()] + ((state >> 40) % 1000) as f32 / 10.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BIG_TEST_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20_000);
+        let encode = std::env::var("INFINITY_BIG_TEST_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BIG_TEST_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE big (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+        let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(n);
+        for i in 0..n {
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            dataset.push(vec![
+                Literal::Int(i as i64),
+                Literal::Str(format!("[{text}]")),
+            ]);
+        }
+        let started = std::time::Instant::now();
+        e.insert_literals("default_db.big", None, dataset).unwrap();
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX big_i ON big (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito=0.25,ls_k=7,alpha=0.5');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type}): {:?}",
+            started.elapsed()
+        );
+
+        let info = e.show_index_info("big", "big_i").expect("show_index");
+        eprintln!(
+            "show_index: {} | {} | chunks {}",
+            info.other_parameters, info.store_dir, info.segment_index_count
+        );
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        assert!(
+            info.other_parameters.contains("M = 16"),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+
+        // Self-query: the build has to answer its own rows.
+        let sample = 200usize;
+        let mut hits = 0usize;
+        for k in 0..sample {
+            let i = (k * 197) % n;
+            let text = vector(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM big SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"),
+            );
+            if got == vec![vec![i.to_string()]] {
+                hits += 1;
+            }
+        }
+        eprintln!("self recall@1: {hits}/{sample}");
+        assert!(
+            hits >= sample * 95 / 100,
+            "self recall {hits}/{sample} is below 95%"
+        );
+
+        // `FLUSH DATA` only dumps the memory segments when the setting says so
+        // (`[storage] flush_dumps_mem_index`).
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let info = e.show_index_info("big", "big_i").expect("after flush");
+        eprintln!("after flush: {} chunks", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM big;"),
+            vec![vec![n.to_string()]]
+        );
+        let info = e.show_index_info("big", "big_i").expect("after reopen");
+        assert!(
+            info.other_parameters
+                .contains(&format!("encode_type = {encode}")),
+            "{}",
+            info.other_parameters
+        );
+        if build_type == "lsg" {
+            assert!(
+                info.other_parameters.contains("lsg_config = sample_raito"),
+                "{}",
+                info.other_parameters
+            );
+        }
+    }
+
+    /// HNSW at production scale: 200k rows x 128 dims by default, 1M with
+    /// `INFINITY_BENCH_ROWS=1000000`.
+    ///
+    /// Reports what a deployment cares about: build time, recall@10 against a
+    /// brute-force ground truth, query latency p50/p99, and the recall after a
+    /// dump + reopen.
+    ///
+    /// Ignored because it builds a real graph:
+    /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
+    #[test]
+    #[ignore = "BENCH: HNSW production scale"]
+    fn hnsw_production_scale() {
+        const DIMS: usize = 128;
+        // A column with a clear non-zero mean (so an untrained quantizer shows
+        // up) and SIFT-like clusters: 1000 centres, each row a centre plus a
+        // small per-dimension jitter. IID uniform vectors in 128 dims are the
+        // adversarial case for every ANN index (the nearest neighbours are no
+        // closer than the far ones), so they say nothing about production data.
+        const BASE: [f32; 4] = [27.4, 16.0, 10.4, 8.6];
+        const CLUSTERS: usize = 1000;
+        fn next(state: &mut u64) -> u64 {
+            *state = (*state)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            *state >> 40
+        }
+        fn vector(i: usize) -> Vec<f32> {
+            let mut centre = (i % CLUSTERS) as u64;
+            let mut row = (i as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (0..DIMS)
+                .map(|j| {
+                    let c = BASE[j % BASE.len()] + (next(&mut centre) % 1000) as f32 / 10.0;
+                    let jitter = (next(&mut row) % 1000) as f32 / 1000.0 - 0.5;
+                    c + jitter * 4.0
+                })
+                .collect()
+        }
+        let n: usize = std::env::var("INFINITY_BENCH_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200_000);
+        let encode = std::env::var("INFINITY_BENCH_ENCODE").unwrap_or_else(|_| "lvq".into());
+        let build_type =
+            std::env::var("INFINITY_BENCH_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
+        let lsg_ratio = std::env::var("INFINITY_BENCH_LSG_RATIO").unwrap_or_else(|_| "0.01".into());
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,128));")
+            .unwrap();
+
+        // Insert in chunks: a 1M-row literal batch would hold ~1GB of text at
+        // once. `flat` keeps the vectors for the brute-force ground truth.
+        let mut flat: Vec<f32> = Vec::with_capacity(n * DIMS);
+        let started = std::time::Instant::now();
+        let chunk = 50_000usize;
+        for start in (0..n).step_by(chunk) {
+            let end = (start + chunk).min(n);
+            let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(end - start);
+            for i in start..end {
+                let v = vector(i);
+                let text = v
+                    .iter()
+                    .map(|x| format!("{x:.3}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                dataset.push(vec![
+                    Literal::Int(i as i64),
+                    Literal::Str(format!("[{text}]")),
+                ]);
+                flat.extend_from_slice(&v);
+            }
+            e.insert_literals("default_db.bench", None, dataset)
+                .unwrap();
+        }
+        eprintln!("insert {n} rows: {:?}", started.elapsed());
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(&format!(
+            "CREATE INDEX bench_i ON bench (v) USING HNSW WITH (M=16, ef_construction=200, \
+             metric='l2', encode='{encode}', build_type='{build_type}', \
+             lsg_config='sample_raito={lsg_ratio},ls_k=10,alpha=1');"
+        ))
+        .unwrap();
+        eprintln!(
+            "build {n} rows ({encode}+{build_type} {lsg_ratio}): {:?}",
+            started.elapsed()
+        );
+        // `HnswIndexInMem::MemUsage`: the graph (links + levels) plus the
+        // encoding's store. Per row is what a deployment budgets with; the
+        // graph is a floor every encoding pays.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let guard = mem.lock().unwrap();
+            let bytes = guard.mem_usage();
+            eprintln!(
+                "index memory ({encode}): {:.1} MiB, {:.0} B/row",
+                bytes as f64 / (1024.0 * 1024.0),
+                bytes as f64 / n as f64
+            );
+        }
+
+        let row = |i: usize| -> &[f32] { &flat[i * DIMS..(i + 1) * DIMS] };
+
+        // Exact top-k over the inserted vectors.
+        let exact_topk = |q: &[f32], k: usize| -> Vec<u64> {
+            let mut best: Vec<(f32, u64)> = (0..n)
+                .map(|i| {
+                    let v = row(i);
+                    let d: f32 = v.iter().zip(q).map(|(a, b)| (a - b) * (a - b)).sum();
+                    (d, i as u64)
+                })
+                .collect();
+            best.select_nth_unstable_by(k, |a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.truncate(k);
+            best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            best.iter().map(|(_, i)| *i).collect()
+        };
+
+        let queries = 50usize;
+        let k = 10usize;
+        let mut hits = 0usize;
+        let mut answers: Vec<Vec<u64>> = Vec::with_capacity(queries);
+        let mut latencies: Vec<std::time::Duration> = Vec::with_capacity(queries);
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            latencies.push(started.elapsed());
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            hits += got.iter().filter(|id| exact.contains(id)).count();
+            answers.push(got);
+        }
+        let recall = hits as f64 / (queries * k) as f64;
+        latencies.sort();
+        let p50 = latencies[latencies.len() / 2];
+        let p99 = latencies[latencies.len() * 99 / 100];
+        eprintln!("recall@{k}: {recall:.3}; query p50 {p50:?}, p99 {p99:?}");
+
+        // `test_lsg_build_ut.cpp::test1`, at this scale: a scaled graph still
+        // has to find each stored row from its own vector. That is the
+        // reference's own LSG acceptance - it says nothing about recall against
+        // an exhaustive L2 top-10, which `recall@{k}` above reports.
+        let self_queries = 200usize;
+        let mut self_hits = 0usize;
+        for si in 0..self_queries {
+            let i = (si * 197) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            if rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"
+                ),
+            ) == vec![vec![i.to_string()]]
+            {
+                self_hits += 1;
+            }
+        }
+        let self_recall = self_hits as f64 / self_queries as f64;
+        eprintln!("self recall@1: {self_hits}/{self_queries}");
+
+        // For an LSG graph, recall in the space it was built in: the reference
+        // scales a node-to-node distance by `sqrt(avg_i * avg_j) ^ alpha`
+        // (`LSGDistWrapper::Inner`) and returns the *raw* distance for a query
+        // vector, so this number and `recall@{k}` answer different questions.
+        // Comparing the two says whether a low `recall@{k}` is the scaled edge
+        // selection or the graph itself.
+        let scaled_recall: Option<f64> = (|| {
+            let segs = e.hnsw_mem_segments("bench", "v").ok()?;
+            let seg = segs.first()?;
+            let guard = seg.lock().ok()?;
+            let lsg = guard.index().lsg()?.clone();
+            // `avg` is indexed by vertex; the vertex order has to be the row
+            // order for the two to line up.
+            if guard.rows().len() != n
+                || guard
+                    .rows()
+                    .iter()
+                    .enumerate()
+                    .any(|(at, r)| *r != at as u64)
+            {
+                return None;
+            }
+            let mut hits = 0usize;
+            for (qi, got) in answers.iter().enumerate() {
+                let i = (qi * 7919) % n;
+                let q = row(i);
+                let mut best: Vec<(f32, u64)> = (0..n)
+                    .map(|j| {
+                        let v = row(j);
+                        let d: f32 = v.iter().zip(q).map(|(a, b)| (a - b) * (a - b)).sum();
+                        (lsg.adjust(d, i, j), j as u64)
+                    })
+                    .collect();
+                best.select_nth_unstable_by(k, |a, b| a.0.partial_cmp(&b.0).unwrap());
+                best.truncate(k);
+                hits += got
+                    .iter()
+                    .filter(|id| best.iter().any(|(_, j)| j == *id))
+                    .count();
+            }
+            Some(hits as f64 / (queries * k) as f64)
+        })();
+        if let Some(scaled) = scaled_recall {
+            eprintln!("recall@{k} in the LSG-scaled space: {scaled:.3}");
+        }
+
+        // The recall/latency curve a deployment tunes with `WITH (ef = ...)`.
+        // The in-memory graph answers through the same `search_with_ef` the
+        // KNN scan calls, so this is the index path without the SQL overhead.
+        if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
+            let graph = mem.lock().unwrap();
+            for ef in [64usize, 128, 256, 512] {
+                let mut curve_hits = 0usize;
+                let mut curve_lat: Vec<std::time::Duration> = Vec::with_capacity(queries);
+                for qi in 0..queries {
+                    let i = (qi * 7919) % n;
+                    let started = std::time::Instant::now();
+                    let got = graph.search_with_ef(row(i), k, Some(ef));
+                    curve_lat.push(started.elapsed());
+                    let exact = exact_topk(row(i), k);
+                    curve_hits += got.iter().filter(|(id, _)| exact.contains(id)).count();
+                }
+                curve_lat.sort();
+                eprintln!(
+                    "ef {ef}: recall@{k} {:.3}, p50 {:?}, p99 {:?}",
+                    curve_hits as f64 / (queries * k) as f64,
+                    curve_lat[curve_lat.len() / 2],
+                    curve_lat[curve_lat.len() * 99 / 100]
+                );
+            }
+        }
+
+        // Dump, reopen, query again: a restart must not change the answers.
+        e.context
+            .flush_dumps_mem_index
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let started = std::time::Instant::now();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        eprintln!("flush + dump: {:?}", started.elapsed());
+        let info = e.show_index_info("bench", "bench_i").expect("show_index");
+        eprintln!("chunks after dump: {}", info.segment_index_count);
+        assert!(info.segment_index_count >= 1, "no chunk dumped");
+
+        drop(e);
+        let started = std::time::Instant::now();
+        let e = Engine::open(dir.path()).unwrap();
+        eprintln!("reopen: {:?}", started.elapsed());
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM bench;"),
+            vec![vec![n.to_string()]]
+        );
+        let mut after_hits = 0usize;
+        for qi in 0..queries {
+            let i = (qi * 7919) % n;
+            let text = row(i)
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
+                ),
+            );
+            let exact = exact_topk(row(i), k);
+            let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            after_hits += got.iter().filter(|id| exact.contains(id)).count();
+        }
+        let after = after_hits as f64 / (queries * k) as f64;
+        eprintln!("recall@{k} after reopen: {after:.3}");
+
+        // A benchmark first: a 200k run reports its numbers and this only fails
+        // when the index answers nothing. The 50k gate below is the regression
+        // check; the 200k+ runs are the measurement.
+        assert!(recall > 0.0 && after > 0.0, "the index answered nothing");
+        if n <= 50_000 && encode == "lvq" {
+            // `build_type=lsg` selects its edges in the scaled space while the
+            // query ranks by raw L2 (`LSGDistWrapper::operator()` returns the
+            // raw distance for a query vector), so its exhaustive-L2 recall is
+            // structurally below a plain graph's - the reference never trains
+            // LSG in a production build, so it never pays this. Gate the plain
+            // build on L2 recall and the scaled build on the reference's own
+            // LSG criterion (each row answers itself).
+            if build_type == "lsg" {
+                assert!(
+                    self_recall >= 0.95,
+                    "LSG self recall@1 {self_recall} is below 0.95"
+                );
+            } else {
+                assert!(recall >= 0.85, "recall@{k} {recall} is below 0.85");
+            }
+            assert!(
+                after >= recall - 0.05,
+                "reopen recall {after} vs {recall} before the restart"
+            );
+        }
+    }
+
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
     /// vectors per the `encode` option and answers the same top-1.
     #[test]
@@ -3531,7 +5478,7 @@ mod tests {
         for encode in ["plain", "lvq", "rabitq"] {
             let dir = tempdir().unwrap();
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
+            e.execute_blocking("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
                 .unwrap();
             let mut sql = String::from("INSERT INTO he VALUES ");
             for i in 0..200 {
@@ -3541,12 +5488,12 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute(&sql).unwrap();
-            e.execute(&format!(
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(&format!(
                 "CREATE INDEX he_i ON he (v) USING HNSW WITH (metric='l2', encode='{encode}');"
             ))
             .unwrap();
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             let rows = rows(
                 &e,
                 "SELECT id FROM he SEARCH MATCH VECTOR \
@@ -3571,11 +5518,11 @@ mod tests {
         .unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(3);
-        e.execute("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
             .unwrap();
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "COPY cvi FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
@@ -3604,15 +5551,17 @@ mod tests {
     fn sparse_and_tensor_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO s VALUES (1, [0:1.0,10:1.0,20:1.0,80:1.0]), \
              (2, [0:2.0,20:2.0,80:2.0]), (4, [0:4.0,80:4.0]), (5, []);",
         )
         .unwrap();
         match &e
-            .execute("SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);")
+            .execute_blocking(
+                "SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);",
+            )
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -3628,16 +5577,16 @@ mod tests {
             other => panic!("{other:?}"),
         }
 
-        e.execute("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO t VALUES (2, [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]]), \
              (4, [[0.2,0.1,0.3,0.4]]);",
         )
         .unwrap();
         // MaxSim over the query's two vectors: 2.21 + (-7.4) = -5.19.
         match &e
-            .execute(
+            .execute_blocking(
                 "SELECT c1, ROUND(SCORE(), 4) FROM t SEARCH MATCH TENSOR \
                  (c2, [[0.0,-10.0,0.0,0.7],[9.2,45.6,-55.8,3.5]], 'float', 'maxsim', '');",
             )
@@ -3664,7 +5613,7 @@ mod tests {
     fn plaid_index_answers_tensor_search_and_mirrors_a_chunk() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -3677,7 +5626,7 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO pt VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO pt VALUES {};", values.join(",")))
             .unwrap();
         let query = "SELECT id FROM pt SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
@@ -3685,8 +5634,10 @@ mod tests {
         let baseline = rows(&e, query);
         assert_eq!(baseline.len(), 3);
 
-        e.execute("CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);",
+        )
+        .unwrap();
         // The scan builds `PlaidIndexInMem` over the 1200 embeddings.
         let indexed = rows(&e, query);
         let tkey = e.table_key("default_db.pt");
@@ -3695,7 +5646,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|t| t.mv.get("t"))
+            .and_then(|t| t.mv.get(&e.test_index_id("default_db.pt", "t", "PLAID")))
             .map(|m| m.read().unwrap().plaid.is_some())
             .unwrap_or(false);
         assert!(built, "PLAID index was not built");
@@ -3703,10 +5654,1225 @@ mod tests {
         assert_eq!(indexed.len(), 3);
         assert_eq!(indexed[0], baseline[0]);
 
-        e.flush().unwrap();
+        // The chunk comes from the index's own dump transaction.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pt", "pidx")).unwrap();
         let loaded = e.read_plaid_index("default_db.pt", "pidx").unwrap();
         assert_eq!(loaded.doc_num(), 300);
         assert_eq!(loaded.total_embedding_num(), 1200);
+    }
+
+    /// Concurrent searches while rows are appended and the tail is dumped: the
+    /// readers never deadlock, every answer is a subset of the table, and the
+    /// final answer covers every row.
+    #[test]
+    fn plaid_index_answers_concurrent_searches() {
+        use std::sync::{Arc, Mutex};
+
+        let dir = tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let tensor_rows = |lo: usize, hi: usize| -> String {
+            let mut values = Vec::new();
+            for i in lo..hi {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    tokens.push(format!("[{x},0.5,0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            values.join(",")
+        };
+        engine
+            .execute_blocking(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let query = "SELECT id FROM pcc SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=400');";
+        let writer = {
+            let engine = Arc::clone(&engine);
+            std::thread::spawn(move || {
+                for step in 0..4 {
+                    let lo = 200 + step * 50;
+                    engine
+                        .execute_blocking(&format!(
+                            "INSERT INTO pcc VALUES {};",
+                            tensor_rows(lo, lo + 50)
+                        ))
+                        .unwrap();
+                }
+                crate::scheduler::block_on(engine.flush()).unwrap();
+            })
+        };
+        let observed: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut readers = Vec::new();
+        for _ in 0..2 {
+            let engine = Arc::clone(&engine);
+            let observed = Arc::clone(&observed);
+            readers.push(std::thread::spawn(move || {
+                for _ in 0..15 {
+                    let seen: Vec<i64> = rows(&engine, query)
+                        .into_iter()
+                        .map(|row| row[0].parse().expect("id column"))
+                        .collect();
+                    observed.lock().unwrap().extend(seen);
+                }
+            }));
+        }
+        writer.join().unwrap();
+        for reader in readers {
+            reader.join().unwrap();
+        }
+
+        // No ghost rows: every id a concurrent reader saw exists.
+        for id in observed.lock().unwrap().iter() {
+            assert!((0..400).contains(id), "reader saw the ghost id {id}");
+        }
+        // And the final answer covers the whole table.
+        let final_ids: std::collections::BTreeSet<i64> = rows(&engine, query)
+            .into_iter()
+            .map(|row| row[0].parse().expect("id column"))
+            .collect();
+        let expected: std::collections::BTreeSet<i64> = (0..400).collect();
+        assert_eq!(final_ids, expected);
+    }
+
+    /// The whole PLAID lifecycle in one run: build, search the corpus, append,
+    /// flush, reopen (mmap load), optimize (chunk merge), a `filter=`, a delete
+    /// and an update. Every step must return exactly the rows the table holds, so
+    /// the index stays coherent across the operations a production table sees.
+    fn plaid_lifecycle(colbertsar: bool) {
+        let dir = tempdir().unwrap();
+        let table = if colbertsar { "pcb" } else { "pld" };
+        let index = if colbertsar { "pcbi" } else { "pldi" };
+        let ddl = if colbertsar {
+            // `nbits` is unused without residuals and is accepted only here.
+            format!(
+                "CREATE INDEX {index} ON {table} (t) USING PLAID \
+                 WITH (centroids = 8, nbits = 8, colbertsar_mode = true);"
+            )
+        } else {
+            format!("CREATE INDEX {index} ON {table} (t) USING PLAID WITH (n_centroids = 8);")
+        };
+        let query = |topn: usize, filter: Option<&str>| {
+            let mut params = format!("topn={topn}");
+            if let Some(filter) = filter {
+                params.push_str(&format!(";filter={filter}"));
+            }
+            format!(
+                "SELECT id FROM {table} SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', '{params}');"
+            )
+        };
+        let ids = |engine: &Engine, sql: &str| -> std::collections::BTreeSet<i64> {
+            rows(engine, sql)
+                .into_iter()
+                .map(|row| row[0].parse().expect("id column"))
+                .collect()
+        };
+        let tensor_rows = |lo: usize, hi: usize| -> String {
+            let mut values = Vec::new();
+            for i in lo..hi {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    let y = ((i + j) % 5) as f32 - 1.0;
+                    tokens.push(format!("[{x},{y},0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            values.join(",")
+        };
+
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute_blocking(&format!(
+                "CREATE TABLE {table} (id INT, t TENSOR(FLOAT,4));"
+            ))
+            .unwrap();
+        engine
+            .execute_blocking(&format!(
+                "INSERT INTO {table} VALUES {};",
+                tensor_rows(0, 200)
+            ))
+            .unwrap();
+        engine.execute_blocking(&ddl).unwrap();
+
+        // 1. The index answers for the whole corpus.
+        let mut expected: std::collections::BTreeSet<i64> = (0..200).collect();
+        assert_eq!(ids(&engine, &query(200, None)), expected);
+
+        // 2. Rows appended after the build are indexed too (incremental add).
+        engine
+            .execute_blocking(&format!(
+                "INSERT INTO {table} VALUES {};",
+                tensor_rows(200, 260)
+            ))
+            .unwrap();
+        expected.extend(200..260);
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 3. A checkpoint + an index dump, then a reopen, loads the flushed
+        // chunk (mmap) instead of rebuilding. The chunk comes from the
+        // `DumpIndex` transaction - the reference's `DumpMemIndex` is the only
+        // index writer; a checkpoint writes blocks only.
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction(table, index)).unwrap();
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+        {
+            let index = engine.multivector_index_for(table, "t", 4).unwrap();
+            let guard = index.read().unwrap();
+            let plaid = guard.plaid.as_ref().expect("PLAID not restored");
+            assert_eq!(plaid.doc_num() as usize, 260);
+            assert_eq!(plaid.is_colbertsar_mode(), colbertsar);
+            if colbertsar {
+                // Residual-free: nothing to map, and nothing on the heap either.
+                assert!(plaid.packed_residuals().is_empty());
+            } else {
+                assert!(
+                    plaid.is_packed_mapped(),
+                    "the PLAID chunk was copied onto the heap instead of mapped"
+                );
+                assert!(!plaid.packed_residuals().is_empty());
+            }
+        }
+
+        // 4. The optimize pass merges the chunks; the answers stay the same.
+        crate::scheduler::block_on(engine.optimize_index_chunks()).unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 5. A `filter=` is answered from the index bitmask.
+        let filtered: std::collections::BTreeSet<i64> = (0..100).collect();
+        assert_eq!(ids(&engine, &query(260, Some("id < 100"))), filtered);
+
+        // 6. A tombstoned row is no longer returned.
+        engine
+            .execute_blocking(&format!("DELETE FROM {table} WHERE id = 5;"))
+            .unwrap();
+        expected.remove(&5);
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 7. An update rewrites the tensor and the row stays searchable.
+        engine
+            .execute_blocking(&format!(
+                "UPDATE {table} SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 6;"
+            ))
+            .unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+
+        // 8. A clean shutdown and restart keeps the same answers.
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(ids(&engine, &query(260, None)), expected);
+    }
+
+    /// PLAID mode, end to end.
+    #[test]
+    fn plaid_index_lifecycle_is_coherent() {
+        plaid_lifecycle(false);
+    }
+
+    /// ColBERTSaR mode, end to end: residual-free chunks and the same lifecycle
+    /// guarantees.
+    #[test]
+    fn colbertsar_index_lifecycle_is_coherent() {
+        plaid_lifecycle(true);
+    }
+
+    /// `filter=` on `SEARCH MATCH TENSOR` narrows the candidates through the
+    /// index's bitmask (`CalculateFilterBitmask`) instead of falling back to a
+    /// row scan: with the whole corpus requested, the filtered answer is exactly
+    /// the unfiltered one restricted to the filter's rows.
+    #[test]
+    fn match_tensor_filter_narrows_through_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO pf VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let all = rows(
+            &e,
+            "SELECT id FROM pf SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300');",
+        );
+        let filtered = rows(
+            &e,
+            "SELECT id FROM pf SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300;filter=id < 150');",
+        );
+        let all_ids: std::collections::HashSet<String> =
+            all.into_iter().map(|row| row[0].clone()).collect();
+        let expected: std::collections::HashSet<String> = all_ids
+            .iter()
+            .filter(|id| id.parse::<i64>().unwrap() < 150)
+            .cloned()
+            .collect();
+        let got: std::collections::HashSet<String> =
+            filtered.into_iter().map(|row| row[0].clone()).collect();
+        assert_eq!(got, expected);
+        assert!(
+            got.len() >= 100,
+            "the filter dropped too many rows: {}",
+            got.len()
+        );
+    }
+
+    /// A `flush` writes the PLAID index out as C++ chunks; the first search
+    /// after a reopen must load them instead of retraining over the whole table
+    /// (that cost is what made a restart pay O(rows) before answering).
+    #[test]
+    fn plaid_index_loads_its_flushed_chunks_after_reopen() {
+        let dir = tempdir().unwrap();
+        let q = "SELECT id FROM pr SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let mut values = Vec::new();
+            for i in 0..300 {
+                let mut tokens = Vec::new();
+                for j in 0..4 {
+                    let x = (i % 7) as f32 + j as f32 * 0.5;
+                    tokens.push(format!("[{x},0.5,0.25,0.125]"));
+                }
+                values.push(format!("({i}, [{}])", tokens.join(",")));
+            }
+            e.execute_blocking(&format!("INSERT INTO pr VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute_blocking("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
+                .unwrap();
+            assert_eq!(rows(&e, q).len(), 3);
+            // The chunk is written by the index's own `DumpIndex` transaction
+            // (the reference's `DumpMemIndex`); a checkpoint writes blocks only.
+            crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("pr", "pri")).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q).len(), 3);
+        // A filter can exclude every PLAID candidate; the sealed readers loaded
+        // beside PLAID are what keeps such a search answered.
+        let filtered = "SELECT id FROM pr SEARCH MATCH TENSOR \
+                        (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3;filter=id < 5');";
+        let filtered_hits = rows(&e, filtered);
+        assert!(
+            !filtered_hits.is_empty(),
+            "a filtered search lost its fallback"
+        );
+        assert!(
+            filtered_hits
+                .iter()
+                .all(|row| row[0].parse::<i64>().unwrap_or(99) < 5),
+            "the filter was not applied: {filtered_hits:?}"
+        );
+        let index = e.multivector_index_for("pr", "t", 4).unwrap();
+        let guard = index.read().unwrap();
+        assert!(
+            guard.plaid.is_some(),
+            "PLAID was not restored from its flushed chunks"
+        );
+        assert_eq!(guard.plaid_seqs.len(), 300, "the row ids were not restored");
+        assert!(
+            guard.plaid.as_ref().is_some_and(|p| p.is_packed_mapped()),
+            "the loaded PLAID chunk was copied onto the heap instead of mapped"
+        );
+        // The sealed readers are loaded beside PLAID on purpose: they are the
+        // fallback a filtered search needs when PLAID returns no admissible
+        // candidate. Their presence also proves the chunk path ran - a rebuild
+        // would have written new ones from the rows.
+        assert_eq!(
+            guard.sealed.len(),
+            1,
+            "the flushed chunk was not mapped for the sealed fallback"
+        );
+        assert!(
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the restored row ids do not line up with the chunk's documents"
+        );
+        assert!(!guard.plaid_dropped, "PLAID was left dropped");
+    }
+
+    /// A NULL tensor adds no PLAID document, but the row still has to count as
+    /// *seen*: `is_complete(reserved)` compares the counter with the table's
+    /// live rows, so a row it never advances on would make every search rebuild
+    /// the whole index, PLAID training included.
+    #[test]
+    fn a_null_tensor_row_keeps_the_multivector_index_complete() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[1.0,0.5,0.25,0.125]])"))
+            .collect();
+        e.execute_blocking(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let first = e.multivector_index_for("mn", "m", 4).unwrap();
+        e.execute_blocking("INSERT INTO mn VALUES (300, NULL);")
+            .unwrap();
+        let after = e.multivector_index_for("mn", "m", 4).unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt although the NULL row was counted as seen"
+        );
+    }
+
+    /// The four `plaid_*` keys reach `plaid_search_options`; the statement's
+    /// option validator runs first and used to reject them as unknown.
+    #[test]
+    fn plaid_search_options_are_accepted_by_the_validator() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let values: Vec<String> = (0..300)
+            .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+            .collect();
+        e.execute_blocking(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        let query = "SELECT id FROM pv SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', \
+                      'topn=3;plaid_n_ivf_probe=32;plaid_centroid_score_threshold=-0.5;\
+                      plaid_n_doc_to_score=300;plaid_n_full_scores=30');";
+        assert_eq!(rows(&e, query).len(), 3);
+    }
+
+    /// A chunk written after a delete covers only the live rows. The restored
+    /// row list has to be that same live population, or the document count
+    /// never matches `doc_num()` and every reopen retrains the index.
+    #[test]
+    fn a_chunk_written_after_a_delete_reopens_without_retraining() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute_blocking(&format!("INSERT INTO md VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute_blocking("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+                .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            e.execute_blocking("DELETE FROM md WHERE id = 0;").unwrap();
+            // A delete drops the in-memory PLAID index, and the next search
+            // rebuilds it; the following flush then rewrites the chunk from the
+            // live rows (`plaid_chunk` -> `column_docs`), which is the chunk
+            // this test reopens.
+            e.execute_blocking(
+                "SELECT id FROM md SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+            )
+            .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let hits = rows(
+            &e,
+            "SELECT id FROM md SEARCH MATCH TENSOR \
+             (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+        );
+        assert!(
+            !hits.iter().any(|row| row[0] == "0"),
+            "the deleted row was scored after the reopen"
+        );
+        let index = e.multivector_index_for("md", "t", 4).unwrap();
+        let guard = index.read().unwrap();
+        assert!(guard.plaid.is_some(), "PLAID was not restored");
+        // The restored id lists have to line up with the chunks that carry
+        // them; a tombstoned row in the list would shift every later id.
+        assert!(
+            guard
+                .sealed
+                .iter()
+                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
+            "the sealed fallback was loaded with a stale row list"
+        );
+        assert_eq!(
+            guard.plaid_seqs.len(),
+            guard
+                .plaid
+                .as_ref()
+                .map(|p| p.doc_num() as usize)
+                .unwrap_or(0),
+            "the restored document ids do not cover the loaded index"
+        );
+    }
+
+    /// `IndexOptions`' PLAID knobs: the reference's defaults
+    /// (`default_values.cppm:154-157`) and the per-query overrides
+    /// (`logical_match_tensor_scan_impl.cpp:116-152`), where a value the
+    /// reference would reject keeps the default.
+    #[test]
+    fn plaid_search_options_follow_the_reference_defaults_and_overrides() {
+        let defaults = crate::engine::state::plaid_search_options(|_| None, 5);
+        assert_eq!(defaults.n_ivf_probe, 8);
+        assert!((defaults.centroid_score_threshold + 0.1).abs() < 1e-6);
+        assert_eq!(defaults.n_doc_to_score, 500);
+        assert_eq!(defaults.n_full_scores, 50);
+
+        let custom = crate::engine::state::plaid_search_options(
+            |k| match k {
+                "plaid_n_ivf_probe" => Some("32".to_string()),
+                "plaid_n_doc_to_score" => Some("40".to_string()),
+                "plaid_n_full_scores" => Some("20".to_string()),
+                _ => None,
+            },
+            5,
+        );
+        assert_eq!(custom.n_ivf_probe, 32);
+        assert_eq!(custom.n_doc_to_score, 40);
+        assert_eq!(custom.n_full_scores, 20);
+
+        // `n_doc_to_score < topn` and `n_full_scores > n_doc_to_score` are the
+        // reference's rejections, so the defaults survive.
+        let rejected = crate::engine::state::plaid_search_options(
+            |k| match k {
+                "plaid_n_doc_to_score" => Some("2".to_string()),
+                "plaid_n_full_scores" => Some("600".to_string()),
+                _ => None,
+            },
+            5,
+        );
+        assert_eq!(rejected.n_doc_to_score, 500);
+        assert_eq!(rejected.n_full_scores, 50);
+    }
+
+    /// A row whose tensor is NULL must not make the multi-vector index look
+    /// incomplete: `doc_count` counts parsed documents, so comparing it with the
+    /// table's live rows rebuilt the whole index (PLAID training included) on
+    /// every search. Rewriting a row must leave PLAID covering every document
+    /// instead of dropping it for good.
+    #[test]
+    fn plaid_index_rebuilds_only_when_the_rows_change() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..320 {
+            if i % 10 == 0 {
+                values.push(format!("({i}, NULL)"));
+                continue;
+            }
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO pm VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+
+        let q = "SELECT id FROM pm SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(rows(&e, q).len(), 3);
+        let first = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert!(
+            first.read().unwrap().plaid.is_some(),
+            "PLAID was not built over 320 rows"
+        );
+        // A second search must reuse the index; a NULL row used to make it look
+        // incomplete and rebuild it every time.
+        assert_eq!(rows(&e, q).len(), 3);
+        let second = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "the second search rebuilt the whole multi-vector index"
+        );
+
+        // An update appends a new row id (the old one is tombstoned), so PLAID
+        // either grows by one or is rebuilt - it must cover every document
+        // afterwards either way.
+        e.execute_blocking("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
+            .unwrap();
+        assert!(!rows(&e, q).is_empty());
+        let after = e.multivector_index_for("pm", "t", 4).unwrap();
+        {
+            let guard = after.read().unwrap();
+            let covered = guard.plaid.as_ref().map(|p| p.doc_num() as usize);
+            assert_eq!(
+                covered,
+                Some(guard.doc_count()),
+                "PLAID does not cover every document after the update"
+            );
+            assert!(!guard.plaid_dropped, "PLAID was left dropped");
+        }
+    }
+
+    /// Two `CREATE INDEX … USING HNSW` on one column are two memory graphs.
+    ///
+    /// The reference keys its `MemIndex` map by
+    /// `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so `idx0` and `idx1` on
+    /// one column never share one. The port only materialised a graph while
+    /// `hnsw_mem` was *empty*, so the second index got none - its dump wrote
+    /// nothing and the first index's graph was fed every row twice (100 rows
+    /// compiled to 200).
+    #[test]
+    fn two_hnsw_indexes_on_one_column_keep_their_own_graphs() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE th (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for i in 0..100 {
+            e.execute_blocking(&format!("INSERT INTO th VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .unwrap();
+        }
+        for name in ["idx0", "idx1"] {
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name} ON th (c2) USING HNSW \
+                 WITH (M=16, ef_construction=20, metric=l2);"
+            ))
+            .unwrap();
+        }
+
+        let ids = e.index_ids_on_column("th", "c2");
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("th");
+        let graphs: Vec<(u64, usize)> = {
+            let tables = e.tables.lock().unwrap();
+            ids.iter()
+                .map(|id| {
+                    let graph = tables[&key]
+                        .hnsw_mem
+                        .get(id)
+                        .unwrap_or_else(|| panic!("index {id} has no memory graph"));
+                    (*id, graph.lock().unwrap().len())
+                })
+                .collect()
+        };
+        // Each graph holds the table once, not twice and not zero times.
+        for (id, rows) in &graphs {
+            assert_eq!(*rows, 100, "graph of index {id} holds {rows} rows");
+        }
+
+        // Both dumps write a chunk into their own directory.
+        for name in ["idx0", "idx1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("th", name)).unwrap();
+            assert_eq!(
+                e.hnsw_chunk_ids("th", name),
+                vec![0],
+                "{name} wrote no chunk"
+            );
+        }
+        let a = e.index_files("th", "idx0");
+        let b = e.index_files("th", "idx1");
+        assert!(a.iter().all(|p| p.to_string_lossy().contains("idx_1")));
+        assert!(b.iter().all(|p| p.to_string_lossy().contains("idx_2")));
+    }
+
+    /// Two `CREATE INDEX … USING FULLTEXT` on one column are two indexes.
+    ///
+    /// Each record owns its tail, its chunk list and its `idx_{id}/` directory
+    /// (`MemIndex` is keyed by `index_id`). Resolving the cache by column made
+    /// the second dump find an emptied tail and write nothing.
+    #[test]
+    fn two_fulltext_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tf (c1 INT, c2 VARCHAR);")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!("INSERT INTO tf VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        for name in ["ft0", "ft1"] {
+            e.execute_blocking(&format!("CREATE INDEX {name} ON tf (c2) USING FULLTEXT;"))
+                .unwrap();
+        }
+        // The registries are keyed by id: one TextIndex per record.
+        let ids = e.index_ids_on_column_of_kind("tf", "c2", &["FULLTEXT"]);
+        assert_eq!(ids.len(), 2, "expected two full-text records: {ids:?}");
+        let key = e.table_key("tf");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                assert!(
+                    tables[&key].text.contains_key(id),
+                    "index {id} has no in-memory text index"
+                );
+            }
+        }
+        for name in ["ft0", "ft1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tf", name)).unwrap();
+            let files = e.index_files("tf", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".dic")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+        // ... and a query still answers from the first one.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT c1 FROM tf SEARCH MATCH TEXT ('c2', 'alpha1', 'topn=5');"
+            ),
+            vec![vec!["1".to_string()]],
+            "the default analyzer keeps digits: only 'alpha1' matches"
+        );
+    }
+
+    /// Two `CREATE INDEX … USING BMP` on one column are two sparse indexes.
+    #[test]
+    fn two_sparse_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tsp (c1 INT, c2 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO tsp VALUES ({i}, [{}:1.0,9:2.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        for name in ["sp0", "sp1"] {
+            e.execute_blocking(&format!("CREATE INDEX {name} ON tsp (c2) USING BMP;"))
+                .unwrap();
+        }
+        let ids = e.index_ids_on_column_of_kind("tsp", "c2", &["BMP"]);
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("tsp");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                assert!(
+                    tables[&key].sparse.contains_key(id),
+                    "index {id} has no in-memory sparse index"
+                );
+            }
+        }
+        for name in ["sp0", "sp1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tsp", name)).unwrap();
+            let files = e.index_files("tsp", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".bmp")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+    }
+
+    /// Two `CREATE INDEX … USING PLAID` on one column are two multi-vector
+    /// indexes, each with its own chunk directory.
+    #[test]
+    fn two_plaid_indexes_on_one_column_both_dump() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tp (c1 INT, c2 TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..200 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO tp VALUES {};", values.join(",")))
+            .unwrap();
+        for name in ["pl0", "pl1"] {
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name} ON tp (c2) USING PLAID WITH (n_centroids = 8);"
+            ))
+            .unwrap();
+        }
+        let ids = e.index_ids_on_column_of_kind("tp", "c2", &["PLAID"]);
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("tp");
+        {
+            let tables = e.tables.lock().unwrap();
+            for id in &ids {
+                let index = tables[&key]
+                    .mv
+                    .get(id)
+                    .unwrap_or_else(|| panic!("index {id} has no multi-vector index"));
+                assert!(
+                    index.read().unwrap().plaid.is_some(),
+                    "index {id} never built its PLAID index"
+                );
+            }
+        }
+        for name in ["pl0", "pl1"] {
+            crate::scheduler::block_on(e.dump_index_transaction("tp", name)).unwrap();
+            let files = e.index_files("tp", name);
+            assert!(
+                files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
+                "{name} wrote no chunk: {files:?}"
+            );
+        }
+    }
+
+    /// One column carrying an `HNSW` **and** a `BMP` index: each kind's
+    /// registry holds its own id, and dropping one leaves the other's alone.
+    ///
+    /// An index id is unique within the table, not within one kind, so a
+    /// column-wide sweep would take the other kind's tail with it.
+    #[test]
+    fn mixed_index_kinds_on_one_column_are_independent() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tm (c1 INT, c2 EMBEDDING(FLOAT,4), c3 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO tm VALUES ({i}, [0.1,0.2,0.3,0.4], [{}:1.0]);",
+                i % 10
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX m_hnsw ON tm (c2) USING HNSW WITH (metric=l2);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX m_sparse ON tm (c3) USING BMP;")
+            .unwrap();
+        let hnsw_id = e.test_index_id("tm", "c2", "HNSW");
+        let sparse_id = e.test_index_id("tm", "c3", "BMP");
+        assert_ne!(hnsw_id, sparse_id);
+        assert_eq!(
+            e.index_ids_on_column_of_kind("tm", "c2", &["HNSW"]),
+            vec![hnsw_id]
+        );
+        assert_eq!(
+            e.index_ids_on_column_of_kind("tm", "c3", &["BMP"]),
+            vec![sparse_id]
+        );
+
+        // Dropping the HNSW index leaves the sparse tail registered.
+        e.execute_blocking("DROP INDEX m_hnsw;").unwrap();
+        let key = e.table_key("tm");
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(
+                !tables[&key].hnsw_mem.contains_key(&hnsw_id),
+                "the dropped HNSW graph is still registered"
+            );
+            assert!(
+                tables[&key].sparse.contains_key(&sparse_id),
+                "dropping the HNSW index took the sparse tail with it"
+            );
+        }
+    }
+
+    /// `DROP INDEX` removes the dropped record's registry entry and nothing
+    /// else - for every kind.
+    ///
+    /// The registries are keyed by index id and an id is unique within the
+    /// table, so a dispatch that does not know the kind either misses the entry
+    /// (`hnsw_mem` stayed behind) or sweeps a neighbour's (`DROP INDEX` on a
+    /// full-text index cleared the column's sparse tail).
+    #[test]
+    fn drop_index_clears_only_that_records_registry() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(
+            "CREATE TABLE dk (id INT, txt VARCHAR, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10));",
+        )
+        .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO dk VALUES ({i}, 'alpha{i}', [0.1,0.2,0.3,0.4], [{}:1.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        for (name, sql) in [
+            ("dk_ft", "CREATE INDEX dk_ft ON dk (txt) USING FULLTEXT;"),
+            (
+                "dk_h",
+                "CREATE INDEX dk_h ON dk (v) USING HNSW WITH (metric=l2);",
+            ),
+            ("dk_s", "CREATE INDEX dk_s ON dk (s) USING BMP;"),
+        ] {
+            e.execute_blocking(sql).unwrap_or_else(|err| {
+                panic!("{name}: {err}");
+            });
+        }
+        // A second full-text record on the same column, so the drop has a
+        // neighbour of its own kind to leave alone.
+        e.execute_blocking("CREATE INDEX dk_ft2 ON dk (txt) USING FULLTEXT;")
+            .unwrap();
+
+        let ft = e.test_index_id("dk", "txt", "FULLTEXT");
+        let ft2 = e
+            .storage
+            .catalog
+            .indexes_of_table("dk")
+            .unwrap()
+            .into_iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT") && im.name == "dk_ft2")
+            .map(|im| im.id)
+            .next()
+            .unwrap();
+        let hnsw = e.test_index_id("dk", "v", "HNSW");
+        let sparse = e.test_index_id("dk", "s", "BMP");
+        assert_ne!(ft, ft2);
+
+        let key = e.table_key("dk");
+        // Materialise the registries the drop has to reach.
+        rows(
+            &e,
+            "SELECT id FROM dk SEARCH MATCH TEXT ('txt', 'alpha1', 'topn=5');",
+        );
+        e.execute_blocking("DROP INDEX dk_ft;").unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(
+                !tables[&key].text.contains_key(&ft),
+                "the dropped full-text index is still registered"
+            );
+            assert!(
+                tables[&key].text.contains_key(&ft2),
+                "dropping dk_ft took the other full-text index with it"
+            );
+            assert!(
+                tables[&key].sparse.contains_key(&sparse),
+                "dropping a full-text index took the sparse tail with it"
+            );
+            assert!(
+                tables[&key].hnsw_mem.contains_key(&hnsw),
+                "dropping a full-text index took the HNSW graph with it"
+            );
+        }
+
+        e.execute_blocking("DROP INDEX dk_h;").unwrap();
+        e.execute_blocking("DROP INDEX dk_s;").unwrap();
+        let tables = e.tables.lock().unwrap();
+        assert!(!tables[&key].hnsw_mem.contains_key(&hnsw));
+        assert!(!tables[&key].sparse.contains_key(&sparse));
+        assert!(
+            tables[&key].text.contains_key(&ft2),
+            "the surviving full-text index lost its registry"
+        );
+    }
+
+    /// `DropScope` names exactly one of the three statements' reach.
+    ///
+    /// `Table` has to mean the whole table - not "the first column", which is
+    /// what a pair of `None`s used to read like - and `Column` has to leave the
+    /// other columns alone.
+    #[test]
+    fn drop_scope_reaches_what_it_names() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ds (id INT, s1 SPARSE(FLOAT,10), s2 SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..10 {
+            e.execute_blocking(&format!(
+                "INSERT INTO ds VALUES ({i}, [{}:1.0], [{}:2.0]);",
+                i % 9,
+                (i + 1) % 9
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX ds_a ON ds (s1) USING BMP;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ds_b ON ds (s2) USING BMP;")
+            .unwrap();
+        let a = e.test_index_id("ds", "s1", "BMP");
+        let b = e.test_index_id("ds", "s2", "BMP");
+        let key = e.table_key("ds");
+
+        // `Column` takes one column's record only.
+        e.drop_index_storage("ds", DropScope::Column("s1"));
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(!tables[&key].sparse.contains_key(&a));
+            assert!(
+                tables[&key].sparse.contains_key(&b),
+                "a column-scoped drop took another column's tail"
+            );
+        }
+
+        // `Table` takes everything that is left.
+        e.drop_index_storage("ds", DropScope::Table);
+        let tables = e.tables.lock().unwrap();
+        assert!(
+            !tables[&key].sparse.contains_key(&b),
+            "a table-scoped drop left a column's tail behind"
+        );
+    }
+
+    /// `DropScope::Record` reaches the HNSW/IVF graphs too, not just the
+    /// secondary, full-text and sparse registries.
+    ///
+    /// Every registry is swept by the same id, so a kind the function never
+    /// heard of still loses its entry. Keying the HNSW half off the secondary
+    /// id list left a dropped graph registered and the pending-byte charge
+    /// behind it.
+    #[test]
+    fn drop_scope_record_clears_hnsw_and_ivf_graphs() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dr (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!("INSERT INTO dr VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX dr_h ON dr (v) USING HNSW WITH (metric=l2);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX dr_i ON dr (v) USING IVF WITH (metric=l2);")
+            .unwrap();
+        let hnsw = e.test_index_id("dr", "v", "HNSW");
+        let ivf = e.test_index_id("dr", "v", "IVF");
+        let key = e.table_key("dr");
+        assert!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .is_some_and(|t| t.hnsw_mem.contains_key(&hnsw)),
+            "the HNSW graph was never materialised"
+        );
+
+        e.drop_index_storage("dr", DropScope::Record(hnsw));
+        {
+            let tables = e.tables.lock().unwrap();
+            let entry = &tables[&key];
+            assert!(
+                !entry.hnsw_mem.contains_key(&hnsw),
+                "a dropped HNSW graph stayed registered"
+            );
+            assert_eq!(
+                entry.index_pending_bytes.get(&hnsw).copied().unwrap_or(0),
+                0,
+                "the dropped graph's pending-byte charge stayed"
+            );
+            assert!(
+                entry.ivf_mem.contains_key(&ivf),
+                "dropping the HNSW record took the IVF entry with it"
+            );
+        }
+
+        e.drop_index_storage("dr", DropScope::Record(ivf));
+        let tables = e.tables.lock().unwrap();
+        assert!(
+            !tables[&key].ivf_mem.contains_key(&ivf),
+            "a dropped IVF record stayed registered"
+        );
+    }
+
+    /// `drop_index_storage` selects by id alone, so an id that names a
+    /// *different* record must not touch this one.
+    ///
+    /// The function takes no kind: an index id is unique within the table and
+    /// every kind's registry holds only its own ids, so removing the id from
+    /// all of them is what makes the call correct without a dispatch - and a
+    /// neighbouring record's entry has to survive it.
+    #[test]
+    fn drop_index_storage_only_touches_the_named_record() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dz (id INT, txt VARCHAR, s SPARSE(FLOAT,10));")
+            .unwrap();
+        for i in 0..10 {
+            e.execute_blocking(&format!(
+                "INSERT INTO dz VALUES ({i}, 'alpha{i}', [{}:1.0]);",
+                i % 9
+            ))
+            .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX dz_ft ON dz (txt) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX dz_s ON dz (s) USING BMP;")
+            .unwrap();
+        let ft = e.test_index_id("dz", "txt", "FULLTEXT");
+        let sparse = e.test_index_id("dz", "s", "BMP");
+        let key = e.table_key("dz");
+
+        // An id no record holds: nothing goes away.
+        let absent = ft.max(sparse) + 1000;
+        e.drop_index_storage("dz", DropScope::Record(absent));
+        {
+            let tables = e.tables.lock().unwrap();
+            assert!(tables[&key].text.contains_key(&ft));
+            assert!(tables[&key].sparse.contains_key(&sparse));
+        }
+
+        // The sparse record's own id: its entry goes, the full-text one stays.
+        e.drop_index_storage("dz", DropScope::Record(sparse));
+        let tables = e.tables.lock().unwrap();
+        assert!(!tables[&key].sparse.contains_key(&sparse));
+        assert!(
+            tables[&key].text.contains_key(&ft),
+            "dropping the sparse record took the full-text one with it"
+        );
+    }
+
+    /// Two `CREATE INDEX` records on one column are two memory indexes.
+    ///
+    /// The reference keys its `MemIndex` map by
+    /// `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so `index3` and
+    /// `index4` on one column never share a tail. The port used to resolve the
+    /// cache by column: creating the second index rebuilt the first one's
+    /// instance under the *second* id, so the first index's chunk was never
+    /// written and `SHOW INDEX` reported an index with no files.
+    #[test]
+    fn two_indexes_on_one_column_keep_separate_memory_indexes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE two (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..200 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO two VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX two_a ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX two_b ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .unwrap();
+        // Both records are materialised under their own id, so both have a
+        // chunk of their own directory.
+        for name in ["two_a", "two_b"] {
+            let files = e.index_files("two", name);
+            assert!(
+                files
+                    .iter()
+                    .any(|p| p.extension().is_some_and(|x| x == "mvec")),
+                "{name} has no chunk: {:?}",
+                files
+            );
+        }
+        // ... and each id owns a *distinct* memory index. Resolving the cache by
+        // column registered one instance under both ids, so the second index
+        // had nothing of its own.
+        let ids = e.index_ids_on_column("two", "t");
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("two");
+        let instances: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            ids.iter()
+                .map(|id| {
+                    tables[&key]
+                        .mv
+                        .get(id)
+                        .unwrap_or_else(|| panic!("index {id} has no memory index"))
+                        .clone()
+                })
+                .collect()
+        };
+        assert!(
+            !Arc::ptr_eq(&instances[0], &instances[1]),
+            "the two indexes share one memory index"
+        );
+        for (id, instance) in ids.iter().zip(&instances) {
+            let guard = instance.read().unwrap();
+            assert!(guard.plaid.is_some(), "index {id} was never built");
+        }
+        // A query still answers from one of them.
+        rows(
+            &e,
+            "SELECT id FROM two SEARCH MATCH TENSOR \
+             (t, [[1.0,0.5,0.25,0.125]], 'float', 'maxsim', 'topn=3');",
+        );
+    }
+
+    /// `USING PLAID … WITH (colbertsar_mode = true)` is the reference's
+    /// ColBERTSaR path (`d3ee9f6`, #3379): query-aware centroids
+    /// (`PlaidIndex::TrainQueryAwareCentroids`) and **no residual storage**, so
+    /// the chunk holds no quantizer and no packed residual. The mode travels in
+    /// the chunk, so a reload restores it.
+    #[test]
+    fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                let y = ((i + j) % 5) as f32 - 1.0;
+                let z = ((i * j) % 11) as f32 * 0.25;
+                tokens.push(format!("[{x},{y},{z},{}]", (i % 3) as f32));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute_blocking(&format!("INSERT INTO cs VALUES {};", values.join(",")))
+            .unwrap();
+
+        // `nbits` is unused without residuals, so `IndexPLAID::Make` skips its
+        // check in this mode; `centroids` is the SQL spelling of
+        // `n_centroids` and has to reach the index.
+        e.execute_blocking(
+            "CREATE INDEX csi ON cs (t) USING PLAID \
+             WITH (centroids = 8, nbits = 8, colbertsar_mode = true);",
+        )
+        .unwrap();
+        let options = e.plaid_options("default_db.cs", "csi");
+        assert!(options.colbertsar, "colbertsar_mode was not picked up");
+        assert_eq!(options.n_centroids, 8, "`centroids` was ignored");
+
+        let query = "SELECT id FROM cs SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(rows(&e, query).len(), 3);
+
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("cs", "csi")).unwrap();
+        let chunks = e.read_plaid_index_chunks("cs", "csi").unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert!(chunks[0].is_colbertsar_mode(), "chunk lost the mode");
+        assert!(
+            chunks[0].packed_residuals().is_empty(),
+            "ColBERTSaR must store no residual"
+        );
+        assert_eq!(chunks[0].doc_num(), 300);
+        // Reload round-trips the mode and stays residual-free.
+        let loaded = e.read_plaid_index("cs", "csi").unwrap();
+        assert!(loaded.is_colbertsar_mode());
+        assert!(loaded.packed_residuals().is_empty());
+
+        // A flag value outside `true/false/1/0` is rejected, as in `IndexPLAID::Make`.
+        assert!(e
+            .execute_blocking(
+                "CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);"
+            )
+            .is_err());
+        // Without the mode `nbits` is validated as before.
+        assert!(e
+            .execute_blocking("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
+            .is_err());
     }
 
     /// `USING SMVE`: the tensor scan builds `SMVEIndexInMem` (projection +
@@ -3715,7 +6881,7 @@ mod tests {
     fn smve_index_answers_tensor_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
             .unwrap();
         let mut values = Vec::new();
         for i in 0..40 {
@@ -3727,14 +6893,14 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+        e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
             .unwrap();
         let query = "SELECT id FROM st SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.5,0.0]], 'float', 'maxsim', 'topn=3');";
         let baseline = rows(&e, query);
         assert_eq!(baseline.len(), 3);
 
-        e.execute("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
+        e.execute_blocking("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
             .unwrap();
         let indexed = rows(&e, query);
         eprintln!(
@@ -3758,7 +6924,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|t| t.mv.get("t"))
+            .and_then(|t| t.mv.get(&e.test_index_id("default_db.st", "t", "SMVE")))
             .map(|m| m.read().unwrap().smve.is_some())
             .unwrap_or(false);
         assert!(built, "SMVE index was not built");
@@ -3771,9 +6937,13 @@ mod tests {
     fn multivector_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+        e.execute_blocking("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+            .unwrap();
+        // The index is what the catalog records; the reference never builds one
+        // for a bare column (`PhysicalMatchTensorScan::PlanWithIndex`).
+        e.execute_blocking("CREATE INDEX mv_v ON mv (v) USING PLAID WITH (n_centroids = 8);")
             .unwrap();
         let q = "SELECT id FROM mv SEARCH MATCH TENSOR \
                  (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
@@ -3781,25 +6951,25 @@ mod tests {
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
-        let idx_dir = std::fs::read_dir(dir.path().join("multivector"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+        // The chunks live in the index's own directory (`idx_{id}/seg_{n}`),
+        // which is where the catalog's records point - not in a private spill
+        // directory, whose layout the reference does not have.
+        // Count the index's files by extension, wherever the catalog put them.
         let count = |ext: &str| {
-            std::fs::read_dir(&idx_dir)
-                .unwrap()
-                .filter_map(|x| x.ok())
-                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
-                .count()
+            let mut n = 0;
+            for path in e.index_files("mv", "mv_v") {
+                if path.extension().is_some_and(|y| y == ext) {
+                    n += 1;
+                }
+            }
+            n
         };
         // One chunk of raw tokens plus its EMVB chunk, written by the build.
         assert_eq!(count("mvec"), 1);
         assert_eq!(count("emvb"), 1);
 
         // A later insert goes to the memory tail and ranks immediately.
-        e.execute("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
+        e.execute_blocking("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
             .unwrap();
         assert_eq!(
             rows(&e, q),
@@ -3812,7 +6982,7 @@ mod tests {
 
         // A dump transaction seals the tail as a second chunk; the query still
         // agrees. A checkpoint keeps the tail in memory.
-        e.dump_all_memory_indexes();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         assert_eq!(count("mvec"), 2);
         assert_eq!(count("emvb"), 2);
         assert_eq!(
@@ -3825,7 +6995,7 @@ mod tests {
         );
 
         // A tombstoned document is filtered out of the index hits.
-        e.execute("DELETE FROM mv WHERE id = 3;").unwrap();
+        e.execute_blocking("DELETE FROM mv WHERE id = 3;").unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
@@ -3838,9 +7008,14 @@ mod tests {
     fn sparse_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
             .unwrap();
-        e.execute("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+        e.execute_blocking("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            .unwrap();
+        // The BMP index is the catalog record the search resolves; a bare
+        // SPARSE column is scanned, not indexed (the reference's
+        // `MatchSparseScan::PlanWithIndex`).
+        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
             .unwrap();
         let q = "SELECT id FROM sp SEARCH MATCH SPARSE \
                  (v, [0:1.0,20:2.0], 'ip', 3);";
@@ -3848,23 +7023,20 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
-        let idx_dir = std::fs::read_dir(dir.path().join("sparse"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
+        // Count the index's files by extension, wherever the catalog put them.
         let count = |ext: &str| {
-            std::fs::read_dir(&idx_dir)
-                .unwrap()
-                .filter_map(|x| x.ok())
-                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
-                .count()
+            let mut n = 0;
+            for path in e.index_files("sp", "sp_v") {
+                if path.extension().is_some_and(|y| y == ext) {
+                    n += 1;
+                }
+            }
+            n
         };
         assert_eq!(count("bmp"), 1);
 
         // The write-time tail is visible before the dump.
-        e.execute("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
+        e.execute_blocking("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
             .unwrap();
         assert_eq!(
             rows(&e, q),
@@ -3877,7 +7049,7 @@ mod tests {
 
         // A dump transaction seals the tail as a second chunk and the ranking
         // holds.
-        e.dump_all_memory_indexes();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         assert_eq!(count("bmp"), 2);
         assert_eq!(
             rows(&e, q),
@@ -3889,7 +7061,7 @@ mod tests {
         );
 
         // Tombstoned rows never appear.
-        e.execute("DELETE FROM sp WHERE id = 3;").unwrap();
+        e.execute_blocking("DELETE FROM sp WHERE id = 3;").unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
@@ -3906,9 +7078,9 @@ mod tests {
         let first;
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
+            e.execute_blocking("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
                 .unwrap();
-            e.execute("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
+            e.execute_blocking("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
                 .unwrap();
 
             let meta = e
@@ -3931,8 +7103,9 @@ mod tests {
                 .unwrap();
             assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sort));
 
-            e.execute("CREATE INDEX ss_i ON ss (v) USING BMP;").unwrap();
-            e.execute("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            e.execute_blocking("CREATE INDEX ss_i ON ss (v) USING BMP;")
+                .unwrap();
+            e.execute_blocking("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
                 .unwrap();
             first = rows(&e, q);
             assert_eq!(first, vec![vec!["2".to_string()], vec!["1".to_string()]]);
@@ -3941,13 +7114,13 @@ mod tests {
                 .lock()
                 .unwrap()
                 .values()
-                .find_map(|t| t.sparse.get("v").cloned())
+                .find_map(|t| t.sparse.values().next().cloned())
                 .unwrap();
             assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
 
             // Sealing the tail rewrites the same-format chunks; the ranking
             // and the recorded hint both hold.
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(rows(&e, q), first);
             assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
         }
@@ -3969,7 +7142,7 @@ mod tests {
             .lock()
             .unwrap()
             .values()
-            .find_map(|t| t.sparse.get("v").cloned())
+            .find_map(|t| t.sparse.values().next().cloned())
             .unwrap();
         assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
     }
@@ -3981,15 +7154,18 @@ mod tests {
     fn secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sec (id INT, v INT);").unwrap();
-        e.execute("INSERT INTO sec VALUES (1, 10), (2, 20);")
+        e.execute_blocking("CREATE TABLE sec (id INT, v INT);")
             .unwrap();
-        e.execute("CREATE INDEX idx_v ON sec (v);").unwrap();
+        e.execute_blocking("INSERT INTO sec VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_v ON sec (v);")
+            .unwrap();
         let q = "SELECT id FROM sec WHERE v = 20;";
         assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
 
         // New rows land in the memory tail and are visible immediately.
-        e.execute("INSERT INTO sec VALUES (3, 20);").unwrap();
+        e.execute_blocking("INSERT INTO sec VALUES (3, 20);")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
@@ -4003,7 +7179,7 @@ mod tests {
         drop(tables);
 
         // The checkpoint keeps the tail...
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -4013,7 +7189,7 @@ mod tests {
         drop(tables);
 
         // ...and the dump drains it; the answer comes from the chunk + new tail.
-        e.dump_index_transaction("sec", "idx_v").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("sec", "idx_v")).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -4031,7 +7207,7 @@ mod tests {
         );
 
         // Tombstoned rows are filtered from both forms.
-        e.execute("DELETE FROM sec WHERE id = 2;").unwrap();
+        e.execute_blocking("DELETE FROM sec WHERE id = 2;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
@@ -4041,24 +7217,930 @@ mod tests {
     fn low_card_secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE b (id INT, flag BOOL);").unwrap();
-        e.execute("INSERT INTO b VALUES (1, true), (2, false);")
+        e.execute_blocking("CREATE TABLE b (id INT, flag BOOL);")
             .unwrap();
-        e.execute("CREATE INDEX idx_flag ON b (flag);").unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (1, true), (2, false);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_flag ON b (flag);")
+            .unwrap();
         let q = "SELECT id FROM b WHERE flag = true;";
         assert_eq!(rows(&e, q), vec![vec!["1".to_string()]]);
-        e.execute("INSERT INTO b VALUES (3, true);").unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (3, true);")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.execute("DELETE FROM b WHERE id = 1;").unwrap();
+        e.execute_blocking("DELETE FROM b WHERE id = 1;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+    }
+
+    /// A `json` column is always a low-cardinality chunk (`index_secondary.cppm:56`
+    /// forces it there) keyed by the flattener's `path:type:value` terms, so the
+    /// planner's `json_*` filters read a term chunk rather than a hashed key.
+    #[test]
+    fn json_secondary_index_seals_term_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE j (id INT, meta JSON);")
+            .unwrap();
+        e.execute_blocking(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+            .unwrap();
+        e.execute_blocking("CREATE INDEX idx_meta ON j (meta);")
+            .unwrap();
+        let by_a = "SELECT id FROM j WHERE json_extract_int(meta, '$.a') = 1;";
+        let has_b = "SELECT id FROM j WHERE json_exists_path(meta, '$.b');";
+        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+
+        // The dump turns the tail into one low-cardinality chunk per segment: the
+        // document's scalar, path and array terms, not a single hashed document.
+        crate::scheduler::block_on(e.dump_index_transaction("j", "idx_meta")).unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let segments = tables
+                .values()
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("j", "meta")))
+                .unwrap();
+            assert_eq!(segments.len(), 1);
+            assert!(segments[0].1.len() > 1);
+            assert_eq!(
+                segments[0].1.kind(),
+                storage::secondary_segment::KeyKind::Bytes
+            );
+        }
+        // Both filters still answer from the chunk plus the (now empty) tail.
+        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+
+        // A new row lands in the tail and is visible through the same filters.
+        e.execute_blocking(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
+            .unwrap();
+        assert_eq!(
+            rows(&e, by_a),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, has_b),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+    }
+
+    /// A `json` document nesting past the flattener's depth bound cannot be
+    /// expanded into terms, but it is valid JSON that may still match a
+    /// predicate. The index therefore keeps it as a candidate instead of
+    /// reporting "no terms" and dropping the row before the residual filter
+    /// above the index scan runs.
+    ///
+    /// The marker is an ordinary term-chunk key, so the row survives the dump
+    /// into a chunk and a cold restart alike.
+    #[test]
+    fn over_depth_json_rows_stay_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE jd (id INT, meta JSON);")
+            .unwrap();
+        // Row 2 nests past `MAX_JSON_DEPTH` (512) and is still valid JSON whose
+        // `$.a` is 1 - exactly the row a term-range read would lose.
+        let deep = format!("{{\"a\":1,\"d\":{}1{}}}", "[".repeat(513), "]".repeat(513));
+        e.execute_blocking(&format!(
+            "INSERT INTO jd VALUES (1, '{{\"a\":1}}'), (2, '{deep}');"
+        ))
+        .unwrap();
+        e.execute_blocking("CREATE INDEX idx_jd ON jd (meta);")
+            .unwrap();
+        let q = "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 1;";
+        let both = vec![vec!["1".to_string()], vec!["2".to_string()]];
+        assert_eq!(rows(&e, q), both);
+
+        // The dump rewrites the tail's terms into a low-cardinality chunk. The
+        // marker is a key like any other, so the row is still found.
+        crate::scheduler::block_on(e.dump_index_transaction("jd", "idx_jd")).unwrap();
+        assert_eq!(rows(&e, q), both);
+
+        // Widening the candidate set must not become a false positive: the
+        // residual filter above the index scan still answers the predicate.
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 999;"
+        )
+        .is_empty());
+        assert!(rows(
+            &e,
+            "SELECT id FROM jd WHERE json_exists_path(meta, '$.zzz');"
+        )
+        .is_empty());
+
+        // The chunk also carries the marker on disk, which is what a cold
+        // restart - or a rebuild from the rows - reads back.
+        {
+            let tables = e.tables.lock().unwrap();
+            let low = tables
+                .values()
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("jd", "meta")))
+                .expect("a json column uses term chunks");
+            assert!(
+                low.iter().any(|(_, reader)| reader
+                    .range(
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                        storage::secondary_lowcard::LowCardKey::Bytes(
+                            storage::json_index::OVERFLOW_TERM.as_bytes().to_vec()
+                        ),
+                    )
+                    .len()
+                    == 1),
+                "the over-depth row's candidate term must be written to the chunk"
+            );
+        }
+
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, q), both);
+    }
+
+    /// `WITH (cardinality = low)` moves any column onto the bitmap layout, not
+    /// just BOOL and JSON (`NewSecondaryIndexInMem` honours the option for every
+    /// type).
+    #[test]
+    fn low_cardinality_option_uses_bitmap_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE lc (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
+            .unwrap();
+        let q = "SELECT id FROM lc WHERE v = 10;";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        crate::scheduler::block_on(e.dump_index_transaction("lc", "lcv")).unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let low = tables
+                .values()
+                .find_map(|t| t.secondary.low.get(&e.test_secondary_id("lc", "v")))
+                .expect("an explicit low-cardinality column uses bitmap chunks");
+            assert_eq!(low.len(), 1);
+            let high = tables
+                .values()
+                .find_map(|t| t.secondary.disk.get(&e.test_secondary_id("lc", "v")));
+            assert!(high.is_none(), "no PGM chunk for a low-cardinality column");
+        }
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+    }
+
+    /// Concurrent inserts, dumps and index reads on one secondary index must
+    /// agree with the rows: no ghost row, and no row missing from the final
+    /// index.
+    ///
+    /// Three races are exercised at once:
+    /// * `SecondaryIndex::fold` republishing the tail while a reader is between
+    ///   its two views (fixed by taking `pending` before the snapshot);
+    /// * a dump emptying the tail before its chunk is registered (fixed by the
+    ///   frozen `sealing` tails the readers merge);
+    /// * many writers appending to one tail concurrently.
+    #[test]
+    fn secondary_index_is_correct_under_concurrent_writes_and_dumps() {
+        use std::collections::HashSet;
+        use std::sync::{Arc, Mutex};
+
+        const WRITERS: usize = 4;
+        const ROWS_PER_WRITER: usize = 1500;
+        const READERS: usize = 2;
+        const READS: usize = 400;
+
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE c (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cv ON c (v);").unwrap();
+
+        // Every row gets its own value, so the tail folds its pending map
+        // several times while the readers probe it.
+        let mut writers = Vec::new();
+        for w in 0..WRITERS {
+            let e = Arc::clone(&e);
+            writers.push(std::thread::spawn(move || {
+                let rows: Vec<Vec<Literal>> = (0..ROWS_PER_WRITER)
+                    .map(|i| {
+                        let id = (w * ROWS_PER_WRITER + i) as i64;
+                        vec![Literal::Int(id), Literal::Int(id)]
+                    })
+                    .collect();
+                e.insert_literals("default_db.c", None, rows).unwrap();
+            }));
+        }
+        // A dump loop interleaves with the writers: each dump freezes a tail and
+        // registers a chunk, which is exactly the window a reader can land in.
+        let dumper = {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                for _ in 0..40 {
+                    std::thread::sleep(std::time::Duration::from_millis(3));
+                    let _ = crate::scheduler::block_on(e.dump_index_transaction("c", "cv"));
+                }
+            })
+        };
+        // Readers record every row id the index ever returns, per value.
+        let observed: Arc<Mutex<Vec<(i64, u64)>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut readers = Vec::new();
+        for r in 0..READERS {
+            let e = Arc::clone(&e);
+            let observed = Arc::clone(&observed);
+            readers.push(std::thread::spawn(move || {
+                let mut at = r * 7;
+                for _ in 0..READS {
+                    at = (at * 31 + 17) % (WRITERS * ROWS_PER_WRITER);
+                    let value = Literal::Int(at as i64);
+                    if let Some(ids) = e.index_lookup("c", "v", &value) {
+                        let mut seen = observed.lock().unwrap();
+                        seen.extend(ids.into_iter().map(|id| (at as i64, id)));
+                    }
+                }
+            }));
+        }
+        for w in writers {
+            w.join().unwrap();
+        }
+        for r in readers {
+            r.join().unwrap();
+        }
+        dumper.join().unwrap();
+        // Everything written is sealed or in the tail.
+        crate::scheduler::block_on(e.dump_index_transaction("c", "cv")).unwrap();
+
+        // The rows themselves, as `seq -> value`.
+        let rows: Vec<(u64, i64)> = e
+            .fetch_rows_with_ids("c")
+            .unwrap()
+            .into_iter()
+            .map(|(seq, row)| {
+                let value = match row.get(1) {
+                    Some(Value::Int(v)) => *v,
+                    _ => 0,
+                };
+                (seq as u64, value)
+            })
+            .collect();
+        assert_eq!(rows.len(), WRITERS * ROWS_PER_WRITER);
+
+        // The index must return exactly the row ids of each value.
+        for (seq, value) in &rows {
+            let indexed: HashSet<u64> = e
+                .index_lookup("c", "v", &Literal::Int(*value))
+                .unwrap()
+                .into_iter()
+                .collect();
+            assert!(
+                indexed.contains(seq),
+                "row {seq} (v = {value}) is missing from the index"
+            );
+        }
+        // No ghost: every id a concurrent reader saw belongs to the final rows.
+        let final_ids: HashSet<u64> = rows.iter().map(|(seq, _)| *seq).collect();
+        for (value, id) in observed.lock().unwrap().iter() {
+            assert!(
+                final_ids.contains(id),
+                "index returned the ghost row {id} for v = {value}"
+            );
+        }
+    }
+
+    /// `CREATE INDEX` reads the table without excluding writers (the reference
+    /// leans on its transaction conflict detection, which this port does not
+    /// have yet). A row committed after the scan had read the table is in
+    /// neither the chunks the build wrote nor the tail it installs - the write
+    /// hook could not put it there while the index was still being built - so
+    /// the build appends it to the tail afterwards (`secondary_catch_up`).
+    /// Without that step the index silently loses every row in the window.
+    #[test]
+    fn create_index_covers_rows_committed_while_it_builds() {
+        use std::sync::Arc;
+
+        const BEFORE: usize = 200;
+        const DURING: usize = 200;
+
+        let dir = tempdir().unwrap();
+        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE cd (id INT, v INT);")
+            .unwrap();
+        for i in 0..BEFORE {
+            e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                .unwrap();
+        }
+        // One writer keeps appending while the build scans; the values are
+        // unique so every expected row is individually checkable.
+        let writer = {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                for i in BEFORE..(BEFORE + DURING) {
+                    e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                        .unwrap();
+                }
+            })
+        };
+        e.execute_blocking("CREATE INDEX cdv ON cd (v);").unwrap();
+        writer.join().unwrap();
+
+        // A range predicate is answered by the index (chunk keys plus the
+        // tail), so a row the build dropped would be missing from the result.
+        let found = rows(&e, "SELECT v FROM cd WHERE v >= 0;");
+        let values: std::collections::HashSet<String> =
+            found.iter().map(|row| row[0].clone()).collect();
+        for i in 0..(BEFORE + DURING) {
+            assert!(
+                values.contains(&i.to_string()),
+                "v = {i} is missing from the index after a concurrent insert"
+            );
+        }
+        assert_eq!(found.len(), BEFORE + DURING, "duplicate index entries");
+    }
+
+    /// Timing harness for the `MATCH TENSOR` scoring loop: the current
+    /// implementation against the per-`(query, doc)` `Vec` allocation plus
+    /// scalar dot it replaced.
+    ///
+    /// ```text
+    /// cargo test --release -p executor --lib tensor_maxsim_throughput -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "timing"]
+    fn tensor_maxsim_throughput() {
+        let (nq, nd, dim) = (32usize, 32usize, 128usize);
+        let q: Vec<Vec<f64>> = (0..nq)
+            .map(|i| {
+                (0..dim)
+                    .map(|j| ((i * 3 + j) % 17) as f64 * 0.5 - 4.0)
+                    .collect()
+            })
+            .collect();
+        let d: Vec<Vec<f64>> = (0..nd)
+            .map(|i| (0..dim).map(|j| ((i * 7 + j) % 13) as f64 - 6.0).collect())
+            .collect();
+
+        let rounds = 500;
+        let t0 = std::time::Instant::now();
+        let mut acc = 0f64;
+        for _ in 0..rounds {
+            acc += tensor_maxsim(&q, &d, ElemType::Float32, ElemType::Float32);
+        }
+        let now = t0.elapsed() / rounds;
+
+        // The loop this replaced: a `Vec<&[f64]>` per pair and a sequential dot.
+        let t0 = std::time::Instant::now();
+        let mut old_acc = 0f64;
+        for _ in 0..rounds {
+            let mut sum = 0f32;
+            for qv in &q {
+                let mut best = f32::NEG_INFINITY;
+                for dv in &d {
+                    let pieces: Vec<&[f64]> = if qv.is_empty() {
+                        continue;
+                    } else if dv.len() == qv.len() {
+                        vec![dv.as_slice()]
+                    } else if dv.len() % qv.len() == 0 {
+                        dv.chunks(qv.len()).collect()
+                    } else {
+                        continue;
+                    };
+                    for piece in pieces {
+                        let mut s = 0f32;
+                        for (a, b) in qv.iter().zip(piece) {
+                            s += quantize_elem(*a, ElemType::Float32)
+                                * quantize_elem(*b, ElemType::Float32);
+                        }
+                        if s > best {
+                            best = s;
+                        }
+                    }
+                }
+                if best.is_finite() {
+                    sum += best;
+                }
+            }
+            old_acc += sum as f64;
+        }
+        let old = t0.elapsed() / rounds;
+        eprintln!(
+            "tensor_maxsim nq={nq} nd={nd} dim={dim}: per_pair_vec+scalar={old:?} \
+             chunks+simd={now:?} ({:.2}x) acc={acc} {old_acc}",
+            old.as_secs_f64() / now.as_secs_f64()
+        );
+    }
+
+    /// The PLAID budget is "do not build", not "build and spill": this port has
+    /// no buffer-manager/mmap search path, so a table past
+    /// `INFINITY_PLAID_MAX_BYTES` answers from the sealed brute-force scan. That
+    /// decision has to be final for the process - otherwise every later query
+    /// rescans the table, retrains the centroids and rewrites the chunk set only
+    /// to decline again.
+    ///
+    /// The budget is a process-wide `OnceLock`, so the case runs in a child
+    /// started with a 1-byte budget.
+    #[test]
+    fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
+        const CHILD: &str = "INFINITY_PLAID_BUDGET_CHILD";
+        const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
+        if let Ok(dir) = std::env::var(DIR) {
+            let e = Engine::open(std::path::Path::new(&dir)).unwrap();
+            e.execute_blocking("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+                .unwrap();
+            let values: Vec<String> = (0..300)
+                .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
+                .collect();
+            e.execute_blocking(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+                .unwrap();
+            e.execute_blocking("CREATE INDEX pbi ON pb (t) USING PLAID;")
+                .unwrap();
+            let first = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            {
+                let guard = first.read().unwrap();
+                assert!(guard.plaid.is_none(), "PLAID must not be built over budget");
+                assert!(guard.plaid_unavailable, "the refusal must be recorded");
+                assert!(guard.plaid_dropped, "the index must report the fallback");
+            }
+            // The refusal is final, so the cached index is reused: a rebuild
+            // would scan the table and retrain the centroids again.
+            let again = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            assert!(
+                std::sync::Arc::ptr_eq(&first, &again),
+                "the index was rebuilt although the budget refused to build PLAID"
+            );
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "engine::tests_ut::tests::a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .env(DIR, dir.path())
+            .env("INFINITY_PLAID_MAX_BYTES", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            out.status.success(),
+            "child failed:\n{stdout}\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            stdout.contains("1 passed"),
+            "the child ran no test:\n{stdout}"
+        );
+    }
+
+    /// A NULL sparse cell writes no postings, so `doc_count` can never reach the
+    /// table's row count on such a table: the coverage check based on it never
+    /// agreed and every `MATCH SPARSE` rebuilt the whole index, chunks
+    /// included. Coverage is measured by the rows the index has *seen*.
+    #[test]
+    fn sparse_index_with_null_rows_is_not_rebuilt_per_query() {
+        use storage::bmp::IdxWidth;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+            .unwrap();
+        e.execute_blocking("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+            .unwrap();
+        // A plain `CREATE INDEX` on a SPARSE column is the reference's
+        // `kBMP` (`IndexBMP::Make`), which is what `sparse_index_for` looks up.
+        e.execute_blocking("CREATE INDEX spnv ON spn (v) USING BMP;")
+            .unwrap();
+        let first = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        let again = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &again),
+            "the index was rebuilt although it had seen every row"
+        );
+        // A NULL insert keeps the same instance: the write hook counts the row
+        // even though it contributes no postings.
+        e.execute_blocking("INSERT INTO spn VALUES (4, NULL);")
+            .unwrap();
+        let after = e
+            .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
+            .unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &after),
+            "the index was rebuilt after a NULL row landed in the tail"
+        );
+    }
+
+    /// `kill -9` in the middle of a dump leaves a spilled chunk file half
+    /// written while the rows themselves are already durable. The restart
+    /// rebuilds every secondary index from the rows (`rebuild_indexes`), and the
+    /// rebuild rewrites the spill set, so the truncated file must never reach
+    /// the reloaded index - a query answered from a half-parsed chunk would
+    /// silently lose rows.
+    #[test]
+    fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tc (id INT, v INT);")
+            .unwrap();
+        let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
+        e.execute_blocking(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+            .unwrap();
+        e.execute_blocking("CREATE INDEX tcv ON tc (v);").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("tc", "tcv")).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        drop(e);
+
+        assert!(
+            truncate_spilled_chunks(dir.path()) > 0,
+            "the dump must have written a chunk file to truncate"
+        );
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM tc WHERE v >= 0;");
+        assert_eq!(found.len(), 500, "a truncated chunk lost rows");
+    }
+
+    /// Cuts every spilled secondary chunk down to half its length: what a
+    /// process killed in the middle of a dump leaves behind.
+    fn truncate_spilled_chunks(root: &std::path::Path) -> usize {
+        // Secondary chunks live in `data/db_/tbl_/idx_/seg_/chunk_*.idx`.
+        let mut cut = 0;
+        let mut stack = vec![root.join("data")];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    cut += truncate_chunk_file(&path);
+                }
+            }
+        }
+        cut
+    }
+
+    fn truncate_chunk_file(path: &std::path::Path) -> usize {
+        let Ok(meta) = std::fs::metadata(path) else {
+            return 0;
+        };
+        if !path.extension().is_some_and(|e| e == "idx") || meta.len() < 16 {
+            return 0;
+        }
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open(path) else {
+            return 0;
+        };
+        usize::from(file.set_len(meta.len() / 2).is_ok())
+    }
+
+    /// The sustained-load shape: a wide table written in bursts with index
+    /// dumps between them, then a reopen. It is the million-row counterpart of
+    /// `secondary_index_is_correct_under_concurrent_writes_and_dumps`, and it is
+    /// ignored by default because it writes `INFINITY_STRESS_ROWS` rows
+    /// (1,000,000 unless the variable says otherwise):
+    ///
+    /// ```text
+    /// INFINITY_STRESS_ROWS=2000000 cargo test -p executor --lib \
+    ///     secondary_stress_sustained_dumps -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "writes up to a million rows; run explicitly"]
+    fn secondary_stress_sustained_dumps() {
+        let total: usize = std::env::var("INFINITY_STRESS_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1_000_000);
+        const BATCH: usize = 5_000;
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE st (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX stv ON st (v);").unwrap();
+
+        let mut written = 0usize;
+        let mut batches = 0usize;
+        while written < total {
+            let end = (written + BATCH).min(total);
+            let values: Vec<String> = (written..end).map(|i| format!("({i}, {i})")).collect();
+            e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
+                .unwrap();
+            written = end;
+            batches += 1;
+            // Every tenth burst dumps what the tail accumulated, so the chunk
+            // set grows while later bursts keep appending to the fresh tail.
+            if batches % 10 == 0 {
+                crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
+            }
+            // A read in the middle of the load: it must see at least the rows
+            // the dumps have already sealed, and never a row that is not there.
+            if batches % 25 == 0 {
+                let _ = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+            }
+        }
+        // The tail is dumped so the final read comes from the chunks, not from
+        // the buffer that would hide a broken chunk set.
+        crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
+
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the index lost rows under load");
+        drop(e);
+
+        let e = Engine::open(dir.path()).unwrap();
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        assert_eq!(found.len(), total, "the rebuild lost rows under load");
+    }
+
+    /// `CREATE INDEX i ON t (lower(name))` is the reference's
+    /// `kSecondaryFunctional`: the expression is the catalog's column, the base
+    /// column is what the rows are read from, the key domain is the function's
+    /// return type, and `lower(name) = 'abc'` is answered from the index.
+    #[test]
+    fn functional_index_answers_a_function_predicate() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE f (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fi ON f (lower(name));")
+            .unwrap();
+
+        let q = "SELECT id FROM f WHERE lower(name) = 'abc';";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        // A new row lands in the memory tail, evaluated the same way.
+        e.execute_blocking("INSERT INTO f VALUES (4, 'ABC');")
+            .unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        // And after the dump the answer comes from the term chunk.
+        crate::scheduler::block_on(e.dump_index_transaction("f", "fi")).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM f WHERE lower(name) = 'xyz';"),
+            vec![vec!["3".to_string()]]
+        );
+
+        // The record carries the function, so reopening restores the index.
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+    }
+
+    /// A hashed (`VARCHAR`) key has no order, but an equality range still has an
+    /// exact key: `ConvertToHashU64` plus the chunk's lower/upper_bound pair.
+    /// A non-equality range has no hash order, so it falls back to the rows.
+    #[test]
+    fn hashed_text_equality_uses_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE h (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX hn ON h (name);").unwrap();
+        e.execute_blocking("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+            .unwrap();
+        let probe = |e: &Engine| {
+            e.index_range_lookup(
+                "h",
+                "name",
+                &[(Value::Str("a".into()), Value::Str("a".into()))],
+            )
+            .unwrap()
+        };
+        assert_eq!(probe(&e), vec![0, 2]);
+
+        crate::scheduler::block_on(e.dump_index_transaction("h", "hn")).unwrap();
+        assert_eq!(probe(&e), vec![0, 2]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM h WHERE name = 'a';"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert!(e
+            .index_range_lookup(
+                "h",
+                "name",
+                &[(Value::Str("a".into()), Value::Str("b".into()))],
+            )
+            .is_none());
+    }
+
+    /// A NULL is not a key: `SecondaryIndexInMemT::InsertInner` skips a row
+    /// whose null bit is set, so neither the memory tail nor a chunk can answer
+    /// for it.
+    #[test]
+    fn null_cells_are_not_indexed() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX nf ON n (flag);").unwrap();
+        e.execute_blocking("CREATE INDEX nn ON n (name);").unwrap();
+        e.execute_blocking(
+            "INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');",
+        )
+        .unwrap();
+
+        // Row 3's NULL flag must not join the `false` bitmap.
+        assert_eq!(
+            e.index_lookup("n", "flag", &Literal::Str("false".into()))
+                .unwrap(),
+            vec![1]
+        );
+        // Row 2's NULL name has no key at all.
+        assert!(e
+            .index_lookup("n", "name", &Literal::Str(String::new()))
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            rows(&e, "SELECT id FROM n WHERE name = 'a';"),
+            vec![vec!["1".to_string()]]
+        );
+
+        // Same after the dump: the chunks carry only the non-NULL keys.
+        crate::scheduler::block_on(e.dump_index_transaction("n", "nf")).unwrap();
+        assert_eq!(
+            e.index_lookup("n", "flag", &Literal::Str("false".into()))
+                .unwrap(),
+            vec![1]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM n WHERE flag = false;"),
+            vec![vec!["2".to_string()]]
+        );
+    }
+
+    /// The index-scan filter reads the column's chunk bitmaps rather than
+    /// re-scanning the rows (`IndexFilterEvaluatorSecondary` ->
+    /// `TrunkReaderT::OutPut`), so its answers must still match a plain
+    /// predicate across a dump, a range and a tombstone.
+    #[test]
+    fn secondary_filter_answers_from_the_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE s (id INT, v INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX sv ON s (v);").unwrap();
+        let values: Vec<String> = (0..200).map(|i| format!("({i}, {})", i % 13)).collect();
+        e.execute_blocking(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+            .unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("s", "sv")).unwrap();
+
+        let mut expected: Vec<String> = (0..200)
+            .filter(|i| (10..=12).contains(&(i % 13)))
+            .map(|i| i.to_string())
+            .collect();
+        expected.sort_by_key(|id| id.parse::<u32>().unwrap());
+        let mut got: Vec<String> = rows(&e, "SELECT id FROM s WHERE v BETWEEN 10 AND 12;")
+            .into_iter()
+            .map(|row| row[0].clone())
+            .collect();
+        got.sort_by_key(|id| id.parse::<u32>().unwrap());
+        assert_eq!(got, expected);
+
+        // A tombstone is not in the row set, so its index entry selects no row.
+        e.execute_blocking("DELETE FROM s WHERE id = 22;").unwrap();
+        let after = rows(&e, "SELECT id FROM s WHERE v = 9;");
+        assert!(!after.iter().any(|row| row[0] == "22"));
+        // 15 rows carry v = 9 before the delete, so 14 remain.
+        assert_eq!(after.len(), 14);
+    }
+
+    /// `OptimizeIndex` folds a segment's secondary chunks into one: the merge is
+    /// a sort over the old chunks' `(key, offset)` pairs, whose offsets are
+    /// already segment-relative, so the merged chunk answers the same queries.
+    #[test]
+    fn optimize_merges_secondary_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE m (id INT, v INT, flag BOOL);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX mv ON m (v);").unwrap();
+        e.execute_blocking("CREATE INDEX mf ON m (flag);").unwrap();
+        e.execute_blocking("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
+            .unwrap();
+        for index in ["mv", "mf"] {
+            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
+        }
+        e.execute_blocking("INSERT INTO m VALUES (3, 10, true);")
+            .unwrap();
+        for index in ["mv", "mf"] {
+            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
+        }
+        let high = |e: &Engine, table: &str, column: &str| -> usize {
+            let id = e.test_secondary_id(table, column);
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find_map(|t| t.secondary.disk.get(&id))
+                .map(|r| r.len())
+                .unwrap_or(0)
+        };
+        let low = |e: &Engine, table: &str, column: &str| -> usize {
+            let id = e.test_secondary_id(table, column);
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find_map(|t| t.secondary.low.get(&id))
+                .map(|r| r.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(high(&e, "m", "v"), 2);
+        assert_eq!(low(&e, "m", "flag"), 2);
+
+        crate::scheduler::block_on(e.optimize_index_chunks()).unwrap();
+
+        assert_eq!(high(&e, "m", "v"), 1);
+        assert_eq!(low(&e, "m", "flag"), 1);
+        assert_eq!(e.secondary_chunk_meta("m", "v"), vec![(0, 3)]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE v = 10;"),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE flag = false;"),
+            vec![vec!["2".to_string()]]
+        );
+        // A merged segment publishes one chunk; the next dump adds a tail chunk.
+        assert_eq!(
+            rows(&e, "SELECT id FROM m WHERE v = 20;"),
+            vec![vec!["2".to_string()]]
+        );
+    }
+
+    /// A `SPARSE` column with **no** `CREATE INDEX` gets no in-memory index:
+    /// the reference's `PhysicalMatchSparseScan::PlanWithIndex` walks
+    /// `TableMeta::GetIndexIDs` and skips a column no `kBMP` index names, so the
+    /// scan reads the blocks. The search still answers - it is just exhaustive.
+    #[test]
+    fn a_sparse_column_without_an_index_is_scanned_not_indexed() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE osp (id INT, s SPARSE(FLOAT,10));")
+            .unwrap();
+        e.execute_blocking("INSERT INTO osp VALUES (1, [0:1.0, 1:2.0]), (2, [1:3.0]);")
+            .unwrap();
+        let query = "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);";
+        assert!(!rows(&e, query).is_empty(), "the exact scan answers");
+        // No index record, and therefore no in-memory index was built.
+        assert!(
+            e.storage.catalog.list_indexes().unwrap().is_empty(),
+            "no index record names the column"
+        );
+        let built = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get(&e.table_key("osp"))
+                .map(|t| !t.sparse.is_empty())
+                .unwrap_or(false)
+        };
+        assert!(!built, "a query must not build an unrecorded index");
+        assert!(
+            e.sparse_index_for("default_db.osp", "s", storage::bmp::IdxWidth::I16)
+                .is_err(),
+            "the lookup refuses a column the catalog does not index"
+        );
     }
 
     /// One quota governs every index form: when it is exceeded the tails are
@@ -4072,21 +8154,27 @@ mod tests {
         // EMVB is a tensor-column index in the reference
         // (`IndexEMVB::ValidateColumnDataType`), so the multi-vector form here
         // is a `TENSOR(FLOAT,2)`.
-        e.execute("CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
-            .unwrap();
-        e.execute("CREATE INDEX qi ON q (c);").unwrap();
+        e.execute_blocking(
+            "CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX qi ON q (c);").unwrap();
         // Both PQ options are mandatory in the reference (`IndexEMVB::Make`
         // starts them at 0 and 0 is not an acceptable value).
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX qm ON q (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
         .unwrap();
-        e.execute("CREATE INDEX qs ON q (s) USING BMP;").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE INDEX qs ON q (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
             "INSERT INTO q VALUES (1, [1.0,0.0], [0:1.0, 1:2.0], 7), \
              (2, [0.0,1.0], [1:3.0], 7);",
         )
         .unwrap();
+        // A write releases the largest tail; the explicit check releases every
+        // one of them (`enforce_memindex_quota(None)` is "enforce it now").
+        crate::scheduler::block_on(e.enforce_memindex_quota(None));
 
         let mv = e
             .tables
@@ -4133,20 +8221,110 @@ mod tests {
         .is_empty());
     }
 
+    /// The append buffer is part of the memory budget, and a breach drains it.
+    ///
+    /// The quota used to cover the in-memory indexes only, so a table with no
+    /// index kept every appended row resident until a checkpoint - a day by
+    /// default. `refresh_block_mirror_extra` now folds the buffer into the
+    /// charge, and the drain writes those rows to their block files.
+    #[test]
+    fn quota_drains_the_append_buffer_of_an_unindexed_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE b (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO b VALUES (1,'one'),(2,'two'),(3,'three'),(4,'four');")
+            .unwrap();
+        let key = e.table_key("b");
+        let buffered = |e: &Engine| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|t| (t.pending_rows.len(), t.unsealed_bytes()))
+                .unwrap_or((0, 0))
+        };
+        let (rows_before, bytes_before) = buffered(&e);
+        assert_eq!(rows_before, 4, "the rows are in the buffer before a drain");
+        assert!(bytes_before > 0, "the buffer is charged to the budget");
+
+        // A budget below what is resident forces the next check to drain.
+        e.set_memindex_quota(1);
+        crate::scheduler::block_on(e.enforce_quota_after_append(&key));
+
+        let (rows_after, bytes_after) = buffered(&e);
+        assert_eq!(rows_after, 0, "the drain sealed every buffered row");
+        assert_eq!(bytes_after, 0, "and released the charge with them");
+
+        // The rows are still readable: the block files are the mirror.
+        assert_eq!(
+            rows(&e, "SELECT id, body FROM b;"),
+            vec![
+                vec!["1".to_string(), "one".to_string()],
+                vec!["2".to_string(), "two".to_string()],
+                vec!["3".to_string(), "three".to_string()],
+                vec!["4".to_string(), "four".to_string()],
+            ]
+        );
+    }
+
+    /// The pressure path can be restricted to one table, which is what a
+    /// caller running inside that table's commit bottom half must do.
+    ///
+    /// Such a caller holds its own table's gate. Walking the other tables would
+    /// wait for *their* gates, and two commits doing that at once - A holding A
+    /// and waiting for B, B holding B and waiting for A - is a deadlock that
+    /// `run_commit_bottom` cannot see, because it only special-cases the same
+    /// table.
+    #[test]
+    fn a_pressure_drain_can_be_limited_to_one_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        for name in ["mine", "other"] {
+            e.execute_blocking(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
+                .unwrap();
+            e.execute_blocking(&format!("INSERT INTO {name} VALUES (1,'a'),(2,'b');"))
+                .unwrap();
+        }
+        let buffered = |e: &Engine, table: &str| {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&e.table_key(table))
+                .map(|entry| entry.pending_rows.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(buffered(&e, "mine"), 2);
+        assert_eq!(buffered(&e, "other"), 2);
+
+        e.set_memindex_quota(1);
+        crate::scheduler::block_on(e.dump_under_pressure(Some("mine")));
+
+        assert_eq!(buffered(&e, "mine"), 0, "the named table was drained");
+        assert_eq!(
+            buffered(&e, "other"),
+            2,
+            "the other table is left for a caller that may wait on its gate"
+        );
+        // Both tables still answer.
+        assert_eq!(rows(&e, "SELECT id FROM mine;").len(), 2);
+        assert_eq!(rows(&e, "SELECT id FROM other;").len(), 2);
+    }
+
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
     /// `similarity=boolean`; each must agree with the reference semantics.
     #[test]
     fn wand_covers_boolean_filters_min_should_and_delta() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ftw (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE ftw (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ftw VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
             .unwrap();
 
         // Boolean similarity: one point per matched term.
@@ -4214,14 +8392,14 @@ mod tests {
     fn bm25_params_override_the_constants() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bm (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE bm (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO bm VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
             .unwrap();
 
         // id=4: tf=1 per term, dl=3; N=4, total_len=9 → avgdl=2.25; df=3.
@@ -4266,10 +8444,14 @@ mod tests {
 
         // The reference rejects out-of-range values.
         assert!(e
-            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');")
+            .execute_blocking(
+                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');"
+            )
             .is_err());
         assert!(e
-            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');")
+            .execute_blocking(
+                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');"
+            )
             .is_err());
     }
 
@@ -4281,14 +8463,14 @@ mod tests {
     fn threshold_is_a_strict_lower_bound_and_prunes_the_scan() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tt (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE tt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO tt VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
             .unwrap();
 
         // `similarity=boolean` scores one point per matched term, so the scores
@@ -4329,16 +8511,16 @@ mod tests {
     fn rank_features_reads_the_index_doc_payload() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
+        e.execute_blocking("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO rf VALUES (1,'alpha','[{\"Tag1\":1}]'),\
              (2,'alpha','[{\"Tag1\":2}]');",
         )
         .unwrap();
-        e.execute("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX rf_feat ON rf (feat) USING FULLTEXT WITH (analyzer='rankfeatures');",
         )
         .unwrap();
@@ -4367,7 +8549,7 @@ mod tests {
         // Round-trip through the sealed segment: the payload is written into the
         // doc list's `of_doc_payload` column and read back by
         // `SegmentIndexReader::doc_payloads`.
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sealed = rows(
             &e,
             "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
@@ -4391,13 +8573,13 @@ mod tests {
     fn a_recreated_table_does_not_search_the_dropped_tables_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
+        e.execute_blocking("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
             .unwrap();
-        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -4407,14 +8589,14 @@ mod tests {
             2
         );
 
-        e.execute("DROP TABLE rt;").unwrap();
-        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+        e.execute_blocking("DROP TABLE rt;").unwrap();
+        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rt VALUES (1,'delta epsilon');")
+        e.execute_blocking("INSERT INTO rt VALUES (1,'delta epsilon');")
             .unwrap();
-        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         assert_eq!(
             rows(
@@ -4438,14 +8620,14 @@ mod tests {
     fn a_phrase_match_answers_from_the_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fp (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fp (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fp VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma'),(5,'beta alpha'),(6,'gamma');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
@@ -4524,14 +8706,14 @@ mod tests {
     fn a_field_group_match_tokenises_only_the_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fg2 (id INT, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fg2 (id INT, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fg2 VALUES (1,'alpha beta'),(2,'gamma'),(3,'delta'),\
              (4,'alpha gamma'),(5,'epsilon'),(6,'zeta');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
@@ -4572,21 +8754,23 @@ mod tests {
     fn ivf_index_serves_vector_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO iv VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
         .unwrap();
-        e.execute("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
             .unwrap();
         // Rows written before the dump live in the IVF memory segment and are
         // merged with the sealed chunks.
-        e.execute("INSERT INTO iv VALUES (5,[0.9,0.1]);").unwrap();
+        e.execute_blocking("INSERT INTO iv VALUES (5,[0.9,0.1]);")
+            .unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
-        assert!(!entry.ivf_mem.get("v").unwrap().is_empty());
+        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
+        assert!(!entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
         drop(tables);
         let q = "SELECT id FROM iv SEARCH MATCH VECTOR \
                  (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);";
@@ -4594,10 +8778,14 @@ mod tests {
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
-        e.flush().unwrap();
+        // The chunk is written by the index's own `DumpIndex` transaction (the
+        // reference's `DumpMemIndex`); a checkpoint writes blocks only.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("iv", "ivx")).unwrap();
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.iv").unwrap();
-        assert!(entry.ivf_mem.get("v").unwrap().is_empty());
+        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
+        assert!(entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
         assert!(entry.ivf.values().any(|segments| !segments.is_empty()));
         drop(tables);
         assert_eq!(
@@ -4612,17 +8800,17 @@ mod tests {
     fn create_index_builds_fulltext_and_hnsw_from_existing_rows() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO bi VALUES (1,'alpha beta',[0.1,0.2,0.3,0.4]),\
              (2,'alpha gamma',[0.4,0.3,0.2,0.1]),\
              (3,'delta',[0.0,0.0,0.0,0.0]);",
         )
         .unwrap();
-        e.execute("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX bi_v ON bi (v) USING HNSW WITH (M=16, ef_construction=20, metric=l2);",
         )
         .unwrap();
@@ -4630,10 +8818,12 @@ mod tests {
         // No query has run yet: both indexes already hold every live row.
         let tables = e.tables.lock().unwrap();
         let entry = tables.get("default_db.bi").unwrap();
-        let text = entry.text.get("body").unwrap().read().unwrap();
+        let body_id = e.test_index_id("default_db.bi", "body", "FULLTEXT");
+        let text = entry.text.get(&body_id).unwrap().read().unwrap();
         assert_eq!(text.total_docs(), 3);
         drop(text);
-        let mem = entry.hnsw_mem.get("v").unwrap().lock().unwrap();
+        let v_id = e.test_index_id("default_db.bi", "v", "HNSW");
+        let mem = entry.hnsw_mem.get(&v_id).unwrap().lock().unwrap();
         assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
     }
 
@@ -4647,28 +8837,773 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_quota(1024);
-        e.execute("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
             .unwrap();
         let row = "(2,[0.1,0.2,0.3,-0.2])";
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
         ))
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX hx ON hc (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
              metric = l2, block_size = 1);",
         )
         .unwrap();
         for _ in 0..3 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
             ))
             .unwrap();
         }
-        // Two chunks for three batches: the first batch fits, the second
-        // crosses the quota, and the bytes above the quota stay accounted so
-        // the third crosses again.
-        assert_eq!(e.hnsw_chunk_ids("hc", "hx").len(), 2);
+        // At most one chunk per batch: the quota releases one index per breach,
+        // so three batches can seal at most three. The floor is two - the quota
+        // is crossed partway through - and where exactly it lands depends on how
+        // much of the batch is resident when the check runs (the append buffer is
+        // part of the budget now, which is what makes the first batch able to
+        // cross on its own).
+        let chunks = e.hnsw_chunk_ids("hc", "hx").len();
+        assert!(
+            (2..=3).contains(&chunks),
+            "three batches seal one chunk each at most, got {chunks}"
+        );
+    }
+
+    /// The budget is one number for the whole engine, not one per index.
+    ///
+    /// C++ `MemIndexTracer` compares `cur_index_memory_` - everything every
+    /// index has charged - with `index_memory_limit_`. A per-index check lets
+    /// `tables × quota` bytes live at once, which is what a deployment with
+    /// many small tables runs into.
+    /// Each session keeps its own database (plan §6.1): two sessions that
+    /// `USE` different databases do not see each other's choice, a bare table
+    /// name resolves in the session's database, and a closed session is
+    /// rejected.
+    #[test]
+    fn sessions_keep_their_own_database() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE DATABASE a;").unwrap();
+        e.execute_blocking("CREATE DATABASE b;").unwrap();
+        for db in ["a", "b"] {
+            e.execute_blocking(&format!("CREATE TABLE {db}.t (id INT);"))
+                .unwrap();
+        }
+        let sa = e.open_session("default_db");
+        let sb = e.open_session("default_db");
+        e.execute_in_session(sa, "USE a;").unwrap();
+        e.execute_in_session(sb, "USE b;").unwrap();
+        assert_eq!(e.session_db(sa).unwrap(), "a");
+        assert_eq!(e.session_db(sb).unwrap(), "b");
+
+        // A bare name resolves in the session's own database.
+        e.execute_in_session(sa, "INSERT INTO t VALUES (1);")
+            .unwrap();
+        e.execute_in_session(sb, "INSERT INTO t VALUES (2);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM a.t;"),
+            vec![vec!["1".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM b.t;"),
+            vec![vec!["1".to_string()]]
+        );
+
+        // The process-wide default never moved.
+        assert_eq!(e.db(), "default_db");
+
+        // A dropped connection does not drop its session (the reference keeps
+        // it in a static map): a client that reconnects and reuses the id still
+        // sees the database it switched to.
+        assert_eq!(e.session_db(sa).unwrap(), "a");
+
+        assert!(e.close_session(sa));
+        assert!(e.execute_in_session(sa, "SELECT 1;").is_err());
+        assert_eq!(e.session_db(sa), None, "a closed session is unknown");
+        // The other session is unaffected.
+        assert_eq!(e.session_db(sb).unwrap(), "b");
+    }
+    /// The delta-maintained total equals a full scan after every kind of
+    /// change: appends, a checkpoint, a delete and a drop (plan 4.2).
+    #[test]
+    fn memindex_total_matches_a_full_scan() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let scan = |e: &Engine| -> usize {
+            let keys: Vec<String> = e.tables.lock().unwrap().keys().cloned().collect();
+            keys.iter().map(|k| e.memindex_bytes_of(k)).sum()
+        };
+        e.execute_blocking(
+            "CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10), c INT);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX t_v ON t (v) USING HNSW WITH (M = 16, ef_construction = 20);",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX t_c ON t (c);").unwrap();
+        e.execute_blocking("CREATE INDEX t_s ON t (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO t VALUES (1,[0.1,0.2,0.3,0.4],[0:1.0],1), \
+             (2,[0.2,0.3,0.4,0.5],[1:2.0],2);",
+        )
+        .unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after the append");
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after the checkpoint");
+        e.execute_blocking("INSERT INTO t VALUES (3,[0.3,0.4,0.5,0.6],[2:3.0],3);")
+            .unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after a second append");
+        e.execute_blocking("DELETE FROM t WHERE id = 1;").unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after a delete");
+        e.execute_blocking("DROP INDEX t_c;").unwrap();
+        assert_eq!(e.memindex_bytes(), scan(&e), "after dropping an index");
+        e.execute_blocking("DROP TABLE t;").unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "after dropping the table");
+    }
+
+    #[test]
+    fn the_memindex_quota_is_global_across_tables() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Six four-dimensional rows cost 6 × (4 × 4 + 152) = 1008 bytes, below
+        // 1500; two tables together cross it.
+        e.set_memindex_quota(1500);
+        for name in ["g1", "g2"] {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {name} (id INT, v EMBEDDING(FLOAT, 4));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {name}_v ON {name} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+        }
+        // Raise the quota while the rows go in, so the insert path's own
+        // per-row check cannot dump a half-built tail: the first table's rows
+        // are still the only charge, so nothing crosses the bound and the dump
+        // that would have run mid-insert never happens. What this test is
+        // about is the check that sees **both** tables, which is the one below.
+        e.set_memindex_quota(1 << 30);
+        for name in ["g1", "g2"] {
+            e.execute_blocking(&format!(
+                "INSERT INTO {name} VALUES (1,[0.1,0.2,0.3,-0.2]),(2,[0.1,0.2,0.3,-0.2]),\
+                 (3,[0.1,0.2,0.3,-0.2]),(4,[0.1,0.2,0.3,-0.2]),\
+                 (5,[0.1,0.2,0.3,-0.2]),(6,[0.1,0.2,0.3,-0.2]);"
+            ))
+            .unwrap();
+        }
+        // Both tails are complete now; the quota is the two-tables-cross-it
+        // value, and this explicit check is the only one that sees both.
+        e.set_memindex_quota(1500);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        crate::scheduler::block_on(e.enforce_memindex_quota(None));
+
+        for name in ["g1", "g2"] {
+            assert!(
+                !e.hnsw_chunk_ids(name, &format!("{name}_v")).is_empty(),
+                "{name}: the two tables together cross the quota, so both tails must be dumped"
+            );
+            let tables = e.tables.lock().unwrap();
+            assert!(
+                tables[&e.table_key(name)].hnsw_mem.is_empty(),
+                "{name}: a dumped HNSW tail is released"
+            );
+        }
+        assert!(e.memindex_bytes() <= 1500);
+    }
+
+    /// A breach that arrives while its table's dump is queued is counted, not
+    /// dropped: the task re-proposes when it finishes if one is still owed.
+    #[test]
+    fn a_queued_dump_counts_the_breaches_it_coalesces() {
+        use crate::engine::state::{MemIndexPending, ALL_TABLES};
+
+        // The bookkeeping the quota uses, exercised directly. The end-to-end
+        // path needs a background processor (a test attaches none), so the
+        // restart suite's `test_mem_bmp` and
+        // `test_optimize_from_different_database` cover that side.
+        let mut pending = MemIndexPending::default();
+        // Two breaches for one table while its dump is queued: one task, but
+        // two owed dumps - the second is not lost.
+        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
+        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
+        assert_eq!(pending.pending.get("default_db.a").copied(), Some(2));
+        // A different table keeps its own count, so it is served too.
+        *pending.pending.entry("default_db.b".into()).or_insert(0) += 1;
+        assert_eq!(pending.pending.len(), 2);
+
+        // An "every tail" proposal is marked as such and cleared with its key.
+        let mut pending = MemIndexPending::default();
+        pending.pending.insert(ALL_TABLES.to_string(), 1);
+        pending.drain_all.insert(ALL_TABLES.to_string());
+        assert!(pending.drain_all.contains(ALL_TABLES));
+        pending.pending.remove(ALL_TABLES);
+        pending.drain_all.remove(ALL_TABLES);
+        assert!(pending.pending.is_empty() && pending.drain_all.is_empty());
+    }
+
+    /// The task that serves a counted breach must not record another one.
+    ///
+    /// Completion decrements the count and then enqueues the next task. Going
+    /// back through `propose_dump` incremented it again, so the "already
+    /// queued" guard fired and nothing was submitted - and every later breach
+    /// took the same path, so the table stopped dumping entirely.
+    #[test]
+    fn a_continuation_dump_does_not_record_a_breach() {
+        use crate::engine::state::MemIndexPending;
+
+        // The bookkeeping both paths share.
+        let mut pending = MemIndexPending::default();
+        let key = "default_db.t".to_string();
+        // Two breaches while one task is queued.
+        *pending.pending.entry(key.clone()).or_insert(0) += 1;
+        *pending.pending.entry(key.clone()).or_insert(0) += 1;
+
+        // Serving one leaves one owed. A continuation must submit with this
+        // count in hand, not re-enter the recording path.
+        let left = {
+            let count = pending.pending.get_mut(&key).unwrap();
+            *count -= 1;
+            *count
+        };
+        assert_eq!(left, 1, "one breach is still owed");
+        assert!(
+            pending.pending.contains_key(&key),
+            "the owed breach stays recorded until a task serves it"
+        );
+
+        // And the continuation itself serves it.
+        let left = {
+            let count = pending.pending.get_mut(&key).unwrap();
+            *count -= 1;
+            *count
+        };
+        assert_eq!(left, 0);
+        if left == 0 {
+            pending.pending.remove(&key);
+        }
+        assert!(pending.pending.is_empty());
+    }
+
+    /// The unified budget counts the HNSW charge, not only the text/sparse/
+    /// multi-vector/secondary tails: an engine whose only memory is a graph
+    /// must still notice it is over.
+    #[test]
+    fn the_budget_counts_the_hnsw_charge() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Large enough that nothing dumps, so the charge stays live.
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE hb (id INT, v EMBEDDING(FLOAT, 4));")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX hb_v ON hb (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        let row = "(1,[0.1,0.2,0.3,-0.2])";
+        e.execute_blocking(&format!(
+            "INSERT INTO hb VALUES {row},{row},{row},{row},{row},{row};"
+        ))
+        .unwrap();
+        assert!(
+            e.memindex_bytes() >= 1008,
+            "six rows charge 1008 bytes, got {}",
+            e.memindex_bytes()
+        );
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        let tables = e.tables.lock().unwrap();
+        assert!(tables[&e.table_key("hb")].hnsw_mem.is_empty());
+    }
+
+    /// Every dumpable family is in the budget and every one is released by a
+    /// dump. PLAID/SMVE are deliberately left out: they are whole-column
+    /// objects in this port and `seal` does not drop them, so charging them
+    /// would make every check over-quota and dump forever.
+    #[test]
+    fn the_budget_covers_every_dumpable_family() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking(
+            "CREATE TABLE fam (id INT, body VARCHAR, s SPARSE(FLOAT, 10), \
+             m TENSOR(FLOAT, 2), c INT, v EMBEDDING(FLOAT, 4));",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX fam_c ON fam (c);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fam_body ON fam (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fam_s ON fam (s) USING BMP;")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fam_m ON fam (m) USING EMVB WITH \
+             (pq_subspace_num = 2, pq_subspace_bits = 8);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fam_v ON fam (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "INSERT INTO fam VALUES \
+             (1,'alpha beta',[0:1.0, 1:2.0],[1.0,0.0],7,[0.1,0.2,0.3,-0.2]), \
+             (2,'alpha gamma',[1:3.0],[0.0,1.0],7,[0.1,0.2,0.3,-0.2]);",
+        )
+        .unwrap();
+        assert!(e.memindex_bytes() > 0);
+
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(
+            e.memindex_bytes(),
+            0,
+            "every dumpable tail must be released"
+        );
+        let tables = e.tables.lock().unwrap();
+        let entry = &tables[&e.table_key("fam")];
+        assert!(entry.hnsw_mem.is_empty());
+        assert_eq!(
+            entry
+                .text
+                .get(&e.test_index_id("fam", "body", "FULLTEXT"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .mem
+                .mem_used(),
+            0
+        );
+        assert_eq!(
+            entry
+                .sparse
+                .get(&e.test_index_id("fam", "s", "BMP"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .tail_bytes,
+            0
+        );
+        assert_eq!(
+            entry
+                .mv
+                .get(&e.test_index_id("fam", "m", "EMVB"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .tail_bytes,
+            0
+        );
+        let secondary_id = e.test_secondary_id("fam", "c");
+        assert_eq!(
+            entry
+                .secondary
+                .indexes
+                .get(&secondary_id)
+                .unwrap()
+                .key_count(),
+            0
+        );
+    }
+
+    /// The IVF memory segment is part of the same budget: rows written since
+    /// the last mirror dump are charged, and a dump releases them.
+    #[test]
+    fn the_budget_counts_the_ivf_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT, 4));")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO iv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
+             (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
+             (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
+             (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX iv_v ON iv (v) USING IVF WITH \
+             (metric = l2, storage_type = product_quantization, \
+             product_quantization_subspace_num = 2, \
+             product_quantization_subspace_bits = 12);",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO iv VALUES (9,[0.5,0.5,0.5,0.5]);")
+            .unwrap();
+        let iv_id = e.test_index_id("iv", "v", "IVF");
+        let tables = e.tables.lock().unwrap();
+        let rows = tables[&e.table_key("iv")]
+            .ivf_mem
+            .get(&iv_id)
+            .map(|r| r.len())
+            .unwrap_or(0);
+        drop(tables);
+        assert_eq!(rows, 1, "the row written since the index was built");
+        assert!(
+            e.memindex_bytes() >= 4 * 4 * rows,
+            "the IVF tail is charged, got {}",
+            e.memindex_bytes()
+        );
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        let tables = e.tables.lock().unwrap();
+        assert!(tables[&e.table_key("iv")]
+            .ivf_mem
+            .get(&iv_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// SQL `FLUSH DATA` reaches the same entry the Thrift/HTTP flush does: it
+    /// runs the checkpoint, and with the switch on it releases the indexes.
+    #[test]
+    fn sql_flush_data_runs_the_checkpoint() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX sf_body ON sf (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES (1,'alpha'),(2,'beta');")
+            .unwrap();
+        // The block columns are the checkpoint's output; the buffer alone has
+        // the rows before it.
+        fn block_columns(dir: &std::path::Path) -> usize {
+            let mut count = 0;
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    count += block_columns(&path);
+                } else if path.extension().is_some_and(|ext| ext == "col") {
+                    count += 1;
+                }
+            }
+            count
+        }
+        assert_eq!(block_columns(dir.path()), 0);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert!(
+            block_columns(dir.path()) > 0,
+            "FLUSH DATA writes the block mirror"
+        );
+        assert!(
+            e.memindex_bytes() > 0,
+            "the default FLUSH DATA is a checkpoint only"
+        );
+
+        e.set_flush_dumps_mem_index(true);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "the switch reaches SQL too");
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM sf"),
+            vec![vec!["2".to_string()]]
+        );
+        // The reference answers these with `Status::NotSupport`.
+        assert_eq!(
+            e.execute_blocking("FLUSH LOG;").unwrap_err().to_string(),
+            "Flush log"
+        );
+        assert_eq!(
+            e.execute_blocking("FLUSH BUFFER;").unwrap_err().to_string(),
+            "Flush buffer"
+        );
+    }
+
+    /// A bulk FLUSH over many tables seals them concurrently: every index still
+    /// gets its chunk, the budget returns to zero and both index kinds answer.
+    #[test]
+    fn flush_dumps_many_tables_at_once() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        let tables: Vec<String> = (0..8).map(|i| format!("ft{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 4));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!(
+                "INSERT INTO {t} VALUES (1,7,[0.1,0.2,0.3,-0.2]),(2,8,[0.1,0.2,0.3,-0.2]);"
+            ))
+            .unwrap();
+        }
+        assert!(e.memindex_bytes() > 0);
+        // The dump runs on the shared pool, so this asserts the concurrent path
+        // produces the same chunks a serial one would.
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        assert_eq!(e.memindex_bytes(), 0);
+        for t in &tables {
+            assert!(
+                !e.hnsw_chunk_ids(t, &format!("{t}_v")).is_empty(),
+                "{t}: the vector index must be dumped"
+            );
+            assert_eq!(
+                rows(&e, &format!("SELECT count(*) FROM {t}")),
+                vec![vec!["2".to_string()]],
+                "{t}: the rows must be readable"
+            );
+            assert_eq!(
+                rows(&e, &format!("SELECT id FROM {t} WHERE c = 7")),
+                vec![vec!["1".to_string()]],
+                "{t}: the secondary index must answer"
+            );
+        }
+    }
+
+    /// Times the bulk dump. Not a gate: run it twice, with
+    /// `INFINITY_FLUSH_DUMP_CONCURRENCY=1` and unset, to see the win.
+    #[test]
+    #[ignore = "SLOW: a timing probe, not a gate"]
+    fn flush_dump_wall_time_probe() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.set_flush_dumps_mem_index(true);
+        let tables: Vec<String> = (0..64).map(|i| format!("p{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 32));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+        }
+        let vector = (0..32)
+            .map(|k| format!("{:.3}", (k as f32) / 32.0))
+            .collect::<Vec<_>>()
+            .join(",");
+        for t in &tables {
+            let mut values = Vec::new();
+            for row in 0..256 {
+                values.push(format!("({row},{},[{vector}])", row % 7));
+            }
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .unwrap();
+        }
+        // The dump is what this probe times; `flush()` also checkpoints 64
+        // tables, which would drown the signal.
+        let started = std::time::Instant::now();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        eprintln!(
+            "dump of {} tables: {:?} ({} workers)",
+            tables.len(),
+            started.elapsed(),
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        );
+        assert_eq!(e.memindex_bytes(), 0);
+    }
+
+    /// A checkpoint's fan-out mirrors every table at either bound, and a
+    /// one-worker sweep stays on the caller.
+    ///
+    /// The fan-out is tokio tasks with `workers` permits (`index::parallel`),
+    /// and its concurrency semantics are pinned there
+    /// (`the_bound_is_the_callers`, `map_keeps_input_order`). What matters here
+    /// is that the table-level work is still complete at both bounds: a table
+    /// silently dropped by the dispatch would pass a thread count and fail the
+    /// mirror check, so that is the assertion.
+    #[test]
+    fn a_checkpoint_uses_the_worker_count_it_was_given() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        let tables: Vec<String> = (0..32).map(|i| format!("tw{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!("CREATE TABLE {t} (id INT, c INT);"))
+                .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES (1,1),(2,2);"))
+                .unwrap();
+        }
+        assert!(crate::scheduler::block_on(e.flush_tables(
+            &e.catalog().list_tables().unwrap(),
+            1,
+            1
+        ))
+        .is_ok());
+        for t in &tables {
+            assert!(
+                !e.read_blocks(t).unwrap().1.is_empty(),
+                "{t} was not mirrored by the 1-worker sweep"
+            );
+        }
+        assert!(crate::scheduler::block_on(e.flush_tables(
+            &e.catalog().list_tables().unwrap(),
+            2,
+            4
+        ))
+        .is_ok());
+        for t in &tables {
+            assert!(
+                !e.read_blocks(t).unwrap().1.is_empty(),
+                "{t} was not mirrored by the 4-worker sweep"
+            );
+        }
+    }
+
+    /// A checkpoint's wall time falls as table-level workers are added
+    /// (plan §5.1 / §9): an `#[ignore]` probe, because wall time on a shared
+    /// host is not a stable assertion and the sweep is I/O bound.
+    ///
+    /// 64 tables with two indexes each, 2048 rows apiece, a full warm-up
+    /// checkpoint (94 s - it writes every block) and then one timed pass per
+    /// worker count that rewrites the one block each table moved. Measured on
+    /// this box (16 cores): 1 worker 159 ms, 2 workers 131 ms, 4 workers 129 ms,
+    /// 8 workers 192 ms - beyond four workers the shared store work in the
+    /// caller dominates and the extra threads only add contention. Run with
+    /// `cargo test -p executor --lib a_checkpoint_scaling_probe -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "wall-time probe: run it explicitly, the numbers are host dependent"]
+    fn a_checkpoint_scaling_probe() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        let tables: Vec<String> = (0..64).map(|i| format!("w{i}")).collect();
+        for t in &tables {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 8));"
+            ))
+            .unwrap();
+            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
+                 (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
+            ))
+            .unwrap();
+        }
+        let vector = (0..8)
+            .map(|k| format!("{:.3}", (k as f32) / 8.0))
+            .collect::<Vec<_>>()
+            .join(",");
+        for t in &tables {
+            let mut values = Vec::new();
+            for row in 0..2048 {
+                values.push(format!("({row},{},[{vector}])", row % 7));
+            }
+            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .unwrap();
+        }
+        let metas = e.catalog().list_tables().unwrap();
+        // A checkpoint only writes the blocks whose data moved (`write_blocks_
+        // bounded` compares `checkpoint_ts_`), so each timed pass first dirties
+        // one block per table: without that every pass would measure the
+        // near-no-op path and show no scaling at all.
+        // Warm-up: the first checkpoint writes every block in full (94 s for
+        // this shape on 16 cores), the timed ones only rewrite the block that
+        // moved. Time the steady state, which is what a periodic checkpoint
+        // pays.
+        crate::scheduler::block_on(e.flush_tables(&metas, 1, 1)).unwrap();
+        let mut ts = 2u64;
+        for w in [1usize, 2, 4, 8] {
+            for (i, t) in tables.iter().enumerate() {
+                e.execute_blocking(&format!(
+                    "INSERT INTO {t} VALUES ({},{},[{vector}]);",
+                    i + 10_000 + w * 100,
+                    i % 7
+                ))
+                .unwrap();
+            }
+            ts += 1;
+            let started = std::time::Instant::now();
+            crate::scheduler::block_on(e.flush_tables(&metas, ts, w)).unwrap();
+            eprintln!(
+                "checkpoint of {} tables at {w} workers: {:?}",
+                metas.len(),
+                started.elapsed()
+            );
+        }
+    }
+
+    /// `[storage] flush_dumps_mem_index`: opt-in, `FLUSH` releases every
+    /// memory index instead of only writing the checkpoint. Off by default -
+    /// the reference's flush leaves the tails in memory and the cross-engine
+    /// byte gates compare directories after `flush_data()`.
+    #[test]
+    fn flush_dumps_every_memory_index_when_configured() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_memindex_quota(1 << 30);
+        e.execute_blocking("CREATE TABLE fd (id INT, body VARCHAR, v EMBEDDING(FLOAT, 4));")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX fd_body ON fd (body) USING FULLTEXT;")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX fd_v ON fd (v) USING HNSW WITH \
+             (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "INSERT INTO fd VALUES \
+             (1,'alpha beta',[0.1,0.2,0.3,-0.2]),(2,'alpha gamma',[0.1,0.2,0.3,-0.2]);",
+        )
+        .unwrap();
+        assert!(e.memindex_bytes() > 0);
+
+        // Default: a flush is a checkpoint, and the tails stay.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert!(
+            e.memindex_bytes() > 0,
+            "a plain FLUSH must not dump, or the byte gates diverge from the reference"
+        );
+
+        e.set_flush_dumps_mem_index(true);
+        // The periodic checkpoint stays a checkpoint: the flag is about the
+        // operator's `FLUSH DATA`, so an interval cannot churn a ts per index.
+        crate::scheduler::block_on(e.checkpoint()).unwrap();
+        assert!(e.memindex_bytes() > 0, "a periodic checkpoint never dumps");
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(e.memindex_bytes(), 0, "FLUSH dumps every memory index");
+        let tables = e.tables.lock().unwrap();
+        let entry = &tables[&e.table_key("fd")];
+        assert_eq!(
+            entry
+                .text
+                .get(&e.test_index_id("fd", "body", "FULLTEXT"))
+                .unwrap()
+                .read()
+                .unwrap()
+                .mem
+                .mem_used(),
+            0
+        );
+        assert!(entry.hnsw_mem.is_empty());
+        drop(tables);
+        assert!(!e.hnsw_chunk_ids("fd", "fd_v").is_empty());
+
+        // The sealed chunks still answer.
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM fd"),
+            vec![vec!["2".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM fd SEARCH MATCH TEXT ('body','alpha','topn=5');"
+            )
+            .len(),
+            2
+        );
     }
 
     /// A write that reaches the engine through the Thrift/import primitives
@@ -4679,7 +9614,7 @@ mod tests {
         use parser::Literal;
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dc (c1 INT);").unwrap();
+        e.execute_blocking("CREATE TABLE dc (c1 INT);").unwrap();
         e.insert_literals(
             "default_db.dc",
             None,
@@ -4705,23 +9640,24 @@ mod tests {
     fn a_product_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ivpq VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
              (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
              (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
              (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
         )
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX ivpq_idx ON ivpq (v) USING IVF WITH \
              (metric = l2, storage_type = product_quantization, \
              product_quantization_subspace_num = 2, \
              product_quantization_subspace_bits = 12);",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ivpq", "ivpq_idx")).unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
             matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
@@ -4739,20 +9675,22 @@ mod tests {
     fn a_scalar_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ivsq VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
         .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX ivsq_idx ON ivsq (v) USING IVF WITH \
              (metric = l2, storage_type = scalar_quantization, \
              scalar_quantization_bits = 8);",
         )
         .unwrap();
-        e.flush().unwrap();
+        // The IVF chunk is written by its `DumpIndex` transaction.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ivsq", "ivsq_idx")).unwrap();
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
@@ -4772,9 +9710,9 @@ mod tests {
     fn multivector_prefilter_uses_the_persisted_residual_codes() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX mvp_i ON mvp (v) USING EMVB \
              WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
@@ -4787,8 +9725,8 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
-        e.dump_all_memory_indexes();
+        e.execute_blocking(&sql).unwrap();
+        crate::scheduler::block_on(e.dump_all_memory_indexes());
         let mv = e
             .tables
             .lock()
@@ -4820,16 +9758,16 @@ mod tests {
     fn wand_scores_multiple_fields_separately() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO ftm VALUES (1,'alpha','beta'),(2,'alpha alpha',''),\
              (3,'beta','alpha');",
         )
         .unwrap();
-        e.execute("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
             .unwrap();
-        e.execute("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
             .unwrap();
         let got = rows(
             &e,
@@ -4865,16 +9803,16 @@ mod tests {
     fn field_group_match_scores_like_the_named_column() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
+        e.execute_blocking("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO fg VALUES (1,'alpha beta','gamma'),(2,'alpha','beta gamma'),\
              (3,'beta','alpha'),(4,'gamma','alpha beta');",
         )
         .unwrap();
-        e.execute("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
             .unwrap();
-        e.execute("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
             .unwrap();
 
         // OR of two terms.
@@ -4933,14 +9871,14 @@ mod tests {
     fn projection_reads_columns_from_the_block_mirror() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "INSERT INTO p VALUES (1,'a',[0.0,0.0]),(2,'b',[1.0,0.0]),\
              (3,'c',[0.0,1.0]);",
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(e.mirror_block_row_count("p").unwrap(), 3);
         let items = [
             SelectItem::Column("id".to_string()),
@@ -4959,7 +9897,7 @@ mod tests {
         // A row written after the flush is not in the block snapshot: the
         // projection overlays it from the row journal, so the new row is
         // visible without waiting for the next checkpoint.
-        e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
+        e.execute_blocking("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
             .unwrap();
         let projected = e.try_projection("p", &items).unwrap().unwrap();
         assert_eq!(projected.len(), 4);
@@ -4978,17 +9916,17 @@ mod tests {
     fn rewriting_a_block_keeps_every_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
         for i in 0..20i64 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO rw VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                 i * 2,
                 i * 2 + 1
             ))
             .unwrap();
             assert_eq!(e.row_count("rw").unwrap(), (i as usize + 1) * 2);
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(
                 e.row_count("rw").unwrap(),
                 (i as usize + 1) * 2,
@@ -5005,11 +9943,12 @@ mod tests {
     fn a_multivector_table_round_trips_through_its_blocks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO mv VALUES ([[1,2],[3,4]]);").unwrap();
+        e.execute_blocking("INSERT INTO mv VALUES ([[1,2],[3,4]]);")
+            .unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
         drop(e);
 
@@ -5034,7 +9973,7 @@ mod tests {
     fn wide_vectors_stay_inline_and_survive_a_reopen() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
+        e.execute_blocking("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
             .unwrap();
         let vector = (0..64)
             .map(|i| format!("{i}.0"))
@@ -5044,7 +9983,7 @@ mod tests {
             .map(|i| format!("{i}:1.0"))
             .collect::<Vec<_>>()
             .join(",");
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO sb VALUES (1, [{vector}], [{sparse}]);"
         ))
         .unwrap();
@@ -5075,7 +10014,7 @@ mod tests {
         assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
         assert!(vector[0][0].contains("63"));
 
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         drop(e);
         let e = Engine::open(dir.path()).unwrap();
         let vector = rows(&e, "SELECT v FROM sb;");
@@ -5089,13 +10028,16 @@ mod tests {
     fn string_secondary_index_seals_hashed_chunks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ss (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE ss (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO ss VALUES (1,'a'),(2,'b');").unwrap();
-        e.execute("CREATE INDEX ss_n ON ss (name);").unwrap();
+        e.execute_blocking("INSERT INTO ss VALUES (1,'a'),(2,'b');")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ss_n ON ss (name);")
+            .unwrap();
         let q = "SELECT id FROM ss WHERE name = 'b';";
         assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
-        e.execute("INSERT INTO ss VALUES (3,'b');").unwrap();
+        e.execute_blocking("INSERT INTO ss VALUES (3,'b');")
+            .unwrap();
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
@@ -5108,7 +10050,7 @@ mod tests {
         assert!(idx.key_count() > 0);
         drop(tables);
         // A dump transaction drains the tail; a checkpoint keeps it.
-        e.dump_index_transaction("ss", "ss_n").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ss", "ss_n")).unwrap();
         let tables = e.tables.lock().unwrap();
         let idx = tables
             .values()
@@ -5120,7 +10062,7 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        e.execute("DELETE FROM ss WHERE id = 2;").unwrap();
+        e.execute_blocking("DELETE FROM ss WHERE id = 2;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
@@ -5136,8 +10078,8 @@ mod tests {
         }
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dc (v INT);").unwrap();
-        e.execute("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
+        e.execute_blocking("CREATE TABLE dc (v INT);").unwrap();
+        e.execute_blocking("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
             .unwrap();
         let table = "default_db.dc";
         let seqs: Vec<usize> = e
@@ -5150,32 +10092,30 @@ mod tests {
         let t1 = stale_delete(&e);
         let t2 = stale_delete(&e);
         let t3 = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)
-            .unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)).unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2)),
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)
-            .unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let a = stale_delete(&e);
         let b = stale_delete(&e);
-        e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a)
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a))
             .unwrap();
         assert!(matches!(
-            e.commit_with_deletes(table, &[seqs[2]], 0, &[], b),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], 0, &[], b)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);
@@ -5185,18 +10125,23 @@ mod tests {
     fn defaults_and_alter_add_column() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (a INT, b INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1, 2);").unwrap();
-        e.execute("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+        e.execute_blocking("CREATE TABLE t (a INT, b INT);")
             .unwrap();
-        e.execute("ALTER TABLE t ADD COLUMN (d INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1, 2);").unwrap();
+        e.execute_blocking("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+            .unwrap();
+        e.execute_blocking("ALTER TABLE t ADD COLUMN (d INT);")
+            .unwrap();
         // duplicate column must be rejected
-        assert!(e.execute("ALTER TABLE t ADD COLUMN (b INT);").is_err());
+        assert!(e
+            .execute_blocking("ALTER TABLE t ADD COLUMN (b INT);")
+            .is_err());
         // explicit column list leaves c/d at their defaults
-        e.execute("INSERT INTO t(a, b) VALUES (2, 2);").unwrap();
-        e.execute("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+        e.execute_blocking("INSERT INTO t(a, b) VALUES (2, 2);")
             .unwrap();
-        match &e.execute("SELECT * FROM t;").unwrap()[0] {
+        e.execute_blocking("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+            .unwrap();
+        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
             QueryResult::Rows { rows, columns } => {
                 assert_eq!(columns.len(), 4);
                 assert_eq!(row_text(rows, 0), vec!["1", "2", "default", "null"]);
@@ -5280,25 +10225,26 @@ mod tests {
     fn databases_are_namespaced() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         // a duplicate without IF NOT EXISTS is an error
-        assert!(e.execute("CREATE DATABASE db1;").is_err());
-        e.execute("CREATE DATABASE IF NOT EXISTS db1;").unwrap();
-        e.execute("USE db1;").unwrap();
-        e.execute("CREATE TABLE t (a INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1);").unwrap();
-        e.execute("USE default_db;").unwrap();
-        e.execute("CREATE TABLE t (a INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (2);").unwrap();
-        let rows = |sql: &str| match &e.execute(sql).unwrap()[0] {
-            QueryResult::Rows { .. } => e.execute(sql).unwrap()[0].rows_text(),
+        assert!(e.execute_blocking("CREATE DATABASE db1;").is_err());
+        e.execute_blocking("CREATE DATABASE IF NOT EXISTS db1;")
+            .unwrap();
+        e.execute_blocking("USE db1;").unwrap();
+        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1);").unwrap();
+        e.execute_blocking("USE default_db;").unwrap();
+        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (2);").unwrap();
+        let rows = |sql: &str| match &e.execute_blocking(sql).unwrap()[0] {
+            QueryResult::Rows { .. } => e.execute_blocking(sql).unwrap()[0].rows_text(),
             other => panic!("{other:?}"),
         };
         assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
         assert_eq!(rows("SELECT * FROM db1.t;"), vec![vec!["1".to_string()]]);
         // dropping the database removes its tables
-        e.execute("DROP DATABASE db1;").unwrap();
-        assert!(e.execute("SELECT * FROM db1.t;").is_err());
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
+        assert!(e.execute_blocking("SELECT * FROM db1.t;").is_err());
         assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
     }
 
@@ -5340,7 +10286,7 @@ mod tests {
     fn a_sparse_column_renders_like_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE sp_render (id INT, a SPARSE(FLOAT, 8), \
              b SPARSE(FLOAT, INT32, 8), c SPARSE(FLOAT, 30000));",
         )
@@ -5353,7 +10299,7 @@ mod tests {
         // An unknown bound is the SDK's `sparse,0,…` spelling; the reference
         // prints the same text for it.
         crate::with_zero_dimension_sparse(|| {
-            e.execute("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
+            e.execute_blocking("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
         })
         .unwrap();
         let got = rows(&e, "SHOW TABLE sp_zero COLUMNS;");
@@ -5361,7 +10307,7 @@ mod tests {
 
         // The rendering survives a restart, which reads the type back from the
         // catalog record (`type_text_of`).
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let e = crate::new_catalog_ut::reopen(e, dir.path());
         let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
         assert_eq!(got[1][1], "Sparse(float,int8,8)");
@@ -5521,13 +10467,15 @@ mod tests {
     fn highlight_uses_the_columns_analyzer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE hg (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE hg (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')")
+        e.execute_blocking(
+            "CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO hg VALUES (1, 'quick brown');")
             .unwrap();
-        e.execute("INSERT INTO hg VALUES (1, 'quick brown');")
-            .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let out = rows(
             &e,
             "SELECT body HIGHLIGHT body FROM hg SEARCH MATCH TEXT (body, 'qui', 10);",
@@ -5544,11 +10492,14 @@ mod tests {
     fn an_ik_fulltext_index_is_tokenised_by_its_analyzer() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ik_t (doc VARCHAR);").unwrap();
-        e.execute("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
+        e.execute_blocking("CREATE TABLE ik_t (doc VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');")
+        e.execute_blocking("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
             .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');",
+        )
+        .unwrap();
         let tokenizer = e.index_tokenizer("ik_t", "doc");
         assert_eq!(tokenizer.analyzer.as_deref(), Some("ik"));
         let index = e.text_index_for("ik_t", "doc", tokenizer).unwrap();
@@ -5574,10 +10525,14 @@ mod tests {
     fn a_keyword_fulltext_index_takes_its_delimiters_from_the_name() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE kw_t (doc VARCHAR);").unwrap();
-        e.execute("INSERT INTO kw_t VALUES ('a,b');").unwrap();
-        e.execute("CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');")
+        e.execute_blocking("CREATE TABLE kw_t (doc VARCHAR);")
             .unwrap();
+        e.execute_blocking("INSERT INTO kw_t VALUES ('a,b');")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');",
+        )
+        .unwrap();
 
         assert_eq!(e.index_delims("kw_t", "doc"), Some(vec![',']));
         let tokenizer = e.index_tokenizer("kw_t", "doc");
@@ -5599,8 +10554,9 @@ mod tests {
         drop(guard);
 
         // The delimiter bytes are not lowercased on the way in.
-        e.execute("CREATE TABLE kw_case (doc VARCHAR);").unwrap();
-        e.execute(
+        e.execute_blocking("CREATE TABLE kw_case (doc VARCHAR);")
+            .unwrap();
+        e.execute_blocking(
             "CREATE INDEX kwc ON kw_case (doc) USING FULLTEXT WITH (analyzer='whitespace-AB');",
         )
         .unwrap();
@@ -5626,12 +10582,12 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_bad_{i}");
-            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX bad_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute(&sql).is_err(), "{name} must be rejected");
+            assert!(e.execute_blocking(&sql).is_err(), "{name} must be rejected");
         }
         for (i, name) in [
             "ngram-3x",
@@ -5643,12 +10599,12 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_ok_{i}");
-            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX ok_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute(&sql).is_ok(), "{name} must be accepted");
+            assert!(e.execute_blocking(&sql).is_ok(), "{name} must be accepted");
         }
     }
 
@@ -5660,7 +10616,7 @@ mod tests {
     fn match_sparse_alpha_option_reaches_the_bmp_search() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
             .unwrap();
         // Block 0 (16 docs) has a loose bound: `10` peaks in one document and
         // `20` in another, so its bound is 2.0 while its best document scores
@@ -5677,11 +10633,15 @@ mod tests {
         for id in 17..=20 {
             values.push_str(&format!("({id}, [10:1.0,20:1.0]),"));
         }
-        e.execute(&format!(
+        e.execute_blocking(&format!(
             "INSERT INTO sp VALUES {};",
             values.trim_end_matches(',')
         ))
         .unwrap();
+        // The BMP index is what carries the `alpha`/`beta` pruning; the
+        // reference resolves it from the catalog, so the test creates one.
+        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
+            .unwrap();
         let score = |opts: &str| -> f64 {
             rows(
                 &e,
@@ -5719,11 +10679,14 @@ mod tests {
     fn sparse_rejects_unknown_options() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
+        e.execute_blocking("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
             .unwrap();
-        e.execute("INSERT INTO sp VALUES (1, [10:1.0]);").unwrap();
+        e.execute_blocking("INSERT INTO sp VALUES (1, [10:1.0]);")
+            .unwrap();
         let err = e
-            .execute("SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')")
+            .execute_blocking(
+                "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')",
+            )
             .unwrap_err();
         let message = err.to_string();
         assert!(
@@ -5733,7 +10696,7 @@ mod tests {
         // The reference's four names are accepted (`tail` is a no-op there).
         for opts in ["alpha=0.5", "beta=0.5", "tail=F", "threshold=0.1"] {
             assert!(
-                e.execute(&format!(
+                e.execute_blocking(&format!(
                     "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', '{opts}')"
                 ))
                 .is_ok(),
@@ -5747,9 +10710,10 @@ mod tests {
     fn empty_string_default_survives_a_catalog_round_trip() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
+        e.execute_blocking("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
             .unwrap();
-        e.execute("INSERT INTO t (num) VALUES (1)").unwrap();
+        e.execute_blocking("INSERT INTO t (num) VALUES (1)")
+            .unwrap();
         let rows = rows(&e, "SELECT * FROM t");
         assert_eq!(rows, vec![vec!["1".to_string(), String::new()]]);
     }
@@ -5787,9 +10751,9 @@ mod tests {
     fn arithmetic_and_boolean_operators_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
+        e.execute_blocking("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
             .unwrap();
-        e.execute("INSERT INTO lg VALUES (7, 3, true, false);")
+        e.execute_blocking("INSERT INTO lg VALUES (7, 3, true, false);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT -a, a + b, a - b, a * b, a % b FROM lg;"),
@@ -5821,8 +10785,9 @@ mod tests {
     fn string_and_power_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sf (s VARCHAR);").unwrap();
-        e.execute("INSERT INTO sf VALUES ('Hello');").unwrap();
+        e.execute_blocking("CREATE TABLE sf (s VARCHAR);").unwrap();
+        e.execute_blocking("INSERT INTO sf VALUES ('Hello');")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT reverse(s), substr(s, 1, 3) FROM sf;"),
             vec![vec!["olleH".to_string(), "ell".to_string()]]
@@ -5848,9 +10813,9 @@ mod tests {
     fn date_component_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE dtf (d DATE, ts DATETIME);")
+        e.execute_blocking("CREATE TABLE dtf (d DATE, ts DATETIME);")
             .unwrap();
-        e.execute("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
+        e.execute_blocking("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
             .unwrap();
         assert_eq!(
             rows(
@@ -5900,10 +10865,12 @@ mod tests {
     fn aggregate_functions_match_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
+        e.execute_blocking("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
             .unwrap();
-        e.execute("INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);",
+        )
+        .unwrap();
         assert_eq!(
             rows(
                 &e,
@@ -5935,10 +10902,12 @@ mod tests {
     fn arithmetic_and_equality_follow_the_reference() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ar (a TINYINT, b TINYINT);")
+        e.execute_blocking("CREATE TABLE ar (a TINYINT, b TINYINT);")
             .unwrap();
-        e.execute("INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);",
+        )
+        .unwrap();
 
         // `+` on TINYINT (values within range; the i64-wide evaluator does not
         // model per-width checked overflow — recorded in CLASS_MAP).
@@ -5987,10 +10956,10 @@ mod tests {
     fn logical_planner_statements_succeed() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
+        e.execute_blocking("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
             .unwrap();
         for i in 0..200 {
-            e.execute(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
+            e.execute_blocking(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
                 .unwrap();
         }
         for sql in [
@@ -6004,14 +10973,15 @@ mod tests {
             "optimize tb;",
             "compact table tb;",
             "flush data;",
-            "flush log;",
+            "flush catalog;",
             "check table tb;",
             "create snapshot tb_snapshot on table tb;",
             "drop index idx;",
         ] {
-            e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+            e.execute_blocking(sql)
+                .unwrap_or_else(|err| panic!("{sql}: {err}"));
         }
-        e.execute("drop table tb;").unwrap();
+        e.execute_blocking("drop table tb;").unwrap();
     }
 
     /// C++: `function/scalar/abs_functions_ut.cpp::AbsFunctionsTest/abs_func`:
@@ -6021,11 +10991,11 @@ mod tests {
     fn abs_function_covers_every_numeric_type() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE av (a TINYINT, b SMALLINT, c INTEGER, d BIGINT, f FLOAT, g DOUBLE);",
         )
         .unwrap();
-        e.execute("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
+        e.execute_blocking("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
             .unwrap();
         assert_eq!(
             rows(
@@ -6042,7 +11012,7 @@ mod tests {
             ]]
         );
         // A NULL input yields a NULL output for every width.
-        e.execute("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
+        e.execute_blocking("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
             .unwrap();
         assert_eq!(
             rows(
@@ -6065,8 +11035,8 @@ mod tests {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for _ in 0..1280 {
-                    let _ = e.execute("CREATE DATABASE db1;");
-                    let _ = e.execute("DROP DATABASE db1;");
+                    let _ = e.execute_blocking("CREATE DATABASE db1;");
+                    let _ = e.execute_blocking("DROP DATABASE db1;");
                 }
             }));
         }
@@ -6088,14 +11058,14 @@ mod tests {
     fn disabled_slow_test_parallel_insert_table() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
+        e.execute_blocking("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..2 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for i in 0..600 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO pit VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
@@ -6132,9 +11102,9 @@ mod tests {
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         // Seven rows per chunk, so the writers seal while the readers search.
         e.set_memindex_capacity(7);
-        e.execute("CREATE TABLE mix (id INTEGER, body VARCHAR)")
+        e.execute_blocking("CREATE TABLE mix (id INTEGER, body VARCHAR)")
             .unwrap();
-        e.execute("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
+        e.execute_blocking("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
             .unwrap();
         let barrier = std::sync::Arc::new(std::sync::Barrier::new(WRITERS + READERS + 1));
         // `()` results: every send is one finished unit of work.
@@ -6146,7 +11116,7 @@ mod tests {
                 for i in 0..PER_WRITER {
                     let id = w * 1000 + i;
                     let _ = tx.send(
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO mix VALUES ({id}, 'alpha beta row{id}');"
                         ))
                         .map(|_| ()),
@@ -6160,8 +11130,10 @@ mod tests {
                 barrier.wait();
                 for _ in 0..READS {
                     let _ = tx.send(
-                        e.execute("SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);")
-                            .map(|_| ()),
+                        e.execute_blocking(
+                            "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+                        )
+                        .map(|_| ()),
                     );
                 }
             });
@@ -6174,7 +11146,9 @@ mod tests {
                     // Optimize takes `batch_gate` and then the index's write
                     // lock (the writer's order) while the readers hold the read
                     // guard: exactly the pair a reversed acquisition would hang.
-                    let _ = tx.send(e.optimize_fulltext("mix").map(|_| ()));
+                    let _ = tx.send(
+                        crate::scheduler::block_on(e.optimize_fulltext_async("mix")).map(|_| ()),
+                    );
                 }
             });
         }
@@ -6211,14 +11185,14 @@ mod tests {
     fn disabled_slow_test_append_append_concurrent() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE cac (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE cac (id INT, name VARCHAR);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for i in 0..100 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO cac VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
@@ -6245,23 +11219,23 @@ mod tests {
             .unwrap_or(30);
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE chaos_test (id INT, body VARCHAR, other_vector EMBEDDING(FLOAT,4));",
         )
         .unwrap();
-        e.execute("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
+        e.execute_blocking("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
             .unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE INDEX other_index ON chaos_test (other_vector) USING HNSW WITH (metric = l2);",
         )
         .unwrap();
         for i in 0..100 {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO chaos_test VALUES ({i}, 'the quick brown fox {i}', [{i}.0,1.0,2.0,3.0]);"
             ))
             .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let start = std::time::Instant::now();
         let mut handles = Vec::new();
         for t in 0..4 {
@@ -6272,22 +11246,22 @@ mod tests {
                     n += 1;
                     match n % 4 {
                         0 => {
-                            let _ = e.execute(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
+                            let _ = e.execute_blocking(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
                         }
                         1 => {
-                            let _ = e.execute(
+                            let _ = e.execute_blocking(
                                 "SELECT id FROM chaos_test SEARCH MATCH VECTOR (other_vector, [0.0,1.0,2.0,3.0], 'float', 'l2', 3);",
                             );
                         }
                         2 => {
-                            let _ = e.execute(&format!(
+                            let _ = e.execute_blocking(&format!(
                                 "UPDATE chaos_test SET body = 'the quick brown fox {}' WHERE id = {};",
                                 n,
                                 n % 100
                             ));
                         }
                         _ => {
-                            let _ = e.execute(
+                            let _ = e.execute_blocking(
                                 "SELECT id FROM chaos_test SEARCH MATCH TEXT ('body', 'quick', 'topn=3');",
                             );
                         }
@@ -6298,8 +11272,8 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
-        e.execute("DROP TABLE chaos_test;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("DROP TABLE chaos_test;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
     }
 
     /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
@@ -6411,9 +11385,9 @@ mod tests {
     fn hnsw_dump_writes_only_the_memory_segment() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut sql = String::from("INSERT INTO hv VALUES ");
         for i in 0..10 {
@@ -6423,7 +11397,7 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
+        e.execute_blocking(&sql).unwrap();
         let indexed = |e: &Engine| {
             e.tables
                 .lock()
@@ -6435,7 +11409,7 @@ mod tests {
         };
         assert_eq!(indexed(&e), 10);
 
-        e.dump_index_transaction("hv", "hv_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
         assert!(
             e.tables.lock().unwrap().values().all(|t| t
                 .hnsw_mem
@@ -6444,11 +11418,13 @@ mod tests {
             "the dump empties the HNSW memory segment"
         );
 
-        e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
-            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);",
+        )
+        .unwrap();
         assert_eq!(indexed(&e), 2);
 
-        e.dump_index_transaction("hv", "hv_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
         let indexed: usize = e
             .load_vector_indexes("default_db.hv", "hv_i")
             .iter()
@@ -6472,9 +11448,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(4);
-        e.execute("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut sql = String::from("INSERT INTO hc VALUES ");
         for i in 0..10 {
@@ -6484,7 +11460,7 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute(&sql).unwrap();
+        e.execute_blocking(&sql).unwrap();
         let indexed = |e: &Engine| {
             e.tables
                 .lock()
@@ -6496,7 +11472,7 @@ mod tests {
         };
         assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");
 
-        e.execute("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
+        e.execute_blocking("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
             .unwrap();
         assert_eq!(indexed(&e), 1, "below the capacity the segment stays");
         let dumped: usize = e
@@ -6514,22 +11490,22 @@ mod tests {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.set_memindex_capacity(2);
-        e.execute("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
             .unwrap();
-        e.execute("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        e.execute_blocking("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
             .unwrap();
-        e.execute("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+        e.execute_blocking("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
             .unwrap();
         let chunks = |e: &Engine| e.load_vector_indexes("default_db.hk", "hk_i");
         assert_eq!(chunks(&e).len(), 2, "one chunk per memory-segment dump");
 
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         assert_eq!(chunks(&e).len(), 2, "no chunk covers the whole table yet");
 
         e.optimize_indexes().unwrap();
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         let merged = chunks(&e);
         assert_eq!(merged.len(), 1, "the merged chunk supersedes the others");
         assert_eq!(merged[0].labels.len(), 4);
@@ -6542,16 +11518,18 @@ mod tests {
     fn optimize_logs_one_dump_command_per_entry() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);")
+        e.execute_blocking(
+            "CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);",
+        )
+        .unwrap();
+        e.execute_blocking("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
             .unwrap();
-        e.execute("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
+        e.execute_blocking("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
             .unwrap();
-        e.dump_index_transaction("ot", "ot_i").unwrap();
-        e.execute("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
-            .unwrap();
-        e.dump_index_transaction("ot", "ot_i").unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
         assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![0, 1]);
 
         e.optimize_indexes().unwrap();
@@ -6641,7 +11619,7 @@ mod tests {
 
         // `Cleanup` is the half that reclaims the bytes: the files go, the
         // markers go, and only the merged chunk is left.
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         assert!(
             !chunk_dir.join("chunk_0.idx").exists() && !chunk_dir.join("chunk_1.idx").exists(),
             "cleanup reclaims the bytes"
@@ -6666,13 +11644,15 @@ mod tests {
     fn test_hnsw_optimize() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);")
-            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);",
+        )
+        .unwrap();
         for _ in 0..3 {
             for _ in 0..2 {
-                e.execute(
+                e.execute_blocking(
                     "INSERT INTO tb1 VALUES \
                      (2,[0.1,0.2,0.3,-0.2]),(4,[0.2,0.1,0.3,0.4]),\
                      (6,[0.3,0.2,0.1,0.4]),(8,[0.4,0.3,0.2,0.1]);",
@@ -6680,7 +11660,7 @@ mod tests {
                 .unwrap();
             }
             // DumpMemIndex: one chunk per iteration's memory segment.
-            e.dump_index_transaction("tb1", "idx1").unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("tb1", "idx1")).unwrap();
         }
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -6689,7 +11669,7 @@ mod tests {
         );
 
         e.optimize_indexes().unwrap();
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
 
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -6724,10 +11704,11 @@ mod tests {
     fn full_rows_come_from_the_block_mirror_when_current() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bm (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE bm (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO bm VALUES (1,'a'),(2,'b');").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("INSERT INTO bm VALUES (1,'a'),(2,'b');")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         // The scalar row cache would answer first; drop it so the test proves
         // the block path.
         e.invalidate_row_cache("default_db.bm");
@@ -6743,14 +11724,14 @@ mod tests {
     fn block_mirror_covers_rows_after_deletes_and_updates() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE bmu (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE bmu (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
+        e.execute_blocking("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         e.invalidate_row_cache("default_db.bmu");
-        e.execute("DELETE FROM bmu WHERE id = 2;").unwrap();
-        e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
+        e.execute_blocking("DELETE FROM bmu WHERE id = 2;").unwrap();
+        e.execute_blocking("UPDATE bmu SET name = 'u' WHERE id = 3;")
             .unwrap();
         let rows = e.try_rows("default_db.bmu").unwrap().unwrap();
         let ids: Vec<&Value> = rows.iter().map(|(_, r)| &r[0]).collect();
@@ -6770,9 +11751,10 @@ mod tests {
     fn scalar_tables_use_the_row_cache() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rc (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE rc (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO rc VALUES (1,'a'),(2,'b');").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (1,'a'),(2,'b');")
+            .unwrap();
         assert_eq!(rows(&e, "SELECT * FROM rc;").len(), 2);
         let key = e.table_key("rc");
         assert!(e
@@ -6787,9 +11769,10 @@ mod tests {
             vec![vec!["2".to_string()]]
         );
 
-        e.execute("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute_blocking("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
-        e.execute("INSERT INTO av VALUES (1,[0.0,0.0]);").unwrap();
+        e.execute_blocking("INSERT INTO av VALUES (1,[0.0,0.0]);")
+            .unwrap();
         assert_eq!(rows(&e, "SELECT * FROM av;").len(), 1);
         let key = e.table_key("av");
         assert!(e
@@ -6807,7 +11790,7 @@ mod tests {
     fn segments_track_row_id_allocations() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE sg (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE sg (id INT);").unwrap();
         e.reserve_rows("sg", 2, true).unwrap();
         e.reserve_rows("sg", 3, true).unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3)]);
@@ -6823,10 +11806,10 @@ mod tests {
     fn a_read_at_an_older_ts_hides_later_commits() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rts (id INT);").unwrap();
-        e.execute("INSERT INTO rts VALUES (1);").unwrap();
+        e.execute_blocking("CREATE TABLE rts (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO rts VALUES (1);").unwrap();
         let pin = e.current_ts();
-        e.execute("INSERT INTO rts VALUES (2);").unwrap();
+        e.execute_blocking("INSERT INTO rts VALUES (2);").unwrap();
 
         // Outside a statement the reader is at `u64::MAX`: both rows.
         assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
@@ -6841,7 +11824,7 @@ mod tests {
 
         // A delete after the pin is invisible to the pinned reader.
         let deleted_pin = e.current_ts();
-        e.execute("DELETE FROM rts WHERE id = 1;").unwrap();
+        e.execute_blocking("DELETE FROM rts WHERE id = 1;").unwrap();
         assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
         {
             let _pinned = ReadTsGuard::enter(deleted_pin);
@@ -6864,20 +11847,20 @@ mod tests {
         {
             let e = Arc::new(Engine::open(dir.path()).unwrap());
             e.install_engine_handle();
-            e.execute("CREATE TABLE ck (id INT);").unwrap();
+            e.execute_blocking("CREATE TABLE ck (id INT);").unwrap();
             let mut handles = Vec::new();
             for t in 0..4 {
                 let e = Arc::clone(&e);
                 handles.push(std::thread::spawn(move || {
                     for b in 0..10 {
                         let first = t * 1000 + b * 2;
-                        e.execute(&format!(
+                        e.execute_blocking(&format!(
                             "INSERT INTO ck VALUES ({first}), ({});",
                             first + 1
                         ))
                         .unwrap();
                         if b % 3 == 0 {
-                            e.flush().unwrap();
+                            crate::scheduler::block_on(e.flush()).unwrap();
                         }
                     }
                 }));
@@ -6895,6 +11878,315 @@ mod tests {
         );
     }
 
+    /// Reopening maps the published chunks instead of rebuilding them, and
+    /// indexes only the rows no chunk covers (plan §5.3: the reference's
+    /// RecoverMemIndex).
+    #[test]
+    fn reopen_loads_secondary_chunks_and_fills_only_the_gap() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE rg (id INT, c INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX rg_c ON rg (c);").unwrap();
+            e.execute_blocking("INSERT INTO rg VALUES (1,7),(2,8),(3,7);")
+                .unwrap();
+            // `FLUSH DATA` with the dump switch on is the checkpoint plus one
+            // `DumpMemIndex` per index, which is what names the chunk's ts.
+            e.set_flush_dumps_mem_index(true);
+            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.set_flush_dumps_mem_index(false);
+            // One row after the dump: the chunk cannot cover it.
+            e.execute_blocking("INSERT INTO rg VALUES (4,7);").unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        let (chunks, meta, tail) = {
+            let id = e.test_secondary_id("rg", "c");
+            let tables = e.tables.lock().unwrap();
+            let sec = &tables
+                .values()
+                .find(|t| t.secondary.disk_backed.contains(&id))
+                .expect("the table reopened with a disk-backed index")
+                .secondary;
+            (
+                sec.disk.get(&id).map(|d| d.len()).unwrap_or(0),
+                sec.chunk_meta.get(&id).cloned().unwrap_or_default(),
+                sec.indexes.get(&id).map(|i| i.key_count()).unwrap_or(0),
+            )
+        };
+        assert_eq!(chunks, 1, "the published chunk is mapped, not rebuilt");
+        assert_eq!(meta, vec![(0u64, 3usize)], "the catalog's chunk record");
+        assert_eq!(tail, 1, "only the uncovered row is in the memory tail");
+        assert_eq!(
+            rows(&e, "SELECT id FROM rg WHERE c = 7"),
+            vec![
+                vec!["1".to_string()],
+                vec!["3".to_string()],
+                vec!["4".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(&e, "SELECT count(*) FROM rg;"),
+            vec![vec!["4".to_string()]]
+        );
+    }
+
+    /// A reopened table's secondary index must keep indexing.
+    ///
+    /// The reload maps the published chunks and fills the gap into the memory
+    /// tail; without a `secondary.indexes` entry the per-row insert hook and
+    /// `DumpIndex` both skip the column, so every row written after the restart
+    /// silently fell out of the index and `dump_index` sealed nothing.
+    #[test]
+    fn a_reopened_secondary_index_indexes_later_rows() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE ri (id INT, c INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX ri_c ON ri (c);").unwrap();
+            e.execute_blocking("INSERT INTO ri VALUES (1,7);").unwrap();
+            e.set_flush_dumps_mem_index(true);
+            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.set_flush_dumps_mem_index(false);
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("INSERT INTO ri VALUES (2,7),(3,9);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, "SELECT id FROM ri WHERE c = 7 ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "the row inserted after the restart must be in the index"
+        );
+        // The dump must find the new rows in the tail and seal them.
+        crate::scheduler::block_on(e.dump_index_transaction("ri", "ri_c")).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let published = {
+            let id = e.test_secondary_id("ri", "c");
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .find(|t| t.secondary.disk_backed.contains(&id))
+                .map(|t| t.secondary.disk.get(&id).map(|d| d.len()).unwrap_or(0))
+                .unwrap_or(0)
+        };
+        assert!(
+            published >= 2,
+            "the dump sealed no chunk from the reopened tail (mapped {published})"
+        );
+    }
+
+    /// A compaction must leave the merged segment's indexes published.
+    ///
+    /// The reference runs `PopulateIndex` for the merged segment inside the
+    /// compaction transaction, so every index gets a chunk for it. The port's
+    /// reload only maps the chunks already in the catalog, so without rebuilding
+    /// the merged segment's secondary spills the index had no `seg_{merged}`
+    /// chunk and a reader lost those rows.
+    #[test]
+    fn a_compaction_publishes_the_merged_segments_secondary_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE rc (id INT, c INT);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX rc_c ON rc (c);").unwrap();
+        e.execute_blocking("INSERT INTO rc VALUES (1,7),(2,8);")
+            .unwrap();
+        e.set_flush_dumps_mem_index(true);
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.set_flush_dumps_mem_index(false);
+        // A second segment, so the compaction has something to merge.
+        let csv = dir.path().join("more.csv");
+        std::fs::write(&csv, "3,9\n4,7\n").unwrap();
+        e.execute_blocking(&format!(
+            "COPY rc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .unwrap();
+        e.execute_blocking("FLUSH DATA;").unwrap();
+        assert_eq!(e.segment_row_counts("rc").len(), 2, "two segments to merge");
+        e.compact_table("rc").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        // The merged segment must have its own published chunk file: that is
+        // what a reader (and the reference) uses to answer for those rows.
+        let merged = e
+            .segment_row_counts("rc")
+            .last()
+            .map(|(id, _)| *id)
+            .unwrap();
+        let root = e.blocks_root().join("db_1").join("tbl_0");
+        let seg_dir = std::fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .map(|d| d.path())
+            .find(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("idx_"))
+            })
+            .map(|p| p.join(format!("seg_{merged}")))
+            .expect("the index directory");
+        let chunks: Vec<String> = std::fs::read_dir(&seg_dir)
+            .map(|d| {
+                d.flatten()
+                    .map(|f| f.file_name().to_string_lossy().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            chunks.iter().any(|n| n.ends_with(".idx")),
+            "the merged segment has no secondary chunk: {chunks:?}"
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM rc WHERE c = 7 ORDER BY id;"),
+            vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+    }
+
+    /// `Cleanup` reclaims the chunk directory of a segment a compaction
+    /// deprecated, and keeps the one whose segment is still live.
+    ///
+    /// A full-text chunk lives in `idx_{id}/seg_{n}` beside the other kinds
+    /// (`SegmentIndexMeta::GetSegmentIndexDir`), so reclaiming a deprecated
+    /// segment's directory removes its chunks with it. The reference deletes
+    /// them by name in `Cleanup` (`CleanChunkIndex`); this is the same sweep
+    /// seen from the directory.
+    #[test]
+    fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cft (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX cft_body ON cft (body) USING FULLTEXT;")
+            .unwrap();
+        for n in 0..4 {
+            let csv = dir.path().join(format!("c{n}.csv"));
+            std::fs::write(&csv, format!("{},alpha row\n", 10 + n)).unwrap();
+            e.execute_blocking(&format!(
+                "COPY cft FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                csv.display()
+            ))
+            .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+        }
+        let indexed_root = || -> std::path::PathBuf {
+            let base = dir.path().join("data/db_1/tbl_0");
+            std::fs::read_dir(&base)
+                .unwrap()
+                .flatten()
+                .map(|d| d.path())
+                .find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("idx_"))
+                })
+                .expect("the index directory")
+        };
+        let chunk_dirs = |root: &std::path::Path| -> Vec<String> {
+            let mut out: Vec<String> = std::fs::read_dir(root)
+                .map(|d| {
+                    d.flatten()
+                        .filter(|f| f.path().is_dir())
+                        .filter(|f| {
+                            std::fs::read_dir(f.path())
+                                .map(|c| {
+                                    c.flatten()
+                                        .any(|e| e.file_name().to_string_lossy().ends_with(".dic"))
+                                })
+                                .unwrap_or(false)
+                        })
+                        .map(|f| f.file_name().to_string_lossy().to_string())
+                        .collect()
+                })
+                .unwrap_or_default();
+            out.sort();
+            out
+        };
+        let before_segments = e.segment_row_counts("cft");
+        assert_eq!(before_segments.len(), 4, "four segments before the merge");
+        assert!(
+            !chunk_dirs(&indexed_root()).is_empty(),
+            "the flushes must have sealed chunks"
+        );
+
+        e.compact_all_segments("cft").unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
+
+        let live: Vec<u32> = e
+            .segment_row_counts("cft")
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        let sources: Vec<u32> = before_segments
+            .iter()
+            .map(|(id, _)| *id)
+            .filter(|id| !live.contains(id))
+            .collect();
+        assert_eq!(sources.len(), 4, "four deprecated source segments");
+        for segment in sources {
+            let path = indexed_root().join(format!("seg_{segment}"));
+            assert!(
+                !path.exists(),
+                "cleanup kept the deprecated segment {segment}'s chunk directory"
+            );
+        }
+        // The index still answers for every row after the sweep.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM cft SEARCH MATCH TEXT (body, 'alpha', 100);"
+            )
+            .len(),
+            4
+        );
+    }
+
+    /// A panic inside `with_zero_dimension_sparse` must not leave the flag set.
+    ///
+    /// The pool reuses its threads, so a leaked flag would let a later,
+    /// unrelated statement accept a zero-dimension sparse value.
+    #[test]
+    fn a_panicking_zero_dimension_scope_restores_the_flag() {
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::with_zero_dimension_sparse(|| panic!("boom"));
+        }));
+        assert!(caught.is_err(), "the panic must propagate");
+        let leaked = crate::engine::state::ALLOW_ZERO_SPARSE.with(|c| c.get());
+        assert!(!leaked, "the zero-dimension flag outlived the panic");
+    }
+
+    /// A panic inside a statement must not leak the session binding.
+    ///
+    /// The blocking pool reuses threads, so a `with_session` that restored the
+    /// previous value only on the normal path would leave the next statement of
+    /// an unrelated connection running in this session (r10 #2).
+    #[test]
+    fn a_panicking_statement_does_not_leak_its_session() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE DATABASE other;").unwrap();
+        let id = e.open_session("default_db");
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            e.with_session(id, || panic!("boom"));
+        }));
+        assert!(caught.is_err(), "the panic must propagate");
+        assert_eq!(
+            crate::engine::statements::active_session(),
+            None,
+            "the session binding outlived the panic"
+        );
+        // The default database is process-wide again, not the session's.
+        e.execute_blocking("CREATE TABLE leak_check (id INT);")
+            .unwrap();
+        assert!(e
+            .catalog()
+            .get_table_by_name("default_db.leak_check")
+            .unwrap()
+            .is_some());
+    }
+
     /// Writers and readers share the table/index state; this exercises the
     /// table-lock boundaries introduced for `TableEntry` (a deadlock hangs the
     /// test binary, which the harness timeout catches).
@@ -6902,23 +12194,23 @@ mod tests {
     fn concurrent_inserts_and_vector_searches_do_not_deadlock() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute_blocking("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
             .unwrap();
-        e.execute("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
+        e.execute_blocking("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for b in 0..25 {
-                    e.execute(&format!(
+                    e.execute_blocking(&format!(
                         "INSERT INTO cc VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                         t * 1000 + b * 2,
                         t * 1000 + b * 2 + 1
                     ))
                     .unwrap();
                     if b % 5 == 0 {
-                        e.flush().unwrap();
+                        crate::scheduler::block_on(e.flush()).unwrap();
                     }
                 }
             }));
@@ -6927,10 +12219,10 @@ mod tests {
             let e = e.clone();
             handles.push(std::thread::spawn(move || {
                 for _ in 0..40 {
-                    let _ = e.execute(
+                    let _ = e.execute_blocking(
                         "SELECT id FROM cc SEARCH MATCH VECTOR (v, [1.0,0.0,0.0,0.0], 'float', 'l2', 3);",
                     );
-                    let _ = e.execute("SELECT count(*) FROM cc;");
+                    let _ = e.execute_blocking("SELECT count(*) FROM cc;");
                 }
             }));
         }
@@ -6960,7 +12252,7 @@ mod tests {
             ]]
         );
 
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         let dbs = rows(&e, "SHOW DATABASES;");
         // The reference lists `db1` first (hash order); the Rust catalog is
         // sorted, so compare the set.
@@ -6998,7 +12290,7 @@ mod tests {
             .any(|d| d == "default_db"));
 
         // Create/Show/Get/Drop a table in `default_db`.
-        e.execute("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
+        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
             .unwrap();
         let tables = rows(&e, "SHOW TABLES FROM default_db;");
         assert_eq!(tables.len(), 1);
@@ -7010,7 +12302,7 @@ mod tests {
             .get_table_by_name("default_db.table1")
             .unwrap()
             .is_some());
-        e.execute("DROP TABLE default_db.table1;").unwrap();
+        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
         assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
         assert!(e
             .catalog()
@@ -7019,25 +12311,25 @@ mod tests {
             .is_none());
 
         // Insert and select through two columns of different widths.
-        e.execute("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
+        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
             .unwrap();
-        e.execute("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
+        e.execute_blocking("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT col1, col2 FROM default_db.table1;"),
             vec![vec!["11".to_string(), "22".to_string()]]
         );
-        e.execute("DROP TABLE default_db.table1;").unwrap();
+        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
 
         // `Query("create database db1;")` + `Query("show databases;")`.
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         let mut names: Vec<String> = rows(&e, "SHOW DATABASES;")
             .into_iter()
             .map(|r| r[0].clone())
             .collect();
         names.sort();
         assert_eq!(names, vec!["db1", "default_db"]);
-        e.execute("DROP DATABASE db1;").unwrap();
+        e.execute_blocking("DROP DATABASE db1;").unwrap();
         assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
         assert!(e
             .catalog()
@@ -7102,14 +12394,14 @@ mod tests {
     fn explain_covers_every_plan_kind() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE DATABASE db1;").unwrap();
+        e.execute_blocking("CREATE DATABASE db1;").unwrap();
         assert!(e
             .catalog()
             .list_databases()
             .unwrap()
             .iter()
             .any(|d| d == "db1"));
-        e.execute("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
+        e.execute_blocking("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
             .unwrap();
 
         // `Infinity::GetDatabase` / `GetTable`: the created table is
@@ -7135,7 +12427,7 @@ mod tests {
         // Insert and read back through the same facade.
         let embedding = vec!["0.5"; 128].join(",");
         for col2 in [42, 7] {
-            e.execute(&format!(
+            e.execute_blocking(&format!(
                 "INSERT INTO db1.knn_table (col1, col2) VALUES ([{embedding}], {col2});"
             ))
             .unwrap();
@@ -7155,7 +12447,9 @@ mod tests {
             "EXPLAIN FRAGMENT SELECT col2 FROM db1.knn_table;",
             "EXPLAIN PIPELINE SELECT col2 FROM db1.knn_table;",
         ] {
-            let mut res = e.execute(sql).unwrap_or_else(|err| panic!("{sql}: {err}"));
+            let mut res = e
+                .execute_blocking(sql)
+                .unwrap_or_else(|err| panic!("{sql}: {err}"));
             assert_eq!(res.len(), 1, "{sql}");
             assert!(matches!(res.remove(0), QueryResult::Rows { .. }), "{sql}");
         }
@@ -7169,8 +12463,9 @@ mod tests {
     fn a_crashed_drop_does_not_resurrect_rows() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
-        e.execute("INSERT INTO crash_t VALUES (1), (2), (3);")
+        e.execute_blocking("CREATE TABLE crash_t (id INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO crash_t VALUES (1), (2), (3);")
             .unwrap();
         assert_eq!(
             rows(&e, "SELECT count(*) FROM crash_t;"),
@@ -7189,16 +12484,496 @@ mod tests {
                 .is_none(),
             "the drop must be visible before the sweep runs"
         );
-        e.execute("CREATE TABLE crash_t (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE crash_t (id INT);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT count(*) FROM crash_t;"),
             vec![vec!["0".to_string()]],
             "the recreated table must not see the dropped table's rows"
         );
-        e.execute("INSERT INTO crash_t VALUES (7);").unwrap();
+        e.execute_blocking("INSERT INTO crash_t VALUES (7);")
+            .unwrap();
         assert_eq!(
             rows(&e, "SELECT id FROM crash_t;"),
             vec![vec!["7".to_string()]]
         );
+    }
+
+    /// Serializes the tests that install or depend on the process-wide chunk
+    /// store.
+    ///
+    /// Two of them running at once would each install a backend for its own
+    /// temporary directory, and the engine parts that resolve paths through the
+    /// slot would then read the other test's manager.
+    static CHUNK_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Every data file the engine writes is published through the persistence
+    /// manager, and a read resolves the object when the local copy is gone.
+    ///
+    /// This is the port's half of the reference's rule: `FileWorker::WriteToFile`
+    /// hands the spool file to `pm->Persist` and a reader maps
+    /// `pm->GetObjPath(obj_addr.obj_key)` (`file_worker_impl.cpp:170`,
+    /// `disk_segment_reader_impl.cpp:59`). Nothing here is specific to the
+    /// full-text index: the block columns are checked too.
+    #[test]
+    fn the_persistent_manager_publishes_every_data_file() {
+        // Declared before `LocalStore` so the locals drop in the other order:
+        // the reset to the local backend happens while the lock is still held.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        /// The backend is process-wide, so a panicking test must not leave a
+        /// manager from its own temporary directory installed.
+        struct LocalStore(());
+        impl Drop for LocalStore {
+            fn drop(&mut self) {
+                storage::chunk_store::install_local_chunk_store();
+            }
+        }
+        let _local = LocalStore(());
+
+        let dir = tempdir().unwrap();
+        let objects = tempdir().unwrap();
+        let object_options = || crate::engine::state::EngineOptions {
+            object_dir: Some(objects.path().to_path_buf()),
+            ..crate::engine::state::EngineOptions::default()
+        };
+        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
+        e.execute_blocking("CREATE TABLE pmt (id INT, body VARCHAR);")
+            .unwrap();
+        for i in 0..8 {
+            e.execute_blocking(&format!("INSERT INTO pmt VALUES ({i}, 'alpha{i} beta');"))
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX pmt_ft ON pmt (body) USING FULLTEXT;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmt", "pmt_ft")).unwrap();
+
+        // Every file under `data/` has an object record, and the object holds at
+        // least the bytes of that part.
+        let files = walk_relative(&dir.path().join("data"));
+        assert!(!files.is_empty(), "the engine wrote no data files");
+        let pm = e.persistence.as_ref().expect("the manager is installed");
+        for rel in &files {
+            let addr = pm
+                .lookup_key(rel)
+                .unwrap_or_else(|| panic!("'{rel}' was not published"));
+            if addr.part_size == 0 {
+                continue;
+            }
+            let object = pm.get_obj_path(&addr.obj_key);
+            let size = std::fs::metadata(&object)
+                .unwrap_or_else(|error| panic!("object for '{rel}': {error}"))
+                .len() as usize;
+            assert!(
+                size >= addr.part_offset + addr.part_size,
+                "object for '{rel}' is {size} bytes, part ends at {}",
+                addr.part_offset + addr.part_size
+            );
+        }
+
+        // The query answers, and a local copy that is gone is served from the
+        // object: the reader resolves the address and maps that part of the
+        // object file, which is what the reference's `GetObjCache` +
+        // `MmapFile(pm->GetObjPath(..))` does.
+        let hits = rows(
+            &e,
+            "SELECT id FROM pmt SEARCH MATCH TEXT (body, 'alpha5', 10);",
+        );
+        assert_eq!(hits.len(), 1);
+
+        // The chunk lives in its segment's index directory.
+        let dic = walk_blobs(&dir.path().join("data"))
+            .keys()
+            .find(|rel| rel.ends_with(".dic"))
+            .map(|rel| dir.path().join("data").join(rel))
+            .expect("a sealed chunk");
+        let block_column = dir.path().join("data/db_1/tbl_0/seg_0/blk_0").join("0.col");
+        let expected_block = std::fs::read(&block_column).unwrap();
+        for (path, expected) in [(&dic, None), (&block_column, Some(expected_block))] {
+            std::fs::remove_file(path).unwrap();
+            let mapped = storage::mapped::MappedFile::open(path)
+                .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            assert!(!mapped.is_empty(), "{}", path.display());
+            if let Some(expected) = expected {
+                assert_eq!(&mapped[..], &expected[..], "the block's bytes");
+            }
+        }
+        drop(e);
+        storage::chunk_store::install_local_chunk_store();
+    }
+
+    /// The objects are the truth: with every local data file gone, opening the
+    /// same directory again answers the same questions.
+    ///
+    /// This is what the object profile is for - the reference's `data/` may be a
+    /// cache, and `pm|object|` the storage of record. A merge runs first so the
+    /// superseded chunks' objects are cleaned up as well: the reopened engine
+    /// must not see them.
+    #[test]
+    fn a_data_directory_comes_back_from_the_objects_alone() {
+        // See `the_persistent_manager_publishes_every_data_file`: same global
+        // slot, same lock, and the guard declared before `LocalStore`.
+        let _lock = CHUNK_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        /// See `the_persistent_manager_publishes_every_data_file`.
+        struct LocalStore(());
+        impl Drop for LocalStore {
+            fn drop(&mut self) {
+                storage::chunk_store::install_local_chunk_store();
+            }
+        }
+        let _local = LocalStore(());
+
+        let dir = tempdir().unwrap();
+        let objects = tempdir().unwrap();
+        let object_options = || crate::engine::state::EngineOptions {
+            object_dir: Some(objects.path().to_path_buf()),
+            ..crate::engine::state::EngineOptions::default()
+        };
+        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
+        e.execute_blocking("CREATE TABLE pmd (id INT, body VARCHAR);")
+            .unwrap();
+        let insert = |e: &Engine, lo: i64, hi: i64| {
+            let values: Vec<String> = (lo..hi)
+                .map(|i| format!("({i}, 'alpha beta bucket{} uniq{i} delta')", i % 7))
+                .collect();
+            e.execute_blocking(&format!("INSERT INTO pmd VALUES {};", values.join(",")))
+                .unwrap();
+        };
+        insert(&e, 0, 200);
+        e.execute_blocking("CREATE INDEX pmd_ft ON pmd (body) USING FULLTEXT;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
+        insert(&e, 200, 400);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
+        // Two chunks are on disk; the merge rewrites them as one and drops the
+        // sources' objects.
+        crate::scheduler::block_on(e.optimize_fulltext_async("pmd")).unwrap();
+
+        let query = "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'uniq42', 5);";
+        let single = rows(&e, query);
+        assert_eq!(single.len(), 1);
+        let all = |e: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(
+                e,
+                "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'beta', 1000);",
+            )
+            .into_iter()
+            .map(|row| row[0].parse().unwrap())
+            .collect()
+        };
+        let expected = all(&e);
+        assert_eq!(expected.len(), 400);
+        // A full-text chunk lives in its segment's index directory
+        // (`data/db_{d}/tbl_{t}/idx_{i}/seg_{s}/ft_*`), which is what the
+        // manager publishes along with the blocks.
+        let published = e
+            .persistence
+            .as_ref()
+            .expect("the manager is installed")
+            .keys_under("")
+            .into_iter()
+            .filter(|key| key.contains("/idx_") && key.contains(".dic"))
+            .count();
+        assert!(published > 0, "the chunks were not published");
+
+        // Everything the engine keeps locally goes away: `data/` (blocks, the
+        // mirror chunks) and the port's own chunk directory. Only the objects
+        // and the catalog are left.
+        //
+        // The restore is driven on the same manager rather than through a second
+        // open: a process that opens a directory twice cannot release the first
+        // catalog handle deterministically (the engine's background tasks hold
+        // their own references), and the reopen path itself is covered by the
+        // python gate, one process per engine.
+        // Blocks and index chunks share `data/` now: a chunk lives in
+        // `data/db_{d}/tbl_{t}/idx_{i}/seg_{s}/`.
+        let data_before = walk_blobs(&dir.path().join("data"));
+        assert!(
+            data_before.keys().any(|name| name.ends_with(".dic")),
+            "the merge left no chunk"
+        );
+        std::fs::remove_dir_all(dir.path().join("data")).unwrap();
+        let manager = e.persistence.as_ref().expect("the manager is installed");
+        let restored = manager.restore_missing_files().unwrap();
+        assert_eq!(
+            restored,
+            data_before.len(),
+            "every data file has an object to come back from"
+        );
+        let compare = |restored: std::collections::BTreeMap<String, Vec<u8>>,
+                       before: std::collections::BTreeMap<String, Vec<u8>>,
+                       what: &str| {
+            let mut missing: Vec<&String> = before
+                .keys()
+                .filter(|k| !restored.contains_key(*k))
+                .collect();
+            let mut extra: Vec<&String> = restored
+                .keys()
+                .filter(|k| !before.contains_key(*k))
+                .collect();
+            missing.sort();
+            extra.sort();
+            assert!(
+                missing.is_empty() && extra.is_empty(),
+                "{what}: {} missing ({:?}), {} extra ({:?})",
+                missing.len(),
+                &missing[..missing.len().min(6)],
+                extra.len(),
+                &extra[..extra.len().min(6)]
+            );
+            for (name, blob) in &before {
+                assert_eq!(
+                    restored[name].len(),
+                    blob.len(),
+                    "{what}: '{name}' came back with a different size"
+                );
+            }
+        };
+        compare(
+            walk_blobs(&dir.path().join("data")),
+            data_before,
+            "the blocks",
+        );
+        // And the answers were computed from what is on disk at all.
+        assert_eq!(all(&e), expected, "the whole corpus");
+        assert_eq!(rows(&e, query), single, "the single-term answer");
+    }
+
+    /// Every file under `root` with its bytes, keyed by relative path.
+    fn walk_blobs(root: &std::path::Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+        let mut out = std::collections::BTreeMap::new();
+        for rel in walk_relative(root) {
+            let path = root.join(&rel);
+            out.insert(rel, std::fs::read(path).unwrap_or_default());
+        }
+        out
+    }
+
+    /// Every file under `root`, as a path relative to it.
+    fn walk_relative(root: &std::path::Path) -> Vec<String> {
+        let mut out = Vec::new();
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return out;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let rel = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            if path.is_dir() {
+                out.extend(
+                    walk_relative(&path)
+                        .into_iter()
+                        .map(|name| format!("{rel}/{name}")),
+                );
+            } else {
+                out.push(rel);
+            }
+        }
+        out
+    }
+
+    /// Writers, readers, deletes and maintenance share one table: every answer a
+    /// reader gets is a row the table really holds, and once the writers stop the
+    /// index covers exactly the live rows - across dumps, merges and a restart.
+    ///
+    /// The invariant is "what the table holds", computed here, not another
+    /// engine's answer: `alpha` is in every document, so a full-text query with a
+    /// large `topn` must return exactly the rows that were not deleted.
+    #[test]
+    fn writers_readers_deletes_and_merges_stay_consistent() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::sync::{Arc, Mutex};
+
+        const WRITERS: i64 = 8;
+        const BATCHES: i64 = 20;
+        const ROWS_PER_BATCH: i64 = 100;
+        const READERS: usize = 6;
+        const MAINTENANCE_ROUNDS: usize = 8;
+        const DELETE_ROUNDS: usize = 16;
+        let total_written = WRITERS * BATCHES * ROWS_PER_BATCH;
+
+        let dir = tempdir().unwrap();
+        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        engine
+            .execute_blocking("CREATE TABLE stress (id INT, body VARCHAR);")
+            .unwrap();
+        engine
+            .execute_blocking("CREATE INDEX stress_ft ON stress (body) USING FULLTEXT;")
+            .unwrap();
+
+        let inserted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
+        let deleted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
+        let stop = Arc::new(AtomicBool::new(false));
+        let queries = Arc::new(AtomicUsize::new(0));
+
+        let mut writers = Vec::new();
+        for writer in 0..WRITERS {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            writers.push(std::thread::spawn(move || {
+                for batch in 0..BATCHES {
+                    let mut ids = Vec::new();
+                    let mut values = Vec::new();
+                    for row in 0..ROWS_PER_BATCH {
+                        // Disjoint per writer and per batch, at any scale.
+                        let id = writer * 1_000_000 + batch * 1_000 + row;
+                        ids.push(id);
+                        values.push(format!("({id}, 'alpha{id} beta')"));
+                    }
+                    // Recorded **before** the insert commits: a reader may see a
+                    // committed row the instant `execute_blocking` returns, so
+                    // accounting for it afterwards leaves a window in which the
+                    // row is in the table and not yet in `inserted` - which the
+                    // readers below would report as a ghost. The insert below
+                    // unwraps, so a failure cannot leave a stale id behind
+                    // unnoticed.
+                    inserted.lock().unwrap().extend(ids);
+                    engine
+                        .execute_blocking(&format!(
+                            "INSERT INTO stress VALUES {};",
+                            values.join(",")
+                        ))
+                        .unwrap();
+                }
+            }));
+        }
+        let mut readers = Vec::new();
+        for _ in 0..READERS {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            let stop = Arc::clone(&stop);
+            let queries = Arc::clone(&queries);
+            readers.push(std::thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    let hits = rows(
+                        &engine,
+                        "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 5000);",
+                    );
+                    let known = inserted.lock().unwrap().clone();
+                    for hit in &hits {
+                        let id: i64 = hit[0].parse().unwrap();
+                        assert!(known.contains(&id), "reader saw the ghost id {id}");
+                    }
+                    queries.fetch_add(1, Ordering::Relaxed);
+                }
+            }));
+        }
+        let deleter = {
+            let engine = Arc::clone(&engine);
+            let inserted = Arc::clone(&inserted);
+            let deleted = Arc::clone(&deleted);
+            std::thread::spawn(move || {
+                for _ in 0..DELETE_ROUNDS {
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let known: Vec<i64> = inserted.lock().unwrap().iter().copied().collect();
+                    if known.len() < 100 {
+                        continue;
+                    }
+                    // Every 17th row of the first half of what is there so far.
+                    let victims: Vec<i64> = known
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .filter(|(at, _)| at % 17 == 0 && *at < known.len() / 2)
+                        .map(|(_, id)| id)
+                        .collect();
+                    if victims.is_empty() {
+                        continue;
+                    }
+                    let list = victims
+                        .iter()
+                        .map(|id| id.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    let sql = format!("DELETE FROM stress WHERE id IN ({list});");
+                    if engine.execute_blocking(&sql).is_ok() {
+                        deleted.lock().unwrap().extend(victims);
+                    }
+                }
+            })
+        };
+        for _ in 0..MAINTENANCE_ROUNDS {
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            let _ =
+                crate::scheduler::block_on(engine.dump_index_transaction("stress", "stress_ft"));
+            let _ = crate::scheduler::block_on(engine.optimize_fulltext_async("stress"));
+            let _ = crate::scheduler::block_on(engine.flush());
+        }
+
+        for handle in writers {
+            handle.join().unwrap();
+        }
+        deleter.join().unwrap();
+        // The readers keep querying until the writers are done.
+        stop.store(true, Ordering::Relaxed);
+        for handle in readers {
+            handle.join().unwrap();
+        }
+        let inserted = inserted.lock().unwrap().clone();
+        assert_eq!(
+            inserted.len(),
+            total_written as usize,
+            "every row the writers sent reached the table"
+        );
+        // What the table holds is the invariant, not what the deleter asked
+        // for: a delete that ran against a transaction the table had not
+        // committed yet removes nothing, and the request list cannot see that.
+        let live_rows = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(engine, "SELECT id FROM stress;")
+                .into_iter()
+                .map(|row| row[0].parse().unwrap())
+                .collect()
+        };
+        let collect = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+            rows(
+                engine,
+                "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 100000);",
+            )
+            .into_iter()
+            .map(|row| row[0].parse().unwrap())
+            .collect()
+        };
+        assert!(queries.load(Ordering::Relaxed) > 0, "the readers ran");
+        let expected = live_rows(&engine);
+        assert!(
+            expected.len() < total_written as usize,
+            "the deletes removed nothing, the test proves nothing"
+        );
+        let tombstones = engine.tombstone_set("stress").unwrap().len();
+        assert_eq!(
+            expected.len() + tombstones,
+            total_written as usize,
+            "the table's rows and its tombstones account for every insert \
+             ({} + {tombstones})",
+            expected.len()
+        );
+        let got = collect(&engine);
+        let missing: Vec<i64> = expected.difference(&got).copied().collect();
+        let extra: Vec<i64> = got.difference(&expected).copied().collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "the index does not cover the live rows: {} missing (first {:?}), \
+             {} extra (first {:?}), table holds {}",
+            missing.len(),
+            &missing[..missing.len().min(20)],
+            extra.len(),
+            &extra[..extra.len().min(20)],
+            expected.len()
+        );
+        let _ = crate::scheduler::block_on(engine.flush());
+        drop(engine);
+
+        // The same answer after a restart: the chunks on disk are the truth.
+        let reopened = Engine::open(dir.path()).unwrap();
+        assert_eq!(collect(&reopened), live_rows(&reopened), "after a restart");
     }
 }

@@ -19,7 +19,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -29,7 +29,7 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 
 fn create_table(engine: &Engine) {
     engine
-        .execute("CREATE TABLE st (id INT, name VARCHAR);")
+        .execute_blocking("CREATE TABLE st (id INT, name VARCHAR);")
         .unwrap();
 }
 
@@ -46,7 +46,9 @@ fn open_is_writable_and_accepts_writes() {
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
 
     create_table(&engine);
-    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
+    engine
+        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .unwrap();
     assert_eq!(
         rows(&engine, "SELECT id FROM st;"),
         vec![vec!["1".to_string()]]
@@ -62,7 +64,9 @@ fn readable_rejects_writes_but_allows_reads() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
     create_table(&engine);
-    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
+    engine
+        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .unwrap();
 
     engine.set_storage_mode(StorageMode::Readable).unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Readable);
@@ -79,7 +83,7 @@ fn readable_rejects_writes_but_allows_reads() {
         "DELETE FROM st;",
         "DROP TABLE st;",
     ] {
-        let error = engine.execute(sql).unwrap_err();
+        let error = engine.execute_blocking(sql).unwrap_err();
         assert_eq!(error.status_code(), INVALID_NODE_ROLE, "{sql}");
         assert_eq!(error.to_string(), "Attempt to write on non-writable node");
     }
@@ -91,10 +95,15 @@ fn readable_rejects_writes_but_allows_reads() {
         .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // A checkpoint needs `kWritable` (`physical_flush_impl.cpp:42-52`) ...
-    assert_eq!(engine.flush().unwrap_err().status_code(), INVALID_NODE_ROLE);
+    assert_eq!(
+        crate::scheduler::block_on(engine.flush())
+            .unwrap_err()
+            .status_code(),
+        INVALID_NODE_ROLE
+    );
     // ... while cleanup runs on a read-only replica too
     // (`background_process_impl.cpp:109`).
-    engine.cleanup().unwrap();
+    crate::scheduler::block_on(engine.cleanup()).unwrap();
 
     // Nothing was published.
     assert_eq!(
@@ -111,11 +120,15 @@ fn returning_to_writable_restores_writes() {
     create_table(&engine);
 
     engine.set_storage_mode(StorageMode::Readable).unwrap();
-    assert!(engine.execute("INSERT INTO st VALUES (1, 'a');").is_err());
+    assert!(engine
+        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .is_err());
 
     engine.set_storage_mode(StorageMode::Writable).unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
-    engine.execute("INSERT INTO st VALUES (1, 'a');").unwrap();
+    engine
+        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .unwrap();
     assert_eq!(
         rows(&engine, "SELECT id FROM st;"),
         vec![vec!["1".to_string()]]
@@ -141,7 +154,9 @@ fn uninitialized_to_writable_is_rejected() {
 
     // A mutating statement on an uninitialized storage is the reference's
     // fatal case, not 8007.
-    let error = engine.execute("CREATE TABLE st (id INT);").unwrap_err();
+    let error = engine
+        .execute_blocking("CREATE TABLE st (id INT);")
+        .unwrap_err();
     assert_eq!(error.to_string(), "Uninitialized storage mode");
 
     // UnInit → Admin is the one legal step, and same-mode is a no-op
@@ -167,12 +182,14 @@ fn admin_allows_reads_but_not_writes() {
         vec![vec!["0".to_string()]]
     );
     let error = engine
-        .execute("INSERT INTO st VALUES (1, 'a');")
+        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
         .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // Admin is below `kReadable`, so even the replica-level cleanup is refused.
     assert_eq!(
-        engine.cleanup().unwrap_err().status_code(),
+        crate::scheduler::block_on(engine.cleanup())
+            .unwrap_err()
+            .status_code(),
         INVALID_NODE_ROLE
     );
 }

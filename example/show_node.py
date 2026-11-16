@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
-'''
+"""
 
 import sys
 
@@ -25,7 +25,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     res = infinity_instance.show_current_node()
     print(res)

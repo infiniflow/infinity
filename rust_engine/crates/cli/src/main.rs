@@ -15,17 +15,6 @@
 mod config;
 mod fulltext_bench;
 
-/// glibc's malloc serialises its arena locks under concurrent writes, which is
-/// what the parallel suite (eight inserters on one table) spends most of its
-/// time in; the C++ engine links jemalloc for the same reason
-/// (`CMakeLists.txt`'s `ENABLE_JEMALLOC`). This port uses mimalloc: it keeps
-/// the same kind of per-thread free lists, and its Rust binding builds on every
-/// target the workspace ships (jemalloc's does not - on this machine
-/// `tikv-jemalloc-sys` 0.7 looks for the static library in `<out>/lib` while
-/// jemalloc installs it into `<out>/lib64`, so the link fails).
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -215,15 +204,33 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
         .and_then(|v| v.trim().parse::<usize>().ok())
         .unwrap_or(64 * 1024);
     engine.set_memindex_capacity(capacity);
-    // `[buffer] buffer_manager_size` — the column-block cache budget (the
-    // reference defaults to 8 GiB).
-    let buffer = toml_value(&text, "buffer_manager_size").unwrap_or_default();
-    let buffer = if buffer.trim().is_empty() {
-        8 * 1024 * 1024 * 1024
-    } else {
-        parse_size_bytes(&buffer) as usize
-    };
-    engine.set_buffer_manager_size(buffer);
+    // `[storage] flush_dumps_mem_index` — `FLUSH DATA` also dumps every memory
+    // index into its chunk. Off by default: the reference's flush is a bare
+    // checkpoint, and the cross-engine byte gates compare directories after
+    // `flush_data()`.
+    let flush_dumps = matches!(
+        toml_value(&text, "flush_dumps_mem_index")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "true" | "1" | "on" | "yes"
+    );
+    engine.set_flush_dumps_mem_index(flush_dumps);
+    // `[buffer] buffer_manager_size`: the port has no BufferManager (sealed
+    // blocks are mapped and evicted by the kernel), but the same ceiling bounds
+    // the decoded HNSW chunks and the block map, so the configured value is
+    // applied instead of being dropped - a memory-limited container that asks
+    // for 512MB must not get the built-in 8 GiB.
+    if let Some(size) = toml_value(&text, "buffer_manager_size")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+    {
+        let bytes = parse_size_bytes(&size) as usize;
+        if bytes > 0 {
+            engine.set_buffer_budget(bytes);
+        }
+    }
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
@@ -232,16 +239,20 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     // node, not about letting cleanup/compact/checkpoint mutate it.
     if secs > 0 && !maintenance {
         // The checkpoint itself (WAL rotation + block flush) runs on the
-        // engine's periodic trigger thread, next to cleanup/compact/optimize
-        // (`PeriodicTriggerThread`); only the page release below stays here,
+        // engine's periodic trigger task, next to cleanup/compact/optimize
+        // (`PeriodicTriggerThread`). Only the page release below stays here,
         // because `trim_allocator` is CLI-only (`infinity-executor` forbids
-        // unsafe code).
+        // unsafe code) - and even it is a task now: it sleeps on `tokio::time`
+        // and hands the one blocking call to the pool, so nothing parks a
+        // thread for the life of the process.
         let weak = Arc::downgrade(&engine);
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(secs));
-            match weak.upgrade() {
-                Some(_) => trim_allocator(),
-                None => break,
+        executor::scheduler().spawn_task(async move {
+            loop {
+                executor::sleep(std::time::Duration::from_secs(secs)).await;
+                if weak.upgrade().is_none() {
+                    break;
+                }
+                executor::scheduler().spawn_blocking(trim_allocator).await;
             }
         });
     }
@@ -266,9 +277,12 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     }
     // The reference starts both front ends on the same storage
     // (`infinity_main.cpp`: `http_server.Start(...)` next to `StartThriftServer()`).
+    // All three front ends share **one** runtime (the engine's), so the process
+    // runs one worker pool instead of four: each front end is a task, an idle
+    // connection is a future, and the statements run on the engine's scheduler.
     let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
     println!("http listening on {}", http.local_addr()?);
-    std::thread::spawn(move || http.run());
+    executor::scheduler().spawn_task(http.serve());
     // The reference serves the PostgreSQL wire protocol too
     // (`pg_server.Run()` on `[network] postgres_port`). A port already taken by
     // a real PostgreSQL must not take the engine down, so a failed bind only
@@ -278,13 +292,18 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     match server::pg::PgServer::bind(&pg_addr, engine.clone()) {
         Ok(pg) => {
             println!("postgres listening on {}", pg.local_addr()?);
-            std::thread::spawn(move || pg.run());
+            executor::scheduler().spawn_task(pg.serve());
         }
         Err(e) => eprintln!("postgres front end disabled: {e}"),
     }
     let server = server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
-    server.run();
+    // The Thrift front end parks this (main) thread; it is still a task on the
+    // shared runtime, so its accept loop and the other two share the workers.
+    executor::scheduler().block_on_runtime(server.serve());
+    // Volo stops accepting on SIGINT/SIGTERM and waits for the live
+    // connections; there is nothing left to serve after that.
+    std::process::exit(0);
 }
 
 /// Releases free heap pages back to the OS (glibc). A no-op elsewhere.
@@ -494,7 +513,7 @@ fn run(args: &[String]) -> common::Result<()> {
             let (m, _) = open_txn(&dir)?;
             let mut t = m.begin();
             t.put(k.clone().into_bytes(), v.clone().into_bytes());
-            let ts = m.commit(t)?;
+            let ts = executor::block_on(m.commit(t))?;
             m.flush()?;
             println!("committed {k}={v} at ts={ts}");
             Ok(())
@@ -548,11 +567,11 @@ fn run(args: &[String]) -> common::Result<()> {
         "query" => {
             let sql = args[2..].join(" ");
             let e = Engine::open(&dir)?;
-            for r in e.execute(&sql)? {
+            for r in e.execute_blocking(&sql)? {
                 print_result(&r);
             }
             let t_flush = Instant::now();
-            e.flush()?;
+            executor::block_on(e.flush())?;
             if std::env::var_os("INFINITY_PROFILE_IMPORT").is_some() {
                 eprintln!("flush profile: {:?}", t_flush.elapsed());
             }
@@ -572,7 +591,7 @@ fn run(args: &[String]) -> common::Result<()> {
             let engine = std::sync::Arc::new(executor::Engine::open_with_options(&dir, options)?);
             let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
             println!("http listening on {}", http.local_addr()?);
-            std::thread::spawn(move || http.run());
+            executor::scheduler().spawn_task(http.serve());
 
             // PostgreSQL wire front end, ported from the C++ server's
             // `src/network/pg_protocol_handler.cppm`. Same scope as upstream:
@@ -587,14 +606,15 @@ fn run(args: &[String]) -> common::Result<()> {
             match server::pg::PgServer::bind(&pg_addr, engine.clone()) {
                 Ok(pg) => {
                     println!("pg listening on {}", pg.local_addr()?);
-                    std::thread::spawn(move || pg.run());
+                    executor::scheduler().spawn_task(pg.serve());
                 }
                 Err(e) => println!("pg disabled, cannot bind {pg_addr}: {e:?}"),
             }
 
             let server = server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
-            server.run();
+            executor::scheduler().block_on_runtime(server.serve());
+            std::process::exit(0);
         }
         "bench" => {
             let n: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(2000);
@@ -602,8 +622,8 @@ fn run(args: &[String]) -> common::Result<()> {
             // Gate E runs the driver twice over the same directory and compares
             // the two runs, so each one must start from an empty table: without
             // the drop, the second run selects twice as many rows.
-            let _ = e.execute("DROP TABLE IF EXISTS t;");
-            let _ = e.execute("CREATE TABLE t (id INT, name VARCHAR);");
+            let _ = e.execute_blocking("DROP TABLE IF EXISTS t;");
+            let _ = e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);");
             let t0 = Instant::now();
             let mut i = 0;
             while i < n {
@@ -614,14 +634,14 @@ fn run(args: &[String]) -> common::Result<()> {
                         format!("({id}, 'v{id}')")
                     })
                     .collect();
-                e.execute(&format!("INSERT INTO t VALUES {};", vals.join(", ")))?;
+                e.execute_blocking(&format!("INSERT INTO t VALUES {};", vals.join(", ")))?;
                 i += batch;
             }
             let ins = t0.elapsed();
             let t1 = Instant::now();
-            let r = e.execute("SELECT * FROM t;")?;
+            let r = e.execute_blocking("SELECT * FROM t;")?;
             let sel = t1.elapsed();
-            e.flush()?;
+            executor::block_on(e.flush())?;
             let rows = match &r[0] {
                 QueryResult::Rows { rows, .. } => rows.len(),
                 _ => 0,
@@ -661,14 +681,14 @@ fn run(args: &[String]) -> common::Result<()> {
             // `knn_query_benchmark` runs two warm-up loops before it times.
             let warm = queries.iter().take(5);
             for q in warm {
-                let _ = e.execute(&knn_sql(table, q, topk, ef))?;
+                let _ = e.execute_blocking(&knn_sql(table, q, topk, ef))?;
             }
             let mut latencies = Vec::with_capacity(queries.len());
             let mut hits = 0usize;
             let mut total = 0usize;
             for (qi, q) in queries.iter().enumerate() {
                 let t0 = Instant::now();
-                let out = e.execute(&knn_sql(table, q, topk, ef))?;
+                let out = e.execute_blocking(&knn_sql(table, q, topk, ef))?;
                 latencies.push(t0.elapsed().as_secs_f64());
                 if let Some(want) = truth.get(qi) {
                     let mut got: Vec<u64> = Vec::new();
@@ -725,7 +745,7 @@ fn run(args: &[String]) -> common::Result<()> {
             let e = Engine::open(&dir)?;
             // create the table if it does not exist (all columns VARCHAR)
             let cols: Vec<String> = header.iter().map(|c| format!("{c} VARCHAR")).collect();
-            let _ = e.execute(&format!("CREATE TABLE {table} ({});", cols.join(", ")));
+            let _ = e.execute_blocking(&format!("CREATE TABLE {table} ({});", cols.join(", ")));
 
             let mut total = 0usize;
             let mut batch: Vec<String> = Vec::new();
@@ -735,7 +755,7 @@ fn run(args: &[String]) -> common::Result<()> {
                 }
                 let sql = format!("INSERT INTO {table} VALUES {};", batch.join(", "));
                 let n = batch.len();
-                e.execute(&sql)?;
+                e.execute_blocking(&sql)?;
                 batch.clear();
                 Ok(n)
             };
@@ -750,7 +770,7 @@ fn run(args: &[String]) -> common::Result<()> {
                 }
             }
             total += flush(&e, &mut batch)?;
-            e.flush()?;
+            executor::block_on(e.flush())?;
             println!("imported {total} row(s) into {table} from {file}");
             Ok(())
         }
@@ -826,7 +846,7 @@ fn run_smoke(dir: &Path) -> common::Result<()> {
                 format!("row{i}").into_bytes(),
                 format!("val{i}").into_bytes(),
             );
-            m.commit(t)?;
+            executor::block_on(m.commit(t))?;
         }
         m.flush()?;
     }
@@ -905,7 +925,7 @@ impl sqllogictest::DB for SltDb {
         &mut self,
         sql: &str,
     ) -> Result<sqllogictest::DBOutput<Self::ColumnType>, common::Error> {
-        let results = self.engine.execute(sql)?;
+        let results = self.engine.execute_blocking(sql)?;
         let Some(last) = results.into_iter().last() else {
             return Ok(sqllogictest::DBOutput::StatementComplete(0));
         };

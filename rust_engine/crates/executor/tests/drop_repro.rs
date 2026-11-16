@@ -11,21 +11,22 @@ use executor::Engine;
 fn drop_after_restore() {
     let dir = tempfile::tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE tb1 (col1 INT);").unwrap();
-    e.execute("INSERT INTO tb1 VALUES (1),(2),(3);").unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE default_db.tb1;")
+    e.execute_blocking("CREATE TABLE tb1 (col1 INT);").unwrap();
+    e.execute_blocking("INSERT INTO tb1 VALUES (1),(2),(3);")
         .unwrap();
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE default_db.tb1;")
+        .unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
     assert!(
         !e.table_exists("default_db.tb1"),
         "drop left the table behind (1)"
     );
-    e.execute("RESTORE TABLE SNAPSHOT s1;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT s1;").unwrap();
     assert!(
         e.table_exists("default_db.tb1"),
         "restore did not recreate it"
     );
-    e.execute("DROP TABLE tb1;").unwrap();
+    e.execute_blocking("DROP TABLE tb1;").unwrap();
     assert!(
         !e.table_exists("default_db.tb1"),
         "drop left the table behind (2)"

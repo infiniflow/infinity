@@ -41,17 +41,17 @@ from infinity_embedded.table import ExplainType as BaseExplainType
 
 class Query(ABC):
     def __init__(
-            self,
-            columns: list[WrapParsedExpr] | None,
-            highlight: list[WrapParsedExpr] | None,
-            search: WrapSearchExpr | None,
-            filter: WrapParsedExpr | None,
-            group_by: list[WrapParsedExpr] | None,
-            having: WrapParsedExpr | None,
-            limit: WrapParsedExpr | None,
-            offset: WrapParsedExpr | None,
-            sort: list[WrapOrderByExpr] | None,
-            total_hits_count: bool | None
+        self,
+        columns: list[WrapParsedExpr] | None,
+        highlight: list[WrapParsedExpr] | None,
+        search: WrapSearchExpr | None,
+        filter: WrapParsedExpr | None,
+        group_by: list[WrapParsedExpr] | None,
+        having: WrapParsedExpr | None,
+        limit: WrapParsedExpr | None,
+        offset: WrapParsedExpr | None,
+        sort: list[WrapOrderByExpr] | None,
+        total_hits_count: bool | None,
     ):
         self.columns = columns
         self.highlight = highlight
@@ -67,19 +67,30 @@ class Query(ABC):
 
 class ExplainQuery(Query):
     def __init__(
-            self,
-            columns: list[WrapParsedExpr] | None,
-            highlight: list[WrapParsedExpr] | None,
-            search: WrapSearchExpr | None,
-            filter: WrapParsedExpr | None,
-            group_by: list[WrapParsedExpr] | None,
-            having: WrapParsedExpr | None,
-            limit: WrapParsedExpr | None,
-            offset: WrapParsedExpr | None,
-            sort: list[WrapOrderByExpr] | None,
-            explain_type: BaseExplainType | None,
+        self,
+        columns: list[WrapParsedExpr] | None,
+        highlight: list[WrapParsedExpr] | None,
+        search: WrapSearchExpr | None,
+        filter: WrapParsedExpr | None,
+        group_by: list[WrapParsedExpr] | None,
+        having: WrapParsedExpr | None,
+        limit: WrapParsedExpr | None,
+        offset: WrapParsedExpr | None,
+        sort: list[WrapOrderByExpr] | None,
+        explain_type: BaseExplainType | None,
     ):
-        super().__init__(columns, highlight, search, filter, group_by, having, limit, offset, sort, None)
+        super().__init__(
+            columns,
+            highlight,
+            search,
+            filter,
+            group_by,
+            having,
+            limit,
+            offset,
+            sort,
+            None,
+        )
         self.explain_type = explain_type
 
 
@@ -110,13 +121,13 @@ class InfinityLocalQueryBuilder(ABC):
         self._total_hits_count = None
 
     def match_dense(
-            self,
-            vector_column_name: str,
-            embedding_data: VEC,
-            embedding_data_type: str,
-            distance_type: str,
-            topn: int,
-            knn_params: {} = None,
+        self,
+        vector_column_name: str,
+        embedding_data: VEC,
+        embedding_data_type: str,
+        distance_type: str,
+        topn: int,
+        knn_params: {} = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -128,14 +139,15 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE,
+                f"Invalid topn, type should be embedded, but get {type(topn)}",
             )
 
         if embedding_data_type == "bit":
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
                     ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
-                    "Embeddings with data bit must have dimension of times of 8!"
+                    "Embeddings with data bit must have dimension of times of 8!",
                 )
             else:
                 new_embedding_data = []
@@ -144,7 +156,7 @@ class InfinityLocalQueryBuilder(ABC):
                     bitunit = 0
                     for bit_idx in range(8):
                         if embedding_data[i * 8 + bit_idx] > 0:
-                            bitunit |= (1 << bit_idx)
+                            bitunit |= 1 << bit_idx
                     new_embedding_data.append(bitunit)
                 embedding_data = new_embedding_data
 
@@ -159,11 +171,28 @@ class InfinityLocalQueryBuilder(ABC):
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
-        if embedding_data_type in ["int", "uint8", "int8", "int16", "int32", "int64", "tinyint", "unsigned tinyint",
-                                   "smallint", "bigint"]:
+        if embedding_data_type in [
+            "int",
+            "uint8",
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "tinyint",
+            "unsigned tinyint",
+            "smallint",
+            "bigint",
+        ]:
             embedding_data = [int(x) for x in embedding_data]
 
-        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+        if embedding_data_type in [
+            "float",
+            "float32",
+            "double",
+            "float64",
+            "float16",
+            "bfloat16",
+        ]:
             embedding_data = [float(x) for x in embedding_data]
 
         data = EmbeddingData()
@@ -199,8 +228,10 @@ class InfinityLocalQueryBuilder(ABC):
             elem_type = EmbeddingDataType.kElemBFloat16
             data.bf16_array_value = embedding_data
         else:
-            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
-                                    f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(
+                ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                f"Invalid embedding {embedding_data[0]} type",
+            )
 
         dist_type = KnnDistanceType.kInvalid
         if distance_type == "l2":
@@ -212,16 +243,21 @@ class InfinityLocalQueryBuilder(ABC):
         elif distance_type == "hamming":
             dist_type = KnnDistanceType.kHamming
         else:
-            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
+            raise InfinityException(
+                ErrorCode.INVALID_KNN_DISTANCE_TYPE,
+                f"Invalid distance type {distance_type}",
+            )
 
         knn_opt_params = []
         optional_filter = None
         if knn_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(
+                knn_params
+            )
             for k, v in knn_params.items():
                 key = k.lower()
-                value = v.lower()
+                value = str(v).lower()
                 tmp_param = InitParameter()
                 tmp_param.param_name = key
                 tmp_param.param_value = value
@@ -244,12 +280,12 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_sparse(
-            self,
-            vector_column_name: str,
-            sparse_data: SparseVector | dict,
-            metric_type: str,
-            topn: int,
-            opt_params: {} = None,
+        self,
+        vector_column_name: str,
+        sparse_data: SparseVector | dict,
+        metric_type: str,
+        topn: int,
+        opt_params: {} = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -261,14 +297,17 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE,
+                f"Invalid topn, type should be embedded, but get {type(topn)}",
             )
 
         sparse_opt_params = []
         optional_filter = None
         if opt_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(opt_params)
+            optional_filter, opt_params = get_search_optional_filter_from_opt_params(
+                opt_params
+            )
             for k, v in opt_params.items():
                 params = InitParameter()
                 params.param_name = k
@@ -290,26 +329,42 @@ class InfinityLocalQueryBuilder(ABC):
                 sparse_expr.i64_array_idx = indices
                 sparse_expr.f64_array_value = values
             case SparseVector([int(), *_], None):
-                raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
-                                        "No values! Sparse data does not support bool value type now")
+                raise InfinityException(
+                    ErrorCode.INVALID_CONSTANT_TYPE,
+                    "No values! Sparse data does not support bool value type now",
+                )
             case dict():
                 if len(sparse_data) == 0:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+                    raise InfinityException(
+                        ErrorCode.INVALID_EXPRESSION, "Empty sparse vector"
+                    )
                 match next(iter(sparse_data.values())):
                     case int():
                         sparse_expr.literal_type = LiteralType.kLongSparseArray
-                        sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
-                        sparse_expr.i64_array_value = [int(vv) for vv in sparse_data.values()]
+                        sparse_expr.i64_array_idx = [
+                            int(kk) for kk in sparse_data.keys()
+                        ]
+                        sparse_expr.i64_array_value = [
+                            int(vv) for vv in sparse_data.values()
+                        ]
                     case float():
                         sparse_expr.literal_type = LiteralType.kDoubleSparseArray
-                        sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
-                        sparse_expr.f64_array_value = [float(vv) for vv in sparse_data.values()]
+                        sparse_expr.i64_array_idx = [
+                            int(kk) for kk in sparse_data.keys()
+                        ]
+                        sparse_expr.f64_array_value = [
+                            float(vv) for vv in sparse_data.values()
+                        ]
                     case _:
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                                f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}")
+                        raise InfinityException(
+                            ErrorCode.INVALID_EXPRESSION,
+                            f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}",
+                        )
             case _:
-                raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
-                                        f"Invalid sparse data type {type(sparse_data)}")
+                raise InfinityException(
+                    ErrorCode.INVALID_CONSTANT_TYPE,
+                    f"Invalid sparse data type {type(sparse_data)}",
+                )
 
         match_sparse_expr.sparse_expr = sparse_expr
 
@@ -324,7 +379,7 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_text(
-            self, fields: str, matching_text: str, topn: int, extra_options: dict | None
+        self, fields: str, matching_text: str, topn: int, extra_options: dict | None
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -336,7 +391,9 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_options is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_options)
+            optional_filter, extra_options = get_search_optional_filter_from_opt_params(
+                extra_options
+            )
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -350,12 +407,12 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_tensor(
-            self,
-            column_name: str,
-            query_data: VEC,
-            query_data_type: str,
-            topn: int,
-            extra_option: dict | None = None,
+        self,
+        column_name: str,
+        query_data: VEC,
+        query_data_type: str,
+        topn: int,
+        extra_option: dict | None = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -364,7 +421,9 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_option is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
+            optional_filter, extra_option = get_search_optional_filter_from_opt_params(
+                extra_option
+            )
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = WrapParsedExpr(ParsedExprType.kMatchTensor)
@@ -380,7 +439,9 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.match_exprs += [match_tensor_expr]
         return self
 
-    def fusion(self, method: str, topn: int, fusion_params: dict | None) -> InfinityLocalQueryBuilder:
+    def fusion(
+        self, method: str, topn: int, fusion_params: dict | None
+    ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         fusion_expr = WrapFusionExpr()
@@ -390,15 +451,24 @@ class InfinityLocalQueryBuilder(ABC):
             if isinstance(fusion_params, dict):
                 for k, v in fusion_params.items():
                     if k == "topn":
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "topn is not allowed in fusion params")
+                        raise InfinityException(
+                            ErrorCode.INVALID_EXPRESSION,
+                            "topn is not allowed in fusion params",
+                        )
                     final_option_text += f";{k}={v}"
         elif method in ["match_tensor"]:
             fusion_expr.has_match_tensor_expr = True
             fusion_expr.match_tensor_expr = make_match_tensor_expr(
-                vector_column_name=fusion_params["field"], embedding_data=fusion_params["query_tensor"],
-                embedding_data_type=fusion_params["element_type"], method_type="maxsim", extra_option=None)
+                vector_column_name=fusion_params["field"],
+                embedding_data=fusion_params["query_tensor"],
+                embedding_data_type=fusion_params["element_type"],
+                method_type="maxsim",
+                extra_option=None,
+            )
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid fusion method")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, "Invalid fusion method"
+            )
         fusion_expr.options_text = final_option_text
         self._search.fusion_exprs += [fusion_expr]
         # *WARN*: A list in nanobind wrapped object is odd that append() does nothing!
@@ -408,11 +478,17 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def filter(self, where: str | None) -> InfinityLocalQueryBuilder:
+        if where is None:
+            self._filter = None
+            return self
         where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
 
     def limit(self, limit: int | None) -> InfinityLocalQueryBuilder:
+        if limit is None:
+            self._limit = None
+            return self
         constant_exp = WrapConstantExpr()
         constant_exp.literal_type = LiteralType.kInteger
         constant_exp.i64_value = limit
@@ -422,6 +498,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def offset(self, offset: int | None) -> InfinityLocalQueryBuilder:
+        if offset is None:
+            self._offset = None
+            return self
         constant_exp = WrapConstantExpr()
         constant_exp.literal_type = LiteralType.kInteger
         constant_exp.i64_value = offset
@@ -431,6 +510,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def group_by(self, columns: list[str] | str) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._group_by = None
+            return self
         group_by_list = []
         if isinstance(columns, list):
             for column in columns:
@@ -443,18 +525,26 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def having(self, having: str | None) -> InfinityLocalQueryBuilder:
+        if having is None:
+            self._having = None
+            return self
         having_expr = traverse_conditions(condition(having))
         self._having = having_expr
         return self
 
     def output(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._columns = None
+            return self
         self._columns = columns
         select_list: list[WrapParsedExpr] = []
         for column in columns:
-            if isinstance(column, str):
-                column = column.lower()
+            # match the special output tokens case-insensitively, but keep the
+            # original string for parsing: lowercasing the whole expression
+            # would corrupt string literals inside it
+            key = column.lower() if isinstance(column, str) else column
 
-            match column:
+            match key:
                 case "*":
                     column_expr = WrapColumnExpr()
                     column_expr.star = True
@@ -564,6 +654,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def highlight(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._highlight = None
+            return self
         highlight_list: list[WrapParsedExpr] = []
         for column in columns:
             if isinstance(column, str):
@@ -576,12 +669,17 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def option(self, option_kv: {}):
-        if 'total_hits_count' in option_kv:
-            if isinstance(option_kv['total_hits_count'], bool):
-                self._total_hits_count = option_kv['total_hits_count']
+        if "total_hits_count" in option_kv:
+            if isinstance(option_kv["total_hits_count"], bool):
+                self._total_hits_count = option_kv["total_hits_count"]
         return self
 
-    def sort(self, order_by_expr_list: list[list[str, SortType]] | None) -> InfinityLocalQueryBuilder:
+    def sort(
+        self, order_by_expr_list: list[list[str, SortType]] | None
+    ) -> InfinityLocalQueryBuilder:
+        if order_by_expr_list is None:
+            self._sort = None
+            return self
         sort_list: list[WrapOrderByExpr] = []
 
         order_by_expr_str = str
@@ -597,7 +695,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
                     parsed_expr.column_expr = column_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_row_id":
                     func_expr = WrapFunctionExpr()
@@ -608,7 +708,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_create_timestamp":
                     func_expr = WrapFunctionExpr()
@@ -619,7 +721,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_delete_timestamp":
                     func_expr = WrapFunctionExpr()
@@ -630,7 +734,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_score":
                     func_expr = WrapFunctionExpr()
@@ -641,7 +747,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_similarity":
                     func_expr = WrapFunctionExpr()
@@ -652,7 +760,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_distance":
                     func_expr = WrapFunctionExpr()
@@ -663,7 +773,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_score_factors":
                     func_expr = WrapFunctionExpr()
@@ -674,7 +786,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_similarity_factors":
                     func_expr = WrapFunctionExpr()
@@ -685,7 +799,9 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
                 case "_distance_factors":
                     func_expr = WrapFunctionExpr()
@@ -696,12 +812,16 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
 
                 case _:
                     parsed_expr = parse_expr(maybe_parse(order_by_expr_str))
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    order_by_expr = WrapOrderByExpr(
+                        parsed_expr, order_by_expr[1] == SortType.Asc
+                    )
                     sort_list.append(order_by_expr)
 
         self._sort = sort_list
@@ -714,7 +834,7 @@ class InfinityLocalQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             group_by=self._group_by,
-            having = self._having,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
@@ -750,6 +870,6 @@ class InfinityLocalQueryBuilder(ABC):
             limit=self._limit,
             offset=self._offset,
             explain_type=explain_type,
-            sort=self._sort
+            sort=self._sort,
         )
         return self._table._explain_query(query)

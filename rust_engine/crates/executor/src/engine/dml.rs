@@ -71,15 +71,16 @@ impl Engine {
     pub(crate) fn write_secondary_pgm_chunks(
         &self,
         table: &str,
-        column: &str,
+        index_id: u64,
         kind: storage::secondary_segment::KeyKind,
         by_segment: HashMap<u64, Vec<(storage::secondary_segment::Key, u32)>>,
     ) {
         use storage::secondary_segment::write_secondary_segment_typed;
-        let dir = self
-            .dir
-            .join("secondary")
-            .join(index_key(table, column).replace('/', "_"));
+        // A rebuild writes straight into the segment's own directory under the
+        // id the catalog hands out, so the records can be read back from there
+        // (`GetChunkIDs1`) instead of scanning a spill set. The id is the
+        // caller's: it is the record being rebuilt, not "the column's index".
+        let set = self.index_segment_set(table);
         // One chunk per **block**, as the reference does: the mem indexer is
         // handed a block at a time (`InsertBlockData`,
         // `secondary_index_in_mem_impl.cpp:104`) and dumps only that block into
@@ -88,17 +89,8 @@ impl Engine {
         // `index_filter_evaluators_impl.cpp:912`) - so only the split point
         // changes here, not the values.
         let block_rows = storage::format::DEFAULT_BLOCK_CAPACITY as u64;
-        // Every call rewrites the whole spill set; the file name carries the row
-        // count, so a leftover from an earlier (smaller) snapshot would publish
-        // a second chunk for the same block.
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                if entry.path().extension().is_some_and(|e| e == "idx") {
-                    let _ = std::fs::remove_file(entry.path());
-                }
-            }
-        }
         let mut readers = Vec::new();
+        let mut meta: Vec<(u64, usize)> = Vec::new();
         for (segment, entries) in by_segment {
             let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
             for entry in entries {
@@ -111,30 +103,52 @@ impl Engine {
                 // `Key::cmp` is the chunk's own order: u64 for integers and
                 // hashed text, the float order for a FLOAT/DOUBLE column.
                 entries.sort_by(|a, b| a.0.order(&b.0));
-                let path = dir.join(format!("seg_{segment}_{block}_{}.idx", entries.len()));
-                // Always rewrite: the name does not capture the data, and a
-                // stale chunk from an earlier run would shadow this one.
+                let next = self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
+                let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
+                if std::fs::create_dir_all(&seg_dir).is_err() {
+                    continue;
+                }
+                let path = seg_dir.join(format!("chunk_{next}.idx"));
                 if write_secondary_segment_typed(&path, kind, &entries).is_err() {
                     continue;
                 }
+                // `AddNewChunkIndex1`.
+                let record = catalog::layout::IndexChunk {
+                    chunk_id: next,
+                    base_name: String::new(),
+                    base_row_id: (segment << 32) | (block * block_rows),
+                    row_count: entries.len() as u64,
+                    term_count: 0,
+                    index_size: 0,
+                    commit_ts: self.txn.current_ts().max(1),
+                };
+                let index = catalog::layout::IndexSegment {
+                    index_id,
+                    segment_id: segment as u32,
+                    chunks: vec![record.clone()],
+                };
+                let _ = self
+                    .storage
+                    .catalog
+                    .append_index_chunk(&set, &index, &record);
                 if let Ok(reader) =
                     storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
                 {
                     // The chunk's offsets are already segment-relative, so the
-                    // base is the segment alone.
+                    // base is the segment alone; its `ChunkIndexMetaInfo` covers
+                    // the rows the block held.
+                    meta.push((segment << 32, entries.len()));
                     readers.push((segment << 32, Arc::new(reader)));
                 }
             }
         }
         let tkey = self.table_key(table);
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(tkey)
-            .or_default()
-            .secondary
-            .disk
-            .insert(column.to_string(), readers);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.secondary.disk.insert(index_id, readers);
+        // A rebuild replaces the whole chunk set, so its meta replaces the list
+        // a previous dump appended to.
+        entry.secondary.chunk_meta.insert(index_id, meta);
     }
 
     /// Appends a committed batch to the decoded-row cache, if the table has one.
@@ -154,9 +168,10 @@ impl Engine {
         // canonical rendering (e.g. a FLOAT column renders `1.000000` even when
         // the literal was `1`).
         let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
         let mut decoded = Vec::with_capacity(encoded.len());
         for text in encoded {
-            match self.parse_stored_row(table, &defaults, text.as_bytes()) {
+            match self.parse_stored_row(table, &defaults, &types, text.as_bytes()) {
                 Ok(values) => decoded.push(values),
                 Err(_) => return,
             }
@@ -401,7 +416,7 @@ impl Engine {
     /// index. Keep that invariant when touching any `tables.lock()` block;
     /// `concurrent_insert_query_seal_and_optimize_do_not_deadlock` fails instead
     /// of hanging when it is broken.
-    pub(crate) fn batch_gate(&self, table: &str) -> Arc<Mutex<()>> {
+    pub(crate) fn batch_gate(&self, table: &str) -> Arc<tokio::sync::Mutex<()>> {
         let key = self.table_key(table);
         let mut gates = self.batch_locks.lock().unwrap();
         Arc::clone(gates.entry(key).or_default())
@@ -411,7 +426,7 @@ impl Engine {
     /// normal SELECT path, maps its columns onto the target schema (by the
     /// explicit list when present, otherwise by position), casts each value to
     /// the target column's type, and appends the rows.
-    pub(crate) fn insert_from_select(
+    pub(crate) async fn insert_from_select(
         &self,
         table: &str,
         columns: Option<&[String]>,
@@ -476,22 +491,64 @@ impl Engine {
             }
             literals.push(out);
         }
-        self.insert_literals(table, None, literals)
+        self.insert_literals_inner(table, None, literals, false)
+            .await
     }
 
-    /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
-    /// directly: rebuilding SQL text for a 1000-row batch and re-parsing it cost
-    /// more than the insert itself.
+    /// [`Self::insert_literals`], retried the way `execute_stmt_retrying`
+    /// retries a statement.
+    ///
+    /// An `Append` conflicts with a `CreateIndex`/`DropIndex` on the same table
+    /// (`new_txn_impl.cpp:3347`), and that conflict is retryable. The commit
+    /// checks it *before* it allocates the row range, so a conflicting attempt
+    /// has written nothing and the whole batch can run again - which is what
+    /// this loop does. The front ends that insert directly (the Thrift `Insert`
+    /// RPC and the REST `POST .../docs` handler) call this so a transient
+    /// schema change does not surface as a client-visible error.
+    pub async fn insert_literals_retrying(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+    ) -> Result<QueryResult> {
+        for _ in 0..RETRY_LIMIT {
+            let before = self.txn.current_ts();
+            match self
+                .insert_literals_inner(table, columns, rows.clone(), false)
+                .await
+            {
+                Err(Error::TxnConflict(_reason)) => {
+                    // The retry spends another txn id, as
+                    // `QueryStatementInternal` does for a re-run statement.
+                    self.txn.end_statement();
+                    self.txn.ensure_statement_id();
+                    if self.txn.current_ts() == before {
+                        std::thread::yield_now();
+                    }
+                    continue;
+                }
+                Err(Error::TxnConflictNoRetry(reason)) => {
+                    return Err(Error::TxnConflictNoRetry(reason))
+                }
+                other => return other,
+            }
+        }
+        Err(Error::TxnConflict(format!(
+            "the insert kept conflicting for {RETRY_LIMIT} attempts"
+        )))
+    }
+
+    /// Inserts literal rows into `table`. Every front end calls this directly -
+    /// the Thrift `Insert` RPC and the HTTP `POST …/docs` handler included:
+    /// rebuilding SQL text for a 1000-row batch and re-parsing it cost more
+    /// than the insert itself, and the REST path paid it once per **row**.
     pub fn insert_literals(
         &self,
         table: &str,
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        // The Thrift `Insert` RPC reaches this directly, so the mode gate has
-        // to live here and not only in `execute` (`PhysicalInsert`).
-        self.ensure_writable()?;
-        self.insert_literals_inner(table, columns, rows, false)
+        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, false))
     }
 
     /// `NewTxn::Import`: like [`Self::insert_literals`], but the batch always
@@ -502,17 +559,20 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        self.ensure_writable()?;
-        self.insert_literals_inner(table, columns, rows, true)
+        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, true))
     }
 
-    pub(crate) fn insert_literals_inner(
+    pub async fn insert_literals_inner(
         &self,
         table: &str,
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
         new_segment: bool,
     ) -> Result<QueryResult> {
+        // `PhysicalInsert::Execute` gates the storage mode inside the operator,
+        // not in the SQL layer, so every caller of this primitive - the SQL
+        // `INSERT`, the Thrift RPC, the REST handler, `COPY` - gets the gate.
+        self.ensure_writable()?;
         let meta = self
             .storage
             .catalog
@@ -656,27 +716,36 @@ impl Engine {
         // spends one.
         let turn = self.txn.begin_write();
         let ts = turn.ts();
-        let allocated = std::cell::Cell::new(RowRange::single(0));
+        // A `std::sync::Mutex` shared with the `before_wal` callback: it only
+        // holds a `RowRange` (two integers) and is locked twice, for one
+        // assignment and one read, never across an `.await`.
+        let allocated = std::sync::Mutex::new(RowRange::single(0));
         let alloc_table = table.to_string();
         let alloc_table_id = meta.id.to_string();
         let alloc_rows = rows.len();
-        let ts = self.txn.commit_at_deferred_with(t, ts, |txn| {
-            let range = self.reserve_rows_at(&alloc_table, alloc_rows, new_segment, ts)?;
-            allocated.set(range);
-            if let Some(block) = typed {
-                txn.set_typed_commands(vec![self.append_command(
-                    &alloc_table,
-                    &alloc_table_id,
-                    range.base,
-                    alloc_rows,
-                    block,
-                )]);
-            }
-            Ok(())
-        })?;
+        let ts = self
+            .txn
+            .commit_at_deferred_with(t, ts, |txn| {
+                // Allocated **inline**: this callback runs on a runtime worker
+                // that already holds the commit turn and `commit_lock`, so it
+                // must not park (see `reserve_rows_at`).
+                let range = self.reserve_rows_at(&alloc_table, alloc_rows, new_segment, ts)?;
+                *allocated.lock().unwrap() = range;
+                if let Some(block) = typed {
+                    txn.set_typed_commands(vec![self.append_command(
+                        &alloc_table,
+                        &alloc_table_id,
+                        range.base,
+                        alloc_rows,
+                        block,
+                    )]);
+                }
+                Ok(())
+            })
+            .await?;
         let committed = phase.elapsed();
         let bottom_started = std::time::Instant::now();
-        let range = allocated.get();
+        let range = *allocated.lock().unwrap();
         let base = range.base;
         // Deferred publish: the commit becomes visible when the bottom half
         // below is done (the guard publishes, on the error path too).
@@ -687,6 +756,13 @@ impl Engine {
         // `CommitBottomAppend` does.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
+        // The append record was created while the row ids were allocated, but
+        // it carries no ts yet: stamping it there would make `committed_rows`
+        // count rows that are still in flight, and a checkpoint in that window
+        // sizes a block from ids that hold nothing. The reference keeps a
+        // block's `created_` fields and its rows in one object; here the ts is
+        // written below, right after the rows reach the buffer.
+        let append_record = range.append;
         let row_count = rows.len();
         let bottom_rows = rows;
         let bottom_encoded = encoded_rows;
@@ -698,7 +774,7 @@ impl Engine {
         // how). Optimize/compact still exclude this section, which is what the
         // gate guarantees for them.
         let gate_wait = std::time::Instant::now();
-        let _batch = gate.lock().unwrap();
+        let _batch = gate.lock().await;
         let gate_waited = gate_wait.elapsed();
         self.run_commit_bottom(&shard_key, move |engine| {
             // `AppendInBlock`: the rows land in the block before the index
@@ -746,9 +822,19 @@ impl Engine {
                 // thread (the reference's `MemIndexAppender` is a single
                 // thread, which is the one structural deviation here).
                 let schema = engine.table_schema(&index_table).unwrap_or_default();
-                for (seq, texts) in &index_rows {
-                    engine.update_indexes_on_insert_text(&index_table, *seq, texts, &schema)?;
-                }
+                // One pass for the whole batch: the per-row form resolved the
+                // table key and took the registry lock once per row.
+                //
+                // The cells come from `bottom_rows` (real `Value`s), not from
+                // the rendered text: a `NULL` must reach the index as
+                // `Value::Null`, because `value_to_tail_keys` skips it - a
+                // string form would make it an ordinary key
+                // (`SecondaryIndexInMemT::InsertInner` skips the null bit).
+                let values: Vec<Vec<Value>> = bottom_rows
+                    .iter()
+                    .map(|row| row.iter().map(Value::from_literal).collect())
+                    .collect();
+                engine.update_secondary_indexes_batch(&index_table, base, &values, &schema);
                 // One batch: the full-text terms of the whole append are
                 // tokenised without the column lock and inserted under it once.
                 let batch: Vec<(usize, &[String])> = index_rows
@@ -773,8 +859,11 @@ impl Engine {
                 // C++ `AppendMemIndex`: a segment that reached
                 // `mem_index_capacity` rows is dumped right after the batch.
                 engine.dump_hnsw_over_capacity(&index_table);
-                engine.dump_secondary_over_capacity(&index_table);
+                engine.dump_secondary_over_capacity_blocking(&index_table);
             }
+            // Fold this batch's index growth into the engine-wide total (plan
+            // 4.2): one table's delta, not a scan of every table.
+            engine.refresh_memindex_charge(&bottom_table);
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_rows.len() as isize);
             engine.append_row_cache(&bottom_table, base, &bottom_encoded);
@@ -790,8 +879,13 @@ impl Engine {
                 .enumerate()
                 .map(|(k, text)| (base + k, text.clone()))
                 .collect();
-            engine.publish_encoded_rows(&bottom_table, &published)
-        })?;
+            engine.publish_encoded_rows(&bottom_table, &published)?;
+            // The rows are readable now (`AppendInBlock`), so the record may
+            // carry this transaction's ts (`BlockVersion::Append(commit_ts, …)`).
+            engine.settle_append_at(&bottom_table, append_record, ts);
+            Ok(())
+        })
+        .await?;
         // Give the allocator's per-batch scratch back to the OS. Trimming on
         // every batch walks the whole heap; once every few batches is enough
         // to keep RSS flat and avoids adding milliseconds to each commit.
@@ -813,6 +907,16 @@ impl Engine {
                 committed,
                 bottom_started.elapsed()
             );
+        }
+        // Only a table with no index declaration checks the quota here.
+        // An indexed table already checks inside `update_text_indexes_batch`;
+        // checking again after every insert would fire a second dump per batch,
+        // which changes the number of chunks a mem-index dump produces - the
+        // restart suite pins that count. The one-batch overshoot this leaves in
+        // the append buffer is bounded, and the next write to the table closes
+        // it.
+        if !self.has_index_declaration(table) {
+            self.enforce_quota_after_append(table).await;
         }
         Ok(QueryResult::Inserted { count: row_count })
     }
@@ -867,7 +971,7 @@ impl Engine {
         }
     }
 
-    pub(crate) fn commit_with_deletes(
+    pub(crate) async fn commit_with_deletes(
         &self,
         table: &str,
         deletes: &[usize],
@@ -896,24 +1000,19 @@ impl Engine {
             table: table.to_string(),
             rows: deletes.iter().map(|seq| *seq as u64).collect(),
         });
-        let ts = self.txn.commit_deferred(txn)?;
+        let ts = self.txn.commit_deferred(txn).await?;
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomDelete` on the table's worker: the block's `version`
         // records the delete ts (and an UPDATE's rewritten rows' append ts).
-        self.delete_bottom(
-            table,
-            deletes,
-            AppendRecords::Last(appended),
-            extra.to_vec(),
-            ts,
-        )?;
+        self.delete_bottom(table, deletes, Some(appended), extra.to_vec(), ts)
+            .await?;
         Ok(ts)
     }
 
     /// `CommitBottomDelete`: the delete joins the table's log, the block's
     /// `version` carries both timestamps, and the rows the statement appended
     /// go into the block (`AppendInBlock`).
-    pub(crate) fn delete_bottom(
+    pub(crate) async fn delete_bottom(
         &self,
         table: &str,
         deletes: &[usize],
@@ -939,9 +1038,8 @@ impl Engine {
             // transaction (`reserve_rows` already logged the create), so the
             // block's `version` has to record this ts for them as well
             // (`BlockVersion::Append`).
-            match appended {
-                AppendRecords::None => {}
-                AppendRecords::Last(count) => engine.settle_append_ts(&bottom_table, count, ts),
+            if let Some(count) = appended {
+                engine.settle_append_ts(&bottom_table, count, ts);
             }
             // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
             // deleting transaction's commit timestamp, and the block rewrite
@@ -949,6 +1047,7 @@ impl Engine {
             engine.settle_delete_at(&bottom_table, first_delete, delete_count, ts);
             engine.refresh_block_mirror_extra(&bottom_table, &bottom_rows)
         })
+        .await
     }
 
     /// Commits an `UPDATE`: the reference's `DeleteV2` and `AppendV2` in one
@@ -957,7 +1056,7 @@ impl Engine {
     /// `prepare` runs between the conflict check and the WAL entry, gets the
     /// base id and fills in the entry's commands; the rows themselves reach the
     /// block in the bottom half.
-    pub(crate) fn commit_rewritten_rows<F>(
+    pub(crate) async fn commit_rewritten_rows<F>(
         &self,
         table: &str,
         deletes: &[usize],
@@ -991,13 +1090,16 @@ impl Engine {
         let turn = self.txn.begin_write();
         let ts = turn.ts();
         let count = rows.len();
-        let allocated = std::cell::Cell::new(RowRange::single(0));
-        let ts = self.txn.commit_at_deferred_with(txn, ts, |txn| {
-            let range = self.reserve_rows_at(table, count, false, ts)?;
-            allocated.set(range);
-            prepare(txn, range.base)
-        })?;
-        let range = allocated.get();
+        let allocated = std::sync::Mutex::new(RowRange::single(0));
+        let ts = self
+            .txn
+            .commit_at_deferred_with(txn, ts, |txn| {
+                let range = self.reserve_rows_at(table, count, false, ts)?;
+                *allocated.lock().unwrap() = range;
+                prepare(txn, range.base)
+            })
+            .await?;
+        let range = *allocated.lock().unwrap();
         let base = range.base;
         let _visible = BottomGuard::new(&self.txn, ts);
         // One copy of the rewritten rows: the block buffer takes them as
@@ -1007,7 +1109,11 @@ impl Engine {
             .enumerate()
             .map(|(k, row)| (base + k, row.clone()))
             .collect();
-        self.delete_bottom(table, deletes, AppendRecords::None, extra, ts)?;
+        // The staged append record settles with its commit ts here, which is what
+        // `committed_rows` reads; without it a checkpoint would not see the
+        // rewritten rows (`reserve_rows_at` no longer stamps it).
+        self.delete_bottom(table, deletes, Some(count), extra, ts)
+            .await?;
         Ok(base)
     }
 
@@ -1109,8 +1215,55 @@ impl Engine {
         values: &[Literal],
         schema: &[String],
     ) -> Result<()> {
-        let texts: Vec<String> = values.iter().map(|v| v.to_slt_string()).collect();
-        self.update_indexes_on_insert_text(table, seq, &texts, schema)
+        let targets = self.secondary_targets(table, schema);
+        self.insert_secondary_keys(&targets, seq, values)
+    }
+
+    /// [`Self::update_indexes_on_insert`] with the targets already resolved, for
+    /// a bulk load that resolves them once per batch.
+    pub(crate) fn insert_secondary_keys(
+        &self,
+        targets: &[SecondaryTarget],
+        seq: usize,
+        values: &[Literal],
+    ) -> Result<()> {
+        // The evaluated row is only built when a functional index needs it: a
+        // plain index reads its cell's text and pays nothing.
+        let mut row_values: Option<Vec<Value>> = None;
+        for target in targets {
+            let Some(value) = values.get(target.pos) else {
+                continue;
+            };
+            // `SecondaryIndexInMemT::InsertInner` skips a row whose null bit is
+            // set: a NULL is not a key.
+            if matches!(value, Literal::Null) {
+                continue;
+            }
+            let keys = match &target.func {
+                None => text_to_tail_keys(&target.declared, &value.to_slt_string()),
+                Some(func) => {
+                    let row = row_values
+                        .get_or_insert_with(|| values.iter().map(Value::from_literal).collect());
+                    match functional_value(func, target.pos, row) {
+                        Some(value) => value_to_key(&target.declared, &value),
+                        None => Vec::new(),
+                    }
+                }
+            };
+            for key in keys {
+                target.index.insert(&key, seq as u64);
+            }
+        }
+        Ok(())
+    }
+
+    /// `[storage] flush_dumps_mem_index`: whether `FLUSH DATA` also dumps every
+    /// memory index (see `Engine::flush_storage`). Off by default, like the
+    /// reference.
+    pub fn set_flush_dumps_mem_index(&self, on: bool) {
+        self.context
+            .flush_dumps_mem_index
+            .store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Feeds a whole batch of rows into every secondary index of `table`.
@@ -1119,6 +1272,12 @@ impl Engine {
     /// string) and took the registry lock for every row, and looked the indexed
     /// column up in the schema once per index per row. A bulk statement paid
     /// that per row; this pays it once for the batch.
+    ///
+    /// Each key is the column's **order-preserving encoding**
+    /// (`Key::ordered_bytes`) - the same domain a sealed chunk uses - so the
+    /// memory tail is ordered like the column (a range scan slices it instead
+    /// of decoding every key) and a dump can write its keys out directly. The
+    /// tails are cloned out under the table lock and appended to outside it.
     pub(crate) fn update_secondary_indexes_batch(
         &self,
         table: &str,
@@ -1129,57 +1288,174 @@ impl Engine {
         if rows.is_empty() {
             return;
         }
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        if entry.secondary.indexes.is_empty() {
+        let targets = self.secondary_targets(table, schema);
+        if targets.is_empty() {
             return;
         }
-        // `(position of the indexed column in the row, index)`, resolved once.
-        let mut targets: Vec<(usize, &mut SecondaryIndex)> = Vec::new();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(pos) = schema.iter().position(|c| c == col) {
-                targets.push((pos, idx));
-            }
-        }
-        // Only the indexed cells are rendered: the key is the cell's stored
-        // text, and a wide table has no reason to format the rest. A varchar
-        // cell *is* its stored text, so it goes in without a copy; everything
-        // else is formatted into one buffer reused across the batch.
-        let mut key = String::new();
         for (k, values) in rows.iter().enumerate() {
             let seq = (base + k) as u64;
-            for (pos, idx) in targets.iter_mut() {
-                let Some(value) = values.get(*pos) else {
+            for target in &targets {
+                let Some(value) = values.get(target.pos) else {
                     continue;
                 };
-                match value {
-                    Value::Str(text) => idx.insert(text.as_bytes(), seq),
-                    other => {
-                        key.clear();
-                        key.push_str(&other.to_slt_string());
-                        idx.insert(key.as_bytes(), seq);
-                    }
+                // A JSON document contributes one key per flattened term, a
+                // functional index one per evaluated row and every other column
+                // exactly one.
+                let keys = match &target.func {
+                    None => value_to_tail_keys(&target.declared, value),
+                    Some(func) => match functional_value(func, target.pos, values) {
+                        Some(value) => value_to_key(&target.declared, &value),
+                        None => Vec::new(),
+                    },
+                };
+                for key in keys {
+                    target.index.insert(&key, seq);
                 }
             }
         }
     }
 
+    /// `(position in the row, declared type, memory tail)` of each indexed
+    /// column, resolved once per statement and held outside the table lock.
+    ///
+    /// The tail is an `Arc` (the registry only borrows it while building this
+    /// list), so the rows go into it without excluding any other table - the
+    /// reference writes into each `SecondaryIndexInMemT` the same way.
+    /// Whether `table` has any secondary index at all.
+    ///
+    /// A per-row `secondary_targets` takes the table lock, walks the index map
+    /// and allocates a `Vec` - for eight million rows on a table with no
+    /// secondary index that is eight million locks spent to find nothing.
+    pub(crate) fn has_secondary_indexes(&self, table: &str) -> bool {
+        let tkey = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .is_some_and(|entry| !entry.secondary.indexes.is_empty())
+    }
+
+    /// Whether `table` has any index the per-row write hook maintains.
+    ///
+    /// The hook (`update_text_indexes_batch_async`) also carries the sparse and
+    /// multi-vector indexes - it is the one place every write path (SQL
+    /// INSERT/UPDATE, `COPY`, the thrift insert) goes through - so a table with
+    /// only a sparse (BMP) index needs it as much as one with a full-text
+    /// index. Gating on full-text and vector alone dropped every row of a
+    /// sparse column, which `SEARCH MATCH SPARSE` then could not see.
+    ///
+    /// On a table with none of them the hook is a lock plus an allocation that
+    /// finds nothing, eight million times over a bulk `COPY`.
+    ///
+    /// Read-only: the `hnsw_probed` short-circuit belongs to
+    /// `hnsw_mem_segments`, and setting it here would make that skip its probe.
+    pub(crate) fn has_text_or_vector_indexes(&self, table: &str) -> bool {
+        let key = self.table_key(table);
+        let has_mem = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&key).is_some_and(|entry| {
+                !entry.hnsw_mem.is_empty()
+                    || !entry.ivf_mem.is_empty()
+                    || !entry.sparse.is_empty()
+                    || !entry.mv.is_empty()
+                    || !entry.text.is_empty()
+            })
+        };
+        if has_mem {
+            return true;
+        }
+        let prefix = format!("{table}.");
+        if self
+            .vector_cache
+            .lock()
+            .unwrap()
+            .keys()
+            .any(|k| k.starts_with(&prefix))
+        {
+            return true;
+        }
+        // An index the registries have not opened yet (a fresh directory, or a
+        // column this table entry has not seen): the catalog record decides.
+        self.storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .iter()
+            .any(|im| {
+                (im.table == table || im.table == self.qualified_table(table))
+                    && (im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                        || im.index_type.eq_ignore_ascii_case("HNSW")
+                        || im.index_type.eq_ignore_ascii_case("IVF")
+                        || im.index_type.eq_ignore_ascii_case("BMP")
+                        || im.index_type.eq_ignore_ascii_case("SPARSE")
+                        || im.index_type.eq_ignore_ascii_case("EMVB"))
+            })
+    }
+
+    pub(crate) fn secondary_targets(&self, table: &str, schema: &[String]) -> Vec<SecondaryTarget> {
+        let tkey = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&tkey) else {
+            return Vec::new();
+        };
+        // The registries are keyed by index id; the column each one indexes
+        // comes from the catalog record (`IndexMeta::column`), which for a
+        // functional index is the expression it was declared with.
+        let Ok(catalog) = self.storage.catalog.indexes_of_table(table) else {
+            return Vec::new();
+        };
+        let columns: std::collections::HashMap<u64, String> =
+            catalog.into_iter().map(|im| (im.id, im.column)).collect();
+        entry
+            .secondary
+            .indexes
+            .iter()
+            .filter_map(|(id, index)| {
+                let col = columns.get(id)?;
+                let declared = entry.secondary.declared_types.get(id)?;
+                // A functional index reads `base` and applies `func`; its
+                // declared type is the function's return type
+                // (`IndexSecondaryFunctional::func_return_type_`).
+                let (pos, func) = match entry.secondary.functional.get(col) {
+                    Some(functional) => (
+                        schema.iter().position(|c| c == &functional.base)?,
+                        Some(functional.func.clone()),
+                    ),
+                    None => (schema.iter().position(|c| c == col)?, None),
+                };
+                Some(SecondaryTarget {
+                    pos,
+                    declared: declared.clone(),
+                    index: Arc::clone(index),
+                    func,
+                })
+            })
+            .collect()
+    }
+
+    /// The `Value` form of [`Self::update_indexes_on_insert`]: a callback path
+    /// that only has the rendered cells cannot tell a NULL from an empty string,
+    /// so every caller hands the row over as values.
     pub(crate) fn update_indexes_on_insert_text(
         &self,
         table: &str,
         seq: usize,
-        values: &[String],
+        values: &[Value],
         schema: &[String],
     ) -> Result<()> {
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        let entry = tables.entry(tkey).or_default();
-        for (col, idx) in entry.secondary.indexes.iter_mut() {
-            if let Some(ci) = schema.iter().position(|c| c == col) {
-                if let Some(v) = values.get(ci) {
-                    idx.insert(v.as_bytes(), seq as u64);
-                }
+        for target in self.secondary_targets(table, schema) {
+            let Some(value) = values.get(target.pos) else {
+                continue;
+            };
+            let keys = match &target.func {
+                None => value_to_tail_keys(&target.declared, value),
+                Some(func) => match functional_value(func, target.pos, values) {
+                    Some(value) => value_to_key(&target.declared, &value),
+                    None => Vec::new(),
+                },
+            };
+            for key in keys {
+                target.index.insert(&key, seq as u64);
             }
         }
         Ok(())
@@ -1194,15 +1470,21 @@ impl Engine {
         // `table_schema` is a full catalog read, so it must not be paid per
         // row: probe the index set once per table, and once there is nothing
         // in `hnsw_mem` the hook has nothing to do.
-        let probing = {
+        // Two questions, one pass, and this is the per-row path:
+        // * `topup` - must the catalog be read to materialise a graph this
+        //   registry does not hold yet? Exactly when a probe was asked for and
+        //   has not run (`CREATE INDEX` sets `hnsw_topup`, the probe clears it).
+        // * `probing` - is there any graph to feed? A table with none returns
+        //   here without touching the catalog again.
+        let (topup, probing) = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key.clone()).or_default();
-            if entry.hnsw_mem.is_empty() && !entry.hnsw_probed {
-                entry.hnsw_probed = true;
-                true
-            } else {
-                !entry.hnsw_mem.is_empty()
-            }
+            // The first insert on a table has to find out whether it has an
+            // HNSW index at all.
+            let first = entry.hnsw_mem.is_empty() && !entry.hnsw_probed;
+            entry.hnsw_probed |= first;
+            let topup = std::mem::take(&mut entry.hnsw_topup) || first;
+            (topup, topup || !entry.hnsw_mem.is_empty())
         };
         if !probing {
             return;
@@ -1215,9 +1497,16 @@ impl Engine {
         let segments: Vec<(String, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>)> = {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(key).or_default();
-            if entry.hnsw_mem.is_empty() && entry.hnsw_probed {
-                // The probe above marked the table as examined; a table with
-                // no HNSW index leaves `hnsw_mem` empty forever.
+            // Materialise the graphs the catalog lists, once per table: this
+            // runs on **every inserted row**, so re-reading the catalog here
+            // would make a warm insert cost "rows x every index in the engine".
+            //
+            // A later `CREATE INDEX … USING HNSW` clears `hnsw_probed` (see the
+            // `CREATE INDEX` path) and registers its own id, so the next row
+            // re-probes and the new index gets a graph of its own - the
+            // reference's `MemIndex` map is keyed by index id, so two indexes on
+            // one column never share one.
+            if topup {
                 let Ok(indexes) = self.storage.catalog.list_indexes() else {
                     return;
                 };
@@ -1237,35 +1526,30 @@ impl Engine {
                     let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
                         continue;
                     };
-                    let opt = |name: &str| -> Option<usize> {
-                        im.options
-                            .iter()
-                            .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                            .and_then(|(_, v)| v.parse().ok())
-                    };
-                    let m = opt("M").unwrap_or(16);
-                    let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
-                    let opt = |name: &str| {
-                        im.options
-                            .iter()
-                            .find(|(k, _)| k.eq_ignore_ascii_case(name))
-                            .map(|(_, v)| v.clone())
-                    };
-                    let metric =
-                        index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
-                    let encoding =
-                        index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
-                    entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
+                    let options =
+                        crate::blocks::index_chunk::HnswOptions::from_options(&im.options);
+                    entry.hnsw_mem.entry(im.id).or_insert_with(|| {
                         Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                            dims, m, efc, metric, encoding,
+                            dims, &options,
                         )))
                     });
                 }
             }
+            // The rows are fed to every HNSW index on the table, each of which
+            // keeps its own graph (the reference's per-`MemIndex` object). The
+            // index id -> column map decides which cell feeds which graph.
+            let by_id: std::collections::HashMap<u64, String> = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|im| (im.id, im.column))
+                .collect();
             entry
                 .hnsw_mem
                 .iter()
-                .map(|(c, m)| (c.clone(), m.clone()))
+                .filter_map(|(id, m)| Some((by_id.get(id)?.clone(), m.clone())))
                 .collect()
         };
         for (column, mem) in segments {
@@ -1344,7 +1628,11 @@ impl Engine {
         let Some(entry) = tables.get_mut(&tkey) else {
             return;
         };
-        for (column, rows) in entry.ivf_mem.iter_mut() {
+        let by_id = self.index_column_map(table);
+        for (index_id, rows) in entry.ivf_mem.iter_mut() {
+            let Some(column) = by_id.get(index_id) else {
+                continue;
+            };
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -1357,14 +1645,33 @@ impl Engine {
         }
     }
 
+    /// `index id -> column` for the table's indexes, resolved from the catalog.
+    ///
+    /// The in-memory registries are keyed by index id, so a hook that walks one
+    /// needs the column each id was built on to find its cell.
+    fn index_column_map(&self, table: &str) -> std::collections::HashMap<u64, String> {
+        self.storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|im| (im.id, im.column))
+            .collect()
+    }
+
     pub(crate) fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.mv.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.mv.iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         if indexes.is_empty() {
             return;
@@ -1388,6 +1695,12 @@ impl Engine {
             }
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The row is seen whether or not it carries a tensor. A NULL cell
+            // adds no PLAID document, but the coverage counter has to advance
+            // anyway: `is_complete(reserved)` compares it with the table's live
+            // rows, and a row it never counts keeps every later search
+            // rebuilding the index from scratch.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             if let Some(doc) = parse_multivector_doc(text, dims) {
                 index.insert(seq as u64, doc);
@@ -1398,6 +1711,7 @@ impl Engine {
     /// Keeps existing sparse indexes in step with an inserted/rewritten row.
     pub(crate) fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
             .tables
             .lock()
@@ -1406,7 +1720,7 @@ impl Engine {
             .map(|e| {
                 e.sparse
                     .iter()
-                    .map(|(c, v)| (c.clone(), v.clone()))
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -1423,6 +1737,11 @@ impl Engine {
             };
             let mut index = shared.write().unwrap();
             index.remove(seq as u64);
+            // The index has seen this row whether or not it carries postings:
+            // the coverage check counts rows, not documents (a NULL sparse cell
+            // writes no term). A rewritten row counts twice, which only makes
+            // the index look more complete than it is - it was just updated.
+            index.note_row();
             let Some(text) = cells.get(ci) else { continue };
             // A NULL cell stores the literal `null`; it has no postings.
             if text.trim().eq_ignore_ascii_case("null") {
@@ -1463,12 +1782,18 @@ impl Engine {
         let tkey = self.table_key(table);
         // Clone the handles, then drop `tables`: an index lock is only ever taken
         // after it (see `batch_gate`'s lock-order note).
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.text
+                    .iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         if indexes.is_empty() {
             return None;
@@ -1508,7 +1833,39 @@ impl Engine {
     /// took the column's write lock once per row and ran the analyzer inside it,
     /// which serialised the most expensive part of the write path against every
     /// reader of that column.
+    /// The synchronous form, for the commit's bottom half.
+    ///
+    /// The bottom job runs on a blocking-pool thread (or inline when no pool is
+    /// attached), so the one wait it contains - the memindex quota's fallback
+    /// dump - is bridged with `block_on`; that is a blocking thread by
+    /// construction, which is exactly where a nested `block_on` is legal.
+    /// Async callers use [`Self::update_text_indexes_batch_async`] instead.
     pub(crate) fn update_text_indexes_batch(
+        &self,
+        table: &str,
+        rows: &[(usize, &[String])],
+        schema: &[String],
+        prepared: Option<&mut PreparedText>,
+    ) {
+        self.update_text_indexes_batch_inner(table, rows, schema, prepared);
+        crate::scheduler::block_on(self.enforce_memindex_quota(Some(table)));
+    }
+
+    /// [`Self::update_text_indexes_batch`] for a caller that is already a task:
+    /// the quota's fallback dump is an `.await` instead of a bridged wait.
+    pub(crate) async fn update_text_indexes_batch_async(
+        &self,
+        table: &str,
+        rows: &[(usize, &[String])],
+        schema: &[String],
+        prepared: Option<&mut PreparedText>,
+    ) {
+        self.update_text_indexes_batch_inner(table, rows, schema, prepared);
+        self.enforce_memindex_quota(Some(table)).await;
+    }
+
+    /// The batch's work, without the quota check.
+    fn update_text_indexes_batch_inner(
         &self,
         table: &str,
         rows: &[(usize, &[String])],
@@ -1525,14 +1882,19 @@ impl Engine {
             self.update_multivector_indexes(table, *seq, cells);
             self.update_sparse_indexes(table, *seq, cells);
         }
-        self.enforce_memindex_quota();
         let tkey = self.table_key(table);
+        let by_id = self.index_column_map(table);
         let indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .map(|e| e.text.iter().map(|(c, v)| (c.clone(), v.clone())).collect())
+            .map(|e| {
+                e.text
+                    .iter()
+                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .collect()
+            })
             .unwrap_or_default();
         for (column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
@@ -1600,6 +1962,15 @@ impl Engine {
                         // Crossed into the next `ROW_ID` segment: seal the old
                         // rows in place. This happens once per 2^32 rows, so the
                         // lock-held write costs nothing measurable.
+                        //
+                        // This is the one seal that writes with the index lock
+                        // held, so it must not take the directory's write gate -
+                        // that would invert the `gate -> index` order every other
+                        // writer uses (`crate::engine::text_index::dir_gate`). The
+                        // chunk it writes is named after its own tail's first row
+                        // id, and no concurrent merge or rebuild reaches that tail
+                        // before this seal: both hold the gate and only see the
+                        // tail once it is sealed.
                         index.seal();
                     }
                     for doc in &prepared {
@@ -1617,7 +1988,17 @@ impl Engine {
                         // The segment is written with the lock released: the
                         // tail moves to `TextIndex::inflight`, where queries keep
                         // reading it, so nobody waits for the fsync.
-                        crate::engine::state::seal_text_index_unlocked(&shared);
+                        //
+                        // The chunk is only reachable through its catalog record,
+                        // so the file and the record are published together under
+                        // the directory's write gate: a build that loaded the
+                        // chunk list between the two would not see the chunk,
+                        // re-index its rows and write the same
+                        // `ft_{base_row_id}` name (`Engine::with_text_dir_gate`).
+                        Self::with_text_dir_gate(&shared, || {
+                            crate::engine::state::seal_text_index_gated(&shared);
+                            self.record_sealed_text_chunks(table, &column);
+                        });
                     }
                     drop(ticket);
                 }
@@ -1671,7 +2052,7 @@ impl Engine {
     /// Commits one `COPY` transaction: `ImportV2` per segment it wrote
     /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:378`), never the
     /// rows, which are already in the blocks the import wrote.
-    pub(crate) fn commit_import_chunk(
+    pub(crate) async fn commit_import_chunk(
         &self,
         table: &str,
         mut t: Txn,
@@ -1714,53 +2095,79 @@ impl Engine {
         let batches_owned: Vec<usize> = batches.to_vec();
         let encoded_owned: Vec<(usize, String)> = encoded_rows.to_vec();
         let table_owned = table.to_string();
-        let ts = self.txn.commit_at_deferred_with(t, ts, |_txn| {
-            let table = table_owned.as_str();
-            // Every block the import wrote carries this transaction's ts: the
-            // reference's `CommitAppend(begin_ts, commit_ts)` writes it into
-            // each block's `version`, so all of them share it.
-            for rows in &batches_owned {
-                self.note_append(table, *rows, true, Some(ts));
-            }
-            for segment in &segments_owned {
-                // The extent is what marks the segment sealed, and a sealed
-                // segment is the only one whose blocks (and segment) get a fast
-                // rough filter - so it has to be recorded **before** the block
-                // write.
-                let rows = self.segment_rows(table, *segment as usize) as u64;
-                self.note_import_rows(table, *segment, rows);
-                self.note_import_ts(table, *segment, ts);
-            }
-            // The published rows and the block they land in are one step: the
-            // block's bitmap coverage comes from the append journal, so a
-            // checkpoint between them would see a journal that already had these
-            // rows while writing a block from the buffer before them (one row
-            // off). Same gate as the binary import path.
+        // The append records are created here (the WAL frame names them) but
+        // **stamped after the rows are published**. The reference keeps a
+        // block's `created_` fields and its rows in one object, so a reader
+        // that sees the ts also sees the data; here the record would otherwise
+        // carry a commit ts while its rows were still in flight, and a
+        // checkpoint in that window sized a block from ids that held nothing
+        // ("block 3.0 holds 0 of the 99 rows committed at ts 22").
+        let mut records_owned: Vec<usize> = Vec::with_capacity(batches_owned.len());
+        let ts = self
+            .txn
+            .commit_at_deferred_with(t, ts, |_txn| {
+                let table = table_owned.as_str();
+                for rows in &batches_owned {
+                    records_owned.push(self.note_append(table, *rows, true, None));
+                }
+                for segment in &segments_owned {
+                    // The extent is what marks the segment sealed, and a sealed
+                    // segment is the only one whose blocks (and segment) get a fast
+                    // rough filter - so it has to be recorded **before** the block
+                    // write.
+                    let rows = self.segment_rows(table, *segment as usize) as u64;
+                    self.note_import_rows(table, *segment, rows);
+                    self.note_import_ts(table, *segment, ts);
+                }
+                Ok(())
+            })
+            .await?;
+        // The published rows and the block they land in are one step: the
+        // block's bitmap coverage comes from the append journal, so a
+        // checkpoint between them would see a journal that already had these
+        // rows while writing a block from the buffer before them (one row
+        // off).
+        //
+        // This runs **after** the commit and **before** `BottomGuard` (which
+        // is what publishes), so the block is still written before the
+        // transaction is visible - the reference's `CommitBottomAppend` order.
+        // It is outside `before_wal` because the gate has to be awaited: inside
+        // that callback (a synchronous `FnOnce` running on a runtime worker
+        // that already holds the commit turn and `commit_lock`) acquiring it
+        // would have to bridge with `block_on`, parking a worker that holds a
+        // `tokio::sync::Mutex` guard.
+        {
             let gate = self.bottom_gate(table);
-            let _turn = gate.lock().unwrap();
+            let _turn = gate.lock().await;
             let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
             self.publish_encoded_rows(table, &encoded_owned)?;
+            // The buffer holds the values now; the stored text of the whole
+            // file (hundreds of MB) has no reader left.
+            drop(encoded_owned);
+            // The rows are readable now, so the records may carry this
+            // transaction's ts (`BlockVersion::Append(commit_ts, …)`).
+            for record in &records_owned {
+                self.settle_append_at(table, *record, ts);
+            }
             // `AppendInBlock` / `CommitBottomAppend`: the reference writes each
             // block inside the import transaction, so a `COPY` leaves readable
             // block files (and `SHOW BLOCKS` sees them) without a checkpoint. A
             // table whose columns the block format cannot express has no mirror
             // - it keeps its rows in the store.
             if self.has_block_layout(table) {
-                self.write_blocks_commit(table, ts)?;
+                self.write_blocks_import(table, ts)?;
             }
-            drop(_held);
-            drop(_turn);
-            Ok(())
-        })?;
+        }
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomAppend` for the imported segments on the table's worker.
         let bottom_table = table.to_string();
         let shard_key = bottom_table.clone();
         self.run_commit_bottom(&shard_key, move |engine| {
             engine.dump_hnsw_over_capacity(&bottom_table);
-            engine.dump_secondary_over_capacity(&bottom_table);
+            engine.dump_secondary_over_capacity_blocking(&bottom_table);
             Ok(())
-        })?;
+        })
+        .await?;
         Ok(ts)
     }
 
@@ -1796,6 +2203,22 @@ impl Engine {
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
     /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
     /// keeps every row in memory until a checkpoint.
+    /// Sets the decoded-block budget (C++ `BufferManager`'s
+    /// `buffer_manager_size`).
+    ///
+    /// The port has no BufferManager - sealed blocks are mapped and evicted by
+    /// the kernel - but the same number is the ceiling on decoded HNSW chunks
+    /// and on the block map, so a deployment that sets a small value still gets
+    /// a small footprint instead of the built-in 8 GiB.
+    pub fn set_buffer_budget(&self, bytes: usize) {
+        self.context
+            .buffer_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .hnsw_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota
@@ -1922,10 +2345,7 @@ impl Engine {
             let dump = {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
-                let cur = entry
-                    .index_pending_bytes
-                    .entry(im.column.clone())
-                    .or_insert(0);
+                let cur = entry.index_pending_bytes.entry(im.id).or_insert(0);
                 *cur += bytes;
                 // The reference dumps when the memory passes the quota and
                 // subtracts only what the dump released, so the rows above
@@ -1942,10 +2362,17 @@ impl Engine {
                 // The dumped segment leaves memory. The bytes above the
                 // quota were already left in the counter, so nothing else to
                 // do here but drop the graph the dump just sealed.
+                //
+                // **Before** the rows of this batch are written: a dump seals
+                // what the graph holds now, so each batch lands in its own
+                // chunk. Proposing it from the post-write quota check instead
+                // merged every batch into one chunk (`test_mem_bmp`,
+                // `test_optimize_from_different_database`).
                 let mut tables = self.tables.lock().unwrap();
                 if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.remove(&im.column);
-                    e.hnsw_probed = false;
+                    e.hnsw_mem.remove(&im.id);
+                    e.index_pending_bytes.insert(im.id, 0);
+                    e.hnsw_topup = true;
                 }
             }
         }

@@ -36,7 +36,7 @@ class TestHelper:
         self.h.create_test_env({"n": {"type": "int"}})
         # insert data
         for i, p in enumerate(document_passages):
-            self.h.insert_data({'n': i}, p)
+            self.h.insert_data({"n": i}, p)
         # wait for fulltext index
         time.sleep(2)
         # show the whole table
@@ -44,21 +44,21 @@ class TestHelper:
         # example: exhaustive search
         print("example: exhaustive search")
         print("example: exhaustive search with BM25")
-        self.h.query_bm25('Who was Alan Turing?', ['n'], 10)
+        self.h.query_bm25("Who was Alan Turing?", ["n"], 10)
         print("example: exhaustive search with ColBERT float target")
-        self.h.query_float('Who was Alan Turing?', ['n'], 10)
+        self.h.query_float("Who was Alan Turing?", ["n"], 10)
         print("example: exhaustive search with ColBERT bit target")
-        self.h.query_bit('Who was Alan Turing?', ['n'], 10)
+        self.h.query_bit("Who was Alan Turing?", ["n"], 10)
         # example: rerank
         print("example: rerank")
         print("example: rerank with ColBERT float target")
-        self.h.query_rerank_float('Who was Alan Turing?', ['n'], 3, 10)
+        self.h.query_rerank_float("Who was Alan Turing?", ["n"], 3, 10)
         print("example: rerank with ColBERT bit target")
-        self.h.query_rerank_bit('Who was Alan Turing?', ['n'], 3, 10)
+        self.h.query_rerank_bit("Who was Alan Turing?", ["n"], 3, 10)
         # drop the test db
         self.h.clear_test_env()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     t = TestHelper()
     t.test()

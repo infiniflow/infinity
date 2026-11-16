@@ -40,7 +40,7 @@ class ConnectionPool:
 
     def get_conn(self):
         with self.lock_:
-            if (len(self.free_pool_) == 0):
+            if len(self.free_pool_) == 0:
                 self._create_conn()
             conn = self.free_pool_.pop()
             logging.debug("get_conn")
@@ -51,14 +51,14 @@ class ConnectionPool:
         Note: User is allowed to release a connection not created by ConnectionPool, or not releasing(due to exception or some other reasons) a connection created by ConnectionPool.
         """
         with self.lock_:
-            if (self.free_pool_.count(conn)):
+            if self.free_pool_.count(conn):
                 raise Exception("the connection has been released")
-            if (len(self.free_pool_) < self.max_size_):
+            if len(self.free_pool_) < self.max_size_:
                 self.free_pool_.append(conn)
             logging.debug("release_conn")
 
     def destroy(self):
-        if not hasattr(self, 'free_pool_'):
+        if not hasattr(self, "free_pool_"):
             return
         for conn in iter(self.free_pool_):
             try:

@@ -8,6 +8,7 @@ license.workspace = true
 common.workspace = true
 parser.workspace = true
 expression.workspace = true
+roaring.workspace = true
 
 [lints]
 workspace = true

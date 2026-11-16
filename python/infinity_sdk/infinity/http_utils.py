@@ -74,45 +74,63 @@ bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not", "regex"]
 
 def function_return_type(function_name, param_type):
     if function_name == "sqrt":
-        return 'Float64'
+        return "Float64"
     elif function_name in ["round", "ceil", "floor"]:
-        if param_type in ['Int8', 'Int16', 'Int32', 'Int64']:
+        if param_type in ["Int8", "Int16", "Int32", "Int64"]:
             return param_type
         else:
-            return 'Float64'
-    elif function_name in ["filter_text", "filter_fulltext", "or", "and", "not", "regex"]:
-        return 'boolean'
+            return "Float64"
+    elif function_name in [
+        "filter_text",
+        "filter_fulltext",
+        "or",
+        "and",
+        "not",
+        "regex",
+    ]:
+        return "boolean"
     elif function_name == "trunc":
-        return 'string'
+        return "string"
     elif function_name == "datepart":
-        return 'Int64'
+        return "Int64"
     elif function_name == "char_length":
-        return 'Int32'
+        return "Int32"
     elif function_name == "sum":
-        if param_type in ['Int8', 'Int16', 'Int32', 'Int64']:
-            return 'Int64'
+        if param_type in ["Int8", "Int16", "Int32", "Int64"]:
+            return "Int64"
         else:
-            return 'Float64'
+            return "Float64"
     elif function_name in ["min", "max"]:
         return param_type
     elif function_name == "count":
-        return 'Int64'
+        return "Int64"
     elif function_name == "avg":
-        return 'Float64'
+        return "Float64"
     # JSON function return types
     elif function_name in ["json_extract", "json_extract_string"]:
-        return 'string'
+        return "string"
     elif function_name == "json_extract_int":
-        return 'Int64'
+        return "Int64"
     elif function_name == "json_extract_double":
-        return 'Float64'
-    elif function_name in ["json_extract_bool", "json_extract_isnull",
-                          "json_exists_path", "json_contains"]:
-        return 'boolean'
+        return "Float64"
+    elif function_name in [
+        "json_extract_bool",
+        "json_extract_isnull",
+        "json_exists_path",
+        "json_contains",
+    ]:
+        return "boolean"
     # String function return types
-    elif function_name in ["substring", "upper", "lower", "trim",
-                           "ltrim", "rtrim", "reverse"]:
-        return 'string'
+    elif function_name in [
+        "substring",
+        "upper",
+        "lower",
+        "trim",
+        "ltrim",
+        "rtrim",
+        "reverse",
+    ]:
+        return "string"
     else:
         return param_type
 
@@ -143,37 +161,37 @@ type_transfrom = {
 def type_to_dtype(type):
     match type.lower():
         case "bool":
-            return 'boolean'
+            return "boolean"
         case "boolean":
-            return 'boolean'
+            return "boolean"
         case "tinyint":
-            return 'Int8'
+            return "Int8"
         case "smallint":
-            return 'Int16'
+            return "Int16"
         case "integer":
-            return 'Int32'
+            return "Int32"
         case "int":
-            return 'Int32'
+            return "Int32"
         case "int32":
-            return 'Int32'
+            return "Int32"
         case "bigint":
-            return 'Int64'
+            return "Int64"
         case "float":
-            return 'Float32'
+            return "Float32"
         case "float32":
-            return 'Float32'
+            return "Float32"
         case "float64":
-            return 'Float64'
+            return "Float64"
         case "float16":
-            return 'Float32'
+            return "Float32"
         case "bfloat16":
-            return 'Float32'
+            return "Float32"
         case "double":
-            return 'Float64'
+            return "Float64"
         case "varchar":
-            return 'string'
+            return "string"
         case "json":
-            return 'string'
+            return "string"
         case _:
             return object
 
@@ -211,6 +229,14 @@ def is_list(str):
         return isinstance(result, list)
     except Exception:
         return False
+
+
+def is_bit_embedding_type(column_type) -> bool:
+    return (
+        isinstance(column_type, str)
+        and re.fullmatch(r"embedding\(bit,\s*\d+\)", column_type.strip().lower())
+        is not None
+    )
 
 
 def is_bool(str):

@@ -1,10 +1,10 @@
 //! Bucket-parallel graph construction, the reference's `HnswHandler::InsertVecs`.
 //!
 //! `InsertVecs` stores the whole batch first, then splits `[start, end)` into
-//! buckets of at least `kBuildBucketSize` vertices and pushes one `Build(j)`
-//! loop per bucket onto the dense-index thread pool. This module is that
-//! path: `HnswIndex::add_batch` stores the vectors, hands the graph to
-//! [`build_parallel`], and takes the links back.
+//! buckets of at least `kBuildBucketSize` vertices and builds one `Build(j)`
+//! loop per bucket in parallel. This module is that path: `HnswIndex::add_batch`
+//! stores the vectors, splits the range with [`buckets_of`], and builds each
+//! bucket with [`build_serial`] on its own tokio task.
 //!
 //! Safety comes from one lock per vertex, as in the reference's
 //! `DataStore::UniqueLock(vertex)`: a thread writes only the vertex it is
@@ -66,6 +66,38 @@ pub(crate) struct Builder<'a> {
     max_level: usize,
 }
 
+/// The state a bucket build shares: everything [`Builder`] borrows, owned so a
+/// task can hold it across an `.await`.
+///
+/// A bucket only reads the store and the levels, and writes the graph under the
+/// per-vertex locks, so sharing these by `Arc` is exactly the reference's
+/// `DataStore::UniqueLock` shape.
+pub(crate) struct SharedBuild {
+    pub(crate) store: std::sync::Arc<Store>,
+    pub(crate) lsg: Option<std::sync::Arc<LsgIndex>>,
+    pub(crate) levels: std::sync::Arc<Vec<usize>>,
+    pub(crate) links: std::sync::Arc<LockedLinks>,
+    pub(crate) m: usize,
+    pub(crate) ef_construction: usize,
+    pub(crate) entry: usize,
+    pub(crate) max_level: usize,
+}
+
+impl SharedBuild {
+    pub(crate) fn builder(&self) -> Builder<'_> {
+        Builder {
+            store: &self.store,
+            lsg: self.lsg.as_deref(),
+            m: self.m,
+            ef_construction: self.ef_construction,
+            levels: &self.levels,
+            links: &self.links,
+            entry: self.entry,
+            max_level: self.max_level,
+        }
+    }
+}
+
 impl<'a> Builder<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
@@ -90,11 +122,14 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Runs `Build` for every vertex in `[start, end)`.
-    pub(crate) fn build_range(&self, start: usize, end: usize) {
+    /// Runs `Build` for every vertex in `[start, end)` except `skip`.
+    pub(crate) fn build_range(&self, start: usize, end: usize, skip: Option<usize>) {
         let mut scratch = SearchScratch::new();
         let mut select = SelectScratch::default();
         for node in start..end {
+            if Some(node) == skip {
+                continue;
+            }
             self.build(node, &mut scratch, &mut select);
         }
     }
@@ -146,7 +181,7 @@ impl<'a> Builder<'a> {
         let mut ep = self.entry;
         let mut cur = self.max_level as i64;
         while cur > q_layer as i64 {
-            ep = self.search_layer_nearest(&query, ep, cur as usize);
+            ep = self.search_layer_nearest(&query, ep, cur as usize, node);
             cur -= 1;
         }
         let mut l = q_layer.min(self.max_level) as i64;
@@ -226,12 +261,17 @@ impl<'a> Builder<'a> {
         sorted.clear();
         sorted.extend_from_slice(cands);
         out.clear();
+        // Ties break on the vertex id in both directions, as they do in
+        // `search_layer`. A quantized store makes equal distances common
+        // (RaBitQ answers with a quantized estimate), and `sort_unstable` is
+        // free to order equal elements however the input happened to be
+        // laid out — which made the built graph vary between runs.
         if sorted.len() < m {
-            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+            sorted.sort_unstable_by(|a, b| b.0.total_cmp(&a.0).then(b.1.cmp(&a.1)));
             out.extend(sorted.iter().map(|(_, n)| *n));
             return out;
         }
-        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        sorted.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         kept.clear();
         for &(d, node) in sorted.iter() {
             if kept.len() == m {
@@ -246,9 +286,21 @@ impl<'a> Builder<'a> {
     }
 
     /// `SearchLayerNearest`: greedy descent on one upper layer.
-    fn search_layer_nearest(&self, q: &QueryRef, start: usize, layer: usize) -> usize {
+    ///
+    /// `self_id` is the vertex being built, and it is the LSG scaling's left
+    /// operand: `Build` passes `vertex_i` to every distance it takes
+    /// (`hnsw_alg.cppm:401`), so a scaled graph descends in the scaled space on
+    /// the upper layers too. Passing `None` here mixed raw and scaled
+    /// distances inside one build.
+    fn search_layer_nearest(
+        &self,
+        q: &QueryRef,
+        start: usize,
+        layer: usize,
+        self_id: usize,
+    ) -> usize {
         let mut cur = start;
-        let mut cur_d = self.distance_to(q, None, cur);
+        let mut cur_d = self.distance_to(q, Some(self_id), cur);
         loop {
             let nodes = self.store.len();
             let next = self.with_neighbors(layer, cur, |list| {
@@ -258,7 +310,7 @@ impl<'a> Builder<'a> {
                     if nb >= nodes {
                         continue;
                     }
-                    let d = self.distance_to(q, None, nb);
+                    let d = self.distance_to(q, Some(self_id), nb);
                     if d < best.1 {
                         best = (nb, d);
                     }
@@ -334,7 +386,14 @@ impl<'a> Builder<'a> {
             });
         }
         let mut out: Vec<(f32, usize)> = result.drain().map(|c| (c.0, c.1)).collect();
-        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        // Break ties by node id, exactly as the serial path does
+        // (`HnswIndex::search_layer_filtered`). A quantized store makes ties
+        // common: RaBitQ answers with a quantized estimate, so many candidates
+        // land on the same `f32`. `result` is a `BinaryHeap`, whose internal
+        // layout is not a function of its contents, so `drain()` hands the ties
+        // over in an arbitrary order; without this `then` the candidate list -
+        // and therefore the graph it builds - changed from build to build.
+        out.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         out
     }
 }
@@ -350,28 +409,49 @@ impl<'a> Builder<'a> {
 /// index's graph reproducible.
 const MIN_BUCKET_SIZE: usize = 1024;
 
-pub(crate) fn build_parallel_range(builder: &Builder<'_>, from: usize, to: usize, threads: usize) {
-    if threads <= 1 || to <= from {
-        builder.build_range(from, to);
-        return;
+/// Splits `[from, to)` into buckets of at least [`MIN_BUCKET_SIZE`].
+pub(crate) fn buckets_of(from: usize, to: usize, threads: usize) -> Vec<(usize, usize)> {
+    if to <= from {
+        return Vec::new();
     }
     let n = to - from;
-    let bucket = ((n - 1) / threads + 1).max(MIN_BUCKET_SIZE);
-    let buckets: Vec<(usize, usize)> = (from..to)
+    let bucket = ((n - 1) / threads.max(1) + 1).max(MIN_BUCKET_SIZE);
+    (from..to)
         .step_by(bucket)
-        .map(|start| (start + bucket).min(to))
-        .zip((from..to).step_by(bucket))
-        .map(|(end, start)| (start, end))
-        .collect();
-    if buckets.len() <= 1 {
-        builder.build_range(from, to);
-        return;
-    }
-    std::thread::scope(|scope| {
-        for (start, end) in buckets {
-            scope.spawn(move || builder.build_range(start, end));
-        }
-    });
+        .map(|start| (start, start + bucket.min(to - start)))
+        .collect()
+}
+
+/// The buckets a batch build runs, skipping `prebuilt`.
+///
+/// `prebuilt` is the vertex `HnswIndex::add_batch` built on its own before the
+/// buckets start (Phase A). Scheduling it again would run `Build` on it a
+/// second time, and a rebuild replaces the vertex's neighbour list - so links
+/// the first build established can disappear, and reverse pruning while
+/// rebuilding it can drop other vertices' links to it.
+///
+/// `prebuilt` is marked with `skip` rather than cut out of the range, because a
+/// bucket is a **contiguous** running range: splitting one would put two
+/// adjacent ranges in flight, and their reverse-link writes are exactly what
+/// makes a build order-dependent.
+pub(crate) fn build_buckets(
+    from: usize,
+    to: usize,
+    prebuilt: Option<usize>,
+    threads: usize,
+) -> Vec<(usize, usize, Option<usize>)> {
+    buckets_of(from, to, threads)
+        .into_iter()
+        .map(|(start, end)| {
+            let skip = prebuilt.filter(|p| (start..end).contains(p));
+            (start, end, skip)
+        })
+        .collect()
+}
+
+/// Builds `[from, to)` on the calling thread.
+pub(crate) fn build_serial(builder: &Builder<'_>, from: usize, to: usize, skip: Option<usize>) {
+    builder.build_range(from, to, skip);
 }
 
 /// Orders two candidates the way `CompareMax` does, for tests.

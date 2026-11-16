@@ -49,6 +49,48 @@ pub(crate) struct HnswOptions {
     pub(crate) lsg: Option<index::lsg::LsgConfig>,
 }
 
+impl HnswOptions {
+    /// The `WITH (...)` options a `CREATE INDEX ... USING HNSW` stored.
+    ///
+    /// `build_type='lsg'` is what turns the index into a local-scaling one; the
+    /// reference then requires `lsg_config` and falls back to `LSGConfig`'s own
+    /// defaults (`0.01 / 10 / 1`) when it is missing.
+    pub(crate) fn from_options(options: &[(String, String)]) -> Self {
+        let raw = |name: &str| {
+            options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.as_str())
+        };
+        let num = |name: &str, default: usize| {
+            raw(name)
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(default)
+        };
+        let lsg = match raw("build_type") {
+            Some(t)
+                if t.trim()
+                    .trim_matches(['\'', '"'])
+                    .eq_ignore_ascii_case("lsg") =>
+            {
+                Some(
+                    raw("lsg_config")
+                        .and_then(index::lsg::LsgConfig::parse)
+                        .unwrap_or_default(),
+                )
+            }
+            _ => None,
+        };
+        Self {
+            m: num("M", 16),
+            ef_construction: num("EF_CONSTRUCTION", 200),
+            metric: index::vector::Metric::parse(raw("metric").unwrap_or("l2")),
+            encoding: index::vector::HnswEncoding::parse(raw("encode").unwrap_or_default()),
+            lsg,
+        }
+    }
+}
+
 pub struct LoadedVectorIndex {
     pub index: HnswHandler,
     pub labels: Vec<u32>,
@@ -117,9 +159,11 @@ pub(crate) fn plaid_coverage(sizes: &[(u32, u32)]) -> (u32, u32) {
 /// `n_docs`. Reading the count from the header avoids decoding a chunk that
 /// cleanup only has to look at.
 pub(crate) fn plaid_chunk_doc_num(path: &std::path::Path) -> Option<u32> {
-    use std::io::Read;
-    let mut head = [0u8; 24];
-    std::fs::File::open(path).ok()?.read_exact(&mut head).ok()?;
+    // Only the header's last field is needed, while a PLAID chunk is as large as
+    // its vectors: map it (through the store, so an object-backed chunk maps its
+    // range) and read the 24 header bytes instead of loading the whole file.
+    let map = storage::chunk_store::open_file(path).ok()?;
+    let head = map.get(..24)?;
     Some(u32::from_le_bytes(head[20..24].try_into().ok()?))
 }
 

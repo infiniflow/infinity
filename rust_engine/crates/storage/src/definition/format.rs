@@ -460,12 +460,32 @@ pub fn write_block(
     columns: &[BlockColumn],
     version: &BlockVersionFile,
 ) -> std::io::Result<PathBuf> {
+    write_block_synced(root, id, columns, version, true)
+}
+
+/// [`write_block`] with control over the file sync.
+///
+/// `sync = false` is for a block an import's own commit writes: the reference
+/// keeps those in memory (its `IMPORT_V2` frame carries the extent, not the
+/// rows) and the checkpoint that follows is what fsyncs them.
+pub fn write_block_synced(
+    root: &Path,
+    id: BlockId,
+    columns: &[BlockColumn],
+    version: &BlockVersionFile,
+    sync: bool,
+) -> std::io::Result<PathBuf> {
     let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
     std::fs::create_dir_all(&dir)?;
     for col in columns {
-        write_block_column(root, id, col)?;
+        write_block_column_synced(root, id, col, sync)?;
     }
-    write_synced(&dir.join(VERSION_FILE), &version.encode())?;
+    let version_bytes = version.encode();
+    if sync {
+        write_synced(&dir.join(VERSION_FILE), &version_bytes)?;
+    } else {
+        write_parts_no_sync(&dir.join(VERSION_FILE), &[&version_bytes])?;
+    }
     Ok(dir)
 }
 
@@ -478,21 +498,83 @@ pub fn write_block(
 /// is never recycled, so an added or dropped column needs neither a rename nor
 /// a rewrite of the columns beside it.
 pub fn write_block_column(root: &Path, id: BlockId, col: &BlockColumn) -> std::io::Result<PathBuf> {
+    write_block_column_synced(root, id, col, true)
+}
+
+/// [`write_block_column`] with control over the file sync.
+pub fn write_block_column_synced(
+    root: &Path,
+    id: BlockId,
+    col: &BlockColumn,
+    sync: bool,
+) -> std::io::Result<PathBuf> {
     let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
     std::fs::create_dir_all(&dir)?;
-    write_synced(
-        &dir.join(column_file(col.column_id)),
-        &encode_data_file(&col.body.encode()),
-    )?;
+    // The header and the body go out in one write: encoding the file into a
+    // second `Vec` copied the whole block (8192 rows spread over the columns)
+    // a second time before `write_synced` copied it again.
+    let body = col.body.encode();
+    let parts: [&[u8]; 4] = [
+        &DATA_FILE_MAGIC.to_le_bytes()[..],
+        &(body.len() as u64).to_le_bytes()[..],
+        &body,
+        &0u64.to_le_bytes()[..],
+    ];
+    let target = dir.join(column_file(col.column_id));
+    if sync {
+        write_synced_parts(&target, &parts)?;
+    } else {
+        write_parts_no_sync(&target, &parts)?;
+    }
     if !col.outline.is_empty() {
         // The outline file is raw: no header, no trailer.
-        write_synced(&dir.join(column_outline_file(col.column_id)), &col.outline)?;
+        let target = dir.join(column_outline_file(col.column_id));
+        if sync {
+            write_synced(&target, &col.outline)?;
+        } else {
+            write_parts_no_sync(&target, &[&col.outline])?;
+        }
     }
     Ok(dir)
 }
 
-/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it before
-/// returning (no directory fsync — the reference does not fsync directories).
+/// Publishes one data file: [`write_synced_direct`] plus, on a persistence
+/// profile, the object the manager publishes it as.
+///
+/// This is the write half of the reference's rule that **every** data file goes
+/// through the persistence manager (`FileWorker::WriteToFile` →
+/// `pm->Persist`, `file_worker_impl.cpp:170`; the full-text and index writers do
+/// the same). With no manager installed the store is the direct-disk one and
+/// this is exactly the old behaviour.
+pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    crate::chunk_store::chunk_store().write(path, bytes)
+}
+
+/// [`write_synced`] for a file assembled from several slices, with no
+/// intermediate `Vec`.
+pub fn write_synced_parts(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> {
+    write_parts(path, parts, true)
+}
+
+/// [`write_synced_parts`] without the `fsync`.
+///
+/// A block written by an import's own commit is **not** what a restart relies
+/// on: the reference's `WalCmdImportV2` carries only the segment extent, and
+/// the reference leaves the block in its buffer object rather than on disk
+/// (measured: a completed C++ `COPY` of 8.4 M rows leaves no `*.col` file at
+/// all). The checkpoint that follows is what fsyncs. Writing these files
+/// without the sync costs 5.4 s less on an 8 M-row import and matches the
+/// reference's durability exactly - no more, no less.
+pub fn write_parts_no_sync(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> {
+    write_parts(path, parts, false)
+}
+
+/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it - and
+/// the directory entry the rename creates - before returning.
+///
+/// This is the raw primitive that bypasses the chunk store: [`write_synced`]
+/// publishes through the store and both of its backends bottom out here, so a
+/// direct-disk profile behaves exactly as it did before the seam existed.
 ///
 /// Used for every file a checkpoint publishes: block columns here and the
 /// index chunks in `executor::blocks`. The reference's file workers sync
@@ -509,12 +591,14 @@ pub fn write_block_column(root: &Path, id: BlockId, col: &BlockColumn) -> std::i
 /// old file keeps a valid inode (measured: the periodic checkpoint died with
 /// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
 /// truncated `blk_0/0.col`).
-pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    write_parts(path, &[bytes], true)
+}
+
+fn write_parts(path: &Path, parts: &[&[u8]], sync: bool) -> std::io::Result<()> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
-    // A dotted, non-`.col` name: `read_block` and the directory scans ignore it,
-    // and it sits next to the target so the rename stays within one filesystem.
     let tmp = path.with_file_name(format!(
         ".{}.tmp{}-{}",
         path.file_name().unwrap_or_default().to_string_lossy(),
@@ -523,15 +607,62 @@ pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     ));
     let write = || -> std::io::Result<()> {
         let mut file = std::fs::File::create(&tmp)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        std::fs::rename(&tmp, path)
+        for part in parts {
+            file.write_all(part)?;
+        }
+        if sync {
+            // The bytes have to reach the disk before the rename publishes
+            // them: a rename is only ordered against data that is already
+            // durable.
+            file.sync_all()?;
+        }
+        std::fs::rename(&tmp, path)?;
+        if sync {
+            // The rename itself is a directory update, and it is what the
+            // readers discover. Without this fsync a power cut can leave the
+            // old entry (or no entry) pointing at a file whose contents are on
+            // the disk, which is how a "complete" chunk disappears or a
+            // half-published one survives. The no-sync path skips both: its
+            // durability comes from the checkpoint that follows.
+            sync_parent(path)?;
+        }
+        Ok(())
     };
     let out = write();
     if out.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
     out
+}
+
+/// `fsync`s the directory holding `path`, so a rename (or an unlink) in it is
+/// durable.
+///
+/// The barrier is what makes "the file is on the disk" mean "the entry naming
+/// it is on the disk too", so a failure here is reported: a caller that cannot
+/// sync the directory has not reached durability, and pretending otherwise is
+/// how a chunk that never got its directory entry survives a power cut as a
+/// published one. Two cases are genuinely not a barrier: a directory that does
+/// not exist (`NotFound` - nothing to sync), and a platform that cannot open a
+/// directory for `fsync` at all (Windows reports `PermissionDenied`), where the
+/// rename is journaled by the filesystem itself.
+pub fn sync_parent(path: &Path) -> std::io::Result<()> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    let dir = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    let handle = match std::fs::File::open(dir) {
+        Ok(handle) => handle,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        #[cfg(windows)]
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    handle.sync_all()
 }
 
 /// Reads a block directory written by [`write_block`] (or by the C++ engine).
@@ -692,33 +823,33 @@ pub fn strip_one_bracket(t: &str) -> &str {
 
 /// Splits array content into its top-level comma-separated segments, keeping
 /// nested `[…]` groups intact (`[1,2],[3,4]` → `["[1,2]", "[3,4]"]`).
-pub fn split_top_level(content: &str) -> Vec<String> {
+///
+/// Borrowed rather than owned, and scanned by byte: a `tensorarray,100,float`
+/// cell holds 1 M elements, and building a `String` per element (plus a second
+/// pass to parse each one) made a five-row insert of such cells take 23 s
+/// against the reference's 3 s.
+pub fn split_top_level(content: &str) -> Vec<&str> {
+    let bytes = content.as_bytes();
     let mut out = Vec::new();
     let mut depth = 0i32;
-    let mut cur = String::new();
-    for ch in content.chars() {
-        match ch {
-            '[' => {
-                depth += 1;
-                cur.push(ch);
-            }
-            ']' => {
-                depth -= 1;
-                cur.push(ch);
-            }
-            ',' if depth == 0 => {
-                let s = cur.trim();
-                if !s.is_empty() {
-                    out.push(s.to_string());
+    let mut start = 0usize;
+    for (i, &b) in bytes.iter().enumerate() {
+        match b {
+            b'[' => depth += 1,
+            b']' => depth -= 1,
+            b',' if depth == 0 => {
+                let segment = content[start..i].trim();
+                if !segment.is_empty() {
+                    out.push(segment);
                 }
-                cur.clear();
+                start = i + 1;
             }
-            _ => cur.push(ch),
+            _ => {}
         }
     }
-    let s = cur.trim();
-    if !s.is_empty() {
-        out.push(s.to_string());
+    let segment = content[start..].trim();
+    if !segment.is_empty() {
+        out.push(segment);
     }
     out
 }

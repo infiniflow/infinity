@@ -60,9 +60,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
             slt_file.write("\n")
 
         slt_file.write("query III rowsort\n")
-        slt_file.write(
-            f"SELECT c2, COUNT(*), SUM(c1) FROM {table_name} GROUP BY c2;\n"
-        )
+        slt_file.write(f"SELECT c2, COUNT(*), SUM(c1) FROM {table_name} GROUP BY c2;\n")
         slt_file.write("----\n")
         select_res = []
         for c2, c1_list in groupby_c2.items():
@@ -72,9 +70,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("query III rowsort\n")
-        slt_file.write(
-            f"SELECT c1, COUNT(*), SUM(c2) FROM {table_name} GROUP BY c1;\n"
-        )
+        slt_file.write(f"SELECT c1, COUNT(*), SUM(c2) FROM {table_name} GROUP BY c1;\n")
         slt_file.write("----\n")
         select_res = []
         for c1, c2_list in groupby_c1.items():

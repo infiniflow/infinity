@@ -177,7 +177,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     table_name,
                     ",".join(
                         [
-                            f"{i}:{d}" # sparse_format_float(d)
+                            f"{i}:{d}"  # sparse_format_float(d)
                             for (i, d) in zip(qindices[start:end], qdata[start:end])
                         ]
                     ),

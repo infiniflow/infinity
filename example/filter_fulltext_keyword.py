@@ -22,7 +22,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -31,11 +33,14 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "uuid": {"type": "varchar"},
-        "score": {"type": "float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "uuid": {"type": "varchar"},
+            "score": {"type": "float"},
+        },
+    )
 
     # Insert 10 rows of data into the 'my_table'
     table_instance.insert(
@@ -96,24 +101,40 @@ try:
     # Create keyword fulltext index on 'uuid' column
     table_instance.create_index(
         "my_index",
-        infinity.index.IndexInfo("uuid", infinity.index.IndexType.FullText, {"analyzer": "keyword"}),
+        infinity.index.IndexInfo(
+            "uuid", infinity.index.IndexType.FullText, {"analyzer": "keyword"}
+        ),
         infinity.common.ConflictType.Error,
     )
 
     # output 7, 8, 9, 10
-    result, extra_result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
+    result, extra_result = (
+        table_instance.output(["*"])
+        .filter("(score > 80.0) and (score <= 90.0)")
+        .to_pl()
+    )
     print(result)
     if extra_result is not None:
         print(extra_result)
 
     # output 6, 8
-    result, extra_result = table_instance.output(["*"]).filter("filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
+    result, extra_result = (
+        table_instance.output(["*"])
+        .filter("filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')")
+        .to_pl()
+    )
     print(result)
     if extra_result is not None:
         print(extra_result)
 
     # output 8
-    result, extra_result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0) and filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
+    result, extra_result = (
+        table_instance.output(["*"])
+        .filter(
+            "(score > 80.0) and (score <= 90.0) and filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')"
+        )
+        .to_pl()
+    )
     print(result)
     if extra_result is not None:
         print(extra_result)
@@ -123,7 +144,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

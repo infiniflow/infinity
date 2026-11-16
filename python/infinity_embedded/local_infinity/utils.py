@@ -45,17 +45,89 @@ from infinity_embedded.local_infinity.types import build_result, logic_type_to_d
 from infinity_embedded.utils import binary_exp_to_paser_exp
 
 
+def _json_operator_path(path):
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    if isinstance(path, exp.Literal) and path.is_string:
+        key = path.this
+        if key and not any(char in key for char in ".[]"):
+            return "$." + key
+    elif isinstance(path, exp.JSONPath):
+        result = ""
+        for part in path.expressions:
+            if isinstance(part, exp.JSONPathRoot):
+                result += "$"
+            elif isinstance(part, exp.JSONPathKey):
+                key = part.this
+                if (
+                    not isinstance(key, str)
+                    or not key
+                    or any(char in key for char in ".[]")
+                ):
+                    break
+                result += "." + key
+            elif (
+                isinstance(part, exp.JSONPathSubscript)
+                and type(part.this) is int
+                and part.this >= 0
+            ):
+                result += f"[{part.this}]"
+            else:
+                break
+        else:
+            if result.startswith("$"):
+                return result
+    raise InfinityException(
+        ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path"
+    )
+
+
 def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Alias):
-        expr = traverse_conditions(cons.args['this'])
+        expr = traverse_conditions(cons.args["this"])
         expr.alias_name = cons.alias
         return expr
+
+    elif isinstance(cons, (exp.JSONExtract, exp.JSONExtractScalar)):
+        # JSON operators -> and ->>. sqlglot parses the right side as a
+        # JSONPath node; the server functions take the path as a string.
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = (
+            "json_extract_string"
+            if isinstance(cons, exp.JSONExtractScalar)
+            else "json_extract"
+        )
+
+        path_sql = _json_operator_path(cons.args["expression"])
+        json_source = cons.args["this"]
+        while isinstance(json_source, exp.JSONExtract) and not isinstance(
+            json_source, exp.JSONExtractScalar
+        ):
+            path_sql = (
+                _json_operator_path(json_source.args["expression"]) + path_sql[1:]
+            )
+            json_source = json_source.args["this"]
+        if isinstance(json_source, exp.JSONExtractScalar):
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, "Cannot extract JSON from a scalar result"
+            )
+        json_expr = parse_expr(json_source)
+        path_constant = WrapConstantExpr()
+        path_constant.literal_type = LiteralType.kString
+        path_constant.str_value = path_sql
+        path_expr = WrapParsedExpr(ParsedExprType.kConstant)
+        path_expr.constant_expr = path_constant
+
+        func_expr.arguments = [json_expr, path_expr]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
 
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = binary_exp_to_paser_exp(
-            cons.key.lower())  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
+            cons.key.lower()
+        )  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
         for value in cons.hashable_args:
@@ -70,13 +142,15 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = function_expr
 
         return parsed_expr
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Is):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.Is):
         # Handle IS NOT NULL / IS NOT TRUE / IS NOT FALSE / IS NOT UNKNOWN.
         # Only IS NOT NULL is supported; others must be rejected.
-        inner_is = cons.args['this']
-        if not isinstance(inner_is.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        inner_is = cons.args["this"]
+        if not isinstance(inner_is.args.get("expression"), exp.Null):
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.",
+            )
         func_expr = WrapFunctionExpr()
         func_expr.func_name = "is_not_null"
         if fn:
@@ -86,7 +160,7 @@ def traverse_conditions(cons, fn=None):
         parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
         parsed_expr.function_expr = func_expr
         return parsed_expr
-    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
+    elif isinstance(cons, exp.Not) and not isinstance(cons.args["this"], exp.In):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = "not"
@@ -151,7 +225,7 @@ def traverse_conditions(cons, fn=None):
 
     elif isinstance(cons, exp.Neg):
         func_expr = WrapFunctionExpr()
-        func_expr.func_name = '-'
+        func_expr.func_name = "-"
         func_expr.arguments = [parse_expr(cons.hashable_args[0])]
         parsed_expr = WrapParsedExpr()
         parsed_expr.type = ParsedExprType.kFunction
@@ -159,12 +233,12 @@ def traverse_conditions(cons, fn=None):
         return parsed_expr
     elif isinstance(cons, exp.Anonymous):
         arguments = []
-        for arg in cons.args['expressions']:
+        for arg in cons.args["expressions"]:
             if arg:
                 parsed_expr = parse_expr(arg)
                 arguments.append(parsed_expr)
         func_expr = WrapFunctionExpr()
-        func_expr.func_name = cons.args['this']
+        func_expr.func_name = cons.args["this"]
         func_expr.arguments = arguments
 
         parsed_expr = WrapParsedExpr()
@@ -188,9 +262,11 @@ def traverse_conditions(cons, fn=None):
     elif isinstance(cons, exp.Is):
         # Handle IS NULL / IS TRUE / IS FALSE / IS UNKNOWN.
         # Only IS NULL is supported; others must be rejected.
-        if not isinstance(cons.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        if not isinstance(cons.args.get("expression"), exp.Null):
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.",
+            )
         func_expr = WrapFunctionExpr()
         func_expr.func_name = "is_null"
         if fn:
@@ -201,10 +277,29 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = func_expr
         return parsed_expr
     # in
+    elif isinstance(cons, exp.Between):
+        # the query wire format has no between expression for where clauses, so
+        # rewrite "x BETWEEN a AND b" as "x >= a AND x <= b" (NOT BETWEEN is
+        # handled by the exp.Not arm above, which recurses into this one);
+        # BETWEEN SYMMETRIC accepts the bounds in either order
+        def within(low, high):
+            return exp.And(
+                this=exp.GTE(this=cons.this.copy(), expression=low.copy()),
+                expression=exp.LTE(this=cons.this.copy(), expression=high.copy()),
+            )
+
+        if cons.args.get("symmetric"):
+            return traverse_conditions(
+                exp.Or(
+                    this=within(cons.args["low"], cons.args["high"]),
+                    expression=within(cons.args["high"], cons.args["low"]),
+                )
+            )
+        return traverse_conditions(within(cons.args["low"], cons.args["high"]))
     elif isinstance(cons, exp.In):
-        left_operand = parse_expr(cons.args['this'])
+        left_operand = parse_expr(cons.args["this"])
         arguments = []
-        for arg in cons.args['expressions']:
+        for arg in cons.args["expressions"]:
             if arg:
                 arguments.append(parse_expr(arg))
 
@@ -219,11 +314,11 @@ def traverse_conditions(cons, fn=None):
 
         return parsed_expr
     # not in
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args["this"], exp.In):
         raw_in = cons.this
-        left_operand = parse_expr(raw_in.args['this'])
+        left_operand = parse_expr(raw_in.args["this"])
         arguments = []
-        for arg in raw_in.args['expressions']:
+        for arg in raw_in.args["expressions"]:
             if arg:
                 arguments.append(parse_expr(arg))
 
@@ -256,21 +351,29 @@ def parse_expr(expr):
 
 
 def get_search_optional_filter_from_opt_params(opt_params: dict):
+    """Split search optional parameters into (filter_expr, remaining params).
+
+    The caller's dict is left untouched: the "filter" entry used to be
+    popped out of it, silently changing data owned by the caller.
+    """
     optional_filter = None
-    k_to_pop = []
+    remaining_params = {}
     for k, v in opt_params.items():
         if k.lower() == "filter":
             if optional_filter is not None:
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                        "Only one filter is allowed in search optional parameters")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION,
+                    "Only one filter is allowed in search optional parameters",
+                )
             if not isinstance(v, str):
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                        f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION,
+                    f"Invalid filter expression '{v}', type should be string, but get {type(v)}",
+                )
             optional_filter = traverse_conditions(condition(v))
-            k_to_pop.append(k)
-    for k in k_to_pop:
-        opt_params.pop(k)
-    return optional_filter
+        else:
+            remaining_params[k] = v
+    return optional_filter, remaining_params
 
 
 def get_local_function_expr_from_fde(fde_obj) -> WrapParsedExpr:
@@ -278,7 +381,9 @@ def get_local_function_expr_from_fde(fde_obj) -> WrapParsedExpr:
     from infinity_embedded.common import FDE
 
     if not isinstance(fde_obj, FDE):
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}")
+        raise InfinityException(
+            ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}"
+        )
 
     # Create tensor data constant expression (2D array)
     tensor_const_expr = WrapConstantExpr()
@@ -319,17 +424,24 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
         if value[0].ndim <= 2:
             value = [x.tolist() for x in value]
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Invalid list member type: {type(value[0])}, ndarray dimension > 2",
+            )
     elif isinstance(value, list) and len(value) > 0:
         # Normalize numpy scalars in list to native Python types (element-wise check)
-        value = [x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x for x in value]
+        value = [
+            x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x
+            for x in value
+        ]
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
             value = value.tolist()
         else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION,
+                f"Invalid list type: {type(value)}, ndarray dimension > 2",
+            )
     # match ConstantExpr
     constant_expression = WrapConstantExpr()
     match value:
@@ -373,25 +485,37 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
             constant_expression.f64_array_value = values
         case dict():
             if len(value) == 0:
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION, "Empty sparse vector"
+                )
             match next(iter(value.values())):
                 case int():
                     constant_expression.literal_type = LiteralType.kLongSparseArray
                     constant_expression.i64_array_idx = [int(k) for k in value.keys()]
-                    constant_expression.i64_array_value = [int(v) for v in value.values()]
+                    constant_expression.i64_array_value = [
+                        int(v) for v in value.values()
+                    ]
                 case float():
                     constant_expression.literal_type = LiteralType.kDoubleSparseArray
                     constant_expression.i64_array_idx = [int(k) for k in value.keys()]
-                    constant_expression.f64_array_value = [float(v) for v in value.values()]
+                    constant_expression.f64_array_value = [
+                        float(v) for v in value.values()
+                    ]
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_EXPRESSION,
+                        f"Invalid sparse vector value type: {type(next(iter(value.values())))}",
+                    )
         case Array():
             constant_expression.literal_type = LiteralType.kCurlyBracketsArray
-            constant_expression.curly_brackets_array = [get_local_constant_expr_from_python_value(child) for child in
-                                                        value.elements]
+            constant_expression.curly_brackets_array = [
+                get_local_constant_expr_from_python_value(child)
+                for child in value.elements
+            ]
         case _:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}"
+            )
     return constant_expression
 
 
@@ -415,25 +539,41 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name must be a string, got {type(name)}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name must be a string, got {type(name)}",
+        )
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores",
+        )
     if len(name) > identifier_limit:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name '{name}' is not of appropriate length")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name '{name}' is not of appropriate length",
+        )
     if name is None:
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
     if name.isspace():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
-                                f"{name_type} name cannot be composed of whitespace characters only")
-    if name == '':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-    if name == ' ':
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME,
+            f"{name_type} name cannot be composed of whitespace characters only",
+        )
+    if name == "":
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
+    if name == " ":
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
     if name.isdigit():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
+        raise InfinityException(
+            ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}"
+        )
 
 
 def name_validity_check(arg_name: str, name_type: str = "Table"):
@@ -493,24 +633,39 @@ def get_constraints(column_info: dict) -> list[ConstraintType]:
                 if ConstraintType.kNull not in res:
                     res.append(ConstraintType.kNull)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "not null":
                 if ConstraintType.kNotNull not in res:
                     res.append(ConstraintType.kNotNull)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "primary key":
                 if ConstraintType.kPrimaryKey not in res:
                     res.append(ConstraintType.kPrimaryKey)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case "unique":
                 if ConstraintType.kUnique not in res:
                     res.append(ConstraintType.kUnique)
                 else:
-                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_CONSTRAINT_TYPE,
+                        f"Duplicated constraint: {constraint}",
+                    )
             case _:
-                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+                raise InfinityException(
+                    ErrorCode.INVALID_CONSTRAINT_TYPE,
+                    f"Unknown constraint: {constraint}",
+                )
     return res
 
 
@@ -537,7 +692,10 @@ def get_embedding_element_type(element_type):
         case "int64" | "i64":
             return EmbeddingDataType.kElemInt64
         case _:
-            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+            raise InfinityException(
+                ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                f"Unknown element type: {element_type}",
+            )
 
 
 def get_embedding_type(column_big_info: list[str]) -> WrapDataType:
@@ -552,7 +710,9 @@ def get_embedding_type(column_big_info: list[str]) -> WrapDataType:
         case "tensorarray":
             column_type.logical_type = LogicalType.kTensorArray
         case _:
-            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
+            raise InfinityException(
+                ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}"
+            )
 
     length = column_big_info[1]
     element_type = column_big_info[2]
@@ -586,7 +746,9 @@ def get_sparse_type(column_big_info: list[str]) -> WrapDataType:
     elif index_type == "int64":
         sparse_type.index_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}")
+        raise InfinityException(
+            ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}"
+        )
     sparse_type.dimension = int(length)
 
     column_type.sparse_type = sparse_type
@@ -595,7 +757,9 @@ def get_sparse_type(column_big_info: list[str]) -> WrapDataType:
 
 def get_data_type(column_info: dict) -> WrapDataType:
     if "type" not in column_info:
-        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type")
+        raise InfinityException(
+            ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type"
+        )
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
     return get_data_type_from_column_big_info(column_big_info)
@@ -614,15 +778,21 @@ def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
             if len(column_big_info) < 2:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, "No element type for array!")
+                raise InfinityException(
+                    ErrorCode.INVALID_DATA_TYPE, "No element type for array!"
+                )
             proto_column_type = WrapDataType()
             proto_column_type.logical_type = LogicalType.kArray
-            proto_column_type.array_type = get_data_type_from_column_big_info(column_big_info[1:])
+            proto_column_type.array_type = get_data_type_from_column_big_info(
+                column_big_info[1:]
+            )
             return proto_column_type
         case _:
             if len(column_big_info) > 1:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
-                                        f"Unknown datatype: {column_big_info}, too many arguments")
+                raise InfinityException(
+                    ErrorCode.INVALID_DATA_TYPE,
+                    f"Unknown datatype: {column_big_info}, too many arguments",
+                )
             proto_column_type = WrapDataType()
             match column_big_info_first_str:
                 case "int8":
@@ -656,7 +826,10 @@ def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
                 case "timestamp":
                     proto_column_type.logical_type = LogicalType.kTimestamp
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {column_big_info_first_str}")
+                    raise InfinityException(
+                        ErrorCode.INVALID_DATA_TYPE,
+                        f"Unknown datatype: {column_big_info_first_str}",
+                    )
             return proto_column_type
 
 

@@ -14,12 +14,49 @@ thread_local! {
 /// a row deleted before the ts log existed - falls back to this.
 pub(crate) const DELETED_MIRROR_TS: u64 = 1;
 
-/// Serialises mirror rewrites.
+/// The mirror rewrite lock of one table.
 ///
-/// A commit re-mirrors its table (`refresh_block_mirror`), so two
-/// concurrent inserts on one table would interleave the block writes and the
-/// stale-directory sweep of the rewrite.
-pub(crate) static MIRROR_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// A commit re-mirrors its table (`refresh_block_mirror`), so two concurrent
+/// writes on the same table would interleave the block writes and the stale
+/// directory sweep of the rewrite. The lock is **per table** (plan §5.1/O15):
+/// everything the rewrite touches - the table's `seg_*` directories, its
+/// `SegmentSet`, its catalog records - is table-scoped, so different tables
+/// have nothing to serialise.
+///
+/// Why not finer: a block write already runs inside the table's bottom gate, so
+/// no two writers of one table exist and a block lock would buy nothing; a
+/// segment lock would let two writers of one table interleave "write segment A"
+/// with "sweep the stale segments", and the sweep's `live` set is computed for
+/// the whole table.
+///
+/// The registry lock is held only long enough to clone the `Arc`; the caller
+/// locks the table's mutex **after** releasing it, so the existing order
+/// (`tables` -> mirror, never mirror -> `tables`) is preserved.
+pub(crate) fn mirror_write_lock(table: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
+    let mut map = mirror_lock_map()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    map.entry(table.to_string())
+        .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
+        .clone()
+}
+
+type MirrorLocks =
+    std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>>;
+
+fn mirror_lock_map() -> &'static MirrorLocks {
+    static LOCKS: std::sync::OnceLock<MirrorLocks> = std::sync::OnceLock::new();
+    LOCKS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Forgets `table`'s mirror lock, so a catalog that creates and drops tables
+/// (a test loop, a tenant) does not grow the registry for the life of the
+/// process.
+pub(crate) fn forget_mirror_write_lock(table: &str) {
+    if let Ok(mut locks) = mirror_lock_map().try_lock() {
+        locks.remove(table);
+    }
+}
 
 impl Default for HnswOptions {
     fn default() -> Self {
@@ -74,6 +111,10 @@ pub(crate) struct BlockCursor<'a> {
     pub(crate) types: Vec<i32>,
     /// `(segment, block)` of the blocks a reader may see.
     pub(crate) visible: std::collections::HashSet<(u32, u16)>,
+    /// The block map `visible` came from: a different `Arc` is a writer that
+    /// rescanned (`BlockCursor::refresh_visible`), the same one cannot hold a
+    /// block the snapshot is missing.
+    pub(crate) index: Option<Arc<std::sync::Mutex<storage::block_index::BlockIndex>>>,
     pub(crate) root: PathBuf,
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
@@ -102,6 +143,7 @@ impl<'a> BlockCursor<'a> {
                     "a column of '{table}' has no C++ block layout, so its rows are not in blocks"
                 ))
             })?;
+        let index = engine.block_index_for(&table);
         let visible = engine
             .visible_block_ids(&table)
             .into_iter()
@@ -116,10 +158,52 @@ impl<'a> BlockCursor<'a> {
             meta,
             types,
             visible,
+            index,
             root: engine.blocks_root(),
             block: None,
             dead,
         })
+    }
+
+    /// Re-reads the visible blocks and the delete journal, if the writer rescanned
+    /// its block map since this cursor was created.
+    ///
+    /// The block writer moves rows from the append buffer into a block **without**
+    /// any ordering against a reader: it writes the block's files and only then
+    /// retires the buffered copies, so a cursor that snapshotted the block set
+    /// before that write sees neither the buffer's row nor the block that now
+    /// holds it. A full-text hit list lands exactly there - a compaction renumbers
+    /// the postings under a statement that started before the merge, and the
+    /// merged rows are the ids the cache names. Re-reading the set is what turns
+    /// the miss back into a hit.
+    ///
+    /// The block writer replaces the table's map with a fresh `Arc` once its files
+    /// are on disk (`write_blocks_mode_with`), so an unchanged `Arc` means no
+    /// block can have been added: the answer stays short and nothing is rescanned.
+    fn refresh_visible(&mut self) -> bool {
+        let Some(index) = self.engine.block_index_for(&self.table) else {
+            return false;
+        };
+        if self
+            .index
+            .as_ref()
+            .is_some_and(|seen| Arc::ptr_eq(seen, &index))
+        {
+            return false;
+        }
+        self.visible = self
+            .engine
+            .visible_block_ids(&self.table)
+            .into_iter()
+            .map(|id| (id.segment_id, id.block_id))
+            .collect();
+        self.dead = self
+            .engine
+            .tombstone_set_at(&self.table, crate::read_ts())
+            .unwrap_or_default();
+        self.index = Some(index);
+        self.block = None;
+        true
     }
 
     /// Many rows at once, in id order.
@@ -127,7 +211,23 @@ impl<'a> BlockCursor<'a> {
     /// The ids are grouped by block and each block is decoded once, instead of
     /// once per row: a 5k-row `UPDATE` names 5k ids that all live in one block,
     /// and decoding the block per id was most of its scan.
+    ///
+    /// A short answer is retried once against a fresh block set (see
+    /// [`Self::refresh_visible`]): a writer that mirrored the rows between this
+    /// cursor's snapshot and this call leaves them in a block the snapshot does
+    /// not name, and the buffered copy is already retired.
     pub(crate) fn rows(&mut self, ids: &[u64]) -> Result<Vec<(usize, Vec<Value>)>> {
+        let mut complete = true;
+        let mut out = self.rows_of(ids, &mut complete)?;
+        if !complete && self.refresh_visible() {
+            out = self.rows_of(ids, &mut complete)?;
+        }
+        Ok(out)
+    }
+
+    /// [`Self::rows`] against the snapshot the cursor holds. `complete` says every
+    /// id was accounted for (decoded, buffered, or deleted).
+    fn rows_of(&mut self, ids: &[u64], complete: &mut bool) -> Result<Vec<(usize, Vec<Value>)>> {
         let mut sorted: Vec<usize> = ids.iter().map(|id| *id as usize).collect();
         sorted.sort_unstable();
         sorted.dedup();
@@ -161,7 +261,11 @@ impl<'a> BlockCursor<'a> {
                 }
                 wanted.insert(*seq);
             }
-            if wanted.is_empty() || !self.visible.contains(&(segment, block_no)) {
+            if wanted.is_empty() {
+                continue;
+            }
+            if !self.visible.contains(&(segment, block_no)) {
+                *complete = false;
                 continue;
             }
             let id = BlockId {
@@ -177,6 +281,7 @@ impl<'a> BlockCursor<'a> {
                 .unwrap_or(true)
             {
                 let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                    *complete = false;
                     continue;
                 };
                 self.block = Some((id, block));
@@ -202,8 +307,12 @@ impl<'a> BlockCursor<'a> {
                 None,
                 Some(&wanted),
             ) else {
+                *complete = false;
                 continue;
             };
+            if rows.len() < wanted.len() {
+                *complete = false;
+            }
             out.extend(rows);
         }
         out.sort_by_key(|(seq, _)| *seq);
@@ -239,7 +348,11 @@ impl<'a> BlockCursor<'a> {
         let block = (offset / DEFAULT_BLOCK_CAPACITY) as u16;
         let slot = offset % DEFAULT_BLOCK_CAPACITY;
         if !self.visible.contains(&(segment, block)) {
-            return Ok(None);
+            // Same race as `rows`: the row may have been mirrored into a block
+            // that the snapshot predates.
+            if !self.refresh_visible() || !self.visible.contains(&(segment, block)) {
+                return Ok(None);
+            }
         }
         let id = BlockId {
             db_id: self.engine.database_id_of(&self.table),
@@ -301,7 +414,7 @@ mod tests {
 
     fn row_strings(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
         let mut out = Vec::new();
-        for r in engine.execute(sql).unwrap() {
+        for r in engine.execute_blocking(sql).unwrap() {
             if let QueryResult::Rows { .. } = r {
                 out = r.rows_text();
             }
@@ -319,10 +432,11 @@ mod tests {
     fn a_sealed_block_is_mapped_once_and_shared() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE mb (id INT, name VARCHAR);")
+        e.execute_blocking("CREATE TABLE mb (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("INSERT INTO mb VALUES (1,'a'),(2,'b');").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("INSERT INTO mb VALUES (1,'a'),(2,'b');")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let root = e.blocks_root();
         let id = e.visible_block_ids("default_db.mb")[0];
 
@@ -348,8 +462,9 @@ mod tests {
         assert_eq!(e.buffer_objects().len(), 1);
 
         // A rewrite replaces the files, and the stale mapping goes with them.
-        e.execute("UPDATE mb SET name = 'c' WHERE id = 1;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("UPDATE mb SET name = 'c' WHERE id = 1;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let rewritten = e.block_map("default_db.mb", &root, id).unwrap();
         assert!(
             !Arc::ptr_eq(&first, &rewritten),
@@ -402,7 +517,7 @@ mod tests {
     fn rehydration_reproduces_the_block_bytes() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute(
+        e.execute_blocking(
             "CREATE TABLE t (id INT, big BIGINT, f FLOAT, d DOUBLE, name VARCHAR, \
              j JSON, v EMBEDDING(FLOAT,4), sp SPARSE(FLOAT,30000));",
         )
@@ -426,7 +541,7 @@ mod tests {
             })
             .collect();
         e.import_literals("default_db.t", None, rows).unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         assert_round_trip(e, dir.path(), "t");
     }
@@ -437,7 +552,8 @@ mod tests {
     fn rehydration_keeps_the_tombstones() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         e.import_literals(
             "default_db.t",
             None,
@@ -451,8 +567,9 @@ mod tests {
                 .collect(),
         )
         .unwrap();
-        e.execute("DELETE FROM t WHERE id % 3 = 0;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id % 3 = 0;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_round_trip(e, dir.path(), "t");
     }
 
@@ -463,7 +580,7 @@ mod tests {
     fn rehydration_reproduces_a_compacted_segment() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR, score FLOAT);")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR, score FLOAT);")
             .unwrap();
         let mut base = 0i64;
         for rows in [100i64, 60, 40, 30] {
@@ -483,10 +600,10 @@ mod tests {
             )
             .unwrap();
             base += rows;
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
-        e.execute("COMPACT TABLE t;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("COMPACT TABLE t;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_round_trip(e, dir.path(), "t");
     }
 
@@ -499,7 +616,8 @@ mod tests {
     fn a_compacted_source_segment_is_invisible_to_every_block_reader() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         let mut base = 0i64;
         for _ in 0..4 {
             e.import_literals(
@@ -518,7 +636,7 @@ mod tests {
             .unwrap();
             base += 8192;
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sources = e.visible_block_ids("t");
         assert_eq!(sources.len(), 4, "one block per source segment");
         assert_eq!(e.visible_row_count("t").unwrap(), 32_768);
@@ -537,7 +655,7 @@ mod tests {
             vec![vec!["32768"]]
         );
 
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let visible = e.visible_block_ids("t");
         assert!(
             visible.iter().all(|id| id.segment_id == 4),
@@ -588,10 +706,10 @@ mod tests {
     fn a_crash_after_an_append_keeps_the_row() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1);").unwrap();
-        e.flush().unwrap();
-        e.execute("INSERT INTO t VALUES (2);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1);").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (2);").unwrap();
         drop(e); // no checkpoint: the row is only in the WAL
 
         let e = Engine::open(dir.path()).unwrap();
@@ -608,10 +726,11 @@ mod tests {
     fn a_crash_after_a_delete_keeps_the_row_hidden() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT);").unwrap();
-        e.execute("INSERT INTO t VALUES (1), (2);").unwrap();
-        e.flush().unwrap();
-        e.execute("DELETE FROM t WHERE id = 2;").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1), (2);")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id = 2;").unwrap();
         drop(e);
 
         let e = Engine::open(dir.path()).unwrap();
@@ -634,7 +753,8 @@ mod tests {
     fn a_compaction_reads_the_rows_out_of_the_blocks() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         for base in [0i64, 100, 200, 300] {
             e.import_literals(
                 "default_db.t",
@@ -651,13 +771,13 @@ mod tests {
             )
             .unwrap();
         }
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let sources = e.visible_block_ids("t");
         assert_eq!(sources.len(), 4, "one block per imported segment");
 
         forget_journal(&e);
         e.compact_all_segments("default_db.t").unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         let visible = e.visible_block_ids("t");
         assert!(
@@ -692,7 +812,8 @@ mod tests {
     fn the_row_counts_and_the_scan_agree_after_deletes() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         e.import_literals(
             "default_db.t",
             None,
@@ -706,8 +827,8 @@ mod tests {
                 .collect(),
         )
         .unwrap();
-        e.execute("DELETE FROM t WHERE id < 100;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id < 100;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         assert_eq!(e.block_visible_range("t", 0, 0), Some((0, 8092)));
         assert_eq!(e.visible_row_count("t").unwrap(), 8092);
@@ -727,7 +848,8 @@ mod tests {
     fn a_commit_writes_only_the_block_it_appends_to() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         let rows = |from: i64, n: i64| -> Vec<Vec<parser::Literal>> {
             (from..from + n)
                 .map(|i| {
@@ -739,14 +861,14 @@ mod tests {
                 .collect()
         };
         // 8193 rows in one `INSERT`: block 0 is full, block 1 holds one row.
-        e.insert_literals_inner(
+        crate::scheduler::block_on(e.insert_literals_inner(
             "default_db.t",
             None,
             rows(0, DEFAULT_BLOCK_CAPACITY as i64 + 1),
             false,
-        )
+        ))
         .unwrap();
-        e.write_blocks("t").unwrap();
+        crate::scheduler::block_on(e.write_blocks("t")).unwrap();
 
         let db_id = e.database_id_of("default_db.t");
         let table_id = e
@@ -772,8 +894,13 @@ mod tests {
 
         // One more row lands in block 1. The commit itself writes no file at
         // all: both blocks are still the bytes the checkpoint left.
-        e.insert_literals_inner("default_db.t", None, rows(9000, 1), false)
-            .unwrap();
+        crate::scheduler::block_on(e.insert_literals_inner(
+            "default_db.t",
+            None,
+            rows(9000, 1),
+            false,
+        ))
+        .unwrap();
         let first = storage::definition::format::read_block(&e.blocks_root(), block(0)).unwrap();
         assert_eq!(first.0.encode(), first_before, "a commit wrote a file");
         let second = storage::definition::format::read_block(&e.blocks_root(), block(1)).unwrap();
@@ -790,7 +917,7 @@ mod tests {
 
         // The checkpoint writes it into block 1, which now has two `create`s;
         // block 0 is untouched in every file, `version` included.
-        e.write_blocks("t").unwrap();
+        crate::scheduler::block_on(e.write_blocks("t")).unwrap();
         let first = storage::definition::format::read_block(&e.blocks_root(), block(0)).unwrap();
         assert_eq!(first.0.encode(), first_before);
         let second = storage::definition::format::read_block(&e.blocks_root(), block(1)).unwrap();
@@ -798,14 +925,15 @@ mod tests {
 
         // A delete is the same: no file until the checkpoint, then only the
         // block that holds the slot carries the tombstone.
-        e.execute("DELETE FROM t WHERE id = 9000;").unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id = 9000;")
+            .unwrap();
         let second = storage::definition::format::read_block(&e.blocks_root(), block(1)).unwrap();
         assert_eq!(second.0.deleted.iter().filter(|ts| **ts != 0).count(), 0);
         assert_eq!(
             row_strings(&e, "SELECT count(*) FROM t;"),
             vec![vec!["8193"]]
         );
-        e.write_blocks("t").unwrap();
+        crate::scheduler::block_on(e.write_blocks("t")).unwrap();
         let first = storage::definition::format::read_block(&e.blocks_root(), block(0)).unwrap();
         assert_eq!(first.0.encode(), first_before);
         let second = storage::definition::format::read_block(&e.blocks_root(), block(1)).unwrap();
@@ -827,16 +955,17 @@ mod tests {
     fn a_checkpoint_writes_only_the_committed_prefix() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE cp (id INT);").unwrap();
-        e.execute("INSERT INTO cp VALUES (1), (2);").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("CREATE TABLE cp (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO cp VALUES (1), (2);")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(e.block_row_count("default_db.cp", 0, 0), Some(2));
 
         // A row range reserved without a commit ts: what a transaction that is
         // still committing looks like from the checkpoint's side.
         let range = e.reserve_rows("default_db.cp", 2, false).unwrap();
         assert_eq!(range.base, 2);
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             e.block_row_count("default_db.cp", 0, 0),
             Some(2),
@@ -857,11 +986,12 @@ mod tests {
     fn the_blocks_are_the_row_set_not_just_the_values() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
-        e.execute("INSERT INTO t VALUES (1,'a'),(2,'b'),(3,'c');")
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
             .unwrap();
-        e.execute("DELETE FROM t WHERE id = 2;").unwrap();
-        e.flush().unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (1,'a'),(2,'b'),(3,'c');")
+            .unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id = 2;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
 
         forget_journal(&e);
         assert!(
@@ -915,7 +1045,7 @@ mod tests {
         // Idempotence without a restart: a rewrite of unchanged rows is a no-op.
         {
             let again_before = read_tree(&dir.join("data"));
-            e.write_blocks(table).unwrap();
+            crate::scheduler::block_on(e.write_blocks(table)).unwrap();
             let again_after = read_tree(&dir.join("data"));
             assert_eq!(
                 again_before, again_after,
@@ -947,8 +1077,8 @@ mod tests {
         drop(e);
 
         let e = Engine::open(dir).unwrap();
-        e.write_blocks(table).unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.write_blocks(table)).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let after = read_tree(&dir.join("data"));
 
         let mut differing: Vec<String> = Vec::new();
@@ -1017,7 +1147,8 @@ mod tests {
     fn the_mirror_writes_the_fast_rough_filter_records() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .unwrap();
         e.import_literals(
             "default_db.t",
             None,
@@ -1031,7 +1162,7 @@ mod tests {
                 .collect(),
         )
         .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         let store = e.catalog().store();
         let prefix = b"seg|1|0|0|fast_rough_filter";
         let record = store.get(prefix).unwrap().expect("segment prefilter");
@@ -1051,10 +1182,10 @@ mod tests {
         assert_eq!(block, record);
 
         // An `INSERT`-filled segment that is not full has no filter at all.
-        e.execute("CREATE TABLE u (id INT);").unwrap();
+        e.execute_blocking("CREATE TABLE u (id INT);").unwrap();
         e.insert_literals("default_db.u", None, vec![vec![parser::Literal::Int(1)]])
             .unwrap();
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert!(store.get(b"seg|1|1|0|fast_rough_filter").unwrap().is_none());
     }
 
@@ -1184,16 +1315,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE t (id INT, name VARCHAR, ok BOOL);")
+            .execute_blocking("CREATE TABLE t (id INT, name VARCHAR, ok BOOL);")
             .unwrap();
         engine
-            .execute("INSERT INTO t VALUES (1, 'a', true);")
+            .execute_blocking("INSERT INTO t VALUES (1, 'a', true);")
             .unwrap();
         engine
-            .execute("INSERT INTO t VALUES (2, 'bb', false);")
+            .execute_blocking("INSERT INTO t VALUES (2, 'bb', false);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("t").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("t")).unwrap(),
+            2
+        );
         // The C++ file names exist under the mirror root (`tbl_{id}` uses the
         // catalog's table id, so discover it rather than hardcoding).
         let db_dir = dir.path().join("data").join("db_1");
@@ -1242,11 +1376,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE t (a INT, b INT, c INT);")
+            .execute_blocking("CREATE TABLE t (a INT, b INT, c INT);")
             .unwrap();
-        engine.execute("INSERT INTO t VALUES (1, 2, 3);").unwrap();
-        engine.execute("ALTER TABLE t DROP COLUMN b;").unwrap();
-        assert_eq!(engine.write_blocks("t").unwrap(), 1);
+        engine
+            .execute_blocking("INSERT INTO t VALUES (1, 2, 3);")
+            .unwrap();
+        engine
+            .execute_blocking("ALTER TABLE t DROP COLUMN b;")
+            .unwrap();
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("t")).unwrap(),
+            1
+        );
 
         let db_dir = dir.path().join("data").join("db_1");
         let tbl_dir = std::fs::read_dir(&db_dir)
@@ -1292,16 +1433,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
             .unwrap();
         engine
-            .execute("INSERT INTO sp VALUES (1, [0:1.5,3:2.5]);")
+            .execute_blocking("INSERT INTO sp VALUES (1, [0:1.5,3:2.5]);")
             .unwrap();
         engine
-            .execute("INSERT INTO sp VALUES (2, [7:3.5]);")
+            .execute_blocking("INSERT INTO sp VALUES (2, [7:3.5]);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("sp").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("sp")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("sp").unwrap();
         // The cell text is the reference's rendering (`SparseT::ToString`
         // prints floats with six decimals), which is also what the engine
@@ -1323,16 +1467,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE spb (id INT, v SPARSE(BIT,100));")
+            .execute_blocking("CREATE TABLE spb (id INT, v SPARSE(BIT,100));")
             .unwrap();
         engine
-            .execute("INSERT INTO spb VALUES (1, [0:1,20:1,80:1]);")
+            .execute_blocking("INSERT INTO spb VALUES (1, [0:1,20:1,80:1]);")
             .unwrap();
         engine
-            .execute("INSERT INTO spb VALUES (2, [7:1]);")
+            .execute_blocking("INSERT INTO spb VALUES (2, [7:1]);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("spb").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("spb")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("spb").unwrap();
         // A bit sparse renders as its present positions only.
         assert_eq!(
@@ -1362,17 +1509,22 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE va (id INT, a ARRAY(VARCHAR));")
+            .execute_blocking("CREATE TABLE va (id INT, a ARRAY(VARCHAR));")
             .unwrap();
         // A short (inlined) element next to a long (outlined) one, and an empty
         // array.
         let long = "this element is definitely longer than thirteen bytes";
         engine
-            .execute(&format!("INSERT INTO va VALUES (1, {{ab,'{long}'}});"))
+            .execute_blocking(&format!("INSERT INTO va VALUES (1, {{ab,'{long}'}});"))
             .unwrap();
-        engine.execute("INSERT INTO va VALUES (2, {});").unwrap();
+        engine
+            .execute_blocking("INSERT INTO va VALUES (2, {});")
+            .unwrap();
 
-        assert_eq!(engine.write_blocks("va").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("va")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("va").unwrap();
         assert_eq!(
             rows,
@@ -1388,14 +1540,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE ar (id INT, a ARRAY(INT));")
+            .execute_blocking("CREATE TABLE ar (id INT, a ARRAY(INT));")
             .unwrap();
         engine
-            .execute("INSERT INTO ar VALUES (1, {1,2,3});")
+            .execute_blocking("INSERT INTO ar VALUES (1, {1,2,3});")
             .unwrap();
-        engine.execute("INSERT INTO ar VALUES (2, {7});").unwrap();
+        engine
+            .execute_blocking("INSERT INTO ar VALUES (2, {7});")
+            .unwrap();
 
-        assert_eq!(engine.write_blocks("ar").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("ar")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("ar").unwrap();
         assert_eq!(
             rows,
@@ -1411,19 +1568,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE na (id INT, a ARRAY(ARRAY(INT)));")
+            .execute_blocking("CREATE TABLE na (id INT, a ARRAY(ARRAY(INT)));")
             .unwrap();
         // An empty outer array, an outer array with an empty inner one, and
         // mixed inner lengths.
         engine
-            .execute("INSERT INTO na VALUES (1, {{0,3},{1}});")
+            .execute_blocking("INSERT INTO na VALUES (1, {{0,3},{1}});")
             .unwrap();
         engine
-            .execute("INSERT INTO na VALUES (2, {{0,3},{}});")
+            .execute_blocking("INSERT INTO na VALUES (2, {{0,3},{}});")
             .unwrap();
-        engine.execute("INSERT INTO na VALUES (3, {});").unwrap();
+        engine
+            .execute_blocking("INSERT INTO na VALUES (3, {});")
+            .unwrap();
 
-        assert_eq!(engine.write_blocks("na").unwrap(), 3);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("na")).unwrap(),
+            3
+        );
         let (_, rows) = engine.read_blocks("na").unwrap();
         assert_eq!(
             rows,
@@ -1440,16 +1602,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE ts (id INT, t TENSOR(FLOAT,3));")
+            .execute_blocking("CREATE TABLE ts (id INT, t TENSOR(FLOAT,3));")
             .unwrap();
         engine
-            .execute("INSERT INTO ts VALUES (1, [[1,2,3],[4,5,6]]);")
+            .execute_blocking("INSERT INTO ts VALUES (1, [[1,2,3],[4,5,6]]);")
             .unwrap();
         engine
-            .execute("INSERT INTO ts VALUES (2, [[7,8,9]]);")
+            .execute_blocking("INSERT INTO ts VALUES (2, [[7,8,9]]);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("ts").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("ts")).unwrap(),
+            2
+        );
         // The outline holds the raw element bytes: 3 vectors * dim 3 * 4 bytes.
         let db_dir = dir.path().join("data").join("db_1");
         let tbl_dir = std::fs::read_dir(&db_dir)
@@ -1497,18 +1662,21 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE ta (id INT, t TENSORARRAY(FLOAT,2));")
+            .execute_blocking("CREATE TABLE ta (id INT, t TENSORARRAY(FLOAT,2));")
             .unwrap();
         // Two tensors (one with two rows, one with a single row) and a single
         // tensor, so both the tensor count and each row count vary.
         engine
-            .execute("INSERT INTO ta VALUES (1, [[[1,2],[3,4]],[[5,6]]]);")
+            .execute_blocking("INSERT INTO ta VALUES (1, [[[1,2],[3,4]],[[5,6]]]);")
             .unwrap();
         engine
-            .execute("INSERT INTO ta VALUES (2, [[[7,8]]]);")
+            .execute_blocking("INSERT INTO ta VALUES (2, [[[7,8]]]);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("ta").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("ta")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("ta").unwrap();
         assert_eq!(
             rows,
@@ -1524,18 +1692,23 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE t (id INT, name VARCHAR, ok BOOL);")
+            .execute_blocking("CREATE TABLE t (id INT, name VARCHAR, ok BOOL);")
             .unwrap();
         engine
-            .execute("INSERT INTO t VALUES (1, 'a', true), (2, 'bb', false);")
+            .execute_blocking("INSERT INTO t VALUES (1, 'a', true), (2, 'bb', false);")
             .unwrap();
-        assert_eq!(engine.write_blocks("t").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("t")).unwrap(),
+            2
+        );
 
-        engine.execute("DELETE FROM t WHERE id = 1;").unwrap();
+        engine
+            .execute_blocking("DELETE FROM t WHERE id = 1;")
+            .unwrap();
         // The tombstone reaches the `version` file at a checkpoint, like every
         // other change to the mirror; without one a reopen would resurrect the
         // row from cells the file still holds.
-        engine.flush().unwrap();
+        crate::scheduler::block_on(engine.flush()).unwrap();
         forget_journal(&engine);
 
         // A deleted row keeps its cells in the block and is hidden by the
@@ -1561,12 +1734,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,3), d DATE, s VARCHAR);")
+            .execute_blocking("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,3), d DATE, s VARCHAR);")
             .unwrap();
         engine
-            .execute("INSERT INTO t VALUES (1, [1.5,2.5,3.5], DATE '2024-01-22', 'alpha');")
+            .execute_blocking(
+                "INSERT INTO t VALUES (1, [1.5,2.5,3.5], DATE '2024-01-22', 'alpha');",
+            )
             .unwrap();
-        assert_eq!(engine.write_blocks("t").unwrap(), 1);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("t")).unwrap(),
+            1
+        );
         // The mirror is the table: with the journal gone the row still reads
         // back through SQL, so every column type survives the block form.
         forget_journal(&engine);
@@ -1581,11 +1759,11 @@ mod tests {
     fn uint8_embedding_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE u8 (id INT, v EMBEDDING(UINT8,3));")
+        e.execute_blocking("CREATE TABLE u8 (id INT, v EMBEDDING(UINT8,3));")
             .unwrap();
-        e.execute("INSERT INTO u8 VALUES (1, [127,128,255]);")
+        e.execute_blocking("INSERT INTO u8 VALUES (1, [127,128,255]);")
             .unwrap();
-        e.write_blocks("u8").unwrap();
+        crate::scheduler::block_on(e.write_blocks("u8")).unwrap();
         let (_, rows) = e.read_blocks("u8").unwrap();
         assert_eq!(rows[0][1], "[127,128,255]");
     }
@@ -1623,12 +1801,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE b (id INT, v EMBEDDING(BIT,16));")
+            .execute_blocking("CREATE TABLE b (id INT, v EMBEDDING(BIT,16));")
             .unwrap();
         engine
-            .execute("INSERT INTO b VALUES (1, [1,0,1,1,0,0,0,1,1,1,0,0,0,0,1,1]);")
+            .execute_blocking("INSERT INTO b VALUES (1, [1,0,1,1,0,0,0,1,1,1,0,0,0,0,1,1]);")
             .unwrap();
-        assert_eq!(engine.write_blocks("b").unwrap(), 1);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("b")).unwrap(),
+            1
+        );
         forget_journal(&engine);
         let rows = row_strings(&engine, "SELECT * FROM b;");
         assert_eq!(rows.len(), 1);
@@ -1643,12 +1824,12 @@ mod tests {
         // A bit tensor row packs `dim` bits into `ceil(dim/8)` bytes; the block
         // reader renders it back as the bit string the reference prints.
         engine
-            .execute("CREATE TABLE v (id INT, ta TENSORARRAY(BIT,8));")
+            .execute_blocking("CREATE TABLE v (id INT, ta TENSORARRAY(BIT,8));")
             .unwrap();
         engine
-            .execute("INSERT INTO v VALUES (1, '[[[1, 1, 1, 0, 1, 0, 1, 1]]]');")
+            .execute_blocking("INSERT INTO v VALUES (1, '[[[1, 1, 1, 0, 1, 0, 1, 1]]]');")
             .unwrap();
-        engine.write_blocks("v").unwrap();
+        crate::scheduler::block_on(engine.write_blocks("v")).unwrap();
         let rows = engine.fetch_rows("v").unwrap();
         assert_eq!(
             rows[0].get(1).map(|v| v.to_slt_string()),
@@ -1664,17 +1845,20 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE lv (id INT, s VARCHAR);")
+            .execute_blocking("CREATE TABLE lv (id INT, s VARCHAR);")
             .unwrap();
         let long = "this string is definitely longer than thirteen bytes";
         engine
-            .execute(&format!("INSERT INTO lv VALUES (1, '{long}');"))
+            .execute_blocking(&format!("INSERT INTO lv VALUES (1, '{long}');"))
             .unwrap();
         engine
-            .execute("INSERT INTO lv VALUES (2, 'short');")
+            .execute_blocking("INSERT INTO lv VALUES (2, 'short');")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("lv").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("lv")).unwrap(),
+            2
+        );
         forget_journal(&engine);
         let rows = row_strings(&engine, "SELECT * FROM lv;");
         assert_eq!(rows.len(), 2);
@@ -1687,13 +1871,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
+            .execute_blocking("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
             .unwrap();
         engine
-            .execute("INSERT INTO hv VALUES (1, [1,2,3]), (2, [4,5,6]), (3, [7,8,9]);")
+            .execute_blocking("INSERT INTO hv VALUES (1, [1,2,3]), (2, [4,5,6]), (3, [7,8,9]);")
             .unwrap();
         engine
-            .execute("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
+            .execute_blocking("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
             .unwrap();
 
         assert_eq!(engine.write_hnsw_index("hv", "hv_idx").unwrap(), 3);
@@ -1710,14 +1894,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
+            e.execute_blocking("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
                 .unwrap();
-            e.execute("INSERT INTO hv VALUES (1,[1,2,3]), (2,[4,5,6]), (3,[7,8,9]);")
+            e.execute_blocking("INSERT INTO hv VALUES (1,[1,2,3]), (2,[4,5,6]), (3,[7,8,9]);")
                 .unwrap();
-            e.execute("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
+            e.execute_blocking("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
                 .unwrap();
-            // A flush writes the rows and the HNSW chunk file.
-            e.flush().unwrap();
+            // The checkpoint writes the rows; the HNSW chunk comes from its
+            // own `DumpIndex` transaction (`NewTxn::DumpMemIndex`) - the only
+            // place the reference writes an index chunk. A checkpoint never
+            // does (`NewTxn::CheckpointTable`).
+            crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_idx")).unwrap();
         }
         // Reopening loads the persisted graph, so the search walks what is on
         // disk rather than scanning every row (plan #70).
@@ -1727,7 +1915,10 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get("default_db.hv")
-                .is_some_and(|t| t.vector.contains_key("v")),
+                .is_some_and(|t| {
+                    let id = e.test_index_id("default_db.hv", "v", "HNSW");
+                    t.vector.contains_key(&id)
+                }),
             "the HNSW graph was not loaded from the mirror"
         );
         let rows = row_strings(
@@ -1742,14 +1933,16 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+            .execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
             .unwrap();
         // Two well-separated clusters.
         engine
-            .execute("INSERT INTO iv VALUES (1, [0,0]), (2, [0,1]), (3, [10,10]), (4, [10,11]);")
+            .execute_blocking(
+                "INSERT INTO iv VALUES (1, [0,0]), (2, [0,1]), (3, [10,10]), (4, [10,11]);",
+            )
             .unwrap();
         engine
-            .execute("CREATE INDEX iv_idx ON iv (v) USING IVF WITH (metric = l2);")
+            .execute_blocking("CREATE INDEX iv_idx ON iv (v) USING IVF WITH (metric = l2);")
             .unwrap();
 
         assert_eq!(engine.write_ivf_index("iv", "iv_idx").unwrap(), 4);
@@ -1774,7 +1967,7 @@ mod tests {
     fn reading_blocks_without_a_mirror_reports_not_found() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
-        engine.execute("CREATE TABLE t (id INT);").unwrap();
+        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
         assert!(engine.read_blocks("t").is_err());
     }
 
@@ -1813,16 +2006,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE v (id INT, e EMBEDDING(FLOAT,3));")
+            .execute_blocking("CREATE TABLE v (id INT, e EMBEDDING(FLOAT,3));")
             .unwrap();
         engine
-            .execute("INSERT INTO v VALUES (1, [1,2,3]);")
+            .execute_blocking("INSERT INTO v VALUES (1, [1,2,3]);")
             .unwrap();
         engine
-            .execute("INSERT INTO v VALUES (2, [4,5,6]);")
+            .execute_blocking("INSERT INTO v VALUES (2, [4,5,6]);")
             .unwrap();
 
-        assert_eq!(engine.write_blocks("v").unwrap(), 2);
+        assert_eq!(
+            crate::scheduler::block_on(engine.write_blocks("v")).unwrap(),
+            2
+        );
         let (_, rows) = engine.read_blocks("v").unwrap();
         assert_eq!(
             rows,
@@ -1853,19 +2049,25 @@ mod tests {
     fn plaid_mirror_with_two_chunks(dir: &std::path::Path) -> Engine {
         let engine = Engine::open(dir).unwrap();
         engine
-            .execute("CREATE TABLE pc (id INT, t TENSOR(FLOAT,2));")
+            .execute_blocking("CREATE TABLE pc (id INT, t TENSOR(FLOAT,2));")
             .unwrap();
         engine
-            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(0, 200)))
+            .execute_blocking(&format!("INSERT INTO pc VALUES {};", plaid_rows(0, 200)))
             .unwrap();
         engine
-            .execute("CREATE INDEX pidx ON pc (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .execute_blocking(
+                "CREATE INDEX pidx ON pc (t) USING PLAID WITH (nbits = 4, n_centroids = 8);",
+            )
             .unwrap();
-        engine.flush().unwrap();
+        // One chunk per `DumpIndex` transaction - the reference's `DumpMemIndex`
+        // is the only index writer; a checkpoint writes blocks only.
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction("pc", "pidx")).unwrap();
         engine
-            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(200, 260)))
+            .execute_blocking(&format!("INSERT INTO pc VALUES {};", plaid_rows(200, 260)))
             .unwrap();
-        engine.flush().unwrap();
+        crate::scheduler::block_on(engine.flush()).unwrap();
+        crate::scheduler::block_on(engine.dump_index_transaction("pc", "pidx")).unwrap();
         engine
     }
 
@@ -1894,7 +2096,7 @@ mod tests {
         );
 
         // A flush with nothing new must not append an empty chunk.
-        engine.flush().unwrap();
+        crate::scheduler::block_on(engine.flush()).unwrap();
         let chunks = engine.read_plaid_index_chunks("pc", "pidx").unwrap();
         assert_eq!(chunks.len(), 2);
         // The read path merges the chunks back into one index.
@@ -1974,7 +2176,7 @@ mod tests {
             1,
             "the superseded chunks are out of the chunk list"
         );
-        engine.cleanup().unwrap();
+        crate::scheduler::block_on(engine.cleanup()).unwrap();
         assert!(
             !dir.join("chunk_0.idx").exists(),
             "cleanup deletes the bytes"
@@ -2000,18 +2202,20 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         {
             let e = Engine::open(dir.path()).unwrap();
-            e.execute("CREATE TABLE t (id INT, v FLOAT);").unwrap();
-            e.execute("INSERT INTO t VALUES (1, 1.0), (2, 2.0), (3, 3.0);")
+            e.execute_blocking("CREATE TABLE t (id INT, v FLOAT);")
                 .unwrap();
-            e.write_blocks("t").unwrap();
+            e.execute_blocking("INSERT INTO t VALUES (1, 1.0), (2, 2.0), (3, 3.0);")
+                .unwrap();
+            crate::scheduler::block_on(e.write_blocks("t")).unwrap();
         }
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("INSERT INTO t VALUES (4, 4.0);").unwrap();
-        e.execute("DELETE FROM t WHERE id = 1;").unwrap();
+        e.execute_blocking("INSERT INTO t VALUES (4, 4.0);")
+            .unwrap();
+        e.execute_blocking("DELETE FROM t WHERE id = 1;").unwrap();
         // The delete is in the table's delete log; the segment record that
         // carries `first_delete_ts` is (re)written by the checkpoint, which is
         // where an append-buffer-only delete reaches the block files.
-        e.write_blocks("t").unwrap();
+        crate::scheduler::block_on(e.write_blocks("t")).unwrap();
         let delete_ts = e
             .delete_ts("t")
             .into_iter()
@@ -2028,13 +2232,13 @@ mod tests {
         assert_eq!(tag(&e).as_deref(), Some(delete_ts.to_string().as_str()));
         // The checkpoint sweeps the layout and writes it back; a DDL captures
         // it the same way.
-        e.flush().unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(
             tag(&e).as_deref(),
             Some(delete_ts.to_string().as_str()),
             "a checkpoint must not claim the segment has no deletes"
         );
-        e.execute("CREATE INDEX ix ON t (id);").unwrap();
+        e.execute_blocking("CREATE INDEX ix ON t (id);").unwrap();
         assert_eq!(
             tag(&e).as_deref(),
             Some(delete_ts.to_string().as_str()),
@@ -2057,5 +2261,58 @@ mod tests {
             (270, 810),
             "an incremental chunk after a merge still adds up"
         );
+    }
+
+    /// Blocks decode as tokio tasks when there is no row predicate (plan
+    /// 6.13.2). The parallel pass must return exactly what the serial walk of
+    /// the same blocks returns, in the same order - the fan-out only decides
+    /// who decodes which block, not what a block holds.
+    #[test]
+    fn parallel_block_decode_matches_the_serial_scan() {
+        let dir = tempdir().unwrap();
+        // The parallel decode needs an owned engine handle (one task per
+        // block); without it the scan is serial and this test would compare the
+        // serial walk with itself.
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.install_engine_handle();
+        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR, score FLOAT);")
+            .unwrap();
+        // Three blocks of rows, so the fan-out actually has more than one.
+        e.import_literals(
+            "default_db.t",
+            None,
+            (0..(DEFAULT_BLOCK_CAPACITY as i64 * 3))
+                .map(|i| {
+                    vec![
+                        parser::Literal::Int(i),
+                        parser::Literal::Str(format!("doc-{i}")),
+                        parser::Literal::Float(i as f64 / 8.0),
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let wanted: Vec<usize> = (0..3).collect();
+        // No predicate: blocks decode as tasks under the core bound.
+        let (names, parallel) = e.read_blocks_pruned_values("t", &wanted, &[]).unwrap();
+        assert_eq!(names.len(), 3);
+        let ids = e.visible_block_ids("default_db.t");
+        assert!(ids.len() >= 3, "the import should span three blocks");
+        // A predicate pins the scan to the serial walk (`&dyn Fn` is not
+        // `Sync`), and one that keeps everything returns the same rows.
+        let (_, serial) = e
+            .read_blocks_filtered_values("t", &wanted, &[], &|_: &[Value]| true)
+            .unwrap();
+        assert_eq!(parallel.len(), serial.len(), "same row count");
+        for (a, b) in parallel.iter().zip(&serial) {
+            assert_eq!(a.0, b.0, "the parallel pass must not reorder the rows");
+            assert_eq!(a.1, b.1, "the parallel pass must not drop a cell");
+        }
+        // And the order is the row-id order the serial walk produced.
+        let mut sorted = parallel.clone();
+        sorted.sort_by_key(|(seq, _)| *seq);
+        assert_eq!(parallel, sorted);
     }
 }

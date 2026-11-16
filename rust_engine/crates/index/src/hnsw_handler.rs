@@ -37,8 +37,8 @@ impl HnswHandler {
     /// C++: `InsertVecs(Iter, config)`.
     ///
     /// The reference stores the whole batch and then builds it in buckets
-    /// across the dense-index thread pool (`kBuildBucketSize`); `add_batch`
-    /// does the same. Returns the number of vectors inserted; vectors with the
+    /// in parallel buckets (`kBuildBucketSize`); `add_batch` does the same.
+    /// Returns the number of vectors inserted; vectors with the
     /// wrong dimension are skipped.
     pub fn insert_vecs<I>(&mut self, vectors: I) -> usize
     where
@@ -51,10 +51,14 @@ impl HnswHandler {
     /// serial path.
     pub fn insert_vecs_threaded<I>(&mut self, vectors: I, threads: usize) -> usize
     where
-        I: IntoIterator<Item = Vec<f32>>,
+        I: IntoIterator,
+        I::Item: AsRef<[f32]>,
     {
         let dims = self.index.dims();
-        let batch: Vec<Vec<f32>> = vectors.into_iter().filter(|v| v.len() == dims).collect();
+        let batch: Vec<I::Item> = vectors
+            .into_iter()
+            .filter(|v| v.as_ref().len() == dims)
+            .collect();
         if batch.is_empty() {
             return 0;
         }
@@ -109,6 +113,12 @@ impl HnswHandler {
     }
 
     /// The wrapped graph (serialization, graph readers).
+    /// The wrapped graph, mutably: the in-memory segment trains the store's
+    /// quantizer and the LSG averages from its first batch before inserting it.
+    pub fn index_mut(&mut self) -> &mut HnswIndex {
+        &mut self.index
+    }
+
     pub fn index(&self) -> &HnswIndex {
         &self.index
     }

@@ -1,4 +1,3 @@
-
 import random
 from threading import Lock, Thread
 
@@ -24,7 +23,9 @@ class TestInsertDeleteParallel:
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         db_obj.create_table(
-            table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
+            table_name,
+            {"id": {"type": "int64"}, "text": {"type": "varchar"}},
+            ConflictType.Error,
         )
         connection_pool.release_conn(infinity_obj)
 
@@ -51,7 +52,9 @@ class TestInsertDeleteParallel:
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
-            table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
+            table_name,
+            {"id": {"type": "int64"}, "text": {"type": "varchar"}},
+            ConflictType.Error,
         )
         table_obj.create_index(
             "text_index", index.IndexInfo("text", index.IndexType.FullText)
@@ -71,6 +74,7 @@ class TestInsertDeleteParallel:
 
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()

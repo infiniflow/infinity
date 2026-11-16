@@ -16,7 +16,7 @@ use std::path::Path;
 
 /// Rows of the first `Rows` result of `sql`.
 pub(crate) fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -84,7 +84,7 @@ pub(crate) fn append_repeated(
 /// Flushes the WAL/KV and reopens the engine at `dir` — the reference's
 /// `RestartTxnMgr` (`replay_test.cppm`).
 pub(crate) fn reopen(engine: Engine, dir: &Path) -> Engine {
-    engine.flush().unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
     drop(engine);
     Engine::open(dir).unwrap()
 }
@@ -92,12 +92,12 @@ pub(crate) fn reopen(engine: Engine, dir: &Path) -> Engine {
 /// `Status::ok()` for a statement the reference expects to commit.
 pub(crate) fn ok(engine: &Engine, sql: &str) {
     engine
-        .execute(sql)
+        .execute_blocking(sql)
         .unwrap_or_else(|e| panic!("expected `{sql}` to succeed: {e}"));
 }
 
 /// Result of executing `sql`, for assertions on `QueryResult::{Deleted,
 /// Updated, Inserted}`.
 pub(crate) fn result(engine: &Engine, sql: &str) -> QueryResult {
-    engine.execute(sql).unwrap().remove(0)
+    engine.execute_blocking(sql).unwrap().remove(0)
 }

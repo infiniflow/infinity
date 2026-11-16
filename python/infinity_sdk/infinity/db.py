@@ -16,7 +16,6 @@ from abc import ABC, abstractmethod
 
 
 class Database(ABC):
-
     @abstractmethod
     def create_table(self, table_name, schema, options):
         pass  # implement create table logic here
@@ -44,5 +43,3 @@ class Database(ABC):
     @abstractmethod
     def restore_table_snapshot(self, snapshot_name: str):
         pass
-    
-    

@@ -15,7 +15,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -53,20 +53,21 @@ fn create_and_drop_database_conflicts() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
 
-    e.execute("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
     // ConflictType::kError: a second create without IF NOT EXISTS fails.
-    assert!(e.execute("CREATE DATABASE db1;").is_err());
-    e.execute("CREATE DATABASE IF NOT EXISTS db1;").unwrap();
-    e.execute("USE db1;").unwrap();
-    e.execute("CREATE TABLE t (id INT);").unwrap();
-    e.execute("INSERT INTO t VALUES (1);").unwrap();
-    e.execute("USE default_db;").unwrap();
+    assert!(e.execute_blocking("CREATE DATABASE db1;").is_err());
+    e.execute_blocking("CREATE DATABASE IF NOT EXISTS db1;")
+        .unwrap();
+    e.execute_blocking("USE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+    e.execute_blocking("INSERT INTO t VALUES (1);").unwrap();
+    e.execute_blocking("USE default_db;").unwrap();
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
     // The database and its tables are gone; a new create starts empty.
-    assert!(e.execute("INSERT INTO db1.t VALUES (2);").is_err());
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("USE db1;").unwrap();
+    assert!(e.execute_blocking("INSERT INTO db1.t VALUES (2);").is_err());
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("USE db1;").unwrap();
     assert!(!e.table_exists("t"));
 }
 
@@ -77,21 +78,21 @@ fn create_and_drop_table_conflicts() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
 
-    e.execute("CREATE TABLE t1 (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE t1 (id INT, name VARCHAR);")
         .unwrap();
-    assert!(e.execute("CREATE TABLE t1 (id INT);").is_err());
-    e.execute("CREATE TABLE t2 (id INT);").unwrap();
+    assert!(e.execute_blocking("CREATE TABLE t1 (id INT);").is_err());
+    e.execute_blocking("CREATE TABLE t2 (id INT);").unwrap();
     assert!(e.table_exists("t1"));
     assert!(e.table_exists("t2"));
 
-    e.execute("DROP TABLE t1;").unwrap();
+    e.execute_blocking("DROP TABLE t1;").unwrap();
     assert!(!e.table_exists("t1"));
-    assert!(e.execute("INSERT INTO t1 VALUES (1);").is_err());
+    assert!(e.execute_blocking("INSERT INTO t1 VALUES (1);").is_err());
     assert!(e.table_exists("t2"));
 
     // Dropping a missing table is only an error without IF EXISTS.
-    assert!(e.execute("DROP TABLE t1;").is_err());
-    e.execute("DROP TABLE IF EXISTS t1;").unwrap();
+    assert!(e.execute_blocking("DROP TABLE t1;").is_err());
+    e.execute_blocking("DROP TABLE IF EXISTS t1;").unwrap();
 }
 
 /// C++: `src/unit_test/storage/new_catalog/append_ut.cpp:118` (`test_append0`)
@@ -101,7 +102,7 @@ fn create_and_drop_table_conflicts() {
 fn appends_accumulate_across_commits() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE ap (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE ap (id INT, name VARCHAR);")
         .unwrap();
 
     for block in 0..2 {
@@ -127,7 +128,7 @@ fn appends_accumulate_across_commits() {
 fn large_appends_span_blocks() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE big (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE big (id INT, name VARCHAR);")
         .unwrap();
 
     for batch in 0..2 {
@@ -159,15 +160,16 @@ fn large_appends_span_blocks() {
 fn append_type_mismatch_is_rejected() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE mm (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE mm (id INT, name VARCHAR);")
         .unwrap();
 
     assert!(e
-        .execute("INSERT INTO mm VALUES ('not_an_int', 'a');")
+        .execute_blocking("INSERT INTO mm VALUES ('not_an_int', 'a');")
         .is_err());
     assert_eq!(e.row_count("mm").unwrap(), 0);
     // The matching shape still works.
-    e.execute("INSERT INTO mm VALUES (1, 'a');").unwrap();
+    e.execute_blocking("INSERT INTO mm VALUES (1, 'a');")
+        .unwrap();
     assert_eq!(e.row_count("mm").unwrap(), 1);
 }
 
@@ -179,17 +181,17 @@ fn append_after_drop_is_rejected() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
 
-    e.execute("CREATE TABLE gone (id INT);").unwrap();
-    e.execute("DROP TABLE gone;").unwrap();
-    assert!(e.execute("INSERT INTO gone VALUES (1);").is_err());
+    e.execute_blocking("CREATE TABLE gone (id INT);").unwrap();
+    e.execute_blocking("DROP TABLE gone;").unwrap();
+    assert!(e.execute_blocking("INSERT INTO gone VALUES (1);").is_err());
     assert!(!e.table_exists("gone"));
 
-    e.execute("CREATE DATABASE db2;").unwrap();
-    e.execute("USE db2;").unwrap();
-    e.execute("CREATE TABLE t (id INT);").unwrap();
-    e.execute("USE default_db;").unwrap();
-    e.execute("DROP DATABASE db2;").unwrap();
-    assert!(e.execute("INSERT INTO db2.t VALUES (1);").is_err());
+    e.execute_blocking("CREATE DATABASE db2;").unwrap();
+    e.execute_blocking("USE db2;").unwrap();
+    e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+    e.execute_blocking("USE default_db;").unwrap();
+    e.execute_blocking("DROP DATABASE db2;").unwrap();
+    assert!(e.execute_blocking("INSERT INTO db2.t VALUES (1);").is_err());
 }
 
 /// C++: `src/unit_test/storage/new_catalog/append_ut.cpp`
@@ -200,13 +202,15 @@ fn append_after_drop_is_rejected() {
 fn append_add_column_fills_old_rows_with_null() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE ac (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE ac (id INT, name VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO ac VALUES (1, 'a'), (2, 'b');")
+    e.execute_blocking("INSERT INTO ac VALUES (1, 'a'), (2, 'b');")
         .unwrap();
 
-    e.execute("ALTER TABLE ac ADD COLUMN (extra INT);").unwrap();
-    e.execute("INSERT INTO ac VALUES (3, 'c', 30);").unwrap();
+    e.execute_blocking("ALTER TABLE ac ADD COLUMN (extra INT);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO ac VALUES (3, 'c', 30);")
+        .unwrap();
 
     assert_eq!(e.row_count("ac").unwrap(), 3);
     let all = rows(&e, "SELECT id, name, extra FROM ac ORDER BY id;");
@@ -219,7 +223,8 @@ fn append_add_column_fills_old_rows_with_null() {
         ]
     );
 
-    e.execute("ALTER TABLE ac DROP COLUMN (extra);").unwrap();
+    e.execute_blocking("ALTER TABLE ac DROP COLUMN (extra);")
+        .unwrap();
     let all = rows(&e, "SELECT id, name FROM ac ORDER BY id;");
     assert_eq!(all, vec![vec!["1", "a"], vec!["2", "b"], vec!["3", "c"],]);
 }
@@ -229,17 +234,22 @@ fn append_add_column_fills_old_rows_with_null() {
 fn append_uses_the_renamed_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE old_name (id INT);").unwrap();
-    e.execute("INSERT INTO old_name VALUES (1);").unwrap();
+    e.execute_blocking("CREATE TABLE old_name (id INT);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO old_name VALUES (1);")
+        .unwrap();
 
-    e.execute("ALTER TABLE old_name RENAME TO new_name;")
+    e.execute_blocking("ALTER TABLE old_name RENAME TO new_name;")
         .unwrap();
     assert!(!e.table_exists("old_name"));
     assert!(e.table_exists("new_name"));
-    e.execute("INSERT INTO new_name VALUES (2);").unwrap();
+    e.execute_blocking("INSERT INTO new_name VALUES (2);")
+        .unwrap();
 
     assert_eq!(e.row_count("new_name").unwrap(), 2);
-    assert!(e.execute("INSERT INTO old_name VALUES (3);").is_err());
+    assert!(e
+        .execute_blocking("INSERT INTO old_name VALUES (3);")
+        .is_err());
 }
 
 /// C++: `src/unit_test/storage/new_catalog/append_ut.cpp`
@@ -248,7 +258,7 @@ fn append_uses_the_renamed_table() {
 fn append_then_compact_preserves_rows() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE acp (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE acp (id INT, name VARCHAR);")
         .unwrap();
     let batch = (0..2000)
         .map(|i| vec![Literal::Int(i), Literal::Str(format!("v{i}"))])
@@ -270,17 +280,19 @@ fn append_then_compact_preserves_rows() {
 fn append_around_secondary_index_lifecycle() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE aix (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE aix (id INT, name VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO aix VALUES (1, 'a'), (2, 'b');")
+    e.execute_blocking("INSERT INTO aix VALUES (1, 'a'), (2, 'b');")
         .unwrap();
-    e.execute("CREATE INDEX aix_name ON aix (name);").unwrap();
-    e.execute("INSERT INTO aix VALUES (3, 'c');").unwrap();
+    e.execute_blocking("CREATE INDEX aix_name ON aix (name);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO aix VALUES (3, 'c');")
+        .unwrap();
 
     let hit = rows(&e, "SELECT id FROM aix WHERE name = 'c';");
     assert_eq!(hit, vec![vec!["3".to_string()]]);
 
-    e.execute("DROP INDEX aix_name ON aix;").unwrap();
+    e.execute_blocking("DROP INDEX aix_name ON aix;").unwrap();
     let hit = rows(&e, "SELECT id FROM aix WHERE name = 'c';");
     assert_eq!(hit, vec![vec!["3".to_string()]]);
     assert_eq!(e.row_count("aix").unwrap(), 3);
@@ -293,12 +305,12 @@ fn append_around_secondary_index_lifecycle() {
 fn delete_removes_rows_from_scans() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE del (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE del (id INT, name VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO del VALUES (1,'a'), (2,'b'), (3,'c'), (4,'d');")
+    e.execute_blocking("INSERT INTO del VALUES (1,'a'), (2,'b'), (3,'c'), (4,'d');")
         .unwrap();
 
-    let deleted = e.execute("DELETE FROM del WHERE id = 2;").unwrap();
+    let deleted = e.execute_blocking("DELETE FROM del WHERE id = 2;").unwrap();
     assert!(matches!(deleted[0], QueryResult::Deleted { count: 1 }));
     assert_eq!(e.row_count("del").unwrap(), 3);
     assert_eq!(
@@ -310,7 +322,7 @@ fn delete_removes_rows_from_scans() {
         ]
     );
 
-    e.execute("DELETE FROM del;").unwrap();
+    e.execute_blocking("DELETE FROM del;").unwrap();
     assert_eq!(e.row_count("del").unwrap(), 0);
     assert!(rows(&e, "SELECT id FROM del;").is_empty());
 }
@@ -322,7 +334,7 @@ fn delete_removes_rows_from_scans() {
 fn delete_across_multiple_blocks() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE dmb (id INT);").unwrap();
+    e.execute_blocking("CREATE TABLE dmb (id INT);").unwrap();
     for batch in 0..2 {
         let rows = (0..8192)
             .map(|i| vec![Literal::Int(batch * 8192 + i)])
@@ -331,7 +343,8 @@ fn delete_across_multiple_blocks() {
     }
     assert_eq!(e.row_count("dmb").unwrap(), 16384);
 
-    e.execute("DELETE FROM dmb WHERE id >= 8192;").unwrap();
+    e.execute_blocking("DELETE FROM dmb WHERE id >= 8192;")
+        .unwrap();
     assert_eq!(e.row_count("dmb").unwrap(), 8192);
     assert_eq!(count(&e, "dmb"), 8192);
     let boundary = rows(&e, "SELECT id FROM dmb WHERE id = 8191;");
@@ -346,11 +359,12 @@ fn delete_across_multiple_blocks() {
 fn delete_then_append_and_compact() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE dac (id INT);").unwrap();
+    e.execute_blocking("CREATE TABLE dac (id INT);").unwrap();
     let batch = (0..100).map(|i| vec![Literal::Int(i)]).collect();
     insert_rows(&e, "default_db.dac", batch).unwrap();
 
-    e.execute("DELETE FROM dac WHERE id < 10;").unwrap();
+    e.execute_blocking("DELETE FROM dac WHERE id < 10;")
+        .unwrap();
     assert_eq!(e.row_count("dac").unwrap(), 90);
     let extra = (100..105).map(|i| vec![Literal::Int(i)]).collect();
     insert_rows(&e, "default_db.dac", extra).unwrap();
@@ -368,13 +382,13 @@ fn delete_then_append_and_compact() {
 fn update_replaces_visible_values() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE upd (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE upd (id INT, name VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO upd VALUES (1,'a'), (2,'b'), (3,'c'), (4,'d');")
+    e.execute_blocking("INSERT INTO upd VALUES (1,'a'), (2,'b'), (3,'c'), (4,'d');")
         .unwrap();
 
     let updated = e
-        .execute("UPDATE upd SET name = 'zzz', id = 100 WHERE id = 2;")
+        .execute_blocking("UPDATE upd SET name = 'zzz', id = 100 WHERE id = 2;")
         .unwrap();
     assert!(matches!(updated[0], QueryResult::Updated { count: 1 }));
     assert_eq!(e.row_count("upd").unwrap(), 4);
@@ -384,7 +398,7 @@ fn update_replaces_visible_values() {
     );
     assert!(rows(&e, "SELECT name FROM upd WHERE id = 2;").is_empty());
 
-    e.execute("UPDATE upd SET name = 'y' WHERE id >= 3;")
+    e.execute_blocking("UPDATE upd SET name = 'y' WHERE id >= 3;")
         .unwrap();
     assert_eq!(
         rows(&e, "SELECT id, name FROM upd ORDER BY id;"),
@@ -405,20 +419,25 @@ fn update_replaces_visible_values() {
 fn update_and_delete_compose() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE ud (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE ud (id INT, name VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO ud VALUES (1,'a'), (2,'b'), (3,'c');")
+    e.execute_blocking("INSERT INTO ud VALUES (1,'a'), (2,'b'), (3,'c');")
         .unwrap();
 
-    e.execute("UPDATE ud SET name = 'A' WHERE id = 1;").unwrap();
-    e.execute("DELETE FROM ud WHERE id = 1;").unwrap();
+    e.execute_blocking("UPDATE ud SET name = 'A' WHERE id = 1;")
+        .unwrap();
+    e.execute_blocking("DELETE FROM ud WHERE id = 1;").unwrap();
     assert_eq!(e.row_count("ud").unwrap(), 2);
     // Nothing left to update at id 1.
-    let again = e.execute("UPDATE ud SET name = 'B' WHERE id = 1;").unwrap();
+    let again = e
+        .execute_blocking("UPDATE ud SET name = 'B' WHERE id = 1;")
+        .unwrap();
     assert!(matches!(again[0], QueryResult::Updated { count: 0 }));
 
-    e.execute("DELETE FROM ud WHERE id = 2;").unwrap();
-    let noop = e.execute("UPDATE ud SET name = 'C' WHERE id = 2;").unwrap();
+    e.execute_blocking("DELETE FROM ud WHERE id = 2;").unwrap();
+    let noop = e
+        .execute_blocking("UPDATE ud SET name = 'C' WHERE id = 2;")
+        .unwrap();
     assert!(matches!(noop[0], QueryResult::Updated { count: 0 }));
     assert_eq!(rows(&e, "SELECT id, name FROM ud;"), vec![vec!["3", "c"]]);
 }
@@ -430,7 +449,7 @@ fn update_and_delete_compose() {
 fn compaction_is_idempotent() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE cc (id INT, name VARCHAR);")
+    e.execute_blocking("CREATE TABLE cc (id INT, name VARCHAR);")
         .unwrap();
     let batch = (0..5000)
         .map(|i| vec![Literal::Int(i), Literal::Str(format!("v{i}"))])
@@ -457,19 +476,19 @@ fn compaction_is_idempotent() {
 fn compact_then_alter_and_drop_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE TABLE cad (id INT);").unwrap();
+    e.execute_blocking("CREATE TABLE cad (id INT);").unwrap();
     let batch = (0..32).map(|i| vec![Literal::Int(i)]).collect();
     insert_rows(&e, "default_db.cad", batch).unwrap();
     e.compact_all_segments("default_db.cad").unwrap();
 
-    e.execute("ALTER TABLE cad ADD COLUMN (name VARCHAR);")
+    e.execute_blocking("ALTER TABLE cad ADD COLUMN (name VARCHAR);")
         .unwrap();
     let all = rows(&e, "SELECT id, name FROM cad ORDER BY id;");
     assert_eq!(all.len(), 32);
     assert_eq!(all[0], vec!["0", "null"]);
     assert_eq!(all[31], vec!["31", "null"]);
 
-    e.execute("DROP TABLE cad;").unwrap();
+    e.execute_blocking("DROP TABLE cad;").unwrap();
     assert!(!e.table_exists("cad"));
-    assert!(e.execute("INSERT INTO cad VALUES (1);").is_err());
+    assert!(e.execute_blocking("INSERT INTO cad VALUES (1);").is_err());
 }

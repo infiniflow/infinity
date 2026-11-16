@@ -24,7 +24,7 @@ class NetworkAddress:
         self.port = port
 
     def __str__(self):
-        return f'IP: {self.ip}, Port: {self.port}'
+        return f"IP: {self.ip}, Port: {self.port}"
 
 
 @dataclass
@@ -76,9 +76,11 @@ class Array:
     def __repr__(self):
         return str(self)
 
+
 @dataclass
 class FDE:
     """Fixed Dimensional Encoding function call for insert operations."""
+
     tensor_data: list  # 2D array of numbers
     target_dimension: int  # Target embedding dimension
 
@@ -95,7 +97,9 @@ class FDE:
 
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray, FDE]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array, FDE]
+INSERT_DATA = dict[
+    str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array, FDE
+]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 

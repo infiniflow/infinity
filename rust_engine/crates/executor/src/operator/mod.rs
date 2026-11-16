@@ -459,25 +459,43 @@ const EXCHANGE_CAPACITY: usize = 1024;
 /// The exchange queue of one parallel fragment: one channel per tasklet,
 /// drained in tasklet order (`FragmentContext::Tasks` hands the merge task the
 /// tasklet sources in that order).
+type ExchangeItem = std::result::Result<DataChunk, String>;
+type ExchangeReceiver = tokio::sync::mpsc::Receiver<ExchangeItem>;
+type ExchangeSender = tokio::sync::mpsc::Sender<ExchangeItem>;
+
 struct ExchangeSource {
-    receivers:
-        std::vec::IntoIter<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>,
-    current: Option<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>,
+    receivers: std::vec::IntoIter<ExchangeReceiver>,
+    current: Option<ExchangeReceiver>,
     width: usize,
     started: bool,
 }
 
 impl ExchangeSource {
-    fn new(
-        receivers: Vec<std::sync::mpsc::Receiver<std::result::Result<DataChunk, String>>>,
-        width: usize,
-    ) -> Self {
+    fn new(receivers: Vec<ExchangeReceiver>, width: usize) -> Self {
         Self {
             receivers: receivers.into_iter(),
             current: None,
             width,
             started: false,
         }
+    }
+}
+
+/// Awaits the next chunk of one tasklet's queue from **synchronous** code.
+///
+/// `Receiver::blocking_recv` panics when the calling thread is driving the
+/// runtime: tokio refuses to park a worker. The sink is synchronous by design
+/// (it drains the queues in tasklet order), and it is reached from a worker
+/// whenever a statement runs a SELECT inline - `INSERT … SELECT` does exactly
+/// that - so the wait is handed to `block_in_place`, which lets the runtime
+/// replace this worker and keep polling the tasklets being waited for. Outside
+/// a runtime this is just `blocking_recv`.
+fn next_chunk_blocking(receiver: &mut ExchangeReceiver) -> Option<ExchangeItem> {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(|| receiver.blocking_recv())
+        }
+        _ => receiver.blocking_recv(),
     }
 }
 
@@ -492,7 +510,7 @@ impl ChunkSource for ExchangeSource {
             if self.current.is_none() {
                 self.current = self.receivers.next();
             }
-            let Some(receiver) = self.current.as_ref() else {
+            let Some(receiver) = self.current.as_mut() else {
                 // Every tasklet is done. A fragment that never produced a chunk
                 // still has to run once, as an empty source does.
                 if !self.started {
@@ -502,26 +520,51 @@ impl ChunkSource for ExchangeSource {
                 state.complete = true;
                 return Ok(());
             };
-            match receiver.recv() {
-                Ok(Ok(chunk)) => {
+            // The sink is the fragment's synchronous merge task: it drains the
+            // tasklets' queues in order and does nothing else, so blocking here
+            // is what it is for.
+            //
+            // `blocking_recv` panics ("Cannot block the current thread from
+            // within a runtime") when the sink runs on a runtime **worker**,
+            // which is where it lands for any SELECT a statement calls
+            // synchronously - `INSERT … SELECT` is the plain case. There the
+            // wait goes through `block_in_place`, which hands the worker's core
+            // to a replacement so the tasklets this sink is waiting for keep
+            // being polled; off a worker it is a plain call.
+            match next_chunk_blocking(receiver) {
+                Some(Ok(chunk)) => {
                     self.started = true;
                     state.data_blocks.push(chunk);
                     return Ok(());
                 }
-                Ok(Err(message)) => return Err(Error::Invalid(message)),
+                Some(Err(message)) => return Err(Error::Invalid(message)),
                 // This tasklet is finished; continue with the next one.
-                Err(_) => self.current = None,
+                None => self.current = None,
             }
         }
     }
 }
 
 /// Drives one tasklet's chain and forwards its head's chunks to the exchange.
-fn run_forward(
+///
+/// The tasklet is an **async task**: it waits for the sink to drain its queue,
+/// and waiting is what it does most of the time. The body is the synchronous
+/// chain - reading the source, running the operators, handing chunks on - with
+/// a yield at the end of every round so a burst of tasklets cannot starve the
+/// sink that drains them.
+///
+/// No `spawn_blocking` here: the fragment *is* the async unit of work. Any step
+/// that turns out to be CPU-bound enough to matter is moved onto its own
+/// primitive **after profiling says so** - a `spawn_blocking` or a tokio
+/// parallel loop around that specific function, not around the loop.
+async fn run_forward<S>(
     mut operators: Vec<Box<dyn PhysicalOperator>>,
-    source: &mut dyn ChunkSource,
-    tx: std::sync::mpsc::SyncSender<std::result::Result<DataChunk, String>>,
-) -> Result<()> {
+    mut source: S,
+    tx: ExchangeSender,
+) -> Result<()>
+where
+    S: ChunkSource + Send,
+{
     for operator in &mut operators {
         operator.init()?;
     }
@@ -534,7 +577,10 @@ fn run_forward(
         for chunk in std::mem::take(&mut states.state_mut(head).data_blocks) {
             // A closed queue means the fragment above has what it needs
             // (`LIMIT` reached): the tasklet can stop.
-            if tx.send(Ok(chunk)).is_err() {
+            // `send` on a bounded channel is what makes the exchange a
+            // backpressure point: it suspends this tasklet (not a thread) while
+            // the sink catches up.
+            if tx.send(Ok(chunk)).await.is_err() {
                 return Ok(());
             }
         }
@@ -543,6 +589,9 @@ fn run_forward(
                 "fragment made no progress after the source was exhausted".into(),
             ));
         }
+        // One round is one chunk (1024 rows); yielding here keeps a long scan
+        // from holding a worker while other statements' fragments are ready.
+        tokio::task::yield_now().await;
     }
     Ok(())
 }
@@ -595,27 +644,29 @@ fn run_tasklets(
     // the same workers.
     let mut receivers = Vec::with_capacity(tasks);
     for (chain, range) in chains.into_iter().zip(ranges) {
-        let (tx, rx) = std::sync::mpsc::sync_channel(EXCHANGE_CAPACITY);
+        let (tx, rx) = tokio::sync::mpsc::channel(EXCHANGE_CAPACITY);
         receivers.push(rx);
-        crate::scheduler::scheduler().submit(Box::new(move || {
-            let mut source = RowsSource::new(range, source_width, batch);
-            if let Err(error) = run_forward(chain, &mut source, tx.clone()) {
-                // The merge task picks the error up from the queue, so a
-                // failing tasklet fails the statement instead of looking like a
-                // short result.
-                let _ = tx.send(Err(error.to_string()));
+        crate::scheduler::scheduler().spawn_tasklet(move || {
+            let source = RowsSource::new(range, source_width, batch);
+            async move {
+                if let Err(error) = run_forward(chain, source, tx.clone()).await {
+                    // The merge task picks the error up from the queue, so a
+                    // failing tasklet fails the statement instead of looking
+                    // like a short result.
+                    let _ = tx.send(Err(error.to_string())).await;
+                }
             }
-        }));
+        });
     }
-    // The sink is the fragment's last task (`FragmentContext::Tasks`), so it
-    // runs on the pool too and the caller waits for it.
-    crate::scheduler::scheduler().run(move || -> Result<(Vec<String>, Vec<Vec<Value>>)> {
-        let mut source = ExchangeSource::new(receivers, prefix_width);
-        if merge.is_empty() {
-            return Ok((names, source.collect()?));
-        }
-        run_serial(merge, names, &mut source)
-    })
+    // The sink is the fragment's last task (`FragmentContext::Tasks`): it
+    // drains the tasklets' queues in order. It runs **here**, on the caller's
+    // thread - the caller is the statement task, which already handed the whole
+    // SELECT to the CPU pool, so dispatching again would only add a hop.
+    let mut source = ExchangeSource::new(receivers, prefix_width);
+    if merge.is_empty() {
+        return Ok((names, source.collect()?));
+    }
+    run_serial(merge, names, &mut source)
 }
 
 /// Runs a lowered chain over a fragment source and returns the result in the

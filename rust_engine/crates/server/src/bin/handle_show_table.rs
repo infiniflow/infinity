@@ -12,8 +12,8 @@ fn main() {
     let engine = Engine::open(&dir).expect("open engine");
     let (seq, db, table, _sid) =
         read_show_table_call(&mut std::io::stdin()).expect("decode ShowTable");
-    let _ = engine.execute(&format!("CREATE TABLE {table} (id INT, name VARCHAR);"));
-    let _ = engine.execute(&format!("INSERT INTO {table} VALUES (1, 'a'), (2, 'b');"));
+    let _ = engine.execute_blocking(&format!("CREATE TABLE {table} (id INT, name VARCHAR);"));
+    let _ = engine.execute_blocking(&format!("INSERT INTO {table} VALUES (1, 'a'), (2, 'b');"));
 
     let col_count = engine
         .catalog()

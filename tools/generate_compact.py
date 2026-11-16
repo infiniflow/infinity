@@ -40,8 +40,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 INTEGER, c2 BOOLEAN);\n")
+        slt_file.write(f"CREATE TABLE {table_name} (c1 INTEGER, c2 BOOLEAN);\n")
         slt_file.write("\n")
 
         slt_file.write("query I\n")
@@ -73,7 +72,6 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("statement ok\n")
         slt_file.write(f"DROP TABLE {table_name};\n")
         slt_file.write("\n")
-
 
 
 if __name__ == "__main__":

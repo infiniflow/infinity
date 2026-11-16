@@ -45,19 +45,27 @@ pub fn trim_allocator() {
 /// Drops clean page cache for one file after writing it back. Long imports
 /// write gigabytes of segment/sidecar files; without this the cache grows
 /// until the OOM killer fires (the reference bounds it with its buffer manager).
+///
+/// Darwin has no `posix_fadvise` (it exposes `fcntl(F_NOCACHE)`, which cannot
+/// drop pages that are already cached), so the write-back is all that happens
+/// there: the function is best effort on every target.
 #[allow(unsafe_code)]
 pub fn drop_file_cache(path: &std::path::Path) {
-    use std::os::unix::io::AsRawFd;
     let Ok(file) = std::fs::File::open(path) else {
         return;
     };
     let _ = file.sync_data();
-    // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
-    unsafe {
-        posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::io::AsRawFd;
+        // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
+        unsafe {
+            posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
+        }
     }
 }
 
+#[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
 unsafe extern "C" {
     fn posix_fadvise(fd: i32, offset: i64, len: i64, advice: i32) -> i32;
@@ -88,11 +96,13 @@ pub mod definition;
 pub mod fast_rough_filter;
 pub mod invertedindex;
 pub mod io;
+pub mod json_index;
 pub mod knn_index;
 pub mod new_txn;
 pub mod persistence;
 pub mod result_cache_manager;
 pub mod secondary_index;
+pub mod simd;
 pub mod wal;
 
 // The module tree above mirrors the reference's src/storage/. The re-exports
@@ -107,7 +117,7 @@ pub use definition::format;
 pub use fast_rough_filter::binary_fuse_filter;
 pub use invertedindex::common::external_sort;
 pub use invertedindex::fst::registry as fst_registry;
-pub use io::{s3, virtual_store};
+pub use io::{chunk_store, s3, virtual_store};
 pub use knn_index::emvb::emvb_segment;
 pub use knn_index::knn_format;
 pub use knn_index::multivector::multivector_segment;

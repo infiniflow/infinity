@@ -23,7 +23,7 @@ fn commit_applies_to_kv() {
         let mut t = m.begin();
         t.put(b"a".to_vec(), b"1".to_vec());
         t.put(b"b".to_vec(), b"2".to_vec());
-        let ts = m.commit(t).unwrap();
+        let ts = futures_executor::block_on(m.commit(t)).unwrap();
         assert!(ts >= 1);
         // commit is visible in the KV store immediately
         assert_eq!(store.get(b"a").unwrap(), Some(b"1".to_vec()));
@@ -42,7 +42,7 @@ fn recovery_replays_wal_after_reopen() {
         for i in 0..3u64 {
             let mut t = m.begin();
             t.put(format!("k{i}").into_bytes(), format!("v{i}").into_bytes());
-            m.commit(t).unwrap();
+            futures_executor::block_on(m.commit(t)).unwrap();
         }
     }
     // fresh manager + fresh store: KV empty, WAL has 3 -> recover
@@ -75,7 +75,7 @@ fn concurrent_commits_are_serialized_and_durable() {
                             format!("k{t}_{j}").into_bytes(),
                             format!("v{t}_{j}").into_bytes(),
                         );
-                        mgr.commit(tx).unwrap();
+                        futures_executor::block_on(mgr.commit(tx)).unwrap();
                     }
                 })
             })
@@ -114,7 +114,7 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
         for i in 0..10u64 {
             let mut t = m.begin();
             t.put(row("default_db.t", i), format!("v{i}").into_bytes());
-            m.commit(t).unwrap();
+            futures_executor::block_on(m.commit(t)).unwrap();
         }
     }
     let full = std::fs::read(&wal).unwrap();
@@ -144,7 +144,7 @@ fn truncated_wal_recovers_exactly_the_valid_prefix() {
 fn empty_txn_rejected() {
     let dir = tempdir().unwrap();
     let m = manager(dir.path());
-    assert!(m.commit(m.begin()).is_err());
+    assert!(futures_executor::block_on(m.commit(m.begin())).is_err());
 }
 
 #[test]
@@ -155,21 +155,24 @@ fn concurrent_deletes_conflict() {
     t1.delete(b"row:1".to_vec());
     let mut t2 = m.begin();
     t2.delete(b"row:1".to_vec());
-    m.commit(t1).unwrap();
-    assert!(matches!(m.commit(t2), Err(Error::TxnConflict(_))));
+    futures_executor::block_on(m.commit(t1)).unwrap();
+    assert!(matches!(
+        futures_executor::block_on(m.commit(t2)),
+        Err(Error::TxnConflict(_))
+    ));
 
     // A transaction that starts after the winner is not stale.
     let mut t3 = m.begin();
     t3.delete(b"row:1".to_vec());
-    m.commit(t3).unwrap();
+    futures_executor::block_on(m.commit(t3)).unwrap();
 
     // Disjoint keys never conflict.
     let mut t4 = m.begin();
     t4.delete(b"row:2".to_vec());
     let mut t5 = m.begin();
     t5.delete(b"row:3".to_vec());
-    m.commit(t5).unwrap();
-    m.commit(t4).unwrap();
+    futures_executor::block_on(m.commit(t5)).unwrap();
+    futures_executor::block_on(m.commit(t4)).unwrap();
 }
 
 /// The commit path writes a typed `WalCmd::Append` (not a KV batch), and
@@ -189,7 +192,7 @@ fn append_is_a_typed_command_and_replays_the_same_rows() {
         for (key, value) in &expected {
             t.put(key.clone(), value.clone());
         }
-        m.commit(t).unwrap();
+        futures_executor::block_on(m.commit(t)).unwrap();
         assert_eq!(store.scan_prefix(b"row:").unwrap(), expected);
     }
 
@@ -243,7 +246,7 @@ fn delete_is_a_typed_command_and_replays_the_tombstones() {
         let mut t = m.begin();
         t.delete(del_key(table, 3));
         t.delete(del_key(table, 4));
-        m.commit(t).unwrap();
+        futures_executor::block_on(m.commit(t)).unwrap();
         assert_eq!(store.scan_prefix(b"del:").unwrap().len(), 2);
     }
     let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
@@ -288,7 +291,7 @@ fn typed_commands_replace_the_catalog_kv_batch() {
         let mut t = m.begin();
         t.put(b"tbl:0000000000000001".to_vec(), b"catalog-record".to_vec());
         t.set_typed_commands(vec![WalCmd::Checkpoint { max_commit_ts: 7 }]);
-        m.commit(t).unwrap();
+        futures_executor::block_on(m.commit(t)).unwrap();
     }
     let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
@@ -313,7 +316,7 @@ fn catalog_writes_are_carried_as_a_kv_batch() {
         let m = TxnManager::open(dir.path().join("wal.log"), store.clone()).unwrap();
         let mut t = m.begin();
         t.put(key.clone(), value.clone());
-        m.commit(t).unwrap();
+        futures_executor::block_on(m.commit(t)).unwrap();
     }
     let mut iter = WalEntryIterator::make(dir.path().join("wal.log"), false).unwrap();
     let entry = iter.next().expect("one record");
@@ -344,7 +347,7 @@ fn rollback_frees_the_slot_and_the_next_txn_does_not_conflict() {
     // The rolled-back transaction never committed, so the same delete succeeds.
     let mut t2 = m.begin();
     t2.delete(b"row:1".to_vec());
-    m.commit(t2).unwrap();
+    futures_executor::block_on(m.commit(t2)).unwrap();
     assert_eq!(m.total_committed_txn_count(), 1);
 
     // Nothing reached the WAL: only the committed record is there.
@@ -360,8 +363,11 @@ fn overlapping_write_ranges_conflict() {
     let mut t2 = m.begin();
     t1.put(b"k".to_vec(), b"a".to_vec());
     t2.put(b"k".to_vec(), b"b".to_vec());
-    m.commit(t1).unwrap();
-    assert!(matches!(m.commit(t2), Err(Error::TxnConflict(_))));
+    futures_executor::block_on(m.commit(t1)).unwrap();
+    assert!(matches!(
+        futures_executor::block_on(m.commit(t2)),
+        Err(Error::TxnConflict(_))
+    ));
 }
 
 /// `NewTxnManager::GetCheckCandidateTxns`: the candidate test is on the KV
@@ -382,7 +388,7 @@ fn a_snapshot_that_saw_a_commit_does_not_conflict_with_it() {
     let mut a = m.begin();
     a.set_op(update(vec![1]));
     a.put(row("default_db.t", 1), b"a".to_vec());
-    let a_ts = m.commit(a).unwrap();
+    let a_ts = futures_executor::block_on(m.commit(a)).unwrap();
     assert_eq!(*m.kv_clock.lock().unwrap(), (a_ts + 1, a_ts));
 
     // B begins after it: its `begin_ts` lands exactly on A's KV commit ts
@@ -396,7 +402,7 @@ fn a_snapshot_that_saw_a_commit_does_not_conflict_with_it() {
     );
     b.set_op(update(vec![2]));
     b.put(row("default_db.t", 2), b"b".to_vec());
-    m.commit(b)
+    futures_executor::block_on(m.commit(b))
         .expect("A is visible to B, so the pair does not conflict");
 
     // C began before A committed: same rule, but A's batch is newer than C's
@@ -405,10 +411,13 @@ fn a_snapshot_that_saw_a_commit_does_not_conflict_with_it() {
     let mut d = m.begin();
     d.set_op(update(vec![3]));
     d.put(row("default_db.t", 3), b"d".to_vec());
-    m.commit(d).unwrap();
+    futures_executor::block_on(m.commit(d)).unwrap();
     c.set_op(update(vec![4]));
     c.put(row("default_db.t", 4), b"c".to_vec());
-    assert!(matches!(m.commit(c), Err(Error::TxnConflict(_))));
+    assert!(matches!(
+        futures_executor::block_on(m.commit(c)),
+        Err(Error::TxnConflict(_))
+    ));
 }
 
 #[test]
@@ -423,8 +432,11 @@ fn read_sets_and_ranges_conflict() {
     // (`NewTxn::Commit`, `new_txn_impl.cpp:2035-2057`).
     let mut reader = m.begin();
     reader.read(row("default_db.t", 0));
-    m.commit(writer).unwrap();
-    assert_eq!(m.commit(reader).unwrap(), m.current_ts() + 1);
+    futures_executor::block_on(m.commit(writer)).unwrap();
+    assert_eq!(
+        futures_executor::block_on(m.commit(reader)).unwrap(),
+        m.current_ts() + 1
+    );
 
     // A *write* transaction that read the key does conflict.
     let mut read_writer = m.begin();
@@ -432,8 +444,11 @@ fn read_sets_and_ranges_conflict() {
     read_writer.put(b"unrelated".to_vec(), b"x".to_vec());
     let mut writer2 = m.begin();
     writer2.put(row("default_db.t", 0), b"b".to_vec());
-    m.commit(writer2).unwrap();
-    assert!(matches!(m.commit(read_writer), Err(Error::TxnConflict(_))));
+    futures_executor::block_on(m.commit(writer2)).unwrap();
+    assert!(matches!(
+        futures_executor::block_on(m.commit(read_writer)),
+        Err(Error::TxnConflict(_))
+    ));
 
     // A range read sees any newer write under the prefix.
     let mut ranged = m.begin();
@@ -441,14 +456,17 @@ fn read_sets_and_ranges_conflict() {
     ranged.put(b"unrelated2".to_vec(), b"y".to_vec());
     let mut writer3 = m.begin();
     writer3.put(row("default_db.t", 1), b"b".to_vec());
-    m.commit(writer3).unwrap();
-    assert!(matches!(m.commit(ranged), Err(Error::TxnConflict(_))));
+    futures_executor::block_on(m.commit(writer3)).unwrap();
+    assert!(matches!(
+        futures_executor::block_on(m.commit(ranged)),
+        Err(Error::TxnConflict(_))
+    ));
 
     // A read from before the writes, committed without overlap, is fine.
     let mut clean = m.begin();
     clean.read(b"untouched".to_vec());
     clean.put(b"other".to_vec(), b"c".to_vec());
-    m.commit(clean).unwrap();
+    futures_executor::block_on(m.commit(clean)).unwrap();
 }
 
 #[test]
@@ -465,7 +483,7 @@ fn active_txn_count_tracks_begin_commit_and_drop() {
     assert_eq!(m.get_txn_info_array().len(), 1);
 
     t.put(b"k".to_vec(), b"v".to_vec());
-    m.commit(t).unwrap();
+    futures_executor::block_on(m.commit(t)).unwrap();
     assert_eq!(m.active_txn_count(), 0);
     assert_eq!(m.oldest_alive_ts(), 0);
     assert!(m.get_txn_info_by_id(1).is_none());
@@ -487,7 +505,7 @@ fn restart_rebuilds_the_conflict_state_from_the_wal() {
         let mut t = m.begin();
         t.put(row("default_db.t", 0), b"a".to_vec());
         t.delete(del_key("default_db.t", 7));
-        m.commit(t).unwrap();
+        futures_executor::block_on(m.commit(t)).unwrap();
     }
     let m = manager(dir.path());
     let seen = m.write_ts.lock().unwrap();
@@ -506,7 +524,7 @@ fn checkpoint_ts_skips_already_applied_records() {
         for i in 0..3u64 {
             let mut t = m.begin();
             t.put(row("default_db.t", i), format!("v{i}").into_bytes());
-            m.commit(t).unwrap();
+            futures_executor::block_on(m.commit(t)).unwrap();
         }
     }
     let store = Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap());
@@ -538,9 +556,9 @@ fn a_wal_only_checkpoint_claims_only_the_flushed_commits() {
     let m = manager(dir.path());
     let mut t = m.begin();
     t.put(row("default_db.t", 0), b"v".to_vec());
-    let committed = m.commit(t).unwrap();
+    let committed = futures_executor::block_on(m.commit(t)).unwrap();
     assert_eq!(m.synced_ts(), 0, "no store flush has happened yet");
-    m.append_checkpoint_flushed().unwrap();
+    futures_executor::block_on(m.append_checkpoint_flushed()).unwrap();
     let floor = m.applied_ts().unwrap();
     assert!(
         floor <= committed,
@@ -548,7 +566,7 @@ fn a_wal_only_checkpoint_claims_only_the_flushed_commits() {
     );
     // Once the store is flushed the frame may claim it.
     m.flush().unwrap();
-    m.append_checkpoint_flushed().unwrap();
+    futures_executor::block_on(m.append_checkpoint_flushed()).unwrap();
     assert!(m.applied_ts().unwrap() > committed);
 }
 
@@ -566,9 +584,9 @@ fn a_checkpoint_does_not_publish_an_in_flight_commit() {
     t.put(row("default_db.t", 0), b"v".to_vec());
     // The KV half is in the store; the bottom (the block and index writes) is
     // still open, as it is for every append until `BottomGuard` drops.
-    let pending = m.commit_deferred(t).unwrap();
+    let pending = futures_executor::block_on(m.commit_deferred(t)).unwrap();
     assert!(m.current_ts() < pending);
-    m.append_checkpoint_flushed().unwrap();
+    futures_executor::block_on(m.append_checkpoint_flushed()).unwrap();
     assert!(
         m.current_ts() < pending,
         "the checkpoint published ts {pending} before its bottom ran"
@@ -593,7 +611,7 @@ fn a_checkpoint_frame_starts_its_fresh_log() {
             for i in 0..200u64 {
                 let mut t = m.begin();
                 t.put(format!("k{i}").into_bytes(), b"v".to_vec());
-                m.commit(t).unwrap();
+                futures_executor::block_on(m.commit(t)).unwrap();
             }
         })
     };
@@ -601,13 +619,13 @@ fn a_checkpoint_frame_starts_its_fresh_log() {
         let m = Arc::clone(&m);
         std::thread::spawn(move || {
             for _ in 0..100 {
-                let _ = m.append_checkpoint_flushed();
+                let _ = futures_executor::block_on(m.append_checkpoint_flushed());
             }
         })
     };
     commits.join().unwrap();
     checkpoints.join().unwrap();
-    m.append_checkpoint_flushed().unwrap();
+    futures_executor::block_on(m.append_checkpoint_flushed()).unwrap();
 
     let is_checkpoint = |entry: &WalEntry| {
         entry
@@ -645,10 +663,10 @@ fn a_checkpoint_is_one_job_on_the_writer() {
     let m = manager(dir.path());
     let mut t = m.begin();
     t.put(b"a".to_vec(), b"1".to_vec());
-    m.commit(t).unwrap();
+    futures_executor::block_on(m.commit(t)).unwrap();
 
     let before = m.wal.ran.load(Ordering::SeqCst);
-    m.append_checkpoint_flushed().unwrap();
+    futures_executor::block_on(m.append_checkpoint_flushed()).unwrap();
     assert_eq!(
         m.wal.ran.load(Ordering::SeqCst) - before,
         1,
@@ -662,10 +680,11 @@ fn a_checkpoint_is_one_job_on_the_writer() {
 fn a_writer_job_error_reaches_the_caller() {
     let dir = tempdir().unwrap();
     let m = manager(dir.path());
-    let error = m
-        .wal
-        .run(|_| -> Result<()> { Err(Error::Wal("rotate failed".into())) })
-        .unwrap_err();
+    let error = futures_executor::block_on(
+        m.wal
+            .run(|_| -> Result<()> { Err(Error::Wal("rotate failed".into())) }),
+    )
+    .unwrap_err();
     assert!(
         error.to_string().contains("rotate failed"),
         "unexpected error: {error}"

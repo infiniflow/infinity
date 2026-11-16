@@ -25,9 +25,6 @@
 //! `GetSizeInBytesVecAligned` does (`serialize.h:143`); a heap buffer is
 //! 16-byte aligned, so padding is `align_to(offset, align)`.
 
-use crate::mapped::MappedFile;
-use memmap2::Mmap;
-use std::fs::File;
 use std::path::Path;
 
 use index::sparse::BmpSearchOptions;
@@ -315,12 +312,11 @@ pub struct BmpReader {
 impl BmpReader {
     #[allow(unsafe_code)]
     pub fn open(path: &Path, width: IdxWidth) -> Result<Self, FormatError> {
-        let file =
-            File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
-        // SAFETY: read-only mapping of an immutable chunk file.
-        let map = MappedFile::from_mmap(
-            unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?,
-        );
+        // The chunk store owns the bytes: a persistence profile may hold this
+        // file only as an object part.
+        let map = crate::chunk_store::chunk_store()
+            .open(path)
+            .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         let mut cur = Cursor { buf: &map, at: 0 };
         let term_num = cur.u64_aligned()? as usize;
         let kths = cur.i32s_aligned(term_num)?;

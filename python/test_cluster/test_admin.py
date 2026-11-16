@@ -11,9 +11,9 @@ def test_admin(cluster: InfinityCluster):
         infinity1 = cluster.client("test")
         assert infinity1 is not None
         res = infinity1.show_current_node()
-        logger.info(f'{res.node_role}, {res.node_status}')
-        assert (res.node_role == "admin")
-        assert (res.node_status == "started")
+        logger.info(f"{res.node_role}, {res.node_status}")
+        assert res.node_role == "admin"
+        assert res.node_status == "started"
 
         res = infinity1.show_admin_variables()
         logger.info(res.data)
@@ -39,7 +39,7 @@ def test_admin_fail0(cluster: InfinityCluster):
         assert infinity1 is not None
 
         with pytest.raises(InfinityException) as e:
-            infinity1.show_node('test')
+            infinity1.show_node("test")
         logger.info(e.value)
 
         with pytest.raises(InfinityException) as e:

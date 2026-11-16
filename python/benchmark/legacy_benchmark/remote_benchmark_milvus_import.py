@@ -28,12 +28,8 @@ def import_data(
         raise Exception("Invalid data set")
     print(f"File Path: {import_path}")
 
-
     if remote:
-        client = MilvusClient(
-            uri="http://localhost:19530",
-            token="root:Milvus"
-        )
+        client = MilvusClient(uri="http://localhost:19530", token="root:Milvus")
 
     if client.has_collection(collection_name="splade_benchmark_collection"):
         client.drop_collection(collection_name="splade_benchmark_collection")
@@ -46,16 +42,18 @@ def import_data(
     schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
     schema.add_field(field_name="vector", datatype=DataType.SPARSE_FLOAT_VECTOR)
     index_params = client.prepare_index_params()
-    #index_params.add_index(
+    # index_params.add_index(
     #    field_name="id",
-    #)
+    # )
 
     index_params.add_index(
         field_name="vector",
         index_name="sparse_inverted_index",
-        index_type="SPARSE_WAND", # the type of index to be created. set to `SPARSE_INVERTED_INDEX` or `SPARSE_WAND`.
-        metric_type="IP", # the metric type to be used for the index. Currently, only `IP` (Inner Product) is supported.
-        params={"drop_ratio_build": 0.2}, # the ratio of small vector values to be dropped during indexi
+        index_type="SPARSE_WAND",  # the type of index to be created. set to `SPARSE_INVERTED_INDEX` or `SPARSE_WAND`.
+        metric_type="IP",  # the metric type to be used for the index. Currently, only `IP` (Inner Product) is supported.
+        params={
+            "drop_ratio_build": 0.2
+        },  # the ratio of small vector values to be dropped during indexi
     )
 
     client.create_collection(
@@ -74,27 +72,25 @@ def import_data(
         indices, values = data_mat.at(data_id)
 
         sparse_embedding = []
-        for i,j in zip(indices, values):
+        for i, j in zip(indices, values):
             sparse_embedding.append((i, j))
-
 
         vectors.append({"id": data_id, "vector": sparse_embedding})
 
         if len(vectors) == 1000:
-            #print(vectors)
+            # print(vectors)
             client.insert(
                 collection_name="splade_benchmark_collection",
                 data=vectors,
             )
             vectors.clear()
             print(data_id)
-        '''
+        """
         client.insert(collection_name="splade_benchmark_collection",
                       data=[{"id":data_id, "vector":sparse_embedding}],
                       )
         print(data_id)
-        '''
-
+        """
 
     end = time.time()
     dur = end - start

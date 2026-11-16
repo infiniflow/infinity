@@ -39,9 +39,10 @@ use analyzer::{Analyzer, AnalyzerPool, RAGAnalyzer};
 /// still `libc::malloc`'d and released by the caller with `free()`, so the
 /// ownership rules - and a caller swapping this library for the C++ one - are
 /// unchanged.
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
+///
+/// The allocator itself is declared once in `common` (which this crate depends
+/// on through `analyzer`), so the `cdylib`/`staticlib` gets the same mimalloc as
+/// every other target without a second `#[global_allocator]`.
 /// Bumped whenever a struct layout or an ownership rule changes.
 pub const ABI_VERSION: u32 = 1;
 

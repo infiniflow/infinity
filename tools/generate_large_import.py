@@ -34,8 +34,7 @@ def generate1(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 INTEGER);\n")
+        slt_file.write(f"CREATE TABLE {table_name} (c1 INTEGER);\n")
         slt_file.write("\n")
 
         slt_file.write("query I\n")
@@ -71,15 +70,18 @@ def generate_big_columns_csv(num, filename):
         f.write(data)
     f.close()
 
+
 def generate_big_int_csv(num, filename):
     with open(os.getcwd() + "/test/data/csv/" + filename, "w") as f:
         f.writelines(str(i) + "," + str(i) + "\n" for i in range(num))
     f.close()
 
+
 def generate_big_rows_csv(num, filename):
     with open(os.getcwd() + "/test/data/csv/" + filename, "w") as f:
         f.writelines(str(i) + ",asdasdlk中fjio@!#!@asd #$%$23\n" for i in range(num))
     f.close()
+
 
 def generate(generate_if_exists: bool, copy_dir: str):
     generate1(generate_if_exists, copy_dir)
@@ -90,8 +92,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
     generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
     generate_big_rows_csv(1024 * 8192 + 1, "test_sdk_import_more_than_one_segment.csv")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate more than 8192 * 1024 rows for testing import")
+    parser = argparse.ArgumentParser(
+        description="Generate more than 8192 * 1024 rows for testing import"
+    )
 
     parser.add_argument(
         "-g",

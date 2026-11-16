@@ -6,6 +6,7 @@ import time
 
 python_executable = sys.executable
 
+
 def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = ""):
     print(f"python test path is {python_test_dir}")
     # run test
