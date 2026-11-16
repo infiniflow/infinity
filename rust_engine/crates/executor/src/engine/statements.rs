@@ -4,24 +4,43 @@ impl QueryResult {
     /// This result's rows as display text (what a `.slt` file or the CLI shows).
     pub fn rows_text(&self) -> Vec<Vec<String>> {
         match self {
-            QueryResult::Rows { rows, .. } => rows
-                .iter()
-                .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
-                .collect(),
+            QueryResult::Rows { rows, .. } => rows.text_rows(),
             _ => Vec::new(),
         }
     }
 
-    /// A result set whose rows are already display text (`SHOW`, `DESCRIBE`,
-    /// `EXPLAIN`, ...): each cell becomes a `Value::Str`, which renders back to
-    /// exactly the same text.
-    pub fn text(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
+    /// This result's rows, materialised from the column buffers.
+    pub fn rows_values(&self) -> Vec<Vec<Value>> {
+        match self {
+            QueryResult::Rows { rows, .. } => rows.rows(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// A result set built from `Value` rows: the columns are typed from what the
+    /// rows hold (`i64`, `f64`, `bool`, text) and the cells go into buffers.
+    pub fn values(columns: Vec<String>, rows: Vec<Vec<Value>>) -> Self {
+        let mut batch = Batch::from_rows(rows);
+        batch.columns = columns.clone();
         QueryResult::Rows {
             columns,
-            rows: rows
-                .into_iter()
+            rows: batch,
+        }
+    }
+
+    /// A result set whose rows are already display text (`SHOW`, `DESCRIBE`,
+    /// `EXPLAIN`, ...): each cell becomes a text cell, which renders back to
+    /// exactly the same text.
+    pub fn text(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
+        let mut batch = Batch::from_rows(
+            rows.into_iter()
                 .map(|r| r.into_iter().map(Value::Str).collect())
                 .collect(),
+        );
+        batch.columns = columns.clone();
+        QueryResult::Rows {
+            columns,
+            rows: batch,
         }
     }
 }
@@ -2028,15 +2047,15 @@ impl Engine {
                 ]
             })
             .collect();
-        Ok(QueryResult::Rows {
-            columns: vec![
+        Ok(QueryResult::values(
+            vec![
                 "name".to_string(),
                 "type".to_string(),
                 "default".to_string(),
                 "comment".to_string(),
             ],
-            rows: text_rows(rows),
-        })
+            text_rows(rows),
+        ))
     }
 
     /// `AppendInBlock` for the rows a statement just committed.
@@ -5112,6 +5131,36 @@ impl Engine {
             }
         }
         let covered = index.load_sealed(&catalog_chunks);
+        // Every row is sealed already: the gap this rebuild exists for is empty,
+        // and the scan below would only rediscover that by decoding the whole
+        // column again - which is what made a reopen of a fully dumped table
+        // read every row of a sparse column. `recover_mem_index` guards
+        // HNSW/IVF/fulltext with the same comparison; `scanned_rows` still
+        // reports the table, because `is_complete` asks whether this index saw
+        // it, not how many postings it holds.
+        let total_rows: u64 = self
+            .segment_row_counts(table)
+            .iter()
+            .map(|(_, rows)| *rows)
+            .sum();
+        let covered_rows: u64 = covered
+            .values()
+            .flat_map(|spans| spans.iter())
+            .map(|(begin, end)| end - begin)
+            .sum();
+        if total_rows > 0 && covered_rows >= total_rows {
+            index.scanned_rows = total_rows as usize;
+            index.seal();
+            let shared = Arc::new(std::sync::RwLock::new(index));
+            self.tables
+                .lock()
+                .unwrap()
+                .entry(tkey)
+                .or_default()
+                .sparse
+                .insert(index_id, shared.clone());
+            return Ok(shared);
+        }
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -5660,8 +5709,9 @@ impl Engine {
         Some(len)
     }
 
-    /// Configured byte budget of the in-memory index buffers (built in at
-    /// 8 GiB; the reference's `[buffer] buffer_manager_size` is ignored).
+    /// Configured byte budget of the in-memory index buffers: the reference's
+    /// `[buffer] buffer_manager_size` when the config sets it, the built-in
+    /// 8 GiB when it does not (`Engine::set_buffer_budget`).
     pub fn buffer_memory_limit(&self) -> usize {
         self.context
             .buffer_budget

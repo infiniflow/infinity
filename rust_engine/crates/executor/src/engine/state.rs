@@ -73,14 +73,16 @@ pub enum QueryResult {
     Updated {
         count: usize,
     },
-    /// A result set. The rows stay as the engine's `Value`s: the text a client
-    /// sees is rendered at the edge (the CLI, the `.slt` runner, the thrift /
-    /// HTTP / postgres writers), so a scan no longer renders every cell to a
-    /// `String` only for the protocol layer to parse it back into the column
-    /// chunk it sends.
+    /// A result set, as the engine's column-major [`Batch`] (the reference's
+    /// `DataBlock`): one typed buffer per column plus its validity bitmap.
+    ///
+    /// The thrift writer packs those buffers straight into the `ColumnField`
+    /// chunks it sends, so a scan never builds a `Value` per cell. The exits
+    /// that still speak rows (the CLI, the `.slt` runner, HTTP, postgres) call
+    /// [`Batch::rows`] or [`Batch::text_rows`] and materialise there.
     Rows {
         columns: Vec<String>,
-        rows: Vec<Vec<Value>>,
+        rows: Batch,
     },
 }
 

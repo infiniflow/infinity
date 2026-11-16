@@ -3284,14 +3284,16 @@ mod tests {
     }
 
     /// Rows as display text, for assertions.
-    fn texts(rows: &[Vec<Value>]) -> Vec<Vec<String>> {
-        rows.iter()
-            .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
-            .collect()
+    fn texts(rows: &Batch) -> Vec<Vec<String>> {
+        rows.text_rows()
     }
 
-    fn row_text(rows: &[Vec<Value>], i: usize) -> Vec<String> {
-        rows[i].iter().map(|v| v.to_slt_string()).collect()
+    fn row_text(rows: &Batch, i: usize) -> Vec<String> {
+        rows.row(i)
+            .unwrap_or_default()
+            .iter()
+            .map(|v| v.to_slt_string())
+            .collect()
     }
 
     /// Round-4 review G1: prove that production `run_plan` (not `plan_select`)
@@ -4367,10 +4369,10 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(
             e.execute_blocking("SELECT 1, 'x';").unwrap(),
-            vec![QueryResult::Rows {
-                columns: vec!["c0".into(), "c1".into()],
-                rows: vec![vec![Value::Int(1), Value::Str("x".into())]]
-            }]
+            vec![QueryResult::values(
+                vec!["c0".into(), "c1".into()],
+                vec![vec![Value::Int(1), Value::Str("x".into())]]
+            )]
         );
         assert!(e.execute_blocking("SELECT * FROM nope;").is_err());
     }

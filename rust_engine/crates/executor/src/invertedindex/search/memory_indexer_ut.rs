@@ -86,7 +86,7 @@ fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
 fn count_rows(e: &Engine, sql: &str) -> usize {
     for r in e.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { rows, .. } = r {
-            return rows[0][0].to_slt_string().parse().unwrap();
+            return rows.row(0).unwrap()[0].to_slt_string().parse().unwrap();
         }
     }
     panic!("no rows for {sql}");

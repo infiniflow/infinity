@@ -4,24 +4,26 @@
 //! column-major batch of at most [`DEFAULT_VECTOR_SIZE`] rows that is filled by
 //! one operator and consumed by the next.
 //!
-//! It deliberately does **not** reuse [`storage::data_block::DataBlock`]:
-//! that one stores `BlockValue` cells (its on-disk representation), while every
-//! expression in this engine evaluates over [`Value`]. Reusing it would force a
-//! per-cell conversion at every operator boundary, which is exactly what the
-//! operator model is meant to remove.
+//! The cells live in typed column buffers ([`ColumnData`]), not in `Value`
+//! rows: a scan decodes a block once, an operator that needs a row (filter,
+//! sort, aggregate) materialises the cells it reads, and a fragment's output is
+//! the concatenation of its chunks into a [`crate::columnar::Batch`] - no step
+//! builds a `Value` per cell the query does not look at.
 
 use ::common::{Error, Result};
 use expression::Value;
+
+use crate::columnar::{Batch, ColumnData};
 
 /// `DEFAULT_BLOCK_CAPACITY` / `DEFAULT_VECTOR_SIZE`
 /// (`src/common/default_values.cppm:58`): the row count of one chunk.
 pub use storage::data_block::DEFAULT_VECTOR_SIZE;
 
-/// A column-major batch of `Value` rows.
+/// A column-major batch of rows.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DataChunk {
-    /// One `Vec<Value>` per column, each with `row_count` entries.
-    columns: Vec<Vec<Value>>,
+    /// One typed buffer per column, each with `row_count` cells.
+    columns: Vec<ColumnData>,
     capacity: usize,
     row_count: usize,
 }
@@ -34,11 +36,13 @@ impl DataChunk {
     }
 
     /// An empty chunk with `column_count` columns that can hold `capacity` rows.
+    ///
+    /// The buffers start as `i64` and widen as rows arrive (see
+    /// [`ColumnData::push_value`]); [`DataChunk::from_rows`] picks the types up
+    /// front when the rows are already known.
     pub fn with_capacity(column_count: usize, capacity: usize) -> Self {
         Self {
-            columns: (0..column_count)
-                .map(|_| Vec::with_capacity(capacity))
-                .collect(),
+            columns: (0..column_count).map(|_| ColumnData::empty()).collect(),
             capacity,
             row_count: 0,
         }
@@ -49,8 +53,8 @@ impl DataChunk {
         self.columns.len()
     }
 
-    /// The column vectors (C++ `DataBlock::column_vectors_`).
-    pub fn columns(&self) -> &[Vec<Value>] {
+    /// The column buffers (C++ `DataBlock::column_vectors_`).
+    pub fn columns(&self) -> &[ColumnData] {
         &self.columns
     }
 
@@ -91,7 +95,7 @@ impl DataChunk {
             )));
         }
         for (column, value) in self.columns.iter_mut().zip(row) {
-            column.push(value.clone());
+            column.push_value(value);
         }
         self.row_count += 1;
         Ok(())
@@ -110,18 +114,20 @@ impl DataChunk {
         if count == 0 {
             return;
         }
+        let order: Vec<usize> = (offset..offset + count).collect();
         for (dst, src) in self.columns.iter_mut().zip(&other.columns) {
-            dst.extend_from_slice(&src[offset..offset + count]);
+            let part = src.permute(&order);
+            dst.append(&part);
         }
         self.row_count += count;
     }
 
     /// The cell at `(row, column)`.
-    pub fn get(&self, row: usize, column: usize) -> Option<&Value> {
+    pub fn get(&self, row: usize, column: usize) -> Option<Value> {
         if row >= self.row_count {
             return None;
         }
-        self.columns.get(column)?.get(row)
+        self.columns.get(column).map(|c| c.value_at(row))
     }
 
     /// Row `row` as an owned slice, in column order.
@@ -129,7 +135,7 @@ impl DataChunk {
         if row >= self.row_count {
             return None;
         }
-        Some(self.columns.iter().map(|c| c[row].clone()).collect())
+        Some(self.columns.iter().map(|c| c.value_at(row)).collect())
     }
 
     /// Marks the chunk ready for consumption (C++ `DataBlock::Finalize`). The
@@ -140,30 +146,31 @@ impl DataChunk {
     /// Drops every row, keeping the columns and their capacity.
     pub fn reset(&mut self) {
         for column in &mut self.columns {
-            column.clear();
+            if let ColumnData::Int64 { values, valid } = column {
+                values.clear();
+                *valid = crate::columnar::Bitmap::new();
+            }
         }
         self.row_count = 0;
     }
 
     /// Row-major view of the chunk.
     pub fn into_rows(self) -> Vec<Vec<Value>> {
-        let mut columns: Vec<std::vec::IntoIter<Value>> =
-            self.columns.into_iter().map(Vec::into_iter).collect();
         (0..self.row_count)
-            .map(|_| {
-                columns
-                    .iter_mut()
-                    .map(|c| c.next().unwrap_or(Value::Null))
-                    .collect()
-            })
+            .map(|r| self.columns.iter().map(|c| c.value_at(r)).collect())
             .collect()
+    }
+
+    /// The chunk as a result block: the same columns, no copying.
+    pub fn into_batch(self, columns: Vec<String>) -> Batch {
+        Batch::new(columns, self.columns, self.row_count)
     }
 
     /// Splits `rows` into chunks of [`DEFAULT_VECTOR_SIZE`] rows. An empty input
     /// produces no chunk.
     pub fn from_rows(column_count: usize, rows: Vec<Vec<Value>>) -> Vec<DataChunk> {
         let mut chunks: Vec<DataChunk> = Vec::new();
-        let mut current = DataChunk::new(column_count);
+        let mut current = Self::typed(column_count, &rows);
         for row in rows {
             if current.is_full() {
                 current.finalize();
@@ -187,6 +194,35 @@ impl DataChunk {
         }
         chunks
     }
+
+    /// A chunk whose columns already carry the types the rows ask for, so the
+    /// first `push_row` does not have to widen them.
+    fn typed(column_count: usize, rows: &[Vec<Value>]) -> DataChunk {
+        let probe = Batch::from_rows(
+            rows.iter()
+                .take(1)
+                .map(|r| {
+                    let mut row = r.clone();
+                    row.resize(column_count, Value::Null);
+                    row
+                })
+                .collect(),
+        );
+        let columns = if probe.data.len() == column_count {
+            probe
+                .data
+                .into_iter()
+                .map(|c| ColumnData::empty_like(&c))
+                .collect::<Vec<_>>()
+        } else {
+            (0..column_count).map(|_| ColumnData::empty()).collect()
+        };
+        DataChunk {
+            columns,
+            capacity: DEFAULT_VECTOR_SIZE,
+            row_count: 0,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -204,8 +240,12 @@ mod tests {
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].row_count(), DEFAULT_VECTOR_SIZE);
         assert_eq!(chunks[1].row_count(), 1);
-        assert_eq!(chunks[0].get(8191, 0), Some(&Value::Int(8191)));
-        assert_eq!(chunks[1].get(0, 1), Some(&Value::Str("r8192".into())));
+        assert_eq!(
+            chunks[0].get(8191, 0),
+            Some(Value::Int(8191)),
+            "the cells are typed in the buffer, not stringified"
+        );
+        assert_eq!(chunks[1].get(0, 1), Some(Value::Str("r8192".into())));
         assert_eq!(chunks.iter().map(|c| c.row_count()).sum::<usize>(), 8193);
     }
 
@@ -220,8 +260,8 @@ mod tests {
         assert_eq!(target.row_count(), 12);
         target.append_with(&chunks[1], 0, 13);
         assert_eq!(target.row_count(), 13);
-        assert_eq!(target.get(11, 0), Some(&Value::Int(8191)));
-        assert_eq!(target.get(12, 0), Some(&Value::Int(8192)));
+        assert_eq!(target.get(11, 0), Some(Value::Int(8191)));
+        assert_eq!(target.get(12, 0), Some(Value::Int(8192)));
         // A full chunk refuses the append instead of overflowing.
         let mut full = DataChunk::new(2);
         full.append_with(&chunks[0], 0, 9000);
@@ -241,8 +281,8 @@ mod tests {
         target.append_with(&chunks[0], 8180, 13);
         assert_eq!(target.row_count(), DEFAULT_VECTOR_SIZE);
         assert!(target.is_full());
-        assert_eq!(target.get(8179, 0), Some(&Value::Int(8179)));
-        assert_eq!(target.get(8180, 0), Some(&Value::Int(8180)));
+        assert_eq!(target.get(8179, 0), Some(Value::Int(8179)));
+        assert_eq!(target.get(8180, 0), Some(Value::Int(8180)));
     }
 
     #[test]
@@ -272,6 +312,16 @@ mod tests {
         let chunks = DataChunk::from_rows(2, rows.clone());
         let back: Vec<Vec<Value>> = chunks.into_iter().flat_map(DataChunk::into_rows).collect();
         assert_eq!(back, rows);
+    }
+
+    #[test]
+    fn a_chunk_becomes_a_batch_without_touching_the_rows() {
+        let rows: Vec<Vec<Value>> = (0..4).map(row).collect();
+        let chunk = DataChunk::from_rows(2, rows.clone()).pop().unwrap();
+        let batch = chunk.into_batch(vec!["id".into(), "name".into()]);
+        assert_eq!(batch.row_count, 4);
+        assert_eq!(batch.rows(), rows);
+        assert_eq!(batch.columns, vec!["id".to_string(), "name".to_string()]);
     }
 
     #[test]

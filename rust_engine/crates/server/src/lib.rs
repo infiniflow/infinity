@@ -1119,7 +1119,10 @@ async fn dispatch_arm(
                     {
                         Ok(rs) => {
                             let mut columns: Vec<String> = Vec::new();
-                            let mut rows: Vec<Vec<Value>> = Vec::new();
+                            // The result arrives column-major: the writer below
+                            // packs these buffers directly instead of walking a
+                            // `Value` per cell.
+                            let mut block = Batch::default();
                             for r in rs {
                                 if let QueryResult::Rows {
                                     columns: c,
@@ -1127,7 +1130,7 @@ async fn dispatch_arm(
                                 } = r
                                 {
                                     columns = c;
-                                    rows = rw;
+                                    block = rw;
                                 }
                             }
                             if std::env::var_os("INF_DEBUG_SQL").is_some() {
@@ -1159,15 +1162,20 @@ async fn dispatch_arm(
                             }
                             let exec_elapsed = exec_started.elapsed();
                             let encode_started = std::time::Instant::now();
-                            let mut resp = select_response_from_typed(
-                                &columns,
-                                &declared_types(eng, &req.table_name, &columns),
-                                &rows,
-                            );
+                            let types = declared_types(eng, &req.table_name, &columns);
+                            // Scalar and text columns are packed from their own
+                            // buffers; an embedding / tensor / sparse column has
+                            // its own wire encoding, so that block takes the
+                            // `Value` writer.
+                            let mut resp = if batch_is_scalar(&columns, &types, &block) {
+                                select_response_from_batch(&columns, &types, &block)
+                            } else {
+                                select_response_from_typed(&columns, &types, &block.rows())
+                            };
                             if std::env::var_os("INF_DEBUG_SEL").is_some() {
                                 eprintln!(
                                     "[SEL] rows={} exec={:?} encode={:?}",
-                                    rows.len(),
+                                    block.row_count,
                                     exec_elapsed,
                                     encode_started.elapsed()
                                 );
@@ -1484,7 +1492,7 @@ async fn dispatch_arm(
                         let mut rows: Vec<Vec<Value>> = Vec::new();
                         for r in rs {
                             if let QueryResult::Rows { rows: rw, .. } = r {
-                                rows = rw;
+                                rows = rw.rows();
                             }
                         }
                         select_response_from_typed(&["explain".to_string()], &[], &rows)
@@ -1853,7 +1861,7 @@ async fn dispatch_arm(
                         let mut rows: Vec<Vec<Value>> = Vec::new();
                         for r in rs {
                             if let QueryResult::Rows { rows: rw, .. } = r {
-                                rows = rw;
+                                rows = rw.rows();
                             }
                         }
                         // The SQL renderer marks an absent comment
@@ -6456,15 +6464,96 @@ fn classify_batch_column(declared: &str, batch: &Batch, i: usize) -> ColKind {
     let kind = classify_column(declared, &[], i);
     if declared.trim().is_empty() {
         if let ColKind::Scalar(_) = kind {
+            // An untyped column is announced the way `infer_column_type` did on
+            // the rows: an integer buffer as `Integer`, whatever its width (the
+            // wire code is what the SDKs read back).
             return ColKind::Scalar(match batch.data.get(i) {
-                Some(ColumnData::Int(_)) => 3,
-                Some(ColumnData::Float(_)) => 6,
-                Some(ColumnData::Bool(_)) => 0,
-                Some(ColumnData::Text(_)) | None => 9,
+                Some(ColumnData::Int32 { .. }) | Some(ColumnData::Int64 { .. }) => 3,
+                Some(ColumnData::Float64 { .. }) => 6,
+                Some(ColumnData::Bool { .. }) => 0,
+                Some(ColumnData::Utf8 { .. }) | Some(ColumnData::Empty { .. }) | None => 9,
             });
         }
     }
     kind
+}
+
+/// Whether every column of the block is a scalar the columnar writer packs
+/// itself (a text, integer, float or bool buffer). A block that still holds an
+/// embedding / tensor / sparse column has to go through the `Value` writer,
+/// which knows those wire encodings.
+pub fn batch_is_scalar(columns: &[String], types: &[String], batch: &Batch) -> bool {
+    columns.iter().enumerate().all(|(i, _)| {
+        matches!(
+            classify_batch_column(types.get(i).map(String::as_str).unwrap_or(""), batch, i),
+            ColKind::Scalar(_)
+        )
+    })
+}
+
+/// Rewrites a column whose buffer does not have the shape its wire code packs,
+/// so the writer below can assume the code's shape.
+///
+/// The declared type and the buffer can disagree: `CAST(id AS VARCHAR)` lands in
+/// a text buffer under an `INT` code, a `BOOL` result computed from integers
+/// lands in an integer buffer under the `BOOL` code. The per-`Value` writer used
+/// to bridge that cell by cell; this does it once per column.
+fn normalize_for_code(code: i32, column: &ColumnData) -> Option<ColumnData> {
+    let wants_text = matches!(code, 9 | 16 | 17 | 18);
+    match (wants_text, column) {
+        (true, ColumnData::Utf8 { .. }) | (false, ColumnData::Empty { .. }) => None,
+        (true, current) => {
+            let cells: Vec<Option<String>> = (0..current.len())
+                .map(|r| match current.value_at(r) {
+                    Value::Null => None,
+                    value => Some(value.to_slt_string()),
+                })
+                .collect();
+            Some(ColumnData::text_from_cells(&cells))
+        }
+        (false, ColumnData::Bool { .. }) if code == 0 => None,
+        (false, current) if code == 0 => {
+            let cells: Vec<Value> = (0..current.len())
+                .map(|r| match current.value_at(r) {
+                    Value::Null => Value::Null,
+                    Value::Bool(b) => Value::Bool(b),
+                    Value::Int(i) => Value::Bool(i != 0),
+                    Value::Float(f) => Value::Bool(f != 0.0),
+                    Value::Str(s) => Value::Bool(matches!(s.trim(), "true" | "TRUE" | "1")),
+                })
+                .collect();
+            Some(ColumnData::from_values(&cells))
+        }
+        (false, ColumnData::Utf8 { .. }) if (1..=4).contains(&code) => {
+            let cells: Vec<Value> = (0..column.len())
+                .map(|r| match column.value_at(r) {
+                    Value::Null => Value::Null,
+                    Value::Str(s) => s
+                        .trim()
+                        .parse::<i64>()
+                        .map(Value::Int)
+                        .unwrap_or(Value::Null),
+                    value => value,
+                })
+                .collect();
+            Some(ColumnData::from_values(&cells))
+        }
+        (false, ColumnData::Utf8 { .. }) if (5..=8).contains(&code) => {
+            let cells: Vec<Value> = (0..column.len())
+                .map(|r| match column.value_at(r) {
+                    Value::Null => Value::Null,
+                    Value::Str(s) => s
+                        .trim()
+                        .parse::<f64>()
+                        .map(Value::Float)
+                        .unwrap_or(Value::Null),
+                    value => value,
+                })
+                .collect();
+            Some(ColumnData::from_values(&cells))
+        }
+        _ => None,
+    }
 }
 
 /// Packs typed column buffers into `ColumnField`s: one contiguous chunk per
@@ -6482,24 +6571,44 @@ pub fn column_fields_from_batch(
             // The batch path only ever holds scalars and text.
             _ => 9,
         };
-        let valid = batch.valid.get(i).cloned().unwrap_or_default();
+        // The wire code decides the cell width, so the buffer has to match it:
+        // a text buffer under a numeric code is not eight bytes of little
+        // endian, and a numeric buffer under `BOOL` is not one byte.
+        let rendered = batch
+            .data
+            .get(i)
+            .and_then(|current| normalize_for_code(code, current));
+        let mut column = batch.data.get(i);
+        if let Some(rendered) = &rendered {
+            column = Some(rendered);
+        }
+        let valid = column
+            .map(|column| column.valid().to_vec())
+            .unwrap_or_default();
         let mut chunk: Vec<u8> = Vec::with_capacity(batch.row_count * 8);
-        match batch.data.get(i) {
-            Some(ColumnData::Int(v)) => {
-                for n in v {
+        match column {
+            Some(ColumnData::Int32 { values, .. }) => {
+                for n in values {
                     match code {
                         1 => chunk.push(*n as i8 as u8),
                         2 => chunk.extend_from_slice(&(*n as i16).to_le_bytes()),
-                        3 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
-                        16 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
-                        17 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
-                        18 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
+                        16 | 17 | 18 | 3 => chunk.extend_from_slice(&n.to_le_bytes()),
+                        _ => chunk.extend_from_slice(&(*n as i64).to_le_bytes()),
+                    }
+                }
+            }
+            Some(ColumnData::Int64 { values, .. }) => {
+                for n in values {
+                    match code {
+                        1 => chunk.push(*n as i8 as u8),
+                        2 => chunk.extend_from_slice(&(*n as i16).to_le_bytes()),
+                        3 | 16 | 17 | 18 => chunk.extend_from_slice(&(*n as i32).to_le_bytes()),
                         _ => chunk.extend_from_slice(&n.to_le_bytes()),
                     }
                 }
             }
-            Some(ColumnData::Float(v)) => {
-                for f in v {
+            Some(ColumnData::Float64 { values, .. }) => {
+                for f in values {
                     match code {
                         5 => chunk.extend_from_slice(&(*f as f32).to_le_bytes()),
                         7 => chunk.extend_from_slice(&f32_to_f16_bits(*f as f32).to_le_bytes()),
@@ -6510,16 +6619,16 @@ pub fn column_fields_from_batch(
                     }
                 }
             }
-            Some(ColumnData::Bool(v)) => {
-                for b in v {
+            Some(ColumnData::Bool { values, .. }) => {
+                for b in values {
                     chunk.push(u8::from(*b));
                 }
             }
-            Some(ColumnData::Text(v)) => {
+            Some(ColumnData::Utf8 { text, .. }) => {
                 // The column is one buffer plus offsets; each cell is a slice of
                 // it, so packing is a length prefix and a copy.
-                for i in 0..v.len() {
-                    let s = v.get(i);
+                for c in 0..text.len() {
+                    let s = text.get(c);
                     match code {
                         16 => chunk.extend_from_slice(&date_to_days(s).unwrap_or(0).to_le_bytes()),
                         17 => chunk.extend_from_slice(&time_to_secs(s).unwrap_or(0).to_le_bytes()),
@@ -6535,7 +6644,7 @@ pub fn column_fields_from_batch(
                     }
                 }
             }
-            None => {}
+            Some(ColumnData::Empty { .. }) | None => {}
         }
         out.push(ColumnField {
             column_type: code,
@@ -8553,6 +8662,70 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A block is packed straight from its column buffers: an `INT` column stays
+    /// four bytes per cell (`ColumnField::column_type` 3), a varchar cell is a
+    /// length prefix plus bytes, a NULL shows up in `bitmasks` at the same row,
+    /// and a column declared `VARCHAR` whose buffer is numeric is rendered to
+    /// text rather than sent as raw little-endian integers.
+    #[test]
+    fn a_batch_is_packed_column_by_column() {
+        let block = Batch::from_rows(vec![
+            vec![
+                Value::Int(7),
+                Value::Str("a".into()),
+                Value::Null,
+                Value::Int(9),
+            ],
+            vec![
+                Value::Int(8),
+                Value::Str("bb".into()),
+                Value::Int(1),
+                Value::Int(10),
+            ],
+        ]);
+        assert!(matches!(block.data[0], ColumnData::Int64 { .. }));
+        let columns = vec![
+            "id".to_string(),
+            "name".to_string(),
+            "ok".to_string(),
+            "label".to_string(),
+        ];
+        let types = vec![
+            "INT".to_string(),
+            "VARCHAR".to_string(),
+            "BOOL".to_string(),
+            "VARCHAR".to_string(),
+        ];
+        assert!(batch_is_scalar(&columns, &types, &block));
+        let fields = column_fields_from_batch(&columns, &types, &block);
+
+        assert_eq!(fields[0].column_type, 3);
+        assert_eq!(fields[0].column_vectors[0].len(), 8);
+        assert_eq!(&fields[0].column_vectors[0][0..4], &7i32.to_le_bytes());
+        assert_eq!(&fields[0].column_vectors[0][4..8], &8i32.to_le_bytes());
+
+        // A varchar chunk is a length prefix plus the bytes, per cell.
+        let text_chunk = |cells: &[&str]| -> Vec<u8> {
+            let mut out = Vec::new();
+            for cell in cells {
+                out.extend_from_slice(&(cell.len() as u32).to_le_bytes());
+                out.extend_from_slice(cell.as_bytes());
+            }
+            out
+        };
+        assert_eq!(fields[1].column_type, 9);
+        assert_eq!(fields[1].column_vectors[0], text_chunk(&["a", "bb"]));
+
+        // A bool column is one byte per cell, and the NULL row is flagged.
+        assert_eq!(fields[2].column_type, 0);
+        assert_eq!(fields[2].column_vectors[0], vec![0u8, 1u8]);
+        assert_eq!(fields[2].bitmasks, vec![false, true]);
+
+        // `label` is declared VARCHAR but holds integers: they are sent as text.
+        assert_eq!(fields[3].column_type, 9);
+        assert_eq!(fields[3].column_vectors[0], text_chunk(&["9", "10"]));
+    }
 
     /// `ARRAY(ARRAY(ARRAY(VARCHAR)))` has three levels and a VARCHAR leaf.
     /// Stripping every trailing paren at once collapsed the nesting, so the

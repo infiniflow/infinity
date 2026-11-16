@@ -42,7 +42,7 @@ fn count(e: &Engine, table: &str) -> usize {
         .unwrap()
     {
         if let QueryResult::Rows { rows, .. } = result {
-            return rows[0][0].to_slt_string().parse().unwrap();
+            return rows.row(0).unwrap()[0].to_slt_string().parse().unwrap();
         }
     }
     panic!("count(*) returned no rows");

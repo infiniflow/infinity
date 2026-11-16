@@ -22,7 +22,7 @@ impl Filter {
         let mut out = DataChunk::with_capacity(block.column_count(), block.capacity());
         for row in 0..block.row_count() {
             let cells: Vec<Value> = (0..block.column_count())
-                .map(|column| block.get(row, column).cloned().unwrap_or(Value::Null))
+                .map(|column| block.get(row, column).unwrap_or(Value::Null))
                 .collect();
             if self.predicate.eval_predicate(&cells) {
                 out.push_row(&cells)?;

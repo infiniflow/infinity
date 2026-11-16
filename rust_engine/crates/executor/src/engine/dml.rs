@@ -1214,14 +1214,23 @@ impl Engine {
                 })
                 .and_then(|name| analyzer::AnalyzerPool::instance().get_analyzer(name).ok());
             let qterms = tokenize_index_text(&query, &tokenizer);
-            for row in rows.iter_mut() {
-                let Some(text) = row.get(i).map(|v| v.to_slt_string()) else {
-                    continue;
-                };
-                row[i] = Value::Str(match &analyzer {
-                    Some(analyzer) => highlight_with_analyzer(&query, &text, analyzer),
-                    None => highlight_text(&text, &qterms, &tokenizer.delims),
-                });
+            // The column is rebuilt once rather than patched cell by cell: a
+            // text column is one buffer plus offsets, so writing a cell in
+            // place would shift every later offset.
+            let cells: Vec<Option<String>> = (0..rows.row_count)
+                .map(|r| match rows.data.get(i).map(|c| c.value_at(r)) {
+                    Some(Value::Null) | None => None,
+                    Some(value) => {
+                        let text = value.to_slt_string();
+                        Some(match &analyzer {
+                            Some(analyzer) => highlight_with_analyzer(&query, &text, analyzer),
+                            None => highlight_text(&text, &qterms, &tokenizer.delims),
+                        })
+                    }
+                })
+                .collect();
+            if let Some(column) = rows.data.get_mut(i) {
+                *column = ColumnData::text_from_cells(&cells);
             }
         }
     }
@@ -2052,12 +2061,9 @@ impl Engine {
 
     /// Resizes that budget.
     pub fn set_buffer_memory_limit(&self, bytes: usize) {
-        self.context
-            .buffer_budget
-            .store(bytes, std::sync::atomic::Ordering::Relaxed);
-        self.context
-            .hnsw_budget
-            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        // `BufferManager::SetMemoryLimit` in the reference; one implementation
+        // with `set_buffer_budget` so the two entry points cannot drift.
+        self.set_buffer_budget(bytes);
     }
 
     /// `WalCmdImportV2` for the segment a `COPY` is writing
@@ -2222,7 +2228,7 @@ impl Engine {
     /// Sealed blocks are mapped here, so the whole budget belongs to the
     /// in-memory index buffers, as the reference spends it on the index side.
     pub fn set_buffer_manager_size(&self, bytes: usize) {
-        self.set_buffer_memory_limit(bytes);
+        self.set_buffer_budget(bytes);
     }
 
     /// Sets `[wal] wal_flush`: when a commit's WAL entry reaches the disk
@@ -2231,11 +2237,8 @@ impl Engine {
         self.txn.set_wal_flush(mode);
     }
 
-    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
-    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
-    /// keeps every row in memory until a checkpoint.
     /// Sets the decoded-block budget (C++ `BufferManager`'s
-    /// `buffer_manager_size`).
+    /// `buffer_manager_size`), which is also the HNSW chunk budget.
     ///
     /// The port has no BufferManager - sealed blocks are mapped and evicted by
     /// the kernel - but the same number is the ceiling on decoded HNSW chunks
@@ -2250,6 +2253,9 @@ impl Engine {
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
+    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
+    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
+    /// keeps every row in memory until a checkpoint.
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota

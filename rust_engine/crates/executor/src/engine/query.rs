@@ -521,10 +521,7 @@ impl Engine {
                     }
                     None => *self.current_db.lock().unwrap() = name.clone(),
                 }
-                out.push(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                });
+                out.push(QueryResult::values(vec![], Vec::new()));
                 self.txn.end_statement();
                 continue;
             }
@@ -836,12 +833,7 @@ impl Engine {
         let fill_row = |scratch: &mut Vec<Value>, batch: &Batch, r: usize| {
             for (c, pos) in needed.iter().enumerate() {
                 if *pos < width {
-                    scratch[*pos] =
-                        if batch.valid.get(c).and_then(|v| v.get(r)).copied() == Some(false) {
-                            Value::Null
-                        } else {
-                            batch.data[c].value_at(r)
-                        };
+                    scratch[*pos] = batch.data[c].value_at(r);
                 }
             }
         };
@@ -857,7 +849,7 @@ impl Engine {
                 };
                 if let (Some(pos), Some(value)) = (col, value) {
                     if let Some(c) = needed.iter().position(|p| *p == pos) {
-                        mask = Some(batch.data[c].equality_mask(&batch.valid[c], value));
+                        mask = Some(batch.data[c].equality_mask(value));
                     }
                 }
             }
@@ -873,16 +865,7 @@ impl Engine {
                 }
             };
             if mask.iter().any(|k| !k) {
-                for c in 0..batch.data.len() {
-                    batch.data[c].retain(&mask);
-                    let mut at = 0usize;
-                    batch.valid[c].retain(|_| {
-                        let v = mask.get(at).copied().unwrap_or(false);
-                        at += 1;
-                        v
-                    });
-                }
-                batch.row_count = mask.iter().filter(|k| **k).count();
+                batch.retain(&mask);
             }
         }
 
@@ -907,12 +890,7 @@ impl Engine {
                 }
                 a.cmp(b)
             });
-            for column in &mut batch.data {
-                *column = crate::blocks::permute_column(column, &order);
-            }
-            for v in &mut batch.valid {
-                *v = order.iter().map(|i| v[*i]).collect();
-            }
+            batch.permute(&order);
         }
 
         let skip = offset.unwrap_or(0) as usize;
@@ -925,22 +903,12 @@ impl Engine {
             .map(|r| r >= skip && r < skip + take)
             .collect();
         if skip > 0 || take < batch.row_count {
-            for c in 0..batch.data.len() {
-                batch.data[c].retain(&keep);
-                let mut at = 0usize;
-                batch.valid[c].retain(|_| {
-                    let v = keep.get(at).copied().unwrap_or(false);
-                    at += 1;
-                    v
-                });
-            }
-            batch.row_count = take;
+            batch.retain(&keep);
         }
 
         // Projection: hand over the decoded column, or evaluate the expression
-        // per row into a new one.
+        // per row into a new buffer.
         let mut data = Vec::with_capacity(projection.len());
-        let mut valid = Vec::with_capacity(projection.len());
         let mut labels = Vec::with_capacity(projection.len());
         for out in &projection {
             match out {
@@ -949,7 +917,6 @@ impl Engine {
                         return Ok(None);
                     };
                     data.push(batch.data[c].clone());
-                    valid.push(batch.valid[c].clone());
                     labels.push(label.clone());
                 }
                 Out::Expr { expr, label } => {
@@ -961,35 +928,13 @@ impl Engine {
                         fill_row(&mut scratch, &batch, r);
                         values.push(expr.eval(&scratch));
                     }
-                    let mut column = if values.iter().any(|v| matches!(v, Value::Str(_))) {
-                        ColumnData::Text(Default::default())
-                    } else if values.iter().any(|v| matches!(v, Value::Float(_))) {
-                        ColumnData::Float(Vec::new())
-                    } else if values.iter().any(|v| matches!(v, Value::Bool(_)))
-                        && !values.iter().any(|v| matches!(v, Value::Int(_)))
-                    {
-                        ColumnData::Bool(Vec::new())
-                    } else {
-                        ColumnData::Int(Vec::new())
-                    };
-                    let mut col_valid = Vec::with_capacity(values.len());
-                    for value in &values {
-                        col_valid.push(!matches!(value, Value::Null));
-                        column.push_value(value);
-                    }
-                    data.push(column);
-                    valid.push(col_valid);
+                    data.push(ColumnData::from_values(&values));
                     labels.push(label.clone());
                 }
             }
         }
         let row_count = batch.row_count;
-        Ok(Some(Batch {
-            columns: labels,
-            data,
-            valid,
-            row_count,
-        }))
+        Ok(Some(Batch::new(labels, data, row_count)))
     }
 
     /// Resolves unqualified table names to `<current_db>.<name>`; a name that
@@ -1376,10 +1321,7 @@ impl Engine {
                 if let Some(meta) = self.storage.catalog.get_table_by_name(new_name)? {
                     self.register_table_ids(&meta);
                 }
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::AlterTableDropColumn { table, column } => {
                 self.invalidate_row_cache(table);
@@ -1570,10 +1512,7 @@ impl Engine {
                 })
             }
             // `USE` is handled by `execute`; reaching here is a no-op.
-            Statement::Use { .. } => Ok(QueryResult::Rows {
-                columns: vec![],
-                rows: vec![],
-            }),
+            Statement::Use { .. } => Ok(QueryResult::values(vec![], Vec::new())),
             Statement::CreateDatabase {
                 name,
                 if_not_exists,
@@ -1589,14 +1528,12 @@ impl Engine {
             // A collection is the legacy alias of a table: the reference's
             // `PhysicalCreateCollection`/`PhysicalDropCollection` only check
             // that the node is writable and acknowledge with `OK`.
-            Statement::CreateCollection { .. } => Ok(QueryResult::Rows {
-                columns: vec!["OK".to_string()],
-                rows: vec![],
-            }),
-            Statement::DropCollection { .. } => Ok(QueryResult::Rows {
-                columns: vec!["OK".to_string()],
-                rows: vec![],
-            }),
+            Statement::CreateCollection { .. } => {
+                Ok(QueryResult::values(vec!["OK".to_string()], Vec::new()))
+            }
+            Statement::DropCollection { .. } => {
+                Ok(QueryResult::values(vec!["OK".to_string()], Vec::new()))
+            }
             Statement::DropDatabase { name, if_exists } => {
                 // The default database backs every session, so the C++ engine
                 // refuses to drop it (3033 DROPPING_USING_DB).
@@ -1672,15 +1609,15 @@ impl Engine {
                     // `SHOW SNAPSHOTS` lists every snapshot directory
                     // (`physical_show_list_snapshots_impl.cpp`): name, scope,
                     // creation time, commit ts and size.
-                    Some("snapshots") => Ok(QueryResult::Rows {
-                        columns: vec![
+                    Some("snapshots") => Ok(QueryResult::values(
+                        vec![
                             "name".to_string(),
                             "scope".to_string(),
                             "time".to_string(),
                             "commit".to_string(),
                             "size".to_string(),
                         ],
-                        rows: text_rows(
+                        text_rows(
                             self.snapshot_briefs()?
                                 .into_iter()
                                 .map(|b| {
@@ -1694,7 +1631,7 @@ impl Engine {
                                 })
                                 .collect(),
                         ),
-                    }),
+                    )),
                     // `SHOW SNAPSHOT <name>` describes one
                     // (`physical_show_snapshot_impl.cpp`).
                     Some("snapshot") => {
@@ -1706,9 +1643,9 @@ impl Engine {
                             .ok_or_else(|| {
                                 Error::Unknown(format!("can't find snapshot: {name}"))
                             })?;
-                        Ok(QueryResult::Rows {
-                            columns: vec!["name".to_string(), "value".to_string()],
-                            rows: text_rows(vec![
+                        Ok(QueryResult::values(
+                            vec!["name".to_string(), "value".to_string()],
+                            text_rows(vec![
                                 vec!["snapshot_name".to_string(), brief.name],
                                 vec!["snapshot_scope".to_string(), brief.scope],
                                 vec!["create_time".to_string(), brief.create_time],
@@ -1718,12 +1655,9 @@ impl Engine {
                                     crate::snapshot::SnapshotBrief::format_size(brief.size),
                                 ],
                             ]),
-                        })
+                        ))
                     }
-                    _ => Ok(QueryResult::Rows {
-                        columns: vec![],
-                        rows: vec![],
-                    }),
+                    _ => Ok(QueryResult::values(vec![], Vec::new())),
                 }
             }
             Statement::ShowTableIndex { table, index } => {
@@ -1732,10 +1666,7 @@ impl Engine {
                         "index '{index}' does not exist on '{table}'"
                     )));
                 }
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             // EXPLAIN only describes a plan; it must not execute the statement,
             // but binding the plan surfaces a missing relation.
@@ -2004,19 +1935,16 @@ impl Engine {
                         if matches!(kind, parser::ExplainKind::Fragment) {
                             lines = fragment_text(lines);
                         }
-                        Ok(QueryResult::Rows {
-                            columns: vec![column.to_string()],
-                            rows: lines.into_iter().map(|l| vec![Value::Str(l)]).collect(),
-                        })
+                        Ok(QueryResult::values(
+                            vec![column.to_string()],
+                            lines.into_iter().map(|l| vec![Value::Str(l)]).collect(),
+                        ))
                     }
                     None => {
                         if let Statement::Select { from: Some(t), .. } = inner.as_ref() {
                             self.table_schema(t)?;
                         }
-                        Ok(QueryResult::Rows {
-                            columns: vec![column.to_string()],
-                            rows: vec![],
-                        })
+                        Ok(QueryResult::values(vec![column.to_string()], Vec::new()))
                     }
                 }
             }
@@ -2428,15 +2356,9 @@ impl Engine {
                         return Err(Error::NotSupport("Flush buffer".into()))
                     }
                 }
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
-            Statement::Utility { .. } => Ok(QueryResult::Rows {
-                columns: vec![],
-                rows: vec![],
-            }),
+            Statement::Utility { .. } => Ok(QueryResult::values(vec![], Vec::new())),
             Statement::SetConfig { key, value } => {
                 // a known key with an out-of-range/malformed value is rejected
                 if let Some(msg) = invalid_config_value(key, value) {
@@ -2461,10 +2383,7 @@ impl Engine {
                     self.result_cache.lock().unwrap().clear();
                     self.plan_cache.clear();
                 }
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::ShowVariable { key } => {
                 let cache_var = key.to_ascii_lowercase();
@@ -2484,10 +2403,7 @@ impl Engine {
                         .cloned()
                         .unwrap_or_else(|| "0".to_string())
                 };
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![vec![Value::Str(v)]],
-                })
+                Ok(QueryResult::values(vec![], vec![vec![Value::Str(v)]]))
             }
             Statement::ShowTableColumns { table } => {
                 let meta = self
@@ -2513,10 +2429,7 @@ impl Engine {
                         ]
                     })
                     .collect();
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: text_rows(rows),
-                })
+                Ok(QueryResult::values(vec![], text_rows(rows)))
             }
             // `SHOW TABLE <t>`: two columns (`name`, `value`) with the six
             // label/value rows from `physical_show_table_impl.cpp`.
@@ -2529,9 +2442,9 @@ impl Engine {
                 let (db, name) = table
                     .split_once('.')
                     .unwrap_or(("default_db", table.as_str()));
-                Ok(QueryResult::Rows {
-                    columns: vec!["name".to_string(), "value".to_string()],
-                    rows: text_rows(vec![
+                Ok(QueryResult::values(
+                    vec!["name".to_string(), "value".to_string()],
+                    text_rows(vec![
                         vec!["database_name".to_string(), db.to_string()],
                         vec!["table_name".to_string(), name.to_string()],
                         vec!["table_comment".to_string(), String::new()],
@@ -2539,56 +2452,35 @@ impl Engine {
                         vec!["column_count".to_string(), meta.columns.len().to_string()],
                         vec!["segment_count".to_string(), "0".to_string()],
                     ]),
-                })
+                ))
             }
             Statement::CreateSnapshot { name, table } => {
                 self.create_table_snapshot(&self.db(), table, name).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::CreateDatabaseSnapshot { name, database } => {
                 self.create_database_snapshot(name, database).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::CreateSystemSnapshot { name } => {
                 self.create_system_snapshot(name).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::DropSnapshot { name } => {
                 self.drop_snapshot(name)?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::RestoreSnapshot { name } => {
                 self.restore_table_snapshot(name).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::RestoreDatabaseSnapshot { name } => {
                 self.restore_database_snapshot(name).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::RestoreSystemSnapshot { name } => {
                 self.restore_system_snapshot(name).await?;
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
+                Ok(QueryResult::values(vec![], Vec::new()))
             }
             Statement::Insert {
                 table,
@@ -2832,13 +2724,13 @@ impl Engine {
                 // server needs to keep 100k connections in flight.
                 let Some(engine) = self.engine_handle() else {
                     let (columns, rows) = self.run_select(stmt)?;
-                    return Ok(QueryResult::Rows { columns, rows });
+                    return Ok(QueryResult::values(columns, rows));
                 };
                 let stmt = stmt.clone();
                 let (columns, rows) = crate::scheduler::scheduler()
                     .spawn_blocking(move || engine.run_select(&stmt))
                     .await?;
-                Ok(QueryResult::Rows { columns, rows })
+                Ok(QueryResult::values(columns, rows))
             }
         }
     }

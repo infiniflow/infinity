@@ -43,10 +43,10 @@
 
 | 层 | 参考（C++） | 端口（Rust） | 后果 |
 |---|---|---|---|
-| 扫描产出 | `ColumnVector`：列式、连续、类型化（`i32` 缓冲 + null 位图） | `Vec<Vec<Value>>`：行式，每个 cell 一个 `Value` 枚举，每行一次 `Vec` 分配 | 40,000 行 → 40,000+ 次分配；perf 里 ~55% 在 malloc/free |
+| 扫描产出 | `ColumnVector`：列式、连续、类型化（`i32` 缓冲 + null 位图） | `columnar::ColumnData`：列式、连续、类型化（`Int32`/`Int64`/`Float64`/`Bool`/`Utf8{offsets,data}` + 位图）；算子边界才物化成 `Value` | 纯投影与 thrift 打包无 per-cell 分配；行物化只发生在表达式求值处 |
 | 解码 | 块文件 buffer 直接用（`ColumnVector::Initialize`），逐行只做 `CheckDelete` | `decode_rows_of_values` 逐 cell 构造 `Value`（标量直接读 slot，varchar 走 outline + `parse_owned_value`） | 端口 decode 2.1 ms（`id`）/ 7.9 ms（含 varchar）；参考整体 1.5 ms |
 | 谓词 | 扫描内对列向量求值；块级 prefilter 只在段封存后存在 | `Expr::eval_predicate` 逐行解释；等值谓词在行缓冲构造时执行；只解谓词列 ∪ 投影列 | 点查端口 2.0 ms vs 参考 4.5 ms |
-| 结果表示 | `DataBlock`（列向量）一路到协议层 | `QueryResult::Rows { rows: Vec<Vec<String>> }` —— 出口把值全渲染成文本（`expression` 的 `Value::to_slt_string`） | `SELECT id` 多出 1.5 ms |
+| 结果表示 | `DataBlock`（列向量）一路到协议层 | `QueryResult::Rows { rows: columnar::Batch }` —— 一路是列向量，thrift 按列打包；CLI / `.slt` / HTTP / postgres 出口才 `text_rows()` | 与参考同形 |
 | 协议打包 | `ProcessColumns` → `HandlePodType`：列缓冲 `memcpy` 进 `ColumnField.column_vectors` | `rows_to_column_fields_typed`：每个 cell 的文本再 `parse::<i32>()` / 重新编码 | 多出 0.4 ms（`id`），varchar 列还要再走一遍 |
 | 传输/客户端 | thrift binary，一列一个 `binary` 块 | 同左（字节数实测相同） | 无差异 |
 
@@ -56,7 +56,7 @@
 
 四次提交（`2191fa03e`、`a0ee75059`、`e19f39132`、`82e75d4c3`）：
 
-1. **结果保持类型化**：`QueryResult::Rows` 从 `Vec<Vec<String>>` 改成 `Vec<Vec<Value>>`，协议层直接按值打包；文本只在 CLI / `.slt` / HTTP / postgres 出口用 `rows_text()` 渲染。
+1. **结果是列式类型化块**：`QueryResult::Rows` 载 `columnar::Batch`（每列一条类型化缓冲 + null 位图），协议层按列打包 `ColumnField`；`Value` 行只在 CLI / `.slt` / HTTP / postgres 出口（`rows_text()`）和算子边界出现。
 2. **投影（含 `*`、标量表达式）走列式缓冲**：`Engine::select_columns` 把单表 `SELECT` 绑到表的列上——列名、`*`、`SelectItem::Expr`（`QueryBinder::bind_expression`）——由 `read_columns_batch` 按**列**解码进 `ColumnData`（`Int`/`Float`/`Bool`/`Text`）+ 每列有效位图；表达式列在逐行求值后按**全部取值**定类型（整型/浮点/文本混合不会截断）。
 3. **`WHERE` 在列缓冲上求值**：谓词按 `predicate_expr` 绑定，用一个复用的行缓冲逐行求值（`col = 常量` 直接按列 `equality_mask`，不建行），只保留命中的行；块 `version` 里没有的删除按 tombstone 过滤。
 4. **`ORDER BY` / `LIMIT` / `OFFSET` 也在列上**：排序键逐行求值后做置换，`LIMIT`/`OFFSET` 是切片；文本列 `ColumnData::Text` 是一段字节 + 偏移（`TextColumn { data, ends }`），不是每 cell 一个 `String`。

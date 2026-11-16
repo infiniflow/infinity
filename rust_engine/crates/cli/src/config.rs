@@ -83,6 +83,9 @@ pub struct Config {
 
     lru_num: usize,
     temp_dir: String,
+    /// `[buffer] buffer_manager_size`; `None` keeps the engine's built-in
+    /// budget. Only parsed real C++ configs set it.
+    buffer_manager_size: Option<i64>,
     mem_index_memory_quota: i64,
 
     checkpoint_interval: u64,
@@ -136,6 +139,7 @@ impl Default for Config {
             snapshot_dir: "/var/infinity/snapshot".into(),
             lru_num: 7,
             temp_dir: "/var/infinity/tmp".into(),
+            buffer_manager_size: None,
             mem_index_memory_quota: 4 * 1024 * 1024 * 1024,
             checkpoint_interval: 86400,
             wal_compact_threshold: 1024 * 1024 * 1024,
@@ -244,10 +248,11 @@ impl Config {
             ("storage.object_storage", "secret_key") => self.object_storage_secret_key = string(),
             ("storage.object_storage", "enable_https") => self.object_storage_https = boolean()?,
             // The reference's BufferManager budget. The port maps sealed blocks
-            // and keeps no BufferManager, so the key is accepted (a C++ conf must
-            // still load) and ignored: only its syntax is checked.
+            // and keeps no BufferManager, but the same number is the ceiling on
+            // the decoded HNSW chunks and the block map, so it is carried here
+            // (`main.rs` hands it to `Engine::set_buffer_budget`).
             ("buffer", "buffer_manager_size") => {
-                let _ = parse_byte_size(&string())?;
+                self.buffer_manager_size = Some(parse_byte_size(&string())?);
             }
             ("buffer", "lru_num") => self.lru_num = integer()? as usize,
             ("buffer", "temp_dir") => self.temp_dir = string(),
@@ -411,6 +416,11 @@ impl Config {
     pub fn mem_index_memory_quota(&self) -> i64 {
         self.mem_index_memory_quota
     }
+    /// `[buffer] buffer_manager_size` in bytes, `None` when the config leaves
+    /// it out (the engine then keeps its built-in budget).
+    pub fn buffer_manager_size(&self) -> Option<i64> {
+        self.buffer_manager_size
+    }
     pub fn checkpoint_interval(&self) -> u64 {
         self.checkpoint_interval
     }
@@ -549,15 +559,18 @@ mod tests {
         assert_eq!(config.cache_result_num(), 10000);
     }
 
-    /// The reference's BufferManager budget is accepted for config
-    /// compatibility and ignored: the port maps sealed blocks and keeps no
-    /// BufferManager, so the engine runs on its built-in 8 GiB.
+    /// The reference's BufferManager budget keeps its meaning: the port has no
+    /// BufferManager, but the same number bounds the decoded HNSW chunks and
+    /// the block map, so the parsed value has to survive into the engine
+    /// instead of being dropped.
     #[test]
-    fn buffer_manager_size_is_accepted_and_ignored() {
+    fn buffer_manager_size_is_carried() {
         let mut config = Config::default();
+        assert_eq!(config.buffer_manager_size(), None);
         config
             .apply_toml("[buffer]\nbuffer_manager_size = \"3GB\"\n")
             .unwrap();
+        assert_eq!(config.buffer_manager_size(), Some(3 * 1024 * 1024 * 1024));
         assert_eq!(config.lru_num(), 7);
     }
 

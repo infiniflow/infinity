@@ -10,7 +10,7 @@ use storage::WalManager;
 fn count(e: &Engine) -> i64 {
     let rs = e.execute_blocking("SELECT COUNT(*) FROM t;").unwrap();
     match &rs[0] {
-        QueryResult::Rows { rows, .. } => rows[0][0].to_slt_string().parse().unwrap(),
+        QueryResult::Rows { rows, .. } => rows.row(0).unwrap()[0].to_slt_string().parse().unwrap(),
         other => panic!("expected rows, got {other:?}"),
     }
 }

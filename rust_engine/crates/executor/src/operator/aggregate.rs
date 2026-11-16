@@ -304,13 +304,13 @@ impl Aggregate {
                 .group_keys
                 .iter()
                 .map(|expr| match expr {
-                    Expr::Column(c) => block.get(row, *c).cloned().unwrap_or(Value::Null),
+                    Expr::Column(c) => block.get(row, *c).unwrap_or(Value::Null),
                     _ => unreachable!("checked above"),
                 })
                 .collect();
         }
         let cells: Vec<Value> = (0..block.column_count())
-            .map(|column| block.get(row, column).cloned().unwrap_or(Value::Null))
+            .map(|column| block.get(row, column).unwrap_or(Value::Null))
             .collect();
         self.group_keys.iter().map(|key| key.eval(&cells)).collect()
     }
@@ -338,7 +338,7 @@ impl Aggregate {
                 let tuple: Vec<Value> = spec
                     .columns
                     .iter()
-                    .map(|c| block.get(row, *c).cloned().unwrap_or(Value::Null))
+                    .map(|c| block.get(row, *c).unwrap_or(Value::Null))
                     .collect();
                 slot.update(spec, &tuple, present);
             }
