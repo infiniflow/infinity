@@ -639,7 +639,10 @@ class TestMemIdx:
             while time.time() - start_time < 60:
                 idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
                 idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-                if len(idx1_dirs) >= before["idx1"] + 1 and len(idx2_dirs) >= before["idx2"] + 1:
+                if (
+                    len(idx1_dirs) >= before["idx1"] + 1
+                    and len(idx2_dirs) >= before["idx2"] + 1
+                ):
                     break
                 time.sleep(1)
 
