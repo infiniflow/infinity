@@ -80,7 +80,9 @@ def generate(generate_if_exists: bool, copy: bool):
     delete_nearest_all = find_nearest(delete_x_all)
 
     with open(csv_path, "w") as csv_file:
-        csv_file.writelines(f"{to_csv_embedding(v_x)},{v_y}\n" for v_x, v_y in zip(x, y))
+        csv_file.writelines(
+            f"{to_csv_embedding(v_x)},{v_y}\n" for v_x, v_y in zip(x, y)
+        )
 
     if copy:
         os.makedirs(copy_dir, exist_ok=True)
@@ -121,9 +123,7 @@ def generate(generate_if_exists: bool, copy: bool):
             )
             slt_file.write("----\n")
             if v_x in delete_x_1:
-                slt_file.write(
-                    f"[{to_result_embedding(delete_nearest_1[v_x])}]\n"
-                )
+                slt_file.write(f"[{to_result_embedding(delete_nearest_1[v_x])}]\n")
             else:
                 slt_file.write(f"[{to_result_embedding(v_x)}]\n")
             slt_file.write("\n")
@@ -140,9 +140,7 @@ def generate(generate_if_exists: bool, copy: bool):
             )
             slt_file.write("----\n")
             if v_x in delete_x_all:
-                slt_file.write(
-                    f"[{to_result_embedding(delete_nearest_all[v_x])}]\n"
-                )
+                slt_file.write(f"[{to_result_embedding(delete_nearest_all[v_x])}]\n")
             else:
                 slt_file.write(f"[{to_result_embedding(v_x)}]\n")
             slt_file.write("\n")

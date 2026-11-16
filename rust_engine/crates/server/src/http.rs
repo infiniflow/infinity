@@ -2072,20 +2072,21 @@ pub async fn route(
                         .collect()
                 })
                 .unwrap_or_else(|| vec!["*".into()]);
-            let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
-            // The inner SELECT is built as an AST and then wrapped, so a
-            // `filter` the client sent is parsed once as a predicate.
-            let inner = match docs_select(
-                &Json::Obj(vec![
-                    (
-                        "output".into(),
-                        Json::Arr(output.into_iter().map(Json::Str).collect()),
-                    ),
-                    ("filter".into(), Json::Str(filter.to_string())),
-                ]),
-                &db,
-                &table,
-            ) {
+            // The inner SELECT is built from the request the client sent, so
+            // every clause explain can forward -- search, group_by, having,
+            // sort, limit, offset -- reaches the plan. Passing only `output`
+            // and `filter` silently explained a plain table scan, so a
+            // match_dense query explained without its KNN SCAN operator.
+            let mut inner_body = match doc {
+                Json::Obj(entries) => entries.clone(),
+                _ => Vec::new(),
+            };
+            inner_body.retain(|(k, _)| k != "output" && k != "explain_type");
+            inner_body.push((
+                "output".into(),
+                Json::Arr(output.into_iter().map(Json::Str).collect()),
+            ));
+            let inner = match docs_select(&Json::Obj(inner_body), &db, &table) {
                 Ok(s) => s,
                 Err(e) => return e,
             };
@@ -2100,24 +2101,32 @@ pub async fn route(
             match run_ast(engine, stmt, "").await {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
-                    // the SDK renders every value under its column name
-                    let mut out = String::new();
-                    if let Some(first) = rows.first() {
-                        for (i, v) in first.iter().enumerate() {
+                    // A plan is one row per line, and the SDK joins every row
+                    // under its column name, so emit them all. Sending only
+                    // rows.first() truncated the plan to its header line, which
+                    // is why a match_dense explain never showed its KNN SCAN.
+                    let mut out: Vec<String> = Vec::with_capacity(rows.len());
+                    for row in &rows {
+                        let mut entry = String::new();
+                        for (i, v) in row.iter().enumerate() {
                             let name = cols.get(i).cloned().unwrap_or_else(|| "explain".into());
                             if i > 0 {
-                                out.push(',');
+                                entry.push(',');
                             }
-                            out.push_str(&format!(
+                            entry.push_str(&format!(
                                 "{{\"{}\":\"{}\"}}",
                                 json_escape(&name),
                                 json_escape(v)
                             ));
                         }
+                        out.push(entry);
                     }
                     (
                         200,
-                        format!("{{\"error_code\":0,\"error_msg\":\"OK\",\"output\":[{out}]}}"),
+                        format!(
+                            "{{\"error_code\":0,\"error_msg\":\"OK\",\"output\":[{}]}}",
+                            out.join(",")
+                        ),
                     )
                 }
                 Err(e) => e,

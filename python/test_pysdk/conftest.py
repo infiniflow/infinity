@@ -30,6 +30,7 @@ def pytest_configure():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+
 current_path = os.path.abspath(os.path.dirname(__file__))
 parent = os.path.join(os.getcwd(), os.pardir)
 pparent = os.path.join(parent, os.pardir)
@@ -39,14 +40,16 @@ pparent = os.path.join(parent, os.pardir)
 def connect_infinity():
     return infinity.connect(common_values.TEST_LOCAL_HOST)
 
+
 @pytest.fixture(scope="function")
 def disconnect_infinity():
     res = ThriftInfinityClient(common_values.TEST_LOCAL_HOST).disconnect()
     assert res.error_code == ErrorCode.OK
 
+
 @pytest.fixture(scope="function")
 def get_infinity_db_param(request):
-    uri = request.param if hasattr(request, 'param') else common_values.TEST_LOCAL_HOST
+    uri = request.param if hasattr(request, "param") else common_values.TEST_LOCAL_HOST
     # connect
     infinity_obj = infinity.connect(uri)
 
@@ -55,6 +58,7 @@ def get_infinity_db_param(request):
     # disconnect
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
+
 
 @pytest.fixture(scope="function")
 def get_infinity_db(request):
@@ -71,26 +75,33 @@ def get_infinity_db(request):
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
 
+
 @pytest.fixture(scope="function")
 def skip_if_local_infinity(request):
     if request.config.getoption("--local-infinity"):
         pytest.skip("Skipping local-infinity test")
-    
+
+
 @pytest.fixture(scope="function")
 def skip_if_remote_infinity(request):
-    if not request.config.getoption("--local-infinity") and not request.config.getoption("--http"):
+    if not request.config.getoption(
+        "--local-infinity"
+    ) and not request.config.getoption("--http"):
         pytest.skip("Skipping remote-infinity test")
+
 
 @pytest.fixture(scope="function")
 def skip_if_http(request):
     if request.config.getoption("--http"):
         pytest.skip("Skipping http test")
 
+
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
     connection_pool = ConnectionPool(common_values.TEST_LOCAL_HOST)
     yield connection_pool
     connection_pool.destroy()
+
 
 @pytest.fixture(scope="class")
 def check_data(request):
@@ -104,22 +115,26 @@ def check_data(request):
         return False
     return True
 
+
 def disable_items_with_mark(items, mark, reason):
     skipper = pytest.mark.skip(reason=reason)
     for item in items:
         if mark in item.keywords:
             item.add_marker(skipper)
 
+
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
+
 
 @pytest.fixture(scope="class")
 def suffix(request):
     if request.config.getoption("--http"):
         return "_http"
-    else :
+    else:
         return "_remote"
+
 
 def pytest_addoption(parser):
     parser.addoption(

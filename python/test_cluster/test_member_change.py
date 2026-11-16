@@ -14,18 +14,18 @@ from util import RtnThread
 
 
 # FIXME: when running multiple times without clear_instance, this test case will fail.
-def test_cluster_leader_follower_change(cluster : InfinityCluster):
-    '''
+def test_cluster_leader_follower_change(cluster: InfinityCluster):
+    """
     n1 : leader
     n2 : follower
     n1 does operations
-    
+
     n1 -> admin
     n2 -> leader
     n1 -> follower
 
     n2 does operations
-    '''
+    """
     with cluster:
         cluster.add_node("node1", "conf/leader.toml")
         cluster.add_node("node2", "conf/follower.toml")
@@ -37,14 +37,14 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         leader_state = instance_state(node1_client)
 
         res = node1_client.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         res = node1_client.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
 
         do_some_operations_cluster(node1_client, [node2_client], leader_state)
 
@@ -53,14 +53,14 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         cluster.set_follower("node1")
 
         res = node1_client.show_node("node1")
-        assert (res.node_name == "node1")
-        assert (res.node_role == "follower")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node1"
+        assert res.node_role == "follower"
+        assert res.node_status == "alive"
 
         res = node1_client.show_node("node2")
-        assert (res.node_name == "node2")
-        assert (res.node_role == "leader")
-        assert (res.node_status == "alive")
+        assert res.node_name == "node2"
+        assert res.node_role == "leader"
+        assert res.node_status == "alive"
 
         do_some_operations_cluster(node2_client, [node1_client], leader_state)
 
@@ -71,7 +71,9 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
 
 @pytest.mark.parametrize("kill", [False, True])
 @pytest.mark.parametrize("leader_shutdown", [False])
-def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, leader_shutdown: bool):
+def test_cluster_shutdown_and_recover(
+    cluster: InfinityCluster, kill: bool, leader_shutdown: bool
+):
     with cluster:
         logger = cluster.logger
 
@@ -138,7 +140,13 @@ def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, lead
                     else:
                         insert_line += 1
 
-            t1 = RtnThread(target=shutdown_leader, args=(insert_time_in_sec, leader_shutdown,))
+            t1 = RtnThread(
+                target=shutdown_leader,
+                args=(
+                    insert_time_in_sec,
+                    leader_shutdown,
+                ),
+            )
             t1.start()
             insert_data()
             t1.join()
@@ -160,7 +168,9 @@ def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, lead
                 cluster.set_leader(follower_name)
                 # restart leader as follower
                 follower_config = (
-                    "conf/leader.toml" if leader_name == "node1" else "conf/follower.toml"
+                    "conf/leader.toml"
+                    if leader_name == "node1"
+                    else "conf/follower.toml"
                 )
                 cluster.add_node(leader_name, follower_config)
                 cluster.set_follower(leader_name)

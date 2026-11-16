@@ -18,11 +18,18 @@ import :buffer_handle;
 import :buffer_handle;
 import :buffer_obj;
 import :file_worker_type;
+import :logger;
+
+import std;
 
 namespace infinity {
 BufferHandle::BufferHandle(BufferObj *buffer_obj, void *data) : buffer_obj_(buffer_obj), data_(data) {}
 
-BufferHandle::BufferHandle(const BufferHandle &other) : buffer_obj_(other.buffer_obj_), data_(other.data_) { buffer_obj_->LoadInner(); }
+BufferHandle::BufferHandle(const BufferHandle &other) : buffer_obj_(other.buffer_obj_), data_(other.data_) {
+    if (buffer_obj_) {
+        buffer_obj_->LoadInner();
+    }
+}
 
 BufferHandle &BufferHandle::operator=(const BufferHandle &other) {
     if (buffer_obj_) {
@@ -30,7 +37,9 @@ BufferHandle &BufferHandle::operator=(const BufferHandle &other) {
     }
     buffer_obj_ = other.buffer_obj_;
     data_ = other.data_;
-    buffer_obj_->LoadInner();
+    if (buffer_obj_) {
+        buffer_obj_->LoadInner();
+    }
     return *this;
 }
 
@@ -52,7 +61,13 @@ BufferHandle &BufferHandle::operator=(BufferHandle &&other) {
 
 BufferHandle::~BufferHandle() {
     if (buffer_obj_) {
-        buffer_obj_->UnloadInner();
+        try {
+            buffer_obj_->UnloadInner();
+        } catch (const std::exception &e) {
+            // A destructor is implicitly noexcept: an exception escaping here would call
+            // std::terminate and bypass every handler above, taking down the whole server.
+            LOG_CRITICAL(e.what());
+        }
     }
     buffer_obj_ = nullptr;
     data_ = nullptr;

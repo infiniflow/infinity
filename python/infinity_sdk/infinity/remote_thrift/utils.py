@@ -263,7 +263,8 @@ def _parse_like(like_node, escape_char=None):
     # sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True instead
     # of wrapping it in a Not node, so the negation must be read off the node.
     function_expr.function_name = binary_exp_to_paser_exp(
-        'notlike' if like_node.args.get('negate') else 'like')
+        "notlike" if like_node.args.get("negate") else "like"
+    )
 
     left_expr = parse_expr(like_node.args["this"])
     pattern_expr = parse_expr(like_node.args["expression"])
@@ -296,11 +297,18 @@ def _parse_not_like(like_node, escape_char=None):
 
 
 def _json_operator_path(path):
-    """Convert supported SQLGlot JSON paths to the server's dot/index syntax."""
+    """Convert supported SQLGlot JSON paths to the server's dot/index syntax.
+
+    A string literal is already the path the caller wrote, so it passes
+    through untouched: ``json_extract(c3, '$.2')`` names a numeric key, which
+    refuses the ``$.`` rewrite below but is a legal server path. Only the
+    ``->`` / ``->>`` operators, where SQLGlot has parsed the key into a
+    JSONPath, go through the key-by-key rewrite.
+    """
     if isinstance(path, exp.Literal) and path.is_string:
         key = path.this
-        if key and not any(char in key for char in ".[]"):
-            return "$." + key
+        if key:
+            return key if key.startswith("$") else "$." + key
     elif isinstance(path, exp.JSONPath):
         result = ""
         for part in path.expressions:
@@ -308,17 +316,27 @@ def _json_operator_path(path):
                 result += "$"
             elif isinstance(part, exp.JSONPathKey):
                 key = part.this
-                if not isinstance(key, str) or not key or any(char in key for char in ".[]"):
+                if (
+                    not isinstance(key, str)
+                    or not key
+                    or any(char in key for char in ".[]")
+                ):
                     break
                 result += "." + key
-            elif isinstance(part, exp.JSONPathSubscript) and type(part.this) is int and part.this >= 0:
+            elif (
+                isinstance(part, exp.JSONPathSubscript)
+                and type(part.this) is int
+                and part.this >= 0
+            ):
                 result += f"[{part.this}]"
             else:
                 break
         else:
             if result.startswith("$"):
                 return result
-    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path")
+    raise InfinityException(
+        ErrorCode.INVALID_EXPRESSION, "Unsupported JSON operator path"
+    )
 
 
 def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
@@ -396,15 +414,24 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         # JSONPath node; the server functions take the path as a string.
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = (
-            'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
+            "json_extract_string"
+            if isinstance(cons, exp.JSONExtractScalar)
+            else "json_extract"
+        )
 
-        path_sql = _json_operator_path(cons.args['expression'])
-        json_source = cons.args['this']
-        while isinstance(json_source, exp.JSONExtract) and not isinstance(json_source, exp.JSONExtractScalar):
-            path_sql = _json_operator_path(json_source.args['expression']) + path_sql[1:]
-            json_source = json_source.args['this']
+        path_sql = _json_operator_path(cons.args["expression"])
+        json_source = cons.args["this"]
+        while isinstance(json_source, exp.JSONExtract) and not isinstance(
+            json_source, exp.JSONExtractScalar
+        ):
+            path_sql = (
+                _json_operator_path(json_source.args["expression"]) + path_sql[1:]
+            )
+            json_source = json_source.args["this"]
         if isinstance(json_source, exp.JSONExtractScalar):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Cannot extract JSON from a scalar result")
+            raise InfinityException(
+                ErrorCode.INVALID_EXPRESSION, "Cannot extract JSON from a scalar result"
+            )
         json_expr = parse_expr(json_source)
         path_expr = ttypes.ParsedExpr()
         path_constant = ttypes.ConstantExpr()
@@ -677,11 +704,18 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         # handled by the exp.Not arm above, which recurses into this one);
         # BETWEEN SYMMETRIC accepts the bounds in either order
         def within(low, high):
-            return exp.And(this=exp.GTE(this=cons.this.copy(), expression=low.copy()),
-                           expression=exp.LTE(this=cons.this.copy(), expression=high.copy()))
+            return exp.And(
+                this=exp.GTE(this=cons.this.copy(), expression=low.copy()),
+                expression=exp.LTE(this=cons.this.copy(), expression=high.copy()),
+            )
+
         if cons.args.get("symmetric"):
-            return traverse_conditions(exp.Or(this=within(cons.args["low"], cons.args["high"]),
-                                              expression=within(cons.args["high"], cons.args["low"])))
+            return traverse_conditions(
+                exp.Or(
+                    this=within(cons.args["low"], cons.args["high"]),
+                    expression=within(cons.args["high"], cons.args["low"]),
+                )
+            )
         return traverse_conditions(within(cons.args["low"], cons.args["high"]))
     elif isinstance(cons, exp.In):
         left_operand = parse_expr(cons.args["this"])
@@ -719,7 +753,9 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
         return parsed_expr
     else:
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {cons}")
+        raise InfinityException(
+            ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {cons}"
+        )
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:
@@ -879,7 +915,10 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 i64_tensor_array_value=value,
             )
         case [[[_, *_], *_], *_] if all(
-            isinstance(x, (int, float)) for row in value for tensor in row for x in tensor
+            isinstance(x, (int, float))
+            for row in value
+            for tensor in row
+            for x in tensor
         ):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.DoubleTensorArray,
@@ -903,6 +942,27 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 i64_array_idx=indices,
                 f64_array_value=[float(v) for v in values],
             )
+        case dict() if value and all(
+            str(index).isdigit() and isinstance(v, (int, float))
+            for index, v in value.items()
+        ):
+            # A sparse vector may also be written as {index: value}, which is
+            # the form it comes back in from a query; accept it on the way in
+            # too instead of rejecting the SDK's own output.
+            indices = [int(index) for index in value]
+            values = list(value.values())
+            if all(isinstance(v, int) for v in values):
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseIntegerArray,
+                    i64_array_idx=indices,
+                    i64_array_value=values,
+                )
+            else:
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseDoubleArray,
+                    i64_array_idx=indices,
+                    f64_array_value=[float(v) for v in values],
+                )
         case Array():
             children_list = [
                 get_remote_constant_expr_from_python_value(child)

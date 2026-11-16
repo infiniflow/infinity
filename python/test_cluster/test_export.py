@@ -8,13 +8,15 @@ from infinity_cluster import InfinityCluster
 
 
 def count_lines(file_path: str):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         lines = file.readlines()
     return len(lines)
+
 
 def delete_file(file_path: str):
     if os.path.exists(file_path):
         os.remove(file_path)
+
 
 class TestExport:
     def test_export_csv(self, cluster: InfinityCluster):
@@ -39,11 +41,26 @@ class TestExport:
                 os.makedirs(common_values.TEST_TMP_DIR)
 
             db_obj.drop_table("test_export_csv", ConflictType.Ignore)
-            table_obj = db_obj.create_table("test_export_csv", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
-            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
+            table_obj = db_obj.create_table(
+                "test_export_csv",
+                {
+                    "doctitle": {"type": "varchar"},
+                    "docdate": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                    "num": {"type": "integer"},
+                    "vec": {"type": "vector, 4, float"},
+                },
+            )
+            res = table_obj.import_data(
+                test_csv_dir, import_options={"file_type": "csv", "delimiter": "\t"}
+            )
             assert res.error_code == ErrorCode.OK
-            test_export_csv_file_path = common_values.TEST_TMP_DIR + "leader_" +"test_export_csv.csv"
-            res = table_obj.export_data(test_export_csv_file_path, {"file_type": "csv", "delimiter" : "\t"})
+            test_export_csv_file_path = (
+                common_values.TEST_TMP_DIR + "leader_" + "test_export_csv.csv"
+            )
+            res = table_obj.export_data(
+                test_export_csv_file_path, {"file_type": "csv", "delimiter": "\t"}
+            )
             assert res.error_code == ErrorCode.OK
             assert count_lines(test_export_csv_file_path) == 9999
             delete_file(test_export_csv_file_path)
@@ -51,8 +68,12 @@ class TestExport:
             time.sleep(1)
             db_obj_2 = infinity2.get_database("default_db")
             table_obj_2 = db_obj_2.get_table("test_export_csv")
-            test_export_csv_file_path = common_values.TEST_TMP_DIR + "follower_" +"test_export_csv.csv"
-            res = table_obj_2.export_data(test_export_csv_file_path, {"file_type": "csv", "delimiter" : "\t"})
+            test_export_csv_file_path = (
+                common_values.TEST_TMP_DIR + "follower_" + "test_export_csv.csv"
+            )
+            res = table_obj_2.export_data(
+                test_export_csv_file_path, {"file_type": "csv", "delimiter": "\t"}
+            )
             assert res.error_code == ErrorCode.OK
             assert count_lines(test_export_csv_file_path) == 9999
             delete_file(test_export_csv_file_path)

@@ -65,14 +65,20 @@ def test_condition_like_function_names():
     }
     for cond_str, expected_func in cases.items():
         from infinity.remote_thrift.utils import traverse_conditions as remote_traverse
+
         res = remote_traverse(condition(cond_str))
         function = res.type.function_expr
         assert function.arguments[0].type.column_expr.column_name == ["c1"]
         assert function.arguments[1].type.constant_expr.str_value == "%test%"
         assert len(function.arguments) == 3
-        assert function.arguments[2].type.constant_expr.str_value == ("!" if "ESCAPE" in cond_str else "\\")
+        assert function.arguments[2].type.constant_expr.str_value == (
+            "!" if "ESCAPE" in cond_str else "\\"
+        )
         func_name = function.function_name
-        assert func_name == expected_func, f"{cond_str}: got {func_name}, want {expected_func}"
+        assert func_name == expected_func, (
+            f"{cond_str}: got {func_name}, want {expected_func}"
+        )
+
 
 def test_condition_json_operators():
     # -> and ->> must map to the json_extract / json_extract_string
@@ -86,9 +92,14 @@ def test_condition_json_operators():
         res = traverse_conditions(condition(cond_str))
         args = res.type.function_expr.arguments
         inner = args[0].type.function_expr
-        assert inner.function_name == expected_func, f"{cond_str}: got {inner.function_name}"
+        assert inner.function_name == expected_func, (
+            f"{cond_str}: got {inner.function_name}"
+        )
         path_const = inner.arguments[1].type.constant_expr
-        assert path_const.str_value == "$.a", f"{cond_str}: got path {path_const.str_value}"
+        assert path_const.str_value == "$.a", (
+            f"{cond_str}: got path {path_const.str_value}"
+        )
+
 
 def test_json_operators_embedded(request):
     # embedded SDK output traversal must support the JSON operators too
@@ -96,43 +107,76 @@ def test_json_operators_embedded(request):
         pytest.skip("embedded-only regression test")
     from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
     from sqlglot import parse_one
+
     for output_str, expected_func in [
         ("c3->'a'", "json_extract"),
         ("c3->>'a'", "json_extract_string"),
         ("c3->'a'->>'b'", "json_extract_string"),
     ]:
         res = embedded_parse_expr(parse_one(output_str))
-        assert res.function_expr.func_name == expected_func, f"{output_str}: got {res.function_expr.func_name}"
-        assert res.function_expr.arguments[1].constant_expr.str_value.endswith("b" if output_str.endswith("b'") else "a")
+        assert res.function_expr.func_name == expected_func, (
+            f"{output_str}: got {res.function_expr.func_name}"
+        )
+        assert res.function_expr.arguments[1].constant_expr.str_value.endswith(
+            "b" if output_str.endswith("b'") else "a"
+        )
 
 
 @pytest.mark.parametrize("sdk", ["embedded", "thrift"])
 @pytest.mark.parametrize("operator", ["->", "->>"])
-@pytest.mark.parametrize("key, expected", [
-    ("a", "$.a"),
-    ("O''Brien", "$.O'Brien"),
-    ("a b", "$.a b"),
-    ("$.a[0]", "$.a[0]"),
-])
+@pytest.mark.parametrize(
+    "key, expected",
+    [
+        ("a", "$.a"),
+        ("O'Brien", "$.O'Brien"),
+        ("a b", "$.a b"),
+        ("$.a[0]", "$.a[0]"),
+    ],
+)
 def test_json_operator_paths(sdk, operator, key, expected, request):
-    """Both SDKs pass decoded, server-compatible paths to JSON functions."""
-    from sqlglot import parse_one
+    """Both SDKs pass decoded, server-compatible paths to JSON functions.
+
+    The right-hand side is built from the expression API instead of parsing
+    ``c3->'key'``. sqlglot 28.1.0 renders a key holding an apostrophe as
+    ``'O''Brien'`` but cannot tokenize that form back, so building the test
+    through SQL text makes it fail on the tokenizer before it reaches the
+    path conversion this test is about. A key that is already a JSON path
+    gets a ``JSONPath`` node, as the parser would produce for it; every other
+    key is a plain ``JSONPathKey``.
+    """
+    import sqlglot.expressions as exp
+
+    path_expressions = [exp.JSONPathRoot()]
+    if "[" in key:
+        name, _, index = key.partition("[")
+        if name not in ("", "$"):
+            path_expressions.append(exp.JSONPathKey(this=name.removeprefix("$.")))
+        path_expressions.append(exp.JSONPathSubscript(this=int(index.rstrip("]"))))
+    else:
+        path_expressions.append(exp.JSONPathKey(this=key))
+
+    node = (exp.JSONExtractScalar if operator == "->>" else exp.JSONExtract)(
+        this=exp.column("c3"),
+        expression=exp.JSONPath(expressions=path_expressions),
+    )
 
     if sdk == "embedded" and not request.config.getoption("--local-infinity"):
         pytest.skip("embedded-only regression test")
     if sdk == "embedded":
         from infinity_embedded.local_infinity.utils import parse_expr
-        function = parse_expr(parse_one(f"c3{operator}'{key}'")).function_expr
-        path = function.arguments[1].constant_expr.str_value
+
+        function = parse_expr(node).function_expr
+        path_value = function.arguments[1].constant_expr.str_value
         assert function.arguments[0].column_expr.names == ["c3"]
         name = function.func_name
     else:
         from infinity.remote_thrift.utils import parse_expr
-        function = parse_expr(parse_one(f"c3{operator}'{key}'")).type.function_expr
-        path = function.arguments[1].type.constant_expr.str_value
+
+        function = parse_expr(node).type.function_expr
+        path_value = function.arguments[1].type.constant_expr.str_value
         assert function.arguments[0].type.column_expr.column_name == ["c3"]
         name = function.function_name
-    assert path == expected
+    assert path_value == expected
     assert name == ("json_extract_string" if operator == "->>" else "json_extract")
 
 
@@ -140,6 +184,7 @@ def test_json_operator_paths(sdk, operator, key, expected, request):
 def test_json_operator_rejects_unrepresentable_key(sdk, request):
     """A literal dotted key must not silently become two server path keys."""
     import sqlglot.expressions as exp
+
     if sdk == "embedded" and not request.config.getoption("--local-infinity"):
         pytest.skip("embedded-only regression test")
     if sdk == "embedded":
@@ -158,19 +203,23 @@ def test_json_operator_rejects_unrepresentable_key(sdk, request):
 def test_json_operator_chain_uses_one_extraction(sdk, operator, request):
     """A chain must not pass VARCHAR from json_extract to another extractor."""
     from sqlglot import parse_one
+
     if sdk == "embedded" and not request.config.getoption("--local-infinity"):
         pytest.skip("embedded-only regression test")
     node = parse_one(f"c3->'a'{operator}'b[0]'")
     if sdk == "embedded":
         from infinity_embedded.local_infinity.utils import parse_expr
+
         function = parse_expr(node).function_expr
         assert function.arguments[0].column_expr.names == ["c3"]
         assert function.arguments[1].constant_expr.str_value == "$.a.b[0]"
     else:
         from infinity.remote_thrift.utils import parse_expr
+
         function = parse_expr(node).type.function_expr
         assert function.arguments[0].type.column_expr.column_name == ["c3"]
         assert function.arguments[1].type.constant_expr.str_value == "$.a.b[0]"
+
     def test_remote_constant_expr_mixed_numeric_lists(self):
         # Regression test (thrift SDK): constant-expression and match_sparse
         # type dispatch looked at the first element only, so a mixed
@@ -179,7 +228,9 @@ def test_json_operator_chain_uses_one_extraction(sdk, operator, request):
         # SparseVector([1, 2], [5, 0.5]) became a sparse integer array.
         from infinity.common import SparseVector
         from infinity.remote_thrift.infinity_thrift_rpc import ttypes
-        from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
+        from infinity.remote_thrift.utils import (
+            get_remote_constant_expr_from_python_value,
+        )
 
         L = ttypes.LiteralType
         res = get_remote_constant_expr_from_python_value([1, 2.5])

@@ -54,7 +54,9 @@ class TestInsertImport:
         logger = infinity_runner.logger
         write_i = 0
 
-        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
+        decorator = infinity_runner_decorator_factory(
+            config, uri, infinity_runner, shutdown_out=True
+        )
 
         def insert_import_func(table_obj):
             nonlocal cur_n, last_n, insert_finish, shutdown, error, write_i
@@ -84,13 +86,17 @@ class TestInsertImport:
                         else:
                             cur_n = total_n
                         cur_n += insert_batch_size
-                        logger.debug(f"insert NO {write_i}. insert {insert_batch_size} data, cur_n: {cur_n} / {total_n}")
+                        logger.debug(
+                            f"insert NO {write_i}. insert {insert_batch_size} data, cur_n: {cur_n} / {total_n}"
+                        )
                     else:
                         abs_import_file = os.path.abspath(import_file)
                         last_n = import_size
                         table_obj.import_data(abs_import_file, import_options)
                         cur_n += import_size
-                        logger.debug(f"import NO {write_i}. import {import_size} data, cur_n: {cur_n} / {total_n}")
+                        logger.debug(
+                            f"import NO {write_i}. import {import_size} data, cur_n: {cur_n} / {total_n}"
+                        )
                     write_i += 1
                 except Exception as e:
                     logger.debug(f"insert/import {if_import} error at {cur_n}")
@@ -231,7 +237,9 @@ class TestInsertImport:
             (
                 EnwikiGenerator.columns(),
                 EnwikiGenerator.index(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory(
+                    "test/data/benchmark/enwiki/enwiki-10w.csv"
+                ),
                 "test/data/csv/enwiki_99.csv",
                 99,
                 {"file_type": "csv", "delimiter": "\t"},

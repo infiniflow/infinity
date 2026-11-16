@@ -19,7 +19,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = "")
         # "--capture=tee-sys",
         "--tb=short",
         test_case,
-        #"-v",
+        # "-v",
         "-x",
         "-m",
         pytest_mark,
@@ -65,7 +65,6 @@ if __name__ == "__main__":
         test_case = f"{python_test_dir}/test_pysdk/{args.test_case}"
     else:
         test_case = f"{python_test_dir}/test_pysdk"
-
 
     print("Start Python SDK testing...")
     start = time.time()

@@ -8,7 +8,7 @@ commands = [
     "python3 tools/run_pysdk_remote_infinity_test.py --pytest_mark='not complex'",
     "python3 tools/run_parallel_test.py --pytest_mark='not complex'",
     "python3 tools/run_http_api.py --pytest_mark='not complex'",
-    "python3 tools/sqllogictest.py"
+    "python3 tools/sqllogictest.py",
 ]
 
 LOG_PATH = "/var/infinity/log/infinity.log"
@@ -32,7 +32,9 @@ if __name__ == "__main__":
                 for fut in futures.as_completed(futs):
                     try:
                         command, elapsed_time, stdout, stderr = fut.result()
-                        print(f"Command '{command}' executed in {elapsed_time:.2f} seconds")
+                        print(
+                            f"Command '{command}' executed in {elapsed_time:.2f} seconds"
+                        )
                         print(f"Command '{command}' output:\n{stdout}")
                         if stderr:
                             print(f"Command '{command}' error:\n{stderr}")

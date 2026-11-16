@@ -20,47 +20,63 @@ class TestDatabase:
 
             db_count = 100
             for i in range(db_count):
-                print('drop test_cluster_db_name' + str(i))
-                infinity1.drop_database('test_cluster_db_name' + str(i), ConflictType.Ignore)
+                print("drop test_cluster_db_name" + str(i))
+                infinity1.drop_database(
+                    "test_cluster_db_name" + str(i), ConflictType.Ignore
+                )
             for i in range(db_count):
-                print('create test_cluster_db_name' + str(i))
-                infinity1.create_database('test_cluster_db_name' + str(i))
+                print("create test_cluster_db_name" + str(i))
+                infinity1.create_database("test_cluster_db_name" + str(i))
 
             time.sleep(1)
             dbs = infinity1.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                print('db name: ' + db_name)
-                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                print("db name: " + db_name)
+                if (
+                    db_name.startswith("test_cluster_db_name")
+                    or db_name == "default_db"
+                ):
                     res_dbs.append(db_name)
             assert len(res_dbs) == (db_count + 1)
 
             dbs = infinity2.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                print('db name: ' + db_name)
-                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                print("db name: " + db_name)
+                if (
+                    db_name.startswith("test_cluster_db_name")
+                    or db_name == "default_db"
+                ):
                     res_dbs.append(db_name)
             assert len(res_dbs) == (db_count + 1)
 
             for i in range(db_count):
-                print('drop test_cluster_db_name' + str(i))
-                infinity1.drop_database('test_cluster_db_name' + str(i), ConflictType.Ignore)
+                print("drop test_cluster_db_name" + str(i))
+                infinity1.drop_database(
+                    "test_cluster_db_name" + str(i), ConflictType.Ignore
+                )
 
             time.sleep(1)
             dbs = infinity1.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                print('db name: ' + db_name)
-                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                print("db name: " + db_name)
+                if (
+                    db_name.startswith("test_cluster_db_name")
+                    or db_name == "default_db"
+                ):
                     res_dbs.append(db_name)
             assert len(res_dbs) == (1)
 
             dbs = infinity2.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                print('db name: ' + db_name)
-                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                print("db name: " + db_name)
+                if (
+                    db_name.startswith("test_cluster_db_name")
+                    or db_name == "default_db"
+                ):
                     res_dbs.append(db_name)
             assert len(res_dbs) == (1)
 
@@ -81,4 +97,4 @@ class TestDatabase:
                 infinity2.create_database("test_cluster_follower_db")
             except InfinityException as e:
                 print(e)
-                assert(e.error_code == 8007)
+                assert e.error_code == 8007

@@ -45,6 +45,7 @@ def csr_read_all(filename: str) -> SparseMatrix:
             data.append(struct.unpack("f", f.read(4))[0])
     return SparseMatrix(nrow, ncol, nnz, indptr, indices, data)
 
+
 def import_data(
     data_set: str,
     block_size: int,
@@ -72,7 +73,7 @@ def import_data(
 
     if client.collection_exists("splade_benchmark_collection"):
         client.delete_collection("splade_benchmark_collection")
-    #print(client.collection_exists("splade_benchmark_collection"))
+    # print(client.collection_exists("splade_benchmark_collection"))
 
     client.create_collection(
         collection_name="splade_benchmark_collection",
@@ -82,7 +83,7 @@ def import_data(
         },
         on_disk_payload=True,
     )
-    #print(client.collection_exists("splade_benchmark_collection"))
+    # print(client.collection_exists("splade_benchmark_collection"))
 
     assert os.path.exists(import_path)
     start = time.time()
@@ -101,16 +102,14 @@ def import_data(
             points.clear()
             print(data_id)
         else:
-            points.append(models.PointStruct(
-                        id=data_id,
-                        payload={},  # Add any additional payload if necessary
-                        vector={
-                            "text": models.SparseVector(
-                                indices=indices,
-                                values=values
-                            )
-                        },
-                    )
+            points.append(
+                models.PointStruct(
+                    id=data_id,
+                    payload={},  # Add any additional payload if necessary
+                    vector={
+                        "text": models.SparseVector(indices=indices, values=values)
+                    },
+                )
             )
 
     end = time.time()

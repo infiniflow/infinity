@@ -14,6 +14,8 @@ from common import common_values
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
+
+
 @pytest.fixture(scope="class")
 def setup_class(request, http):
     if http:
@@ -26,6 +28,7 @@ def setup_class(request, http):
     yield
     request.cls.infinity_obj.disconnect()
 
+
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
@@ -33,17 +36,28 @@ class TestInfinity:
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize(
+        "check_data",
+        [
+            {
+                "file_name": "embedding_int_dim3.csv",
+                "data_dir": common_values.TEST_TMP_DIR,
+            }
+        ],
+        indirect=True,
+    )
     def test_compact(self, check_data, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         assert db_obj
 
         if not check_data:
             copy_data("embedding_int_dim3.csv")
-        db_obj.drop_table("test_compact"+suffix, ConflictType.Ignore)
+        db_obj.drop_table("test_compact" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_compact"+suffix, {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+            "test_compact" + suffix,
+            {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+            ConflictType.Error,
+        )
 
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
@@ -81,5 +95,5 @@ class TestInfinity:
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 12
 
-        res = db_obj.drop_table("test_compact"+suffix, ConflictType.Error)
+        res = db_obj.drop_table("test_compact" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

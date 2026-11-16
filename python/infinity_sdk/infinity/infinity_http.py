@@ -62,7 +62,7 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     if not cast_expr.lower().startswith("cast("):
         return None
 
-    match = re.search(r'\bAS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
+    match = re.search(r"\bAS\s+(\w+)\s*\)$", cast_expr, re.IGNORECASE)
     if not match:
         return None
 
@@ -1328,7 +1328,11 @@ class table_http_result:
                     is_varchar = declared_type.lower() == "varchar"
                 if v is None or isinstance(v, (int, float)) or is_varchar:
                     new_tup = tup + (v,)
-                elif is_bit_embedding_type(col_types.get(col_name)) and v.startswith("[") and v.endswith("]"):
+                elif (
+                    is_bit_embedding_type(col_types.get(col_name))
+                    and v.startswith("[")
+                    and v.endswith("]")
+                ):
                     # "[01000000]" is a bit string, not a number; keep it like the thrift client does
                     new_tup = tup + ([v[1:-1]],)
                 elif is_list(v) and not is_json_function(col_name):
@@ -1355,11 +1359,13 @@ class table_http_result:
                     else:
                         coerce_bool = col_type.lower() in ("bool", "boolean")
                     if coerce_bool:
-                        if v.lower() == 'true':
+                        if v.lower() == "true":
                             v = True
-                        elif v.lower() == 'false':
+                        elif v.lower() == "false":
                             v = False
-                        elif v.lower() == 'none':  # Convert string "None" to Python None
+                        elif (
+                            v.lower() == "none"
+                        ):  # Convert string "None" to Python None
                             v = None
                     new_tup = tup + (v,)
                 df_dict[col_name] = new_tup

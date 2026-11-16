@@ -28,7 +28,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -37,11 +39,14 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+    )
 
     # Insert 3 rows of data into the 'my_table'
     table_instance.insert(
@@ -92,7 +97,11 @@ try:
     # Create index on varchar column for full-text search and multiple way fusion.
     res = table_instance.create_index(
         "my_index",
-        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText, {"ANALYZER": "chinese"}), infinity.common.ConflictType.Error)
+        infinity.index.IndexInfo(
+            "body", infinity.index.IndexType.FullText, {"ANALYZER": "chinese"}
+        ),
+        infinity.common.ConflictType.Error,
+    )
 
     questions = [
         r"芯片",  # single term
@@ -111,7 +120,12 @@ try:
         r'"Bloom filter"',  # phrase: adjacent multiple terms
     ]
     for question in questions:
-        qb_result, extra_result = table_instance.output(["num", "body", "_score"]).highlight(["body"]).match_text("body", question, 10).to_pl()
+        qb_result, extra_result = (
+            table_instance.output(["num", "body", "_score"])
+            .highlight(["body"])
+            .match_text("body", question, 10)
+            .to_pl()
+        )
         print(f"question: {question}")
         print(qb_result)
         if extra_result is not None:
@@ -119,7 +133,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

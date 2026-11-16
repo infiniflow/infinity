@@ -3,9 +3,9 @@ from infinity_cluster import InfinityCluster
 
 
 def test_admin2standalone(cluster: InfinityCluster):
-    '''
+    """
     test: admin->(standalone, operations)->admin->(standalone, operations)
-    '''
+    """
     with cluster:
         cluster.add_node("test", "conf/leader.toml")
         test_client = cluster.client("test")
@@ -16,7 +16,7 @@ def test_admin2standalone(cluster: InfinityCluster):
         assert test_client.show_current_node().node_role == "standalone"
         do_some_operations(test_client, state)
 
-        cluster.set_admin("test") 
+        cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_standalone("test")
@@ -26,10 +26,11 @@ def test_admin2standalone(cluster: InfinityCluster):
         clear_instance(state, test_client)
         cluster.remove_node("test")
 
+
 def test_standalone2admin(cluster: InfinityCluster):
-    '''
+    """
     test: (standalone, operations)->admin->(standalone, operations)->admin
-    '''
+    """
     with cluster:
         cluster.add_node("test", "conf/infinity_conf.toml")
         test_client = cluster.client("test")
@@ -50,10 +51,11 @@ def test_standalone2admin(cluster: InfinityCluster):
 
         cluster.remove_node("test")
 
+
 def test_admin2standalone2admin2leader(cluster: InfinityCluster):
-    '''
+    """
     test: admin->(standalone, operations)->admin->(leader, operations)
-    '''
+    """
     with cluster:
         cluster.add_node("test", "conf/leader.toml")
         test_client = cluster.client("test")
@@ -64,7 +66,7 @@ def test_admin2standalone2admin2leader(cluster: InfinityCluster):
         assert test_client.show_current_node().node_role == "standalone"
         do_some_operations(test_client, state)
 
-        cluster.set_admin("test") 
+        cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_leader("test")
@@ -76,10 +78,11 @@ def test_admin2standalone2admin2leader(cluster: InfinityCluster):
         clear_instance(state, test_client)
         cluster.remove_node("test")
 
+
 def test_standalone2admin2leader2admin(cluster: InfinityCluster):
-    '''
+    """
     test: (standalone, operations)->admin->(leader, operations)->admin
-    '''
+    """
     with cluster:
         cluster.add_node("test", "conf/infinity_minio_conf.toml")
         test_client = cluster.client("test")

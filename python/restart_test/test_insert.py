@@ -42,7 +42,9 @@ class TestInsert:
         shutdown = False
         error = False
 
-        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
+        decorator = infinity_runner_decorator_factory(
+            config, uri, infinity_runner, shutdown_out=True
+        )
 
         def insert_func(table_obj):
             nonlocal cur_insert_n, last_insert_n, shutdown, error
@@ -140,7 +142,9 @@ class TestInsert:
             ),
             (
                 EnwikiGenerator.columns(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory(
+                    "test/data/benchmark/enwiki/enwiki-10w.csv"
+                ),
             ),
             (
                 SiftGenerator.columns(),
@@ -171,6 +175,7 @@ class TestInsert:
         def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.create_table("test_insert", columns, ConflictType.Error)
+
         part1()
 
         self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
@@ -179,6 +184,7 @@ class TestInsert:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert", ConflictType.Error)
+
         part2()
 
     @pytest.mark.slow
@@ -195,7 +201,9 @@ class TestInsert:
             (
                 EnwikiGenerator.columns(),
                 EnwikiGenerator.index(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory(
+                    "test/data/benchmark/enwiki/enwiki-10w.csv"
+                ),
             ),
             (
                 SiftGenerator.columns(),
@@ -231,6 +239,7 @@ class TestInsert:
             table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
             for idx in indexes:
                 table_obj.create_index(f"idx_{idx.target_name}", idx)
+
         part1()
 
         self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
@@ -239,6 +248,7 @@ class TestInsert:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert", ConflictType.Error)
+
         part2()
 
     def _test_insert_checkpoint_inner(

@@ -3,7 +3,9 @@ import random
 import numpy as np
 
 
-def generate_sparse_data(row_n: int, max_dim: int, sparsity: float, max_col: int = 4096):
+def generate_sparse_data(
+    row_n: int, max_dim: int, sparsity: float, max_col: int = 4096
+):
     nnz = int(row_n * max_dim * sparsity)
     indptr = np.zeros(row_n + 1).astype(np.int64)
     while True:
@@ -25,7 +27,15 @@ def generate_sparse_data(row_n: int, max_dim: int, sparsity: float, max_col: int
         indices[start:end] = np.sort(indices[start:end])
     return indptr, indices, data
 
-def find_topk(indptr: list[int], indices: list[int], data: list[float], topk: int, qindices: list[int], qdata: list[float]):
+
+def find_topk(
+    indptr: list[int],
+    indices: list[int],
+    data: list[float],
+    topk: int,
+    qindices: list[int],
+    qdata: list[float],
+):
     row_n = len(indptr) - 1
     dist = []
     qnnz = len(qindices)

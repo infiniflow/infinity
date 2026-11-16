@@ -1,6 +1,7 @@
 def analyze(str):
     return str.split()
 
+
 def term_weight(tokens: list):
     print("=====================")
     print(tokens)

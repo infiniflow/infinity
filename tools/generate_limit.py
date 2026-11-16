@@ -17,7 +17,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(limit_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(limit_path) and os.path.exists(slt_path) and not generate_if_exists:
+    if (
+        os.path.exists(limit_path)
+        and os.path.exists(slt_path)
+        and not generate_if_exists
+    ):
         print(
             f"File {slt_path} and {limit_path} already existed exists. Skip Generating."
         )
@@ -27,9 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
         slt_file.write("\n")
         slt_file.write("statement ok\n")
-        slt_file.write(
-            f"CREATE TABLE {table_name} (c1 int, c2 int);\n"
-        )
+        slt_file.write(f"CREATE TABLE {table_name} (c1 int, c2 int);\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
@@ -39,7 +41,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
-            f"SELECT * FROM {table_name} order by c1 limit {limit} offset {offset};\n")
+            f"SELECT * FROM {table_name} order by c1 limit {limit} offset {offset};\n"
+        )
         slt_file.write("----\n")
 
         for i in range(row_n):
@@ -57,8 +60,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate limit data for test")
+    parser = argparse.ArgumentParser(description="Generate limit data for test")
 
     parser.add_argument(
         "-g",

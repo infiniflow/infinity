@@ -21,7 +21,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -30,11 +32,14 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "name": {"type": "varchar"},
-        "score": {"type": "float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "name": {"type": "varchar"},
+            "score": {"type": "float"},
+        },
+    )
 
     # Insert 10 rows of data into the 'my_table'
     table_instance.insert(
@@ -92,19 +97,25 @@ try:
         ]
     )
 
-    result = table_instance.output(["num", "name", "score"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
+    result = (
+        table_instance.output(["num", "name", "score"])
+        .filter("(score > 80.0) and (score <= 90.0)")
+        .to_pl()
+    )
     print(result)
 
     # result = table_instance.output(["num", "name", "score"]).filter("not (score > 80.0)").to_pl()
     # print(result)
 
-    result, extra_result = table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
+    result, extra_result = (
+        table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
+    )
     print(result)
     if extra_result is not None:
         print(extra_result)
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

@@ -11,11 +11,11 @@ from pymilvus import MilvusClient
 
 def fvecs_read_all(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -25,11 +25,11 @@ def fvecs_read_all(filename):
 
 def read_groundtruth(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}i', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}i", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -57,7 +57,9 @@ def read_groundtruth(filename):
     return ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100
 
 
-def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
+def calculate_recall_all(
+    ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results
+):
     correct_1 = 0.0
     correct_10 = 0.0
     correct_100 = 0.0
@@ -88,42 +90,54 @@ def trace_unhandled_exceptions(func):
         try:
             func(*args, **kwargs)
         except Exception:
-            print('Exception in ' + func.__name__)
+            print("Exception in " + func.__name__)
             traceback.print_exc()
 
     return wrapped_func
 
 
 @trace_unhandled_exceptions
-def work(queries, topk, metric_type, column_name, data_type, ef: int, remote: bool, table_name="sift_benchmark"):
+def work(
+    queries,
+    topk,
+    metric_type,
+    column_name,
+    data_type,
+    ef: int,
+    remote: bool,
+    table_name="sift_benchmark",
+):
     if remote:
-        client = MilvusClient(
-            uri="http://localhost:19530"
-        )
+        client = MilvusClient(uri="http://localhost:19530")
     client.load_collection(collection_name="sift_benchmark_collection")
     for query in queries:
         client.search(
             collection_name="sift_benchmark_collection",  # Replace with the actual name of your collection
             data=[query],
             limit=topk,  # Max. number of search results to return
-            search_params={"metric_type": "L2", "params": {"params": {"ef": str(ef)}}}  # Search parameters
+            search_params={
+                "metric_type": "L2",
+                "params": {"params": {"ef": str(ef)}},
+            },  # Search parameters
         )
     client.close()
 
 
 def fvecs_read(filename):
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 yield list(vec)
             except struct.error:
                 break
 
 
-def process_pool(threads, rounds, query_path, ef: int, limit: int, remote: bool, table_name):
+def process_pool(
+    threads, rounds, query_path, ef: int, limit: int, remote: bool, table_name
+):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -142,7 +156,19 @@ def process_pool(threads, rounds, query_path, ef: int, limit: int, remote: bool,
         p = multiprocessing.Pool(threads)
         start = time.time()
         for idx in range(threads):
-            p.apply_async(work, args=(queries[idx], limit, "l2", "col1", "float", ef, remote, table_name))
+            p.apply_async(
+                work,
+                args=(
+                    queries[idx],
+                    limit,
+                    "l2",
+                    "col1",
+                    "float",
+                    ef,
+                    remote,
+                    table_name,
+                ),
+            )
         p.close()
         p.join()
         end = time.time()
@@ -151,7 +177,7 @@ def process_pool(threads, rounds, query_path, ef: int, limit: int, remote: bool,
         results.append(f"Total Dur: {dur:.2f} s")
         results.append(f"Query Count: {total_queries_count}")
         results.append(f"QPS: {(total_queries_count / dur):.2f}")
-        dur_sum+=dur
+        dur_sum += dur
 
     dur_sum /= rounds
     results.append(f"Avg total dur: {dur_sum:.2f} s")
@@ -160,7 +186,9 @@ def process_pool(threads, rounds, query_path, ef: int, limit: int, remote: bool,
         print(result)
 
 
-def one_thread(rounds, query_path, ground_truth_path, ef: int, limit: int, remote: bool, table_name):
+def one_thread(
+    rounds, query_path, ground_truth_path, ef: int, limit: int, remote: bool, table_name
+):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -169,41 +197,45 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, limit: int, remot
     queries = fvecs_read_all(query_path)
 
     if remote:
-        client = MilvusClient(
-            uri="http://localhost:19530"
-        )
+        client = MilvusClient(uri="http://localhost:19530")
 
     client.load_collection(collection_name="sift_benchmark_collection")
 
     dur_sum = 0
     for i in range(rounds):
-
         query_results = [[] for _ in range(len(queries))]
 
         dur = 0.0
         for idx, query_vec in enumerate(queries):
-
             start = time.time()
-            #query_builder.match_dense('col1', query_vec, 'float', 'l2', 100, {'ef': str(ef)})
+            # query_builder.match_dense('col1', query_vec, 'float', 'l2', 100, {'ef': str(ef)})
             res_list = client.search(
                 collection_name="sift_benchmark_collection",
                 data=[query_vec],
                 limit=limit,  # Max. number of search results to return
-                search_params={"metric_type": "L2", "params": {"ef": str(ef)}}  # Search parameters
+                search_params={
+                    "metric_type": "L2",
+                    "params": {"ef": str(ef)},
+                },  # Search parameters
             )
             end = time.time()
 
             diff = end - start
             dur += diff
 
-
             for res in res_list[0]:
                 query_results[idx].append(res["id"])
 
-        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
+        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = (
+            read_groundtruth(ground_truth_path)
+        )
 
-        recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
-                                                               ground_truth_sets_100, query_results)
+        recall_1, recall_10, recall_100 = calculate_recall_all(
+            ground_truth_sets_1,
+            ground_truth_sets_10,
+            ground_truth_sets_100,
+            query_results,
+        )
         results.append(f"Round {i + 1}:")
         results.append(f"Total Dur: {dur:.2f} s")
         results.append(f"Query Count: {len(queries)}")
@@ -233,12 +265,22 @@ def benchmark(threads, rounds, data_set, ef: int, limit: int, remote: bool, path
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, limit, remote, "sift_benchmark")
+            process_pool(
+                threads, rounds, query_path, ef, limit, remote, "sift_benchmark"
+            )
 
         else:
             print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, limit, remote, "sift_benchmark")
+            one_thread(
+                rounds,
+                query_path,
+                ground_truth_path,
+                ef,
+                limit,
+                remote,
+                "sift_benchmark",
+            )
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
@@ -250,7 +292,15 @@ def benchmark(threads, rounds, data_set, ef: int, limit: int, remote: bool, path
         else:
             print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, limit, remote, "gist_benchmark")
+            one_thread(
+                rounds,
+                query_path,
+                ground_truth_path,
+                ef,
+                limit,
+                remote,
+                "gist_benchmark",
+            )
 
 
 def str2bool(value):
@@ -264,7 +314,7 @@ def str2bool(value):
         raise argparse.ArgumentTypeError("Boolean value expected")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     current_path = os.getcwd()
 
     parser = argparse.ArgumentParser(description="Benchmark Infinity")
@@ -287,32 +337,24 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='sift_1m',  # gist_1m
+        default="sift_1m",  # gist_1m
         dest="data_set",
     )
-    parser.add_argument(
-        "--ef",
-        type=int,
-        default=200,
-        dest="ef"
-    )
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=100,
-        dest="limit"
-    )
-    parser.add_argument(
-        "-R",
-        "--remote",
-        type=str2bool,
-        default=True,
-        dest="remote"
-    )
+    parser.add_argument("--ef", type=int, default=200, dest="ef")
+    parser.add_argument("--limit", type=int, default=100, dest="limit")
+    parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     data_dir = current_path + "/test/data/benchmark/" + parser.parse_args().data_set
     print(f"Data Dir: {data_dir}")
 
     args = parser.parse_args()
 
-    benchmark(args.threads, args.rounds, args.data_set, args.ef, args.limit, args.remote, path=data_dir)
+    benchmark(
+        args.threads,
+        args.rounds,
+        args.data_set,
+        args.ef,
+        args.limit,
+        args.remote,
+        path=data_dir,
+    )

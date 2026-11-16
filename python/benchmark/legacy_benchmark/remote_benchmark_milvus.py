@@ -9,9 +9,7 @@ from utils import csr_read_all, gt_read_all
 
 def work(remote, queries, topk, alpha, beta):
     if remote:
-        client = MilvusClient(
-            uri="http://localhost:19530"
-        )
+        client = MilvusClient(uri="http://localhost:19530")
     client.load_collection(collection_name="splade_benchmark_collection")
     for indices, values in queries:
         query_vector = []
@@ -21,9 +19,9 @@ def work(remote, queries, topk, alpha, beta):
             collection_name="splade_benchmark_collection",
             data=[query_vector],
             limit=topk,  # Max. number of search results to return
-            search_params={"metric_type": "IP", "params": {"drop_ratio_search": 0.2}}
+            search_params={"metric_type": "IP", "params": {"drop_ratio_search": 0.2}},
         )
-    #client.release_collection(collection_name="splade_benchmark_collection")
+    # client.release_collection(collection_name="splade_benchmark_collection")
     client.close()
 
 
@@ -66,9 +64,7 @@ def calculate_recall(gt, query_res):
 
 def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
     if remote:
-        client = MilvusClient(
-            uri="http://localhost:19530"
-        )
+        client = MilvusClient(uri="http://localhost:19530")
 
     query_mat = csr_read_all(query_path)
     topk, gt = gt_read_all(gt_path)
@@ -88,11 +84,14 @@ def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
                 query_vector.append((k, j))
 
             start = time.time()
-            res_list  = client.search(
+            res_list = client.search(
                 collection_name="splade_benchmark_collection",
                 data=[query_vector],
                 limit=topk,  # Max. number of search results to return
-                search_params={"metric_type": "IP", "params": {"drop_ratio_search": 0.2}}
+                search_params={
+                    "metric_type": "IP",
+                    "params": {"drop_ratio_search": 0.2},
+                },
             )
             end = time.time()
             dur += end - start
@@ -100,7 +99,7 @@ def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
             for res in res_list[0]:
                 query_results[query_id].append(res["id"])
 
-        #client.release_collection(collection_name="splade_benchmark_collection")
+        # client.release_collection(collection_name="splade_benchmark_collection")
         print(f"Round {i + 1} finished\n")
         topk1, gt = gt_read_all(gt_path)
         assert topk == topk1
@@ -116,7 +115,7 @@ def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
     results.append(f"Avg Dur: {dur_sum:.2f} s")
     results.append(f"Avg Qps: {(query_mat.nrow / dur_sum):.2f}")
 
-    #client.delete_collection("splade_benchmark_collection")
+    # client.delete_collection("splade_benchmark_collection")
 
     for res in results:
         print(res)

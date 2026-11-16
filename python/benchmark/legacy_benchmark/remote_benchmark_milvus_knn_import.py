@@ -8,11 +8,11 @@ from pymilvus import DataType, MilvusClient
 
 def fvecs_read_all(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -21,11 +21,11 @@ def fvecs_read_all(filename):
 
 
 def fvecs_read(filename):
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 yield list(vec)
             except struct.error:
@@ -33,10 +33,7 @@ def fvecs_read(filename):
 
 
 def insert_sift_1m(path):
-    client = MilvusClient(
-        uri="http://localhost:19530",
-        token="root:Milvus"
-    )
+    client = MilvusClient(uri="http://localhost:19530", token="root:Milvus")
 
     if client.has_collection(collection_name="sift_benchmark_collection"):
         client.drop_collection(collection_name="sift_benchmark_collection")
@@ -53,13 +50,13 @@ def insert_sift_1m(path):
         field_name="vector",
         index_type="HNSW",
         metric_type="L2",
-        params={"M": 16, "efConstruction": 200}
+        params={"M": 16, "efConstruction": 200},
     )
 
     client.create_collection(
         collection_name="sift_benchmark_collection",
         schema=schema,
-        index_params=index_params
+        index_params=index_params,
     )
 
     assert os.path.exists(path)
@@ -71,7 +68,7 @@ def insert_sift_1m(path):
     vectors = []
     time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
-        vectors.append({"id":idx, "vector":query_vec})
+        vectors.append({"id": idx, "vector": query_vec})
         if len(vectors) == 1000:
             client.insert(
                 collection_name="sift_benchmark_collection",
@@ -98,10 +95,7 @@ def insert_sift_1m(path):
 
 
 def insert_gist_1m(path):
-    client = MilvusClient(
-        uri="http://localhost:19530",
-        token="root:Milvus"
-    )
+    client = MilvusClient(uri="http://localhost:19530", token="root:Milvus")
 
     if client.has_collection(collection_name="sift_benchmark_collection"):
         client.drop_collection(collection_name="sift_benchmark_collection")
@@ -118,13 +112,13 @@ def insert_gist_1m(path):
         field_name="vector",
         index_type="IVF_FLAT",
         metric_type="IP",
-        #params={"nlist": 128}
+        # params={"nlist": 128}
     )
 
     client.create_collection(
         collection_name="sift_benchmark_collection",
         schema=schema,
-        index_params=index_params
+        index_params=index_params,
     )
 
     assert os.path.exists(path)
@@ -137,7 +131,7 @@ def insert_gist_1m(path):
     vectors = []
     time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
-        vectors.append({"id":idx, "vector":query_vec})
+        vectors.append({"id": idx, "vector": query_vec})
         if len(vectors) == 1000:
             client.insert(
                 collection_name="sift_benchmark_collection",
@@ -159,13 +153,15 @@ def insert_gist_1m(path):
 
 
 def insert_data(threads, data_set, path):
-    if not os.path.exists(path + "/sift_base.fvecs") and not os.path.exists(path + "/gist_base.fvecs"):
+    if not os.path.exists(path + "/sift_base.fvecs") and not os.path.exists(
+        path + "/gist_base.fvecs"
+    ):
         raise Exception("Invalid data set")
     if data_set == "sift_1m":
         data_path = path + "/sift_base.fvecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
-            #process_pool(threads, data_path, "sift_benchmark")
+            # process_pool(threads, data_path, "sift_benchmark")
         else:
             print("Single-thread")
             insert_sift_1m(data_path)
@@ -173,13 +169,13 @@ def insert_data(threads, data_set, path):
         data_path = path + "/gist_base.fvecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
-            #process_pool(threads, data_path, "gist_benchmark")
+            # process_pool(threads, data_path, "gist_benchmark")
         else:
             print("Single-thread")
             insert_gist_1m(data_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     current_path = os.getcwd()
     parent_path = os.path.dirname(current_path)
     parent_path = os.path.dirname(parent_path)
@@ -194,7 +190,7 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='sift_1m',
+        default="sift_1m",
         # default='gist_1m',
         dest="data_set",
     )
@@ -203,7 +199,7 @@ if __name__ == '__main__':
         "-t",
         "--thread",
         type=int,
-        default='1',
+        default="1",
         dest="threads",
     )
 

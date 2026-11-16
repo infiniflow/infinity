@@ -43,8 +43,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
             slt_file.write("\n")
 
             slt_file.write("statement ok\n")
-            slt_file.write(
-                f"CREATE TABLE {table_name} (c1 INTEGER);\n")
+            slt_file.write(f"CREATE TABLE {table_name} (c1 INTEGER);\n")
             slt_file.write("\n")
 
             for _ in range(import_n):
@@ -74,8 +73,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate many import for test")
+    parser = argparse.ArgumentParser(description="Generate many import for test")
 
     parser.add_argument(
         "-g",

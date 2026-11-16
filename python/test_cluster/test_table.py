@@ -21,18 +21,24 @@ class TestTable:
             db1 = infinity1.get_database("default_db")
             table_count = 100
             for i in range(table_count):
-                print('drop test_cluster_table_name' + str(i))
-                db1.drop_table('test_cluster_table_name' + str(i), ConflictType.Ignore)
+                print("drop test_cluster_table_name" + str(i))
+                db1.drop_table("test_cluster_table_name" + str(i), ConflictType.Ignore)
             for i in range(table_count):
-                print('create test_cluster_table_name' + str(i))
-                db1.create_table('test_cluster_table_name' + str(i), {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
-            ConflictType.Error)
+                print("create test_cluster_table_name" + str(i))
+                db1.create_table(
+                    "test_cluster_table_name" + str(i),
+                    {
+                        "c1": {"type": "int", "constraints": ["primary key"]},
+                        "c2": {"type": "float"},
+                    },
+                    ConflictType.Error,
+                )
 
             time.sleep(1)
             tables = db1.get_all_tables()
             res_tables = []
             for table_name in tables:
-                if table_name.startswith("test_cluster_table_name") :
+                if table_name.startswith("test_cluster_table_name"):
                     res_tables.append(table_name)
             assert len(res_tables) == (table_count)
 
@@ -40,19 +46,19 @@ class TestTable:
             tables = db2.get_all_tables()
             res_tables = []
             for table_name in tables:
-                if table_name.startswith("test_cluster_table_name") :
+                if table_name.startswith("test_cluster_table_name"):
                     res_tables.append(table_name)
             assert len(res_tables) == (table_count)
 
             for i in range(table_count):
-                print('drop test_cluster_table_name' + str(i))
-                db1.drop_table('test_cluster_table_name' + str(i), ConflictType.Ignore)
+                print("drop test_cluster_table_name" + str(i))
+                db1.drop_table("test_cluster_table_name" + str(i), ConflictType.Ignore)
 
             time.sleep(1)
             tables = db1.get_all_tables()
             res_tables = []
             for table_name in tables:
-                if table_name.startswith("test_cluster_table_name") :
+                if table_name.startswith("test_cluster_table_name"):
                     res_tables.append(table_name)
             assert len(res_tables) == 0
 
@@ -60,7 +66,7 @@ class TestTable:
             tables = db2.get_all_tables()
             res_tables = []
             for table_name in tables:
-                if table_name.startswith("test_cluster_table_name") :
+                if table_name.startswith("test_cluster_table_name"):
                     res_tables.append(table_name)
             assert len(res_tables) == 0
 
@@ -79,8 +85,14 @@ class TestTable:
 
             db = infinity2.get_database("default_db")
             try:
-                db.create_table('test_cluster_follwer_table', {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
-            ConflictType.Error)
+                db.create_table(
+                    "test_cluster_follwer_table",
+                    {
+                        "c1": {"type": "int", "constraints": ["primary key"]},
+                        "c2": {"type": "float"},
+                    },
+                    ConflictType.Error,
+                )
             except InfinityException as e:
                 print(e)
-                assert(e.error_code == 8007)
+                assert e.error_code == 8007

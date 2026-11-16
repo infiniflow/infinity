@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is to connect local infinity instance, create table, insert data, delete and update data.
-'''
+"""
 
 import sys
 
@@ -25,8 +25,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
-
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -35,14 +36,17 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+    )
 
     # Insert 3 rows of data into the 'my_table'
-    print('about to insert data')
+    print("about to insert data")
     table_instance.insert(
         [
             {
@@ -65,23 +69,25 @@ try:
 
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
-    print('about to delete data')
+    print("about to delete data")
     table_instance.delete("num = 2")
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
-    print('about to insert data again')
-    table_instance.insert([
-        {
-            "num": 2,
-            "body": r"Office for Harmful Blooms",
-            "vec": [4.0, 4.2, 4.3, 4.5],
-        },
-        {
-            "num": 2,
-            "body": r"Office for Harmful Blooms",
-            "vec": [4.0, 4.2, 4.3, 4.5],
-        }
-    ])
+    print("about to insert data again")
+    table_instance.insert(
+        [
+            {
+                "num": 2,
+                "body": r"Office for Harmful Blooms",
+                "vec": [4.0, 4.2, 4.3, 4.5],
+            },
+            {
+                "num": 2,
+                "body": r"Office for Harmful Blooms",
+                "vec": [4.0, 4.2, 4.3, 4.5],
+            },
+        ]
+    )
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
 
@@ -91,7 +97,7 @@ try:
     print(result)
 
     infinity_instance.disconnect()
-    print('test done')
+    print("test done")
     sys.exit(0)
 
 except Exception as e:
