@@ -174,9 +174,15 @@ type WalJob = Box<dyn FnOnce(&mut WalManager) + Send>;
 /// without every committer serialising on the file itself. `WalWriter` owns the
 /// active log on such a thread; each call is one job and waits for its reply,
 /// so the order the caller emits is the order on disk.
+///
+/// The queue is a **tokio** channel (plan 6.12.4 step 2). The writer thread is
+/// not an async task - it is the one place a file is appended in order - so it
+/// uses `blocking_recv`, and the committers, which are blocking-pool threads,
+/// use `blocking_send`. That keeps the behaviour identical while removing the
+/// `std::sync::mpsc` primitive that cannot be moved to `send().await` later.
 struct WalWriter {
     /// `None` once the writer is being shut down, which closes the queue.
-    jobs: Option<std::sync::mpsc::Sender<WalJob>>,
+    jobs: Option<tokio::sync::mpsc::UnboundedSender<WalJob>>,
     thread: Option<std::thread::JoinHandle<()>>,
     /// How many jobs the thread has run. A checkpoint has to be exactly one
     /// (swap + frame + fsync), so a test can pin that.
@@ -198,7 +204,7 @@ impl Drop for WalWriter {
 
 impl WalWriter {
     fn start(wal: WalManager) -> Self {
-        let (jobs, queue) = std::sync::mpsc::channel::<WalJob>();
+        let (jobs, mut queue) = tokio::sync::mpsc::unbounded_channel::<WalJob>();
         #[cfg(test)]
         let ran = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         #[cfg(test)]
@@ -207,7 +213,7 @@ impl WalWriter {
             .name("wal-writer".to_string())
             .spawn(move || {
                 let mut wal = wal;
-                while let Ok(job) = queue.recv() {
+                while let Some(job) = queue.blocking_recv() {
                     #[cfg(test)]
                     counter.fetch_add(1, Ordering::SeqCst);
                     job(&mut wal);
@@ -222,13 +228,18 @@ impl WalWriter {
         }
     }
 
-    /// Runs one operation on the writer and waits for it to finish.
-    fn run<T, F>(&self, f: F) -> Result<T>
+    /// Hands `f` to the WAL writer thread and awaits its reply.
+    ///
+    /// The writer owns the active log, so the append itself is a genuine
+    /// blocking operation (a dedicated thread). The *committer* only waits for
+    /// the result, and that wait is an `.await` - it holds no thread while the
+    /// writer is busy (plan 6.12).
+    async fn run<T, F>(&self, f: F) -> Result<T>
     where
         T: Send + 'static,
         F: FnOnce(&mut WalManager) -> Result<T> + Send + 'static,
     {
-        let (reply, answer) = std::sync::mpsc::channel();
+        let (reply, answer) = tokio::sync::oneshot::channel();
         self.jobs
             .as_ref()
             .ok_or_else(|| Error::Wal("the WAL writer is shut down".into()))?
@@ -237,7 +248,7 @@ impl WalWriter {
             }))
             .map_err(|_| Error::Wal("the WAL writer stopped".into()))?;
         answer
-            .recv()
+            .await
             .map_err(|_| Error::Wal("the WAL writer stopped".into()))?
     }
 }
@@ -312,7 +323,7 @@ pub struct TxnManager {
     wal_synced: Arc<AtomicU64>,
     /// Serialises the batch sync so commits that arrive together share one
     /// `Sync()` instead of each taking its own.
-    sync_lock: Mutex<()>,
+    sync_lock: tokio::sync::Mutex<()>,
     /// `total_commit_count`: successful commits since open (the reference's
     /// `NewTxnManager::total_committed_txn_count`).
     total_committed: AtomicU64,
@@ -340,8 +351,9 @@ pub struct TxnManager {
     /// with it (`commit_ts < oldest begin_ts`).
     candidates: Mutex<std::collections::BTreeMap<TxnTimeStamp, Candidate>>,
     /// Serialises the checkpoint/cleanup writers, which do not take a commit
-    /// ts turn of their own.
-    commit_lock: Mutex<()>,
+    /// ts turn of their own. It is an async Mutex because a commit holds it
+    /// across the WAL append's `.await`.
+    commit_lock: tokio::sync::Mutex<()>,
     /// C++ `NewTxnManager::wait_conflict_ck_` / `allocator_map_`: every write
     /// transaction that has taken a commit ts, keyed by that ts. Only the
     /// **smallest** one may run its commit, so the WAL entry, the row-id
@@ -349,12 +361,15 @@ pub struct TxnManager {
     /// which is what keeps a block's row ids a dense prefix (the reference's
     /// `TxnAllocator` hands ranges out in the same order).
     turns: Mutex<std::collections::BTreeSet<TxnTimeStamp>>,
-    turn_cv: std::sync::Condvar,
+    /// Wakes every `turn_wait` when a smaller commit ts is released. Async
+    /// waiters register with `notified().enable()` before re-checking, so a
+    /// release between the check and the await cannot be lost.
+    turn_notify: tokio::sync::Notify,
     /// C++ `NewTxnManager::bottom_txns_`: transactions whose bottom half has
     /// been taken, keyed by commit ts. `true` when the bottom finished, so the
     /// clock can only advance past the **smallest** unfinished ts.
     bottom_txns: Mutex<std::collections::BTreeMap<TxnTimeStamp, bool>>,
-    bottom_cv: std::sync::Condvar,
+    bottom_notify: tokio::sync::Notify,
 }
 
 /// One entry of `NewTxnManager::check_txn_map_`: what a transaction that took a
@@ -387,9 +402,9 @@ impl WriteTurn<'_> {
         self.ts
     }
 
-    /// Blocks until this transaction is the smallest unfinished commit ts.
-    pub fn wait(&self) {
-        self.manager.turn_wait(self.ts);
+    /// Awaits until this transaction is the smallest unfinished commit ts.
+    pub async fn wait(&self) {
+        self.manager.turn_wait(self.ts).await;
     }
 }
 
@@ -405,12 +420,12 @@ impl Drop for WriteTurn<'_> {
 struct CommitRelease<'a> {
     manager: &'a TxnManager,
     ts: TxnTimeStamp,
-    committed: &'a std::cell::Cell<bool>,
+    committed: &'a std::sync::atomic::AtomicBool,
 }
 
 impl Drop for CommitRelease<'_> {
     fn drop(&mut self) {
-        if !self.committed.get() {
+        if !self.committed.load(Ordering::SeqCst) {
             self.manager.finish_candidate(self.ts, false);
             self.manager.finish_bottom(self.ts);
         }
@@ -487,7 +502,7 @@ impl TxnManager {
             synced: AtomicU64::new(applied_ts),
             last_frame: AtomicU64::new(applied_ts),
             wal_synced: Arc::new(AtomicU64::new(start_ts)),
-            sync_lock: Mutex::new(()),
+            sync_lock: tokio::sync::Mutex::new(()),
             wal_flush: AtomicU64::new(WalFlush::OnlyWrite as u64),
             last_wal_sync_ms: AtomicU64::new(0),
             total_committed: AtomicU64::new(0),
@@ -496,11 +511,11 @@ impl TxnManager {
             active: Arc::new(Mutex::new(HashMap::new())),
             kv_clock: Mutex::new((0, 0)),
             candidates: Mutex::new(std::collections::BTreeMap::new()),
-            commit_lock: Mutex::new(()),
+            commit_lock: tokio::sync::Mutex::new(()),
             turns: Mutex::new(std::collections::BTreeSet::new()),
-            turn_cv: std::sync::Condvar::new(),
+            turn_notify: tokio::sync::Notify::new(),
             bottom_txns: Mutex::new(std::collections::BTreeMap::new()),
-            bottom_cv: std::sync::Condvar::new(),
+            bottom_notify: tokio::sync::Notify::new(),
         };
         // `Storage::Init` -> `RecoverMemIndex` -> `BeginRecoveryTxn`: the
         // reference begins one transaction before its startup checkpoint, so it
@@ -836,26 +851,33 @@ impl TxnManager {
             self.current_ts.fetch_max(front, Ordering::SeqCst);
         }
         drop(bottom);
-        self.bottom_cv.notify_all();
+        self.bottom_notify.notify_waiters();
     }
 
     /// Waits until `commit_ts` is visible (`current_ts` has reached it).
-    pub fn wait_visible(&self, commit_ts: TxnTimeStamp) {
-        let mut bottom = self.bottom_txns.lock().unwrap();
-        while self.current_ts.load(Ordering::SeqCst) < commit_ts {
-            bottom = self.bottom_cv.wait(bottom).unwrap();
+    /// The wait is an `.await`, so a reader waiting on a slow bottom half does
+    /// not occupy a thread.
+    pub async fn wait_visible(&self, commit_ts: TxnTimeStamp) {
+        loop {
+            let notified = self.bottom_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.current_ts.load(Ordering::SeqCst) >= commit_ts {
+                return;
+            }
+            notified.await;
         }
     }
 
     /// [`Self::commit`] without publishing the commit; the caller calls
     /// [`Self::finish_bottom`] when its bottom work is done.
-    pub fn commit_deferred(&self, txn: Txn) -> Result<TxnTimeStamp> {
+    pub async fn commit_deferred(&self, txn: Txn) -> Result<TxnTimeStamp> {
         let turn = self.reserve_commit_ts();
         let commit_ts = turn.ts();
-        self.commit_at_deferred(txn, commit_ts)
+        self.commit_at_deferred(txn, commit_ts).await
     }
 
-    pub fn commit(&self, txn: Txn) -> Result<TxnTimeStamp> {
+    pub async fn commit(&self, txn: Txn) -> Result<TxnTimeStamp> {
         // C++ distinguishes a read-only transaction (no WAL record, commit ts
         // `current_ts + 1`, `GetReadCommitTS`) from an empty one.
         let read_only = txn.is_empty();
@@ -863,7 +885,7 @@ impl TxnManager {
             return Err(Error::Txn("empty transaction".into()));
         }
         if read_only {
-            let _commit = self.commit_lock.lock().unwrap();
+            let _commit = self.commit_lock.lock().await;
             return Ok(self.current_ts() + 1);
         }
         // `NewTxnManager::GetWriteCommitTS`: `prepare_commit_ts_ += 2`, taken
@@ -871,7 +893,7 @@ impl TxnManager {
         // its timestamp - the reference never hands the same value out twice.
         let turn = self.reserve_commit_ts();
         let commit_ts = turn.ts();
-        self.commit_at(txn, commit_ts)
+        self.commit_at(txn, commit_ts).await
     }
 
     /// Takes the next write commit timestamp without committing anything.
@@ -906,13 +928,28 @@ impl TxnManager {
     }
 
     /// Waits until every smaller commit ts has committed (or gone away).
-    fn turn_wait(&self, commit_ts: TxnTimeStamp) {
-        let mut turns = self.turns.lock().unwrap();
-        // A ts taken through [`Self::reserve_commit_ts`] joins here, so it is
-        // still serialised against the transactions that registered early.
-        turns.insert(commit_ts);
-        while turns.first().copied() != Some(commit_ts) {
-            turns = self.turn_cv.wait(turns).unwrap();
+    async fn turn_wait(&self, commit_ts: TxnTimeStamp) {
+        {
+            let mut turns = self.turns.lock().unwrap();
+            // A ts taken through [`Self::reserve_commit_ts`] joins here, so it
+            // is still serialised against the transactions that registered
+            // early.
+            turns.insert(commit_ts);
+            if turns.first().copied() == Some(commit_ts) {
+                return;
+            }
+        }
+        loop {
+            let notified = self.turn_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            {
+                let turns = self.turns.lock().unwrap();
+                if turns.first().copied() == Some(commit_ts) {
+                    return;
+                }
+            }
+            notified.await;
         }
     }
 
@@ -922,7 +959,7 @@ impl TxnManager {
         let mut turns = self.turns.lock().unwrap();
         if turns.remove(&commit_ts) {
             drop(turns);
-            self.turn_cv.notify_all();
+            self.turn_notify.notify_waiters();
         }
     }
 
@@ -946,18 +983,25 @@ impl TxnManager {
             .insert(table.to_string(), (db_id.to_string(), table_id.to_string()));
     }
 
-    pub fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
-        self.commit_at_deferred(txn, commit_ts).inspect(|&ts| {
-            self.finish_bottom(ts);
-        })
+    pub async fn commit_at(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+        self.commit_at_deferred(txn, commit_ts)
+            .await
+            .inspect(|&ts| {
+                self.finish_bottom(ts);
+            })
     }
 
     /// [`Self::commit_at`] without publishing the commit: the caller finishes
     /// its own bottom work (in the executor: the index updates) and then calls
     /// [`Self::finish_bottom`], so a transaction is visible only once its rows
     /// *and* its index entries are in place.
-    pub fn commit_at_deferred(&self, txn: Txn, commit_ts: TxnTimeStamp) -> Result<TxnTimeStamp> {
+    pub async fn commit_at_deferred(
+        &self,
+        txn: Txn,
+        commit_ts: TxnTimeStamp,
+    ) -> Result<TxnTimeStamp> {
         self.commit_at_deferred_with(txn, commit_ts, |_| Ok(()))
+            .await
     }
 
     /// [`Self::commit_at_deferred`] with a step that runs **after** the conflict
@@ -968,7 +1012,7 @@ impl TxnManager {
     /// `new_txn_manager_impl.cpp:207-314`): the range is part of the log entry,
     /// and a transaction that lost the conflict never spends one. `before_wal`
     /// gets the transaction so it can fill in the command it is about to log.
-    pub fn commit_at_deferred_with<F>(
+    pub async fn commit_at_deferred_with<F>(
         &self,
         txn: Txn,
         commit_ts: TxnTimeStamp,
@@ -977,19 +1021,21 @@ impl TxnManager {
     where
         F: FnOnce(&mut Txn) -> Result<()>,
     {
-        let ts = self.commit_deferred_locked(txn, commit_ts, before_wal)?;
+        let ts = self
+            .commit_deferred_locked(txn, commit_ts, before_wal)
+            .await?;
         // The entry is appended inside the commit-ts turn; the fsync happens
         // here, after the turn is released, so commits that arrive together
         // share one `Sync()` - `WalManager::NewFlush` syncs a whole batch from
         // its own thread for the same reason. The turn orders the append, not
         // the durability.
-        self.flush_after_commit()?;
+        self.flush_after_commit().await?;
         Ok(ts)
     }
 
     /// The commit proper: ordered by commit ts, holding `commit_lock` and the
     /// turn until the entry is written and the catalog batch applied.
-    fn commit_deferred_locked<F>(
+    async fn commit_deferred_locked<F>(
         &self,
         mut txn: Txn,
         commit_ts: TxnTimeStamp,
@@ -1001,18 +1047,18 @@ impl TxnManager {
         // `GetWriteCommitTS` -> `wait_conflict_ck_`: only the smallest commit ts
         // may write its entry, so the log (and everything the entry decides:
         // row ids, block slots) follows commit order.
-        self.turn_wait(commit_ts);
+        self.turn_wait(commit_ts).await;
         // The checkpoint reads `last_appended` to decide whether it has to
         // rotate, so appending the entry and publishing the new high-water mark
         // must be one step with respect to it (`WalManager::Flush` does both in
         // its own loop, `wal_manager_impl.cpp:288-294`). Taken **after** the
         // turn: a checkpoint never waits for a commit's turn.
-        let _commit = self.commit_lock.lock().unwrap();
+        let _commit = self.commit_lock.lock().await;
         // Every exit path below (conflict, allocation failure, WAL error) hands
         // the place back **and** lets the clock move past it, so one failed
         // statement cannot stall the commits after it - the reference's
         // `RemoveMapElementForRollbackNoLock` (`new_txn_manager_impl.cpp:888`).
-        let committed = std::cell::Cell::new(false);
+        let committed = std::sync::atomic::AtomicBool::new(false);
         let _release = CommitRelease {
             manager: self,
             ts: commit_ts,
@@ -1051,7 +1097,9 @@ impl TxnManager {
         // the commit-ts turn, so the log stays in commit order; the fsync runs
         // in the caller, after the turn is released, so commits that arrive
         // together share one `Sync()`.
-        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))?;
+        self.wal
+            .run(move |wal| wal.append(&entry).map(|_| ()))
+            .await?;
         self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
         let mut writes: Vec<(Vec<u8>, Option<Vec<u8>>)> = txn
             .writes
@@ -1103,7 +1151,7 @@ impl TxnManager {
         // sees a commit that is still being applied.
         self.total_committed.fetch_add(1, Ordering::Relaxed);
         self.finish_candidate(commit_ts, true);
-        committed.set(true);
+        committed.store(true, Ordering::SeqCst);
         Ok(commit_ts)
     }
 
@@ -1382,7 +1430,7 @@ impl TxnManager {
     /// The caller must have written the block mirror for the same range; a
     /// caller that only rotates the WAL needs no mirror because it writes no
     /// store either - the frame then simply repeats the last flush's floor.
-    pub fn append_checkpoint_flushed(&self) -> Result<()> {
+    pub async fn append_checkpoint_flushed(&self) -> Result<()> {
         let frame_ts = self.synced_ts() | 1;
         // The skip is decided on the **clock**, not on the payload: the
         // reference compares against `BeginTxnShared`'s begin ts
@@ -1400,11 +1448,11 @@ impl TxnManager {
         if last > 0 && last + 2 >= begin_ts {
             return Ok(());
         }
-        self.write_checkpoint(frame_ts)
+        self.write_checkpoint(frame_ts).await
     }
 
-    fn write_checkpoint(&self, frame_ts: TxnTimeStamp) -> Result<()> {
-        let _commit = self.commit_lock.lock().unwrap();
+    async fn write_checkpoint(&self, frame_ts: TxnTimeStamp) -> Result<()> {
+        let _commit = self.commit_lock.lock().await;
         // The manager's high-water marks are always current; a directory that
         // holds nothing yet has none of them set.
         let floor = frame_ts
@@ -1451,12 +1499,14 @@ impl TxnManager {
         // let a commit land in the fresh log before the frame, which put a row
         // frame ahead of the checkpoint. The caller syncs the frame once the
         // data it claims is on disk (`TxnManager::sync_wal`).
-        self.wal.run(move |wal| {
-            if rotate && wal.file_size()? > 0 {
-                wal.rotate(seal)?;
-            }
-            wal.append(&entry).map(|_| ())
-        })?;
+        self.wal
+            .run(move |wal| {
+                if rotate && wal.file_size()? > 0 {
+                    wal.rotate(seal)?;
+                }
+                wal.append(&entry).map(|_| ())
+            })
+            .await?;
         if rotate {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
@@ -1478,8 +1528,8 @@ impl TxnManager {
     /// and leaves one `CLEANUP` command carrying its **begin** ts
     /// (`CleanupTxnStore::ToWalEntry`). Replay ignores it; the frame exists so
     /// a cleanup is visible in the log exactly as it is in the reference's.
-    pub fn append_cleanup(&self) -> Result<()> {
-        let _commit = self.commit_lock.lock().unwrap();
+    pub async fn append_cleanup(&self) -> Result<()> {
+        let _commit = self.commit_lock.lock().await;
         if self.current_ts.load(Ordering::SeqCst) == 0
             && self.prepare_commit_ts.load(Ordering::SeqCst) == 0
         {
@@ -1494,9 +1544,11 @@ impl TxnManager {
                 timestamp: begin_ts,
             }],
         );
-        self.wal.run(move |wal| wal.append(&entry).map(|_| ()))?;
+        self.wal
+            .run(move |wal| wal.append(&entry).map(|_| ()))
+            .await?;
         self.last_appended.fetch_max(commit_ts, Ordering::SeqCst);
-        self.sync_wal_grouped()?;
+        self.sync_wal_grouped().await?;
         self.note_standalone(TxnOp::Cleanup, commit_ts);
         // Published in commit-ts order, like any other commit: see
         // [`Self::write_checkpoint`].
@@ -1510,16 +1562,19 @@ impl TxnManager {
     /// The reference rotates when the WAL passes its size threshold and keeps
     /// every sealed segment until `Cleanup`; so does this engine (see
     /// [`Self::drop_sealed_wal_up_to`]).
-    pub fn rotate_wal_if_large(&self) -> Result<()> {
+    pub async fn rotate_wal_if_large(&self) -> Result<()> {
         const SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
         let seal = self.last_appended.load(Ordering::SeqCst);
-        let rotated = self.wal.run(move |wal| {
-            if wal.file_size()? >= SEGMENT_BYTES {
-                wal.rotate(seal)?;
-                return Ok(true);
-            }
-            Ok(false)
-        })?;
+        let rotated = self
+            .wal
+            .run(move |wal| {
+                if wal.file_size()? >= SEGMENT_BYTES {
+                    wal.rotate(seal)?;
+                    return Ok(true);
+                }
+                Ok(false)
+            })
+            .await?;
         if rotated {
             self.last_swap.store(seal, Ordering::SeqCst);
         }
@@ -1577,15 +1632,17 @@ impl TxnManager {
     /// would reopen at an older position — or, once the older sealed segment
     /// has been pruned, not open at all. Commit entries are synced in batches
     /// by [`Self::sync_wal_grouped`], as `WalManager::NewFlush` does.
-    pub fn sync_wal(&self) -> Result<()> {
+    pub async fn sync_wal(&self) -> Result<()> {
         let synced = Arc::clone(&self.wal_synced);
-        self.wal.run(move |wal| {
-            wal.sync()?;
-            // Read inside the writer's own job, after the fsync: the log is
-            // single-threaded, so this is exactly what the sync covered.
-            synced.fetch_max(wal.appended_ts(), Ordering::SeqCst);
-            Ok(())
-        })
+        self.wal
+            .run(move |wal| {
+                wal.sync()?;
+                // Read inside the writer's own job, after the fsync: the log is
+                // single-threaded, so this is exactly what the sync covered.
+                synced.fetch_max(wal.appended_ts(), Ordering::SeqCst);
+                Ok(())
+            })
+            .await
     }
 
     /// `[wal] wal_flush`: how a commit's entry is made durable.
@@ -1595,10 +1652,10 @@ impl TxnManager {
     }
 
     /// The commit path's durability step, per `[wal] wal_flush`.
-    fn flush_after_commit(&self) -> Result<()> {
+    async fn flush_after_commit(&self) -> Result<()> {
         match self.wal_flush() {
             // `flush_at_once`: the entry is on disk when the commit returns.
-            WalFlush::FlushAtOnce => self.sync_wal_grouped(),
+            WalFlush::FlushAtOnce => self.sync_wal_grouped().await,
             // `only_write` (the reference's default): the append reaches the
             // kernel and the OS flushes when it wants. A crash of this process
             // does not lose it; the checkpoint is the durability boundary.
@@ -1618,7 +1675,7 @@ impl TxnManager {
                 }
                 self.last_wal_sync_ms
                     .store(now, std::sync::atomic::Ordering::Relaxed);
-                self.sync_wal_grouped()
+                self.sync_wal_grouped().await
             }
         }
     }
@@ -1639,15 +1696,15 @@ impl TxnManager {
     /// is already durable" is exactly its own entry being covered. The first
     /// caller takes the lock and syncs through the newest appended entry; the
     /// others re-check after it and find theirs covered by that same `Sync()`.
-    fn sync_wal_grouped(&self) -> Result<()> {
+    async fn sync_wal_grouped(&self) -> Result<()> {
         if self.wal_synced.load(Ordering::SeqCst) >= self.last_appended.load(Ordering::SeqCst) {
             return Ok(());
         }
-        let _one = self.sync_lock.lock().unwrap();
+        let _one = self.sync_lock.lock().await;
         if self.wal_synced.load(Ordering::SeqCst) >= self.last_appended.load(Ordering::SeqCst) {
             return Ok(());
         }
-        self.sync_wal()
+        self.sync_wal().await
     }
 
     /// Highest commit timestamp the checkpoint has put into an SST.

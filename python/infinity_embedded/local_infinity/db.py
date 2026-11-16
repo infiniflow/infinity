@@ -33,8 +33,12 @@ class LocalDatabase(Database, ABC):
         self._db_name = name
         self._db_comment = comment
 
-    def create_table(self, table_name: str, columns_definition,
-                     conflict_type: ConflictType = ConflictType.Error):
+    def create_table(
+        self,
+        table_name: str,
+        columns_definition,
+        conflict_type: ConflictType = ConflictType.Error,
+    ):
         # process column definitions
         """
         db_obj.create_table("my_table",
@@ -63,10 +67,15 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
-        res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
-                                      column_defs=column_defs,
-                                      conflict_type=create_table_conflict)
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
+        res = self._conn.create_table(
+            db_name=self._db_name,
+            table_name=table_name,
+            column_defs=column_defs,
+            conflict_type=create_table_conflict,
+        )
 
         if res.error_code == ErrorCode.OK:
             return LocalTable(self._conn, self._db_name, table_name)
@@ -81,9 +90,18 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_table_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type")
-        res = self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=drop_table_conflict)
-        if res.error_code == ErrorCode.OK or res.error_code == ErrorCode.TABLE_NOT_EXIST:
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type"
+            )
+        res = self._conn.drop_table(
+            db_name=self._db_name,
+            table_name=table_name,
+            conflict_type=drop_table_conflict,
+        )
+        if (
+            res.error_code == ErrorCode.OK
+            or res.error_code == ErrorCode.TABLE_NOT_EXIST
+        ):
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)

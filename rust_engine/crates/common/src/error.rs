@@ -74,6 +74,11 @@ pub enum Error {
     #[error("{0}")]
     SnapshotNotFound(String),
 
+    /// C++ `Status::NotSupport` (3032). The status keeps the bare message, so
+    /// `Display` does too (`FLUSH LOG` answers "Flush log").
+    #[error("{0}")]
+    NotSupport(String),
+
     /// C++ `Status::Unknown` (3091), which renders as `Unknown {detail}` — the
     /// wording `SHOW SNAPSHOT <missing>` produces
     /// (`physical_show_snapshot_impl.cpp:39`).
@@ -108,6 +113,8 @@ impl Error {
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
             // 3048 NO_COLUMN_DEFINED.
             Error::NoColumnDefined(_) => 3048,
+            // 3032 NOT_SUPPORTED.
+            Error::NotSupport(_) => 3032,
             // 3050 EMPTY_SELECT_FIELDS.
             Error::Invalid(m) if m.starts_with("empty select fields") => 3050,
             // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the
@@ -135,6 +142,10 @@ impl Error {
             // 3009 INVALID_INDEX_DEFINITION (index kind vs column type).
             Error::Invalid(m) if m.starts_with("SECONDARY index requires") => 3009,
             Error::Invalid(m) if m.contains("index requires a") => 3009,
+            // `IndexSecondary::ValidateColumnDataType` refuses the column type
+            // with `InvalidIndexDefinition`, so a secondary index on a column
+            // that cannot carry one is 3009, not a generic invalid parameter.
+            Error::Invalid(m) if m.starts_with("Cannot build secondary index on data type") => 3009,
             // 3077 ANALYZER_NOT_FOUND (unknown name, or a C++ family the Rust
             // port does not vendor; both carry an explanatory suffix).
             Error::Invalid(m) if m.starts_with("analyzer ") && m.contains("not found") => 3077,
@@ -269,5 +280,16 @@ mod tests {
         let error = Error::InvalidNodeRole("Attempt to write on non-writable node".to_string());
         assert_eq!(error.status_code(), 8007);
         assert_eq!(error.to_string(), "Attempt to write on non-writable node");
+    }
+
+    /// `IndexSecondary::ValidateColumnDataType` rejects a column type that
+    /// cannot carry the index with `Status::InvalidIndexDefinition` (3009), the
+    /// code the SDK's `test_sparse_knn_with_invalid_index_type` asserts.
+    #[test]
+    fn a_secondary_index_on_an_unsupported_column_type_maps_to_3009() {
+        let error = Error::Invalid(
+            "Cannot build secondary index on data type: SPARSE(FLOAT,1000)".to_string(),
+        );
+        assert_eq!(error.status_code(), 3009);
     }
 }

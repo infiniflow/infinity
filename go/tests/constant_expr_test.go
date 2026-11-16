@@ -116,24 +116,24 @@ func TestParseConstantValueIntegerArray(t *testing.T) {
 			name:  "[]int",
 			input: []int{1, 2, 3, 4, 5},
 			expected: &thriftapi.ConstantExpr{
-				LiteralType:    thriftapi.LiteralType_IntegerArray,
-				I64ArrayValue:  []int64{1, 2, 3, 4, 5},
+				LiteralType:   thriftapi.LiteralType_IntegerArray,
+				I64ArrayValue: []int64{1, 2, 3, 4, 5},
 			},
 		},
 		{
 			name:  "[]int64",
 			input: []int64{10, 20, 30},
 			expected: &thriftapi.ConstantExpr{
-				LiteralType:    thriftapi.LiteralType_IntegerArray,
-				I64ArrayValue:  []int64{10, 20, 30},
+				LiteralType:   thriftapi.LiteralType_IntegerArray,
+				I64ArrayValue: []int64{10, 20, 30},
 			},
 		},
 		{
 			name:  "empty int slice",
 			input: []int64{},
 			expected: &thriftapi.ConstantExpr{
-				LiteralType:    thriftapi.LiteralType_IntegerArray,
-				I64ArrayValue:  []int64{},
+				LiteralType:   thriftapi.LiteralType_IntegerArray,
+				I64ArrayValue: []int64{},
 			},
 		},
 	}
@@ -161,16 +161,16 @@ func TestParseConstantValueDoubleArray(t *testing.T) {
 			name:  "[]float64",
 			input: []float64{1.1, 2.2, 3.3},
 			expected: &thriftapi.ConstantExpr{
-				LiteralType:    thriftapi.LiteralType_DoubleArray,
-				F64ArrayValue:  []float64{1.1, 2.2, 3.3},
+				LiteralType:   thriftapi.LiteralType_DoubleArray,
+				F64ArrayValue: []float64{1.1, 2.2, 3.3},
 			},
 		},
 		{
 			name:  "[]float32",
 			input: []float32{0.5, 1.5},
 			expected: &thriftapi.ConstantExpr{
-				LiteralType:    thriftapi.LiteralType_DoubleArray,
-				F64ArrayValue:  []float64{0.5, 1.5},
+				LiteralType:   thriftapi.LiteralType_DoubleArray,
+				F64ArrayValue: []float64{0.5, 1.5},
 			},
 		},
 	}
@@ -191,7 +191,7 @@ func TestParseConstantValueDoubleArray(t *testing.T) {
 func TestParseConstantValueIntegerTensor(t *testing.T) {
 	input := [][]int64{{1, 2, 3}, {4, 5, 6}}
 	expected := &thriftapi.ConstantExpr{
-		LiteralType:   thriftapi.LiteralType_IntegerTensor,
+		LiteralType:    thriftapi.LiteralType_IntegerTensor,
 		I64TensorValue: input,
 	}
 
@@ -207,7 +207,7 @@ func TestParseConstantValueIntegerTensor(t *testing.T) {
 func TestParseConstantValueDoubleTensor(t *testing.T) {
 	input := [][]float64{{1.1, 2.2}, {3.3, 4.4}}
 	expected := &thriftapi.ConstantExpr{
-		LiteralType:   thriftapi.LiteralType_DoubleTensor,
+		LiteralType:    thriftapi.LiteralType_DoubleTensor,
 		F64TensorValue: input,
 	}
 
@@ -223,7 +223,7 @@ func TestParseConstantValueDoubleTensor(t *testing.T) {
 func TestParseConstantValueIntegerTensorArray(t *testing.T) {
 	input := [][][]int64{{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}}
 	expected := &thriftapi.ConstantExpr{
-		LiteralType:        thriftapi.LiteralType_IntegerTensorArray,
+		LiteralType:         thriftapi.LiteralType_IntegerTensorArray,
 		I64TensorArrayValue: input,
 	}
 
@@ -239,7 +239,7 @@ func TestParseConstantValueIntegerTensorArray(t *testing.T) {
 func TestParseConstantValueDoubleTensorArray(t *testing.T) {
 	input := [][][]float64{{{1.1, 2.2}, {3.3, 4.4}}, {{5.5, 6.6}, {7.7, 8.8}}}
 	expected := &thriftapi.ConstantExpr{
-		LiteralType:        thriftapi.LiteralType_DoubleTensorArray,
+		LiteralType:         thriftapi.LiteralType_DoubleTensorArray,
 		F64TensorArrayValue: input,
 	}
 

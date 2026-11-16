@@ -58,7 +58,7 @@ class InfinityClient(BaseClient):
         for i, idx in enumerate(indexs):
             table_obj.create_index(f"index{i}", idx)
 
-        #inf_http_client = InfinityHttpClient("default_db", self.table_name)
+        # inf_http_client = InfinityHttpClient("default_db", self.table_name)
         inf_http_client = infinity_http()
 
         dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
@@ -170,12 +170,7 @@ class InfinityClient(BaseClient):
         elif self.data_mode == "fulltext":
             res, res_type, extra_result = (
                 table_obj.output(["_row_id", "_score"])
-                .match_text(
-                    "",
-                    query,
-                    self.data['topK'],
-                    {"default_field": "body"}
-                )
+                .match_text("", query, self.data["topK"], {"default_field": "body"})
                 .to_result()
             )
             result = list(zip(res["ROW_ID"], res["SCORE"]))
@@ -184,9 +179,9 @@ class InfinityClient(BaseClient):
             query_builder = InfinityThriftQueryBuilder(table_obj)
             query_builder.output(["_row_id"])
             query_builder.match_sparse(
-                list(self.data["schema"].keys())[0],#vector column name:col1
+                list(self.data["schema"].keys())[0],  # vector column name:col1
                 SparseVector(indices=indices, values=values),
-                self.data["metric_type"],#ip
+                self.data["metric_type"],  # ip
                 self.data["topK"],
                 {"alpha": str(self.data["alpha"]), "beta": str(self.data["beta"])},
             )

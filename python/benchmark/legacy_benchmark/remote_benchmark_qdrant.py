@@ -77,12 +77,9 @@ def work(remote, queries, topk, alpha, beta):
             collection_name="splade_benchmark_collection",
             query_vector=models.NamedSparseVector(
                 name="text",
-                vector=models.SparseVector(
-                    indices=indices,
-                    values=values
-                ),
+                vector=models.SparseVector(indices=indices, values=values),
             ),
-            limit = topk
+            limit=topk,
         )
 
 
@@ -139,16 +136,13 @@ def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
         for query_id in range(query_mat.nrow):
             indices, values = query_mat.at(query_id)
             start = time.time()
-            res_list  = client.search(
+            res_list = client.search(
                 collection_name="splade_benchmark_collection",
                 query_vector=models.NamedSparseVector(
                     name="text",
-                    vector=models.SparseVector(
-                        indices=indices,
-                        values=values
-                    ),
+                    vector=models.SparseVector(indices=indices, values=values),
                 ),
-                limit=topk
+                limit=topk,
             )
 
             end = time.time()
@@ -172,7 +166,7 @@ def one_thread(remote, rounds, query_path, gt_path, alpha, beta):
     results.append(f"Avg Dur: {dur_sum:.2f} s")
     results.append(f"Avg Qps: {(query_mat.nrow / dur_sum):.2f}")
 
-    #client.delete_collection("splade_benchmark_collection")
+    # client.delete_collection("splade_benchmark_collection")
 
     for res in results:
         print(res)

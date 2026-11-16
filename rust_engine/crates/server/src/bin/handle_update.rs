@@ -12,21 +12,24 @@ fn main() {
     let engine = Engine::open(&dir).expect("open engine");
     let (seq, req) = read_update_call(&mut std::io::stdin()).expect("decode Update call");
     let t = &req.table_name;
-    let _ = engine.execute(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
-    let _ = engine.execute(&format!(
+    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
+    let _ = engine.execute_blocking(&format!(
         "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
     ));
 
-    let resp = match engine.execute(&req.to_sql()) {
+    let sid = req.session_id;
+    let run = executor::block_on(engine.execute_parsed(vec![req.into_statement()], ""))
+        .map_err(|e| e.to_string());
+    let resp = match run {
         Ok(_) => CommonResponse {
             error_code: 0,
             error_msg: "OK".into(),
-            session_id: req.session_id,
+            session_id: sid,
         },
         Err(e) => CommonResponse {
             error_code: 1,
-            error_msg: e.to_string(),
-            session_id: req.session_id,
+            error_msg: e,
+            session_id: sid,
         },
     };
     let mut out = std::io::stdout().lock();

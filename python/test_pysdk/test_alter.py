@@ -43,9 +43,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(
             res,
-            pd.DataFrame({"c1": [1], "c2": [2]}).astype(
-                {"c1": 'Int32', "c2": 'Int32'}
-            )
+            pd.DataFrame({"c1": [1], "c2": [2]}).astype({"c1": "Int32", "c2": "Int32"}),
         )
 
         res = table_obj.add_columns({"c2": {"type": "varchar", "default": "default"}})
@@ -60,9 +58,9 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(
             res,
-            pd.DataFrame({"c1": [1], "c2": [2], "c3": [None], "c4": ["default"]}).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": 'string', "c4": 'string'}
-            )
+            pd.DataFrame(
+                {"c1": [1], "c2": [2], "c3": [None], "c4": ["default"]}
+            ).astype({"c1": "Int32", "c2": "Int32", "c3": "string", "c4": "string"}),
         )
 
         table_obj.insert([{"c1": 2, "c2": 3, "c3": "test"}])
@@ -71,10 +69,13 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame(
-                {"c1": [1, 2], "c2": [2, 3], "c3": [None, "test"], "c4": ["default", "default"]}
-            ).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": 'string', "c4": 'string'}
-            ),
+                {
+                    "c1": [1, 2],
+                    "c2": [2, 3],
+                    "c3": [None, "test"],
+                    "c4": ["default", "default"],
+                }
+            ).astype({"c1": "Int32", "c2": "Int32", "c3": "string", "c4": "string"}),
         )
 
         db_obj.drop_table(table_name)
@@ -101,28 +102,42 @@ class TestInfinity:
         )
         assert table_obj is not None
 
-        res = table_obj.insert([
-            {"c1": 1, "c2": "hello"},
-            {"c1": 2, "c2": "world"},
-        ])
+        res = table_obj.insert(
+            [
+                {"c1": 1, "c2": "hello"},
+                {"c1": 2, "c2": "world"},
+            ]
+        )
         assert res.error_code == infinity.ErrorCode.OK
 
         # 2. Add NOT NULL column with default — succeeds, existing rows get default
-        res = table_obj.add_columns({"c3": {"type": "varchar", "constraints": ["not null"], "default": "default_val"}})
+        res = table_obj.add_columns(
+            {
+                "c3": {
+                    "type": "varchar",
+                    "constraints": ["not null"],
+                    "default": "default_val",
+                }
+            }
+        )
         assert res.error_code == infinity.ErrorCode.OK
 
         res, _ = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(
             res.sort_values("c1").reset_index(drop=True),
-            pd.DataFrame({
-                "c1": pd.array([1, 2], dtype="Int32"),
-                "c2": pd.array(["hello", "world"], dtype="string"),
-                "c3": pd.array(["default_val", "default_val"], dtype="string"),
-            }),
+            pd.DataFrame(
+                {
+                    "c1": pd.array([1, 2], dtype="Int32"),
+                    "c2": pd.array(["hello", "world"], dtype="string"),
+                    "c3": pd.array(["default_val", "default_val"], dtype="string"),
+                }
+            ),
         )
 
         # 3. Add NOT NULL column without default on table that has data — fails
-        res = table_obj.add_columns({"c4": {"type": "int", "constraints": ["not null"]}})
+        res = table_obj.add_columns(
+            {"c4": {"type": "int", "constraints": ["not null"]}}
+        )
         assert res.error_code != infinity.ErrorCode.OK
 
         db_obj.drop_table(table_name)
@@ -148,7 +163,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["test"]}).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": 'string'}
+                {"c1": "Int32", "c2": "Int32", "c3": "string"}
             ),
         )
 
@@ -162,7 +177,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"]}).astype(
-                {"c1": 'Int32', "c3": 'string'}
+                {"c1": "Int32", "c3": "string"}
             ),
         )
 
@@ -172,7 +187,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1, 2], "c3": ["test", "test2"]}).astype(
-                {"c1": 'Int32', "c3": 'string'}
+                {"c1": "Int32", "c3": "string"}
             ),
         )
 
@@ -243,11 +258,11 @@ class TestInfinity:
                 }
             ).astype(
                 {
-                    "num": 'Int32',
-                    "body": 'string',
+                    "num": "Int32",
+                    "body": "string",
                     "vec": object,
-                    "column_name2": 'Float32',
-                    "column_name3": 'string',
+                    "column_name2": "Float32",
+                    "column_name3": "string",
                 }
             ),
         )
@@ -290,7 +305,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"], "c2": ["test"]}).astype(
-                {"c1": 'Int32', "c3": "string", "c2": "string"}
+                {"c1": "Int32", "c3": "string", "c2": "string"}
             ),
         )
 
@@ -301,9 +316,7 @@ class TestInfinity:
             res,
             pd.DataFrame(
                 {"c1": [1, 1], "c3": ["test", "t2"], "c2": ["test", "t1"]}
-            ).astype(
-                {"c1": 'Int32', "c3": "string", "c2": "string"}
-            ),
+            ).astype({"c1": "Int32", "c3": "string", "c2": "string"}),
         )
 
         db_obj.drop_table(table_name)

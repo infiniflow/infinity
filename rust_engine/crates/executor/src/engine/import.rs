@@ -8,7 +8,7 @@ impl Engine {
     /// Loads a CSV file into `table` (`COPY t FROM …`). The path may be absolute
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
-    pub(crate) fn copy_from(
+    pub(crate) async fn copy_from(
         &self,
         table: &str,
         path: &str,
@@ -18,14 +18,14 @@ impl Engine {
         // commits once. The extent each segment ends up with is what decides
         // how many index chunks the mirror publishes for it.
         let before = self.segment_row_counts(table);
-        let result = self.copy_from_inner(table, path, opts);
+        let result = self.copy_from_inner(table, path, opts).await;
         if result.is_ok() {
             self.settle_import_extent(table, &before);
         }
         result
     }
 
-    pub(crate) fn copy_from_inner(
+    pub(crate) async fn copy_from_inner(
         &self,
         table: &str,
         path: &str,
@@ -34,7 +34,7 @@ impl Engine {
         // The import writes its blocks inside its own commit, so a background
         // compaction must not run between the commit and the write.
         let gate = self.batch_gate(table);
-        let _batch = gate.lock().unwrap();
+        let _batch = gate.lock().await;
         if self.storage.catalog.get_table_by_name(table)?.is_none() {
             return Err(Error::NotFound(format!("table '{table}'")));
         }
@@ -43,25 +43,42 @@ impl Engine {
             .iter()
             .find(|(k, _)| k == "FORMAT")
             .map(|(_, v)| v.to_ascii_uppercase());
-        // Read raw bytes: `FORMAT FVECS` is binary, everything else is text.
+        // The whole file is only read for the formats that need it in one
+        // piece (binary vectors, the JSON forms). CSV streams, and reading the
+        // 326 MB file into a `Vec` first only to open it again was a full extra
+        // pass over the input.
+        let whole_file = |path: &std::path::Path| -> Option<Vec<u8>> { std::fs::read(path).ok() };
         // Missing fixtures stay a statement-level success with no rows.
-        let t_read0 = std::time::Instant::now();
-        let bytes_in = match std::fs::read(&resolved) {
-            Ok(b) => b,
-            Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
-        };
-        let t_read = t_read0.elapsed();
         // The binary formats parse into the same literal rows the CSV path
         // builds, then commit them the same way.
         let rows = match format.as_deref() {
-            Some("FVECS") => Some(self.binary_vector_rows(table, &bytes_in, 4)?),
-            Some("BVECS") => Some(self.binary_vector_rows(table, &bytes_in, 1)?),
-            Some("CSR") => Some(self.csr_sparse_rows(table, &bytes_in)?),
+            Some("FVECS") => Some(self.binary_vector_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+                4,
+            )?),
+            Some("BVECS") => Some(self.binary_vector_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+                1,
+            )?),
+            Some("CSR") => Some(self.csr_sparse_rows(
+                table,
+                &whole_file(&resolved).ok_or_else(|| {
+                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
+                })?,
+            )?),
             Some("PARQUET") => Some(self.parquet_rows(table, &resolved)?),
             _ => None,
         };
         if let Some(rows) = rows {
-            return self.import_literal_rows(table, rows, t_read);
+            return self
+                .import_literal_rows(table, rows, std::time::Duration::ZERO)
+                .await;
         }
         let delim = opts
             .iter()
@@ -77,11 +94,18 @@ impl Engine {
         // `FORMAT JSONL` (one object per line) and `FORMAT JSON` (one array)
         // are small in practice; the CSV path streams.
         if format_of("JSONL") || format_of("JSON") {
+            let Some(bytes_in) = whole_file(&resolved) else {
+                return Ok(QueryResult::Inserted { count: 0 });
+            };
             let text = String::from_utf8_lossy(&bytes_in).into_owned();
             if format_of("JSONL") {
-                return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
+                return self
+                    .copy_from_jsonl(table, &text, &types_for_scan, &defaults)
+                    .await;
             }
-            return self.copy_from_json(table, &text, &types_for_scan, &defaults);
+            return self
+                .copy_from_json(table, &text, &types_for_scan, &defaults)
+                .await;
         }
         // CSV: read line by line and commit in blocks, so an 8-million-row
         // import does not hold the file and its parsed rows in memory.
@@ -108,6 +132,12 @@ impl Engine {
         // `(row id, stored text)` per row, so the commit can hand the block the
         // values it publishes without a second pass over the file.
         let mut encoded_rows: Vec<(usize, String)> = Vec::new();
+        // `HEADER true` makes the first line a header: the reference validates
+        // its column count against the table and then drops it without counting
+        // it as a row (`PhysicalImport::NewCSVHeaderHandler`).
+        let mut pending_header = opts
+            .iter()
+            .any(|(k, v)| k == "HEADER" && v.eq_ignore_ascii_case("true"));
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -127,7 +157,33 @@ impl Engine {
                     continue;
                 }
                 let fields: Vec<String> = csv_fields(line, delim);
-                let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+                if pending_header {
+                    pending_header = false;
+                    // The reference requires the header to have exactly the
+                    // table's column count and then drops it without counting
+                    // it as a row. Its cell-by-cell name comparison is
+                    // inverted (`!strcmp` aborts on *equal* names) under a
+                    // comment that says the names are not checked; that is a
+                    // bug, so only the count is enforced here.
+                    if fields.len() != types_for_scan.len() {
+                        return Err(Error::Invalid(format!(
+                            "import: the header has {} columns but the table has {}",
+                            fields.len(),
+                            types_for_scan.len()
+                        )));
+                    }
+                    continue;
+                }
+                // One allocation per cell, not two: `normalize_cell` hands back
+                // the field unchanged for the plain numeric/text cells that
+                // make up most of a `COPY`.
+                let mut cells: Vec<String> = fields
+                    .into_iter()
+                    .map(|f| match normalize_cell_cow(&f) {
+                        std::borrow::Cow::Borrowed(_) => f,
+                        std::borrow::Cow::Owned(o) => o,
+                    })
+                    .collect();
                 if cells.len() > types_for_scan.len() {
                     return Err(Error::Invalid(format!(
                         "import: the file has {} columns but the table has {}",
@@ -185,10 +241,10 @@ impl Engine {
                     });
                     let take = (batch.len() - start).min(room);
                     let (range, next_cursor) = match current {
-                        Some(cursor) => self.reserve_import_rows(table, take, cursor)?,
+                        Some(cursor) => self.reserve_import_rows(table, take, cursor).await?,
                         None => {
-                            let opened = self.begin_import(table)?;
-                            self.reserve_import_rows(table, take, opened)?
+                            let opened = self.begin_import(table).await?;
+                            self.reserve_import_rows(table, take, opened).await?
                         }
                     };
                     let base = range.base;
@@ -205,21 +261,35 @@ impl Engine {
                     if !segments.contains(&segment) {
                         segments.push(segment);
                     }
+                    // Both hooks take a lock and allocate per row; on a table
+                    // with no secondary index or no text/vector index they find
+                    // nothing eight million times over.
+                    let secondary_targets = if self.has_secondary_indexes(table) {
+                        self.secondary_targets(table, &schema)
+                    } else {
+                        Vec::new()
+                    };
+                    let needs_texts = self.has_text_or_vector_indexes(table);
                     let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(take);
                     for (k, row) in batch[start..start + take].iter().enumerate() {
-                        self.update_indexes_on_insert(table, base + k, row, &schema)?;
-                        texts_by_row
-                            .push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                        self.insert_secondary_keys(&secondary_targets, base + k, row)?;
+                        if needs_texts {
+                            texts_by_row
+                                .push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                        }
                     }
-                    // One batch for the full-text columns: tokenise without the
-                    // column lock, insert under it once.
-                    let text_batch: Vec<(usize, &[String])> = texts_by_row
-                        .iter()
-                        .map(|(seq, cells)| (*seq, cells.as_slice()))
-                        .collect();
-                    self.update_text_indexes_batch(table, &text_batch, &schema, None);
-                    for (seq, texts) in &texts_by_row {
-                        self.update_vector_caches(table, *seq, texts);
+                    if needs_texts {
+                        // One batch for the full-text columns: tokenise without
+                        // the column lock, insert under it once.
+                        let text_batch: Vec<(usize, &[String])> = texts_by_row
+                            .iter()
+                            .map(|(seq, cells)| (*seq, cells.as_slice()))
+                            .collect();
+                        self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                            .await;
+                        for (seq, texts) in &texts_by_row {
+                            self.update_vector_caches(table, *seq, texts);
+                        }
                     }
                     total += take;
                     staged += take;
@@ -233,7 +303,17 @@ impl Engine {
         if staged > 0 {
             // One `create` boundary per staged batch, across every segment this
             // statement opened.
-            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)?;
+            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)
+                .await?;
+            // `live_rows` is what the query path's cache freshness and index
+            // coverage gates compare against, and it adds a *delta* to a
+            // published count - so every write path has to report its rows.
+            // `INSERT` does (`note_live_rows` in the commit hook), `COPY` did
+            // not: a table loaded by `COPY` kept the count of whatever last
+            // published it (`row_count`, or a vector cache build over the rows
+            // of the time), which made a stale vector cache look fresh and let
+            // an index that covers part of the table pass the coverage gate.
+            self.note_live_rows(table, staged as isize);
         } else {
             drop(t);
         }
@@ -243,7 +323,7 @@ impl Engine {
     /// Loads a `FORMAT JSONL` copy: one JSON object per line, keyed by column
     /// name. Sparse columns come as `{index: value}` objects (float) or index
     /// arrays (bit); everything else is a scalar.
-    pub(crate) fn copy_from_jsonl(
+    pub(crate) async fn copy_from_jsonl(
         &self,
         table: &str,
         text: &str,
@@ -262,11 +342,12 @@ impl Engine {
             }
         }
         self.insert_json_objects(table, &objects, types, defaults)
+            .await
     }
 
     /// Loads a `FORMAT JSON` copy: the whole file is one JSON array whose
     /// elements are objects keyed by column name.
-    pub(crate) fn copy_from_json(
+    pub(crate) async fn copy_from_json(
         &self,
         table: &str,
         text: &str,
@@ -283,12 +364,13 @@ impl Engine {
             }
         }
         self.insert_json_objects(table, &objects, types, defaults)
+            .await
     }
 
     /// Inserts one row per JSON object (keyed by column name). Sparse columns
     /// come as `{index: value}` objects (float) or index arrays (bit);
     /// everything else is a scalar.
-    pub(crate) fn insert_json_objects(
+    pub(crate) async fn insert_json_objects(
         &self,
         table: &str,
         objects: &[Vec<(String, expression::json::Json)>],
@@ -354,8 +436,8 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let opened = self.begin_import(table)?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
+        let opened = self.begin_import(table).await?;
+        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
@@ -366,7 +448,7 @@ impl Engine {
         // block as part of the transaction, after it commits.
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        let _ts = self.txn.commit_at_deferred(t, ts)?;
+        let _ts = self.txn.commit_at_deferred(t, ts).await?;
         let _visible = BottomGuard::new(&self.txn, _ts);
         self.note_append(table, rows.len(), true, Some(_ts));
         self.note_import_ts(table, (base >> 32) as u32, _ts);
@@ -381,12 +463,13 @@ impl Engine {
             .iter()
             .map(|(seq, cells)| (*seq, cells.as_slice()))
             .collect();
-        self.update_text_indexes_batch(table, &text_batch, &schema, None);
+        self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+            .await;
         for (seq, texts) in &texts_by_row {
             self.update_vector_caches(table, *seq, texts);
         }
         self.dump_hnsw_over_capacity(table);
-        self.dump_secondary_over_capacity(table);
+        self.dump_secondary_over_capacity(table).await;
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -396,7 +479,7 @@ impl Engine {
     /// `ApplySegmentIDs`, the `ImportV2` frame, the block write and the
     /// published rows. Every import format parses into the same literals and
     /// lands here.
-    fn import_literal_rows(
+    async fn import_literal_rows(
         &self,
         table: &str,
         rows: Vec<Vec<Literal>>,
@@ -406,8 +489,8 @@ impl Engine {
         let t1 = std::time::Instant::now();
         // `ApplySegmentIDs`: a segment of the statement's own, with no append
         // record yet - the records are written when it commits.
-        let opened = self.begin_import(table)?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened)?;
+        let opened = self.begin_import(table).await?;
+        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
@@ -422,11 +505,14 @@ impl Engine {
         // it commits - a statement that loses its commit leaves neither behind.
         let turn = self.txn.reserve_commit_ts();
         let ts = turn.ts();
-        let ts = self.txn.commit_at_deferred(t, ts)?;
+        let ts = self.txn.commit_at_deferred(t, ts).await?;
         let t_commit = t2.elapsed();
         let t3 = std::time::Instant::now();
         let _visible = BottomGuard::new(&self.txn, ts);
         self.note_append(table, rows.len(), true, Some(ts));
+        // The published live-row count, as `INSERT` reports it: the cache
+        // freshness and index coverage gates compare against it.
+        self.note_live_rows(table, rows.len() as isize);
         let segment = (base >> 32) as u32;
         let imported = self.segment_rows(table, segment as usize) as u64;
         self.note_import_rows(table, segment, imported);
@@ -438,7 +524,7 @@ impl Engine {
         // bottom gate (and mark the thread as its bottom, so the block writer
         // does not re-enter it).
         let gate = self.bottom_gate(table);
-        let _turn = gate.lock().unwrap();
+        let _turn = gate.lock().await;
         let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
         self.publish_rows(table, base, &rows)?;
         // `AppendInBlock`: the import's block is readable as soon as the

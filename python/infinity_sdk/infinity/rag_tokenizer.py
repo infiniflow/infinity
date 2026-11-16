@@ -82,7 +82,11 @@ def _fold_char(char: str) -> str:
         return char
     decomposed = unicodedata.normalize("NFD", char)
     base = decomposed[0]
-    if base.isascii() and base.isalpha() and all(unicodedata.combining(c) for c in decomposed[1:]):
+    if (
+        base.isascii()
+        and base.isalpha()
+        and all(unicodedata.combining(c) for c in decomposed[1:])
+    ):
         return base
     return char
 
@@ -133,7 +137,9 @@ class RagTokenizer:
             logging.info(f"Using user dictionary: {user_dict}")
         else:
             if user_dict and not os.path.exists(user_dict):
-                logging.warning(f"User dictionary not found: {user_dict}, using default")
+                logging.warning(
+                    f"User dictionary not found: {user_dict}, using default"
+                )
             current_dir = os.path.dirname(os.path.abspath(__file__))
             resource_dir = "/usr/share/infinity/resource/rag"
             current_dir_huqie = os.path.join(current_dir, "huqie.txt")
@@ -143,7 +149,9 @@ class RagTokenizer:
             elif os.path.exists(resource_dir_huqie):
                 self.DIR_ = resource_dir_huqie
             else:
-                logging.error(f"Dictionary huqie.txt not found in {current_dir} and {resource_dir}")
+                logging.error(
+                    f"Dictionary huqie.txt not found in {current_dir} and {resource_dir}"
+                )
                 exit(1)
             logging.info(f"Using default dictionary: {self.DIR_}")
 
@@ -163,11 +171,15 @@ class RagTokenizer:
                 return
             except Exception:
                 # fail to load trie from file, build default trie
-                logging.exception(f"[HUQIE]:Fail to load trie file {trie_file_name}, build the default trie file")
+                logging.exception(
+                    f"[HUQIE]:Fail to load trie file {trie_file_name}, build the default trie file"
+                )
                 self.trie_ = datrie.Trie(string.printable)
         else:
             # file not exist, build default trie
-            logging.info(f"[HUQIE]:Trie file {trie_file_name} not found, build the default trie file")
+            logging.info(
+                f"[HUQIE]:Trie file {trie_file_name} not found, build the default trie file"
+            )
             self.trie_ = datrie.Trie(string.printable)
 
         # load data from dict file and save to trie file
@@ -197,7 +209,10 @@ class RagTokenizer:
         if self._fold_diacritics:
             # Folded to ASCII in tokenize() and left unstemmed: there is no
             # Snowball stemmer for these languages (see _normalize_token).
-            logging.debug("Tokenizer language set to '%s' (diacritics folding, no stemming)", language)
+            logging.debug(
+                "Tokenizer language set to '%s' (diacritics folding, no stemming)",
+                language,
+            )
             return
 
         snowball_lang = _SNOWBALL_LANGUAGE_MAP.get(lang_key)
@@ -213,7 +228,9 @@ class RagTokenizer:
                 self._use_lemmatizer = False
             logging.debug(
                 "Tokenizer language set to '%s' (Snowball: %s, lemmatizer: %s)",
-                language, snowball_lang, self._use_lemmatizer,
+                language,
+                snowball_lang,
+                self._use_lemmatizer,
             )
         else:
             # Unsupported language (Chinese, Japanese, Korean, etc.) –
@@ -233,7 +250,9 @@ class RagTokenizer:
                 inside_code = 0x0020
             else:
                 inside_code -= 0xFEE0
-            if inside_code < 0x0020 or inside_code > 0x7E:  # After the conversion, if it's not a half-width character, return the original character.
+            if (
+                inside_code < 0x0020 or inside_code > 0x7E
+            ):  # After the conversion, if it's not a half-width character, return the original character.
                 rstring += uchar
             else:
                 rstring += chr(inside_code)
@@ -282,19 +301,28 @@ class RagTokenizer:
                     copy_pretks.append((t, self.trie_[k]))
                 else:
                     copy_pretks.append((t, (-12, "")))
-                next_res = self.dfs_(chars, mid, copy_pretks, tkslist, _depth + 1, _memo)
+                next_res = self.dfs_(
+                    chars, mid, copy_pretks, tkslist, _depth + 1, _memo
+                )
                 res = max(res, next_res)
                 _memo[state_key] = res
                 return res
 
         S = s + 1
         if s + 2 <= len(chars):
-            t1 = "".join(chars[s: s + 1])
-            t2 = "".join(chars[s: s + 2])
-            if self.trie_.has_keys_with_prefix(self.key_(t1)) and not self.trie_.has_keys_with_prefix(self.key_(t2)):
+            t1 = "".join(chars[s : s + 1])
+            t2 = "".join(chars[s : s + 2])
+            if self.trie_.has_keys_with_prefix(
+                self.key_(t1)
+            ) and not self.trie_.has_keys_with_prefix(self.key_(t2)):
                 S = s + 2
-        if len(preTks) > 2 and len(preTks[-1][0]) == 1 and len(preTks[-2][0]) == 1 and len(preTks[-3][0]) == 1:
-            t1 = preTks[-1][0] + "".join(chars[s: s + 1])
+        if (
+            len(preTks) > 2
+            and len(preTks[-1][0]) == 1
+            and len(preTks[-2][0]) == 1
+            and len(preTks[-3][0]) == 1
+        ):
+            t1 = preTks[-1][0] + "".join(chars[s : s + 1])
             if self.trie_.has_keys_with_prefix(self.key_(t1)):
                 S = s + 2
 
@@ -312,7 +340,7 @@ class RagTokenizer:
             _memo[state_key] = res
             return res
 
-        t = "".join(chars[s: s + 1])
+        t = "".join(chars[s : s + 1])
         k = self.key_(t)
         copy_pretks = copy.deepcopy(preTks)
         if k in self.trie_:
@@ -486,10 +514,14 @@ class RagTokenizer:
 
             i, j, _i, _j = 0, 0, 0, 0
             same = 0
-            while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
+            while (
+                i + same < len(tks1)
+                and j + same < len(tks)
+                and tks1[i + same] == tks[j + same]
+            ):
                 same += 1
             if same > 0:
-                res.append(" ".join(tks[j: j + same]))
+                res.append(" ".join(tks[j : j + same]))
             _i = i + same
             _j = j + same
             j = _j + 1
@@ -514,9 +546,13 @@ class RagTokenizer:
                 res.append(" ".join(self._sort_tokens(tkslist)[0][0]))
 
                 same = 1
-                while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
+                while (
+                    i + same < len(tks1)
+                    and j + same < len(tks)
+                    and tks1[i + same] == tks[j + same]
+                ):
                     same += 1
-                res.append(" ".join(tks[j: j + same]))
+                res.append(" ".join(tks[j : j + same]))
                 _i = i + same
                 _j = j + same
                 j = _j + 1
@@ -604,15 +640,18 @@ def naive_qie(txt):
     return tks
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Rag Tokenizer')
-    parser.add_argument('text', nargs='?', help='Text to tokenize')
-    parser.add_argument('-f', '--file', help='Input file path (one text per line)')
-    parser.add_argument('-o', '--output', help='Output file path')
-    parser.add_argument('--fine-grained', action='store_true',
-                        help='Use fine-grained tokenization')
-    parser.add_argument('--user-dict', help='User dictionary file')
-    parser.add_argument('-l', '--language', help='Language for stemming (e.g., english, dutch)')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Rag Tokenizer")
+    parser.add_argument("text", nargs="?", help="Text to tokenize")
+    parser.add_argument("-f", "--file", help="Input file path (one text per line)")
+    parser.add_argument("-o", "--output", help="Output file path")
+    parser.add_argument(
+        "--fine-grained", action="store_true", help="Use fine-grained tokenization"
+    )
+    parser.add_argument("--user-dict", help="User dictionary file")
+    parser.add_argument(
+        "-l", "--language", help="Language for stemming (e.g., english, dutch)"
+    )
 
     args = parser.parse_args()
 
@@ -631,7 +670,7 @@ if __name__ == '__main__':
 
         logging.info(f"Processing file: {args.file}")
         texts = []
-        with open(args.file, 'r', encoding='utf-8') as f:
+        with open(args.file, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:  # Skip empty lines
@@ -676,13 +715,13 @@ if __name__ == '__main__':
     if args.output:
         # Write to output file
         logging.info(f"Writing results to output file: {args.output}")
-        with open(args.output, 'w', encoding='utf-8') as f:
+        with open(args.output, "w", encoding="utf-8") as f:
             for i, (text, result) in enumerate(zip(texts, results), 1):
                 if isinstance(result, list):
-                    output_line = ' '.join(result)
+                    output_line = " ".join(result)
                 else:
                     output_line = str(result)
-                f.write(output_line + '\n')
+                f.write(output_line + "\n")
         logging.info(f"Results written to {args.output}")
     else:
         # Print to console

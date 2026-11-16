@@ -26,7 +26,7 @@ fn table_exists(engine: &Engine, table: &str) -> bool {
 
 fn index_exists(engine: &Engine, table: &str, index: &str) -> bool {
     engine
-        .execute(&format!("SHOW TABLE {table} INDEX {index};"))
+        .execute_blocking(&format!("SHOW TABLE {table} INDEX {index};"))
         .is_ok()
 }
 
@@ -52,7 +52,7 @@ fn wal_replay_database() {
     for db in ["db1", "db2", "db3", "db4"] {
         h::ok(&e, &format!("CREATE DATABASE {db};"));
     }
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     h::ok(&e, "CREATE DATABASE db5;");
     h::ok(&e, "DROP DATABASE db1;");
@@ -90,7 +90,7 @@ fn wal_replay_tables() {
         "CREATE TABLE default_db.tbl3 \
          (tiny_int_col TINYINT, big_int_col BIGINT, double_col DOUBLE);",
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let e = h::reopen(e, dir.path());
     assert!(table_exists(&e, "tbl1"));
@@ -126,7 +126,7 @@ fn wal_replay_append() {
         e.insert_literals("default_db.tbl4", None, rows).unwrap(),
         QueryResult::Inserted { count: 2 }
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let e = h::reopen(e, dir.path());
     h::ok(&e, "CREATE TABLE default_db.tbl5 (tiny_int_col TINYINT);");
@@ -160,7 +160,7 @@ fn wal_replay_import() {
     for table in ["tbl1", "tbl2"] {
         create_tiny_big_double(&e, &format!("default_db.{table}"));
     }
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     create_tiny_big_double(&e, "default_db.tbl3");
 
     for _ in 0..2 {
@@ -214,7 +214,7 @@ fn wal_replay_compact() {
             .collect();
         e.insert_literals("default_db.tbl1", None, rows).unwrap();
     }
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.segment_ids("tbl1"), vec![0]);
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
     assert_eq!(e.block_ids("tbl1", 0), vec![0, 1]);
@@ -262,7 +262,7 @@ fn wal_replay_create_index_ivf_flat() {
         "CREATE INDEX idx1 ON default_db.test_annivfflat (col1) \
          USING IVF WITH (metric = 'l2');",
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let e = h::reopen(e, dir.path());
     assert!(index_exists(&e, "default_db.test_annivfflat", "idx1"));
@@ -289,7 +289,7 @@ fn wal_replay_create_index_hnsw() {
         "CREATE INDEX hnsw_index ON default_db.test_hnsw (col1) USING HNSW \
          WITH (metric = 'l2', encode = 'plain', m = 16, ef_construction = 200);",
     );
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     let e = h::reopen(e, dir.path());
     assert!(index_exists(&e, "default_db.test_hnsw", "hnsw_index"));
@@ -361,7 +361,7 @@ fn repeat_replay_append() {
 
     append_repeat_row(&e);
     check_repeat_rows(&e, 2, false);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     append_repeat_row(&e);
     check_repeat_rows(&e, 3, false);
@@ -404,7 +404,7 @@ fn repeat_replay_import() {
     import_block(&e);
     assert_eq!(h::segment_rows(&e, "tb1"), 16384);
 
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     import_block(&e);
     assert_eq!(h::segment_rows(&e, "tb1"), 24576);
 
@@ -456,7 +456,7 @@ fn recycle_wal_after_delta_checkpoint() {
     );
     // The reference checkpoint: make the rows durable, then let the reclaimer
     // drop what the KV base already holds.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e.checkpoint_wal();
     // The recycled log must still be a valid frame stream.
     storage::WalManager::read_all(&wal_path).unwrap();

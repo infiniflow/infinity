@@ -1440,7 +1440,7 @@ geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担�
 | （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
 | `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描（由 SQL 测试覆盖） |
 | `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | PGM 查找/重复键/边界、VARCHAR 哈希、低基数 Roaring 往返已覆盖；跨事务集成由 SQL 测试覆盖 |
-| `knn/hnsw/*_ut.cpp` | `index::vector::HnswIndex` | plain 图的插入/检索/ef 已覆盖；`LSG`/`LVQ`/`RaBitQ` 变体不进入 SQL 面（已登记设计变更） |
+| `knn/hnsw/*_ut.cpp` | `index::vector::HnswIndex` | plain 图的插入/检索/ef 已覆盖；`LSG`/`LVQ`/`RaBitQ` 的存储与距离变体由 `lvq`/`rabitq`/`lsg` 三个模块的单测 + SQL 面（`encode`/`build_type` 选项）覆盖 |
 | `knn/sparse/*_ut.cpp` | `index::sparse` / `bmp_cpp` | 块/ivt 不变量与序列化往返已覆盖；`alpha` 剪枝边界用例未逐个移植 |
 | `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排、阈值回退、PQ 预过滤已覆盖；`test_fakepq` 的 OPQ 训练由写入路径测试覆盖 |
 | `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 索引生命周期已覆盖；任务调度/重试场景未移植（调度器为 D4 豁免） |

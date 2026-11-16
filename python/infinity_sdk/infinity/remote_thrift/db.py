@@ -32,8 +32,12 @@ class RemoteDatabase(Database, ABC):
         self._db_name = name
 
     @name_validity_check("table_name", "Table")
-    def create_table(self, table_name: str, columns_definition,
-                     conflict_type: ConflictType = ConflictType.Error):
+    def create_table(
+        self,
+        table_name: str,
+        columns_definition,
+        conflict_type: ConflictType = ConflictType.Error,
+    ):
         # process column definitions
         """
         db_obj.create_table("my_table",
@@ -62,11 +66,16 @@ class RemoteDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
 
-        res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
-                                      column_defs=column_defs,
-                                      conflict_type=create_table_conflict)
+        res = self._conn.create_table(
+            db_name=self._db_name,
+            table_name=table_name,
+            column_defs=column_defs,
+            conflict_type=create_table_conflict,
+        )
 
         if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
@@ -76,17 +85,25 @@ class RemoteDatabase(Database, ABC):
     @name_validity_check("table_name", "Table")
     def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
         if conflict_type == ConflictType.Error:
-            res = self._conn.drop_table(db_name=self._db_name, table_name=table_name,
-                                        conflict_type=ttypes.DropConflict.Error)
-            if (res.error_code == ErrorCode.OK):
+            res = self._conn.drop_table(
+                db_name=self._db_name,
+                table_name=table_name,
+                conflict_type=ttypes.DropConflict.Error,
+            )
+            if res.error_code == ErrorCode.OK:
                 return res
             else:
                 raise InfinityException(res.error_code, res.error_msg)
         elif conflict_type == ConflictType.Ignore:
-            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
-                                         conflict_type=ttypes.DropConflict.Ignore)
+            return self._conn.drop_table(
+                db_name=self._db_name,
+                table_name=table_name,
+                conflict_type=ttypes.DropConflict.Ignore,
+            )
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
+            raise InfinityException(
+                ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type"
+            )
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
@@ -97,8 +114,7 @@ class RemoteDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def show_table(self, table_name):
-        res = self._conn.show_table(
-            db_name=self._db_name, table_name=table_name)
+        res = self._conn.show_table(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -106,8 +122,7 @@ class RemoteDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def get_table(self, table_name):
-        res = self._conn.get_table(
-            db_name=self._db_name, table_name=table_name)
+        res = self._conn.get_table(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
@@ -115,8 +130,9 @@ class RemoteDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def create_table_snapshot(self, snapshot_name: str, table_name: str):
-        res = self._conn.create_table_snapshot(db_name=self._db_name, table_name=table_name,
-                                               snapshot_name=snapshot_name)
+        res = self._conn.create_table_snapshot(
+            db_name=self._db_name, table_name=table_name, snapshot_name=snapshot_name
+        )
         if res.error_code == ErrorCode.OK:
             return res
         else:

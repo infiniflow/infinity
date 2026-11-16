@@ -29,7 +29,7 @@ const PLANS: [&str; 12] = [
 const TEXT: &str = "abcdefghijklmnopqrstuvwxyz";
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -63,17 +63,17 @@ fn insert_one(engine: &Engine, table: &str, value: i64) {
 /// `TestTxnCleanup::PreTest`: db1/tb1, a secondary index, two one-row imports,
 /// a merge and a checkpoint/cleanup.
 fn pre_test(engine: &Engine) {
-    engine.execute("CREATE DATABASE db1;").unwrap();
+    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
     engine
-        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
     engine
-        .execute("CREATE INDEX index1 ON db1.tb1(col1);")
+        .execute_blocking("CREATE INDEX index1 ON db1.tb1(col1);")
         .unwrap();
     insert_one(engine, "db1.tb1", 1);
     insert_one(engine, "db1.tb1", 1);
     engine.compact_all_segments("db1.tb1").unwrap();
-    engine.cleanup().unwrap();
+    crate::scheduler::block_on(engine.cleanup()).unwrap();
 }
 
 /// Runs every plan: `cleanup()` at `a`/`b`/`c`, `op` at `B`, then the check
@@ -90,7 +90,7 @@ fn run_plans(pre: impl Fn(&Engine), op: impl Fn(&Engine), check: impl Fn(&Engine
                     op(&e);
                     ran = true;
                 }
-                'a'..='c' => e.cleanup().unwrap(),
+                'a'..='c' => crate::scheduler::block_on(e.cleanup()).unwrap(),
                 // `A` (begin) and `C` (commit) have no visible state.
                 _ => {}
             }
@@ -98,12 +98,12 @@ fn run_plans(pre: impl Fn(&Engine), op: impl Fn(&Engine), check: impl Fn(&Engine
         if !ran {
             op(&e);
         }
-        e.cleanup().unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         check(&e);
 
         // `TestTxnCleanup::PostTest`.
-        e.execute("DROP DATABASE IF EXISTS db1;").unwrap();
-        e.cleanup().unwrap();
+        e.execute_blocking("DROP DATABASE IF EXISTS db1;").unwrap();
+        crate::scheduler::block_on(e.cleanup()).unwrap();
         assert!(!e.table_exists("db1.tb1"));
     }
 }
@@ -114,7 +114,7 @@ fn cleanup_with_drop_db() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("DROP DATABASE db1;").unwrap();
+            e.execute_blocking("DROP DATABASE db1;").unwrap();
         },
         |e| {
             assert!(!e.table_exists("db1.tb1"));
@@ -129,7 +129,7 @@ fn cleanup_and_drop_table() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("DROP TABLE db1.tb1;").unwrap();
+            e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
         },
         |e| {
             assert!(!e.table_exists("db1.tb1"));
@@ -143,7 +143,7 @@ fn cleanup_and_add_columns() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+            e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
                 .unwrap();
         },
         |e| {
@@ -170,7 +170,7 @@ fn cleanup_and_drop_columns() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+            e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
                 .unwrap();
         },
         |e| {
@@ -193,7 +193,8 @@ fn cleanup_and_rename_table() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+            e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+                .unwrap();
         },
         |e| {
             assert!(!e.table_exists("db1.tb1"));
@@ -225,11 +226,13 @@ fn cleanup_and_drop_index() {
     run_plans(
         pre_test,
         |e| {
-            e.execute("DROP INDEX index1 ON db1.tb1;").unwrap();
+            e.execute_blocking("DROP INDEX index1 ON db1.tb1;").unwrap();
         },
         |e| {
             assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-            assert!(e.execute("SHOW TABLE db1.tb1 INDEX index1;").is_err());
+            assert!(e
+                .execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
+                .is_err());
         },
     );
 }
@@ -244,14 +247,15 @@ fn cleanup_and_drop_index() {
 fn cleanup_and_optimize_index() {
     run_plans(
         |e| {
-            e.execute("CREATE DATABASE db1;").unwrap();
-            e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+            e.execute_blocking("CREATE DATABASE db1;").unwrap();
+            e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
                 .unwrap();
-            e.execute("CREATE INDEX index1 ON db1.tb1(col1);").unwrap();
+            e.execute_blocking("CREATE INDEX index1 ON db1.tb1(col1);")
+                .unwrap();
             for _ in 0..2 {
                 insert_one(e, "db1.tb1", 1);
                 // `DumpMemIndex`.
-                e.flush().unwrap();
+                crate::scheduler::block_on(e.flush()).unwrap();
             }
         },
         |e| {
@@ -265,7 +269,8 @@ fn cleanup_and_optimize_index() {
                 rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
                 vec![vec!["2".to_string()]]
             );
-            e.execute("SHOW TABLE db1.tb1 INDEX index1;").unwrap();
+            e.execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
+                .unwrap();
         },
     );
 }
@@ -285,7 +290,7 @@ fn cleanup_and_append() {
             // The block mirror writes each segment into its own directory, so
             // after a checkpoint the three live rows sit in the two segments
             // that hold them.
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(e.block_ids("db1.tb1", 1), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 1, 0), Some(2));
             assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
@@ -310,7 +315,7 @@ fn cleanup_and_delete() {
             assert_eq!(e.segment_ids("db1.tb1"), vec![2]);
             assert_eq!(e.segments("db1.tb1"), vec![(2, 1)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 1);
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 2, 0), Some(1));
         },
@@ -345,7 +350,7 @@ fn cleanup_and_update() {
                 rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
                 vec![vec!["1".to_string()]]
             );
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
             assert_eq!(e.block_ids("db1.tb1", 3), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 3, 0), Some(2));
         },
@@ -363,12 +368,13 @@ fn cleanup_and_dump_index() {
     run_plans(
         pre_test,
         |e| {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         },
         |e| {
             assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
             assert_eq!(count(e, "db1.tb1"), 2);
-            e.execute("SHOW TABLE db1.tb1 INDEX index1;").unwrap();
+            e.execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
+                .unwrap();
             // The dump keeps every indexed row queryable.
             assert_eq!(
                 rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),

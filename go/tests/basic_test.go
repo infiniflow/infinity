@@ -33,7 +33,7 @@ const (
 
 // TestConnection tests connect and disconnect server
 func TestConnection(t *testing.T) {
-	conn, err := infinity.Connect(testLocalHost)
+	conn, err := infinity.Connect(TestConfig.URI)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}

@@ -102,6 +102,20 @@ pub enum KeyKind {
     /// `ConvertToOrderedI64` (`DateTimeT`, `TimestampT`): a raw signed 8-byte
     /// key, `days * 86400 + seconds` (`GetEpochTime`).
     I64,
+    /// `KeepOrderedSelf<TinyIntT>`: `TinyIntT` is `int8_t`
+    /// (`parser/type/internal_types.h:55`), so the key array is one byte wide.
+    I8,
+    /// `KeepOrderedSelf<SmallIntT>`: `int16_t`, two bytes.
+    I16,
+    /// `KeepOrderedSelf<BooleanT>`: `bool`, one byte. A BOOL column is always
+    /// written as a low-cardinality chunk (`SecondaryIndexInMemT` dispatches
+    /// BOOL onto the low path), so no high-cardinality chunk is ever produced
+    /// for it - [`write_secondary_segment_typed`] refuses the kind.
+    Bool,
+    /// `KeepOrderedString<JsonTermT>`: a variable-length JSON term. A JSON
+    /// column is low-cardinality only (the reference rejects a high-cardinality
+    /// JSON index outright), so this kind has no key width and no PGM layout.
+    Bytes,
 }
 
 impl KeyKind {
@@ -110,20 +124,30 @@ impl KeyKind {
         match self {
             KeyKind::U64 | KeyKind::F64 | KeyKind::I64 => 8,
             KeyKind::F32 | KeyKind::I32 => 4,
+            KeyKind::I16 => 2,
+            KeyKind::I8 | KeyKind::Bool => 1,
+            // Variable-length: a term is `u32 len` + bytes. Only the
+            // low-cardinality writer sees it, and it never asks for a width.
+            KeyKind::Bytes => 0,
         }
     }
 
     /// `sizeof(Segment)` for `PGMIndex<K, 64, 4, Floating>`: `{K key; Floating
     /// slope; u32 intercept;}` under `#pragma pack(push, 1)`, so there is no
-    /// padding: `8+4+4`, `4+4+4`, `8+8+4`.
+    /// padding: `sizeof(K) + 4 + 4`, or `sizeof(K) + 8 + 4` for a `double` key.
     pub fn segment_width(self) -> usize {
         match self {
             // `{u64, f32, u32}`, `{i64, f32, u32}`
             KeyKind::U64 | KeyKind::I64 => 16,
             // `{f32, f32, u32}`, `{i32, f32, u32}`
             KeyKind::F32 | KeyKind::I32 => 12,
+            // `{i16, f32, u32}`, `{i8, f32, u32}`, `{bool, f32, u32}`
+            KeyKind::I16 => 10,
+            KeyKind::I8 | KeyKind::Bool => 9,
             // `{f64, f64, u32}` — `Floating` is `double` only for `double` keys.
             KeyKind::F64 => 20,
+            // No PGM: a JSON term array is low-cardinality only.
+            KeyKind::Bytes => 0,
         }
     }
 
@@ -158,6 +182,12 @@ pub enum Key {
     F64(f64),
     I32(i32),
     I64(i64),
+    /// `TinyIntT` (`int8_t`).
+    I8(i8),
+    /// `SmallIntT` (`int16_t`).
+    I16(i16),
+    /// `BooleanT` (`bool`): a low-cardinality key, 0 or 1.
+    Bool(bool),
 }
 
 impl Key {
@@ -168,6 +198,9 @@ impl Key {
             Key::F64(_) => KeyKind::F64,
             Key::I32(_) => KeyKind::I32,
             Key::I64(_) => KeyKind::I64,
+            Key::I8(_) => KeyKind::I8,
+            Key::I16(_) => KeyKind::I16,
+            Key::Bool(_) => KeyKind::Bool,
         }
     }
 
@@ -176,6 +209,9 @@ impl Key {
             (Key::U64(a), Key::U64(b)) => a.cmp(b),
             (Key::I32(a), Key::I32(b)) => a.cmp(b),
             (Key::I64(a), Key::I64(b)) => a.cmp(b),
+            (Key::I8(a), Key::I8(b)) => a.cmp(b),
+            (Key::I16(a), Key::I16(b)) => a.cmp(b),
+            (Key::Bool(a), Key::Bool(b)) => (*a as u8).cmp(&(*b as u8)),
             _ => self.as_f64().total_cmp(&other.as_f64()),
         }
     }
@@ -187,7 +223,93 @@ impl Key {
             Key::F64(v) => v,
             Key::I32(v) => f64::from(v),
             Key::I64(v) => v as f64,
+            Key::I8(v) => f64::from(v),
+            Key::I16(v) => f64::from(v),
+            Key::Bool(v) => f64::from(u8::from(v)),
         }
+    }
+
+    /// The key as an **order-preserving** byte encoding: two keys of one kind
+    /// compare byte-wise exactly as [`Key::order`] compares them.
+    ///
+    /// The in-memory tail (`index::SecondaryIndex`) is a `BTreeMap` over these
+    /// bytes: that is what lets a range scan slice it the way the reference
+    /// slices its ordered `RcuMultiMap`, instead of decoding every key. It is
+    /// **not** the chunk layout - a chunk stores the key's raw little-endian
+    /// `OrderedKeyType` bits, which is what the reference writes.
+    pub fn ordered_bytes(self) -> Vec<u8> {
+        match self {
+            Key::U64(v) => v.to_be_bytes().to_vec(),
+            Key::I64(v) => ordered_u64_bits(v as u64).to_be_bytes().to_vec(),
+            Key::I32(v) => ((v as u32) ^ (1 << 31)).to_be_bytes().to_vec(),
+            Key::F32(v) => ordered_u32_bits(v.to_bits()).to_be_bytes().to_vec(),
+            Key::F64(v) => ordered_u64_bits(v.to_bits()).to_be_bytes().to_vec(),
+            Key::I8(v) => vec![(v as u8) ^ 0x80],
+            Key::I16(v) => ((v as u16) ^ 0x8000).to_be_bytes().to_vec(),
+            Key::Bool(v) => vec![u8::from(v)],
+        }
+    }
+
+    /// Inverse of [`Self::ordered_bytes`] for a column's key kind.
+    pub fn from_ordered_bytes(kind: KeyKind, bytes: &[u8]) -> Option<Key> {
+        Some(match kind {
+            KeyKind::U64 => Key::U64(u64::from_be_bytes(bytes.try_into().ok()?)),
+            KeyKind::I64 => {
+                Key::I64(unordered_u64_bits(u64::from_be_bytes(bytes.try_into().ok()?)) as i64)
+            }
+            KeyKind::I32 => {
+                Key::I32(((u32::from_be_bytes(bytes.try_into().ok()?)) ^ (1 << 31)) as i32)
+            }
+            KeyKind::F32 => Key::F32(f32::from_bits(unordered_u32_bits(u32::from_be_bytes(
+                bytes.try_into().ok()?,
+            )))),
+            KeyKind::F64 => Key::F64(f64::from_bits(unordered_u64_bits(u64::from_be_bytes(
+                bytes.try_into().ok()?,
+            )))),
+            KeyKind::I8 => Key::I8((*bytes.first()? ^ 0x80) as i8),
+            KeyKind::I16 => {
+                let raw = u16::from_be_bytes(bytes.get(..2)?.try_into().ok()?);
+                Key::I16((raw ^ 0x8000) as i16)
+            }
+            KeyKind::Bool => Key::Bool(*bytes.first()? != 0),
+            // A term is not a fixed-width ordered key; the JSON path keeps it
+            // as [`crate::secondary_lowcard::LowCardKey::Bytes`].
+            KeyKind::Bytes => return None,
+        })
+    }
+}
+
+/// Sortable-bits transform: maps `f64` bit patterns onto ascending `u64` order,
+/// which is exactly `f64::total_cmp`'s order (`-0.0 < +0.0`, NaN last).
+fn ordered_u64_bits(bits: u64) -> u64 {
+    if bits & (1u64 << 63) != 0 {
+        !bits
+    } else {
+        bits ^ (1u64 << 63)
+    }
+}
+
+fn unordered_u64_bits(bits: u64) -> u64 {
+    if bits & (1u64 << 63) != 0 {
+        bits ^ (1u64 << 63)
+    } else {
+        !bits
+    }
+}
+
+fn ordered_u32_bits(bits: u32) -> u32 {
+    if bits & (1u32 << 31) != 0 {
+        !bits
+    } else {
+        bits ^ (1u32 << 31)
+    }
+}
+
+fn unordered_u32_bits(bits: u32) -> u32 {
+    if bits & (1u32 << 31) != 0 {
+        bits ^ (1u32 << 31)
+    } else {
+        !bits
     }
 }
 
@@ -264,6 +386,52 @@ impl IntegralKey for i32 {
         match key {
             Key::I32(v) => v,
             other => other.as_f64() as i32,
+        }
+    }
+}
+
+impl IntegralKey for i16 {
+    const SENTINEL: Self = i16::MAX;
+    const SENTINEL_PREV: Self = i16::MAX - 1;
+    fn next(self) -> Self {
+        self.wrapping_add(1)
+    }
+    fn as_i128(self) -> i128 {
+        self as i128
+    }
+    fn approx_diff(self, key: Self) -> f64 {
+        (self as u16).wrapping_sub(key as u16) as f64
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::I16(v) => v,
+            other => other.as_f64() as i16,
+        }
+    }
+}
+
+impl IntegralKey for i8 {
+    const SENTINEL: Self = i8::MAX;
+    const SENTINEL_PREV: Self = i8::MAX - 1;
+    fn next(self) -> Self {
+        self.wrapping_add(1)
+    }
+    fn as_i128(self) -> i128 {
+        self as i128
+    }
+    fn approx_diff(self, key: Self) -> f64 {
+        (self as u8).wrapping_sub(key as u8) as f64
+    }
+    fn push_le(self, out: &mut Vec<u8>) {
+        out.push(self as u8);
+    }
+    fn from_key(key: Key) -> Self {
+        match key {
+            Key::I8(v) => v,
+            other => other.as_f64() as i8,
         }
     }
 }
@@ -1425,6 +1593,20 @@ impl<X: IntegralKey> Pgm<X> {
         if keys.is_empty() {
             return Self::default();
         }
+        // The reference probes with `*std::prev(last) + 1`. For an 8- or
+        // 16-bit key already at `numeric_limits<K>::max()` that addition
+        // overflows (signed overflow is UB in the reference), and there is no
+        // representable "one past the last key" to build the model over. Emit
+        // an empty model instead: `lookup` then binary-searches the key array,
+        // which is correct without the acceleration.
+        if keys[keys.len() - 1] == X::SENTINEL {
+            return Self {
+                n: keys.len() as u32,
+                first_key: keys[0],
+                segments: Vec::new(),
+                levels_offsets: Vec::new(),
+            };
+        }
         let last_key_plus_one = keys[keys.len() - 1].next();
         let mut segments = Vec::new();
         let mut levels_offsets = vec![0u64];
@@ -1679,8 +1861,20 @@ pub fn write_secondary_segment_typed(
         }
         KeyKind::I32 => write_integral_segment::<i32>(path, entries),
         KeyKind::I64 => write_integral_segment::<i64>(path, entries),
+        KeyKind::I16 => write_integral_segment::<i16>(path, entries),
+        KeyKind::I8 => write_integral_segment::<i8>(path, entries),
         KeyKind::F32 => write_float_segment::<f32>(path, entries),
         KeyKind::F64 => write_float_segment::<f64>(path, entries),
+        // A BOOL column never reaches the high-cardinality writer: the reference
+        // dispatches BOOL onto the low-cardinality path unconditionally
+        // (`SecondaryIndexInMemT`), and [`crate::secondary_lowcard`] is what
+        // stores it.
+        KeyKind::Bool => Err(FormatError::Io(
+            "a BOOL secondary chunk is low-cardinality only".to_string(),
+        )),
+        KeyKind::Bytes => Err(FormatError::Io(
+            "a JSON secondary chunk is low-cardinality only".to_string(),
+        )),
     }
 }
 
@@ -1785,6 +1979,11 @@ impl SecondarySegmentReader {
     /// header, so the kind has to come from the column's declared type.
     #[allow(unsafe_code)]
     pub fn open_with_kind(path: &Path, kind: KeyKind) -> Result<Self, FormatError> {
+        if kind == KeyKind::Bytes {
+            return Err(FormatError::Io(
+                "a JSON secondary chunk is low-cardinality only".to_string(),
+            ));
+        }
         let file =
             File::open(path).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
         // SAFETY: read-only mapping of an immutable chunk file.
@@ -1884,6 +2083,11 @@ impl SecondarySegmentReader {
             ))),
             KeyKind::I32 => Key::I32(i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap())),
             KeyKind::I64 => Key::I64(i64::from_le_bytes(self.map[at..at + 8].try_into().unwrap())),
+            KeyKind::I8 => Key::I8(self.map[at] as i8),
+            KeyKind::I16 => Key::I16(i16::from_le_bytes(self.map[at..at + 2].try_into().unwrap())),
+            KeyKind::Bool => Key::Bool(self.map[at] != 0),
+            // Rejected by `open_with_kind`: a JSON chunk is low-cardinality.
+            KeyKind::Bytes => Key::U64(0),
         }
     }
 
@@ -1969,6 +2173,15 @@ impl SecondarySegmentReader {
             }
         }
         lo
+    }
+
+    /// Every `(key, offset)` pair, in stored order: key order, then the order
+    /// duplicates were written. A merge reads a whole chunk this way
+    /// (`InsertMergeData` over the reference's chunk buffers).
+    pub fn pairs(&self) -> Vec<(Key, u32)> {
+        (0..self.row_count)
+            .map(|i| (self.key(i), self.offset(i)))
+            .collect()
     }
 
     /// First key of the chunk (useful for range scans).
@@ -2700,15 +2913,69 @@ mod tests {
         assert_eq!(reader.range(Key::I64(-86_400), Key::I64(0)), vec![0, 1]);
     }
 
-    /// An empty typed chunk round-trips (`n = 0`, one sentinel segment).
+    /// An empty typed chunk round-trips. `PGMIndex::build` returns before it
+    /// pushes a segment or a level (`pgm_index.hpp:97-99`), so the tail is
+    /// `n = 0`, `first_key = 0`, no segments and no levels: 16 bytes for an
+    /// `f32` key, the reference's own empty model.
     #[test]
     fn empty_typed_chunk_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("empty_f32.idx");
         write_secondary_segment_typed(&path, KeyKind::F32, &[]).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap().len(), 4 + 4 + 4 + 4);
         let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::F32).unwrap();
         assert_eq!(reader.len(), 0);
         assert!(reader.lookup(Key::F32(1.0)).is_empty());
         assert!(reader.range(Key::F32(-1.0), Key::F32(1.0)).is_empty());
+    }
+
+    /// TINYINT/SMALLINT chunks store `int8_t`/`int16_t` keys - one and two bytes,
+    /// the reference's `KeepOrderedSelf` width - and the PGM tail's stride
+    /// follows it.
+    #[test]
+    fn narrow_integer_chunks_use_their_own_width() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let i8_entries: Vec<(Key, u32)> = [(-128i8, 0u32), (-1, 1), (0, 2), (127, 3)]
+            .into_iter()
+            .map(|(key, offset)| (Key::I8(key), offset))
+            .collect();
+        let path = dir.path().join("i8.idx");
+        write_secondary_segment_typed(&path, KeyKind::I8, &i8_entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(bytes[0] as i8, -128);
+        assert_eq!(bytes[1] as i8, -1);
+        assert_eq!(bytes[3] as i8, 127);
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I8).unwrap();
+        assert_eq!(reader.len(), 4);
+        assert_eq!(reader.lookup(Key::I8(-1)), vec![1]);
+        assert_eq!(reader.range(Key::I8(0), Key::I8(127)), vec![2, 3]);
+
+        let i16_entries: Vec<(Key, u32)> = [(-32768i16, 0u32), (7, 1), (32767, 2)]
+            .into_iter()
+            .map(|(key, offset)| (Key::I16(key), offset))
+            .collect();
+        let path = dir.path().join("i16.idx");
+        write_secondary_segment_typed(&path, KeyKind::I16, &i16_entries).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(i16::from_le_bytes([bytes[0], bytes[1]]), -32768);
+        assert_eq!(i16::from_le_bytes([bytes[2], bytes[3]]), 7);
+        let reader = SecondarySegmentReader::open_with_kind(&path, KeyKind::I16).unwrap();
+        assert_eq!(reader.len(), 3);
+        assert_eq!(reader.lookup(Key::I16(7)), vec![1]);
+        assert_eq!(reader.range(Key::I16(-32768), Key::I16(0)), vec![0]);
+    }
+
+    /// BOOL and JSON chunks are low-cardinality only; the high-cardinality
+    /// writer refuses them instead of writing a chunk the reference cannot read.
+    #[test]
+    fn bool_and_json_chunks_are_refused_by_the_pgm_writer() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bool.idx");
+        assert!(
+            write_secondary_segment_typed(&path, KeyKind::Bool, &[(Key::Bool(true), 0)]).is_err()
+        );
+        let path = dir.path().join("json.idx");
+        assert!(write_secondary_segment_typed(&path, KeyKind::Bytes, &[]).is_err());
     }
 }

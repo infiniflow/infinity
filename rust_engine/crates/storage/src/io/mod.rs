@@ -7,6 +7,9 @@
 //!   `byte_slice_reader.cppm`) over a chain of [`ByteSlice`]s. Unlike the file
 //!   writer these store native little-endian integers.
 //! * [`StreamReader`] (`stream_reader.cppm`), a line reader.
+//! * [`ChunkStore`] (`chunk_store::ChunkStore`), the seam every index chunk's
+//!   bytes go through, so a persistence-manager profile owns them the way the
+//!   reference's does.
 //!
 //! The wire encodings are the observable contract of these classes and are
 //! pinned by the ported unit tests. Byte slices grow in place the same way the
@@ -1164,5 +1167,6 @@ mod tests {
     }
 }
 
+pub mod chunk_store;
 pub mod s3;
 pub mod virtual_store;

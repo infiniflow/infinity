@@ -13,7 +13,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -23,7 +23,7 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 
 fn index_exists(engine: &Engine, table: &str, index: &str) -> bool {
     engine
-        .execute(&format!("SHOW TABLE {table} INDEX {index};"))
+        .execute_blocking(&format!("SHOW TABLE {table} INDEX {index};"))
         .is_ok()
 }
 
@@ -45,9 +45,11 @@ fn columns(engine: &Engine, table: &str) -> Vec<String> {
 }
 
 fn setup(engine: &Engine, db: &str, defs: &str) {
-    engine.execute(&format!("CREATE DATABASE {db};")).unwrap();
     engine
-        .execute(&format!("CREATE TABLE {db}.tb1 ({defs});"))
+        .execute_blocking(&format!("CREATE DATABASE {db};"))
+        .unwrap();
+    engine
+        .execute_blocking(&format!("CREATE TABLE {db}.tb1 ({defs});"))
         .unwrap();
 }
 
@@ -64,23 +66,25 @@ fn index_test1() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
     assert!(index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(indexes_of_db(&e, "db1"), 1);
 
     // An indexed equality lookup still returns the stored row.
-    e.execute("INSERT INTO db1.tb1 VALUES (7, 'a');").unwrap();
+    e.execute_blocking("INSERT INTO db1.tb1 VALUES (7, 'a');")
+        .unwrap();
     assert_eq!(
         rows(&e, "SELECT col2 FROM db1.tb1 WHERE col1 = 7;"),
         vec![vec!["a".to_string()]]
     );
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(indexes_of_db(&e, "db1"), 0);
 
-    e.execute("DROP DATABASE db1;").unwrap();
-    assert!(e.execute("USE db1;").is_err());
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    assert!(e.execute_blocking("USE db1;").is_err());
 }
 
 /// C++ `index_ut.cpp:147` (`index_test2`): a secondary, a full-text and an
@@ -95,17 +99,18 @@ fn index_test2() {
         "col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,128)",
     );
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
         .unwrap();
-    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
         .unwrap();
     for idx in ["idx1", "idx2", "idx3"] {
         assert!(index_exists(&e, "db1.tb1", idx), "{idx} exists");
     }
     assert_eq!(indexes_of_db(&e, "db1"), 3);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 0);
 }
 
@@ -121,15 +126,16 @@ fn createindex_wrong_conflicttype() {
     // name and `ON` is rejected by the parser (the equivalent of the reference's
     // non-ok status).
     assert!(e
-        .execute("CREATE INDEX idx1 INVALID ON db1.tb1 (col1);")
+        .execute_blocking("CREATE INDEX idx1 INVALID ON db1.tb1 (col1);")
         .is_err());
     assert!(e
-        .execute("CREATE INDEX idx1 REPLACE ON db1.tb1 (col1);")
+        .execute_blocking("CREATE INDEX idx1 REPLACE ON db1.tb1 (col1);")
         .is_err());
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
 
     // The normal conflict type still works.
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
     assert!(index_exists(&e, "db1.tb1", "idx1"));
 }
 
@@ -141,12 +147,17 @@ fn dropindex_wrong_conflicttype() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    assert!(e.execute("DROP INDEX REPLACE idx1 ON db1.tb1;").is_err());
-    assert!(e.execute("DROP INDEX INVALID idx1 ON db1.tb1;").is_err());
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    assert!(e
+        .execute_blocking("DROP INDEX REPLACE idx1 ON db1.tb1;")
+        .is_err());
+    assert!(e
+        .execute_blocking("DROP INDEX INVALID idx1 ON db1.tb1;")
+        .is_err());
     assert!(index_exists(&e, "db1.tb1", "idx1"));
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
 }
 
@@ -162,18 +173,21 @@ fn create_index_and_drop_db() {
         "db1",
         "col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,128)",
     );
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
         .unwrap();
-    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
         .unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 3);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 0);
 
     // A create-index after the drop cannot commit.
-    assert!(e.execute("CREATE INDEX idx4 ON db1.tb1 (col1);").is_err());
+    assert!(e
+        .execute_blocking("CREATE INDEX idx4 ON db1.tb1 (col1);")
+        .is_err());
     assert!(!index_exists(&e, "db1.tb1", "idx4"));
 }
 
@@ -188,19 +202,22 @@ fn create_index_and_drop_table() {
         "db1",
         "col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,128)",
     );
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
         .unwrap();
-    e.execute("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX idx3 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
         .unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 3);
 
-    e.execute("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert_eq!(indexes_of_db(&e, "db1"), 0);
-    assert!(e.execute("CREATE INDEX idx4 ON db1.tb1 (col1);").is_err());
+    assert!(e
+        .execute_blocking("CREATE INDEX idx4 ON db1.tb1 (col1);")
+        .is_err());
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:979` (`DISABLED_SLOW_create_index_create_index`): the
@@ -213,17 +230,21 @@ fn disabled_slow_create_index_create_index() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    assert!(e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").is_err());
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    assert!(e
+        .execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .is_err());
     assert!(index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(indexes_of_db(&e, "db1"), 1);
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
     // After the drop the name can be reused.
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
     assert!(index_exists(&e, "db1.tb1", "idx1"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:1225` (`create_index_add_column`): an index created
@@ -235,9 +256,10 @@ fn create_index_add_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
     append_ids(&e, "db1.tb1", 16);
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 INT);")
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 INT);")
         .unwrap();
 
     assert!(index_exists(&e, "db1.tb1", "idx1"));
@@ -247,7 +269,7 @@ fn create_index_add_column() {
         "8"
     );
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:1624` (`create_index_drop_column`): the C++ transaction
@@ -261,20 +283,21 @@ fn create_index_drop_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx2 ON db1.tb1 (col2);").unwrap();
+    e.execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col2);")
+        .unwrap();
     // The engine keeps the index/column dependency explicit instead of dropping
     // both at once.
     assert!(e
-        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .is_err());
-    e.execute("DROP INDEX idx2 ON db1.tb1;").unwrap();
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("DROP INDEX idx2 ON db1.tb1;").unwrap();
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
 
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1"]);
     assert!(!index_exists(&e, "db1.tb1", "idx2"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:2006` (`create_index_rename_table`): the index follows a
@@ -284,10 +307,13 @@ fn create_index_rename_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("INSERT INTO db1.tb1 VALUES (5, 'a');").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO db1.tb1 VALUES (5, 'a');")
+        .unwrap();
 
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+    e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+        .unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert!(e.table_exists("db1.tb2"));
     assert!(index_exists(&e, "db1.tb2", "idx1"));
@@ -297,7 +323,7 @@ fn create_index_rename_table() {
         vec![vec!["a".to_string()]]
     );
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:2504` (`drop_index_and_drop_db`): a committed index drop
@@ -307,13 +333,16 @@ fn drop_index_and_drop_db() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
     assert_eq!(indexes_of_db(&e, "db1"), 0);
-    assert!(e.execute("DROP INDEX idx1 ON db1.tb1;").is_err());
-    assert!(e.execute("CREATE INDEX idx2 ON db1.tb1 (col1);").is_err());
+    assert!(e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").is_err());
+    assert!(e
+        .execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col1);")
+        .is_err());
 }
 
 /// C++ `index_ut.cpp:2816` (`drop_index_and_drop_table`): dropping the index
@@ -323,14 +352,15 @@ fn drop_index_and_drop_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    e.execute("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:3159` (`create_index_and_drop_index`): create then drop
@@ -342,8 +372,9 @@ fn create_index_and_drop_index() {
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
     append_ids(&e, "db1.tb1", 4);
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(e.row_count("db1.tb1").unwrap(), 4);
     assert_eq!(
@@ -351,7 +382,7 @@ fn create_index_and_drop_index() {
         "2"
     );
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:3332` (`drop_index_and_drop_index`): the first drop
@@ -361,14 +392,15 @@ fn drop_index_and_drop_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    assert!(e.execute("DROP INDEX idx1 ON db1.tb1;").is_err());
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    assert!(e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").is_err());
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
     assert!(e.table_exists("db1.tb1"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:3526` (`drop_index_add_column`): after the index is
@@ -381,15 +413,16 @@ fn drop_index_add_column() {
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
     append_ids(&e, "db1.tb1", 8);
 
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 INT);")
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 INT);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2", "col3"]);
     assert!(!index_exists(&e, "db1.tb1", "idx1"));
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8);
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:3924` (`drop_index_drop_column`): dropping the index then
@@ -407,14 +440,15 @@ fn drop_index_drop_column() {
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
 
-    e.execute("CREATE INDEX idx2 ON db1.tb1 (col2);").unwrap();
-    e.execute("DROP INDEX idx2 ON db1.tb1;").unwrap();
-    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute_blocking("CREATE INDEX idx2 ON db1.tb1 (col2);")
+        .unwrap();
+    e.execute_blocking("DROP INDEX idx2 ON db1.tb1;").unwrap();
+    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
         .unwrap();
     assert_eq!(columns(&e, "db1.tb1"), vec!["col1"]);
     assert!(!index_exists(&e, "db1.tb1", "idx2"));
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }
 
 /// C++ `index_ut.cpp:4308` (`drop_index_and_rename_table`): the index was
@@ -425,11 +459,14 @@ fn drop_index_and_rename_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");
-    e.execute("CREATE INDEX idx1 ON db1.tb1 (col1);").unwrap();
-    e.execute("INSERT INTO db1.tb1 VALUES (9, 'z');").unwrap();
+    e.execute_blocking("CREATE INDEX idx1 ON db1.tb1 (col1);")
+        .unwrap();
+    e.execute_blocking("INSERT INTO db1.tb1 VALUES (9, 'z');")
+        .unwrap();
 
-    e.execute("DROP INDEX idx1 ON db1.tb1;").unwrap();
-    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
+    e.execute_blocking("DROP INDEX idx1 ON db1.tb1;").unwrap();
+    e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+        .unwrap();
     assert!(e.table_exists("db1.tb2"));
     assert!(!index_exists(&e, "db1.tb2", "idx1"));
     assert_eq!(
@@ -437,5 +474,5 @@ fn drop_index_and_rename_table() {
         vec![vec!["z".to_string()]]
     );
 
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }

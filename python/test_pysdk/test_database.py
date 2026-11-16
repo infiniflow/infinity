@@ -109,18 +109,28 @@ class TestInfinity:
 
         for i in range(loop_count):
             # 2.1 create database:
-            self.infinity_obj.create_database('test_pysdk_test_repeatedly_create_drop_show_databases' + suffix)
+            self.infinity_obj.create_database(
+                "test_pysdk_test_repeatedly_create_drop_show_databases" + suffix
+            )
 
             # 2.2 show database
             dbs = self.infinity_obj.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                if (db_name.startswith("test_pysdk") and db_name.endswith(suffix)) or db_name == "default_db":
-                    assert db_name in ['test_pysdk_test_repeatedly_create_drop_show_databases' + suffix, "default_db"]
+                if (
+                    db_name.startswith("test_pysdk") and db_name.endswith(suffix)
+                ) or db_name == "default_db":
+                    assert db_name in [
+                        "test_pysdk_test_repeatedly_create_drop_show_databases"
+                        + suffix,
+                        "default_db",
+                    ]
                     res_dbs.append(db_name)
             assert len(res_dbs) == 2
 
-            self.infinity_obj.drop_database('test_pysdk_test_repeatedly_create_drop_show_databases' + suffix)
+            self.infinity_obj.drop_database(
+                "test_pysdk_test_repeatedly_create_drop_show_databases" + suffix
+            )
 
     def _test_drop_database_with_invalid_name(self, suffix):
         """
@@ -194,17 +204,26 @@ class TestInfinity:
 
     def _test_get_drop_db_with_two_threads(self, suffix):
         # connect
-        self.infinity_obj.drop_database("test_get_drop_db_with_two_thread" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_get_drop_db_with_two_thread" + suffix, ConflictType.Ignore
+        )
         self.infinity_obj.create_database("test_get_drop_db_with_two_thread" + suffix)
 
-        thread1 = threading.Thread(target=self.infinity_obj.drop_database("test_get_drop_db_with_two_thread" + suffix),
-                                   args=(1,))
+        thread1 = threading.Thread(
+            target=self.infinity_obj.drop_database(
+                "test_get_drop_db_with_two_thread" + suffix
+            ),
+            args=(1,),
+        )
 
         with pytest.raises(InfinityException) as e:
             # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
             thread2 = threading.Thread(
-                target=self.infinity_obj.get_database("test_get_drop_db_with_two_thread" + suffix),
-                args=(2,))
+                target=self.infinity_obj.get_database(
+                    "test_get_drop_db_with_two_thread" + suffix
+                ),
+                args=(2,),
+            )
 
             thread1.start()
             thread2.start()
@@ -234,11 +253,17 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             thread1 = threading.Thread(
-                target=self.infinity_obj.create_database("test_create_same_db_in_different_threads" + suffix),
-                args=(1,))
+                target=self.infinity_obj.create_database(
+                    "test_create_same_db_in_different_threads" + suffix
+                ),
+                args=(1,),
+            )
             thread2 = threading.Thread(
-                target=self.infinity_obj.create_database("test_create_same_db_in_different_threads" + suffix),
-                args=(2,))
+                target=self.infinity_obj.create_database(
+                    "test_create_same_db_in_different_threads" + suffix
+                ),
+                args=(2,),
+            )
             thread1.start()
             thread2.start()
 
@@ -249,7 +274,9 @@ class TestInfinity:
         assert e.value.args[0] == ErrorCode.DUPLICATE_DATABASE_NAME
 
         # drop
-        self.infinity_obj.drop_database("test_create_same_db_in_different_threads" + suffix)
+        self.infinity_obj.drop_database(
+            "test_create_same_db_in_different_threads" + suffix
+        )
 
     def test_database(self, suffix):
         self._test_database(suffix)
@@ -261,59 +288,85 @@ class TestInfinity:
         self._test_get_drop_db_with_two_threads(suffix)
         self._test_create_same_db_in_different_threads(suffix)
 
-    @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
-                                               ConflictType.Ignore,
-                                               0,
-                                               1,
-                                               ])
+    @pytest.mark.parametrize(
+        "conflict_type",
+        [
+            ConflictType.Error,
+            ConflictType.Ignore,
+            0,
+            1,
+        ],
+    )
     def test_create_with_valid_option(self, conflict_type, suffix):
         # create db
-        self.infinity_obj.drop_database("test_create_option" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_create_option" + suffix, ConflictType.Ignore
+        )
         self.infinity_obj.create_database("test_create_option" + suffix, conflict_type)
 
         self.infinity_obj.drop_database("test_create_option" + suffix)
 
-    @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
-                                               pytest.param("#@$@!%string"),
-                                               pytest.param([]),
-                                               pytest.param({}),
-                                               pytest.param(()),
-                                               ])
+    @pytest.mark.parametrize(
+        "conflict_type",
+        [
+            pytest.param(1.1),
+            pytest.param("#@$@!%string"),
+            pytest.param([]),
+            pytest.param({}),
+            pytest.param(()),
+        ],
+    )
     def test_create_with_invalid_option(self, conflict_type, suffix):
-        self.infinity_obj.drop_database("test_create_invalid_option" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_create_invalid_option" + suffix, ConflictType.Ignore
+        )
 
         with pytest.raises(InfinityException) as e:
-            self.infinity_obj.create_database("test_create_invalid_option" + suffix, conflict_type)
+            self.infinity_obj.create_database(
+                "test_create_invalid_option" + suffix, conflict_type
+            )
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
-    @pytest.mark.parametrize("conflict_type", [
-        ConflictType.Error,
-        ConflictType.Ignore,
-        0,
-        1,
-    ])
+    @pytest.mark.parametrize(
+        "conflict_type",
+        [
+            ConflictType.Error,
+            ConflictType.Ignore,
+            0,
+            1,
+        ],
+    )
     def test_drop_option_with_valid_option(self, conflict_type, suffix):
         # create db
-        self.infinity_obj.drop_database("test_drop_option" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_drop_option" + suffix, ConflictType.Ignore
+        )
         self.infinity_obj.create_database("test_drop_option" + suffix)
         self.infinity_obj.drop_database("test_drop_option" + suffix, conflict_type)
 
-        self.infinity_obj.drop_database("test_drop_option" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_drop_option" + suffix, ConflictType.Ignore
+        )
 
-    @pytest.mark.parametrize("conflict_type", [
-        pytest.param(ConflictType.Replace),
-        pytest.param(2),
-        pytest.param(1.1),
-        pytest.param("#@$@!%string"),
-        pytest.param([]),
-        pytest.param({}),
-        pytest.param(()),
-    ])
+    @pytest.mark.parametrize(
+        "conflict_type",
+        [
+            pytest.param(ConflictType.Replace),
+            pytest.param(2),
+            pytest.param(1.1),
+            pytest.param("#@$@!%string"),
+            pytest.param([]),
+            pytest.param({}),
+            pytest.param(()),
+        ],
+    )
     def test_drop_option(self, conflict_type, suffix):
         # create db
-        self.infinity_obj.drop_database("test_drop_option" + suffix, ConflictType.Ignore)
+        self.infinity_obj.drop_database(
+            "test_drop_option" + suffix, ConflictType.Ignore
+        )
         self.infinity_obj.create_database("test_drop_option" + suffix)
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.drop_database("test_drop_option" + suffix, conflict_type)

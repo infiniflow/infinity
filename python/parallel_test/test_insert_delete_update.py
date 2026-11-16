@@ -19,14 +19,19 @@ class TestInsertDeleteUpdate:
         db_obj = infinity_obj.get_database(db_name)
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table(table_name,
-                                        {"tag": {"type": "int"}, "c1": {"type": "vector,4,float"}}, ConflictType.Error)
+        table_obj = db_obj.create_table(
+            table_name,
+            {"tag": {"type": "int"}, "c1": {"type": "vector,4,float"}},
+            ConflictType.Error,
+        )
         connection_pool.release_conn(infinity_obj)
 
         threads = []
         end_time = time.time() + kRunningTime
         for i in range(kNumThread):
-            threads.append(Thread(target=random_exec, args=[connection_pool, end_time, i]))
+            threads.append(
+                Thread(target=random_exec, args=[connection_pool, end_time, i])
+            )
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
@@ -35,7 +40,7 @@ class TestInsertDeleteUpdate:
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database(db_name)
         table_obj = db_obj.get_table(table_name)
-        res, extra_result = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -45,8 +50,17 @@ def insert(table_obj):
     try:
         value = []
         for i in range(100):
-            value.append({"tag": random.randint(0, 9),
-                          "c1": [random.random(), random.random(), random.random(), random.random()]})
+            value.append(
+                {
+                    "tag": random.randint(0, 9),
+                    "c1": [
+                        random.random(),
+                        random.random(),
+                        random.random(),
+                        random.random(),
+                    ],
+                }
+            )
         table_obj.insert(value)
     except Exception as e:
         print(e)
@@ -61,13 +75,15 @@ def delete(table_obj):
 
 def updata(table_obj):
     try:
-        table_obj.update(f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}])
+        table_obj.update(
+            f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}]
+        )
     except Exception as e:
         print(e)
 
 
 def search(table_obj):
-    res, extra_result = table_obj.output(['*']).to_df()
+    res, extra_result = table_obj.output(["*"]).to_df()
     print(res)
 
 

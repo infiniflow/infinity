@@ -23,7 +23,7 @@ use parser::Literal;
 use tempfile::tempdir;
 
 fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute(sql).unwrap() {
+    for result in engine.execute_blocking(sql).unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -33,7 +33,7 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 
 /// One `DumpMemIndex` transaction, the reference's dump.
 fn dump(engine: &Engine, index: &str) {
-    engine.dump_index_transaction("db1.tb1", index).unwrap();
+    crate::scheduler::block_on(engine.dump_index_transaction("db1.tb1", index)).unwrap();
 }
 
 impl Engine {
@@ -41,7 +41,11 @@ impl Engine {
     fn secondary_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.secondary.indexes.get(column)?;
+        let index = tables
+            .get(&key)?
+            .secondary
+            .indexes
+            .get(&self.test_secondary_id(table, column))?;
         Some((index.begin_row_id()?, index.row_count()))
     }
 
@@ -52,7 +56,7 @@ impl Engine {
         let tables = self.tables.lock().unwrap();
         tables
             .get(&key)
-            .and_then(|e| e.secondary.disk.get(column))
+            .and_then(|e| e.secondary.disk.get(&self.test_secondary_id(table, column)))
             .map(|chunks| {
                 chunks
                     .iter()
@@ -66,7 +70,12 @@ impl Engine {
     fn fulltext_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.text.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .text
+            .get(&self.test_index_id(table, column, "FULLTEXT"))?
+            .read()
+            .ok()?;
         let docs = &index.mem.docs;
         Some((*docs.keys().min()?, docs.len()))
     }
@@ -75,7 +84,12 @@ impl Engine {
     fn hnsw_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.hnsw_mem.get(column)?.lock().ok()?;
+        let index = tables
+            .get(&key)?
+            .hnsw_mem
+            .get(&self.test_index_id(table, column, "HNSW"))?
+            .lock()
+            .ok()?;
         let rows = index.rows();
         Some((*rows.first()?, rows.len()))
     }
@@ -84,7 +98,10 @@ impl Engine {
     fn ivf_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let rows = tables.get(&key)?.ivf_mem.get(column)?;
+        let rows = tables
+            .get(&key)?
+            .ivf_mem
+            .get(&self.test_index_id(table, column, "IVF"))?;
         Some((rows.iter().map(|(seq, _)| *seq).min()?, rows.len()))
     }
 
@@ -92,7 +109,12 @@ impl Engine {
     fn sparse_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.sparse.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .sparse
+            .get(&self.test_index_id(table, column, "BMP"))?
+            .read()
+            .ok()?;
         Some((*index.tail.keys().min()?, index.tail.len()))
     }
 
@@ -101,7 +123,12 @@ impl Engine {
     fn mv_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
         let key = self.table_key(table);
         let tables = self.tables.lock().unwrap();
-        let index = tables.get(&key)?.mv.get(column)?.read().ok()?;
+        let index = tables
+            .get(&key)?
+            .mv
+            .get(&self.test_index_id(table, column, "EMVB"))?
+            .read()
+            .ok()?;
         Some((*index.tail.keys().min()?, index.tail.len()))
     }
 }
@@ -142,9 +169,11 @@ fn five_column_rows(start: usize, n: usize) -> Vec<Vec<Literal>> {
 fn test_index0() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT);").unwrap();
-    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT);")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .unwrap();
 
     e.insert_literals(
         "db1.tb1",
@@ -172,8 +201,9 @@ fn test_index0() {
     assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 8192)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
-    // Second dump + third block, then OptimizeIndex (a no-op for secondary in
-    // the Rust engine; the reference merges the chunks into chunk 2).
+    // Second dump + third block, then OptimizeIndex: the two chunks of the
+    // segment fold into one (`InsertMergeData` over their `(key, offset)` pairs,
+    // `OptimizeIndexInner`'s secondary case).
     dump(&e, "index1");
     e.insert_literals(
         "db1.tb1",
@@ -186,12 +216,10 @@ fn test_index0() {
     .unwrap();
     e.optimize_indexes().unwrap();
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((16384, 8192)));
-    // Each chunk records base row id 0 (the reference's
-    // `ChunkIndexMetaInfo::base_row_id_ == RowID(0,0)`) and the rows it covers.
-    assert_eq!(
-        e.secondary_chunks("db1.tb1", "col1"),
-        vec![(0, 8192), (0, 8192)]
-    );
+    // The merged chunk records base row id 0 (the reference's
+    // `ChunkIndexMetaInfo::base_row_id_ == RowID(0,0)`) and covers both blocks
+    // the two old chunks held.
+    assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 16384)]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
 }
 
@@ -202,22 +230,23 @@ fn test_index0() {
 fn test_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute(
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking(
         "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,4), \
          col4 SPARSE(FLOAT,10), col5 TENSOR(FLOAT,4));",
     )
     .unwrap();
-    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
         .unwrap();
-    e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
-    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
         .unwrap();
-    e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+    e.execute_blocking("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
         .unwrap();
-    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+    e.execute_blocking("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
         .unwrap();
 
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
@@ -225,9 +254,9 @@ fn test_index() {
     // The dump seals each index's memory tail; the checkpoint then mirrors the
     // block columns and the full-text chunk (it does not dump a memory tail).
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
-        e.dump_index_transaction("db1.tb1", index).unwrap();
+        crate::scheduler::block_on(e.dump_index_transaction("db1.tb1", index)).unwrap();
     }
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
         .unwrap();
 
@@ -256,7 +285,7 @@ fn test_index() {
 
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
         assert!(e
-            .execute(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .execute_blocking(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
             .is_ok());
     }
 }
@@ -268,11 +297,12 @@ fn test_index() {
 fn test_populate_index0() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
         .unwrap();
-    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
 
     // Two blocks appended after the indexes were created (populate path).
@@ -280,8 +310,8 @@ fn test_populate_index0() {
         .unwrap();
     e.insert_literals("db1.tb1", None, two_block_rows(8192, 8192))
         .unwrap();
-    e.dump_all_memory_indexes();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.dump_all_memory_indexes());
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     // Trigger the lazily built full-text index.
     rows(
@@ -307,8 +337,8 @@ fn test_populate_index0() {
 fn disabled_slow_test_populate_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute(
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking(
         "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,4), \
          col4 SPARSE(FLOAT,10), col5 TENSOR(FLOAT,4));",
     )
@@ -317,23 +347,24 @@ fn disabled_slow_test_populate_index() {
     // The first block predates every index: creating the index populates it.
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
         .unwrap();
-    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
-    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
         .unwrap();
-    e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
         .unwrap();
-    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute_blocking("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
         .unwrap();
-    e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+    e.execute_blocking("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
         .unwrap();
-    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+    e.execute_blocking("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+        .unwrap();
+    e.execute_blocking("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
         .unwrap();
 
     // The second block is indexed incrementally.
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
         .unwrap();
-    e.dump_all_memory_indexes();
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.dump_all_memory_indexes());
+    crate::scheduler::block_on(e.flush()).unwrap();
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
@@ -348,7 +379,7 @@ fn disabled_slow_test_populate_index() {
     assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 16384)));
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
         assert!(e
-            .execute(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .execute_blocking(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
             .is_ok());
     }
 }
@@ -358,30 +389,34 @@ fn disabled_slow_test_populate_index() {
 ///
 /// The reference also asks for `cardinality = low` and inspects
 /// `IndexSecondary::IsJsonIndex/GetSecondaryIndexCardinality/
-/// BuildOtherParamsString`. The engine explicitly rejects the cardinality hint
-/// on a JSON secondary index and has no equivalent inspector, so the reachable
-/// assertion is the successful create/list/drop of the JSON index.
+/// BuildOtherParamsString`. A JSON index is always low cardinality, so `low` is
+/// accepted and `high` is an invalid definition
+/// (`index_secondary_impl.cpp:83-89`).
 #[test]
 fn test_json_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.tb1 (id INT, meta JSON);")
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.tb1 (id INT, meta JSON);")
         .unwrap();
 
-    // The reference's `cardinality = low` option is rejected by this engine.
+    // `cardinality = high` contradicts a JSON index; `low` is what the index is
+    // anyway, so it is accepted.
     assert!(e
-        .execute(
+        .execute_blocking(
             "CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY \
-             WITH (cardinality = 'low');"
+             WITH (cardinality = 'high');"
         )
         .is_err());
     // Without the hint the JSON secondary index is created.
-    e.execute("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
+    e.execute_blocking("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
         .unwrap();
-    assert!(e.execute("SHOW TABLE db1.tb1 INDEX idx_json;").is_ok());
+    assert!(e
+        .execute_blocking("SHOW TABLE db1.tb1 INDEX idx_json;")
+        .is_ok());
 
-    e.execute("DROP INDEX idx_json ON db1.tb1;").unwrap();
-    e.execute("DROP TABLE db1.tb1;").unwrap();
-    e.execute("DROP DATABASE db1;").unwrap();
+    e.execute_blocking("DROP INDEX idx_json ON db1.tb1;")
+        .unwrap();
+    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
+    e.execute_blocking("DROP DATABASE db1;").unwrap();
 }

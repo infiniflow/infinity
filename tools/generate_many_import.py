@@ -65,8 +65,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate many import for test")
+    parser = argparse.ArgumentParser(description="Generate many import for test")
 
     parser.add_argument(
         "-g",

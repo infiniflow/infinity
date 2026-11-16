@@ -43,9 +43,8 @@ __all__ = [
     "RemoteThriftInfinityConnection",
     "connect",
     "quote_string_literal",
-    "regex_filter"
+    "regex_filter",
 ]
-
 
 
 def connect(uri=LOCAL_HOST, logger: logging.Logger = None) -> InfinityConnection:

@@ -45,12 +45,23 @@ impl BgTask for BlockingTask {
         "BlockingTask"
     }
 
-    fn run(self: Box<Self>) {
-        let (lock, cv) = &*self.gate;
-        let mut released = lock.lock().unwrap();
-        while !*released {
-            released = cv.wait(released).unwrap();
-        }
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        // Waiting on a `Condvar` is a genuine block, so the task parks a
+        // blocking-pool thread for exactly as long as the test holds the gate -
+        // that is the fixture's point (it makes the queue's backlog
+        // observable), not a shape the engine uses.
+        Box::pin(async move {
+            let gate = std::sync::Arc::clone(&self.gate);
+            crate::scheduler::scheduler()
+                .spawn_blocking(move || {
+                    let (lock, cv) = &*gate;
+                    let mut released = lock.lock().unwrap();
+                    while !*released {
+                        released = cv.wait(released).unwrap();
+                    }
+                })
+                .await;
+        })
     }
 }
 
@@ -73,11 +84,15 @@ fn wait_until(mut cond: impl FnMut() -> bool, what: &str) {
 fn global_variables_report_real_counts() {
     let dir = tempdir().unwrap();
     let engine = Arc::new(Engine::open(dir.path()).unwrap());
-    engine.execute("CREATE TABLE gv (id INT);").unwrap();
-    engine.execute("INSERT INTO gv VALUES (1), (2);").unwrap();
+    engine
+        .execute_blocking("CREATE TABLE gv (id INT);")
+        .unwrap();
+    engine
+        .execute_blocking("INSERT INTO gv VALUES (1), (2);")
+        .unwrap();
     // A checkpoint writes the C++ block mirror; reading it back is what puts
     // blocks in the engine's buffer cache (`BlockIndex::get_block`).
-    engine.flush().unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
     engine.read_blocks("gv").unwrap();
 
     // Reading the block mirror populates the engine's block cache, so the
@@ -142,7 +157,7 @@ fn global_variables_report_real_counts() {
     assert!(global(&engine, "cpu_usage").parse::<f64>().unwrap() >= 0.0);
 
     // Session scope reports this engine's own counters, not constants.
-    engine.execute("SELECT 1;").unwrap();
+    engine.execute_blocking("SELECT 1;").unwrap();
     assert!(session(&engine, "query_count").parse::<u64>().unwrap() >= 1);
     assert_eq!(session(&engine, "total_rollback_count"), "1");
 }
@@ -273,7 +288,7 @@ fn query_registry_lists_running_and_finished_statements() {
         .unwrap();
 
     assert!(engine.running_queries().is_empty());
-    engine.execute("SELECT 1;").unwrap();
+    engine.execute_blocking("SELECT 1;").unwrap();
     assert!(
         engine.running_queries().is_empty(),
         "a returned statement is no longer running"
@@ -299,7 +314,7 @@ fn query_registry_lists_running_and_finished_statements() {
         )
         .unwrap();
     for _ in 0..3 {
-        engine.execute("SELECT 2;").unwrap();
+        engine.execute_blocking("SELECT 2;").unwrap();
     }
     assert_eq!(engine.profiles().len(), 2);
     assert_eq!(engine.profiles()[0].query_text, "SELECT 2;");
@@ -311,7 +326,9 @@ fn query_registry_lists_running_and_finished_statements() {
 fn failed_statements_leave_the_registry() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
-    assert!(engine.execute("SELECT * FROM missing_table;").is_err());
+    assert!(engine
+        .execute_blocking("SELECT * FROM missing_table;")
+        .is_err());
     assert!(engine.running_queries().is_empty());
 }
 
@@ -321,9 +338,13 @@ fn failed_statements_leave_the_registry() {
 fn buffer_objects_describe_the_block_cache() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
-    engine.execute("CREATE TABLE bo (id INT);").unwrap();
-    engine.execute("INSERT INTO bo VALUES (7);").unwrap();
-    engine.flush().unwrap();
+    engine
+        .execute_blocking("CREATE TABLE bo (id INT);")
+        .unwrap();
+    engine
+        .execute_blocking("INSERT INTO bo VALUES (7);")
+        .unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
     engine.read_blocks("bo").unwrap();
 
     let objects = engine.buffer_objects();
@@ -359,9 +380,13 @@ fn all_files_walks_the_engine_directory() {
             path.display()
         );
     }
-    engine.execute("CREATE TABLE af (id INT);").unwrap();
-    engine.execute("INSERT INTO af VALUES (1);").unwrap();
-    engine.flush().unwrap();
+    engine
+        .execute_blocking("CREATE TABLE af (id INT);")
+        .unwrap();
+    engine
+        .execute_blocking("INSERT INTO af VALUES (1);")
+        .unwrap();
+    crate::scheduler::block_on(engine.flush()).unwrap();
     assert!(
         engine
             .all_files()
@@ -378,13 +403,13 @@ fn memory_indexes_report_the_in_memory_rows() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
     engine
-        .execute("CREATE TABLE mi (id INT, body VARCHAR, v EMBEDDING(2));")
+        .execute_blocking("CREATE TABLE mi (id INT, body VARCHAR, v EMBEDDING(2));")
         .unwrap();
     engine
-        .execute("CREATE INDEX mi_ft ON mi (body) USING FULLTEXT;")
+        .execute_blocking("CREATE INDEX mi_ft ON mi (body) USING FULLTEXT;")
         .unwrap();
     engine
-        .execute("INSERT INTO mi VALUES (1, 'hello world', [1.0, 0.0]);")
+        .execute_blocking("INSERT INTO mi VALUES (1, 'hello world', [1.0, 0.0]);")
         .unwrap();
 
     let rows = engine.memory_indexes();
@@ -409,7 +434,9 @@ fn memory_indexes_report_the_in_memory_rows() {
 fn rollback_counter_moves_exactly_once_per_rollback() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();
-    engine.execute("CREATE TABLE rb (id INT);").unwrap();
+    engine
+        .execute_blocking("CREATE TABLE rb (id INT);")
+        .unwrap();
 
     let txn = engine.begin_txn();
     assert_eq!(number(&engine, "active_txn_count"), 1);
@@ -459,7 +486,7 @@ fn cache_result_capacity_reports_the_configuration_not_the_sentinel() {
         "the reference's default capacity, never usize::MAX"
     );
     engine
-        .execute("SET CONFIG cache_result_capacity 64;")
+        .execute_blocking("SET CONFIG cache_result_capacity 64;")
         .unwrap();
     assert_eq!(
         engine

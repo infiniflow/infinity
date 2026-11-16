@@ -11,45 +11,59 @@ from transformers import HfArgumentParser
 
 @dataclass
 class EvalArgs:
-    languages: str = field(default="en", metadata={
-        'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh', "nargs": "+"})
-    query_result_dave_dir: str = field(default='./query-results', metadata={'help': 'Dir to save query result.'})
-    qrels_dir: str = field(default='./qrels', metadata={'help': 'Dir to qrels.'})
-    metrics: str = field(default="ndcg@10",
-                         metadata={'help': 'Metrics to evaluate. Avaliable metrics: ndcg@k, recall@k', "nargs": "+"})
+    languages: str = field(
+        default="en",
+        metadata={
+            "help": "Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh",
+            "nargs": "+",
+        },
+    )
+    query_result_dave_dir: str = field(
+        default="./query-results", metadata={"help": "Dir to save query result."}
+    )
+    qrels_dir: str = field(default="./qrels", metadata={"help": "Dir to qrels."})
+    metrics: str = field(
+        default="ndcg@10",
+        metadata={
+            "help": "Metrics to evaluate. Avaliable metrics: ndcg@k, recall@k",
+            "nargs": "+",
+        },
+    )
 
 
-all_query_types = ['bm25', 'dense', 'sparse']
+all_query_types = ["bm25", "dense", "sparse"]
 
 
 def map_metric(metric: str):
-    metric, k = metric.split('@')
-    if metric.lower() == 'ndcg':
-        return k, f'ndcg_cut.{k}'
-    elif metric.lower() == 'recall':
-        return k, f'recall.{k}'
+    metric, k = metric.split("@")
+    if metric.lower() == "ndcg":
+        return k, f"ndcg_cut.{k}"
+    elif metric.lower() == "recall":
+        return k, f"recall.{k}"
     else:
         raise ValueError(f"Unkown metric: {metric}")
 
 
 def evaluate(script_path, qrels_path, query_result_path, metrics: list):
-    cmd_prefix = ['java', '-jar', script_path]
+    cmd_prefix = ["java", "-jar", script_path]
 
     results = {}
     for metric in metrics:
         k, mapped_metric = map_metric(metric)
-        args = ['-c', '-M', str(k), '-m', mapped_metric, qrels_path, query_result_path]
+        args = ["-c", "-M", str(k), "-m", mapped_metric, qrels_path, query_result_path]
         cmd = cmd_prefix + args
 
         # print(f'Running command: {cmd}')
         shell = platform.system() == "Windows"
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell
+        )
         stdout, stderr = process.communicate()
         if stderr:
             print(stderr.decode("utf-8"))
         result_str = stdout.decode("utf-8")
         try:
-            results[metric] = float(result_str.split(' ')[-1].split('\t')[-1])
+            results[metric] = float(result_str.split(" ")[-1].split("\t")[-1])
         except Exception:
             results[metric] = result_str
     return results
@@ -61,14 +75,20 @@ def main():
     eval_args: EvalArgs
     query_result_dave_dir = eval_args.query_result_dave_dir
     languages = check_languages(eval_args.languages)
-    metrics = eval_args.metrics if isinstance(eval_args.metrics, list) else [eval_args.metrics]
-    script_path = download_evaluation_script('trec_eval')
+    metrics = (
+        eval_args.metrics
+        if isinstance(eval_args.metrics, list)
+        else [eval_args.metrics]
+    )
+    script_path = download_evaluation_script("trec_eval")
     for lang in languages:
         print("*****************************")
         print(f"Start evaluating {lang} ...")
-        qrels_path = os.path.join(eval_args.qrels_dir, f"qrels.mldr-v1.0-{lang}-test.tsv")
+        qrels_path = os.path.join(
+            eval_args.qrels_dir, f"qrels.mldr-v1.0-{lang}-test.tsv"
+        )
         for filename in os.listdir(query_result_dave_dir):
-            if not filename.startswith(f'{lang}_') or not filename.endswith('.txt'):
+            if not filename.startswith(f"{lang}_") or not filename.endswith(".txt"):
                 continue
             query_result_path = os.path.join(query_result_dave_dir, filename)
             if not os.path.isfile(query_result_path):

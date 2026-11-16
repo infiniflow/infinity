@@ -102,10 +102,10 @@ fn logical_match_scan_base_test1() {
     let dir = tempfile::tempdir().unwrap();
     let engine = crate::Engine::open(dir.path()).unwrap();
     engine
-        .execute("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .execute_blocking("create table tb_embedding(col1 int, col2 embedding(float, 4))")
         .expect("create table");
     engine
-        .execute(
+        .execute_blocking(
             "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), \
              (2, [0.2, 0.2, 0.2, 0.2])",
         )

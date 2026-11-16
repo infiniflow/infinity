@@ -182,13 +182,13 @@ impl RabitqStore {
 
     /// Sets the rotated centroid without storing any code (`Optimize`'s
     /// training half).
-    pub fn train(&mut self, vectors: &[Vec<f32>]) {
+    pub fn train<V: AsRef<[f32]>>(&mut self, vectors: &[V]) {
         if vectors.is_empty() {
             return;
         }
         let mut centroid = vec![0.0f32; self.dim];
         for v in vectors {
-            let p = self.padded(v);
+            let p = self.padded(v.as_ref());
             for (j, x) in p.iter().enumerate() {
                 centroid[j] += x;
             }
@@ -645,5 +645,284 @@ mod tests {
             }
         }
         assert!(hits >= 16, "true nearest in top-10 only {hits}/20 times");
+    }
+
+    /// Diagnostic: how far the estimator is from the exact distance, against
+    /// what the 1-bit code can theoretically carry.
+    #[test]
+    fn diag_estimator_accuracy() {
+        let dim = 128;
+        let n = 1024;
+        let mut rng = Rng(41);
+        let vectors: Vec<Vec<f32>> = (0..n).map(|_| rng.vector(dim, 100.0, 200.0)).collect();
+        let mut store = RabitqStore::new(dim, Metric::L2, 13);
+        store.build(&vectors);
+        let q = rng.vector(dim, 100.0, 200.0);
+        let query = store.make_query(&q);
+        store.make_query(&q);
+
+        // Reconstructed vectors: the 1-bit code plus norm/centroid must land
+        // near the original (the sign-only reconstruction error is ~0.36 of
+        // the norm: 1 - 2/pi).
+        let mut recon_err = 0.0f64;
+        let mut norm_sum = 0.0f64;
+        for (i, v) in vectors.iter().take(64).enumerate() {
+            let back = store.decompress(i).unwrap();
+            let e: f32 = back.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
+            recon_err += e as f64;
+            norm_sum += v.iter().map(|x| x * x).sum::<f32>() as f64;
+        }
+        eprintln!("reconstruction MSE / ||v||^2 = {:.3}", recon_err / norm_sum);
+
+        // Estimated vs exact distance.
+        let mut sum_rel = 0.0f64;
+        let mut sum_sq = 0.0f64;
+        let mut cnt = 0usize;
+        for (i, v) in vectors.iter().enumerate().take(256) {
+            let exact: f32 = v.iter().zip(&q).map(|(a, b)| (a - b) * (a - b)).sum();
+            let est = store.distance(&query, i).unwrap();
+            let rel = (est - exact) / exact;
+            sum_rel += rel as f64;
+            sum_sq += (rel as f64) * (rel as f64);
+            cnt += 1;
+            if i < 3 {
+                eprintln!("  d{i}: exact {exact:.3} est {est:.3}");
+            }
+        }
+        let mean = sum_rel / cnt as f64;
+        let rms = (sum_sq / cnt as f64).sqrt();
+        eprintln!("relative error: mean {mean:.4}, rms {rms:.4}");
+
+        // The exact 1-bit estimate (query not u8-quantized): isolates the
+        // quantization of the query from the 1-bit code's own error.
+        let mut sum_rel_bar = 0.0f64;
+        let mut sum_sq_bar = 0.0f64;
+        let c = store.rot_centroid().to_vec();
+        let mut qo = rotate(&store.padded(&q), &store.rom, dim);
+        for (r, cc) in qo.iter_mut().zip(&c) {
+            *r -= *cc;
+        }
+        let qn = qo.iter().map(|x| x * x).sum::<f32>().sqrt();
+        for x in qo.iter_mut() {
+            *x /= qn;
+        }
+        for (i, v) in vectors.iter().enumerate().take(256) {
+            let data = &store.data()[i];
+            let inv_sqrt_d = 1.0 / (dim as f32).sqrt();
+            let mut ip_bar = 0.0f32;
+            for d in 0..dim {
+                let bit = (data.code[d / 8] >> (d % 8)) & 1;
+                let x = if bit == 1 { inv_sqrt_d } else { -inv_sqrt_d };
+                ip_bar += x * qo[d];
+            }
+            let ip = ip_bar / data.error;
+            let est = (data.norm * data.norm + qn * qn - 2.0 * data.norm * qn * ip).max(0.0);
+            let exact: f32 = v.iter().zip(&q).map(|(a, b)| (a - b) * (a - b)).sum();
+            let rel = (est - exact) / exact;
+            sum_rel_bar += rel as f64;
+            sum_sq_bar += (rel as f64) * (rel as f64);
+        }
+        eprintln!(
+            "exact-query 1-bit: mean {:.4}, rms {:.4}",
+            sum_rel_bar / 256.0,
+            (sum_sq_bar / 256.0).sqrt()
+        );
+    }
+
+    /// Diagnostic: recall@10 of the estimator against the recall@10 of ranking
+    /// by the reconstructed vector (centroid + norm * sign code).
+    #[test]
+    fn diag_ranking_quality() {
+        let dim = 128;
+        let n = 8192;
+        let queries = 20;
+        let mut rng = Rng(51);
+        let vectors: Vec<Vec<f32>> = (0..n).map(|_| rng.vector(dim, 100.0, 200.0)).collect();
+        let mut store = RabitqStore::new(dim, Metric::L2, 17);
+        store.build(&vectors);
+        let mut hits_est = 0usize;
+        let mut hits_recon = 0usize;
+        for _ in 0..queries {
+            let q = rng.vector(dim, 100.0, 200.0);
+            let query = store.make_query(&q);
+            let mut truth: Vec<usize> = (0..n).collect();
+            truth.sort_by(|a, b| {
+                plain_l2(&q, &vectors[*a])
+                    .partial_cmp(&plain_l2(&q, &vectors[*b]))
+                    .unwrap()
+            });
+            let mut est: Vec<usize> = (0..n).collect();
+            est.sort_by(|a, b| {
+                store
+                    .distance(&query, *a)
+                    .unwrap()
+                    .partial_cmp(&store.distance(&query, *b).unwrap())
+                    .unwrap()
+            });
+            let mut rec: Vec<usize> = (0..n).collect();
+            rec.sort_by(|a, b| {
+                plain_l2(&q, &store.decompress(*a).unwrap())
+                    .partial_cmp(&plain_l2(&q, &store.decompress(*b).unwrap()))
+                    .unwrap()
+            });
+            hits_est += est[..10].iter().filter(|i| truth[..10].contains(i)).count();
+            hits_recon += rec[..10].iter().filter(|i| truth[..10].contains(i)).count();
+        }
+        let total = (queries * 10) as f64;
+        eprintln!(
+            "recall@10: estimator {:.3}, reconstructed {:.3}",
+            hits_est as f64 / total,
+            hits_recon as f64 / total
+        );
+    }
+
+    /// Diagnostic: what extra magnitude bits per dimension would buy, on the
+    /// same data and the same rotation. `ex = 0` is the shipped 1-bit code.
+    #[test]
+    fn diag_extra_bits() {
+        let dim = 128;
+        let n = 8192;
+        let queries = 40;
+        let mut rng = Rng(61);
+        let vectors: Vec<Vec<f32>> = (0..n).map(|_| rng.vector(dim, 100.0, 200.0)).collect();
+        let qs: Vec<Vec<f32>> = (0..queries)
+            .map(|_| rng.vector(dim, 100.0, 200.0))
+            .collect();
+        let mut store = RabitqStore::new(dim, Metric::L2, 19);
+        // The centroid must be trained, otherwise every [100, 200] vector
+        // normalizes to nearly the same direction and all recall is noise.
+        store.train(&vectors);
+        let rom = store.rom().to_vec();
+        let centroid = store.rot_centroid().to_vec();
+
+        // Rotated, centered, unit-normalized base and queries.
+        let prep = |v: &[f32]| -> (Vec<f32>, f32, f32) {
+            let mut r = rotate(&store.padded(v), &rom, dim);
+            for (x, c) in r.iter_mut().zip(&centroid) {
+                *x -= *c;
+            }
+            let norm = r.iter().map(|x| x * x).sum::<f32>().sqrt();
+            for x in r.iter_mut() {
+                *x /= norm;
+            }
+            let raw: f32 = store.padded(v).iter().map(|x| x * x).sum();
+            (r, norm, raw)
+        };
+        let base: Vec<(Vec<f32>, f32)> = vectors
+            .iter()
+            .map(|v| {
+                let (u, norm, _) = prep(v);
+                (u, norm)
+            })
+            .collect();
+        let qry: Vec<(Vec<f32>, f32)> = qs
+            .iter()
+            .map(|v| {
+                let (u, norm, _) = prep(v);
+                (u, norm)
+            })
+            .collect();
+
+        // Ground truth is query-independent of the codec, so sort once.
+        let truths: Vec<Vec<usize>> = qs
+            .iter()
+            .map(|q| {
+                let mut t: Vec<usize> = (0..n).collect();
+                t.sort_by(|a, b| {
+                    plain_l2(q, &vectors[*a])
+                        .partial_cmp(&plain_l2(q, &vectors[*b]))
+                        .unwrap()
+                });
+                t.truncate(10);
+                t
+            })
+            .collect();
+
+        // Code every base vector for one configuration: extra magnitude bits
+        // `ex` give `r_d = sign * bucket_center(|u_d|)`. `None` is the exact
+        // (unquantized) code, kept as a harness check.
+        let make_codes = |ex: Option<usize>| -> Vec<(Vec<f32>, f32)> {
+            base.iter()
+                .map(|(u, _)| {
+                    let r = match ex {
+                        None => u.clone(),
+                        Some(ex) => {
+                            let levels = (1u32 << ex) as f32;
+                            let mut r = vec![0.0f32; dim];
+                            for (d, x) in u.iter().enumerate() {
+                                let bucket = ((x.abs() * levels).floor()).min(levels - 1.0);
+                                let center = (bucket + 0.5) / levels;
+                                r[d] = if *x >= 0.0 { center } else { -center };
+                            }
+                            r
+                        }
+                    };
+                    let rr: f32 = r.iter().map(|x| x * x).sum();
+                    let ro: f32 = r.iter().zip(u).map(|(a, b)| a * b).sum();
+                    // Least-squares rescale: `r` is not unit norm, so
+                    // `<u, q> ~= (ro / rr) * <r, q>`.
+                    (r, ro / rr)
+                })
+                .collect()
+        };
+        // Base ids ordered by the estimated distance.
+        let rank = |codes: &[(Vec<f32>, f32)], qu: &[f32], qn: f32| -> Vec<usize> {
+            let mut est: Vec<(f32, usize)> = codes
+                .iter()
+                .enumerate()
+                .map(|(i, (r, c))| {
+                    let ip: f32 = r.iter().zip(qu).map(|(a, b)| a * b).sum();
+                    let cos = ip * c;
+                    let norm = base[i].1;
+                    (norm * norm + qn * qn - 2.0 * norm * qn * cos, i)
+                })
+                .collect();
+            est.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            est.into_iter().map(|(_, i)| i).collect()
+        };
+
+        let configs = [
+            None,
+            Some(0usize),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            Some(5),
+        ];
+        for ex in configs {
+            let codes = make_codes(ex);
+            let mut hits = 0usize;
+            for (qi, (qu, qn)) in qry.iter().enumerate() {
+                let order = rank(&codes, qu, *qn);
+                hits += order[..10]
+                    .iter()
+                    .filter(|i| truths[qi].contains(i))
+                    .count();
+            }
+            let label = match ex {
+                None => "exact".to_string(),
+                Some(ex) => format!("ex={ex} ({} bits/dim)", 1 + ex),
+            };
+            eprintln!(
+                "{label}: recall@10 {:.3}",
+                hits as f64 / (queries * 10) as f64
+            );
+        }
+
+        // The shipped 1-bit code under oversample-then-rerank: how often does
+        // the true top-10 land inside the estimator's own top-`m`?
+        let codes = make_codes(Some(0));
+        for m in [10usize, 20, 50, 100, 200, 400] {
+            let mut keep = 0usize;
+            for (qi, (qu, qn)) in qry.iter().enumerate() {
+                let order = rank(&codes, qu, *qn);
+                keep += truths[qi].iter().filter(|i| order[..m].contains(i)).count();
+            }
+            eprintln!(
+                "1-bit top-{m} contains the true top-10: {:.3}",
+                keep as f64 / (queries * 10) as f64
+            );
+        }
     }
 }

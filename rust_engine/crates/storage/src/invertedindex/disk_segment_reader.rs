@@ -48,18 +48,19 @@
 //! `PositionListEncoder` (see `docs/CPP_FORMAT_SPEC.md` §9.3.5).
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs;
 
+use crate::invertedindex::chunk_manifest::{ChunkManifest, LiveStats};
 use crate::mapped::MappedFile;
-use memmap2::Mmap;
 
 use crate::format::FormatError;
 use crate::invertedindex::format::position_list::decode_position_list;
 use crate::invertedindex::format::{
     build_fst, decode_dic_meta_at, decode_u32_block_all, dic_fst, encode_column_lengths,
     encode_dic, encode_term_meta_region_with_offsets, fst_get, fulltext_chunk_file,
-    DocListFormatOption, FstStream, SkipListReader, TermMeta, TermMetaFlags, TermPostings,
-    FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
+    DocListFormatOption, FstStream, SkipListFormat, SkipListReader, TermMeta, TermMetaFlags,
+    TermPostings, FULLTEXT_DICT_SUFFIX, FULLTEXT_LENGTH_SUFFIX, FULLTEXT_POSTING_SUFFIX,
+    POSTING_MINI_BLOCK,
 };
 use crate::invertedindex::index_merger::{decode_doc_block, PostingWriter};
 
@@ -177,6 +178,113 @@ pub type TermSink<'a> = dyn FnMut(&str, &[PostingEntry], &dyn Fn(u64) -> u16) + 
 /// One mini-block's decoded columns: `doc_id` deltas, frequencies, doc payloads.
 pub type DecodedDocBlock = (Vec<u32>, Vec<u32>, Vec<u16>);
 
+/// How many terms one seal batch encodes before the writer appends them.
+///
+/// Encoding is parallel, appending is sequential, and the batch bounds how much
+/// encoded output is in flight: the streaming shape's point was that sealing a
+/// large tail never holds the whole segment's postings, and a batch keeps that
+/// true while giving the pool something to do.
+const SEAL_BATCH_TERMS: usize = 256;
+
+/// One term waiting to be encoded: its name, postings and per-document payloads.
+///
+/// The payloads are resolved when the term is produced (`payload_of` borrows the
+/// caller's map) because the encoder runs later, on another thread.
+struct TermBatch {
+    term: String,
+    list: Vec<PostingEntry>,
+    payloads: Vec<u16>,
+}
+
+/// Encodes `batch` (in parallel) and appends the results to `pos` in order.
+///
+/// The per-term `TermMeta` offsets are relative to the buffer the encoder wrote
+/// into; shifting them by the position the term ends up at keeps the `.pos`
+/// slice layout identical to the serial writer's - only who did the encoding
+/// changes (plan 6.13.3).
+#[allow(clippy::too_many_arguments)] // one argument per piece of the segment being built
+fn flush_term_batch(
+    batch: &mut Vec<TermBatch>,
+    flags: TermMetaFlags,
+    base_row_id: u64,
+    doc_count: u32,
+    doc_len: std::sync::Arc<std::collections::HashMap<u64, u32>>,
+    pos: &mut Vec<u8>,
+    metas: &mut Vec<TermMeta>,
+    terms: &mut Vec<Vec<u8>>,
+) -> Result<(), FormatError> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+    // Pure encoding: each term is independent and writes only its own frame, so
+    // a term is the CPU leaf. Each becomes a tokio task under the core bound and
+    // runs on the blocking pool; the writer stays a single sequential append.
+    //
+    // The closure owns everything it reads (the term comes with the item, the
+    // doc lengths are shared by `Arc`), so each body is `'static` and a decode
+    // never borrows the caller's stack.
+    let workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .min(batch.len());
+    let items: Vec<TermBatch> = std::mem::take(batch);
+    let encode = move |item: TermBatch| -> Result<(String, Vec<u8>, TermMeta), common::Error> {
+        let fail = |e: FormatError| common::Error::Invalid(e.to_string());
+        let mut frame: Vec<u8> = Vec::new();
+        let mut writer = PostingWriter::new(flags);
+        for ((row, tf, positions), payload) in item.list.iter().zip(&item.payloads) {
+            // `docid_t` is the segment offset (`row - base_row_id`), the same
+            // subtraction the reference makes; no table and no search.
+            let Some(doc) = row
+                .checked_sub(base_row_id)
+                .filter(|offset| *offset < u64::from(doc_count))
+            else {
+                return Err(fail(FormatError::Invalid(format!(
+                    "term '{}' has a posting for row {row}, which is outside the segment \
+                     starting at {base_row_id}",
+                    item.term
+                ))));
+            };
+            let doc = doc as u32;
+            let len = doc_len.get(row).copied().unwrap_or(*tf);
+            // `PostingWriter::AddPosition` counts the frequency and writes the
+            // position stream (`posting_writer_impl.cpp:87-92`), so the two can
+            // never disagree.
+            if positions.is_empty() {
+                // Indexed without a position list: the frequency can only come
+                // from the caller (`SetCurrentTF`).
+                writer.set_current_tf(*tf);
+            } else if positions.len() == *tf as usize {
+                for p in positions {
+                    writer.add_position(*p);
+                }
+            } else {
+                return Err(fail(FormatError::Invalid(format!(
+                    "term '{}' has {} positions for document {row} but its frequency is {tf}",
+                    item.term,
+                    positions.len()
+                ))));
+            }
+            writer.end_document(doc, len, *payload);
+        }
+        let meta = writer.dump(&mut frame);
+        Ok((item.term, frame, meta))
+    };
+    let encoded: Vec<(String, Vec<u8>, TermMeta)> =
+        index::parallel::map_blocking(items, workers, encode)
+            .map_err(|e| FormatError::Invalid(e.to_string()))?;
+    for (term, frame, mut meta) in encoded {
+        let base = pos.len() as u64;
+        meta.doc_start += base;
+        meta.pos_start += base;
+        meta.pos_end += base;
+        pos.extend_from_slice(&frame);
+        metas.push(meta);
+        terms.push(term.into_bytes());
+    }
+    Ok(())
+}
+
 pub fn write_segment_index_streaming(
     index_dir: &str,
     base_name: &str,
@@ -185,6 +293,87 @@ pub fn write_segment_index_streaming(
     flags: TermMetaFlags,
     for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
 ) -> Result<(), FormatError> {
+    write_segment_index_streaming_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming`] with the chunk's live statistics stated.
+///
+/// `docs` still describes every row the chunk spans (the `.len` slots are
+/// addressed by `row - base_row_id`, so they cannot be compacted), while
+/// `live` is what a predicate still sees: the token count of the documents the
+/// caller kept (`sum(dl)`) and how many of them there are (BM25 `N`). `None`
+/// means the chunk holds every document it lists, which is the seal path's
+/// answer once deleted rows are filtered out of `docs`.
+pub fn write_segment_index_streaming_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    live: Option<LiveStats>,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        SEAL_BATCH_TERMS,
+        live,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming`] with the encode batch size stated.
+///
+/// The batch only decides how many terms are encoded together; the bytes are
+/// the same for any value, which is what `batching_does_not_change_the_bytes`
+/// pins. It exists so a test can drive the extremes (one term per batch, one
+/// batch for the whole segment) without a build-time knob.
+pub fn write_segment_index_streaming_with(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    batch_terms: usize,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    write_segment_index_streaming_with_live(
+        index_dir,
+        base_name,
+        base_row_id,
+        docs,
+        flags,
+        batch_terms,
+        None,
+        for_each_term,
+    )
+}
+
+/// [`write_segment_index_streaming_with`] with the live statistics and the
+/// publish marker of the chunk.
+#[allow(clippy::too_many_arguments)] // one argument per piece of the chunk being built, as `write_segment_index`
+pub fn write_segment_index_streaming_with_live(
+    index_dir: &str,
+    base_name: &str,
+    base_row_id: u64,
+    docs: &[(u64, u32)],
+    flags: TermMetaFlags,
+    batch_terms: usize,
+    live: Option<LiveStats>,
+    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+) -> Result<(), FormatError> {
+    let batch_terms = batch_terms.max(1);
     fs::create_dir_all(index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
 
     // A segment covers the **contiguous** row-id range `base_row_id..base_row_id
@@ -247,59 +436,63 @@ pub fn write_segment_index_streaming(
         lengths[(row - base_row_id) as usize] = *len;
         doc_len.insert(*row, *len);
     }
+    // Shared with every encode task instead of copied per batch.
+    let doc_len = std::sync::Arc::new(doc_len);
     let len_bytes = encode_column_lengths(&lengths);
 
     let mut pos: Vec<u8> = Vec::new();
     let mut metas: Vec<TermMeta> = Vec::new();
     let mut terms: Vec<Vec<u8>> = Vec::new();
-    // An error inside the callback cannot propagate through the `dyn` signature,
-    // so it is parked here and returned once the term loop is done.
+    // Terms are encoded as tokio tasks in batches (plan 6.13.3): the CPU
+    // half - doc-list and position-list encoding - is what a large seal spends
+    // its time on, while the writer itself must stay a single sequential
+    // append. A batch bounds the memory at `batch_terms` terms' postings,
+    // which is the same bound the streaming shape was introduced for.
+    let mut batch: Vec<TermBatch> = Vec::new();
     let mut failure: Option<FormatError> = None;
     {
         let mut emit = |term: &str, list: &[PostingEntry], payload_of: &dyn Fn(u64) -> u16| {
             if failure.is_some() || list.is_empty() {
                 return;
             }
-            let mut writer = PostingWriter::new(flags);
-            for (row, tf, doc_positions) in list {
-                // `docid_t` is the segment offset (`row - base_row_id`), the same
-                // subtraction the reference makes; no table and no search.
-                let Some(doc) = row
-                    .checked_sub(base_row_id)
-                    .filter(|offset| *offset < u64::from(doc_count))
-                else {
-                    failure = Some(FormatError::Invalid(format!(
-                        "term '{term}' has a posting for row {row}, which is outside the segment \
-                         starting at {base_row_id}"
-                    )));
-                    return;
-                };
-                let doc = doc as u32;
-                let len = doc_len.get(row).copied().unwrap_or(*tf);
-                // `PostingWriter::AddPosition` counts the frequency and writes the
-                // position stream (`posting_writer_impl.cpp:87-92`), so the two can
-                // never disagree.
-                if doc_positions.is_empty() {
-                    // Indexed without a position list: the frequency can only come
-                    // from the caller (`SetCurrentTF`).
-                    writer.set_current_tf(*tf);
-                } else if doc_positions.len() == *tf as usize {
-                    for p in doc_positions {
-                        writer.add_position(*p);
-                    }
-                } else {
-                    failure = Some(FormatError::Invalid(format!(
-                        "term '{term}' has {} positions for document {row} but its frequency is {tf}",
-                        doc_positions.len()
-                    )));
-                    return;
+            // The payload closure borrows the caller's storage, so the values
+            // are taken now; encoding later must not touch it.
+            let payloads: Vec<u16> = list.iter().map(|(row, _, _)| payload_of(*row)).collect();
+            batch.push(TermBatch {
+                term: term.to_string(),
+                list: list.to_vec(),
+                payloads,
+            });
+            if batch.len() >= batch_terms {
+                if let Err(error) = flush_term_batch(
+                    &mut batch,
+                    flags,
+                    base_row_id,
+                    doc_count,
+                    std::sync::Arc::clone(&doc_len),
+                    &mut pos,
+                    &mut metas,
+                    &mut terms,
+                ) {
+                    failure = Some(error);
                 }
-                writer.end_document(doc, len, payload_of(*row));
             }
-            metas.push(writer.dump(&mut pos));
-            terms.push(term.as_bytes().to_vec());
         };
         for_each_term(&mut emit);
+    }
+    if failure.is_none() {
+        if let Err(error) = flush_term_batch(
+            &mut batch,
+            flags,
+            base_row_id,
+            doc_count,
+            std::sync::Arc::clone(&doc_len),
+            &mut pos,
+            &mut metas,
+            &mut terms,
+        ) {
+            failure = Some(error);
+        }
     }
     if let Some(failure) = failure {
         return Err(failure);
@@ -310,14 +503,34 @@ pub fn write_segment_index_streaming(
     let fst = build_fst(&entries);
     let dic = encode_dic(&meta_region, &fst);
 
+    // Every file goes through the chunk store, dedicated (`try_compose = false`
+    // like the reference's full-text writer): a persistence profile publishes it
+    // as an object of its own at the same moment, instead of a checkpoint-time
+    // sweep finding it later.
+    let store = crate::chunk_store::chunk_store();
     let write = |suffix: &str, bytes: &[u8]| -> Result<(), FormatError> {
         let path = fulltext_chunk_file(index_dir, base_name, suffix);
-        crate::format::write_synced(std::path::Path::new(&path), bytes)
+        store
+            .write_dedicated(std::path::Path::new(&path), bytes)
             .map_err(|e| FormatError::Io(e.to_string()))
     };
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
+    // The publish marker goes last: it is what makes "all three files are on
+    // the disk at these sizes" a fact the loader can check. Without it a crash
+    // between the writes above leaves a `.dic` that `load_sealed` would find
+    // beside the previous generation's `.pos`/`.len`.
+    let live = live.unwrap_or_else(|| LiveStats::of(docs));
+    ChunkManifest {
+        span_docs: doc_count,
+        live_docs: live.docs.min(doc_count),
+        total_len: live.total_len,
+        dic_len: dic.len() as u64,
+        pos_len: pos.len() as u64,
+        len_len: len_bytes.len() as u64,
+    }
+    .write(index_dir, base_name)?;
     Ok(())
 }
 
@@ -339,32 +552,79 @@ pub struct SegmentIndexReader {
 }
 
 impl SegmentIndexReader {
-    /// Opens `{dir}/{base_name}.{dic,pos,len}`. Fails if any file is missing;
-    /// an empty segment (`len` file of zero bytes) is allowed.
+    /// Opens `{dir}/{base_name}.{dic,pos,len}` and validates the set.
     ///
     /// The mapping is the only `unsafe` operation in this crate: a segment is
     /// immutable once sealed, so the mapped region cannot change underneath the
     /// reader (rebuilds write a new base name instead of overwriting).
-    #[allow(unsafe_code)]
+    ///
+    /// Validation, in the order it costs:
+    ///
+    /// * `.len` must be a whole number of `u32` slots — a truncated write
+    ///   leaves a partial slot, and `doc_count` is derived from that length;
+    /// * `.dic` must carry a parseable FST region — a truncated dictionary
+    ///   would otherwise be read as a shorter one with valid-looking offsets;
+    /// * when the chunk's [`ChunkManifest`] is present, the three files must be
+    ///   the exact bytes it recorded. That is what rejects a file set published
+    ///   in two generations (`.dic` from a retried seal, `.pos`/`.len` left from
+    ///   the previous one), which decodes into wrong rows rather than failing.
+    ///
+    /// A chunk with no manifest (written by the reference, or by this port
+    /// before the marker existed) passes on the structural checks alone, so old
+    /// data stays readable.
     pub fn open(
         dir: &str,
         base_name: &str,
         base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
+        // `chunk_store().open` is the resolution step of the reference's
+        // `pm->GetObjCache` + `MmapFile(pm->GetObjPath(...))`: the local copy is
+        // used when it is there, and the object's part is mapped when the file
+        // set was only ever published to the persistence manager.
+        let store = crate::chunk_store::chunk_store();
         let map = |suffix: &str| -> Result<MappedFile, FormatError> {
             let path = fulltext_chunk_file(dir, base_name, suffix);
-            let file = File::open(&path).map_err(|e| FormatError::Io(e.to_string()))?;
-            // SAFETY: the file is read-only for the lifetime of the mapping and
-            // does not change while it is mapped (a segment is immutable once
-            // sealed).
-            let map = unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))?;
-            Ok(MappedFile::from_mmap(map))
+            store
+                .open(std::path::Path::new(&path))
+                .map_err(|e| FormatError::Io(e.to_string()))
         };
         let len = map(FULLTEXT_LENGTH_SUFFIX)?;
+        if len.len() % 4 != 0 {
+            return Err(FormatError::Invalid(format!(
+                "chunk '{base_name}': the .len file is {} bytes, not a whole number of u32 slots",
+                len.len()
+            )));
+        }
+        let dic = map(FULLTEXT_DICT_SUFFIX)?;
+        // The FST region's own trailer is the only structural check a `.dic`
+        // carries; a truncated write loses it.
+        dic_fst(&dic)?;
+        let pos = map(FULLTEXT_POSTING_SUFFIX)?;
+        if let Some(manifest) = ChunkManifest::read(dir, base_name)? {
+            if !manifest.matches_files(dic.len() as u64, pos.len() as u64, len.len() as u64) {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the files are {} / {} / {} bytes, but its marker \
+                     records {} / {} / {}",
+                    dic.len(),
+                    pos.len(),
+                    len.len(),
+                    manifest.dic_len,
+                    manifest.pos_len,
+                    manifest.len_len
+                )));
+            }
+            if manifest.span_docs as usize != len.len() / 4 {
+                return Err(FormatError::Invalid(format!(
+                    "chunk '{base_name}': the marker records {} documents but .len holds {}",
+                    manifest.span_docs,
+                    len.len() / 4
+                )));
+            }
+        }
         Ok(Self {
-            dic: map(FULLTEXT_DICT_SUFFIX)?,
-            pos: map(FULLTEXT_POSTING_SUFFIX)?,
+            dic,
+            pos,
             len,
             base_row_id,
             flags,
@@ -605,12 +865,26 @@ impl SegmentIndexReader {
         // (`VInt pos_skip_len, VInt pos_list_len, pos_skip, pos_list`); take a
         // slice of it instead of decoding the whole list.
         let mut pos_bytes = None;
+        let mut pos_skiplist = None;
         let mut at = body + doc_list_len as usize;
         if let Ok((pos_skip_len, n3)) = crate::invertedindex::format::read_vint(&slice[at..]) {
             at += n3;
             if let Ok((pos_list_len, n4)) = crate::invertedindex::format::read_vint(&slice[at..]) {
-                let start = at + n4 + pos_skip_len as usize;
-                if let Some(list) = slice.get(start..start + pos_list_len as usize) {
+                let skip_start = at + n4;
+                let list_start = skip_start + pos_skip_len as usize;
+                // The position skip list is `[u32 total_pos][u32 offset]` per
+                // flushed record (`PositionListEncoder::flush_position_buffer`
+                // → `SkipListWriter::add_item_2`), the same pair the in-memory
+                // decoder seeks with (`InMemPositionListDecoder::skip_to`). It
+                // is what keeps a hop from replaying the whole prefix.
+                if pos_skip_len > 0 {
+                    if let Some(bytes) = slice.get(skip_start..list_start) {
+                        let mut reader = SkipListReader::new(&SkipListFormat::for_position());
+                        reader.load_byte_slice(bytes, 0, bytes.len());
+                        pos_skiplist = Some(Box::new(reader));
+                    }
+                }
+                if let Some(list) = slice.get(list_start..list_start + pos_list_len as usize) {
                     if !list.is_empty() {
                         pos_bytes = Some(list);
                     }
@@ -642,6 +916,7 @@ impl SegmentIndexReader {
             last_ordinal: 0,
             df: meta.doc_freq as usize,
             pos_bytes,
+            pos_skiplist,
             pos_off: 0,
             pos_buf: Vec::new(),
             pos_at: 0,
@@ -653,6 +928,8 @@ impl SegmentIndexReader {
             pos_skip: 0,
             #[cfg(test)]
             blocks_decoded: 0,
+            #[cfg(test)]
+            pos_records_decoded: 0,
         }))
     }
 
@@ -758,6 +1035,12 @@ pub struct TermDocCursor<'a> {
     /// The position half of the term's `.pos` slice, decoded one record at a
     /// time (`MAX_POS_PER_RECORD` delta-coded positions per `u8`-framed record).
     pos_bytes: Option<&'a [u8]>,
+    /// The term's position skip list, one item per `MAX_POS_PER_RECORD`-position
+    /// record (`PositionSkipListFormat`: `[u32 total_pos][u32 offset]`). A block
+    /// hop uses it to land on the record that holds the target occurrence
+    /// instead of replaying the stream from its start; `None` for a position
+    /// list shorter than one record, which the writer never flushed an item for.
+    pos_skiplist: Option<Box<SkipListReader>>,
     pos_off: usize,
     pos_buf: Vec<u32>,
     pos_at: usize,
@@ -779,13 +1062,18 @@ pub struct TermDocCursor<'a> {
     /// without a skip item (shorter than one block), where the caller has to
     /// compute the bound from the decoded postings.
     block_max: Option<(u32, u16)>,
-    /// Occurrences still to drop from the position stream: after a block hop
-    /// the stream is re-read from its start and the skipped blocks' positions
-    /// are discarded lazily, on the first `positions()` call.
+    /// Occurrences still to drop from the position stream, counted from
+    /// `pos_off`: the prefix of the record a hop landed in, discarded lazily on
+    /// the first `positions()` call. At most one record's worth
+    /// (`MAX_POS_PER_RECORD`); a hop no longer replays the whole prefix.
     pos_skip: usize,
     /// Blocks decoded so far (the seek path's cost; tests assert on it).
     #[cfg(test)]
     blocks_decoded: usize,
+    /// Position records decoded so far (the position seek's cost; a hop into a
+    /// long list must not touch the records before the one it landed in).
+    #[cfg(test)]
+    pos_records_decoded: usize,
 }
 
 impl<'a> TermDocCursor<'a> {
@@ -983,7 +1271,8 @@ impl<'a> TermDocCursor<'a> {
     }
 
     /// The next delta-coded offset from the position stream, dropping the
-    /// occurrences of the blocks a seek hopped over (`pos_skip`).
+    /// prefix of the record a seek landed in (`pos_skip`, bounded by one
+    /// record's length).
     fn next_delta(&mut self) -> Option<u32> {
         loop {
             while self.pos_at >= self.pos_buf.len() {
@@ -995,6 +1284,10 @@ impl<'a> TermDocCursor<'a> {
                 self.pos_off = end;
                 self.pos_buf = decode_u32_block_all(payload).ok()?;
                 self.pos_at = 0;
+                #[cfg(test)]
+                {
+                    self.pos_records_decoded += 1;
+                }
                 if self.pos_buf.is_empty() {
                     return None;
                 }
@@ -1083,9 +1376,10 @@ impl<'a> TermDocCursor<'a> {
         self.tfs.clear();
         self.ordinals.clear();
         self.at = 0;
-        // The position stream is sequential: it is re-read from its start and the
-        // skipped blocks' occurrences dropped lazily, on the first `positions()`.
-        self.reset_positions(prev_ttf);
+        // The doc skip list already counted the occurrences the hop skipped; the
+        // position skip list turns that count into a record offset, so only the
+        // landed record's prefix is dropped (one record, not the whole prefix).
+        self.seek_positions(prev_ttf);
         self.fill()
     }
 
@@ -1098,8 +1392,42 @@ impl<'a> TermDocCursor<'a> {
         self.ordinals.clear();
     }
 
+    /// Lands the position stream on occurrence `skip`.
+    ///
+    /// Where [`Self::reset_positions`] rewinds to the start and drops `skip`
+    /// deltas one by one — a cost proportional to how far into the list the hop
+    /// landed, i.e. quadratic over a full scan — the position skip list maps the
+    /// occurrence count to the record that holds it (`[u32 total_pos][u32
+    /// offset]`, the pair `InMemPositionListDecoder::skip_to` seeks with). The
+    /// reference's `PositionIterator::SkipTo` does the same; a term whose
+    /// position list never flushed a record has no skip list and keeps the
+    /// rewind.
+    fn seek_positions(&mut self, skip: u32) {
+        // An item is keyed by the **last** occurrence of its record, so `+ 1`
+        // sends a `skip` that lands exactly on a record's end to the next
+        // record, whose `prev_doc_id` is that end: nothing is left to drop.
+        let hit = self
+            .pos_skiplist
+            .as_mut()
+            .and_then(|list| list.skip_to(skip.saturating_add(1)));
+        let Some(hit) = hit else {
+            self.reset_positions(skip);
+            return;
+        };
+        // `offset` is the accumulated offset **before** this item, i.e. where
+        // the record it names starts; `prev_doc_id` counts the occurrences of
+        // the records before it.
+        self.pos_off = hit.offset as usize;
+        self.pos_buf.clear();
+        self.pos_at = 0;
+        self.pos_skip = skip.saturating_sub(hit.prev_doc_id) as usize;
+        self.consumed = 0;
+        self.cur_positions.clear();
+    }
+
     /// Rewinds the position stream and marks the first `skip` occurrences as
-    /// already consumed (the blocks a seek hopped over).
+    /// already consumed (the blocks a seek hopped over). The fallback for a term
+    /// without a position skip list; see [`Self::seek_positions`].
     fn reset_positions(&mut self, skip: u32) {
         self.pos_off = 0;
         self.pos_buf.clear();
@@ -1107,6 +1435,12 @@ impl<'a> TermDocCursor<'a> {
         self.pos_skip = skip as usize;
         self.consumed = 0;
         self.cur_positions.clear();
+    }
+
+    /// Position records decoded so far (the position seek's cost).
+    #[cfg(test)]
+    pub fn pos_records_decoded(&self) -> usize {
+        self.pos_records_decoded
     }
 }
 
@@ -1298,6 +1632,43 @@ mod tests {
         }
     }
 
+    /// A hop into a long posting list must land the position stream on the
+    /// record that holds the target occurrence (the position skip list), not
+    /// replay every record before it.
+    ///
+    /// That replay is why `OPTIMIZE` used to make a phrase query slower: merging
+    /// k chunks into one multiplied the prefix a hop walks by k, so a 300k-row
+    /// phrase went from 10 s (five chunks) to 40 s (one chunk) with identical
+    /// scores. Here one hop to the last document of a 2000-document list (46
+    /// position records) must decode a handful of records, not the list.
+    #[test]
+    fn a_hop_lands_on_the_position_record_it_needs() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_str = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..2000u64).map(|row| (row, 9)).collect();
+        let postings = BTreeMap::from([(
+            "t".to_string(),
+            (0..2000u64)
+                .map(|row| (row, 3, vec![0u32, 4, 8]))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(dir_str, "hop", 0, &docs, &postings, flags).unwrap();
+        let reader = SegmentIndexReader::open(dir_str, "hop", 0, flags).unwrap();
+        let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
+        cursor.advance(1999);
+        assert_eq!(cursor.doc(), Some(1999));
+        assert_eq!(cursor.positions(), [0, 4, 8]);
+        // Within-block prefix (docs 1920..1999 x 3 occurrences, 128 per record)
+        // plus the document's own: a few records, nowhere near the 46 the
+        // rewind would walk.
+        assert!(
+            cursor.pos_records_decoded() <= 8,
+            "{} position records decoded for one hop",
+            cursor.pos_records_decoded()
+        );
+    }
+
     #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
         // 300 documents whose row ids start at 1<<32: a later insert batch, far
@@ -1370,14 +1741,23 @@ mod tests {
         assert_eq!(meta.total_tf, 300);
     }
 
-    /// A segment is exactly the reference's three files: `.dic`, `.pos`, `.len`.
+    /// A segment is exactly the reference's three files (`.dic`, `.pos`, `.len`),
+    /// with this port's publish marker kept **out** of the chunk directory.
+    ///
     /// The port used to add a `.row` sidecar (a `u64[]` row-id table); the row
-    /// of a document is now `base_row_id + docid_t`, so nothing else may be
-    /// written - an extra file in the chunk directory is a format deviation.
+    /// of a document is `base_row_id + docid_t`, so no fourth *data* file may be
+    /// written. The `.ok` marker is this port's own bookkeeping - it names the
+    /// three files' lengths and the chunk's live statistics - and it lives in a
+    /// sibling tree (`ChunkManifest::path`), because `data/` has to list exactly
+    /// what the reference writes.
     #[test]
     fn a_segment_is_exactly_the_reference_file_family() {
         let dir = tempfile::tempdir().unwrap();
-        let index_dir = dir.path().to_str().unwrap();
+        // An engine's chunk directory sits under `data/`, which is the tree that
+        // must list exactly the reference's files.
+        let chunk_dir = dir.path().join("data/db_1/tbl_0/idx_1/seg_0");
+        std::fs::create_dir_all(&chunk_dir).unwrap();
+        let index_dir = chunk_dir.to_str().unwrap();
         let docs = vec![(0u64, 7u32), (1, 9)];
         let postings: BTreeMap<String, Vec<PostingEntry>> =
             BTreeMap::from([("t".to_string(), vec![(0u64, 1u32, vec![0u32])])]);
@@ -1404,6 +1784,46 @@ mod tests {
                 "ft_0000000000000000.pos".to_string(),
             ]
         );
+        // The marker lives in the sibling `fulltext/manifests/` tree, with the
+        // chunk's relative layout below it.
+        let marker = crate::invertedindex::chunk_manifest::ChunkManifest::path(
+            index_dir,
+            "ft_0000000000000000",
+        );
+        assert_eq!(
+            marker,
+            dir.path()
+                .join("fulltext/manifests/db_1/tbl_0/idx_1/seg_0/ft_0000000000000000.ok")
+        );
+        assert!(
+            marker.exists(),
+            "the marker is not under fulltext/manifests"
+        );
+        // The marker describes the files that were just written, and every
+        // document of a fresh chunk is live.
+        let manifest = crate::invertedindex::chunk_manifest::ChunkManifest::read(
+            index_dir,
+            "ft_0000000000000000",
+        )
+        .expect("the chunk is published with a marker")
+        .expect("the marker is well formed");
+        let size = |suffix: &str| -> u64 {
+            std::fs::metadata(crate::invertedindex::format::fulltext_chunk_file(
+                index_dir,
+                "ft_0000000000000000",
+                suffix,
+            ))
+            .unwrap()
+            .len()
+        };
+        assert!(manifest.matches_files(
+            size(FULLTEXT_DICT_SUFFIX),
+            size(FULLTEXT_POSTING_SUFFIX),
+            size(FULLTEXT_LENGTH_SUFFIX)
+        ));
+        assert_eq!(manifest.span_docs, 2);
+        assert_eq!(manifest.live_docs, 2);
+        assert_eq!(manifest.total_len, 16);
     }
 
     /// A row with no text (the reference's `InsertGap`) keeps its `docid_t`: the
@@ -2080,5 +2500,82 @@ mod tests {
         assert_eq!(cursor.doc(), Some(49));
         assert_eq!(cursor.blocks_decoded, 1);
         assert_eq!(cursor.positions(), &[49 % 5]);
+    }
+
+    /// Terms are encoded in batches as tokio tasks (plan 6.13.3), and the
+    /// batch size only decides who encodes what: the three files must be the
+    /// same bytes for one term per batch, the production batch, and one batch
+    /// for the whole segment.
+    ///
+    /// This is the guarantee the byte gates rely on - a parallel encoder that
+    /// reordered or mis-offset the `.pos` slices would show up here first.
+    #[test]
+    fn batching_does_not_change_the_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap();
+        let (docs, postings) = many_term_sample();
+        let flags = tf_flags();
+
+        let write = |base_name: &str, batch_terms: usize| {
+            write_segment_index_streaming_with(
+                index_dir,
+                base_name,
+                0,
+                &docs,
+                flags,
+                batch_terms,
+                &mut |emit| {
+                    for (term, list) in &postings {
+                        let payload = |_row: u64| 0u16;
+                        emit(term, list, &payload);
+                    }
+                },
+            )
+            .unwrap();
+            let read =
+                |suffix: &str| std::fs::read(format!("{index_dir}/{base_name}{suffix}")).unwrap();
+            (
+                read(FULLTEXT_DICT_SUFFIX),
+                read(FULLTEXT_POSTING_SUFFIX),
+                read(FULLTEXT_LENGTH_SUFFIX),
+            )
+        };
+
+        let one_at_a_time = write("ft_one", 1);
+        let production = write("ft_batch", SEAL_BATCH_TERMS);
+        let all_at_once = write("ft_all", postings.len());
+        assert_eq!(one_at_a_time.0, production.0, "the dictionary moved");
+        assert_eq!(one_at_a_time.1, production.1, "the postings moved");
+        assert_eq!(one_at_a_time.2, production.2, "the lengths moved");
+        assert_eq!(all_at_once.0, production.0);
+        assert_eq!(all_at_once.1, production.1);
+        assert_eq!(all_at_once.2, production.2);
+
+        // And the segment still reads back what went in.
+        let reader = SegmentIndexReader::open(index_dir, "ft_batch", 0, flags).unwrap();
+        assert_eq!(reader.doc_count(), docs.len());
+        for (term, list) in &postings {
+            let got = reader.postings(term).unwrap();
+            let want: Vec<(u64, u32)> = list.iter().map(|(row, tf, _)| (*row, *tf)).collect();
+            assert_eq!(got, want, "term '{term}'");
+        }
+    }
+
+    /// Enough terms to cross several encode batches, several postings each.
+    #[allow(clippy::type_complexity)]
+    fn many_term_sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<PostingEntry>>) {
+        let rows = 200u64;
+        let docs: Vec<(u64, u32)> = (0..rows).map(|row| (row, 4)).collect();
+        let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
+        // 600 terms, each on every third row, so the batch boundary falls inside
+        // a term's list rather than only between single-posting terms.
+        for t in 0..600u32 {
+            let list: Vec<PostingEntry> = (t as u64..rows)
+                .step_by(3)
+                .map(|row| (row, 1u32, vec![(row % 4) as u32]))
+                .collect();
+            postings.insert(format!("term{t:04}"), list);
+        }
+        (docs, postings)
     }
 }

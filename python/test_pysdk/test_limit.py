@@ -12,6 +12,7 @@ from common import common_values
 def http(request):
     return request.config.getoption("--http")
 
+
 @pytest.fixture(scope="class")
 def setup_class(request, http):
     if http:
@@ -34,44 +35,87 @@ class TestInfinity:
         # infinity
         db_obj.drop_table("test_limit" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_limit" + suffix, {
+            "test_limit" + suffix,
+            {
                 "c1": {"type": "int", "constraints": ["primary key", "not null"]},
-                "c2": {"type": "int", "constraints": ["not null"]}}, ConflictType.Error)
+                "c2": {"type": "int", "constraints": ["not null"]},
+            },
+            ConflictType.Error,
+        )
 
         assert table_obj is not None
 
         res = table_obj.insert(
-            [{"c1": -3, "c2": 3}, {"c1": -2, "c2": 2}, {"c1": -1, "c2": 1}, {"c1": 0, "c2": 0}, {"c1": 1, "c2": 1},
-             {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
+            [
+                {"c1": -3, "c2": 3},
+                {"c1": -2, "c2": 2},
+                {"c1": -1, "c2": 1},
+                {"c1": 0, "c2": 0},
+                {"c1": 1, "c2": 1},
+                {"c1": 2, "c2": 2},
+                {"c1": 3, "c2": 3},
+            ]
+        )
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.insert(
-            [{"c1": -8, "c2": 8}, {"c1": -7, "c2": 7}, {"c1": -6, "c2": 6}, {"c1": 7, "c2": 7}, {"c1": 8, "c2": 8},
-             {"c1": 9, "c2": 9}])
+            [
+                {"c1": -8, "c2": 8},
+                {"c1": -7, "c2": 7},
+                {"c1": -6, "c2": 6},
+                {"c1": 7, "c2": 7},
+                {"c1": 8, "c2": 8},
+                {"c1": 9, "c2": 9},
+            ]
+        )
         assert res.error_code == ErrorCode.OK
 
         res, extra_res = table_obj.output(["c1", "c2"]).limit(2).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2),
-                                                         'c2': (3, 2)})
-                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame({"c1": (-3, -2), "c2": (3, 2)}).astype(
+                {"c1": "Int32", "c2": "Int32"}
+            ),
+        )
 
         res, extra_res = table_obj.output(["c1", "c2"]).limit(2).offset(2).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 0),
-                                                         'c2': (1, 0)})
-                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame({"c1": (-1, 0), "c2": (1, 0)}).astype(
+                {"c1": "Int32", "c2": "Int32"}
+            ),
+        )
 
-        res, extra_res = table_obj.output(["c1", "c2"]).limit(2).offset(2).option({"total_hits_count": True}).to_df()
-        assert extra_res['total_hits_count'] == 13
+        res, extra_res = (
+            table_obj.output(["c1", "c2"])
+            .limit(2)
+            .offset(2)
+            .option({"total_hits_count": True})
+            .to_df()
+        )
+        assert extra_res["total_hits_count"] == 13
 
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 0),
-                                                         'c2': (1, 0)})
-                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame({"c1": (-1, 0), "c2": (1, 0)}).astype(
+                {"c1": "Int32", "c2": "Int32"}
+            ),
+        )
 
-        res, extra_res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).limit(3).option({"total_hits_count": True}).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, -1),
-                                                         'c2': (0, 1, 1)})
-                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
-        assert extra_res['total_hits_count'] == 13
+        res, extra_res = (
+            table_obj.output(["c1", "c2"])
+            .sort([["c2", SortType.Asc], ["c1", SortType.Desc]])
+            .limit(3)
+            .option({"total_hits_count": True})
+            .to_df()
+        )
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame({"c1": (0, 1, -1), "c2": (0, 1, 1)}).astype(
+                {"c1": "Int32", "c2": "Int32"}
+            ),
+        )
+        assert extra_res["total_hits_count"] == 13
 
         res = db_obj.drop_table("test_limit" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

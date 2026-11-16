@@ -19,7 +19,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(bvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(bvecs_path) and os.path.exists(slt_path) and not generate_if_exists:
+    if (
+        os.path.exists(bvecs_path)
+        and os.path.exists(slt_path)
+        and not generate_if_exists
+    ):
         print(
             f"File {slt_path} and {bvecs_path} already existed exists. Skip Generating."
         )
@@ -44,8 +48,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         for _ in range(row_n):
             bvecs_file.write((dim).to_bytes(4, byteorder="little"))
-            random_array = 20 * np.random.random(dim) # 0~20
-            ivec = random_array.astype(np.uint8) # 0~20
+            random_array = 20 * np.random.random(dim)  # 0~20
+            ivec = random_array.astype(np.uint8)  # 0~20
             ivec.tofile(bvecs_file)
             bvec = ivec.astype(np.uint8)
             bvec_str = ",".join([format_float1(x) for x in bvec])

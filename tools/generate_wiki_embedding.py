@@ -7,7 +7,7 @@ dst_fp = "./test/data/csv/enwiki_embedding_9999.csv"
 
 def generate():
     with open(src_fp) as src:
-        with open(dst_fp, 'w') as dst:
+        with open(dst_fp, "w") as dst:
             i = 0
             for line in src:
                 suffix = f'\t{i}\t"[{i}, {i}, {i}, {i}]"\n'

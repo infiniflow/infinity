@@ -3,11 +3,37 @@
 use common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
-    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, SparseStore,
-    Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, FlushKind, JoinClause,
+    JoinKind, Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem,
+    SparseStore, Statement,
 };
 use crate::lexer::{tokenize, Token};
+
+/// Parses one projection (`c1`, `*`, `count(*)`, `abs(c1) AS a`) and rejects
+/// anything after it. This is the entry point for a REST `output` entry.
+///
+/// A projection is not an expression: `*` and the aggregates are only accepted
+/// by the select-list grammar, so they need this rather than [`parse_expr`].
+pub fn parse_select_item(sql: &str) -> Result<(SelectItem, Option<String>)> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let (mut items, mut aliases) = p.select_items()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    if items.len() != 1 {
+        return Err(Error::Invalid(format!(
+            "expected one select item, got {}",
+            items.len()
+        )));
+    }
+    Ok((items.remove(0), aliases.pop().flatten()))
+}
 
 /// Parses zero or more `;`-separated statements.
 pub fn parse(sql: &str) -> Result<Vec<Statement>> {
@@ -29,6 +55,75 @@ pub fn parse(sql: &str) -> Result<Vec<Statement>> {
         }
     }
     Ok(out)
+}
+
+/// Parses **exactly one** statement and rejects trailing input.
+///
+/// A front end that carries a fragment of SQL (a REST `filter` string, an SDK
+/// `where` expression) parses it with this, then builds its request as an AST.
+/// [`parse`] accepts `a; b` and would let the fragment smuggle a second
+/// statement into a request that only ever meant to filter rows.
+pub fn parse_one(sql: &str) -> Result<Statement> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    while p.peek() == &Token::Semicolon {
+        p.advance();
+    }
+    if p.peek() == &Token::Eof {
+        return Err(Error::Invalid("parse error: empty statement".into()));
+    }
+    let stmt = p.statement()?;
+    while p.peek() == &Token::Semicolon {
+        p.advance();
+    }
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(stmt)
+}
+
+/// Parses a bare boolean expression as a `WHERE` predicate, rejecting anything
+/// after it. This is the entry point for a filter the client sent as text.
+///
+/// Only end-of-input is accepted here, not `;`: a filter is a fragment, never a
+/// statement, so `c1 = 1; DROP TABLE t` must fail rather than stop at the
+/// semicolon and run the rest as a second statement.
+pub fn parse_predicate(sql: &str) -> Result<Predicate> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let pred = p.predicate()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(pred)
+}
+
+/// Parses a bare expression (a projection or a `SET col = <expr>` value),
+/// rejecting anything after it. End-of-input only, for the same reason
+/// [`parse_predicate`] takes no `;`.
+pub fn parse_expr(sql: &str) -> Result<ExprAst> {
+    let mut p = Parser {
+        toks: tokenize(sql)?,
+        pos: 0,
+    };
+    let e = p.expr()?;
+    if p.peek() != &Token::Eof {
+        return Err(Error::Invalid(format!(
+            "parse error near {:?}: unexpected trailing input",
+            p.peek()
+        )));
+    }
+    Ok(e)
 }
 
 struct Parser {
@@ -68,6 +163,26 @@ impl Parser {
         } else {
             self.err(&format!("expected keyword {kw}"))
         }
+    }
+    /// The remaining tokens of a tolerated statement, rendered as words
+    /// (`SET …`, `PRAGMA …`, and a `FLUSH` target this parser does not know).
+    fn rest_words(&mut self) -> Vec<String> {
+        let mut parts: Vec<String> = Vec::new();
+        while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+            parts.push(match self.advance() {
+                Token::Ident(s) => s,
+                Token::Int(i) => i.to_string(),
+                Token::Float(f) => f.to_string(),
+                Token::Str(s) => s,
+                Token::Star => "*".to_string(),
+                Token::Comma => ",".to_string(),
+                Token::LParen => "(".to_string(),
+                Token::RParen => ")".to_string(),
+                Token::Op(o) => o,
+                _ => String::new(),
+            });
+        }
+        parts
     }
     /// `(k = v, …)`: a property list as `WITH (…)` / `PROPERTIES (…)` spells
     /// it. Keys are upper-cased; a bare flag (`HEADER`) has an empty value.
@@ -634,23 +749,34 @@ impl Parser {
                 let table = self.expect_table_name()?;
                 Ok(Statement::Describe { table })
             }
-            "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH" | "CHECK" => {
+            // `FLUSH DATA|CATALOG|LOG|BUFFER` (C++ `FlushStatement`). An
+            // unknown target keeps the old tolerated `Utility` shape.
+            "FLUSH" => {
                 self.advance();
-                let mut parts: Vec<String> = Vec::new();
-                while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
-                    parts.push(match self.advance() {
-                        Token::Ident(s) => s,
-                        Token::Int(i) => i.to_string(),
-                        Token::Float(f) => f.to_string(),
-                        Token::Str(s) => s,
-                        Token::Star => "*".to_string(),
-                        Token::Comma => ",".to_string(),
-                        Token::LParen => "(".to_string(),
-                        Token::RParen => ")".to_string(),
-                        Token::Op(o) => o,
-                        _ => String::new(),
-                    });
+                let kind = match self.peek() {
+                    Token::Ident(s) if s.eq_ignore_ascii_case("DATA") => Some(FlushKind::Data),
+                    Token::Ident(s) if s.eq_ignore_ascii_case("CATALOG") => {
+                        Some(FlushKind::Catalog)
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("LOG") => Some(FlushKind::Log),
+                    Token::Ident(s) if s.eq_ignore_ascii_case("BUFFER") => Some(FlushKind::Buffer),
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    self.advance();
+                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        self.advance();
+                    }
+                    return Ok(Statement::Flush { kind });
                 }
+                let parts = self.rest_words();
+                Ok(Statement::Utility {
+                    text: parts.join(" "),
+                })
+            }
+            "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "CHECK" => {
+                self.advance();
+                let parts = self.rest_words();
                 Ok(Statement::Utility {
                     text: parts.join(" "),
                 })
@@ -2809,6 +2935,13 @@ pub fn normalize_datetime(kind: &str, raw: &str) -> String {
     if kind == "INTERVAL" || kind == "JSON" {
         return raw.trim().to_string();
     }
+    // A NULL keeps its marker. Rendering it through the arms below dropped it
+    // for TIME ("null" has no date part, so the default "00:00:00" replaced it)
+    // and produced "null 00:00:00" for DATETIME/TIMESTAMP; either way the row
+    // read back as an epoch value instead of NULL.
+    if raw.trim().eq_ignore_ascii_case("null") {
+        return "null".to_string();
+    }
     // accept `/` as a date separator, e.g. `DATE '2222/11/11'`
     let s = raw.trim().replace('/', "-");
     let s = s.as_str();
@@ -3001,6 +3134,33 @@ mod tests {
                 if_exists: false
             }
         );
+    }
+
+    /// A fragment a front end carries (a REST `filter`, a projection, a sort
+    /// key) must not be able to smuggle a second statement in.
+    #[test]
+    fn a_single_fragment_rejects_trailing_statements() {
+        assert!(parse_one("SELECT 1;").is_ok());
+        assert!(parse_one("SELECT 1;;").is_ok());
+        assert!(parse_one("SELECT 1; DROP TABLE t;").is_err());
+        assert!(parse_one("").is_err());
+
+        assert!(parse_predicate("c1 = 1").is_ok());
+        assert!(parse_predicate("c1 = 1 AND c2 > 2").is_ok());
+        assert!(parse_predicate("c1 = 1; DROP TABLE t").is_err());
+        // A complete statement is not a predicate.
+        assert!(parse_predicate("c1 = 1 DROP TABLE t").is_err());
+
+        assert!(parse_expr("c1 + 1").is_ok());
+        assert!(parse_expr("c1 DROP TABLE t").is_err());
+
+        // A projection is not an expression: `*` and an aggregate only parse
+        // through the select-list grammar.
+        assert!(parse_select_item("*").is_ok());
+        assert!(parse_select_item("count(*)").is_ok());
+        assert!(parse_select_item("c1 AS a").unwrap().1.as_deref() == Some("a"));
+        assert!(parse_select_item("c1; DROP TABLE t").is_err());
+        assert!(parse_select_item("c1, c2").is_err());
     }
 
     #[test]
@@ -3817,6 +3977,33 @@ mod tests {
         assert!(parse("select 1;").is_ok());
         assert!(parse("select a, sum(b), function(c, nested(d)) from t1;").is_ok());
     }
+    /// `FLUSH` names one of the reference's four targets; anything else keeps
+    /// the tolerated `Utility` shape the parser used before it had a node.
+    #[test]
+    fn flush_names_its_target() {
+        assert_eq!(
+            parse("FLUSH DATA;").unwrap(),
+            vec![Statement::Flush {
+                kind: FlushKind::Data
+            }]
+        );
+        for (sql, kind) in [
+            ("FLUSH catalog", FlushKind::Catalog),
+            ("flush log", FlushKind::Log),
+            ("FLUSH BUFFER", FlushKind::Buffer),
+        ] {
+            assert_eq!(
+                parse(sql).unwrap(),
+                vec![Statement::Flush { kind }],
+                "{sql}"
+            );
+        }
+        let Statement::Utility { text } = &parse("FLUSH SOMETHING").unwrap()[0] else {
+            panic!("an unknown target stays a utility statement");
+        };
+        assert_eq!(text, "SOMETHING");
+    }
+
     /// C++ `src/unit_test/parser/sql_select_statement_ut.cpp:988-1213
     /// SelectStatementParsingTest.good_test3`.
     #[test]
@@ -4165,5 +4352,28 @@ mod tests {
         ] {
             assert!(parse(sql).is_err(), "{sql}");
         }
+    }
+
+    /// One NULL has one stored spelling, whatever the temporal type: the
+    /// marker must survive normalisation instead of being turned into a zero
+    /// date/time, or the row reads back as an epoch value rather than NULL.
+    #[test]
+    fn temporal_null_keeps_one_spelling() {
+        for kind in ["DATE", "TIME", "DATETIME", "TIMESTAMP"] {
+            assert_eq!(normalize_datetime(kind, "null"), "null", "{kind}");
+            assert_eq!(normalize_datetime(kind, "NULL"), "null", "{kind}");
+        }
+    }
+
+    /// A real value is still normalised, so the marker did not swallow the
+    /// ordinary path.
+    #[test]
+    fn temporal_values_still_normalize() {
+        assert_eq!(normalize_datetime("DATE", "2024/5/6"), "2024-05-06");
+        assert_eq!(normalize_datetime("TIME", "7:8:9"), "07:08:09");
+        assert_eq!(
+            normalize_datetime("DATETIME", "2024-5-6 7:8:9"),
+            "2024-05-06 07:08:09"
+        );
     }
 }

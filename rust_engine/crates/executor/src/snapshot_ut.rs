@@ -12,7 +12,7 @@ fn engine() -> (tempfile::TempDir, Engine) {
 }
 
 fn result(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    let r = e.execute(sql).unwrap().into_iter().next().unwrap();
+    let r = e.execute_blocking(sql).unwrap().into_iter().next().unwrap();
     match &r {
         crate::QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows, got {other:?}"),
@@ -20,7 +20,7 @@ fn result(e: &Engine, sql: &str) -> Vec<Vec<String>> {
 }
 
 fn columns(e: &Engine, sql: &str) -> Vec<String> {
-    match e.execute(sql).unwrap().into_iter().next().unwrap() {
+    match e.execute_blocking(sql).unwrap().into_iter().next().unwrap() {
         crate::QueryResult::Rows { columns, .. } => columns,
         other => panic!("expected rows, got {other:?}"),
     }
@@ -32,11 +32,12 @@ fn columns(e: &Engine, sql: &str) -> Vec<String> {
 #[test]
 fn a_table_snapshot_writes_the_reference_metadata() {
     let (dir, e) = engine();
-    e.execute("CREATE TABLE snap_t (a INT, b VARCHAR);")
+    e.execute_blocking("CREATE TABLE snap_t (a INT, b VARCHAR);")
         .unwrap();
-    e.execute("INSERT INTO snap_t VALUES (1, 'x'), (2, 'y');")
+    e.execute_blocking("INSERT INTO snap_t VALUES (1, 'x'), (2, 'y');")
         .unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE snap_t;").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE snap_t;")
+        .unwrap();
 
     let root = e.snapshot_dir();
     assert_eq!(root, dir.path().join("snapshot"));
@@ -120,19 +121,21 @@ fn a_table_snapshot_writes_the_reference_metadata() {
 #[test]
 fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
     let (_d, e) = engine();
-    e.execute("CREATE TABLE snap_i (a INT, b VARCHAR);")
+    e.execute_blocking("CREATE TABLE snap_i (a INT, b VARCHAR);")
         .unwrap();
     let block: Vec<Vec<parser::Literal>> = (0..8192)
         .map(|_| vec![parser::Literal::Int(1), parser::Literal::Str("x".into())])
         .collect();
-    e.execute("CREATE INDEX idx_a ON snap_i (a);").unwrap();
+    e.execute_blocking("CREATE INDEX idx_a ON snap_i (a);")
+        .unwrap();
     e.import_literals("default_db.snap_i", None, block).unwrap();
     e.dump_index("default_db.snap_i", "idx_a").unwrap();
     // The mirror publishes the `idx_chunk|…` records the snapshot reads (the
     // reference writes them inside the dump transaction; the port's mirror
     // writes them at checkpoint time).
-    e.flush().unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE snap_i;").unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE snap_i;")
+        .unwrap();
 
     let text = std::fs::read_to_string(e.snapshot_dir().join("s1").join("s1.json")).unwrap();
     let json = expression::json::parse(&text).unwrap();
@@ -230,12 +233,15 @@ fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
 #[test]
 fn database_and_system_snapshots_nest_their_tables() {
     let (_d, e) = engine();
-    e.execute("CREATE DATABASE db1;").unwrap();
-    e.execute("CREATE TABLE db1.t1 (a INT);").unwrap();
-    e.execute("INSERT INTO db1.t1 VALUES (1), (2);").unwrap();
+    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    e.execute_blocking("CREATE TABLE db1.t1 (a INT);").unwrap();
+    e.execute_blocking("INSERT INTO db1.t1 VALUES (1), (2);")
+        .unwrap();
 
-    e.execute("CREATE SNAPSHOT sdb ON DATABASE db1;").unwrap();
-    e.execute("CREATE SNAPSHOT ssys ON SYSTEM;").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT sdb ON DATABASE db1;")
+        .unwrap();
+    e.execute_blocking("CREATE SNAPSHOT ssys ON SYSTEM;")
+        .unwrap();
 
     let root = e.snapshot_dir();
     let db_json = std::fs::read_to_string(root.join("sdb").join("sdb.json")).unwrap();
@@ -295,20 +301,22 @@ fn nested_ts(text: &str) -> Vec<u64> {
 #[test]
 fn drop_snapshot_removes_the_directory() {
     let (_d, e) = engine();
-    e.execute("CREATE TABLE t (a INT);").unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").unwrap();
+    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .unwrap();
     let path = e.snapshot_dir().join("s1");
     assert!(path.exists());
 
-    e.execute("DROP SNAPSHOT s1;").unwrap();
+    e.execute_blocking("DROP SNAPSHOT s1;").unwrap();
     assert!(!path.exists());
     assert!(e.snapshot_names().unwrap().is_empty());
     assert!(!e.snapshot_dir().join("deleted_s1").exists());
 
-    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .unwrap();
     assert!(e.snapshot_names().unwrap().iter().any(|n| n == "s1"));
 
-    let err = e.execute("DROP SNAPSHOT missing;").unwrap_err();
+    let err = e.execute_blocking("DROP SNAPSHOT missing;").unwrap_err();
     assert!(err.to_string().contains("not found"), "{err}");
 }
 
@@ -318,17 +326,22 @@ fn drop_snapshot_removes_the_directory() {
 #[test]
 fn snapshot_creation_reports_the_reference_errors() {
     let (_d, e) = engine();
-    e.execute("CREATE TABLE t (a INT);").unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").unwrap();
+    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .unwrap();
 
-    let err = e.execute("CREATE SNAPSHOT s1 ON TABLE t;").unwrap_err();
+    let err = e
+        .execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .unwrap_err();
     assert_eq!(err.to_string(), "Snapshot: s1 already exists");
 
-    let err = e.execute("CREATE SNAPSHOT s2 ON TABLE nope;").unwrap_err();
+    let err = e
+        .execute_blocking("CREATE SNAPSHOT s2 ON TABLE nope;")
+        .unwrap_err();
     assert_eq!(err.status_code(), 3022);
     assert!(err.to_string().contains("nope"), "{err}");
 
-    let err = e.execute("SHOW SNAPSHOT nope;").unwrap_err();
+    let err = e.execute_blocking("SHOW SNAPSHOT nope;").unwrap_err();
     assert!(err.to_string().contains("can't find snapshot"), "{err}");
 }
 
@@ -337,13 +350,15 @@ fn snapshot_creation_reports_the_reference_errors() {
 #[test]
 fn a_restored_table_keeps_its_rows() {
     let (_d, e) = engine();
-    e.execute("CREATE TABLE t (a INT, b VARCHAR);").unwrap();
-    e.execute("INSERT INTO t VALUES (1, 'x'), (2, 'y'), (3, 'z');")
+    e.execute_blocking("CREATE TABLE t (a INT, b VARCHAR);")
         .unwrap();
-    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").unwrap();
-    e.execute("DROP TABLE t;").unwrap();
+    e.execute_blocking("INSERT INTO t VALUES (1, 'x'), (2, 'y'), (3, 'z');")
+        .unwrap();
+    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .unwrap();
+    e.execute_blocking("DROP TABLE t;").unwrap();
 
-    e.execute("RESTORE TABLE SNAPSHOT s1;").unwrap();
+    e.execute_blocking("RESTORE TABLE SNAPSHOT s1;").unwrap();
     assert_eq!(
         result(&e, "SELECT a, b FROM t ORDER BY a;"),
         vec![

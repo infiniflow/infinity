@@ -81,7 +81,6 @@ pub struct Config {
     mem_index_capacity: u64,
     snapshot_dir: String,
 
-    buffer_manager_size: i64,
     lru_num: usize,
     temp_dir: String,
     mem_index_memory_quota: i64,
@@ -135,7 +134,6 @@ impl Default for Config {
             compact_interval: 120,
             mem_index_capacity: 65536,
             snapshot_dir: "/var/infinity/snapshot".into(),
-            buffer_manager_size: 8 * 1024 * 1024 * 1024,
             lru_num: 7,
             temp_dir: "/var/infinity/tmp".into(),
             mem_index_memory_quota: 4 * 1024 * 1024 * 1024,
@@ -245,8 +243,11 @@ impl Config {
             ("storage.object_storage", "access_key") => self.object_storage_access_key = string(),
             ("storage.object_storage", "secret_key") => self.object_storage_secret_key = string(),
             ("storage.object_storage", "enable_https") => self.object_storage_https = boolean()?,
+            // The reference's BufferManager budget. The port maps sealed blocks
+            // and keeps no BufferManager, so the key is accepted (a C++ conf must
+            // still load) and ignored: only its syntax is checked.
             ("buffer", "buffer_manager_size") => {
-                self.buffer_manager_size = parse_byte_size(&string())?
+                let _ = parse_byte_size(&string())?;
             }
             ("buffer", "lru_num") => self.lru_num = integer()? as usize,
             ("buffer", "temp_dir") => self.temp_dir = string(),
@@ -401,9 +402,6 @@ impl Config {
     pub fn snapshot_dir(&self) -> &str {
         &self.snapshot_dir
     }
-    pub fn buffer_manager_size(&self) -> i64 {
-        self.buffer_manager_size
-    }
     pub fn lru_num(&self) -> usize {
         self.lru_num
     }
@@ -544,12 +542,23 @@ mod tests {
         assert_eq!(config.data_dir(), "/var/infinity/data");
         assert_eq!(config.wal_dir(), "/var/infinity/wal");
         assert_eq!(config.storage_type(), StorageType::Local);
-        assert_eq!(config.buffer_manager_size(), 8 * 1024 * 1024 * 1024);
         assert_eq!(config.lru_num(), 7);
         assert_eq!(config.temp_dir(), "/var/infinity/tmp");
         assert_eq!(config.mem_index_memory_quota(), 4 * 1024 * 1024 * 1024);
         assert_eq!(config.result_cache(), "off");
         assert_eq!(config.cache_result_num(), 10000);
+    }
+
+    /// The reference's BufferManager budget is accepted for config
+    /// compatibility and ignored: the port maps sealed blocks and keeps no
+    /// BufferManager, so the engine runs on its built-in 8 GiB.
+    #[test]
+    fn buffer_manager_size_is_accepted_and_ignored() {
+        let mut config = Config::default();
+        config
+            .apply_toml("[buffer]\nbuffer_manager_size = \"3GB\"\n")
+            .unwrap();
+        assert_eq!(config.lru_num(), 7);
     }
 
     /// C++: `ConfigTest.test2`.
@@ -579,7 +588,6 @@ mod tests {
         assert_eq!(config.object_storage_access_key(), "minioadmin");
         assert_eq!(config.object_storage_secret_key(), "minioadmin");
         assert!(!config.object_storage_https());
-        assert_eq!(config.buffer_manager_size(), 3 * 1024 * 1024 * 1024);
         assert_eq!(config.lru_num(), 8);
         assert_eq!(config.mem_index_memory_quota(), 2 * 1024 * 1024 * 1024);
         assert_eq!(config.result_cache(), "off");
@@ -677,7 +685,6 @@ mod tests {
         assert_eq!(config.compact_interval(), 120);
         assert_eq!(config.mem_index_capacity(), 1048576);
         assert_eq!(config.snapshot_dir(), "/var/infinity/snapshot");
-        assert_eq!(config.buffer_manager_size(), 4 * 1024 * 1024 * 1024);
         assert_eq!(config.lru_num(), 7);
         assert_eq!(config.mem_index_memory_quota(), 1024 * 1024 * 1024);
         assert_eq!(config.checkpoint_interval(), 86400);

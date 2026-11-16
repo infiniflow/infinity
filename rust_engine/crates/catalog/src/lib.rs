@@ -378,6 +378,13 @@ pub struct Catalog {
     /// path that changes a table clears this first, so a hit answers what a
     /// re-read would.
     table_cache: Mutex<std::collections::HashMap<String, TableMeta>>,
+    /// Decoded index records, keyed by qualified table name.
+    ///
+    /// The engine always opens with `catalog_only` (plan §4.1), so the native
+    /// `idx:` keys never exist and every index lookup used to re-read the whole
+    /// layout plus the whole `catalog|idx|` prefix. One bounded build per table
+    /// answers the same records; the invalidation is the table cache's.
+    index_cache: Mutex<std::collections::HashMap<String, Arc<Vec<IndexMeta>>>>,
     /// How many DDL calls are in flight. A DDL reads the table it is about to
     /// change and then writes it, so both a cache filled before the call and
     /// one filled *during* it would be stale afterwards: reads bypass the
@@ -500,6 +507,7 @@ impl Catalog {
             catalog_only: false,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
+            index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
@@ -514,6 +522,7 @@ impl Catalog {
             catalog_only: true,
             capture: Mutex::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
+            index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
         }
@@ -528,8 +537,8 @@ impl Catalog {
         DdlGuard { catalog: self }
     }
 
-    /// Drops every cached table record and makes in-flight reads decline to
-    /// publish theirs.
+    /// Drops every cached table and index record and makes in-flight reads
+    /// decline to publish theirs.
     ///
     /// A DDL calls this twice: entering it (so the call does not read a record
     /// from before its own change) and again after the commit lands. The second
@@ -542,6 +551,7 @@ impl Catalog {
         self.ddl_epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         cache.clear();
+        self.index_cache.lock().unwrap().clear();
     }
 
     /// Whether this catalog persists only the C++ key space.
@@ -645,27 +655,7 @@ impl Catalog {
             // is numbered per table (1-based, as `CREATE INDEX` would) -
             // skipping the ids the other records already hold, so the fallback
             // cannot hand two indexes the same id.
-            let mut next: HashMap<String, u64> = HashMap::new();
-            let mut taken: HashMap<String, std::collections::HashSet<u64>> = HashMap::new();
-            for im in out.iter() {
-                if im.id > 0 {
-                    taken.entry(im.table.clone()).or_default().insert(im.id);
-                }
-            }
-            for im in out.iter_mut() {
-                if im.id == 0 {
-                    let used = taken.entry(im.table.clone()).or_default();
-                    let n = next.entry(im.table.clone()).or_insert(0);
-                    loop {
-                        *n += 1;
-                        if !used.contains(n) {
-                            break;
-                        }
-                    }
-                    im.id = *n;
-                    used.insert(*n);
-                }
-            }
+            Self::assign_fallback_ids(&mut out);
             // Name-only indexes — the engine does not materialise an expression
             // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name
             // lives under a supplementary table tag (`write_layout_from`).
@@ -684,6 +674,192 @@ impl Catalog {
                         out.push(IndexMeta {
                             name: name.to_string(),
                             table: format!("{}.{}", t.db_name, t.table_name),
+                            column: String::new(),
+                            index_type: String::new(),
+                            options: Vec::new(),
+                            id: 0,
+                        });
+                    }
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    /// Numbers records that arrived without an id (hand-written ones) per
+    /// table, 1-based and skipping the ids already in use.
+    fn assign_fallback_ids(out: &mut [IndexMeta]) {
+        let mut next: HashMap<String, u64> = HashMap::new();
+        let mut taken: HashMap<String, std::collections::HashSet<u64>> = HashMap::new();
+        for im in out.iter() {
+            if im.id > 0 {
+                taken.entry(im.table.clone()).or_default().insert(im.id);
+            }
+        }
+        for im in out.iter_mut() {
+            if im.id == 0 {
+                let used = taken.entry(im.table.clone()).or_default();
+                let n = next.entry(im.table.clone()).or_insert(0);
+                loop {
+                    *n += 1;
+                    if !used.contains(n) {
+                        break;
+                    }
+                }
+                im.id = *n;
+                used.insert(*n);
+            }
+        }
+    }
+
+    /// The indexes of one table, resolved with one bounded prefix scan and
+    /// cached per table.
+    ///
+    /// The engine always opens with catalog_only (plan 4.1), so the native
+    /// idx: keys do not exist and list_indexes re-reads the whole layout plus
+    /// the whole catalog|idx| prefix on every call. This resolves one table
+    /// instead: one read_table, one scan of catalog|idx|{db}|{tbl}|, then point
+    /// gets for each index. A warm lookup is a hash hit; a miss costs O(that
+    /// table's indexes), not O(all tables).
+    pub fn indexes_of_table(&self, table: &str) -> Result<Vec<IndexMeta>> {
+        let Some(qualified) = self.qualified_table_name(table)? else {
+            return Ok(Vec::new());
+        };
+        self.indexes_cached(table, &qualified)
+    }
+
+    /// The qualified name of `table`, or `None` when it does not exist.
+    ///
+    /// A qualified name resolves by its own record. A bare one may not: the
+    /// engine normally qualifies names first, but the per-row index hook is
+    /// handed whatever the statement used, and `list_indexes` callers used to
+    /// match a bare name against the short half. The fallback scan only runs
+    /// when the direct lookup misses, and the result is cached under the name
+    /// that was asked for.
+    fn qualified_table_name(&self, table: &str) -> Result<Option<String>> {
+        if let Some(meta) = self.get_table_by_name(table)? {
+            return Ok(Some(meta.name));
+        }
+        if table.contains('.') {
+            return Ok(None);
+        }
+        Ok(self
+            .list_tables()?
+            .into_iter()
+            .find(|t| t.name.rsplit('.').next() == Some(table))
+            .map(|t| t.name))
+    }
+
+    /// One index by table and name; None when the table or the index is gone.
+    pub fn index_by_name(&self, table: &str, name: &str) -> Result<Option<IndexMeta>> {
+        Ok(self
+            .indexes_of_table(table)?
+            .into_iter()
+            .find(|im| im.name == name))
+    }
+
+    fn indexes_cached(&self, key: &str, qualified: &str) -> Result<Vec<IndexMeta>> {
+        if self.capture.lock().unwrap().is_some()
+            || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
+        {
+            return self.indexes_of_table_uncached(qualified);
+        }
+        let epoch = self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst);
+        if let Some(hit) = self.index_cache.lock().unwrap().get(key) {
+            return Ok((**hit).clone());
+        }
+        let built = Arc::new(self.indexes_of_table_uncached(qualified)?);
+        let mut cache = self.index_cache.lock().unwrap();
+        if self.ddl_epoch.load(std::sync::atomic::Ordering::SeqCst) == epoch {
+            cache.insert(key.to_string(), built.clone());
+            if key != qualified {
+                // Answer the qualified spelling from the same build.
+                cache.insert(qualified.to_string(), built.clone());
+            }
+        }
+        Ok((*built).clone())
+    }
+
+    fn indexes_of_table_uncached(&self, table: &str) -> Result<Vec<IndexMeta>> {
+        let (db_name, bare) = match table.split_once('.') {
+            Some((db, t)) => (db.to_string(), t.to_string()),
+            None => (
+                self.databases()?
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "default_db".to_string()),
+                table.to_string(),
+            ),
+        };
+        self.with_view(|store| {
+            let Some(layout) = crate::layout::read_table(store, &db_name, &bare)? else {
+                return Ok(Vec::new());
+            };
+            let db_id = layout.db_id.to_string();
+            let table_id = layout.table_id.to_string();
+            let prefix = format!("catalog|idx|{db_id}|{table_id}|");
+            let mut newest: HashMap<String, (u64, String)> = HashMap::new();
+            for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+                let key = String::from_utf8_lossy(&k).to_string();
+                let fields: Vec<&str> = key.split('|').collect();
+                if fields.len() != 6 {
+                    continue;
+                }
+                let Ok(ts) = fields[5].parse::<u64>() else {
+                    continue;
+                };
+                let slot = newest
+                    .entry(fields[4].to_string())
+                    .or_insert((0, String::new()));
+                if ts >= slot.0 {
+                    *slot = (ts, String::from_utf8_lossy(&v).to_string());
+                }
+            }
+            let mut names: Vec<(String, (u64, String))> = newest.into_iter().collect();
+            names.sort_by(|a, b| a.0.cmp(&b.0));
+            let mut out: Vec<IndexMeta> = Vec::new();
+            for (name, (ts, index_id)) in names {
+                if crate::layout::is_dropped(
+                    store,
+                    &crate::layout::dropped_index_key(&db_id, &table_id, &name, ts, &index_id),
+                )? {
+                    continue;
+                }
+                let tag = storage::catalog_format::catalog_index_tag_key(
+                    &db_id,
+                    &table_id,
+                    &index_id,
+                    "index_base",
+                );
+                let Some(bytes) = store.get(tag.as_bytes())? else {
+                    continue;
+                };
+                let Some(mut def) = crate::value_format::index_def_from_bytes(&bytes) else {
+                    continue;
+                };
+                def.owner = Some((db_id.clone(), table_id.clone()));
+                def.index_id = index_id.parse().ok();
+                let Some(meta) = crate::layout::index_meta_of(&def, std::slice::from_ref(&layout))
+                else {
+                    continue;
+                };
+                out.push(meta);
+            }
+            Self::assign_fallback_ids(&mut out);
+            // A name-only index (an expression target such as c1 + 5) has no
+            // C++ IndexBase; its name lives under a per-table tag.
+            let tag = storage::catalog_format::catalog_table_tag_key(
+                &db_id,
+                &table_id,
+                "rust_name_only_indexes",
+            );
+            if let Some(bytes) = store.get(tag.as_bytes())? {
+                for name in String::from_utf8_lossy(&bytes).split(',') {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        out.push(IndexMeta {
+                            name: name.to_string(),
+                            table: format!("{}.{}", layout.db_name, layout.table_name),
                             column: String::new(),
                             index_type: String::new(),
                             options: Vec::new(),
@@ -775,7 +951,19 @@ impl Catalog {
         // `tbl|col|` and `catalog|idx|`), so mirror it inside this capture.
         // C++-only mode already rewrote it inside `f`; a checkpoint mirrors it
         // too, which is what covers a directory no DDL touched.
-        if out.is_ok() && !self.catalog_only {
+        // `f` wrote nothing in the native key space, so it changed no table,
+        // column or index: the C++ layout it would produce is the one already
+        // there. `DROP TABLE IF EXISTS <missing>` is exactly this case, and a
+        // test that drops a thousand absent tables spent a full layout rewrite
+        // (list everything, sweep every key, then compare every key against the
+        // store to decide the statement was a no-op) on each of them.
+        let wrote_nothing = self
+            .capture
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|capture| capture.batch.is_empty());
+        if out.is_ok() && !self.catalog_only && !wrote_nothing {
             // Best effort, like the checkpoint's: a column type the C++ encoding
             // does not cover yet leaves the previous layout in place rather than
             // failing the DDL (the next checkpoint reports it).
@@ -869,6 +1057,96 @@ impl Catalog {
         crate::layout::write_index_segments(self.store.as_ref(), set, indexes)
     }
 
+    /// The chunk id `segment`'s next dump takes
+    /// (`SegmentIndexMeta::GetAndSetNextChunkID`).
+    ///
+    /// The counter, not a count of files: it only ever moves forward, so an id
+    /// is never reused even after `Cleanup` dropped the chunk that held it.
+    pub fn next_chunk_id(
+        &self,
+        db_id: &str,
+        table_id: &str,
+        index_id: u64,
+        segment: u32,
+    ) -> Result<u32> {
+        self.with_view(|store| {
+            let tag = storage::catalog_format::catalog_index_segment_tag_key(
+                db_id,
+                table_id,
+                &index_id.to_string(),
+                segment,
+                "next_chunk_id",
+            );
+            let counter = store
+                .get(tag.as_bytes())?
+                .and_then(|v| String::from_utf8_lossy(&v).parse::<u32>().ok())
+                .unwrap_or(0);
+            let records =
+                crate::layout::read_index_chunks(store, db_id, table_id, &index_id.to_string())?;
+            let from_records = records
+                .into_iter()
+                .find(|(id, _)| *id == segment)
+                .and_then(|(_, chunks)| chunks.iter().map(|(id, _)| *id).max())
+                .map(|id| id as u32 + 1)
+                .unwrap_or(0);
+            Ok(counter.max(from_records))
+        })
+    }
+
+    /// Takes the next chunk id **and** raises the counter in one batch
+    /// (`SegmentIndexMeta::GetAndSetNextChunkID`).
+    ///
+    /// [`Self::next_chunk_id`] only reads: two recorders that both read it and
+    /// then both append would publish two chunks under one id, and
+    /// `append_index_chunk` overwrites rather than rejecting.
+    ///
+    /// `counter_lock` serialises the read against the raise, the way
+    /// `create_table_typed` holds it for the table counter: the batch alone is
+    /// an unconditional write, so two callers that read 7 before either wrote
+    /// would both store 8 and both return 7.
+    pub fn take_next_chunk_id(
+        &self,
+        db_id: &str,
+        table_id: &str,
+        index_id: u64,
+        segment: u32,
+    ) -> Result<u32> {
+        let _counter = self.counter_lock.lock().unwrap();
+        let id = self.next_chunk_id(db_id, table_id, index_id, segment)?;
+        let tag = storage::catalog_format::catalog_index_segment_tag_key(
+            db_id,
+            table_id,
+            &index_id.to_string(),
+            segment,
+            "next_chunk_id",
+        );
+        self.store
+            .atomic_batch(&[(tag.into_bytes(), Some((id + 1).to_string().into_bytes()))])?;
+        Ok(id)
+    }
+
+    /// Records one chunk a seal just wrote, leaving the segment's other chunks
+    /// alone (`NewCatalog::AddNewChunkIndex1`).
+    pub fn append_index_chunk(
+        &self,
+        set: &crate::layout::SegmentSet,
+        index: &crate::layout::IndexSegment,
+        chunk: &crate::layout::IndexChunk,
+    ) -> Result<usize> {
+        crate::layout::append_index_chunk(self.store.as_ref(), set, index, chunk)
+    }
+
+    /// Replaces one segment's chunk list (`RemoveChunkIDs` + `AddNewChunkIndex1`).
+    pub fn replace_segment_chunks(
+        &self,
+        set: &crate::layout::SegmentSet,
+        index_id: u64,
+        segment: u32,
+        chunks: &[crate::layout::IndexChunk],
+    ) -> Result<usize> {
+        crate::layout::replace_segment_chunks(self.store.as_ref(), set, index_id, segment, chunks)
+    }
+
     /// Marks `segments` as deprecated at `ts` (a compaction's commit ts), for
     /// the table and for each of `index_ids`.
     pub fn drop_segments(
@@ -892,6 +1170,12 @@ impl Catalog {
     /// and reads their rows a second time next to the merged segment's.
     pub fn dropped_segments(&self, db_id: &str, table_id: &str) -> Result<Vec<u32>> {
         self.with_view(|store| crate::layout::dropped_segments(store, db_id, table_id))
+    }
+
+    /// [`Self::dropped_segments`] with the ts of each deprecation, so a reader
+    /// can ignore the ones that were recorded after it started.
+    pub fn dropped_segments_with_ts(&self, db_id: &str, table_id: &str) -> Result<Vec<(u32, u64)>> {
+        self.with_view(|store| crate::layout::dropped_segments_with_ts(store, db_id, table_id))
     }
 
     /// The deletes a C++-layout rewrite performs before writing the layout.
@@ -1044,13 +1328,74 @@ impl Catalog {
         comments: &[Option<String>],
         sparse_stores: &[Option<SparseStore>],
     ) -> Result<TableMeta> {
+        let existing = self.get_table_by_name(name)?;
+        self.create_table_typed_resolved(
+            name,
+            existing.as_ref(),
+            false,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            sparse_stores,
+        )
+    }
+
+    /// [`Self::create_table_typed_with_sparse_stores`] with the name already
+    /// resolved.
+    ///
+    /// Inside a capture `get_table_by_name` re-reads the store (the cache is
+    /// bypassed there), and the caller has just done that lookup to decide
+    /// whether a crashed `DROP TABLE` left orphans behind - one resolution is
+    /// enough for both.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_table_typed_existing(
+        &self,
+        name: &str,
+        existing: Option<&TableMeta>,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
+        self.create_table_typed_resolved(
+            name,
+            existing,
+            true,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            sparse_stores,
+        )
+    }
+
+    /// The body of both entries: `resolved` says the caller already looked the
+    /// name up, so a duplicate is decided from `existing` alone.
+    #[allow(clippy::too_many_arguments)]
+    fn create_table_typed_resolved(
+        &self,
+        name: &str,
+        existing: Option<&TableMeta>,
+        resolved: bool,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
         let _ddl = self.begin_ddl();
         // The `CREATE TABLE … PROPERTIES (bloom_filter_columns = …)` flag is
         // **not** recorded here: the reference's `ColumnDef::ToJson` omits
         // `build_bloom_filter_`, so the catalog it writes reads back as
         // all-false. The flag survives only in the WAL's `CreateTableV2`.
 
-        if self.get_table_by_name(name)?.is_some() {
+        if existing.is_some() || (!resolved && self.get_table_by_name(name)?.is_some()) {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
         }
         // The counter is committed in the same batch as the table, so its lock
@@ -1164,7 +1509,17 @@ impl Catalog {
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
         let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         let first = meta.columns.len();
-        for (i, c) in columns.iter().enumerate() {
+        // `TableMeta::GetNextColumnID` is a **counter**: it hands out the stored
+        // value and `AddColumns` advances it. Deriving the id from the live
+        // columns instead handed a dropped column's id to the next `ADD COLUMN`,
+        // so the new column inherited the old one's `{id}.col` files. The tag
+        // only moves forward, so the larger of it and the live ids wins (`+1`
+        // covers a directory written before the tag existed).
+        let db_id = self
+            .database_id_of_name(meta.name.split('.').next().unwrap_or(&meta.name))?
+            .unwrap_or(1);
+        let first_id = self.next_column_id_of(db_id, meta.id, &meta.ids)?;
+        for (next_id, (i, c)) in (first_id..).zip(columns.iter().enumerate()) {
             if meta.columns.iter().any(|x| x == c) {
                 return Err(Error::Catalog(format!("column '{c}' already exists")));
             }
@@ -1176,7 +1531,6 @@ impl Catalog {
             meta.comments.push(comments.get(i).cloned().flatten());
             meta.sparse_stores
                 .push(sparse_stores.get(i).copied().flatten());
-            let next_id = meta.ids.iter().copied().max().map_or(0, |v| v + 1);
             meta.ids.push(next_id);
         }
         if self.catalog_only {
@@ -1392,7 +1746,33 @@ impl Catalog {
                 let found = self.with_view(|store| crate::layout::read_table(store, db, table))?;
                 return Ok(found.as_ref().map(crate::layout::table_meta_of));
             }
-            return Ok(self.tables()?.into_iter().find(|t| t.name == name));
+            // A bare name is looked up in `default_db` first: that is the
+            // database every unqualified statement resolves against, and the
+            // point read is a couple of keys. Reading every table and filtering
+            // - which is what this did - made a `DROP TABLE` of a bare name cost
+            // O(tables) per statement (0.22 ms against the reference's 0.07 on
+            // a 1000-table directory). Only a name that is not in `default_db`
+            // pays for the scan, and there the database list bounds it.
+            if let Some(found) =
+                self.with_view(|store| crate::layout::read_table(store, "default_db", name))?
+            {
+                return Ok(Some(crate::layout::table_meta_of(&found)));
+            }
+            // Not in the default database: try the others by name, still as a
+            // point read each. Listing every table and filtering turned a miss
+            // into a full catalog scan, which `DROP TABLE IF EXISTS <missing>`
+            // paid on every call.
+            for db in self.database_records()? {
+                if db == "default_db" {
+                    continue;
+                }
+                if let Some(found) =
+                    self.with_view(|store| crate::layout::read_table(store, &db, name))?
+                {
+                    return Ok(Some(crate::layout::table_meta_of(&found)));
+                }
+            }
+            return Ok(None);
         }
         match self.store.get(&name_key(name))? {
             Some(b) => {
@@ -1422,11 +1802,21 @@ impl Catalog {
     /// `Cleanup` walks them, and the name stops resolving because
     /// `get_table_by_name` refuses a record with a marker.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
+        let meta = self.get_table_by_name(name)?;
+        self.drop_table_meta(name, meta.as_ref())
+    }
+
+    /// [`Self::drop_table`] with the record the caller already resolved.
+    ///
+    /// Inside a capture every `get_table_by_name` re-reads the store (the cache
+    /// is bypassed so the statement's own uncommitted DDL is visible), so the
+    /// caller's lookup is worth handing over instead of repeating.
+    pub fn drop_table_meta(&self, name: &str, meta: Option<&TableMeta>) -> Result<bool> {
         let _ddl = self.begin_ddl();
         if self.catalog_only {
             // A name that already has a marker is gone: `DROP TABLE` reports it
             // as absent, exactly as `CatalogMeta::GetTableMeta` does.
-            if self.get_table_by_name(name)?.is_none() {
+            if meta.is_none() && self.get_table_by_name(name)?.is_none() {
                 return Ok(false);
             }
             let (db_id, bare) = self.db_and_bare_name(name)?;
@@ -1821,19 +2211,33 @@ impl Catalog {
         index_type: &str,
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
-        // Per-table index ids start at 1 and are never reused.
-        let id = if self.catalog_only {
-            self.next_index_id(table)?
-        } else {
-            let short = table.split('.').next_back().unwrap_or(table);
-            self.list_indexes()?
-                .iter()
-                .filter(|i| i.table == table || i.table == short)
-                .map(|i| i.id)
-                .max()
-                .map_or(1, |v| v + 1)
-        };
+        let _ddl = self.begin_ddl();
+        // Per-table index ids start at 1 and are never reused. The counter is
+        // the authority in both modes: deriving the id from the **live** indexes
+        // hands a dropped index's id to the new one, which then inherits its
+        // records and its `drop|idx|` marker.
+        let id = self.next_index_id(table)?;
         self.create_index_typed_with_id(name, table, column, index_type, options, id)
+    }
+
+    /// `TableMeta::GetNextColumnID`: the table's `next_column_id` tag.
+    ///
+    /// A counter, not a count of the live columns: `DROP COLUMN c; ADD COLUMN c`
+    /// must not hand the new column the dropped one's id, or it inherits that
+    /// column's `{id}.col` files. The tag only moves forward, so the larger of
+    /// it and the live ids wins (`+1` covers a directory written before the tag
+    /// existed).
+    fn next_column_id_of(&self, db_id: u64, table_id: u64, live: &[u64]) -> Result<u64> {
+        let tag = storage::catalog_format::catalog_table_tag_key(
+            &db_id.to_string(),
+            &table_id.to_string(),
+            "next_column_id",
+        );
+        let previous = self
+            .with_view(|store| store.get(tag.as_bytes()))?
+            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+            .unwrap_or(0);
+        Ok(previous.max(live.iter().copied().max().map_or(0, |v| v + 1)))
     }
 
     /// `TableMeta::GetNextIndexID`: the table's `next_index_id` tag, incremented
@@ -1845,9 +2249,23 @@ impl Catalog {
     /// which then inherits the old record's key, and with it the drop marker.
     fn next_index_id(&self, table: &str) -> Result<u64> {
         let (db_id, bare) = self.db_and_bare_name(table)?;
+        let live_max = |cat: &Self| -> u64 {
+            let short = table.split('.').next_back().unwrap_or(table);
+            cat.list_indexes()
+                .unwrap_or_default()
+                .iter()
+                .filter(|i| i.table == table || i.table == short)
+                .map(|i| i.id)
+                .max()
+                .unwrap_or(0)
+        };
         let Some((table_id, _)) = crate::layout::table_record(self.store.as_ref(), &db_id, &bare)?
         else {
-            return Ok(1);
+            // No C++ table record yet (a native-only catalog before its first
+            // layout rewrite): there is no counter to read, so the live ids are
+            // the only history. They are correct here because nothing has been
+            // dropped yet in such a catalog.
+            return Ok(live_max(self) + 1);
         };
         let tag = storage::catalog_format::catalog_table_tag_key(
             &db_id,
@@ -1858,7 +2276,10 @@ impl Catalog {
             .with_view(|store| store.get(tag.as_bytes()))?
             .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
             .unwrap_or(0);
-        let id = previous + 1;
+        // The counter is the authority, but a catalog that has records and no
+        // tag yet (one written before the tag existed) still has to start past
+        // the live ids.
+        let id = previous.max(live_max(self)) + 1;
         // The layout rewrite below re-reads this tag and keeps the larger value,
         // so staging it is what makes the counter survive the rewrite.
         self.stage(&[(tag.into_bytes(), Some(id.to_string().into_bytes()))])?;
@@ -1986,6 +2407,7 @@ impl Catalog {
     /// `drop|idx|{db}/{table}/{name}/{create_ts}/{index_id}`; the reference's
     /// cleanup removes both.
     pub fn drop_index(&self, name: &str) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         if self.catalog_only {
             let mut staged: Vec<BatchItem> = Vec::new();
             for def in crate::layout::read_indexes(self.store.as_ref())?
@@ -2064,6 +2486,7 @@ impl Catalog {
     /// Drops `table`'s index named `name`. Two tables may own an index with the
     /// same name, so callers that know the table must use this form.
     pub fn drop_index_on(&self, table: &str, name: &str) -> Result<bool> {
+        let _ddl = self.begin_ddl();
         let short = table.split('.').next_back().unwrap_or(table);
         if self.catalog_only {
             let mut indexes = self.indexes()?;
@@ -2188,6 +2611,114 @@ mod tests {
                 String::from_utf8_lossy(key)
             );
         }
+    }
+
+    /// The per-table lookup answers exactly what filtering list_indexes
+    /// answers, and a DDL invalidates it.
+    /// A warm per-table lookup answers without touching the store: the point
+    /// of the index cache (plan 4.1: the hot paths call this per table, per
+    /// batch, per index).
+    #[test]
+    fn a_warm_index_lookup_does_not_scan() {
+        let dir = tempdir().unwrap();
+        let (c, counts) = counting_catalog(dir.path(), true);
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INT".to_string(), "VARCHAR".to_string()],
+            &[None, None],
+        )
+        .unwrap();
+        c.create_index_typed("i1", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+
+        // Warm: the first lookup builds the table's entry.
+        assert!(c.index_by_name("db2.t", "i1").unwrap().is_some());
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i1").unwrap().is_some());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 1);
+        assert_eq!(counts.get("scans"), 0, "a warm lookup read the store");
+
+        // A miss still costs one bounded scan of that table, not a layout read.
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "nope").unwrap().is_none());
+        assert_eq!(counts.get("scans"), 0, "a warm miss should not scan either");
+
+        // After a DDL the entry is rebuilt from that table's prefix only.
+        c.create_index_typed("i2", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_some());
+        // Bounded: the database record, the table record and its columns, the
+        // table's own index prefix — never the whole `catalog|idx|` family.
+        assert_eq!(counts.get("full_index_scans"), 0);
+        assert!(
+            counts.get("scans") <= 8,
+            "a miss scanned {} prefixes",
+            counts.get("scans")
+        );
+        counts.reset();
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_some());
+        assert_eq!(counts.get("scans"), 0);
+    }
+
+    #[test]
+    fn indexes_of_table_matches_list_indexes_and_follows_ddl() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let c = Catalog::with_store_catalog_only(store);
+        c.create_database("db2", false).unwrap();
+        c.create_table_typed(
+            "db2.t",
+            &cols(&["id", "name"]),
+            &[None, None],
+            &[false, false],
+            &["INT".to_string(), "VARCHAR".to_string()],
+            &[None, None],
+        )
+        .unwrap();
+        c.create_table_typed(
+            "db2.other",
+            &cols(&["id"]),
+            &[None],
+            &[false],
+            &["INT".to_string()],
+            &[None],
+        )
+        .unwrap();
+        c.create_index_typed("i1", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+        c.create_index_typed("i2", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        c.create_index_typed("i1", "db2.other", "id", "SECONDARY", &[])
+            .unwrap();
+
+        let all = c.list_indexes().unwrap();
+        let mut want: Vec<IndexMeta> = all.iter().filter(|i| i.table == "db2.t").cloned().collect();
+        want.sort_by(|a, b| a.name.cmp(&b.name));
+        let mut got = c.indexes_of_table("db2.t").unwrap();
+        got.sort_by(|a, b| a.name.cmp(&b.name));
+        assert_eq!(got, want);
+
+        // A warm lookup still follows a DDL: the cache is dropped on entry.
+        assert_eq!(
+            c.index_by_name("db2.t", "i1").unwrap().unwrap().column,
+            "name"
+        );
+        c.create_index_typed("i3", "db2.t", "id", "SECONDARY", &[])
+            .unwrap();
+        assert!(c.index_by_name("db2.t", "i3").unwrap().is_some());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 3);
+        assert!(c.index_by_name("db2.t", "nope").unwrap().is_none());
+        assert!(c.indexes_of_table("db2.not_there").unwrap().is_empty());
+
+        // A drop makes the lookup stop returning the index.
+        assert!(c.drop_index_on("db2.t", "i2").unwrap());
+        assert!(c.index_by_name("db2.t", "i2").unwrap().is_none());
+        assert_eq!(c.indexes_of_table("db2.t").unwrap().len(), 2);
     }
 
     #[test]
@@ -2333,6 +2864,10 @@ mod tests {
         deletes: std::sync::atomic::AtomicUsize,
         batches: std::sync::atomic::AtomicUsize,
         batch_items: std::sync::atomic::AtomicUsize,
+        scans: std::sync::atomic::AtomicUsize,
+        /// Scans of the whole index family (`catalog|idx|` with no table): the
+        /// O(all tables) read the per-table directory exists to avoid.
+        full_index_scans: std::sync::atomic::AtomicUsize,
     }
 
     impl Counts {
@@ -2342,6 +2877,8 @@ mod tests {
             self.deletes.store(0, SeqCst);
             self.batches.store(0, SeqCst);
             self.batch_items.store(0, SeqCst);
+            self.scans.store(0, SeqCst);
+            self.full_index_scans.store(0, SeqCst);
         }
         fn get(&self, what: &str) -> usize {
             use std::sync::atomic::Ordering::SeqCst;
@@ -2350,6 +2887,8 @@ mod tests {
                 "deletes" => self.deletes.load(SeqCst),
                 "batches" => self.batches.load(SeqCst),
                 "items" => self.batch_items.load(SeqCst),
+                "scans" => self.scans.load(SeqCst),
+                "full_index_scans" => self.full_index_scans.load(SeqCst),
                 other => panic!("unknown counter {other}"),
             }
         }
@@ -2391,6 +2930,14 @@ mod tests {
         }
 
         fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.counts
+                .scans
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if prefix == b"catalog|idx|" {
+                self.counts
+                    .full_index_scans
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
             self.inner.scan_prefix(prefix)
         }
 
@@ -2455,6 +3002,49 @@ mod tests {
         let renamed = c.get_table_by_name("new").unwrap().unwrap();
         assert_eq!(renamed.id, created.id);
         assert_eq!(renamed.name, "new");
+    }
+
+    /// `catalog_only` never reads the native `idx:` keys, so a legacy record
+    /// cannot make an index appear twice - the read paths derive the list from
+    /// the C++ key space alone (plan §4.1 / r10 #3).
+    #[test]
+    fn catalog_only_ignores_a_legacy_index_record() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let c = Catalog::with_store_catalog_only(store);
+        c.create_table_typed(
+            "default_db.t",
+            &cols(&["doc"]),
+            &[None],
+            &[false],
+            &["VARCHAR".to_string()],
+            &[None],
+        )
+        .unwrap();
+        c.create_index_typed("idx", "default_db.t", "doc", "FULLTEXT", &[])
+            .unwrap();
+        // A stray record of the pre-scoping shape, as an older store may hold.
+        let legacy = IndexMeta {
+            name: "idx".into(),
+            table: "default_db.t".into(),
+            column: "doc".into(),
+            index_type: "FULLTEXT".into(),
+            options: vec![],
+            id: 1,
+        };
+        c.store().put(b"idx:idx", &legacy.encode()).unwrap();
+        assert_eq!(
+            c.indexes_of_table("default_db.t").unwrap().len(),
+            1,
+            "the C++ key space names the index once"
+        );
+        assert_eq!(c.list_indexes().unwrap().len(), 1);
+        // Dropping removes the index from the C++ key space; the stray native
+        // record is left where it is, because `catalog_only` never writes (or
+        // sweeps) that key space - the byte gate compares it verbatim.
+        assert!(c.drop_index("idx").unwrap());
+        assert!(c.indexes_of_table("default_db.t").unwrap().is_empty());
+        assert!(c.list_indexes().unwrap().is_empty());
     }
 
     /// `CREATE INDEX` writes the declaration and removes a legacy `idx:{name}`

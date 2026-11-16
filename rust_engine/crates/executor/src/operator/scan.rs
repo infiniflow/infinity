@@ -37,6 +37,9 @@ pub struct TableScan {
     pub candidate: Option<IndexScanCandidate>,
     /// Maps `candidate`'s columns onto the unpruned row layout.
     pub index_positions: Option<Vec<usize>>,
+    /// The candidate's columns, in the evaluator's own order: the secondary
+    /// filter asks the engine for `index_columns[column_id]`.
+    pub index_columns: Option<Vec<String>>,
     /// The full-text column the candidate's index filter reads.
     pub fulltext_index_column: Option<String>,
     pub fulltext_substring: bool,
@@ -53,9 +56,10 @@ impl TableScan {
         // which is keyed by the storage row id (C++ `IndexFilterEvaluatorFulltext`
         // queries the `ColumnIndexReader`), so the scan needs the ids alongside
         // the rows.
-        let needs_ids = self.candidate.is_some()
-            && self.fulltext_index_column.is_some()
-            && !self.fulltext_substring;
+        // The secondary filter reads its index, which is keyed by the storage row
+        // id, so an index scan carries the ids as well; the full-text filter has
+        // always needed them for the same reason.
+        let needs_ids = self.candidate.is_some();
         // Only a plain full scan of the node is cacheable: an override or an
         // index filter answers a *predicate*, not the node's rows.
         let cacheable = self.override_rows.is_none() && self.candidate.is_none();
@@ -89,6 +93,9 @@ impl TableScan {
                 candidate,
                 positions,
                 self.fulltext_substring,
+                Some(engine),
+                &self.table,
+                self.index_columns.as_deref(),
             )?;
         }
         if let Some(full) = &self.source_columns {
@@ -302,9 +309,11 @@ mod tests {
     #[test]
     fn a_table_scan_reads_the_table_and_aligns_the_pruned_layout() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT, b INT);").unwrap();
         engine
-            .execute("INSERT INTO s VALUES (1, 10), (2, 20);")
+            .execute_blocking("CREATE TABLE s (a INT, b INT);")
+            .unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1, 10), (2, 20);")
             .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
@@ -313,6 +322,7 @@ mod tests {
             override_rows: None,
             candidate: None,
             index_positions: None,
+            index_columns: None,
             fulltext_index_column: None,
             fulltext_substring: false,
             prune: Vec::new(),
@@ -327,8 +337,10 @@ mod tests {
     #[test]
     fn an_unmatchable_scan_yields_no_row() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT);").unwrap();
-        engine.execute("INSERT INTO s VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1);")
+            .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],
@@ -336,6 +348,7 @@ mod tests {
             override_rows: Some(vec![vec![Value::Int(1)]]),
             candidate: None,
             index_positions: None,
+            index_columns: None,
             fulltext_index_column: None,
             fulltext_substring: false,
             prune: Vec::new(),
@@ -348,8 +361,10 @@ mod tests {
     #[test]
     fn an_override_supplies_the_rows_instead_of_the_table() {
         let (_dir, engine) = engine();
-        engine.execute("CREATE TABLE s (a INT);").unwrap();
-        engine.execute("INSERT INTO s VALUES (1);").unwrap();
+        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
+        engine
+            .execute_blocking("INSERT INTO s VALUES (1);")
+            .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],
@@ -357,6 +372,7 @@ mod tests {
             override_rows: Some(vec![vec![Value::Int(42)]]),
             candidate: None,
             index_positions: None,
+            index_columns: None,
             fulltext_index_column: None,
             fulltext_substring: false,
             prune: Vec::new(),

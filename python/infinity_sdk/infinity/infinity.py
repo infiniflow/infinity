@@ -70,7 +70,7 @@ class InfinityConnection(ABC):
     @abstractmethod
     def show_snapshot(self, snapshot_name: str):
         pass
-    
+
     @abstractmethod
     def drop_snapshot(self, snapshot_name: str):
         pass

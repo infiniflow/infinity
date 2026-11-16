@@ -1,0 +1,8 @@
+entries:
+  default:
+    filename: volo_gen.rs
+    protocol: thrift
+    services:
+      - idl:
+          source: local
+          path: ../../thrift/infinity.thrift

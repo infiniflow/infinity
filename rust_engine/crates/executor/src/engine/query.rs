@@ -3,13 +3,37 @@ use super::*;
 impl Engine {
     /// Runs a derived-table subquery (`FROM (SELECT …)`), returning its columns
     /// and rows so the outer query can scan them.
+    ///
+    /// **Synchronous on purpose.** This used to be `async fn` calling
+    /// `self.execute(sql).await`, which made the caller - `run_select_with_ctes`,
+    /// a 600-line synchronous recursion - bridge it with `block_on`. That put a
+    /// whole statement chain (parse, qualify, result cache, retry loop) behind a
+    /// park/unpark loop running on a blocking-pool thread, and it was the only
+    /// `block_on` anywhere in the SELECT path.
+    ///
+    /// The statement is a SELECT (the caller checks the prefix), so this takes
+    /// the same steps `execute` does that matter for a read and none that do
+    /// not:
+    ///
+    /// * `ensure_statement_id` - already taken by the enclosing statement, and
+    ///   the id lives in a thread-local that is idempotent (`txn/src/lib.rs`),
+    ///   so the subquery shares it either way;
+    /// * `qualify_tables` - **kept**: `run_select_with_ctes` qualifies only CTE
+    ///   references, so without this `FROM (SELECT * FROM t)` would resolve `t`
+    ///   in whatever database the parser left, not the session's;
+    /// * the result cache and the conflict retry loop - skipped: a read cannot
+    ///   conflict, and a cache miss runs the same `run_select`.
     pub(crate) fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
-        for r in self.execute(sql)? {
-            if let QueryResult::Rows { columns, rows } = r {
-                return Ok((columns, rows));
-            }
+        let Some(stmt) = parse(sql)?.into_iter().next() else {
+            return Ok((Vec::new(), Vec::new()));
+        };
+        // The caller's prefix check already restricts this to SELECT; keep the
+        // guard so a future caller cannot hand a DML statement to a read path.
+        if !matches!(stmt, Statement::Select { .. }) {
+            return Err(Error::Invalid("a derived table must be a SELECT".into()));
         }
-        Ok((Vec::new(), Vec::new()))
+        let qualified = self.qualify_tables(&stmt);
+        self.run_select(&qualified)
     }
 
     /// Runs a scalar/`EXISTS` subquery, returning typed rows. The SQL text is
@@ -373,10 +397,102 @@ impl Engine {
         }
     }
 
-    pub fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
-        let __q_p = parse(sql)?;
+    /// `block_on` adapter over [`Self::execute`] for callers that are not
+    /// async: the `cli`, the helper binaries and the ~1500 test call sites.
+    ///
+    /// This is a caller convenience, not a second code path - it polls exactly
+    /// the same future the wire handlers await.
+    ///
+    /// **It must not run on a runtime task.** The adapter parks the calling
+    /// thread, and a statement's completion can need the very worker it is
+    /// parked on (a bottom half, or the fan-out it dispatched): the statement
+    /// then waits for itself and the process hangs instead of failing. That is
+    /// not hypothetical - a background optimize that awaited a gate this way
+    /// stalled every client of the table for the whole Go suite's timeout. The
+    /// assertion turns the next such misuse into an immediate, named failure
+    /// in debug builds; the async entry ([`Self::execute`]) is what a task
+    /// must call.
+    pub fn execute_blocking(&self, sql: &str) -> Result<Vec<QueryResult>> {
+        // A plain `assert!`, not `debug_assert!`: this fired in a release build
+        // (the Thrift `run_common` helper called it from a handler task) and
+        // cost an afternoon - the server slept at 8% CPU with every worker
+        // parked. The check is one thread-local read per statement.
+        assert!(
+            tokio::task::try_id().is_none(),
+            "execute_blocking parks the calling thread; from inside a runtime \
+             task it deadlocks the worker. Await `execute` instead.\nSQL: {sql}"
+        );
+        crate::scheduler::block_on(self.execute(sql))
+    }
+
+    /// Runs `sql` on the caller's task.
+    ///
+    /// Every wait in the chain is an `.await` (WAL writer, row allocator,
+    /// bottom half, commit-ts turn, fragment sink), and a genuinely blocking
+    /// operation - CPU decode/encode/build, blocking file I/O - is dispatched
+    /// through `scheduler().spawn_blocking`. An in-flight
+    /// statement therefore holds a future, not a thread, which is what lets the
+    /// server keep 100k connections open while their requests run.
+    ///
+    /// Synchronous callers (`cli`, the helper binaries, the tests) go through
+    /// [`Self::execute_blocking`].
+    /// `DROP TABLE` without the SQL round trip.
+    ///
+    /// The thrift `DropTable` RPC used to format `DROP TABLE <name>` and hand
+    /// it to [`Self::execute`], so every drop paid a parse and a plan for a
+    /// statement whose meaning the caller already had. The reference's
+    /// `DropTable` handler goes straight to its executor; measured on a
+    /// 1000-table directory that was 0.27 ms against the reference's 0.07.
+    pub async fn drop_table_direct(&self, name: &str, if_exists: bool) -> Result<QueryResult> {
+        // The reference rolls the transaction back on a failing DDL, and a
+        // rollback spends no timestamp: reject before the DDL transaction is
+        // opened.
+        if !if_exists && self.storage.catalog.get_table_by_name(name)?.is_none() {
+            return Err(Error::Invalid(format!("table '{name}' does not exist")));
+        }
+        let drop_cmd = self.drop_table_command(name)?;
+        let existed = self
+            .ddl_commit_typed(
+                TxnOp::DropTable {
+                    db: split_table_name(name).0,
+                    table: name.to_string(),
+                },
+                || self.drop_table_all(name),
+                |_batch| drop_cmd.clone(),
+            )
+            .await?;
+        if existed {
+            // `DROP TABLE` clears every kind's registry; each drop owns its own
+            // map (see `drop_index_storage` for the per-record form).
+            self.drop_index_storage(name, DropScope::Table);
+        }
+        Ok(QueryResult::DroppedTable {
+            name: name.to_string(),
+            existed,
+        })
+    }
+
+    pub async fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
+        self.execute_parsed(parse(sql)?, sql).await
+    }
+
+    /// Runs statements the caller has **already parsed**.
+    ///
+    /// A front end that receives structured input (the REST handlers, the
+    /// Thrift RPCs) builds the statement as an AST and calls this, so a value it
+    /// holds never makes a round trip through SQL text. That round trip was
+    /// where a client-supplied `filter` used to reach the parser verbatim: a
+    /// `;` in it ran a second statement the request never mentioned.
+    ///
+    /// `text` is the display text `SHOW QUERIES` records; an empty string means
+    /// "there is none" and the AST's own rendering is used.
+    pub async fn execute_parsed(
+        &self,
+        stmts: Vec<Statement>,
+        text: &str,
+    ) -> Result<Vec<QueryResult>> {
         let mut out = Vec::new();
-        for s in __q_p {
+        for s in stmts {
             // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
             // ones included; the id lands in the WAL frame of a write. An RPC
             // that already took one for its statement keeps it.
@@ -397,7 +513,14 @@ impl Engine {
                 {
                     return Err(Error::NotFound(format!("database '{name}'")));
                 }
-                *self.current_db.lock().unwrap() = name.clone();
+                // Inside a session the switch is that session's, not the
+                // process-wide default (§6.1).
+                match crate::engine::statements::active_session() {
+                    Some(id) => {
+                        self.sessions.lock().unwrap().insert(id, name.clone());
+                    }
+                    None => *self.current_db.lock().unwrap() = name.clone(),
+                }
                 out.push(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -411,15 +534,13 @@ impl Engine {
             // covers INSERT/INSERT SELECT/DELETE/UPDATE, the DDL and snapshot
             // statements, and COPY FROM.
             //
-            // `FLUSH`/`OPTIMIZE`/`COMPACT`/`CLEANUP`/`DUMP` are not covered:
-            // they have no AST node, and the parser folds them into
-            // `Utility { text }` while dropping the keyword itself (`FLUSH
-            // DATA` parses to `text == "DATA"`, see
-            // `infinity-parser/src/corpora_ut.rs:50-57`), so the verb cannot be
-            // recovered here. Nothing is bypassed today because the executor
-            // answers every `Utility` with an empty result; they must be gated
-            // once they get real `Statement` variants. Their engine-method
-            // entry points (`flush`, `optimize_indexes`, `cleanup`) are gated.
+            // `OPTIMIZE`/`COMPACT`/`CLEANUP`/`DUMP` are not covered: they have
+            // no AST node, and the parser folds them into `Utility { text }`
+            // while dropping the keyword, so the verb cannot be recovered
+            // here. Nothing is bypassed today because the executor answers
+            // every `Utility` with an empty result. `FLUSH` does have a node
+            // now (`Statement::Flush`), and its own arm gates the storage mode
+            // (`PhysicalFlush::Execute` does the same before its switch).
             if invalidates_result_cache(&qualified) {
                 self.ensure_writable()?;
             }
@@ -434,7 +555,7 @@ impl Engine {
                     self.txn.end_statement();
                     continue;
                 }
-                let res = self.execute_stmt_retrying(&qualified, sql)?;
+                let res = self.execute_stmt_retrying(&qualified, text).await?;
                 // Only small results are worth caching: retaining (and later
                 // cloning on a hit) a whole-table `SELECT *` keeps hundreds of
                 // megabytes to gigabytes alive.
@@ -455,7 +576,7 @@ impl Engine {
                 self.result_cache.lock().unwrap().clear();
                 self.plan_cache.clear();
             }
-            out.push(self.execute_stmt_retrying(&qualified, sql)?);
+            out.push(self.execute_stmt_retrying(&qualified, text).await?);
             // No per-statement durability step: the reference's commit appends
             // its frame with `ofs_.write` (userspace, no fsync,
             // `wal_manager_impl.cpp:311`) and writes the catalog with
@@ -479,7 +600,12 @@ impl Engine {
         if statements.len() != 1 {
             return Ok(None);
         }
-        let statement = &statements[0];
+        self.select_columns_of(&statements[0], sql)
+    }
+
+    /// [`Self::select_columns`] for a statement the caller already holds.
+    /// `text` is the display text `SHOW QUERIES` records (empty means none).
+    pub fn select_columns_of(&self, statement: &Statement, text: &str) -> Result<Option<Batch>> {
         let Statement::Select {
             items,
             from: Some(from),
@@ -672,7 +798,7 @@ impl Engine {
         self.context
             .query_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let _query = self.begin_query(statement, sql);
+        let _query = self.begin_query(statement, text);
         let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
         // A predicate the secondary index can answer already names its rows:
         // decoding the whole table first made every indexed lookup cost the
@@ -970,10 +1096,14 @@ impl Engine {
     /// only keeps a statement that conflicts with itself from spinning: the
     /// retry is given up after a thousand turns, and a turn that saw no commit
     /// at all yields the CPU first.
-    pub(crate) fn execute_stmt_retrying(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
+    pub(crate) async fn execute_stmt_retrying(
+        &self,
+        stmt: &Statement,
+        sql: &str,
+    ) -> Result<QueryResult> {
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
-            match self.execute_stmt(stmt, sql) {
+            match self.execute_stmt(stmt, sql).await {
                 Err(Error::TxnConflict(_reason)) => {
                     // `QueryStatementInternal` begins a new transaction for the
                     // retry, so the statement spends another txn id.
@@ -1003,13 +1133,18 @@ impl Engine {
     /// statement is visible to `SHOW QUERIES` while it runs, and its wall-clock
     /// duration moves to the profile history when it returns — including on the
     /// error path, because the guard deregisters on drop.
-    pub(crate) fn execute_stmt(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
+    pub(crate) async fn execute_stmt(&self, stmt: &Statement, sql: &str) -> Result<QueryResult> {
         let _query = self.begin_query(stmt, sql);
         // `NewTxnManager::BeginTxnShared`: a statement reads the state as of the
         // clock when it started, so a commit that lands while it runs is not
         // half-visible (`NewTxn::BeginTS`, `new_txn_manager_impl.cpp:113`).
-        let _read = ReadTsGuard::enter(self.txn.current_ts() + 1);
-        let mut res = self.execute_stmt_inner(stmt)?;
+        //
+        // A task-local scope, not a guard: the statement is resumed on whichever
+        // runtime worker is free, so a thread-local set here would not be the
+        // value the rest of the statement reads.
+        let read_ts = self.txn.current_ts() + 1;
+        let mut res =
+            crate::engine::state::with_read_ts(read_ts, self.execute_stmt_inner(stmt)).await?;
         if let Statement::Select {
             highlight,
             search,
@@ -1024,7 +1159,7 @@ impl Engine {
         Ok(res)
     }
 
-    pub(crate) fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
+    pub(crate) async fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable {
                 name,
@@ -1125,51 +1260,54 @@ impl Engine {
                     &types,
                     name.rsplit('.').next().unwrap_or(name),
                 )?;
-                let t = self.ddl_commit_typed(
-                    TxnOp::CreateTable {
-                        db: split_table_name(name).0,
-                        table: name.clone(),
-                    },
-                    || {
-                        self.create_table_clearing_orphans(
-                            name,
-                            &names,
-                            &defaults,
-                            &not_nulls,
-                            &types,
-                            &comments,
-                            &sparse_stores,
-                        )
-                    },
-                    // The reference puts the flag into the WAL command itself
-                    // (`TableDef::WriteAdv` -> `ColumnDef::WriteAdv`), not into
-                    // the catalog, whose `ColumnDef::ToJson` omits it.
-                    |batch| {
-                        let (db, bare) = split_table_name(name);
-                        let cmd =
-                            crate::wal_bridge::create_table_command_from_batch(batch, &db, &bare)?;
-                        match cmd {
-                            storage::WalCmd::CreateTable {
-                                db_name,
-                                db_id,
-                                table_id,
-                                mut table_def,
-                            } => {
-                                for (i, column) in table_def.columns.iter_mut().enumerate() {
-                                    column.build_bloom_filter =
-                                        bloom.get(i).copied().unwrap_or(false);
-                                }
-                                Some(storage::WalCmd::CreateTable {
+                let t = self
+                    .ddl_commit_typed(
+                        TxnOp::CreateTable {
+                            db: split_table_name(name).0,
+                            table: name.clone(),
+                        },
+                        || {
+                            self.create_table_clearing_orphans(
+                                name,
+                                &names,
+                                &defaults,
+                                &not_nulls,
+                                &types,
+                                &comments,
+                                &sparse_stores,
+                            )
+                        },
+                        // The reference puts the flag into the WAL command itself
+                        // (`TableDef::WriteAdv` -> `ColumnDef::WriteAdv`), not into
+                        // the catalog, whose `ColumnDef::ToJson` omits it.
+                        |batch| {
+                            let (db, bare) = split_table_name(name);
+                            let cmd = crate::wal_bridge::create_table_command_from_batch(
+                                batch, &db, &bare,
+                            )?;
+                            match cmd {
+                                storage::WalCmd::CreateTable {
                                     db_name,
                                     db_id,
                                     table_id,
-                                    table_def,
-                                })
+                                    mut table_def,
+                                } => {
+                                    for (i, column) in table_def.columns.iter_mut().enumerate() {
+                                        column.build_bloom_filter =
+                                            bloom.get(i).copied().unwrap_or(false);
+                                    }
+                                    Some(storage::WalCmd::CreateTable {
+                                        db_name,
+                                        db_id,
+                                        table_id,
+                                        table_def,
+                                    })
+                                }
+                                other => Some(other),
                             }
-                            other => Some(other),
-                        }
-                    },
-                )?;
+                        },
+                    )
+                    .await?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -1202,13 +1340,17 @@ impl Engine {
                 // move the secondary-index declarations; the old table entry
                 // (whose registries refer to the old row ids) is dropped and
                 // rebuilt from the renamed rows below.
-                let pairs: Vec<String> = self
-                    .tables
-                    .lock()
-                    .unwrap()
-                    .get(&new_tkey)
-                    .map(|e| e.secondary.indexes.keys().cloned().collect())
-                    .unwrap_or_default();
+                // The indexes to rebuild after the rename, each under its own
+                // catalog id: the registries are keyed by id, so the columns
+                // come from the catalog list.
+                let pairs: Vec<(String, u64)> = self
+                    .storage
+                    .catalog
+                    .indexes_of_table(table)?
+                    .into_iter()
+                    .filter(|i| is_secondary_kind(&i.index_type))
+                    .map(|i| (i.column, i.id))
+                    .collect();
                 let rename_cmd = self.rename_table_command(table, new_name)?;
                 self.ddl_commit_typed(
                     TxnOp::RenameTable {
@@ -1223,13 +1365,14 @@ impl Engine {
                         // needs neither a drop nor a re-create (doing that
                         // stamped it with a new ts and made the catalog differ).
                         self.storage.catalog.rename_table(table, new_name)?;
-                        for column in &pairs {
-                            let _ = self.build_index(new_name, column);
+                        for (column, id) in &pairs {
+                            let _ = self.build_index_of(new_name, column, *id);
                         }
                         Ok(())
                     },
                     |_| rename_cmd,
-                )?;
+                )
+                .await?;
                 if let Some(meta) = self.storage.catalog.get_table_by_name(new_name)? {
                     self.register_table_ids(&meta);
                 }
@@ -1249,9 +1392,9 @@ impl Engine {
                 if self
                     .storage
                     .catalog
-                    .list_indexes()?
+                    .indexes_of_table(table)?
                     .iter()
-                    .any(|im| im.table == *table && im.column == *column)
+                    .any(|im| im.column == *column)
                 {
                     return Err(Error::Invalid(format!(
                         "column '{column}' is used by an index"
@@ -1288,15 +1431,15 @@ impl Engine {
                         if let Some(im) = self
                             .storage
                             .catalog
-                            .list_indexes()?
+                            .indexes_of_table(table)?
                             .into_iter()
-                            .find(|i| i.table == *table && i.column == *column)
+                            .find(|i| i.column == *column)
                         {
                             let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
                         }
                         Ok(((), drop_position))
                     },
-                    |position| {
+                    |position| async move {
                         // A buffered row has no block file to leave alone: it
                         // loses the cell at the column's position, exactly as
                         // the reference's block buffer does. Applied only once
@@ -1307,27 +1450,25 @@ impl Engine {
                         Ok(())
                     },
                     |_| dc_cmd,
-                )?;
-                let tkey = self.table_key(table);
-                self.tables
-                    .lock()
-                    .unwrap()
-                    .entry(tkey)
-                    .or_default()
-                    .secondary
-                    .indexes
-                    .remove(column);
-                // remaining indexes now hold stale row ids: rebuild them
-                let remaining: Vec<String> = self
+                )
+                .await?;
+                // The dropped column's own index records went with the column;
+                // its registry entries are keyed by id, so each kind's drop
+                // resolves them against what the catalog recorded *before* the
+                // drop (it scopes itself to its own kind's records).
+                self.drop_index_storage(table, DropScope::Column(column));
+                // remaining indexes now hold stale row ids: rebuild them, one
+                // catalog record at a time (a column may carry several).
+                let remaining: Vec<(String, u64)> = self
                     .storage
                     .catalog
-                    .list_indexes()?
+                    .indexes_of_table(table)?
                     .into_iter()
-                    .filter(|i| i.table == *table && is_secondary_kind(&i.index_type))
-                    .map(|i| i.column)
+                    .filter(|i| is_secondary_kind(&i.index_type))
+                    .map(|i| (i.column, i.id))
                     .collect();
-                for col in remaining {
-                    self.build_index(table, &col)?;
+                for (col, id) in remaining {
+                    self.build_index_of(table, &col, id)?;
                 }
                 Ok(QueryResult::CreatedTable {
                     id: 0,
@@ -1398,7 +1539,7 @@ impl Engine {
                         )?;
                         Ok(((), ac_blocks))
                     },
-                    |blocks| {
+                    |blocks| async move {
                         // Rows still in the append buffer have no block file
                         // yet (`AddColumnsData` walks the segments and would
                         // skip them): the reference's block *buffer* gains the
@@ -1406,7 +1547,11 @@ impl Engine {
                         self.patch_buffered_add_columns(table, base_index as usize, &added);
                         // And the blocks that already exist get one file for
                         // each new column, before the commit is visible.
-                        self.add_column_files(table, base_index as usize, &blocks)
+                        // `add_column_files_async` awaits the table's bottom
+                        // gate instead of bridging it with `block_on` on the
+                        // worker that is running this statement.
+                        self.add_column_files_async(table, base_index as usize, &blocks)
+                            .await
                     },
                     move |b| match &ac_ident {
                         Some((db_id, table_id, table_key)) => {
@@ -1417,7 +1562,8 @@ impl Engine {
                         }
                         None => None,
                     },
-                )?;
+                )
+                .await?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
@@ -1436,7 +1582,8 @@ impl Engine {
                     TxnOp::CreateDatabase { db: name.clone() },
                     || self.storage.catalog.create_database(name, *if_not_exists),
                     |batch| crate::wal_bridge::create_database_command_from_batch(batch, name),
-                )?;
+                )
+                .await?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
             // A collection is the legacy alias of a table: the reference's
@@ -1473,28 +1620,42 @@ impl Engine {
                     .into_iter()
                     .map(|t| t.name)
                     .collect();
-                self.ddl_commit_typed(
-                    TxnOp::DropDatabase { db: name.clone() },
-                    || {
-                        let existed = self.storage.catalog.drop_database(name, *if_exists)?;
-                        if existed || *if_exists {
-                            for t in &held {
-                                if self.storage.catalog.is_catalog_only() {
-                                    // `DROP DATABASE` is a marker; its tables go
-                                    // with it in `Cleanup` (`NewCatalog::
-                                    // CleanDB`), so only the in-memory registry
-                                    // forgets them now.
-                                    let key = self.table_key(t);
-                                    self.tables.lock().unwrap().remove(&key);
-                                } else {
-                                    self.drop_table_all(t)?;
+                let catalog_only = self.storage.catalog.is_catalog_only();
+                let dropped = self
+                    .ddl_commit_typed(
+                        TxnOp::DropDatabase { db: name.clone() },
+                        || {
+                            let existed = self.storage.catalog.drop_database(name, *if_exists)?;
+                            if existed || *if_exists {
+                                for t in &held {
+                                    if catalog_only {
+                                        // `DROP DATABASE` is a marker; its
+                                        // tables go with it in `Cleanup`
+                                        // (`NewCatalog::CleanDB`), so the
+                                        // in-memory registry is all this
+                                        // branch has to forget - and that
+                                        // happens after the commit, below.
+                                    } else {
+                                        self.drop_table_all(t)?;
+                                    }
                                 }
                             }
-                        }
-                        Ok(existed)
-                    },
-                    |_batch| drop_db_cmd,
-                )?;
+                            Ok(existed)
+                        },
+                        |_batch| drop_db_cmd,
+                    )
+                    .await?;
+                // The registry cleanup is a table-map write, so it is done
+                // here: the capture callback above is synchronous and runs on a
+                // runtime worker, where neither `.await` nor `blocking_lock()`
+                // is available.
+                if catalog_only && dropped {
+                    let keys: Vec<String> = held.iter().map(|t| self.table_key(t)).collect();
+                    let mut tables = self.tables.lock().unwrap();
+                    for key in keys {
+                        tables.remove(&key);
+                    }
+                }
                 Ok(QueryResult::DroppedDatabase { name: name.clone() })
             }
             Statement::Show { text } => {
@@ -1566,13 +1727,7 @@ impl Engine {
                 }
             }
             Statement::ShowTableIndex { table, index } => {
-                if !self
-                    .storage
-                    .catalog
-                    .list_indexes()?
-                    .iter()
-                    .any(|im| im.name == *index && im.table == *table)
-                {
+                if self.storage.catalog.index_by_name(table, index)?.is_none() {
                     return Err(Error::Invalid(format!(
                         "index '{index}' does not exist on '{table}'"
                     )));
@@ -1868,7 +2023,7 @@ impl Engine {
                 opts,
             } => {
                 if *from {
-                    let r = self.copy_from(table, path, opts);
+                    let r = self.copy_from(table, path, opts).await;
                     if r.is_ok() {
                         self.bump_writes(table);
                         // `NewTxn::Import` populates every index of the table
@@ -1896,7 +2051,35 @@ impl Engine {
                 opts,
                 if_not_exists,
             } => {
-                self.validate_index(table, column, index_type, opts)?;
+                // A functional target (`lower(name)`) is the reference's
+                // `kSecondaryFunctional` (`parser.y:586`): the expression is the
+                // index's column in the catalog and its argument is the column
+                // the rows come from (`logical_planner_impl.cpp:939-985`). The
+                // key domain is the function's return type.
+                let functional = functional_parts(column);
+                let (validate_column, effective_type, returns) = match &functional {
+                    Some((func, base)) => {
+                        let base_type = self
+                            .table_schema(table)?
+                            .iter()
+                            .position(|c| c == base)
+                            .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                            .ok_or_else(|| Error::Invalid(format!("unknown column '{base}'")))?;
+                        let returns =
+                            functional_return_type(func, &base_type).ok_or_else(|| {
+                                Error::Invalid(format!(
+                                "unsupported function '{func}' for a secondary functional index"
+                            ))
+                            })?;
+                        (
+                            base.clone(),
+                            "SECONDARYFUNCTIONAL",
+                            Some(returns.to_string()),
+                        )
+                    }
+                    None => (column.clone(), index_type.as_str(), None),
+                };
+                self.validate_index(table, &validate_column, effective_type, opts)?;
                 let duplicate = self
                     .storage
                     .catalog
@@ -1910,6 +2093,34 @@ impl Engine {
                 // qualified (`default_db.wdldl`).
                 let table_name = table.rsplit('.').next().unwrap_or(table).to_string();
                 let table_key = self.table_catalog_key(table)?;
+                let mut index_opts = opts.clone();
+                if let Some((func, base)) = &functional {
+                    // `IndexSecondaryFunctional`'s record carries the function
+                    // info and the return type next to the cardinality
+                    // (`index_secondary_functional_impl.cpp:67-77`).
+                    index_opts.push(("FUNC".to_string(), func.clone()));
+                    index_opts.push(("FUNC_COLUMN".to_string(), base.clone()));
+                    index_opts.push((
+                        "FUNC_RETURN".to_string(),
+                        returns.clone().unwrap_or_default(),
+                    ));
+                }
+                // The catalog record stores the `WITH (...)` text as written,
+                // and the C++ engine reads `lsg_config` back with
+                // `LSGConfig::FromString`, which only knows the spelling it
+                // writes itself (`sample_raito`). Accepting `sample_ratio` in SQL
+                // but persisting it verbatim made such a directory abort the C++
+                // engine (`Invalid index parameter type: sample_ratio`), so the
+                // value is normalised to `LSGConfig::ToString` before it is
+                // stored. `LsgConfig::parse` takes both spellings.
+                if let Some(pos) = index_opts
+                    .iter()
+                    .position(|(k, _)| k.eq_ignore_ascii_case("lsg_config"))
+                {
+                    if let Some(config) = index::lsg::LsgConfig::parse(&index_opts[pos].1) {
+                        index_opts[pos].1 = config.to_string();
+                    }
+                }
                 self.ddl_commit_typed(
                     TxnOp::CreateIndex {
                         table: table.clone(),
@@ -1917,9 +2128,13 @@ impl Engine {
                         columns: vec![column.clone()],
                     },
                     || {
-                        self.storage
-                            .catalog
-                            .create_index_typed(name, table, column, index_type, opts)
+                        self.storage.catalog.create_index_typed(
+                            name,
+                            table,
+                            column,
+                            effective_type,
+                            &index_opts,
+                        )
                     },
                     |batch| {
                         let (db, _) = split_table_name(table);
@@ -1931,7 +2146,12 @@ impl Engine {
                             name,
                         )
                     },
-                )?;
+                )
+                .await?;
+                // The index's catalog id, which is its identity in every
+                // in-memory registry (the reference keys `MemIndex` by
+                // `(index_id, segment)`); a column may carry several indexes.
+                let created_index_id = self.index_position(table, name).ok().map(|id| id as u64);
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 // The option name is `ANALYZER` in SQL but `analyzer` over the
                 // API (the reference lower-cases every `InitParameter` there),
@@ -1955,11 +2175,42 @@ impl Engine {
                         .insert(name.clone(), a.clone());
                     entry.analyzers_by_index.insert(name.clone(), a);
                 }
-                // a functional-index target is not a plain column, so there is
-                // no materialised index to build
-                let has_rows = self.table_schema(table)?.iter().any(|c| c == column);
-                if is_secondary_kind(index_type) && has_rows {
-                    self.build_index(table, column)?;
+                // A functional index is materialised from its base column; the
+                // expression itself is not a column of the table.
+                let has_rows = match &functional {
+                    Some((_, base)) => self.table_schema(table)?.iter().any(|c| c == base),
+                    None => self.table_schema(table)?.iter().any(|c| c == column),
+                };
+                if let (Some((func, base)), true) = (&functional, has_rows) {
+                    self.register_functional_index(
+                        table,
+                        column,
+                        base,
+                        func,
+                        returns.as_deref().unwrap_or_default(),
+                    );
+                }
+                if is_secondary_kind(effective_type) && has_rows {
+                    // The build measures the row id its scan stops at and
+                    // registers the tail the write hook feeds. A writer's
+                    // commit runs its hook and its block append inside this
+                    // gate, so a row that reached neither the scan nor the
+                    // hook exists only if it was allocated before the
+                    // measurement, appended after the scan and hooked while
+                    // no index was registered yet - the gate excludes exactly
+                    // that window (`create_index_covers_rows_committed_while
+                    // _it_builds`). The compaction path already builds under
+                    // the gate it holds (`populate_secondary_indexes`).
+                    let gate = self.batch_gate(table);
+                    let _held = gate.lock().await;
+                    // Only the record this statement created: a column may
+                    // already carry another secondary index, and rebuilding that
+                    // one would scan the rows again, append a second chunk set
+                    // and leave its rows covered twice.
+                    match created_index_id {
+                        Some(id) => self.build_index_of(table, column, id)?,
+                        None => self.build_index(table, column)?,
+                    }
                 }
                 // C++ `IndexBuilder`: a full-text or HNSW index is materialised
                 // by `CREATE INDEX`, not by the first query. Building lazily
@@ -1967,10 +2218,37 @@ impl Engine {
                 // did not exist on disk until somebody searched.
                 if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
                     let tokenizer = self.index_tokenizer(table, column);
-                    self.text_index_for(table, column, tokenizer)?;
+                    if let Some(index_id) = created_index_id {
+                        self.text_index_for_id(table, index_id, column, tokenizer)?;
+                    }
                 }
-                if has_rows && index_type.eq_ignore_ascii_case("HNSW") {
-                    self.build_hnsw_index(table, column)?;
+                if index_type.eq_ignore_ascii_case("HNSW") {
+                    // Clear the "already looked for an HNSW index" probe before
+                    // building. It is a one-shot flag (`hnsw_probed`): a table
+                    // that saw an insert before it had any HNSW index kept it
+                    // set with an empty `hnsw_mem`, and every later insert then
+                    // took the `!hnsw_mem.is_empty()` branch and skipped the
+                    // tail - the new index silently missed every row written
+                    // after it was created. Resetting it also makes
+                    // `hnsw_mem_segments` materialise the segment here.
+                    {
+                        let key = self.table_key(table);
+                        let mut tables = self.tables.lock().unwrap();
+                        let entry = tables.entry(key).or_default();
+                        entry.hnsw_topup = true;
+                        if let Some(index_id) = created_index_id {
+                            entry.hnsw_mem.remove(&index_id);
+                        }
+                    }
+                    if has_rows {
+                        // Build **this** record's graph, not every HNSW graph
+                        // on the column (the reference keeps one `MemIndex`
+                        // per index id).
+                        match created_index_id {
+                            Some(id) => self.build_hnsw_index_of(table, column, Some(id))?,
+                            None => self.build_hnsw_index(table, column)?,
+                        }
+                    }
                 }
                 // A multi-vector index is materialised when it is created, so
                 // queries only read segment files; later inserts go to the
@@ -1985,15 +2263,13 @@ impl Engine {
                         .and_then(|s| s.iter().position(|c| c == column))
                         .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
                         .and_then(|ty| type_dim(&ty));
-                    if let Some(dims) = dims {
-                        // The memory index is built once, with the configs the
-                        // catalog had at that moment; a second index on the same
-                        // column (`USING SMVE` after `USING PLAID`) would
-                        // silently reuse it. The reference keeps one object per
-                        // index, so rebuild when the cached one does not know
-                        // this kind.
-                        self.forget_multivector_index(table, column, index_type);
-                        let _ = self.multivector_index_for(table, column, dims);
+                    if let (Some(dims), Some(index_id)) = (dims, created_index_id) {
+                        // The memory index belongs to **this** catalog record:
+                        // a second index on the same column (`USING SMVE` after
+                        // `USING PLAID`) is a second `MemIndex` in the
+                        // reference, so it is built under its own id and the
+                        // first one keeps its tail and chunks.
+                        let _ = self.multivector_index_by_id(table, column, index_id, dims);
                     }
                 }
                 // The sparse BMP index is materialised the same way.
@@ -2004,22 +2280,24 @@ impl Engine {
                         .and_then(|s| s.iter().position(|c| c == column))
                         .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
                         .map(|ty| sparse_idx_width(&ty));
-                    if let Some(width) = width {
-                        let _ = self.sparse_index_for(table, column, width);
+                    if let (Some(width), Some(index_id)) = (width, created_index_id) {
+                        let _ = self.sparse_index_by_id(table, column, index_id, width);
                     }
                 }
                 // An IVF index keeps a memory segment for rows written before
                 // the next mirror dump.
                 if index_type.eq_ignore_ascii_case("IVF") {
-                    let tkey = self.table_key(table);
-                    self.tables
-                        .lock()
-                        .unwrap()
-                        .entry(tkey)
-                        .or_default()
-                        .ivf_mem
-                        .entry(column.clone())
-                        .or_default();
+                    if let Some(index_id) = created_index_id {
+                        let tkey = self.table_key(table);
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .ivf_mem
+                            .entry(index_id)
+                            .or_default();
+                    }
                 }
                 // `PrepareCommitCreateIndex` -> `PopulateIndex` over every
                 // segment the table already has: the first chunk of a
@@ -2056,28 +2334,7 @@ impl Engine {
                 })
             }
             Statement::DropTable { name, if_exists } => {
-                // The reference rolls the transaction back on a failing DDL,
-                // and a rollback spends no timestamp: reject before the DDL
-                // transaction is opened.
-                if !*if_exists && self.storage.catalog.get_table_by_name(name)?.is_none() {
-                    return Err(Error::Invalid(format!("table '{name}' does not exist")));
-                }
-                let drop_cmd = self.drop_table_command(name)?;
-                let existed = self.ddl_commit_typed(
-                    TxnOp::DropTable {
-                        db: split_table_name(name).0,
-                        table: name.clone(),
-                    },
-                    || self.drop_table_all(name),
-                    |_batch| drop_cmd.clone(),
-                )?;
-                if existed {
-                    self.drop_text_index_storage(name, None);
-                }
-                Ok(QueryResult::DroppedTable {
-                    name: name.clone(),
-                    existed,
-                })
+                self.drop_table_direct(name, *if_exists).await
             }
             Statement::DropIndex { name, if_exists } => {
                 let target = self
@@ -2087,29 +2344,31 @@ impl Engine {
                     .unwrap_or_default()
                     .into_iter()
                     .find(|im| im.name == *name)
-                    .map(|im| (im.table, im.column, im.index_type));
+                    .map(|im| (im.table, im.id));
                 if target.is_none() && !*if_exists {
                     return Err(Error::Invalid(format!("index '{name}' does not exist")));
                 }
-                let was_fulltext = target
-                    .as_ref()
-                    .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
-                    .unwrap_or(false);
                 let drop_idx_cmd = self.drop_index_command(name)?;
-                let existed = self.ddl_commit_typed(
-                    TxnOp::DropIndex {
-                        table: target
-                            .as_ref()
-                            .map(|(table, _, _)| table.clone())
-                            .unwrap_or_default(),
-                        index: name.clone(),
-                    },
-                    || self.storage.catalog.drop_index(name),
-                    |_batch| drop_idx_cmd,
-                )?;
+                let existed = self
+                    .ddl_commit_typed(
+                        TxnOp::DropIndex {
+                            table: target
+                                .as_ref()
+                                .map(|(table, _)| table.clone())
+                                .unwrap_or_default(),
+                            index: name.clone(),
+                        },
+                        || self.storage.catalog.drop_index(name),
+                        |_batch| drop_idx_cmd,
+                    )
+                    .await?;
                 if existed {
-                    if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
-                        self.drop_text_index_storage(&table, Some(&column));
+                    if let Some((table, index_id)) = target {
+                        // The dropped record's registry only: an index id is
+                        // unique within the table, so the other indexes on the
+                        // column (of this kind or any other) keep their graphs,
+                        // tails and readers.
+                        self.drop_index_storage(&table, DropScope::Record(index_id));
                     }
                 }
                 Ok(QueryResult::DroppedIndex {
@@ -2121,7 +2380,10 @@ impl Engine {
                 table,
                 columns,
                 query,
-            } => self.insert_from_select(table, columns.as_deref(), query),
+            } => {
+                self.insert_from_select(table, columns.as_deref(), query)
+                    .await
+            }
             // The reference has no `CREATE TABLE … AS SELECT`: the statement
             // reaches its binder as a table definition without columns and
             // fails there (`Status::NoColumnDefined`,
@@ -2145,6 +2407,28 @@ impl Engine {
                 Err(Error::Unrecoverable("Unknown DDL type".to_string()))
             }
             Statement::Describe { table } => self.describe_table(table),
+            // C++ `PhysicalFlush`: `DATA` runs a checkpoint, `CATALOG` the
+            // catalog-store flush, and the other two are "not supported" (the
+            // reference answers `Status::NotSupport("Flush log"/"Flush buffer")`).
+            Statement::Flush { kind } => {
+                match kind {
+                    parser::ast::FlushKind::Data => self.flush().await?,
+                    parser::ast::FlushKind::Catalog => {
+                        self.ensure_writable()?;
+                        self.txn.flush()?;
+                    }
+                    parser::ast::FlushKind::Log => {
+                        return Err(Error::NotSupport("Flush log".into()))
+                    }
+                    parser::ast::FlushKind::Buffer => {
+                        return Err(Error::NotSupport("Flush buffer".into()))
+                    }
+                }
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
             Statement::Utility { .. } => Ok(QueryResult::Rows {
                 columns: vec![],
                 rows: vec![],
@@ -2254,21 +2538,21 @@ impl Engine {
                 })
             }
             Statement::CreateSnapshot { name, table } => {
-                self.create_table_snapshot(&self.db(), table, name)?;
+                self.create_table_snapshot(&self.db(), table, name).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
                 })
             }
             Statement::CreateDatabaseSnapshot { name, database } => {
-                self.create_database_snapshot(name, database)?;
+                self.create_database_snapshot(name, database).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
                 })
             }
             Statement::CreateSystemSnapshot { name } => {
-                self.create_system_snapshot(name)?;
+                self.create_system_snapshot(name).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -2282,21 +2566,21 @@ impl Engine {
                 })
             }
             Statement::RestoreSnapshot { name } => {
-                self.restore_table_snapshot(name)?;
+                self.restore_table_snapshot(name).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
                 })
             }
             Statement::RestoreDatabaseSnapshot { name } => {
-                self.restore_database_snapshot(name)?;
+                self.restore_database_snapshot(name).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
                 })
             }
             Statement::RestoreSystemSnapshot { name } => {
-                self.restore_system_snapshot(name)?;
+                self.restore_system_snapshot(name).await?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -2306,7 +2590,10 @@ impl Engine {
                 table,
                 columns,
                 rows,
-            } => self.insert_literals(table, columns.as_deref(), rows.clone()),
+            } => {
+                self.insert_literals_inner(table, columns.as_deref(), rows.clone(), false)
+                    .await
+            }
             Statement::Delete { table, where_pred } => {
                 // A WHERE clause must be a predicate: `DELETE FROM t WHERE c1` on
                 // a non-boolean column is rejected by the reference.
@@ -2335,7 +2622,7 @@ impl Engine {
                 }
                 if !to_del.is_empty() {
                     let t = self.txn.begin();
-                    self.commit_with_deletes(table, &to_del, 0, &[], t)?;
+                    self.commit_with_deletes(table, &to_del, 0, &[], t).await?;
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),
@@ -2386,8 +2673,15 @@ impl Engine {
                             }
                         }
                     }
-                    // An array value cannot be stored in a scalar column.
-                    if matches!(e, parser::ExprAst::Literal(parser::Literal::Array(_))) {
+                    // An array value cannot be stored in a scalar column. A
+                    // numeric vector literal is an array the same way a textual
+                    // one is: both only fit a structured column.
+                    if matches!(
+                        e,
+                        parser::ExprAst::Literal(
+                            parser::Literal::Array(_) | parser::Literal::Vector(_)
+                        )
+                    ) {
                         let structured = ty.starts_with("ARRAY")
                             || ty.starts_with("VECTOR")
                             || ty.starts_with("EMBEDDING")
@@ -2461,12 +2755,8 @@ impl Engine {
                     let table_name = table.to_string();
                     let table_ident = self.table_ident(table)?;
                     let row_count = literals.len();
-                    let base = self.commit_rewritten_rows(
-                        table,
-                        &to_del,
-                        &new_rows,
-                        t,
-                        move |txn, base| {
+                    let base = self
+                        .commit_rewritten_rows(table, &to_del, &new_rows, t, move |txn, base| {
                             if let Some((_, table_id, _)) = table_ident {
                                 // A row the WAL encoder cannot express keeps
                                 // its `DeleteV2` only: the new cells reach the
@@ -2485,14 +2775,13 @@ impl Engine {
                                 }
                             }
                             Ok(())
-                        },
-                    )?;
+                        })
+                        .await?;
                     // A table with no index has nothing to feed: rendering every
                     // cell to text for the hooks cost a `format!` per cell on
                     // every rewritten row.
                     if self.has_index_declaration(table) || self.any_in_memory_index() {
                         let schema = self.table_schema(table).unwrap_or_default();
-                        self.update_secondary_indexes_batch(table, base, &new_rows, &schema);
                         // `PrepareCommitUpdate` commits delete + append, so every
                         // index kind takes the rewritten rows - the secondary tail
                         // included (`AppendIndex` dispatches over them all). Nothing
@@ -2504,21 +2793,17 @@ impl Engine {
                             let mut row_texts: Vec<(usize, Vec<String>)> =
                                 Vec::with_capacity(new_rows.len());
                             for (k, nr) in new_rows.iter().enumerate() {
+                                self.update_indexes_on_insert_text(table, base + k, nr, &schema)?;
                                 let texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
-                                self.update_indexes_on_insert_text(
-                                    table,
-                                    base + k,
-                                    &texts,
-                                    &schema,
-                                )?;
                                 row_texts.push((base + k, texts));
                             }
                             let batch: Vec<(usize, &[String])> = row_texts
                                 .iter()
                                 .map(|(seq, cells)| (*seq, cells.as_slice()))
                                 .collect();
-                            self.update_text_indexes_batch(table, &batch, &schema, None);
+                            self.update_text_indexes_batch_async(table, &batch, &schema, None)
+                                .await;
                             for (seq, texts) in &row_texts {
                                 self.update_vector_caches(table, *seq, texts);
                             }
@@ -2533,7 +2818,22 @@ impl Engine {
                 // The rows stay `Value`s: rendering every cell to text here only
                 // for the protocol layer to parse it back was ~40% of a scan's
                 // server time (`docs/SELECT_CHAIN.md`).
-                let (columns, rows) = self.run_select(stmt)?;
+                //
+                // A SELECT is one **CPU unit**: planning, the fragment's
+                // tasklets and the merge are all pure computation over data
+                // that is already in memory (the block decode reads mapped
+                // pages). It is dispatched as a whole to the CPU pool, so the
+                // statement task yields its worker for the entire query instead
+                // of parking it for the scan's duration - which is what the
+                // server needs to keep 100k connections in flight.
+                let Some(engine) = self.engine_handle() else {
+                    let (columns, rows) = self.run_select(stmt)?;
+                    return Ok(QueryResult::Rows { columns, rows });
+                };
+                let stmt = stmt.clone();
+                let (columns, rows) = crate::scheduler::scheduler()
+                    .spawn_blocking(move || engine.run_select(&stmt))
+                    .await?;
                 Ok(QueryResult::Rows { columns, rows })
             }
         }
@@ -2638,6 +2938,9 @@ impl Engine {
                 let prune = scan_predicate_of(&plan)
                     .map(|pred| prune_conditions(&pred, &columns))
                     .unwrap_or_default();
+                // The index filter names `columns[i]` for the evaluator's
+                // `column_id`, exactly the layout `index_positions` maps.
+                let index_columns = Some(columns.clone());
                 crate::operator::scan::SourceSpec::Table(Box::new(
                     crate::operator::scan::TableScan {
                         table,
@@ -2646,6 +2949,7 @@ impl Engine {
                         override_rows,
                         candidate,
                         index_positions,
+                        index_columns,
                         fulltext_index_column,
                         fulltext_substring,
                         prune,

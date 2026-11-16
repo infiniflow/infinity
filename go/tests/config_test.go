@@ -24,7 +24,7 @@ import (
 // TestSetConfig tests setting and getting configuration values
 // Based on Python SDK test_pysdk/test_config.py
 func TestSetConfig(t *testing.T) {
-	conn, err := infinity.Connect(testLocalHost)
+	conn, err := infinity.Connect(TestConfig.URI)
 	if err != nil {
 		t.Skipf("Failed to connect to server: %v", err)
 	}

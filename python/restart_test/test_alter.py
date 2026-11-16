@@ -67,9 +67,9 @@ class TestAlter:
                     }
                 ).astype(
                     {
-                        "c1": 'Int32',
-                        "c3": 'string',
-                        "c4": 'string',
+                        "c1": "Int32",
+                        "c3": "string",
+                        "c4": "string",
                     }
                 ),
             )
@@ -140,7 +140,7 @@ class TestAlter:
 
         @decorator
         def part2(infinity_obj):
-            time.sleep(1) # wait some time or match_text is not available
+            time.sleep(1)  # wait some time or match_text is not available
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -157,11 +157,11 @@ class TestAlter:
                     }
                 ).astype(
                     {
-                        "c1": 'Int32',
-                        "c3": 'string',
-                        "c4": 'string',
-                        "c2": 'Float32',
-                        "c5": 'Int32',
+                        "c1": "Int32",
+                        "c3": "string",
+                        "c4": "string",
+                        "c2": "Float32",
+                        "c5": "Int32",
                     }
                 ),
             )

@@ -21,21 +21,23 @@ fn open() -> (tempfile::TempDir, Engine) {
 #[test]
 fn explain_basic_test1() {
     let (_dir, engine) = open();
-    engine.execute("create database db1").unwrap();
-    engine.execute("create collection collection1").unwrap();
+    engine.execute_blocking("create database db1").unwrap();
     engine
-        .execute("create table tb(col1 int, col2 varchar)")
+        .execute_blocking("create collection collection1")
+        .unwrap();
+    engine
+        .execute_blocking("create table tb(col1 int, col2 varchar)")
         .unwrap();
     for i in 0..200 {
         engine
-            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
             .unwrap();
     }
     engine
-        .execute("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .execute_blocking("create table tb_embedding(col1 int, col2 embedding(float, 4))")
         .unwrap();
     engine
-        .execute(
+        .execute_blocking(
             "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), \
              (2, [0.2, 0.2, 0.2, 0.2])",
         )
@@ -56,7 +58,7 @@ fn explain_basic_test1() {
         }
         for variant in variants {
             let mut result = engine
-                .execute(&variant)
+                .execute_blocking(&variant)
                 .unwrap_or_else(|err| panic!("{variant}: {err}"));
             assert_eq!(result.len(), 1, "{variant}");
             assert!(
@@ -162,15 +164,17 @@ fn explain_basic_test1() {
 fn logical_create_collection_test1() {
     let (_dir, engine) = open();
     engine
-        .execute("create table tb(col1 int, col2 varchar)")
+        .execute_blocking("create table tb(col1 int, col2 varchar)")
         .unwrap();
-    engine.execute("create index idx on tb(col1)").unwrap();
+    engine
+        .execute_blocking("create index idx on tb(col1)")
+        .unwrap();
     for i in 0..200 {
         engine
-            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
             .unwrap();
     }
-    let result = engine.execute("create collection tb").unwrap();
+    let result = engine.execute_blocking("create collection tb").unwrap();
     assert_eq!(result.len(), 1);
     let QueryResult::Rows { columns, rows } = &result[0] else {
         panic!("expected an OK row, got {:?}", result[0]);
@@ -184,9 +188,9 @@ fn logical_create_collection_test1() {
 #[test]
 fn logical_drop_collection_test1() {
     let (_dir, engine) = open();
-    let created = engine.execute("create collection tb").unwrap();
+    let created = engine.execute_blocking("create collection tb").unwrap();
     assert!(matches!(created[0], QueryResult::Rows { .. }));
-    let dropped = engine.execute("drop collection tb").unwrap();
+    let dropped = engine.execute_blocking("drop collection tb").unwrap();
     assert!(matches!(dropped[0], QueryResult::Rows { .. }));
 }
 
@@ -197,15 +201,15 @@ fn logical_drop_collection_test1() {
 fn plan_fragment_test1() {
     let (_dir, engine) = open();
     engine
-        .execute("create table tb(col1 int, col2 varchar)")
+        .execute_blocking("create table tb(col1 int, col2 varchar)")
         .unwrap();
     for i in 0..200 {
         engine
-            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
             .unwrap();
     }
     let result = engine
-        .execute("explain fragment select * from tb where col1 < 100")
+        .execute_blocking("explain fragment select * from tb where col1 < 100")
         .unwrap();
     let QueryResult::Rows { rows, .. } = &result[0] else {
         panic!("expected fragment rows");
@@ -240,27 +244,29 @@ fn fragment_test_build_fragment() {
         "create table t2(a bigint)",
         "create table t3(c1 embedding(bit,10))",
     ] {
-        let result = engine.execute(sql).unwrap_or_else(|e| panic!("{sql}: {e}"));
+        let result = engine
+            .execute_blocking(sql)
+            .unwrap_or_else(|e| panic!("{sql}: {e}"));
         assert_eq!(result.len(), 1, "{sql}");
     }
     // Drop database and table.
     assert!(matches!(
-        engine.execute("drop database db1").unwrap()[0],
+        engine.execute_blocking("drop database db1").unwrap()[0],
         QueryResult::DroppedDatabase { .. }
     ));
     assert!(matches!(
-        engine.execute("drop table t1").unwrap()[0],
+        engine.execute_blocking("drop table t1").unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
 
     // Show.
-    let show_tables = engine.execute("show tables").unwrap();
+    let show_tables = engine.execute_blocking("show tables").unwrap();
     let QueryResult::Rows { columns, .. } = &show_tables[0] else {
         panic!("expected SHOW TABLES rows");
     };
     assert_eq!(columns.len(), 8);
 
-    let show_table = engine.execute("show table t2").unwrap();
+    let show_table = engine.execute_blocking("show table t2").unwrap();
     let QueryResult::Rows { columns, rows } = &show_table[0] else {
         panic!("expected SHOW TABLE rows");
     };
@@ -275,11 +281,11 @@ fn fragment_test_build_fragment() {
     assert_eq!(shown[4], vec!["column_count".to_string(), "1".to_string()]);
 
     assert!(matches!(
-        engine.execute("drop table t3").unwrap()[0],
+        engine.execute_blocking("drop table t3").unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
     assert!(matches!(
-        engine.execute("drop table t2").unwrap()[0],
+        engine.execute_blocking("drop table t2").unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
 }

@@ -18,6 +18,13 @@
 //! The output is the `{"id","title","text"}` JSONL that
 //! `infinity fulltext-bench <dir> insert <corpus> <batch>` reads.
 
+// This binary uses nothing but std, so it never references `common` - where the
+// workspace's global allocator is declared - and the linker drops that crate.
+// It declares the same allocator itself so every executable here allocates the
+// same way.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};

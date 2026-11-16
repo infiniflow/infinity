@@ -6,6 +6,7 @@
 //! Mechanical translation first: same field order, same enum widths.
 
 use ::common::{Error, Result};
+use index::lsg::LsgConfig;
 
 use super::ddl_def::{
     put_f32, put_i32, put_i64, put_str, put_u32, put_u8, EmbeddingDataType, Reader,
@@ -205,8 +206,11 @@ pub enum IndexDef {
         m: u64,
         ef_construction: u64,
         block_size: u64,
-        /// `lsg_config_` presence; the config body itself is not ported yet.
-        has_lsg: bool,
+        /// `lsg_config_` body: `(sample_ratio, ls_k, alpha)` written as
+        /// `f32, u64 (size_t), f32`. `None` is the reference's empty optional;
+        /// it is not the same as a present body with the default values, so the
+        /// distinction has to survive the round trip.
+        lsg: Option<LsgConfig>,
     },
     /// `IndexEMVB::WriteAdv` (`index_emvb_impl.cpp:116`): two `u32`s.
     Emvb {
@@ -338,7 +342,7 @@ impl IndexDef {
                 m,
                 ef_construction,
                 block_size,
-                has_lsg,
+                lsg,
             } => {
                 base.write_adv(out);
                 put_u8(out, *metric_type as i8 as u8);
@@ -349,7 +353,14 @@ impl IndexDef {
                 put_i64(out, *m as i64);
                 put_i64(out, *ef_construction as i64);
                 put_i64(out, *block_size as i64);
-                put_u8(out, if *has_lsg { 1 } else { 0 });
+                put_u8(out, if lsg.is_some() { 1 } else { 0 });
+                // `IndexHnsw::WriteAdv` then calls `LSGConfig::WriteAdv`:
+                // `float sample_ratio_`, `size_t ls_k_`, `float alpha_`.
+                if let Some(config) = lsg {
+                    put_f32(out, config.sample_ratio);
+                    put_i64(out, config.ls_k as i64);
+                    put_f32(out, config.alpha);
+                }
             }
         }
     }
@@ -384,12 +395,19 @@ impl IndexDef {
                 let m = r.i64()? as u64;
                 let ef_construction = r.i64()? as u64;
                 let block_size = r.i64()? as u64;
-                let has_lsg = r.u8()? != 0;
-                if has_lsg {
-                    return Err(Error::Storage(
-                        "HNSW LSG config body is not ported yet".into(),
-                    ));
-                }
+                // `IndexHnsw::ReadAdv` mirrors `WriteAdv`: a presence byte and,
+                // when set, the `LSGConfig` body. A frame that carries one used
+                // to fail here, which dropped the whole `CreateIndex` command
+                // on replay and left the index missing after recovery.
+                let lsg = if r.u8()? != 0 {
+                    Some(LsgConfig {
+                        sample_ratio: r.f32()?,
+                        ls_k: r.u64()? as usize,
+                        alpha: r.f32()?,
+                    })
+                } else {
+                    None
+                };
                 IndexDef::Hnsw {
                     base,
                     metric_type,
@@ -398,7 +416,7 @@ impl IndexDef {
                     m,
                     ef_construction,
                     block_size,
-                    has_lsg,
+                    lsg,
                 }
             }
             IndexType::Emvb => IndexDef::Emvb {
@@ -556,7 +574,38 @@ mod tests {
             m: 16,
             ef_construction: 20,
             block_size: 16,
-            has_lsg: false,
+            lsg: None,
         });
+    }
+
+    /// `IndexHnsw::WriteAdv` appends the `LSGConfig` body after the presence
+    /// byte: `f32 sample_ratio`, `size_t ls_k`, `f32 alpha`. A frame carrying
+    /// it used to be rejected outright, which dropped the whole `CreateIndex`
+    /// command during replay.
+    #[test]
+    fn hnsw_lsg_body_roundtrips_and_has_the_reference_layout() {
+        let def = IndexDef::Hnsw {
+            base: base(IndexType::Hnsw, "vec_idx", "vec"),
+            metric_type: MetricType::L2,
+            encode_type: HnswEncodeType::Lvq,
+            build_type: HnswBuildType::Lsg,
+            m: 16,
+            ef_construction: 200,
+            block_size: 8192,
+            lsg: Some(LsgConfig {
+                sample_ratio: 0.25,
+                ls_k: 7,
+                alpha: 0.5,
+            }),
+        };
+        let mut bytes = Vec::new();
+        def.write_adv(&mut bytes);
+        // Presence byte + `f32 + u64 + f32` = 17 bytes of LSG payload.
+        let tail = &bytes[bytes.len() - 17..];
+        assert_eq!(tail[0], 1);
+        assert_eq!(f32::from_le_bytes(tail[1..5].try_into().unwrap()), 0.25);
+        assert_eq!(u64::from_le_bytes(tail[5..13].try_into().unwrap()), 7);
+        assert_eq!(f32::from_le_bytes(tail[13..17].try_into().unwrap()), 0.5);
+        roundtrip(def);
     }
 }

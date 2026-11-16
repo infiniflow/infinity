@@ -13,6 +13,11 @@
 //! the part of the model that is not ported (see `docs/CLASS_MAP.md`).
 
 #![forbid(unsafe_code)]
+// Portable SIMD (stable in neither channel yet, so the workspace pins a nightly
+// toolchain - see `rust-toolchain.toml`) keeps the `MaxSim` kernels safe code:
+// a tensor `MATCH` spends its time in `sum_q max_d dot(q, d)`, and `std::arch`
+// intrinsics would need `unsafe`, which this crate forbids.
+#![feature(portable_simd)]
 
 // Names the rest of the crate reaches through `crate::`.
 use ::common::{Error, Result};
@@ -55,6 +60,7 @@ pub mod diagnostics;
 mod dump_mem_index_ut;
 mod explain;
 mod explain_search;
+mod fanout;
 #[cfg(test)]
 mod gate_b_executor_ut;
 pub mod global_resource_usage;
@@ -95,6 +101,7 @@ mod replay_txn_ut;
 #[cfg(test)]
 mod request_ut;
 mod scheduler;
+pub use scheduler::{block_on, scheduler, sleep, TaskScheduler};
 #[cfg(test)]
 mod select_ddl_ut;
 mod snapshot;
@@ -106,6 +113,8 @@ mod storage_mode_ut;
 mod subquery_cte_ut;
 #[cfg(test)]
 mod table_ut;
+#[cfg(test)]
+mod text_cell_ut;
 #[cfg(test)]
 mod txn_ut;
 #[cfg(test)]
@@ -130,4 +139,5 @@ pub use columnar::{Batch, ColumnData};
 pub use parser::Literal;
 
 mod engine;
+pub use engine::statements::{with_session_scope, with_session_sync};
 pub use engine::*;

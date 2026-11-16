@@ -64,19 +64,21 @@ class BaseClient:
         """
         Download dataset and extract it into path.
         """
-        #Ask for downloading data in taeget path
-        print(f"Dataset doesn't exist: {target_path},\n"
-              f"downloading dataset in {target_path}?\n"
-              f"[Y/n]")
-        while(True):
+        # Ask for downloading data in taeget path
+        print(
+            f"Dataset doesn't exist: {target_path},\n"
+            f"downloading dataset in {target_path}?\n"
+            f"[Y/n]"
+        )
+        while True:
             user_input = input()
-            if user_input == 'Y' or user_input == 'y' :
+            if user_input == "Y" or user_input == "y":
                 print("Downloading...")
                 break
-            elif user_input == 'N' or user_input == 'n':
+            elif user_input == "N" or user_input == "n":
                 print("Exit")
                 sys.exit(0)
-            else :
+            else:
                 print("Invalid input!")
 
         _, ext = os.path.splitext(url)
@@ -389,11 +391,16 @@ class BaseClient:
                     expected_result = f["neighbors"]
                     for i, result in enumerate(results):
                         ids = []
-                        if self.data["app"] == "qdrant" :
+                        if self.data["app"] == "qdrant":
                             for ScoredPoint in result[1:]:
-                                ids.append(((ScoredPoint.id >> 32) << 23) + (ScoredPoint.id & 0xFFFFFFFF))
-                        else :#elasticsearch & infinity
-                            ids = [((x >> 32) << 23) + (x & 0xFFFFFFFF) for x in result[1:]]
+                                ids.append(
+                                    ((ScoredPoint.id >> 32) << 23)
+                                    + (ScoredPoint.id & 0xFFFFFFFF)
+                                )
+                        else:  # elasticsearch & infinity
+                            ids = [
+                                ((x >> 32) << 23) + (x & 0xFFFFFFFF) for x in result[1:]
+                            ]
                         precision = (
                             len(set(ids).intersection(expected_result[i][1:]))
                             / self.data["topK"]

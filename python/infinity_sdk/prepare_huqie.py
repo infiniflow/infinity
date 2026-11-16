@@ -13,7 +13,7 @@ def prepare_huqie_file(source_file, target_dir):
     if not source_file.exists():
         print(f"Source file does not exist: {source_file}")
         return False
-    
+
     print(f"Copy {source_file} to {target_dir}")
     shutil.copy2(source_file, target_dir)
 
@@ -38,6 +38,7 @@ def prepare_huqie_file(source_file, target_dir):
         return False
 
     return True
+
 
 if __name__ == "__main__":
     script_dir = Path(__file__).resolve().parent

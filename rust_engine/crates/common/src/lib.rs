@@ -5,6 +5,25 @@
 
 #![forbid(unsafe_code)]
 
+/// The process-wide allocator: mimalloc, on every executable and every test
+/// binary.
+///
+/// The C++ engine links jemalloc for the same reason (`ENABLE_JEMALLOC`): the
+/// insert and checkpoint paths allocate heavily from several threads at once,
+/// and glibc's arena locks serialise them. This port uses mimalloc, whose Rust
+/// binding builds on every target the workspace ships (jemalloc's does not - on
+/// this machine `tikv-jemalloc-sys` 0.7 looks for the static library in
+/// `<out>/lib` while jemalloc installs it into `<out>/lib64`, so the link
+/// fails).
+///
+/// It is declared here, not in `main.rs`, because `#[global_allocator]` may be
+/// declared only once per program but is needed by every binary: `infinity`,
+/// the `src/bin/` helpers, the examples, and each crate's unit-test binary.
+/// `common` is the workspace's one universal dependency, so this single
+/// declaration covers all of them.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod cast;
 pub mod datetime;
 pub mod error;

@@ -1,4 +1,5 @@
 use super::*;
+use storage::invertedindex::chunk_manifest::ChunkManifest;
 
 /// Sorts a posting list by row id and collapses repeated rows, keeping the
 /// **first** entry of each row. An UPDATE appends the rewritten row's terms
@@ -38,17 +39,63 @@ pub(crate) fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
     *list = out;
 }
 
+/// The one gate every file-level mutation of a full-text index directory takes.
+///
+/// One directory has more writers than one instance: the cached `TextIndex`
+/// seals while it fills, a rebuild seals while it re-indexes, `optimize`
+/// rewrites chunks and unlinks their sources, `dump` and the checkpoint publish
+/// the same names, and a reopen's `load_sealed` removes the chunks it considers
+/// superseded. Those paths took three different locks - `flush_lock` for
+/// dump/checkpoint, the table's `batch_gate` for optimize, **nothing at all** for
+/// a seal or a rebuild - so any two of them could write, rename or unlink one
+/// file at the same time. A chunk is named after its first row id, so two
+/// writers of one range choose the same name and the narrower write wins: the
+/// rows it does not cover never reach the layout the next open reads
+/// (`writers_readers_deletes_and_merges_stay_consistent`, one chunk's worth of
+/// rows missing after a restart).
+///
+/// Per directory, process wide: two engines opened on one directory are one
+/// directory on disk. One entry per directory is kept for the life of the
+/// process - one per full-text index, so the map is the index count, not a
+/// growing trace of every seal. It is only ever held around blocking file I/O
+/// and never across an `await`, so it is a `std::sync::Mutex`. Taken **before**
+/// any index
+/// lock - `Engine::with_text_dir_gate` (used by every seal),
+/// `optimize_text_index_unlocked` and the build all follow that order, and
+/// nothing takes it while holding one - which is what keeps `gate -> index` the
+/// only nesting this index has.
+pub(crate) fn dir_gate(dir: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
+    type Gate = std::sync::Arc<std::sync::Mutex<()>>;
+    type Gates = std::sync::Mutex<std::collections::HashMap<String, Gate>>;
+    static GATES: std::sync::OnceLock<Gates> = std::sync::OnceLock::new();
+    let gates = GATES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let mut gates = gates.lock().unwrap_or_else(|poison| poison.into_inner());
+    gates
+        .entry(dir.to_string())
+        .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
+        .clone()
+}
+
 /// Removes a spill run's transient segment files.
 pub(crate) fn remove_run_files(dir: &str, base_name: &str) {
+    // Through the store, so a persistence profile forgets the object parts as
+    // well instead of leaving them reachable by key.
+    let store = storage::chunk_store::chunk_store();
     for suffix in [
         storage::invertedindex::format::FULLTEXT_DICT_SUFFIX,
         storage::invertedindex::format::FULLTEXT_POSTING_SUFFIX,
         storage::invertedindex::format::FULLTEXT_LENGTH_SUFFIX,
     ] {
-        let _ = std::fs::remove_file(storage::invertedindex::format::fulltext_chunk_file(
-            dir, base_name, suffix,
+        // Best effort: a spill run nothing references any more, and the next
+        // attempt removes whatever this one missed.
+        let _ = store.remove(std::path::Path::new(
+            &storage::invertedindex::format::fulltext_chunk_file(dir, base_name, suffix),
         ));
     }
+    // The publish marker goes with them, or a later chunk that reuses this base
+    // name would be validated against the lengths of the one just removed.
+    let _ =
+        store.remove(&storage::invertedindex::chunk_manifest::ChunkManifest::path(dir, base_name));
 }
 
 /// One spilled sorted run: the memory tail written as the regular segment file
@@ -175,6 +222,15 @@ pub(crate) struct MemoryIndexer {
     pub(crate) term_ids: FastMap<String, u32>,
     pub(crate) term_names: Vec<String>,
     pub(crate) live: std::collections::HashSet<u64>,
+    /// Rows this tail is responsible for and that were deleted after their text
+    /// reached it (the resident postings or a spilled run).
+    ///
+    /// [`Self::delete`] cannot drop a posting from the in-memory lists or from a
+    /// run written to disk, and a run's rows are gone from [`Self::live`] once
+    /// they spill, so the seal path needs its own record to leave them out of
+    /// the chunk it writes. Inserting the row again clears its entry: the new
+    /// text is what the tail holds.
+    pub(crate) deleted: std::collections::HashSet<u64>,
     pub(crate) n_docs: usize,
     pub(crate) total_len: u64,
     /// Approximate bytes held by this segment, for the memindex budget.
@@ -268,6 +324,8 @@ impl MemoryIndexer {
             return false;
         }
         let seq = doc.seq;
+        // The row is live again: whatever it held before the delete is stale.
+        self.deleted.remove(&seq);
         let mut toks: Vec<(u32, u32, u16)> = Vec::with_capacity(doc.terms.len());
         for (term, pos, payload) in &doc.terms {
             let id = match self.term_ids.get(term.as_str()) {
@@ -356,8 +414,13 @@ impl MemoryIndexer {
 
     /// C++: deleting a document only drops its live marker; the postings and
     /// length stay until the segment is compacted.
+    ///
+    /// The row is also recorded as deleted, so the seal that writes this tail
+    /// leaves its postings out of the chunk instead of publishing a document no
+    /// predicate can match.
     pub(crate) fn delete(&mut self, seq: u64) {
         self.live.remove(&seq);
+        self.deleted.insert(seq);
     }
 
     /// C++: `GetDocCount` of the resident tail. The spilled runs are counted by
@@ -368,14 +431,31 @@ impl MemoryIndexer {
         self.n_docs
     }
 
-    /// Documents the next sealed segment will hold: the tail plus every run.
+    /// Documents the next sealed segment will hold: the tail plus every run,
+    /// minus the rows deleted since their text reached it.
     pub(crate) fn pending_docs(&self) -> usize {
-        self.n_docs + self.runs.iter().map(|run| run.docs.len()).sum::<usize>()
+        let mut docs = self.n_docs + self.runs.iter().map(|run| run.docs.len()).sum::<usize>();
+        if !self.deleted.is_empty() {
+            docs -= self
+                .deleted
+                .iter()
+                .filter(|row| self.doc_len_of(**row).is_some())
+                .count();
+        }
+        docs
     }
 
-    /// Token count the next sealed segment will hold.
+    /// Token count the next sealed segment will hold, over the live documents.
     pub(crate) fn pending_len(&self) -> u64 {
-        self.total_len + self.runs.iter().map(|run| run.total_len).sum::<u64>()
+        let mut total = self.total_len + self.runs.iter().map(|run| run.total_len).sum::<u64>();
+        if !self.deleted.is_empty() {
+            for row in &self.deleted {
+                if let Some(len) = self.doc_len_of(*row) {
+                    total = total.saturating_sub(u64::from(len));
+                }
+            }
+        }
+        total
     }
 
     /// C++: `MemUsed` — the resident bytes, i.e. the tail's. The runs live on
@@ -406,6 +486,8 @@ impl MemoryIndexer {
         self.clear_tail();
         self.spilled = None;
         self.newest.clear();
+        // The runs go with it, so nothing is left for the record to describe.
+        self.deleted.clear();
         for run in self.runs.drain(..) {
             run.remove();
         }
@@ -556,6 +638,13 @@ impl MemoryIndexer {
             return None;
         }
         let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(row, len)| (*row, *len)).collect();
+        // A deleted row is not a document of the segment this tail is about to
+        // become: keeping it would publish text no predicate can match and count
+        // it in BM25's `N`.
+        docs.retain(|(row, _)| !self.deleted.contains(row));
+        if docs.is_empty() {
+            return None;
+        }
         docs.sort_unstable_by_key(|(row, _)| *row);
         Some(docs)
     }
@@ -603,6 +692,11 @@ impl MemoryIndexer {
             lengths.extend(run.docs.iter().copied());
         }
         lengths.extend(self.docs.iter().map(|(row, len)| (*row, *len)));
+        // Deleted rows are left out of the chunk the seal is about to write, so
+        // they must not decide its `base_row_id`/span either.
+        if !self.deleted.is_empty() {
+            lengths.retain(|row, _| !self.deleted.contains(row));
+        }
         Some(lengths.into_iter().collect())
     }
 
@@ -638,6 +732,12 @@ impl MemoryIndexer {
             // A row re-indexed inside the tail appears twice; the segment holds
             // exactly one list per document.
             dedupe_posting_entries(&mut hits);
+            if !self.deleted.is_empty() {
+                hits.retain(|(row, _, _)| !self.deleted.contains(row));
+            }
+            if hits.is_empty() {
+                continue;
+            }
             let empty = std::collections::BTreeMap::new();
             let payloads = self.payloads.get(id).unwrap_or(&empty);
             f(&self.term_names[id], &hits, payloads);
@@ -727,8 +827,15 @@ impl MemoryIndexer {
                 }));
             }
             if !entries.is_empty() {
-                let (hits, table) = dedupe_sourced_entries(entries);
-                f(&term, &hits, &table);
+                let (mut hits, table) = dedupe_sourced_entries(entries);
+                // Rows deleted after their text reached this tail (or one of its
+                // runs) are not documents of the chunk being written.
+                if !self.deleted.is_empty() {
+                    hits.retain(|(row, _, _)| !self.deleted.contains(row));
+                }
+                if !hits.is_empty() {
+                    f(&term, &hits, &table);
+                }
             }
         }
     }
@@ -1027,6 +1134,23 @@ impl TextTokenizer {
     }
 }
 
+/// `INF_FT_TRACE=1` turns on the full-text diagnostics, `INF_FT_TRACE=<substr>`
+/// narrows them to columns whose `table.column` contains the substring.
+///
+/// The point of these lines is a CI-only failure: a query that answers with no
+/// rows on a table full of matches leaves nothing behind but the assertion, so
+/// every decision that can make an index empty prints the numbers it decided
+/// on. They are silent unless the variable is set - the write path runs them
+/// for every seal.
+pub(crate) fn ft_trace_enabled(what: &str) -> bool {
+    match std::env::var("INF_FT_TRACE") {
+        Ok(v) if v.is_empty() || v == "0" => false,
+        Ok(v) if v == "1" || v == "true" => true,
+        Ok(v) => what.contains(v.as_str()),
+        Err(_) => false,
+    }
+}
+
 /// In-memory inverted index for one text column: a [`MemoryIndexer`] for the
 /// unsealed segment plus the sealed on-disk segments.
 /// C++: the `MemoryIndexer` + `IndexSegmentReader` pair held by a column.
@@ -1043,11 +1167,29 @@ pub(crate) struct TextIndex {
     /// (`.dic`, `.pos`, `.len`) exactly like the reference's per-segment
     /// indexes.
     pub(crate) reader: ColumnIndexReader,
-    /// Directory holding this column's sealed segment files.
+    /// This index's chunk root, `idx_{index_id}`.
+    ///
+    /// Every chunk lives one level down, in `dir/seg_{segment}` - the
+    /// reference's `SegmentIndexMeta::GetSegmentIndexDir`
+    /// (`src/storage/catalog/meta/segment_index_meta_impl.cpp:288`), which is
+    /// also the directory the catalog's `idx_chunk` records point at. Keeping
+    /// the two in one place is what lets a reader be built from the catalog
+    /// alone, the way `ColumnIndexReader::Open` is.
     pub(crate) dir: String,
     /// Rows re-indexed after their segment was sealed; the sealed copy is stale
     /// and must not be scored (the memory index holds the new text).
     pub(crate) overridden: std::collections::HashSet<u64>,
+    /// The `ROW_ID` segments the catalog listed the last time this index was
+    /// told (a compaction's `drop_segments_not_in`, or the build's
+    /// `load_sealed_scoped`); `None` means "not told yet".
+    ///
+    /// A seal that was already writing when a merge reindexed the column
+    /// publishes a chunk of a segment the merge retired: its postings name rows
+    /// that now live under new ids. `complete_seal` must not clear their
+    /// overridden marks - that would put the retired ids back in the postings
+    /// after the merge published, and a `topn=3` `MATCH` on a table full of
+    /// matches would answer nothing.
+    pub(crate) live_segments: Option<std::collections::HashSet<u32>>,
     /// Publication barrier: the first row id of every run a writer announced
     /// (`announce_publish`) but has not published yet, with the number of
     /// writers holding it.
@@ -1076,6 +1218,30 @@ pub(crate) struct TextIndex {
     /// Duration of the last seal's file write, in microseconds
     /// ([`crate::diagnostics::FulltextStats`]).
     pub(crate) last_seal_us: u64,
+    /// Chunks this index sealed and has not recorded in the catalog yet.
+    ///
+    /// A seal runs on every write path (the capacity trigger, the dump
+    /// transaction, `FLUSH DATA`) and none of them holds the catalog handle, so
+    /// the seal queues the chunk and whoever owns the engine drains it
+    /// (`Engine::record_sealed_text_chunks`). The record is what a reader has
+    /// to go by: `load_sealed_scoped` reads the catalog and nothing else.
+    pub(crate) unrecorded: Vec<SealedChunk>,
+    /// The write gate this index's **directory** shares with every other
+    /// instance opened on it ([`dir_gate`]). Held around the file-level work of
+    /// a seal, a merge and a build, never across an index lock.
+    pub(crate) gate: std::sync::Arc<std::sync::Mutex<()>>,
+}
+
+/// One chunk a seal wrote: what its catalog record needs.
+#[derive(Clone, Debug)]
+pub(crate) struct SealedChunk {
+    /// `ROW_ID` segment the chunk belongs to.
+    pub(crate) segment: u32,
+    /// `ft_{base_row_id:016x}`, the chunk's file base name.
+    pub(crate) base_name: String,
+    pub(crate) base_row_id: u64,
+    /// Rows the chunk's `.len` covers.
+    pub(crate) row_count: u64,
 }
 
 /// A detached tail being written out (see [`TextIndex::inflight`]).
@@ -1114,10 +1280,11 @@ impl TextIndex {
         for mem in self.tails().collect::<Vec<_>>().into_iter().rev() {
             tail.extend(mem.doc_payloads(term));
         }
+        // An overridden id is retired: the id itself never resolves again (a
+        // re-indexed row gets a new one), so its payload must not answer for the
+        // sealed copy either.
         for row in &self.overridden {
-            if !tail.contains_key(row) {
-                out.remove(row);
-            }
+            out.remove(row);
         }
         out.extend(tail);
         out
@@ -1125,8 +1292,18 @@ impl TextIndex {
 }
 
 /// One sealed segment's index: the mmap'd reader plus the corpus counts.
+///
+/// `docs` is the row **span** the chunk covers (its `.len` slots, which a
+/// posting's `docid_t` is an offset into) while `live_docs` is what a predicate
+/// still sees. They differ once a merge has dropped the rows deleted before it:
+/// the slots cannot move, so the span stays and only the statistics shrink.
+/// BM25's `N` is the live count - scoring a chunk by its span would divide by
+/// documents no query can return.
 pub(crate) struct SealedSegment {
     pub(crate) docs: u32,
+    /// Documents a predicate still sees (BM25 `N`).
+    pub(crate) live_docs: u32,
+    /// `sum(dl)` over the live documents (BM25's corpus length).
     pub(crate) total_len: u64,
     pub(crate) reader: storage::invertedindex::disk_segment_reader::SegmentIndexReader,
 }
@@ -1163,8 +1340,6 @@ pub(crate) struct MergeRun {
     /// `(base_name, base_row_id)` of every chunk in the run, in row order.
     sources: Vec<(String, u64)>,
     dst: String,
-    docs: u32,
-    total_len: u64,
 }
 
 /// The chunk merges `optimize` would perform, computed from the segment headers
@@ -1173,6 +1348,9 @@ pub(crate) struct MergePlan {
     /// The chunk list the plan was made from, re-checked before it is applied.
     signature: Vec<(String, u64)>,
     runs: Vec<MergeRun>,
+    /// Rows that were deleted: the merge drops their postings, which is the only
+    /// point in a chunk's life where they can be reclaimed.
+    deleted: std::collections::HashSet<u64>,
 }
 
 pub(crate) struct SealJob {
@@ -1193,11 +1371,16 @@ impl SealJob {
     /// than merging it back into a tail other writers may have appended to.
     pub(crate) fn write(&self) -> Option<SealedSegment> {
         let base_name = format!("ft_{:016x}", self.base_row_id);
+        // The chunk belongs to the `ROW_ID` segment its rows come from, and the
+        // chunk goes into that segment's directory - the place the catalog's
+        // `idx_chunk` record names, so a reader can be built from the catalog.
+        let dir =
+            storage::invertedindex::format::segment_chunk_dir(&self.dir, self.base_row_id >> 32);
         let mem = &*self.tail;
         let realtime = mem.runs.is_empty() && mem.spilled.is_none();
         let docs = &self.docs;
         let written = storage::invertedindex::disk_segment_reader::write_segment_index_streaming(
-            &self.dir,
+            &dir,
             &base_name,
             self.base_row_id,
             docs,
@@ -1220,7 +1403,7 @@ impl SealJob {
             return None;
         }
         let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-            &self.dir,
+            &dir,
             &base_name,
             self.base_row_id,
             self.flags,
@@ -1228,10 +1411,27 @@ impl SealJob {
         .ok()?;
         Some(SealedSegment {
             docs: self.docs_span,
+            // `docs` was filtered of the rows deleted before the seal, so the
+            // chunk it describes holds exactly these documents.
+            live_docs: self.docs.len() as u32,
             total_len: self.total_len,
             reader,
         })
     }
+}
+
+/// One sealed chunk the catalog lists, where the reference wrote it.
+///
+/// `dir` is the segment's index directory
+/// (`db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}`) and `base_name` the chunk's
+/// `ft_{base_row_id:016x}`; together they name the three files
+/// (`ChunkIndexMetaInfo::full_text_files`). The port's runtime index keeps its
+/// chunks in one directory per column, so this is only used to adopt them.
+#[derive(Debug, Clone)]
+pub(crate) struct CatalogChunk {
+    pub(crate) dir: String,
+    pub(crate) base_name: String,
+    pub(crate) base_row_id: u64,
 }
 
 /// The per-column reader over the sealed segments.
@@ -1245,9 +1445,10 @@ pub(crate) struct ColumnIndexReader {
 }
 
 impl ColumnIndexReader {
-    /// C++: `GetDocCount` over the segment readers.
+    /// C++: `GetDocCount` over the segment readers — over the documents a
+    /// predicate still sees, which is what BM25's `N` means.
     pub(crate) fn doc_count(&self) -> usize {
-        self.segments.iter().map(|s| s.docs as usize).sum()
+        self.segments.iter().map(|s| s.live_docs as usize).sum()
     }
 
     /// Total token count across the segment readers.
@@ -1316,6 +1517,10 @@ impl PosArena {
 
 impl TextIndex {
     pub(crate) fn new(dir: String, tokenizer: TextTokenizer) -> Self {
+        // Looked up before `dir` is moved: every instance on one directory has to
+        // share the gate, which is what makes a seal and a rebuild exclude each
+        // other (`dir_gate`).
+        let gate = dir_gate(&dir);
         Self {
             tokenizer,
             mem: MemoryIndexer::new(),
@@ -1323,9 +1528,12 @@ impl TextIndex {
             reader: ColumnIndexReader::default(),
             dir,
             overridden: Default::default(),
+            live_segments: None,
             pending_publish: Default::default(),
             inflight: None,
             last_seal_us: 0,
+            unrecorded: Vec::new(),
+            gate,
         }
     }
 
@@ -1371,104 +1579,145 @@ impl TextIndex {
     /// A chunk that cannot be mapped (a torn write at a crash) discards the
     /// whole set: indexing half the table from disk and rebuilding the other
     /// half would count the same documents twice.
+    /// [`Self::load_sealed_scoped`] over whatever this index's own directory
+    /// holds.
+    ///
+    /// **Test-only.** Production asks the catalog (see
+    /// [`Self::load_sealed_scoped`]); a unit test builds a directory and has no
+    /// catalog to name, so this names the chunks it finds and hands them to the
+    /// same loader.
+    #[cfg(test)]
     pub(crate) fn load_sealed(&mut self) -> u64 {
-        let Ok(entries) = std::fs::read_dir(&self.dir) else {
-            return 0;
-        };
-        let mut bases: Vec<String> = entries
-            .flatten()
+        let store = storage::chunk_store::chunk_store();
+        let mut bases: Vec<String> = Vec::new();
+        for segment in store.list(std::path::Path::new(&self.dir), "seg_") {
+            let dir = format!("{}/{}", self.dir, segment);
+            for name in store.list(std::path::Path::new(&dir), "ft_") {
+                if let Some(base) = name.strip_suffix(".dic") {
+                    bases.push(format!("{dir}\t{base}"));
+                }
+            }
+        }
+        bases.sort_unstable();
+        let chunks: Vec<CatalogChunk> = bases
+            .into_iter()
             .filter_map(|entry| {
-                let name = entry.file_name().into_string().ok()?;
-                name.strip_suffix(".dic").map(|base| base.to_string())
+                let (dir, base) = entry.split_once('\t')?;
+                let base_row_id = base
+                    .strip_prefix("ft_")
+                    .and_then(|hex| hex.split('_').next())
+                    .and_then(|hex| u64::from_str_radix(hex, 16).ok())?;
+                Some(CatalogChunk {
+                    dir: dir.to_string(),
+                    base_name: base.to_string(),
+                    base_row_id,
+                })
             })
             .collect();
-        if bases.is_empty() {
+        self.load_sealed_scoped(&chunks)
+    }
+
+    /// Copies chunks the **reference** wrote into this index's own directory.
+    ///
+    /// The reference stores a chunk in the segment's directory
+    /// (`db_{db}/tbl_{tbl}/idx_{idx}/seg_{seg}/ft_{base}.{dic,pos,len}`) and
+    /// keeps the list in the catalog (`ChunkIndexMetaInfo`); it never scans a
+    /// directory for them. The port's runtime index lives in one directory per
+    /// column, so a directory the reference produced has no chunk the loader
+    /// would find — this copies them over, through the chunk store, and the
+    /// normal load path then maps them.
+    ///
+    /// Copying rather than reading in place keeps a single directory per index
+    /// (which is what the merge and the run-file cleanup assume) at the cost of
+    /// one copy when a reference directory is opened by the port for the first
+    /// time. A chunk already present under this directory is left alone.
+    /// [`Self::load_sealed`] with the `ROW_ID` segments the catalog still
+    /// lists. A chunk of any other segment belongs to rows a compaction moved,
+    /// so it is removed instead of loaded: its row ids name no live row.
+    ///
+    /// `catalog` is the chunk list the catalog holds for this index, in the
+    /// reference's layout. It is the fallback when this index's own directory
+    /// has nothing: that is the shape of a directory the reference wrote, and
+    /// adopting those chunks beats re-indexing the whole column.
+    pub(crate) fn load_sealed_scoped(&mut self, catalog: &[CatalogChunk]) -> u64 {
+        if catalog.is_empty() {
             return 0;
         }
-        // The base name is the chunk's first row id in hex, zero padded, so the
-        // name order is the row order.
-        bases.sort_unstable();
-        // A merged chunk (`ft_{base:016x}_{rows:x}`, `optimize_chunks`) supersedes
-        // the plain chunks its range covers. A crash between writing the merged
-        // files and deleting the sources leaves both on disk; loading both would
-        // count every row in the range twice, only a rebuild would not notice. The
-        // covered plain chunks are dropped here, and their files removed through
-        // `remove_run_files` so the next open does not see them either.
-        let mut merged_ranges: Vec<(u64, u64)> = Vec::new();
-        for base in &bases {
-            let Some(rest) = base.strip_prefix("ft_") else {
-                continue;
-            };
-            let Some((start_hex, rows_hex)) = rest.split_once('_') else {
-                continue;
-            };
-            let (Ok(start), Ok(rows)) = (
-                u64::from_str_radix(start_hex, 16),
-                u64::from_str_radix(rows_hex, 16),
-            ) else {
-                continue;
-            };
-            merged_ranges.push((start, start + rows));
-        }
-        if !merged_ranges.is_empty() {
-            bases.retain(|base| {
-                let Some(rest) = base.strip_prefix("ft_") else {
-                    return true;
-                };
-                // The merged chunk is not covered by its own range.
-                if rest.contains('_') {
-                    return true;
-                }
-                let Ok(start) = u64::from_str_radix(rest, 16) else {
-                    return true;
-                };
-                let covered = merged_ranges
-                    .iter()
-                    .any(|(from, to)| start >= *from && start < *to);
-                if covered {
-                    remove_run_files(&self.dir, base);
-                }
-                !covered
-            });
-        }
-        let mut segments = Vec::with_capacity(bases.len());
+        // **The catalog is the whole input.** `ColumnIndexReader::Open` walks
+        // `SegmentIndexIDs -> ChunkIDs` and reads each chunk's `chunk_info`; it
+        // never lists a directory, which is what makes a compaction safe -
+        // dropping the segment's id makes its chunks unreachable at once, and
+        // what `Cleanup` removes afterwards can no longer be read. A chunk that
+        // is on disk but not in the catalog (a merge's superseded source, a
+        // directory another engine wrote) is therefore **not** loaded.
+        let mut segments = Vec::with_capacity(catalog.len());
         let mut next = 0u64;
-        for base in &bases {
-            // The chunk's first row id is part of its name
-            // (`fulltext_base_name`), and it is what turns a posting's dense
-            // ordinal back into a row id: opening with 0 would make every chunk
-            // claim rows `0..doc_count` and the caller would re-index the rest.
-            let Some(base_row_id) = base
-                .strip_prefix("ft_")
-                .and_then(|hex| hex.split('_').next())
-                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
-            else {
-                return 0;
-            };
+        // A chunk whose files do not validate is the remains of a publish that
+        // never finished (or of two generations mixed by a retried seal). Its
+        // rows are committed rows whose postings are gone, so the only correct
+        // answer is to re-index the column from the blocks - and that rebuild
+        // starts at row 0, which would overlap every chunk already loaded. So
+        // one broken chunk retires the whole set: the caller rebuilds from
+        // scratch, and `Cleanup` removes what is on disk.
+        let mut broken = false;
+        for chunk in catalog {
+            // A chunk's `chunk_info` names its first row id, and that is what
+            // turns a posting's dense ordinal back into a row id.
+            let base_row_id = chunk.base_row_id;
             let Ok(reader) = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-                &self.dir,
-                base,
+                &chunk.dir,
+                &chunk.base_name,
                 base_row_id,
                 storage::invertedindex::format::OPTION_FLAG_ALL,
             ) else {
-                return 0;
+                if ft_trace_enabled(&self.dir) {
+                    eprintln!(
+                        "[FT] {} catalog chunk {} in {} could not be opened",
+                        self.dir, chunk.base_name, chunk.dir
+                    );
+                }
+                broken = true;
+                break;
             };
             let docs = reader.doc_count();
             if docs == 0 {
                 continue;
             }
-            let total_len: u64 = (0..docs as u32)
-                .filter_map(|doc| reader.doc_len(doc))
-                .map(u64::from)
-                .sum();
+            // The marker carries what the files cannot: after a merge drops the
+            // rows deleted before it, the span (and therefore `docs`) still
+            // covers them while BM25's `N` and `sum(dl)` do not.
+            let (live_docs, total_len) = match ChunkManifest::read(&chunk.dir, &chunk.base_name) {
+                Ok(Some(manifest)) => (manifest.live_docs, manifest.total_len),
+                Ok(None) => (
+                    docs as u32,
+                    (0..docs as u32)
+                        .filter_map(|doc| reader.doc_len(doc))
+                        .map(u64::from)
+                        .sum(),
+                ),
+                Err(_) => {
+                    broken = true;
+                    break;
+                }
+            };
             if let Some((_, last)) = reader.row_range() {
                 next = next.max(last + 1);
             }
             segments.push(SealedSegment {
                 docs: docs as u32,
+                live_docs,
                 total_len,
                 reader,
             });
+        }
+        if broken {
+            if ft_trace_enabled(&self.dir) {
+                eprintln!(
+                    "[FT] {} rebuild: a catalog chunk could not be read",
+                    self.dir
+                );
+            }
+            return 0;
         }
         if segments.is_empty() {
             return 0;
@@ -1477,10 +1726,100 @@ impl TextIndex {
         next
     }
 
+    /// Where the loaded chunk list stops being contiguous inside one `ROW_ID`
+    /// segment, if it does.
+    ///
+    /// A hole is legitimate on its own: rows between two seals may have no
+    /// postings at all (`InsertGap`), or the rows in between may not exist, and
+    /// `load_sealed` must keep the chunks on both sides of it
+    /// (`optimize_merges_every_contiguous_run`). It is only *evidence of a lost
+    /// chunk* when the caller also finds the index short of the table's rows:
+    /// chunks are published under a name derived from their first row id, so a
+    /// chunk that a second writer overwrote with a narrower one leaves exactly
+    /// this shape - and `next` cannot repair it, because it resumes at the
+    /// largest end and the rows inside the hole are then indexed never again.
+    pub(crate) fn first_coverage_hole(&self) -> Option<u64> {
+        let mut order: Vec<usize> = (0..self.reader.segments.len()).collect();
+        order.sort_by_key(|at| self.reader.segments[*at].reader.base_row_id());
+        for pair in order.windows(2) {
+            let previous = &self.reader.segments[pair[0]];
+            let following = &self.reader.segments[pair[1]];
+            let (previous_base, following_base) = (
+                previous.reader.base_row_id(),
+                following.reader.base_row_id(),
+            );
+            // Two `ROW_ID` segments are 2^32 apart, and a segment's chunk list
+            // starts where its own rows start: only a gap *inside* one segment
+            // can be a lost chunk.
+            if (previous_base >> 32) != (following_base >> 32) {
+                continue;
+            }
+            let Some((_, previous_last)) = previous.reader.row_range() else {
+                continue;
+            };
+            if following_base > previous_last + 1 {
+                return Some(previous_last + 1);
+            }
+        }
+        None
+    }
+
+    /// Drops every sealed chunk at or after `hole`, files included, so a caller
+    /// can re-index those rows from the blocks without counting them twice.
+    /// Returns how many chunks were dropped. The chunks below `hole` stay: they
+    /// are still the truth for the rows they cover.
+    pub(crate) fn drop_chunks_from(&mut self, hole: u64) -> usize {
+        let mut kept = Vec::with_capacity(self.reader.segments.len());
+        let mut dropped = 0usize;
+        for segment in std::mem::take(&mut self.reader.segments) {
+            if segment.reader.base_row_id() >= hole {
+                storage::invertedindex::chunk_manifest::remove_chunk(
+                    &self.dir,
+                    segment.reader.base_name(),
+                );
+                dropped += 1;
+            } else {
+                kept.push(segment);
+            }
+        }
+        self.reader.segments = kept;
+        dropped
+    }
+
     /// Documents in the column across the sealed segments and the unsealed
     /// segment (the memory tail, a tail in flight and their spill runs).
     pub(crate) fn total_docs(&self) -> usize {
         self.tails().map(|mem| mem.pending_docs()).sum::<usize>() + self.reader.doc_count()
+    }
+
+    /// The `ROW_ID` segments (`row >> 32`) this index holds documents for.
+    ///
+    /// A freshly built index may only be cached while every segment it covers is
+    /// still listed by the catalog: a compaction renumbers the rows of the
+    /// segments it takes, so a posting that names a retired segment resolves to
+    /// nothing (or to another row). The set of covered segments decides that
+    /// exactly; a timestamp comparison cannot, because a statement reads at
+    /// `current_ts() + 1` and other transactions keep committing past a running
+    /// merge's ts while its drops are still invisible (see
+    /// `Engine::publish_text_index`).
+    pub(crate) fn covered_row_segments(&self) -> std::collections::BTreeSet<u32> {
+        let mut segments = std::collections::BTreeSet::new();
+        let mut add = |first: u64, last: u64| {
+            for id in (first >> 32)..=(last >> 32) {
+                segments.insert(id as u32);
+            }
+        };
+        for segment in &self.reader.segments {
+            if let Some((first, last)) = segment.reader.row_range() {
+                add(first, last);
+            }
+        }
+        for tail in self.tails() {
+            if let Some((first, last)) = tail.row_range {
+                add(first, last);
+            }
+        }
+        segments
     }
 
     /// Writes the current (unsealed) segment's index to disk and clears the
@@ -1629,9 +1968,32 @@ impl TextIndex {
     /// carries the current text of every row it holds, so those rows are no
     /// longer shadowed by an older sealed copy; the tail's memory and its
     /// transient spill files are released.
+    ///
+    /// The exception is a chunk of a `ROW_ID` segment a merge retired: the seal
+    /// was already writing when the merge reindexed the column, so the rows it
+    /// holds are the ids the merge moved, not the new ones. Their marks stay -
+    /// see the note below.
     pub(crate) fn complete_seal(&mut self, job: SealJob, reader: SealedSegment) {
         for row in &job.overridden_rows {
             self.overridden.remove(row);
+        }
+        // Clearing the marks of a chunk the merge retired would put the retired
+        // ids back in the postings *after* the merge published: `drop_segments_not_in`
+        // ran before this chunk existed, so nothing else drops them, and `MATCH`
+        // then fills its top-n with rows no fetch can resolve (0 rows on a table
+        // full of matches).
+        //
+        // A segment the snapshot does not list is only retired when a *newer*
+        // one is live: row-id segments are allocated in ascending order, and an
+        // append opens the next id without telling this index, so its chunk is
+        // newer than every id recorded here and must keep its rows visible.
+        let segment = (reader.reader.base_row_id() >> 32) as u32;
+        let retired = self
+            .live_segments
+            .as_ref()
+            .is_some_and(|live| !live.contains(&segment) && live.iter().any(|id| *id > segment));
+        if retired {
+            self.overridden.extend(job.overridden_rows.iter().copied());
         }
         // The runs were merged into the segment (`MemoryIndexer::Reset`).
         for run in &job.tail.runs {
@@ -1645,6 +2007,12 @@ impl TextIndex {
             self.inflight = None;
         }
         self.reader.segments.push(reader);
+        self.unrecorded.push(SealedChunk {
+            segment: (job.base_row_id >> 32) as u32,
+            base_name: format!("ft_{:016x}", job.base_row_id),
+            base_row_id: job.base_row_id,
+            row_count: u64::from(job.docs_span),
+        });
     }
 
     /// Releases the claim after a failed write. The tail **stays in flight**, so
@@ -1686,7 +2054,17 @@ impl TextIndex {
     /// which runs the I/O outside the lock.
     #[cfg(test)]
     pub(crate) fn optimize_chunks(&mut self) -> crate::Result<usize> {
-        let Some(plan) = self.plan_merge()? else {
+        self.optimize_chunks_with(&std::collections::HashSet::new())
+    }
+
+    /// [`Self::optimize_chunks`] with the table's deleted rows, which is what
+    /// production passes: the merge is where their postings are reclaimed.
+    #[cfg(test)]
+    pub(crate) fn optimize_chunks_with(
+        &mut self,
+        deleted: &std::collections::HashSet<u64>,
+    ) -> crate::Result<usize> {
+        let Some(plan) = self.plan_merge(deleted)? else {
             return Ok(0);
         };
         let merged = Self::merge_runs(&self.dir, &plan);
@@ -1714,7 +2092,10 @@ impl TextIndex {
     ///
     /// Pure: it reads the segment headers and touches no files, so the plan can
     /// be made under the lock and executed outside it.
-    pub(crate) fn plan_merge(&self) -> crate::Result<Option<MergePlan>> {
+    pub(crate) fn plan_merge(
+        &self,
+        deleted: &std::collections::HashSet<u64>,
+    ) -> crate::Result<Option<MergePlan>> {
         let segments = &self.reader.segments;
         if segments.len() < 2 {
             return Ok(None);
@@ -1728,30 +2109,35 @@ impl TextIndex {
         for index in order {
             let segment = &segments[index];
             let base = segment.reader.base_row_id();
-            // A run needs every member **dense** (its `.len` has one entry per
-            // row of its range, so a sparse chunk would leave holes in the
-            // merged `.len` or shift every later row's length) and each member to
-            // start exactly where the previous one ended. A gap, an empty chunk
-            // or a sparse chunk closes the run it was about to join.
-            let last = match segment.reader.row_range() {
-                Some((first, last))
-                    if first == base && last + 1 - first == u64::from(segment.docs) =>
-                {
-                    last
-                }
-                _ => {
-                    Self::flush_run(&mut runs, &mut current, segments);
-                    continue;
-                }
+            // A run is a set of chunks of **one** `ROW_ID` segment that start
+            // exactly where the previous one ended. A chunk may itself hold rows
+            // without text (an `InsertGap`): its `.len` covers the whole span and
+            // the merger re-pads those slots, so density inside a chunk is not a
+            // requirement.
+            let Some((_, last)) = segment.reader.row_range() else {
+                // A chunk that spans no row has nothing to merge.
+                Self::flush_run(&mut runs, &mut current, segments);
+                continue;
             };
+            if !current.is_empty()
+                && (base >> 32) != (segments[current[0]].reader.base_row_id() >> 32)
+            {
+                // Two `ROW_ID` segments are 2^32 apart: a merged `docid_t` is a
+                // `u32`, so they cannot share one chunk.
+                Self::flush_run(&mut runs, &mut current, segments);
+            }
             if !current.is_empty() && base < current_end {
                 return Err(crate::Error::Invalid(format!(
                     "full-text chunks overlap: chunk '{}' starts at row {base}, but the run \
-                     expects row {current_end}",
-                    segment.reader.base_name()
+                     already covers up to row {}",
+                    segment.reader.base_name(),
+                    current_end - 1
                 )));
             }
-            if current.is_empty() || base != current_end {
+            if !current.is_empty() && base > current_end {
+                // A hole between two chunks closes the run: the merged `.len`
+                // would have to span the rows in between, and a hole of many
+                // rows inflates it (4 bytes per row) for nothing.
                 Self::flush_run(&mut runs, &mut current, segments);
             }
             current.push(index);
@@ -1764,6 +2150,7 @@ impl TextIndex {
         Ok(Some(MergePlan {
             signature: self.segment_signature(),
             runs,
+            deleted: deleted.clone(),
         }))
     }
 
@@ -1775,8 +2162,15 @@ impl TextIndex {
             return;
         }
         let base_row_id = segments[members[0]].reader.base_row_id();
-        let rows: u64 = members.iter().map(|i| u64::from(segments[*i].docs)).sum();
-        let total_len: u64 = members.iter().map(|i| segments[*i].total_len).sum();
+        // The merged chunk spans from the first member's base to the last
+        // member's last row - `segments.docs` sums the members' spans, which
+        // under-counts once a hole between them is padded, and the `.len` array
+        // the merger writes is the whole span.
+        let last_row = members
+            .last()
+            .and_then(|index| segments[*index].reader.row_range().map(|(_, last)| last))
+            .unwrap_or(base_row_id);
+        let rows = last_row + 1 - base_row_id;
         runs.push(MergeRun {
             sources: members
                 .iter()
@@ -1788,8 +2182,6 @@ impl TextIndex {
                 })
                 .collect(),
             dst: storage::fulltext_base_name(base_row_id, Some(rows)),
-            docs: rows as u32,
-            total_len,
         });
     }
 
@@ -1812,21 +2204,34 @@ impl TextIndex {
                     })
                     .collect();
                 let base_row_id = run.sources[0].1;
+                // A run only merges chunks of one `ROW_ID` segment (its members
+                // are contiguous), so they all live in that segment's directory.
+                let run_dir =
+                    storage::invertedindex::format::segment_chunk_dir(dir, base_row_id >> 32);
+                // The deleted rows are dropped here, which is the only point
+                // where their postings can be reclaimed: a chunk is immutable
+                // once published, and the `.len` slot of a row cannot move
+                // because a posting's id is `row - base_row_id`.
                 let merged =
-                    storage::invertedindex::index_merger::ColumnIndexMerger::new(dir, flags)
-                        .merge(&sources, &run.dst)
-                        .and_then(|()| {
+                    storage::invertedindex::index_merger::ColumnIndexMerger::new(&run_dir, flags)
+                        .merge_with(&sources, &run.dst, Some(&plan.deleted))
+                        .and_then(|stats| {
                             storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
-                                dir,
+                                &run_dir,
                                 &run.dst,
                                 base_row_id,
                                 flags,
                             )
+                            .map(|reader| (stats, reader))
                         });
                 match merged {
-                    Ok(reader) => Some(SealedSegment {
-                        docs: run.docs,
-                        total_len: run.total_len,
+                    Ok((stats, reader)) => Some(SealedSegment {
+                        // The merger reports what it actually wrote, not the
+                        // plan's estimate: a hole between two sources widens the
+                        // span the `.len` array covers.
+                        docs: stats.span_docs,
+                        live_docs: stats.live.docs,
+                        total_len: stats.live.total_len,
                         reader,
                     }),
                     Err(_) => {
@@ -1857,7 +2262,11 @@ impl TextIndex {
         if self.segment_signature() != plan.signature {
             for (run, result) in plan.runs.iter().zip(merged.iter_mut()) {
                 if result.take().is_some() {
-                    remove_run_files(&self.dir, &run.dst);
+                    let run_dir = storage::invertedindex::format::segment_chunk_dir(
+                        &self.dir,
+                        run.sources[0].1 >> 32,
+                    );
+                    remove_run_files(&run_dir, &run.dst);
                 }
             }
             return 0;
@@ -1875,6 +2284,12 @@ impl TextIndex {
                     .map(move |(name, _)| (name.as_str(), index))
             })
             .collect();
+        // A run whose merge failed keeps **every** source: the files are still on
+        // disk and they are the only copy of those rows' postings. Dropping the
+        // members behind the first one (the shape this loop used to have) made
+        // the index answer without those rows until the next reopen, while the
+        // files looked healthy the whole time.
+        let failed: Vec<bool> = merged.iter().map(Option::is_none).collect();
         let segments = std::mem::take(&mut self.reader.segments);
         let mut out: Vec<SealedSegment> = Vec::with_capacity(segments.len());
         for segment in segments {
@@ -1883,6 +2298,10 @@ impl TextIndex {
                 out.push(segment);
                 continue;
             };
+            if failed[run_index] {
+                out.push(segment);
+                continue;
+            }
             // The merged chunk takes the place of the run's first member; the
             // rest of the run's chunks disappear into it.
             if plan.runs[run_index].sources[0].0 != base_name {
@@ -1894,7 +2313,8 @@ impl TextIndex {
                     done[run_index] = true;
                     applied += 1;
                 }
-                // The merge failed: its sources stay as they are.
+                // Unreachable while `failed` above is exact; keeping the sources
+                // is the only safe answer if it ever is not.
                 None => out.push(segment),
             }
         }
@@ -1907,8 +2327,12 @@ impl TextIndex {
             if !done[run_index] {
                 continue;
             }
+            let run_dir = storage::invertedindex::format::segment_chunk_dir(
+                &self.dir,
+                run.sources[0].1 >> 32,
+            );
             for (base_name, _) in &run.sources {
-                remove_run_files(&self.dir, base_name);
+                remove_run_files(&run_dir, base_name);
             }
         }
         self.reader.segments = out;
@@ -2005,6 +2429,56 @@ impl TextIndex {
         (sources, segment_from)
     }
 
+    /// Drops the sealed segments every slot of which is an overridden row.
+    ///
+    /// A compaction renumbers the rows it merges: their new text lands in the
+    /// tail and their old sealed copies are overridden, so a segment that a
+    /// merge took whole can never answer again. Keeping it would still count its
+    /// documents in BM25's `N` and its tokens in the corpus length (no query can
+    /// return them), so `N` would grow with every compaction the table takes.
+    /// Only a segment whose rows are **all** retired goes: a partial merge
+    /// leaves the live rows of a mixed segment in place.
+    ///
+    /// The overrides stay recorded after the segment is gone: the same id also
+    /// appears in the unsealed segment's postings (the merge replaced a posting
+    /// that was already spilled or still resident), and only `overridden`
+    /// filters those out.
+    /// Drops the sealed segments whose `ROW_ID` segment is no longer live.
+    ///
+    /// This is the reference's behaviour seen from the reader: its
+    /// `ColumnIndexReader` is built from the catalog's `SegmentIndexIDs`, so a
+    /// segment a compaction deprecated simply never appears. The port keeps
+    /// every reader in memory and cannot re-walk the catalog on each merge, so
+    /// the segments are dropped here instead - **whole segments**, not rows.
+    /// That is what makes an `overridden` entry safe to keep: it only ever names
+    /// a row whose segment may still be in `reader.segments`.
+    pub(crate) fn drop_segments_not_in(&mut self, live: &std::collections::HashSet<u32>) {
+        // Remembered for `complete_seal`: a seal that is still writing holds the
+        // ids this merge retired.
+        self.live_segments = Some(live.clone());
+        self.reader
+            .segments
+            .retain(|segment| live.contains(&((segment.reader.base_row_id() >> 32) as u32)));
+        // A retired id only needs its mark while some source can still produce
+        // it. Everything of a dropped segment went with it, and the rows that
+        // moved are in a tail (or, once sealed, in a live segment), so a mark
+        // whose id no range covers is dead weight - and a non-empty set is what
+        // turns off the readers' single-source/concat fast paths, so the set has
+        // to shrink back once the stale copies are gone.
+        let mut ranges: Vec<(u64, u64)> = self
+            .reader
+            .segments
+            .iter()
+            .filter_map(|segment| segment.reader.row_range())
+            .collect();
+        ranges.extend(self.tails().filter_map(|tail| tail.row_range));
+        self.overridden.retain(|row| {
+            ranges
+                .iter()
+                .any(|(first, last)| row >= first && row <= last)
+        });
+    }
+
     /// Postings and corpus statistics for `terms`, merging every sealed segment
     /// with the unsealed one. Stale copies of re-indexed rows are dropped.
     pub(crate) fn merge(&self, terms: &[String]) -> MergedIndex {
@@ -2013,12 +2487,18 @@ impl TextIndex {
         let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
         for term in terms {
             let mut list: Vec<(u64, u32)> = Vec::new();
+            // A re-indexed row's copy in the unsealed segment is its current
+            // text, but an id a compaction renumbered is
+            // retired everywhere: its posting can still be in the tail or in a
+            // spilled run, and nothing else filters it out (the id is not a
+            // `DELETE`, so `tombstone_set` does not know it).
             for mem in self.tails() {
-                list.extend(mem.postings_newest_first(term));
+                list.extend(
+                    mem.postings_newest_first(term)
+                        .into_iter()
+                        .filter(|(d, _)| !self.overridden.contains(d)),
+                );
             }
-            // A re-indexed row's *sealed* copy is stale, but the copy in the
-            // unsealed segment is the current text: only the sealed one is
-            // dropped (the memory index already resolved its own duplicates).
             list.extend(
                 self.reader
                     .postings(term)

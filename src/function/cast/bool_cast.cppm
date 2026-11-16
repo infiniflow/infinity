@@ -36,22 +36,41 @@ export struct TryCastBoolean {
     }
 };
 
-//  // Cast BooleanT to other VarcharT type
-//  template <>
-//  inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
-//     if (source) {
-//         constexpr u16 TRUE_LEN = 4;
-//         std::memcpy(target.short_.data_, "true", TRUE_LEN);
-//         std::memset(target.short_.data_ + TRUE_LEN, 0, VARCHAR_INLINE_LEN - TRUE_LEN);
-//         target.length_ = TRUE_LEN;
-//     } else {
-//         constexpr u16 FALSE_LEN = 5;
-//         std::memcpy(target.short_.data_, "false", FALSE_LEN);
-//         std::memset(target.short_.data_ + FALSE_LEN, 0, VARCHAR_INLINE_LEN - FALSE_LEN);
-//         target.length_ = FALSE_LEN;
-//     }
-//     return true;
-// }
+// Cast BooleanT to other VarcharT type
+template <>
+inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
+    const std::string_view text = source ? "true" : "false";
+    target.length_ = static_cast<u32>(text.size());
+    std::memcpy(target.short_.data_, text.data(), target.length_);
+    // Clear the rest of the inline buffer. `Varchar` is a union: leaving stale
+    // bytes past the text means a reader of `vector_.prefix_`/`file_offset_`
+    // sees whatever the slot held before.
+    std::memset(target.short_.data_ + target.length_, 0, VARCHAR_INLINE_LEN - target.length_);
+    return true;
+}
+
+/// `CAST(<bool> AS VARCHAR)` on a column.
+///
+/// A VARCHAR column is var-length: the value must be written through the
+/// column's own varchar appender so the outline buffer holds the text. Filling
+/// the `VarcharT` slot directly (what `TryCastColumnVector` would do) leaves
+/// the outline empty, and every later read of the cell then resolves the
+/// slot's offset against a buffer that holds nothing.
+export struct BooleanTryCastToVarlen {
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType, TargetType &, ColumnVector *) {
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
+    }
+};
+
+template <>
+inline bool BooleanTryCastToVarlen::Run(BooleanT source, VarcharT &target, ColumnVector *result_vector) {
+    const std::string_view text = source ? "true" : "false";
+    result_vector->AppendVarcharInner(std::span<const char>(text.data(), text.size()), target);
+    return true;
+}
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
@@ -60,7 +79,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
 
     switch (target.type()) {
         case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BooleanT, VarcharT, BooleanTryCastToVarlen>);
         }
         default: {
             std::string error_msg = fmt::format("Can't cast from Boolean to {}", target.ToString());

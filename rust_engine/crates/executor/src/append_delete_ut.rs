@@ -53,7 +53,7 @@ fn append1_reads_back_committed_and_concurrent_batches() {
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 8);
 
     // `NewCatalog::GetBlockVisibleRange`: one range `[0, 8)`.
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
     assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8));
     assert_eq!(e.block_visible_range("db1.tb1", 0, 0), Some((0, 8)));
@@ -82,7 +82,7 @@ fn append_append_keeps_one_visible_block() {
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
     assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8192));
     assert_eq!(e.block_visible_range("db1.tb1", 0, 0), Some((0, 8192)));
@@ -117,12 +117,12 @@ fn append_and_optimize_index_keeps_rows_and_index() {
         assert_eq!(h::append(&e, "db1.tb1", rows), 8192);
         // `DumpMemIndex` seals the memory segment for the first two batches.
         if batch < 2 {
-            e.flush().unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
         }
     }
 
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 3 * 8192);
     let hits = h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 1;");
@@ -160,7 +160,7 @@ fn delete_then_drop_database() {
         "ALTER TABLE db1.tb1 ADD COLUMN (c3 INT);",
         "DROP TABLE db1.tb1;",
     ] {
-        assert!(e.execute(sql).is_err(), "{sql} should fail");
+        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
     }
 }
 
@@ -183,7 +183,7 @@ fn delete_then_drop_table() {
         "DELETE FROM db1.tb1;",
         "UPDATE db1.tb1 SET col1 = 3;",
     ] {
-        assert!(e.execute(sql).is_err(), "{sql} should fail");
+        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
     }
 }
 
@@ -389,7 +389,7 @@ fn delete_then_compact() {
     e.compact_all_segments("db1.tb1").unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-    e.flush().unwrap();
+    crate::scheduler::block_on(e.flush()).unwrap();
     assert_eq!(e.block_ids("db1.tb1", 1).len(), 1);
     assert_eq!(e.block_row_count("db1.tb1", 1, 0), Some(8192));
     assert_eq!(e.block_visible_range("db1.tb1", 1, 0), Some((0, 8192)));
@@ -419,7 +419,7 @@ fn delete_then_optimize_index() {
     h::ok(&e, "DELETE FROM db1.tb1 WHERE col1 < 8192;");
 
     e.optimize_indexes().unwrap();
-    e.cleanup().unwrap();
+    crate::scheduler::block_on(e.cleanup()).unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 2 * 8192);
     assert_eq!(h::count(&e, "db1.tb1"), 2 * 8192);
     assert!(h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 1;").is_empty());

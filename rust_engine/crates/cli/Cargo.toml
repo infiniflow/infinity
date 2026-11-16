@@ -27,11 +27,9 @@ server.workspace = true
 # The `.slt` parser and validator the reference's own runner is built from; the
 # conformance command drives the engine through it, so there is one
 # implementation of the format, not two.
-# glibc's malloc serialises the concurrent insert path on its arena locks; the
-# reference links jemalloc (`ENABLE_JEMALLOC=ON`) for the same reason. This port
-# uses mimalloc, which keeps the per-thread caches that make the eight-thread
-# insert path scale and, unlike jemalloc's Rust bindings, builds out of the box
-# on every target the workspace ships.
+# The allocator is declared in `common` and inherited by `infinity` and the
+# helpers that reference it. `gen-corpus` is std-only, so it never pulls
+# `common` in; it declares the same allocator itself.
 mimalloc.workspace = true
 sqllogictest = "0.29.1"
 

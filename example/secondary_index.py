@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
-'''
+"""
 
 import sys
 
@@ -25,7 +25,9 @@ try:
     # infinity_instance = infinity.connect("/var/infinity")
 
     #  Use infinity module to connect a remote server
-    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    infinity_instance = infinity.connect(
+        infinity.common.NetworkAddress("127.0.0.1", 23817)
+    )
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -34,25 +36,35 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
-        "id": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
+            "id": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+    )
 
     # Attempt to insert 10 rows
     rows = 10
 
     for idx in range(rows):
-        table_instance.insert([
+        table_instance.insert(
+            [
                 {
                     "num": idx,
                     "id": "ID_" + str(idx),
                     "vec": [1.0, 1.2, 0.8, 0.9],
-                }]
+                }
+            ]
         )
 
-    table_instance.create_index("index1", infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary), infinity.common.ConflictType.Ignore, "secondary_index1")
+    table_instance.create_index(
+        "index1",
+        infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary),
+        infinity.common.ConflictType.Ignore,
+        "secondary_index1",
+    )
     res, extra_result = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
     print(res)
     if extra_result is not None:
@@ -60,7 +72,7 @@ try:
 
     infinity_instance.disconnect()
 
-    print('test done')
+    print("test done")
     sys.exit(0)
 except Exception as e:
     print(str(e))

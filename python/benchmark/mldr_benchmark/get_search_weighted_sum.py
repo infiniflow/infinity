@@ -34,9 +34,12 @@ class InfinityClientForSearch:
     def __init__(self, with_colbert: bool):
         self.test_db_name = "default_db"
         self.test_table_name_prefix = "mldr_test_table_text_dense_sparse_"
-        self.test_table_schema = {"docid_col": {"type": "varchar"}, "fulltext_col": {"type": "varchar"},
-                                  "dense_col": {"type": "vector,1024,float"},
-                                  "sparse_col": {"type": "sparse,250002,float,int"}}
+        self.test_table_schema = {
+            "docid_col": {"type": "varchar"},
+            "fulltext_col": {"type": "varchar"},
+            "dense_col": {"type": "vector,1024,float"},
+            "sparse_col": {"type": "sparse,250002,float,int"},
+        }
         if with_colbert:
             self.test_table_name_prefix += "colbert_"
             self.test_table_schema["colbert_col"] = {"type": "tensor,128,float"}
@@ -50,13 +53,21 @@ class InfinityClientForSearch:
         self.infinity_table = self.infinity_db.get_table(table_name)
         print(f"Get table {table_name} successfully.")
 
-    def weighted_sum_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int, weights_str: str):
+    def weighted_sum_query(
+        self,
+        query_targets_list: list,
+        apply_funcs_list: list,
+        max_hits: int,
+        weights_str: str,
+    ):
         result_table = self.infinity_table.output(["docid_col", "_score"])
         for query_target, apply_func in zip(query_targets_list, apply_funcs_list):
             result_table = apply_func(result_table, query_target, max_hits)
-        result_table = result_table.fusion(method='weighted_sum', topn=max_hits, fusion_params={"weights": weights_str})
+        result_table = result_table.fusion(
+            method="weighted_sum", topn=max_hits, fusion_params={"weights": weights_str}
+        )
         result = result_table.to_pl()
-        return result['docid_col'], result['SCORE']
+        return result["docid_col"], result["SCORE"]
 
     def main(self, languages: list[str], save_dir: str):
         for lang in languages:
@@ -65,35 +76,55 @@ class InfinityClientForSearch:
             # enable streaming to decrease download time
             queries, qids = get_queries_and_qids(lang, False)
             print(f"Total number of queries: {len(qids)}")
-            print(f"Average query chars: {sum([len(q) for q in queries]) / len(queries)}")
+            print(
+                f"Average query chars: {sum([len(q) for q in queries]) / len(queries)}"
+            )
             # weighted sum fusion ops
             print("Start to search for weighted sum.")
-            query_type_combs = [['dense', 'sparse'], ['bm25', 'dense', 'sparse']]
-            weights_strs = ['0.8,0.2', '0.5,0.35,0.15']
+            query_type_combs = [["dense", "sparse"], ["bm25", "dense", "sparse"]]
+            weights_strs = ["0.8,0.2", "0.5,0.35,0.15"]
             for query_type_comb, weights_str in zip(query_type_combs, weights_strs):
-                query_type_comb_str = '_'.join(query_type_comb) + '_weighted_sum'
+                query_type_comb_str = "_".join(query_type_comb) + "_weighted_sum"
                 print(f"Start to search for weighted sum method: {query_type_comb_str}")
-                embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data") for
-                                        query_type in query_type_comb]
-                query_yields_list = [query_yields[query_type](queries, embedding_file) for query_type, embedding_file in
-                                     zip(query_type_comb, embedding_files_list)]
-                apply_funcs_list = [apply_funcs[query_type] for query_type in query_type_comb]
+                embedding_files_list = [
+                    os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data")
+                    for query_type in query_type_comb
+                ]
+                query_yields_list = [
+                    query_yields[query_type](queries, embedding_file)
+                    for query_type, embedding_file in zip(
+                        query_type_comb, embedding_files_list
+                    )
+                ]
+                apply_funcs_list = [
+                    apply_funcs[query_type] for query_type in query_type_comb
+                ]
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)
                 result_list = []
                 for query, qid in tqdm(zip(queries, qids), total=total_query_num):
-                    query_targets_list = [next(query_yield) for query_yield in query_yields_list]
+                    query_targets_list = [
+                        next(query_yield) for query_yield in query_yields_list
+                    ]
                     time_start = time.time()
-                    docid_list, score_list = self.weighted_sum_query(query_targets_list, apply_funcs_list,
-                                                                     max_hits=1000, weights_str=weights_str)
+                    docid_list, score_list = self.weighted_sum_query(
+                        query_targets_list,
+                        apply_funcs_list,
+                        max_hits=1000,
+                        weights_str=weights_str,
+                    )
                     time_end = time.time()
                     total_query_time += time_end - time_start
                     result = []
                     for docid, score in zip(docid_list, score_list):
                         result.append(FakeJScoredDoc(docid, score))
                     result_list.append((qid, result))
-                print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
-                save_path = os.path.join(save_dir, f"{lang}_fusion_{query_type_comb_str}.txt")
+                print(
+                    f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms."
+                )
+                save_path = os.path.join(
+                    save_dir, f"{lang}_fusion_{query_type_comb_str}.txt"
+                )
                 print(f"Save search result to: {save_path}")
                 save_result(result_list, save_path, qids, max_hits=1000)
 

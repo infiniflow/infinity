@@ -45,7 +45,9 @@ class TestCompact:
 
         @decorator
         def part2(infinity_obj):
-            table_obj = infinity_obj.get_database("default_db").get_table("test_compact")
+            table_obj = infinity_obj.get_database("default_db").get_table(
+                "test_compact"
+            )
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == import_num * 4

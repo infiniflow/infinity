@@ -27,11 +27,11 @@ from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 
 def fvecs_read_all(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -41,11 +41,11 @@ def fvecs_read_all(filename):
 
 def read_groundtruth(filename):
     vectors = []
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}i', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}i", f.read(4 * dims))
                 assert dims == len(vec)
                 vectors.append(list(vec))
             except struct.error:
@@ -73,7 +73,9 @@ def read_groundtruth(filename):
     return ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100
 
 
-def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
+def calculate_recall_all(
+    ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results
+):
     correct_1 = 0.0
     correct_10 = 0.0
     correct_100 = 0.0
@@ -104,14 +106,22 @@ def trace_unhandled_exceptions(func):
         try:
             func(*args, **kwargs)
         except Exception:
-            print('Exception in ' + func.__name__)
+            print("Exception in " + func.__name__)
             traceback.print_exc()
 
     return wrapped_func
 
 
 @trace_unhandled_exceptions
-def work(queries, topk, metric_type, column_name, data_type, ef: int, table_name="sift_benchmark"):
+def work(
+    queries,
+    topk,
+    metric_type,
+    column_name,
+    data_type,
+    ef: int,
+    table_name="sift_benchmark",
+):
     infinity_obj = infinity.connect(LOCAL_HOST)
     table = infinity_obj.get_database("default_db").get_table(table_name)
     for query in queries:
@@ -119,17 +129,19 @@ def work(queries, topk, metric_type, column_name, data_type, ef: int, table_name
         # table.match_dense(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["_row_id"])
-        query_builder.match_dense(column_name, query, data_type, metric_type, topk, {"ef": str(ef)})
+        query_builder.match_dense(
+            column_name, query, data_type, metric_type, topk, {"ef": str(ef)}
+        )
         query_builder.to_result()
     infinity_obj.disconnect()
 
 
 def fvecs_read(filename):
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
             try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack(f'{dims}f', f.read(4 * dims))
+                dims = struct.unpack("i", f.read(4))[0]
+                vec = struct.unpack(f"{dims}f", f.read(4 * dims))
                 assert dims == len(vec)
                 yield list(vec)
             except struct.error:
@@ -153,7 +165,9 @@ def process_pool(threads, rounds, query_path, ef: int, table_name):
         p = multiprocessing.Pool(threads)
         start = time.time()
         for idx in range(threads):
-            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", ef, table_name))
+            p.apply_async(
+                work, args=(queries[idx], 100, "l2", "col1", "float", ef, table_name)
+            )
         p.close()
         p.join()
         end = time.time()
@@ -165,7 +179,9 @@ def process_pool(threads, rounds, query_path, ef: int, table_name):
 
     dur_sum /= rounds
     print(f"Round result [1, {rounds}]:")
-    print(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}")
+    print(
+        f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}"
+    )
 
 
 def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
@@ -179,7 +195,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
     table = infinity_obj.get_database("default_db").get_table(table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
-    query_builder.match_dense('col1', queries[0], 'float', 'l2', 100, {'ef': str(ef)})
+    query_builder.match_dense("col1", queries[0], "float", "l2", 100, {"ef": str(ef)})
     res, _, _ = query_builder.to_result()
 
     dur_sum = 0
@@ -188,12 +204,17 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
 
         dur = 0.0
         for idx, query_vec in enumerate(queries):
-
             start = time.time()
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
-            query_builder.match_dense('col1', query_vec, 'float', 'l2', 100,
-                                      {'index_name': 'hnsw_index', 'ef': str(ef)})
+            query_builder.match_dense(
+                "col1",
+                query_vec,
+                "float",
+                "l2",
+                100,
+                {"index_name": "hnsw_index", "ef": str(ef)},
+            )
             res, _, _ = query_builder.to_result()
             end = time.time()
 
@@ -206,10 +227,16 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
             for j in range(len(res_list)):
                 query_results[idx].append(res_list[j])
 
-        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
+        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = (
+            read_groundtruth(ground_truth_path)
+        )
 
-        recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
-                                                               ground_truth_sets_100, query_results)
+        recall_1, recall_10, recall_100 = calculate_recall_all(
+            ground_truth_sets_1,
+            ground_truth_sets_10,
+            ground_truth_sets_100,
+            query_results,
+        )
         print(f"Round {i + 1}:")
         print(f"Query Count: {len(queries)}")
         print(f"Recall@1: {recall_1}")
@@ -220,7 +247,9 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
 
     dur_sum /= rounds
     print(f"Round result [1, {rounds}]:")
-    print(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(len(queries) / dur_sum):.2f}")
+    print(
+        f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(len(queries) / dur_sum):.2f}"
+    )
     print(f"Recall@1: {recall_1}, Recall@10: {recall_10}, Recall@100: {recall_100}")
 
     infinity_obj.disconnect()
@@ -280,14 +309,16 @@ def benchmark(threads, rounds, data_set, ef: int, path):
             one_thread(rounds, query_path, ground_truth_path, ef, "msmarco_benchmark")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     current_path = os.getcwd()
 
     parser = argparse.ArgumentParser(description="Benchmark Infinity")
 
     parser.add_argument("-t", "--threads", type=int, default=1, dest="threads")
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
-    parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m, sift_10k
+    parser.add_argument(
+        "-d", "--data", type=str, default="sift_1m", dest="data_set"
+    )  # sift_1m, gist_1m, msmarco_1m, sift_10k
     parser.add_argument("--ef", type=int, default=200, dest="ef")
 
     data_dir = current_path + "/test/data/benchmark/" + parser.parse_args().data_set
