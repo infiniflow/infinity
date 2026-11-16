@@ -90,7 +90,7 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
     if (iter == proposed_dump_.end()) {
         return;
     }
-    size_t dump_size = iter->second;
+    size_t dump_size = iter->second.mem_used_;
     proposed_dump_.erase(iter);
     if (proposed_dump_size_ >= dump_size) {
         proposed_dump_size_ -= dump_size;
@@ -99,6 +99,31 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
         }
     } else {
         proposed_dump_size_ = 0;
+    }
+}
+
+void MemIndexTracer::DumpFailed(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+    std::lock_guard lck(mtx_);
+    for (auto iter = proposed_dump_.begin(); iter != proposed_dump_.end(); ++iter) {
+        const ProposedDumpEntry &entry = iter->second;
+        if (entry.db_name_ == db_name && entry.table_name_ == table_name && entry.index_name_ == index_name && entry.segment_id_ == segment_id) {
+            if (proposed_dump_size_ >= entry.mem_used_) {
+                proposed_dump_size_ -= entry.mem_used_;
+            } else {
+                proposed_dump_size_ = 0;
+            }
+            proposed_dump_.erase(iter);
+            if (proposed_dump_.empty()) {
+                proposed_dump_size_ = 0;
+            }
+            LOG_INFO(fmt::format("Dump reservation released for {}.{}.{} segment {} after a dropped dump task; the next capacity trigger can "
+                                 "re-propose it.",
+                                 db_name,
+                                 table_name,
+                                 index_name,
+                                 segment_id));
+            return;
+        }
     }
 }
 
@@ -117,8 +142,15 @@ std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
             if (proposed_dump_.find(mem_index_detail->mem_index_) != proposed_dump_.end()) {
                 continue;
             }
-            // Record index in proposed dump
-            proposed_dump_[mem_index_detail->mem_index_] = mem_index_detail->mem_used_;
+            // Record index in proposed dump, keeping the identity needed by
+            // DumpFailed to release the reservation if the task is dropped.
+            ProposedDumpEntry entry;
+            entry.mem_used_ = mem_index_detail->mem_used_;
+            entry.db_name_ = mem_index_detail->db_name_;
+            entry.table_name_ = mem_index_detail->table_name_;
+            entry.index_name_ = mem_index_detail->index_name_;
+            entry.segment_id_ = mem_index_detail->segment_id_;
+            proposed_dump_[mem_index_detail->mem_index_] = entry;
             proposed_dump_size_ += mem_index_detail->mem_used_;
         }
 

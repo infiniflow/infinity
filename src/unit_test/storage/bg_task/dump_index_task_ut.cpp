@@ -36,6 +36,7 @@ import :txn_state;
 import :data_block;
 import :new_txn_manager;
 import :new_txn;
+import :dump_index_process;
 import :db_meta;
 import :table_meta;
 import :table_index_meta;
@@ -210,5 +211,28 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_SLOW_row_cnt_exceed_memindex_capacity) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
+    }
+}
+
+// DumpBackoffDelayMs: 0.5s doubling per failure, capped at 30s; non-positive
+// attempt counts yield no delay.
+TEST(DumpBackoffDelayTest, Schedule) {
+    EXPECT_EQ(DumpBackoffDelayMs(0), 0);
+    EXPECT_EQ(DumpBackoffDelayMs(-3), 0);
+    EXPECT_EQ(DumpBackoffDelayMs(1), 500);
+    EXPECT_EQ(DumpBackoffDelayMs(2), 1000);
+    EXPECT_EQ(DumpBackoffDelayMs(3), 2000);
+    EXPECT_EQ(DumpBackoffDelayMs(4), 4000);
+    EXPECT_EQ(DumpBackoffDelayMs(5), 8000);
+    EXPECT_EQ(DumpBackoffDelayMs(6), 16000);
+    // 500 * 2^6 = 32000 would exceed the cap.
+    EXPECT_EQ(DumpBackoffDelayMs(7), 30000);
+    EXPECT_EQ(DumpBackoffDelayMs(100), 30000);
+    // Monotonic up to the cap.
+    i64 prev = 0;
+    for (i64 attempts = 1; attempts <= 100; ++attempts) {
+        i64 delay = DumpBackoffDelayMs(attempts);
+        EXPECT_GE(delay, prev);
+        prev = delay;
     }
 }

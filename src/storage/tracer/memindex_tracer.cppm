@@ -58,6 +58,17 @@ export struct MemIndexDetail {
     bool is_emvb_index_{};
 };
 
+// A reservation recorded by MakeDumpTask: the memory charge plus the identity
+// needed to release the reservation when the dump task is dropped
+// (MemIndexTracer::DumpFailed) without holding the MemIndex pointer.
+struct ProposedDumpEntry {
+    size_t mem_used_{};
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
+    SegmentID segment_id_{};
+};
+
 export class MemIndexTracer {
 public:
     MemIndexTracer(size_t index_memory_limit) : index_memory_limit_(index_memory_limit) {}
@@ -77,6 +88,11 @@ private:
 public:
     void DumpDone(std::shared_ptr<MemIndex> mem_index);
 
+    // Releases the reservation recorded for the identified mem index when its
+    // dump task is terminally dropped (attempts exhausted, non-retriable
+    // failure, or shutdown), so the next capacity trigger can re-propose it.
+    void DumpFailed(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
+
     std::vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
 
     virtual void TriggerDump(std::shared_ptr<DumpMemIndexTask> task) = 0;
@@ -95,7 +111,7 @@ protected:
 
     mutable std::mutex mtx_; // protect cur_index_memory_, proposed_dump_ and proposed_dump_size_
     size_t cur_index_memory_ = 0;
-    std::unordered_map<std::shared_ptr<MemIndex>, size_t> proposed_dump_{};
+    std::unordered_map<std::shared_ptr<MemIndex>, ProposedDumpEntry> proposed_dump_{};
     size_t proposed_dump_size_ = 0;
 };
 
