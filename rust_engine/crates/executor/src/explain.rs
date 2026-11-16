@@ -504,6 +504,8 @@ pub struct HashAggPlan<'a> {
     pub items: &'a [SelectItem],
     pub table: &'a str,
     pub group_by: &'a [ExprAst],
+    /// `HAVING`, printed on the aggregate node that produces the groups.
+    pub having: Option<&'a Predicate>,
     pub order_by: &'a [OrderKey],
 }
 
@@ -628,6 +630,12 @@ pub fn explain_group_agg(p: &HashAggPlan) -> Vec<String> {
         lines.push(attr(agg_d, "group by table index: #2"));
         let kt: Vec<String> = keys.iter().map(|k| anno(k)).collect();
         lines.push(attr(agg_d, &format!("group by: [{}]", kt.join(", "))));
+    }
+    if let Some(h) = p.having {
+        lines.push(attr(
+            agg_d,
+            &format!("having: {}", render_pred_m(h, &ids, false)),
+        ));
     }
 
     let scan_d = if has_sort { 3 } else { 2 };
@@ -754,6 +762,12 @@ pub fn explain_hash_agg(p: &HashAggPlan) -> Vec<String> {
         merge_d,
         &format!("aggregates: [{}]", agg_txt.join(", ")),
     ));
+    if let Some(h) = p.having {
+        lines.push(attr(
+            merge_d,
+            &format!("having: {}", render_pred_m(h, &ids, false)),
+        ));
+    }
 
     let hash_d = merge_d + 1;
     lines.push(header(hash_d, "HASH AGGREGATE", 3));
