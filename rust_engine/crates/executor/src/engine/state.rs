@@ -6380,6 +6380,53 @@ pub(crate) fn optimize_text_index_unlocked(
     Ok(index.apply_merge(&plan, merged))
 }
 
+/// [`optimize_text_index_unlocked`] for a full-text index that is **not** in the
+/// engine's cache: maps the chunk list the catalog holds into a detached
+/// [`TextIndex`], merges it, and returns what it holds afterwards.
+///
+/// The reference never consults a memory index here - `OptimizeFtIndex` walks
+/// `SegmentIndexMeta`'s chunk ids (`new_txn_index_impl.cpp:2193-2245`) - so an
+/// index whose column has not been queried since the process started (or since
+/// a compaction dropped its cache entry) is merged like any other. The caller
+/// publishes the returned chunk list and drops the detached index, so an
+/// optimize tick costs the mapping, not a resident index per column.
+///
+/// The return value is the merge count and, per surviving chunk,
+/// `(segment, base_name, base_row_id, row_count, term_count)`.
+pub(crate) fn merge_text_index_from_catalog(
+    dir: &str,
+    chunks: &[crate::engine::text_index::CatalogChunk],
+    deleted: &std::collections::HashSet<u64>,
+) -> crate::Result<(usize, Vec<crate::engine::text_index::HeldTextChunk>)> {
+    let mut index = TextIndex::new(dir.to_string(), TextTokenizer::default());
+    // Nothing is re-indexed: `load_sealed_scoped` maps the chunks the catalog
+    // names, exactly what the query path's build does before it scans the tail.
+    if index.load_sealed_scoped(chunks) == 0 {
+        return Ok((0, Vec::new()));
+    }
+    let shared: SharedTextIndex = Arc::new(std::sync::RwLock::new(index));
+    let done = optimize_text_index_unlocked(&shared, deleted)?;
+    let held = {
+        let index = shared.read().unwrap_or_else(|poison| poison.into_inner());
+        index
+            .reader
+            .segments
+            .iter()
+            .map(|segment| {
+                let base_row_id = segment.reader.base_row_id();
+                (
+                    (base_row_id >> 32) as u32,
+                    segment.reader.base_name().to_string(),
+                    base_row_id,
+                    u64::from(segment.docs),
+                    segment.total_len,
+                )
+            })
+            .collect()
+    };
+    Ok((done, held))
+}
+
 pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
     index.mem.delete(seq);
     // A row whose text already went to a sealed segment keeps its old postings
@@ -7201,6 +7248,40 @@ pub(crate) struct RowFulltextProvider<'a> {
 }
 
 impl RowFulltextProvider<'_> {
+    /// The dictionary terms `term` is looked up as.
+    ///
+    /// C++ runs the *analyzer* over the `filter_fulltext` text before the query
+    /// tree is built (`SearchDriver::ParseSingleWithFields` with
+    /// `GetColumn2Analyzer`, `filter_expression_push_down_indexscanfilter_impl.
+    /// cpp:980-994`), so the tree holds analyzed terms. Looking the literal up
+    /// instead searched the raw word: a `standard` column stores `families` and
+    /// its stem `famili`, a query for `family` matched only the document that
+    /// spelled it that way, while `MATCH TEXT` (which does analyze) matched
+    /// both. The analyzer emits a word *and* its stem at one offset, so every
+    /// emitted form is searched and the caller's boolean tree decides the rest.
+    pub(crate) fn query_terms(&self, term: &str) -> Vec<String> {
+        let needle = term.to_lowercase();
+        // A sparse-gram index is a literal-run test over the text, not a term
+        // lookup: its analyzer emits grams, which would never match `needle`.
+        if self.substring {
+            return vec![needle];
+        }
+        let Some((_, tokenizer)) = self.index else {
+            return vec![needle];
+        };
+        let mut terms: Vec<String> = crate::tokenize_index_positions(&needle, tokenizer)
+            .into_iter()
+            .map(|(term, _)| term)
+            .filter(|term| !term.is_empty())
+            .collect();
+        terms.sort_unstable();
+        terms.dedup();
+        if terms.is_empty() {
+            terms.push(needle);
+        }
+        terms
+    }
+
     /// C++ `ColumnIndexReader::Lookup(term, false)`: the row ids whose documents
     /// contain `term`, with stale copies of re-indexed rows removed.
     pub(crate) fn index_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
@@ -7219,6 +7300,20 @@ impl RowFulltextProvider<'_> {
                 .unwrap_or_default(),
         )
     }
+
+    /// [`Self::index_postings`] over every form the analyzer emitted, or `None`
+    /// when this column has no inverted index to answer the filter.
+    fn analyzed_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
+        let mut out: Option<std::collections::HashSet<usize>> = None;
+        for analyzed in self.query_terms(term) {
+            // `index_postings` returns `None` when the index's tokenizer is not
+            // the one the filter asked for; that is a property of the column, so
+            // one probe is enough.
+            let hits = self.index_postings(&analyzed)?;
+            out.get_or_insert_with(Default::default).extend(hits);
+        }
+        out
+    }
 }
 
 impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
@@ -7227,7 +7322,7 @@ impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
         // The term index answers from the postings; a sparse-gram index
         // (seeded by `RegexIndexRewrite`, or named with `col@index`) is a
         // literal-run test over the text.
-        let postings = self.index_postings(&needle);
+        let postings = self.analyzed_postings(&needle);
         let mut out = Vec::new();
         for (i, row) in self.rows.iter().enumerate() {
             let hit = if let (Some(postings), Some(ids)) = (&postings, self.row_ids) {

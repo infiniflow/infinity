@@ -328,7 +328,7 @@ impl Engine {
             // rest are scored by the exact scan.
             let mut covered: HashSet<usize> =
                 index.row_ids().into_iter().map(|id| id as usize).collect();
-            covered.extend(mem);
+            covered.extend(mem.iter().copied());
             let uncovered = self.uncovered_rows(q, &covered);
             return Some(KnnProbe {
                 candidates,

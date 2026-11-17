@@ -80,10 +80,12 @@ impl TableScan {
                 .as_ref()
                 .map(|column| engine.index_tokenizer(&self.table, column));
             let fulltext_index = match (&self.fulltext_index_column, &row_ids, &tokenizer) {
-                (Some(column), Some(_), Some(tokenizer)) if !self.fulltext_substring => Some((
-                    engine.text_index_for(&self.table, column, tokenizer.clone())?,
-                    tokenizer.clone(),
-                )),
+                // The index and its tokeniser come back as a pair: a column with
+                // two `FULLTEXT` indexes has one tokeniser per record, and the
+                // provider can only look a term up when the two agree.
+                (Some(column), Some(_), Some(tokenizer)) if !self.fulltext_substring => Some(
+                    engine.text_index_with_tokenizer(&self.table, column, tokenizer.clone())?,
+                ),
                 _ => None,
             };
             rows = crate::apply_index_filter(

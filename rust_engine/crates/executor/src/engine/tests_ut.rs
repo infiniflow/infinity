@@ -549,6 +549,42 @@ mod tests {
         assert_eq!(fulltext_chunks(&reopened), 1);
     }
 
+    /// The merge reads the **catalog**, not the cache: `OptimizeFtIndex` walks
+    /// `SegmentIndexMeta`'s chunk ids, so an index no query has loaded since the
+    /// process started (a restart with no `MATCH` on the column yet, or one whose
+    /// cache a compaction dropped) is merged all the same. The old walk over
+    /// `entry.text` saw no index and left such a chunk list fragmented forever.
+    #[test]
+    fn a_reopened_engine_merges_chunks_it_has_not_loaded() {
+        let dir = tempdir().unwrap();
+        let query = "SELECT id FROM opt SEARCH MATCH TEXT (body, 'alpha', 100);";
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.set_memindex_capacity(2);
+            e.execute_blocking("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+                .unwrap();
+            for i in 0..10 {
+                e.execute_blocking(&format!(
+                    "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
+                ))
+                .unwrap();
+            }
+            crate::scheduler::block_on(e.flush()).unwrap();
+            assert!(fulltext_chunks(&e) > 1, "five seals leave five chunks");
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        // Nothing has loaded the index: the cache is empty, which is exactly the
+        // state the cache-only walk could not merge.
+        assert_eq!(fulltext_chunks(&e), 0);
+        e.optimize_indexes().unwrap();
+        // The catalog names the merged chunk, so the first query maps one chunk
+        // and answers every row.
+        assert_eq!(rows(&e, query).len(), 10);
+        assert_eq!(fulltext_chunks(&e), 1, "the reopened engine merged them");
+    }
+
     /// A compaction renumbers every row, so the full-text index has to be
     /// rebuilt with the new ids. The query after the merge must still answer,
     /// both from the in-memory rebuild and from the chunks a reopen maps.
@@ -3113,6 +3149,49 @@ mod tests {
         }
     }
 
+    /// A merge publishes the merged chunk and then unlinks its sources, so a
+    /// crash between the two leaves `ft_{base:016x}_{rows:x}` in the catalog
+    /// next to the plain chunks it replaced. Mapping both copies puts every row
+    /// of the range in the index twice, and `total_docs` then exceeds the live
+    /// row count - the number the cache's reuse guard compares against - with
+    /// nothing on disk looking wrong. The reader retires the older copy (the
+    /// merged chunk is the newer one) instead of failing over to a rebuild.
+    #[test]
+    fn a_merged_chunk_retires_the_plain_chunks_it_replaced() {
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 2, 2, "a");
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.optimize_chunks().unwrap(), 1);
+        let merged = &index.reader.segments[0];
+        let catalog = vec![
+            CatalogChunk {
+                dir: storage::invertedindex::format::segment_chunk_dir(d, 0),
+                base_name: merged.reader.base_name().to_string(),
+                base_row_id: merged.reader.base_row_id(),
+                row_count: u64::from(merged.docs),
+            },
+            // The source the crash left behind: its files are gone, so only the
+            // span in the record still says which rows it covered.
+            CatalogChunk {
+                dir: storage::invertedindex::format::segment_chunk_dir(d, 0),
+                base_name: storage::fulltext_base_name(2, None),
+                base_row_id: 2,
+                row_count: 2,
+            },
+        ];
+        let mut reopened = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert!(reopened.load_sealed_scoped(&catalog) > 0);
+        assert_eq!(
+            reopened.reader.segments.len(),
+            1,
+            "the plain chunk inside the merged span is the older copy"
+        );
+        assert_eq!(reopened.reader.doc_count(), 4, "each row counted once");
+    }
+
     /// A chunk that went missing leaves a hole in the list, and the resume
     /// point `load_sealed` returns is the largest end - past the hole. The
     /// build asks [`TextIndex::first_coverage_hole`] when the chunks are short
@@ -4117,6 +4196,57 @@ mod tests {
             "SELECT num FROM ft WHERE filter_fulltext('doc','alpha','threshold=999');",
         );
         assert!(none.is_empty());
+    }
+
+    /// `filter_fulltext` searches the query the column's analyzer produces, the
+    /// same terms `MATCH TEXT` searches (`SearchDriver::ParseSingleWithFields`
+    /// analyzes the matching text before it builds the query tree), and the
+    /// index scan is the *only* answer: C++ consumes the
+    /// `FilterFulltextExpression` into the evaluator, so the predicate does not
+    /// run again above the scan. Re-running it made the expression interpreter's
+    /// raw-word `fulltext_match` the last word, and a `standard` column - which
+    /// stores both `families` and its stem `famili` - answered
+    /// `filter_fulltext('body','family')` with one row while `MATCH TEXT` gave
+    /// two.
+    #[test]
+    fn filter_fulltext_analyzes_the_query_like_match_text() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE stem_probe (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO stem_probe VALUES (1,'the families arrived'),(2,'a family portrait'),\
+             (3,'he implies it'),(4,'they imply it');",
+        )
+        .unwrap();
+        e.execute_blocking("CREATE INDEX sp_idx ON stem_probe (body) USING FULLTEXT;")
+            .unwrap();
+        for (query, expected) in [("family", 2), ("families", 2), ("imply", 2), ("implies", 2)] {
+            let filtered = rows(
+                &e,
+                &format!("SELECT id FROM stem_probe WHERE filter_fulltext('body','{query}');"),
+            );
+            assert_eq!(
+                filtered.len(),
+                expected,
+                "filter_fulltext('body','{query}') must stem like MATCH TEXT"
+            );
+            let matched = rows(
+                &e,
+                &format!("SELECT id FROM stem_probe SEARCH MATCH TEXT (body, '{query}', 10);"),
+            );
+            assert_eq!(
+                filtered.len(),
+                matched.len(),
+                "filter_fulltext and MATCH TEXT disagree on '{query}': {filtered:?} vs {matched:?}"
+            );
+        }
+        // A word the analyzer does not index still matches nothing.
+        assert!(rows(
+            &e,
+            "SELECT id FROM stem_probe WHERE filter_fulltext('body','famil');"
+        )
+        .is_empty());
     }
 
     #[test]

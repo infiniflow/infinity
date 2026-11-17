@@ -374,6 +374,22 @@ pub fn fulltext_base_name(row_id: u64, merged_row_count: Option<u64>) -> String 
     }
 }
 
+/// `true` for a chunk [`fulltext_base_name`] names with its row count, i.e. one
+/// `OptimizeFtIndex` produced by merging (`ft_{rowid:016x}_{rows:x}`).
+///
+/// The suffix is what tells a merged chunk from a plain one: both start with
+/// `ft_` and 16 hex digits, and only the merged name has more after them. A
+/// reader needs the distinction to resolve the state a merge's crash window
+/// leaves behind - the merged chunk published while one of the sources it
+/// replaced is still recorded - where the plain chunk inside the merged span is
+/// the older copy.
+pub fn is_merged_fulltext_base_name(base_name: &str) -> bool {
+    base_name
+        .strip_prefix("ft_")
+        .and_then(|rest| rest.split_once('_'))
+        .is_some_and(|(base, rows)| base.len() == 16 && u64::from_str_radix(rows, 16).is_ok())
+}
+
 /// The three full-text index files for a chunk base name.
 pub fn fulltext_files(base_name: &str) -> [String; 3] {
     [

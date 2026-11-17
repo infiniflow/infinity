@@ -89,68 +89,120 @@ impl Engine {
     /// The body [`Self::optimize_fulltext_async`] runs: the gate is held.
     async fn optimize_fulltext_locked(&self, table: &str) -> Result<usize> {
         let key = self.table_key(table);
+        // **The catalog is the input**, exactly as in the reference: a merge
+        // reads `SegmentIndexMeta`'s chunk ids (`OptimizeFtIndex`,
+        // `new_txn_index_impl.cpp:2193-2245`) and never a memory index. Walking
+        // only the cached indexes left every index of a process that had not
+        // answered a query on the column yet unmerged - a reopened engine kept
+        // its chunk list fragmented for good, because nothing but a `MATCH` or a
+        // `filter_fulltext` ever loads the cache.
+        let catalog_indexes: Vec<(u64, String)> = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+            .map(|im| (im.id, im.column))
+            .collect();
+        if catalog_indexes.is_empty() {
+            return Ok(0);
+        }
         // Clone the handles while the `tables` guard is held, then drop it before
         // taking any index write lock. `text_index_for` takes `tables` first and
         // the index second, so waiting for an index lock with `tables` held is the
         // reverse order and can deadlock a concurrent seal or query.
-        let indexes: Vec<(u64, String, SharedTextIndex)> = {
+        let cached: Vec<(u64, SharedTextIndex)> = {
             let tables = self.tables.lock().unwrap();
-            let Some(entry) = tables.get(&key) else {
-                return Ok(0);
-            };
-            let by_id: std::collections::HashMap<u64, String> = self
-                .storage
-                .catalog
-                .indexes_of_table(&self.qualified_table(table))
+            tables
+                .get(&key)
+                .map(|entry| entry.text.iter().map(|(id, v)| (*id, v.clone())).collect())
                 .unwrap_or_default()
-                .into_iter()
-                .map(|im| (im.id, im.column))
-                .collect();
-            entry
-                .text
-                .iter()
-                .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
-                .collect()
         };
-        if indexes.is_empty() {
-            return Ok(0);
-        }
         // A merge is the only point at which the postings of a deleted row can
         // be reclaimed (a chunk is immutable once published), so it takes the
         // table's deleted rows with it.
         let deleted = self.tombstone_set(table)?;
         if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
             eprintln!(
-                "[FT] optimize_fulltext_locked {table} indexes={}",
-                indexes.len()
+                "[FT] optimize_fulltext_locked {table} indexes={} cached={}",
+                catalog_indexes.len(),
+                cached.len()
             );
         }
         let mut merges = 0;
-        let mut merged: Vec<(u64, String)> = Vec::new();
-        for (index_id, column, index) in indexes {
-            // The merge rewrites whole chunks and fsyncs every file it writes:
-            // it is a blocking leaf, so it runs on the blocking pool. Running it
-            // here would hold a runtime worker for the duration of the rewrite,
-            // stalling every other task scheduled on it.
-            let done = crate::scheduler::scheduler()
-                .spawn_blocking({
-                    let deleted = deleted.clone();
-                    move || crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
-                })
-                .await?;
-            if done > 0 {
-                merged.push((index_id, column));
+        for (index_id, column) in catalog_indexes {
+            let shared = cached
+                .iter()
+                .find(|(id, _)| *id == index_id)
+                .map(|(_, shared)| shared.clone());
+            match shared {
+                Some(index) => {
+                    // The merge rewrites whole chunks and fsyncs every file it
+                    // writes: it is a blocking leaf, so it runs on the blocking
+                    // pool. Running it here would hold a runtime worker for the
+                    // duration of the rewrite, stalling every other task
+                    // scheduled on it.
+                    let done = crate::scheduler::scheduler()
+                        .spawn_blocking({
+                            let deleted = deleted.clone();
+                            move || {
+                                crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
+                            }
+                        })
+                        .await?;
+                    if done == 0 {
+                        continue;
+                    }
+                    merges += done;
+                    if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
+                        eprintln!(
+                            "[FT] {table}.{column} optimize merged {done}, republishing records"
+                        );
+                    }
+                    // The merge replaced chunks: the catalog's chunk list is what
+                    // a reader maps, so it has to name the merged chunk and stop
+                    // naming the sources the merge deleted (`OptimizeFtIndex` ->
+                    // `RemoveChunkIDs`).
+                    self.republish_text_chunks(table, index_id, &column);
+                }
+                None => {
+                    // No cache entry: map the chunk list from the catalog, merge
+                    // it, and publish the result. Nothing is loaded back into
+                    // `tables`, so an optimize tick over a large catalog does not
+                    // turn into a resident index per column.
+                    let Some(root) = self.fulltext_index_root_of(table, index_id) else {
+                        continue;
+                    };
+                    let chunks = self.fulltext_catalog_chunks_of(table, index_id)?;
+                    if chunks.len() < 2 {
+                        continue;
+                    }
+                    let dir = root.to_string_lossy().into_owned();
+                    let (done, held): (usize, Vec<crate::engine::text_index::HeldTextChunk>) =
+                        crate::scheduler::scheduler()
+                            .spawn_blocking({
+                                let deleted = deleted.clone();
+                                move || {
+                                    crate::engine::state::merge_text_index_from_catalog(
+                                        &dir, &chunks, &deleted,
+                                    )
+                                }
+                            })
+                            .await?;
+                    if done == 0 || held.is_empty() {
+                        continue;
+                    }
+                    merges += done;
+                    if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
+                        eprintln!(
+                            "[FT] {table}.{column} optimize merged {done} (uncached), \
+                             republishing records"
+                        );
+                    }
+                    self.republish_text_chunks_of(table, index_id, &column, &held);
+                }
             }
-            merges += done;
-        }
-        // The merge replaced chunks: the catalog's chunk list is what a reader
-        // maps, so it has to name the merged chunk and stop naming the sources
-        // the merge deleted (`OptimizeFtIndex` -> `RemoveChunkIDs`).
-        for (index_id, column) in merged {
-            if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
-                eprintln!("[FT] {table}.{column} optimize merged {merges}, republishing records");
-            }
-            self.republish_text_chunks(table, index_id, &column);
         }
         Ok(merges)
     }
@@ -202,6 +254,26 @@ impl Engine {
                 })
                 .unwrap_or_default()
         };
+        self.republish_text_chunks_of(&qualified, index_id, column, &held);
+    }
+
+    /// [`Self::republish_text_chunks`] with the chunk list the merge produced,
+    /// for a merge that ran on an index **not** held in the cache
+    /// ([`crate::engine::state::merge_text_index_from_catalog`]).
+    ///
+    /// `held` is `(segment, base_name, base_row_id, row_count, term_count)` per
+    /// chunk the index holds now.
+    pub(crate) fn republish_text_chunks_of(
+        &self,
+        table: &str,
+        index_id: u64,
+        column: &str,
+        held: &[(u32, String, u64, u64, u64)],
+    ) {
+        let qualified = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
+            return;
+        };
         let set = catalog::layout::SegmentSet {
             db_id: self.database_id_of(&qualified).to_string(),
             table_id: meta.id.to_string(),
@@ -234,7 +306,7 @@ impl Engine {
         let mut per_segment: std::collections::BTreeMap<u32, Vec<catalog::layout::IndexChunk>> =
             Default::default();
         let ts = self.txn.current_ts().max(1);
-        for (segment, base_name, base_row_id, row_count, term_count) in &held {
+        for (segment, base_name, base_row_id, row_count, term_count) in held {
             let chunk_id = match by_base.get(base_name) {
                 Some(id) => *id,
                 None => {

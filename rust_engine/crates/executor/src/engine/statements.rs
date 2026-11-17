@@ -3986,34 +3986,68 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
+        Ok(self.text_index_with_tokenizer(table, column, tokenizer)?.0)
+    }
+
+    /// [`Self::text_index_for`] **and** the tokeniser the returned index's
+    /// postings were written with.
+    ///
+    /// The two have to travel together: two `FULLTEXT` indexes on one column may
+    /// declare different analyzers, so the caller's `tokenizer` (the column's own
+    /// choice, `column_analyzer_name`) is not necessarily the record's. A query
+    /// path that pairs the index with the other one cannot look a term up -
+    /// `RowFulltextProvider` compares the pair and must give up on a mismatch -
+    /// and `filter_fulltext` then keeps every row instead of narrowing. The
+    /// caller passes the tokeniser only as the fallback for a record that names
+    /// none.
+    pub(crate) fn text_index_with_tokenizer(
+        &self,
+        table: &str,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<(SharedTextIndex, TextTokenizer)> {
         let (index_id, index_name) = self.fulltext_record(table, column).ok_or_else(|| {
             Error::Invalid(format!(
                 "fulltext index does not exist for column '{column}'"
             ))
         })?;
-        // The tokeniser belongs to the **record**, not the column: two
-        // `FULLTEXT` indexes on one column may declare different analyzers, and
-        // `column_analyzer_name` picks one for the whole column (in *name*
-        // order) while this resolves the index by id. Using the column's choice
-        // for the record it did not select tokenises the query with one
-        // analyzer and the postings with another.
         let tokenizer = self
             .index_tokenizer_of(table, &index_name)
             .unwrap_or(tokenizer);
-        self.text_index_for_id(table, index_id, column, tokenizer)
+        let index = self.text_index_for_id(table, index_id, column, tokenizer.clone())?;
+        Ok((index, tokenizer))
     }
 
-    /// The `(id, name)` of the full-text record a plain `MATCH TEXT` resolves
-    /// to on `column`.
+    /// The `(id, name)` of the full-text record a plain `MATCH TEXT` or
+    /// `filter_fulltext` resolves to on `column`.
+    ///
+    /// A sparse-gram record is the one `regex()` narrows with (`index=`), not the
+    /// one a term search reads, so a column carrying both is answered by the
+    /// regular analyzer - the same preference `column_analyzer_name` applies to
+    /// the column's tokeniser (`filter_regex_multi_index.slt`).
     fn fulltext_record(&self, table: &str, column: &str) -> Option<(u64, String)> {
-        self.storage
+        let records: Vec<(u64, String)> = self
+            .storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
             .ok()?
             .into_iter()
-            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+            .filter(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
             .filter(|im| im.id > 0)
             .map(|im| (im.id, im.name))
+            .collect();
+        records
+            .iter()
+            .find(|(_, name)| {
+                !matches!(
+                    self.analyzer_of_index(table, name)
+                        .as_deref()
+                        .and_then(|name| analyzer::parse_analyzer_name(name).ok()),
+                    Some(analyzer::AnalyzerName::SparseGram { .. })
+                )
+            })
+            .or_else(|| records.first())
+            .cloned()
     }
 
     /// The tokeniser one full-text record was created with.
@@ -4650,7 +4684,11 @@ impl Engine {
     /// it is also the authoritative list for a directory the port wrote.
     /// `idx_{index_id}` for a full-text index - the root the seals write under
     /// and the catalog's `idx_chunk` records name.
-    fn fulltext_index_root_of(&self, table: &str, index_id: u64) -> Option<std::path::PathBuf> {
+    pub(crate) fn fulltext_index_root_of(
+        &self,
+        table: &str,
+        index_id: u64,
+    ) -> Option<std::path::PathBuf> {
         let qualified = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&qualified).ok()??;
         Some(self.blocks_root().join(format!(
@@ -4703,6 +4741,7 @@ impl Engine {
                     dir: dir.clone(),
                     base_name: info.base_name,
                     base_row_id: info.base_row_id,
+                    row_count: info.row_count,
                 });
             }
         }
