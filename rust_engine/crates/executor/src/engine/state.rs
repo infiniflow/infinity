@@ -5202,11 +5202,19 @@ pub(crate) struct Context {
     /// The fair seal scheduler (§9.6): weights per database, one seal in flight
     /// per tenant, and the `index_seal_starvation` counter.
     pub(crate) seal_scheduler: std::sync::Mutex<crate::engine::maintain::SealScheduler>,
-    /// Per-index recall monitors (§11.3 item 4), keyed by catalog index id.
-    /// Sampling is on; the state is in memory because a target is a policy, not
-    /// a property of the data (a restart re-learns in a few sampled queries).
-    pub(crate) recall:
-        std::sync::Mutex<std::collections::HashMap<u64, crate::engine::recall::RecallMonitor>>,
+    /// Per-index recall monitors (§11.3 item 4), keyed by table **and** catalog
+    /// index id: an id is unique within a table, not across the engine, so keying
+    /// on it alone let two tables with an index of the same id share one target,
+    /// one latency budget and one width.
+    ///
+    /// Sampling is on; the state is in memory because a target is a policy, not a
+    /// property of the data (a restart re-learns in a few sampled queries).
+    pub(crate) recall: std::sync::Mutex<
+        std::collections::HashMap<
+            crate::engine::recall::RecallKey,
+            crate::engine::recall::RecallMonitor,
+        >,
+    >,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,

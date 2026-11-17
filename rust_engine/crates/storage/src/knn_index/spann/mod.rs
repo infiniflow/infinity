@@ -765,11 +765,22 @@ impl FileIndex {
         let width = beam.unwrap_or(self.beam).max(1);
 
         let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, ROOT_KEY)];
+        // See the heap path: a leaf above the bottom level is scanned, not
+        // descended through (`crates/index/src/spann/mod.rs`, `search_masked`).
+        let mut shallow: Vec<(f32, PartitionKey)> = Vec::new();
         let mut level = chunk.height();
-        while level > 1 {
+        // Same descent as the heap path: it ends when nothing is left to descend
+        // into, because a branch can be shallower than the tree's height.
+        loop {
             // Same narrowing as the heap path (`search::level_width`).
-            let mut next = Beam::new(search::level_width(width, level - 1));
-            for (_, key) in &current {
+            let mut next = Beam::new(search::level_width(width, level.saturating_sub(1)));
+            let mut descended = false;
+            for (bound, key) in &current {
+                if chunk.meta(*key).is_some_and(|m| m.level <= 1) {
+                    shallow.push((*bound, *key));
+                    continue;
+                }
+                descended = true;
                 for child in chunk.children(*key) {
                     let Some(centroid) = chunk.centroid(child) else {
                         continue;
@@ -784,11 +795,20 @@ impl FileIndex {
                     next.push(lower, child);
                 }
             }
+            if !descended {
+                break;
+            }
             current = next.into_items();
             if current.is_empty() {
-                return Vec::new();
+                break;
             }
-            level -= 1;
+            level = level.saturating_sub(1).max(2);
+        }
+        current.extend(shallow);
+        // The leaf scan's early stop reads `current` in bound order.
+        current.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        if current.is_empty() {
+            return Vec::new();
         }
 
         let mut set = SearchSet::with_default_capacity(k);

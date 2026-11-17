@@ -592,16 +592,14 @@ pub(crate) fn decode_embedding_f32(
     match element_type {
         6 => {
             let bytes = body.get(at..at + dim * 4)?;
-            for slot in bytes.chunks_exact(4) {
-                out.push(f32::from_le_bytes([slot[0], slot[1], slot[2], slot[3]]));
+            for slot in bytes.as_chunks::<4>().0 {
+                out.push(f32::from_le_bytes(*slot));
             }
         }
         7 => {
             let bytes = body.get(at..at + dim * 8)?;
-            for slot in bytes.chunks_exact(8) {
-                out.push(f64::from_le_bytes([
-                    slot[0], slot[1], slot[2], slot[3], slot[4], slot[5], slot[6], slot[7],
-                ]) as f32);
+            for slot in bytes.as_chunks::<8>().0 {
+                out.push(f64::from_le_bytes(*slot) as f32);
             }
         }
         _ => {

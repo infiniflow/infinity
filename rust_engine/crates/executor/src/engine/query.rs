@@ -2270,6 +2270,10 @@ impl Engine {
                                         tree,
                                     )),
                                 );
+                            // The tree is heap (centroids + codes, and the member
+                            // vectors in `encode = none`): fold it into the
+                            // watermark charge so `seal_pressure` sees it.
+                            self.refresh_memindex_charge(table);
                         }
                     }
                 }

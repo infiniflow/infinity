@@ -29,6 +29,19 @@ const LATENCY_SAMPLES: usize = 128;
 const WIDEN_CAP: usize = 4;
 /// How much better than the target the estimate has to be before narrowing.
 const SHRINK_MARGIN: f32 = 0.03;
+/// Width of one window bucket, in seconds.
+///
+/// The window needs a mean, not the samples: an hour per bucket bounds it at
+/// `WINDOW_SECS / BUCKET_SECS` = 168 entries whatever the query rate, where keeping
+/// every sample meant a `VecDeque` that grew with traffic for seven days.
+const BUCKET_SECS: u64 = 3_600;
+
+/// Identity of one monitor: the table's key plus its catalog index id.
+///
+/// An index id is unique **within a table** (`drop_index_storage` relies on that),
+/// not across the engine: without the table, a second table's index with the same
+/// id inherited the first one's target, budget and width.
+pub(crate) type RecallKey = (String, u64);
 
 /// Per-index recall state.
 ///
@@ -43,7 +56,7 @@ pub(crate) struct RecallMonitor {
     budget_ms: Option<f32>,
     sample_rate: u64,
     seen: u64,
-    window: VecDeque<(u64, f32)>,
+    window: VecDeque<Bucket>,
     latency: VecDeque<f32>,
     base_beam: usize,
     beam: usize,
@@ -110,11 +123,29 @@ impl RecallMonitor {
 
     /// Feeds one sampled query. Returns the new beam when it changed.
     pub(crate) fn observe(&mut self, now_secs: u64, est: f32, latency_ms: f32) -> Option<usize> {
+        let est = est.clamp(0.0, 1.0);
         let cutoff = now_secs.saturating_sub(WINDOW_SECS);
-        while self.window.front().is_some_and(|(ts, _)| *ts < cutoff) {
+        // A bucket is dropped once its first sample is older than the window, so the
+        // estimate never spans more than seven days (it can span one hour less).
+        while self
+            .window
+            .front()
+            .is_some_and(|bucket| bucket.start < cutoff)
+        {
             self.window.pop_front();
         }
-        self.window.push_back((now_secs, est.clamp(0.0, 1.0)));
+        let start = now_secs - now_secs % BUCKET_SECS;
+        match self.window.back_mut() {
+            Some(last) if last.start == start => {
+                last.sum += est;
+                last.count += 1;
+            }
+            _ => self.window.push_back(Bucket {
+                start,
+                sum: est,
+                count: 1,
+            }),
+        }
         self.latency.push_back(latency_ms);
         while self.latency.len() > LATENCY_SAMPLES {
             self.latency.pop_front();
@@ -137,11 +168,12 @@ impl RecallMonitor {
 
     /// The window's mean estimate, `None` before the first sample.
     pub(crate) fn estimate(&self) -> Option<f32> {
-        if self.window.is_empty() {
+        let count: u32 = self.window.iter().map(|bucket| bucket.count).sum();
+        if count == 0 {
             return None;
         }
-        let sum: f32 = self.window.iter().map(|(_, est)| *est).sum();
-        Some(sum / self.window.len() as f32)
+        let sum: f32 = self.window.iter().map(|bucket| bucket.sum).sum();
+        Some(sum / count as f32)
     }
 
     /// The p99 of the sampled end-to-end latencies.
@@ -157,8 +189,23 @@ impl RecallMonitor {
 
     #[cfg(test)]
     pub(crate) fn samples(&self) -> usize {
+        self.window.iter().map(|bucket| bucket.count as usize).sum()
+    }
+
+    /// How many buckets the window holds right now (the memory bound).
+    #[cfg(test)]
+    pub(crate) fn buckets(&self) -> usize {
         self.window.len()
     }
+}
+
+/// One hour of samples: the running sum and the count that produced it.
+#[derive(Clone, Copy, Debug)]
+struct Bucket {
+    /// Start of the hour, in the same seconds scale as `observe`'s `now_secs`.
+    start: u64,
+    sum: f32,
+    count: u32,
 }
 
 #[cfg(test)]
@@ -215,6 +262,32 @@ mod tests {
             m.observe(3000 + i, 1.0, 9.0);
         }
         assert_eq!(m.beam(), 16);
+    }
+
+    /// The window holds buckets, not samples: a mean is two numbers per hour.
+    #[test]
+    fn the_window_keeps_buckets_not_samples() {
+        let mut m = RecallMonitor::new(8);
+        for hour in 0..24u64 {
+            m.observe(hour * BUCKET_SECS, 0.9, 1.0);
+        }
+        assert_eq!((m.samples(), m.buckets()), (24, 24));
+        let mean = m.estimate().expect("a mean over the buckets");
+        assert!((mean - 0.9).abs() < 1e-5, "mean {mean}");
+        // Two samples in one hour share a bucket and average inside it.
+        m.observe(24 * BUCKET_SECS, 1.0, 1.0);
+        m.observe(24 * BUCKET_SECS + 60, 0.0, 1.0);
+        assert_eq!((m.samples(), m.buckets()), (26, 25));
+        // Eight days of hourly traffic (`now` only moves forward): the window never
+        // grows past seven days.
+        for hour in 25..(25 + 8 * 24) {
+            m.observe(hour * BUCKET_SECS, 1.0, 1.0);
+        }
+        assert!(
+            m.buckets() <= (WINDOW_SECS / BUCKET_SECS) as usize + 1,
+            "{} buckets retained",
+            m.buckets()
+        );
     }
 
     #[test]

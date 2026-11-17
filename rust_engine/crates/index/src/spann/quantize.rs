@@ -213,18 +213,22 @@ pub fn encode(rot: &Rotation, rot_centroid: &[f32], v: &[f32]) -> Code {
     let dim = rot.dim();
     let raw_norm = l2_norm(v);
     let mut buf = rot.apply(v);
-    let mut norm = 0.0f32;
+    let mut norm_sq = 0.0f32;
     for (x, c) in buf.iter().zip(rot_centroid) {
         let d = x - c;
-        norm += d * d;
+        norm_sq += d * d;
     }
-    norm = if is_approx_zero(norm) {
-        1.0
+    // A row that sits on its centroid has no residual: the stored norm stays 0 (it
+    // is what `recover_l2` multiplies by) and only the *divisor* is forced to 1, so
+    // the direction stays the zero vector with every bit clear.
+    let norm = if is_approx_zero(norm_sq) {
+        0.0
     } else {
-        norm.sqrt()
+        norm_sq.sqrt()
     };
+    let divisor = if norm == 0.0 { 1.0 } else { norm };
     for (x, c) in buf.iter_mut().zip(rot_centroid) {
-        *x = (*x - c) / norm;
+        *x = (*x - c) / divisor;
     }
     let mut bits = vec![0u8; code_bytes(dim)];
     let mut sum = 0.0f32;
@@ -254,18 +258,20 @@ pub fn make_query(rot: &Rotation, rot_centroid: &[f32], q: &[f32]) -> QueryCode 
     let dim = rot.dim();
     let raw_norm = l2_norm(q);
     let mut buf = rot.apply(q);
-    let mut norm = 0.0f32;
+    let mut norm_sq = 0.0f32;
     for (x, c) in buf.iter().zip(rot_centroid) {
         let d = x - c;
-        norm += d * d;
+        norm_sq += d * d;
     }
-    norm = if is_approx_zero(norm) {
-        1.0
+    // Same split as `encode`: a zero norm is kept, the divisor is not.
+    let norm = if is_approx_zero(norm_sq) {
+        0.0
     } else {
-        norm.sqrt()
+        norm_sq.sqrt()
     };
+    let divisor = if norm == 0.0 { 1.0 } else { norm };
     for (x, c) in buf.iter_mut().zip(rot_centroid) {
-        *x = (*x - c) / norm;
+        *x = (*x - c) / divisor;
     }
     let mut lower = f32::MAX;
     let mut upper = f32::MIN;
@@ -375,12 +381,12 @@ fn masked_code_sum(code: &[f32], bits: &[u8], dim: usize) -> f32 {
     }
     let mut estimate = acc.reduce_sum();
     // The last `dim % 8` dimensions are not a whole byte of the code.
-    for d in at * 8..n {
+    for (d, value) in code.iter().enumerate().take(n).skip(at * 8) {
         if bits
             .get(d / 8)
             .is_some_and(|byte| (byte >> (d % 8)) & 1 == 1)
         {
-            estimate += code[d];
+            estimate += *value;
         }
     }
     estimate
@@ -388,19 +394,26 @@ fn masked_code_sum(code: &[f32], bits: &[u8], dim: usize) -> f32 {
 
 /// A bound on `|estimate − true_squared_l2|`.
 ///
-/// The sign approximation `û` sits at exactly `‖u − û‖² = 2(1 − ⟨u,û⟩)`, so
-/// `|⟨u − û, q̂⟩| ≤ ‖u − û‖` and the squared-distance error is at most
-/// `2·‖o−c‖·‖q−c‖·‖u − û‖`. The query's own 255-bucket quantization is not
-/// covered; it is `delta`-bounded and two orders of magnitude smaller in
-/// practice (asserted by the unit test below).
+/// The estimate divides the recovered inner product by `error` (see
+/// [`distance_estimate_parts`]), i.e. it treats the reconstruction as the
+/// **scaled** direction `û / ⟨u,û⟩`, whose residual is
+/// `‖u − û/⟨u,û⟩‖ = √(1/⟨u,û⟩² − 1)`. That is the direction error the bound has
+/// to carry: `√(2(1 − ⟨u,û⟩))` is the error of the *unscaled* sign direction and
+/// under-bounds it (0.63 against 0.75 at `⟨u,û⟩ = 0.8`), which would let
+/// `SearchSet` prune on an interval the truth is not in.
+///
+/// The query's 255-bucket quantization joins it: every coordinate of the unit
+/// query direction is off by at most `delta/2`, so the direction is off by at
+/// most `delta·√dim/2`.
 pub fn error_bound(q: &QueryCode, c: &Code) -> f32 {
     error_bound_parts(q, c.norm, c.error)
 }
 
 /// [`error_bound`] over the raw slot columns (no allocation).
 pub fn error_bound_parts(q: &QueryCode, norm: f32, error: f32) -> f32 {
-    let dir_err = (2.0 * (1.0 - error)).max(0.0).sqrt();
-    2.0 * norm * q.norm * dir_err
+    let dir_err = (1.0 / (error * error) - 1.0).max(0.0).sqrt();
+    let quant_err = q.delta * (q.code.len() as f32).sqrt() * 0.5;
+    2.0 * norm * q.norm * (dir_err + quant_err)
 }
 
 /// Reconstructs the raw vector from its code (tests and the `store_full_vectors`
@@ -488,6 +501,41 @@ mod tests {
             );
         }
         assert!(worst.is_finite());
+    }
+
+    /// A row sitting on its centroid keeps a zero residual norm.
+    ///
+    /// The norm is what `recover_l2` multiplies by, so storing the `1.0` that only
+    /// the divisor needs put a `‖o−c‖` of 1 into every recovery of that member.
+    /// With the norm kept at 0 the estimate collapses to `‖q−c‖²`, which is the
+    /// truth, and the bound collapses to 0 with it.
+    #[test]
+    fn a_zero_residual_keeps_its_norm() {
+        let rot = Rotation::new(16, 5);
+        let centroid: Vec<f32> = (0..16).map(|d| d as f32 * 0.25).collect();
+        let rot_centroid = rot.apply(&centroid);
+        let c = encode(&rot, &rot_centroid, &centroid);
+        assert_eq!(c.norm, 0.0);
+        let q: Vec<f32> = (0..16).map(|d| 1.0 + d as f32).collect();
+        let qc = make_query(&rot, &rot_centroid, &q);
+        let truth: f32 = q
+            .iter()
+            .zip(&centroid)
+            .map(|(a, b)| (a - b) * (a - b))
+            .sum();
+        let est = distance_estimate(&qc, &c, 16);
+        assert!(
+            (est - truth).abs() < 1e-2 * truth.max(1.0),
+            "estimate {est} vs truth {truth}"
+        );
+        assert_eq!(error_bound(&qc, &c), 0.0);
+        let back = dequantize(&rot, &rot_centroid, &c);
+        let err: f32 = back
+            .iter()
+            .zip(&centroid)
+            .map(|(a, b)| (a - b) * (a - b))
+            .sum();
+        assert!(err < 1e-3, "the centroid comes back, err {err}");
     }
 
     #[test]

@@ -136,16 +136,11 @@ pub(crate) enum SpannHandle {
 
 /// Orders a union of per-chunk answers the way the metric ranks, so truncating
 /// it keeps the global best rather than each chunk's best.
-fn merge_chunks(chunks: &[Arc<storage::knn_index::spann::FileIndex>], merged: &mut [(u64, f32)]) {
-    let l2 = chunks.first().is_none_or(|c| c.metric().is_l2());
-    merged.sort_by(|a, b| {
-        let ord = a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal);
-        if l2 {
-            ord
-        } else {
-            ord.reverse()
-        }
-    });
+fn merge_chunks(merged: &mut [(u64, f32)]) {
+    // Ascending, for every metric: `FileIndex::search` already answers "smaller is
+    // better" (ip is `−⟨o,q⟩`, cosine is `−cos`), so reversing the order for those
+    // two turned `truncate(k)` into "keep the k worst".
+    merged.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 }
 
 impl SpannHandle {
@@ -174,7 +169,7 @@ impl SpannHandle {
                 for chunk in chunks {
                     merged.extend(chunk.search(q, k, beam));
                 }
-                merge_chunks(chunks, &mut merged);
+                merge_chunks(&mut merged);
                 merged.truncate(k);
                 merged
             }
@@ -227,7 +222,7 @@ impl SpannHandle {
                     for chunk in chunks {
                         merged.extend(chunk.search_filtered(q, k, Some(width), &ids));
                     }
-                    merge_chunks(chunks, &mut merged);
+                    merge_chunks(&mut merged);
                     merged.truncate(k);
                     merged
                 }
@@ -369,7 +364,11 @@ pub(crate) fn candidate_budget(topn: usize, beam: usize, multiplier: usize) -> u
     let results = (((topn as f64) * 1.2).ceil() as usize).max(10);
     let log = (beam.max(2) as f64).log2() * (topn.max(2) as f64).log2();
     let extra = (log as usize).saturating_mul(multiplier);
-    (results + extra).clamp(results, MAX_RERANK_CANDIDATES)
+    // A `topn` of 1000 asks for a pool of at least 1200, which is already past the
+    // ceiling: clamping to `(1200, 1024)` panics, and a pool under `results` would
+    // return a short top-k. The floor wins.
+    let ceiling = MAX_RERANK_CANDIDATES.max(results);
+    (results + extra).clamp(results, ceiling)
 }
 
 impl crate::Engine {
@@ -477,7 +476,7 @@ impl crate::Engine {
             .recall
             .lock()
             .unwrap()
-            .get(&im.id)
+            .get(&(tkey.clone(), im.id))
             .and_then(|monitor| monitor.estimate())
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "n/a".to_string());

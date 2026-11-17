@@ -142,6 +142,15 @@ impl Options {
                 "must be >= 4".to_string(),
             ));
         }
+        // The on-disk metadata stores a partition's member count in a `u16`
+        // (`writer::META_ENTRY`), so a bigger partition would truncate the count
+        // and lose rows on reload.
+        if self.max_partition_size > u16::MAX as usize {
+            return Err(SpannError::InvalidOption(
+                "max_partition_size",
+                "must be <= 65535".to_string(),
+            ));
+        }
         if self.min_partition_size < 2 || self.min_partition_size > self.max_partition_size {
             return Err(SpannError::InvalidOption(
                 "min_partition_size",
@@ -317,10 +326,11 @@ impl SpannIndex {
 
     /// Heap bytes the tree owns, for §10's budget and the `spann_bytes` gauge.
     ///
-    /// Counts the two centroids per partition, the child key table and the
-    /// members (meta + code); it excludes the allocator's slack and the raw
-    /// vectors `encode = none` keeps, which is why the benchmark reports it next
-    /// to the process RSS rather than instead of it.
+    /// Counts the two centroids per partition, the child key table, the members
+    /// (meta + code) and - with `encode = none` - the raw member vectors the tree
+    /// keeps for the conformance path, which is the larger half of that mode's
+    /// footprint. It still excludes the allocator's slack, which is why the
+    /// benchmark reports it next to the process RSS rather than instead of it.
     pub fn mem_usage(&self) -> usize {
         let mut total = 0usize;
         for part in self.store.partitions() {
@@ -330,6 +340,7 @@ impl SpannIndex {
             for member in &part.members {
                 total += member.code.bits.len();
             }
+            total += part.raw_bytes();
         }
         total
     }
@@ -391,28 +402,49 @@ impl SpannIndex {
         };
         let width = beam.unwrap_or(self.opts.base_beam).max(1);
         let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, root.key)];
+        // Leaves met above the bottom level. The bisection splits by row count, so
+        // one side of a split can fit in a partition while the other does not and
+        // the tree ends up with branches of different depth; a leaf like that has
+        // no children to descend into and used to empty the beam (or, worse, be
+        // skipped while its siblings answered).
+        let mut shallow: Vec<(f32, PartitionKey)> = Vec::new();
         let mut level = root.level;
-        while level > 1 {
+        // The descent ends when nothing is left to descend into, not when the level
+        // counter reaches 1: with branches of different depth the counter is only
+        // an upper bound, and stopping on it left a partition at level 2 unscanned.
+        loop {
             // Interior levels narrow: the root of a 1M-row tree holds a handful
             // of children, so spending the leaf width there only scans
             // centroids (see `search::level_width`).
-            let mut next = Beam::new(search::level_width(width, level - 1));
-            for (_, key) in &current {
+            let mut next = Beam::new(search::level_width(width, level.saturating_sub(1)));
+            let mut descended = false;
+            for (bound, key) in &current {
                 let Some(p) = self.store.partition(*key) else {
                     continue;
                 };
+                if p.is_leaf() {
+                    shallow.push((*bound, *key));
+                    continue;
+                }
+                descended = true;
                 for child in &p.children {
                     if let Some(c) = self.store.partition(*child) {
                         next.push(c.lower_bound(q, self.opts.metric), *child);
                     }
                 }
             }
+            if !descended {
+                break;
+            }
             current = next.into_items();
             if current.is_empty() {
-                return Vec::new();
+                break;
             }
-            level -= 1;
+            level = level.saturating_sub(1).max(2);
         }
+        current.extend(shallow);
+        // The leaf scan's early stop reads `current` in bound order.
+        current.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
 
         let mut set = SearchSet::with_default_capacity(k);
         // `current` is sorted by lower bound, so the first partition that cannot
@@ -514,6 +546,17 @@ mod tests {
             min_rows: 0,
             adaptive_beam: false,
         }
+    }
+
+    /// A partition's member count is a `u16` on disk (`writer::META_ENTRY`), so a
+    /// wider partition would truncate the count and lose rows on reload.
+    #[test]
+    fn validate_rejects_a_partition_too_wide_for_the_on_disk_count() {
+        let mut o = opts(64, Encode::Rabitq);
+        o.max_partition_size = u16::MAX as usize + 1;
+        assert!(o.validate().is_err(), "the count would not fit");
+        o.max_partition_size = u16::MAX as usize;
+        assert!(o.validate().is_ok(), "the widest partition that fits");
     }
 
     #[test]
@@ -687,6 +730,54 @@ mod tests {
             .map(|p| (p.key, p.centroid.clone()))
             .collect();
         assert_eq!(ca, cb);
+    }
+
+    /// A tree whose branches end at different levels is still fully searchable.
+    ///
+    /// The bisection splits by row count, so `2·max + 1` rows leave one side that
+    /// fits in a partition and a sibling that does not - and the parent then sits
+    /// two levels above that leaf. The descent used to walk into the leaf's empty
+    /// child list and drop its rows, and `collapse_top` used to orphan it by
+    /// re-parenting only the nodes of one level.
+    #[test]
+    fn mixed_depth_branches_stay_reachable() {
+        let max = 64;
+        let rows = random_points(2 * max + 1, 8, 5);
+        // `root_fanout = 2` collapses a single level, so the shallow branch stays
+        // where the bisection left it instead of being flattened by the new root.
+        let mixed = Options {
+            root_fanout: 2,
+            ..opts(max, Encode::Rabitq)
+        };
+        let index = SpannIndex::build(rows.clone(), mixed).unwrap();
+        let store = index.store();
+        let straddles = index.partitions().iter().any(|p| {
+            !p.is_leaf()
+                && p.children.iter().any(|c| {
+                    store
+                        .partition(*c)
+                        .is_some_and(|child| p.level > child.level + 1)
+                })
+        });
+        assert!(
+            straddles,
+            "the fixture did not produce a mixed-depth branch"
+        );
+        let mut stack = vec![store.root()];
+        let mut covered = 0usize;
+        while let Some(key) = stack.pop() {
+            let p = store.partition(key).expect("every child is a partition");
+            if p.is_leaf() {
+                covered += p.len();
+            } else {
+                stack.extend(p.children.iter().copied());
+            }
+        }
+        assert_eq!(covered, rows.len(), "a leaf is unreachable from the root");
+        // A probe wide enough to visit every partition returns every row: the
+        // shallow leaves are scanned like any other.
+        let got = index.search(&rows[7].1, rows.len(), Some(usize::MAX));
+        assert_eq!(got.len(), rows.len(), "the descent skipped a branch");
     }
 
     #[test]

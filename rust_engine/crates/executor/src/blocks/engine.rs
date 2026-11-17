@@ -100,6 +100,22 @@ impl RowCells<'_> {
     }
 }
 
+/// The embedding column a [`BlocksEngine::decode_vectors_of_block`] walk wants.
+///
+/// One argument for "which column, how wide, in which element type" instead of
+/// five loose ones.
+#[derive(Clone, Copy)]
+pub(crate) struct VectorColumn<'a> {
+    /// The declared types (`IndexMeta`/table meta `types`), in column order.
+    pub declared: &'a [String],
+    /// The storage types, in column order.
+    pub storage: &'a [i32],
+    /// Position of the embedding column.
+    pub col: usize,
+    pub dim: usize,
+    pub element_type: i32,
+}
+
 fn value_cell_text(values: &[Value], col: usize) -> std::borrow::Cow<'_, str> {
     match values.get(col) {
         Some(value) => std::borrow::Cow::Owned(mirror_cell_text(value)),
@@ -1676,6 +1692,10 @@ impl Engine {
         // index is the rows that chunk now covers, so it is cleared once the
         // records are appended below.
         let mut spann_ready: Vec<u64> = Vec::new();
+        // `(index name, segment, chunks it replaces, chunk ts)` - deprecated once the
+        // replacement has a record, so `cleanup_index_chunks` can reclaim the bytes of
+        // the superseded snapshot without a reader ever losing the one it has open.
+        let mut spann_superseded: Vec<(String, u32, Vec<u32>, u64)> = Vec::new();
         for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
@@ -1993,6 +2013,15 @@ impl Engine {
                         continue;
                     }
                     let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
+                    // The snapshots this rebuild replaces. They keep their bytes
+                    // until `cleanup_index_chunks` runs, and going through
+                    // `deprecate_chunks` is what keeps a reader that already mapped
+                    // one of them valid: the marker only removes the record.
+                    let superseded: Vec<u32> = self
+                        .live_chunk_files(table, &im.name, *segment, &seg_dir)
+                        .into_iter()
+                        .map(|(id, _)| id as u32)
+                        .collect();
                     // One chunk per segment, streamed: the tree that has to be
                     // resident is this segment's, not the table's.
                     let Some(index_size) =
@@ -2000,6 +2029,12 @@ impl Engine {
                     else {
                         continue;
                     };
+                    // The new chunk is published below and is the one that has to
+                    // survive; everything the segment listed before it is dead. The
+                    // markers are written *after* the new record lands, so a crash in
+                    // between leaves the old snapshot live rather than leaving the
+                    // segment with none.
+                    spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
                     spann_ready.push(index_id as u64);
                     vec![IndexChunk {
                         chunk_id,
@@ -2079,6 +2114,14 @@ impl Engine {
                 }
                 let _ = self.storage.catalog.append_index_chunk(&set, index, chunk);
             }
+        }
+        // The replacement is in the catalog now, so the snapshots it supersedes can
+        // leave the segment's list: `Cleanup` deletes their bytes once no reader
+        // holds them (`reclaim_deprecated_chunks`). One live chunk per segment is
+        // then the invariant, which is why `merge_optimizable_indexes` needs no
+        // SPANN branch - there is never a second chunk to fold.
+        for (index_name, segment, superseded, ts) in spann_superseded {
+            let _ = self.deprecate_chunks(table, &index_name, segment, &superseded, ts);
         }
         // The published chunks cover the rows the mem index was holding.
         if !spann_ready.is_empty() {
@@ -3807,14 +3850,10 @@ impl Engine {
     /// `decode_rows_of_values` answers `Value::Null` for them as well.
     pub(crate) fn decode_vectors_of_block(
         ids: &[u64],
-        type_text: &[String],
-        types: &[i32],
+        vector: VectorColumn<'_>,
         id: BlockId,
         version: &storage::definition::format::BlockVersionFile,
         columns: &dyn BlockColumns,
-        col: usize,
-        dim: usize,
-        element_type: i32,
         rows_wanted: &std::collections::HashSet<usize>,
     ) -> Option<Vec<(usize, Vec<f32>)>> {
         let row_count: usize = version
@@ -3822,9 +3861,12 @@ impl Engine {
             .last()
             .map(|c| c.cumulative_row_count as usize)
             .unwrap_or(0);
-        let column_id = ids.get(col).copied().unwrap_or(col as u64);
+        let column_id = ids.get(vector.col).copied().unwrap_or(vector.col as u64);
         let (body, _outline) = columns.column(column_id)?;
-        let layout = layout_of(type_text.get(col)?, *types.get(col)?)?;
+        let layout = layout_of(
+            vector.declared.get(vector.col)?,
+            *vector.storage.get(vector.col)?,
+        )?;
         let (body_data, body_null) =
             storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
         let base =
@@ -3843,7 +3885,9 @@ impl Engine {
             if body_null.len() > row / 8 && body_null[row / 8] & (1 << (row % 8)) == 0 {
                 continue;
             }
-            let Some(values) = decode_embedding_f32(body_data, row, dim, element_type) else {
+            let Some(values) =
+                decode_embedding_f32(body_data, row, vector.dim, vector.element_type)
+            else {
                 continue;
             };
             out.push((base + row, values));
@@ -4998,6 +5042,33 @@ impl Engine {
     /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
     /// builder needs. Handing each cell to the caller lets it parse and drop the
     /// text per block, so a build's peak is the vectors plus one block's text.
+    /// Hands the buffered cells of `column` for the rows of `segment` (every
+    /// segment when `None`) to `sink`, one cell at a time.
+    ///
+    /// The sink runs **while the buffer is locked**, so it must not reach back into
+    /// `tables` - a segment build only writes to its scratch file.
+    pub(crate) fn for_each_buffered_cell(
+        &self,
+        table: &str,
+        column: usize,
+        segment: Option<u32>,
+        mut sink: impl FnMut(usize, &str),
+    ) {
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get(&key) else {
+            return;
+        };
+        for (seq, values) in &entry.pending_rows {
+            if segment.is_some_and(|only| (*seq as u64 >> 32) as u32 != only) {
+                continue;
+            }
+            if let Some(value) = values.get(column) {
+                sink(*seq, &mirror_cell_text(value));
+            }
+        }
+    }
+
     pub(crate) fn for_each_block_cell(
         &self,
         table: &str,
@@ -5035,15 +5106,10 @@ impl Engine {
         }
         // Rows that are still in the append buffer have no block yet. Their seq
         // carries the segment in its high half (`base_row_id = segment << 32`).
-        for (seq, values) in self.pending_rows_of(&table) {
-            if segment.is_some_and(|s| (seq as u64 >> 32) as u32 != s) {
-                continue;
-            }
-            if let Some(v) = values.get(column) {
-                let text = mirror_cell_text(v);
-                f(seq, &text);
-            }
-        }
+        // Read them under the buffer's own lock, one cell at a time: cloning it
+        // first (`pending_rows_of`) copied every buffered row's whole embedding to
+        // keep one column of one segment.
+        self.for_each_buffered_cell(&table, column, segment, f);
     }
 
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
@@ -5743,9 +5809,9 @@ impl Engine {
                 }
                 continue;
             }
-            // A spann segment can hold several chunks (a dump per checkpoint, and
-            // an optimize folds them), so its superseded files have to be
-            // reclaimed too - without this branch the bytes of every archived
+            // A dump replaces the segment's snapshot and deprecates the one it
+            // supersedes (`publish_index_chunks`), so those files have to be
+            // reclaimed here - without this branch the bytes of every superseded
             // chunk stayed on disk forever.
             if im.index_type.eq_ignore_ascii_case("SPANN") {
                 for (segment, _) in self.segment_row_counts(&im.table) {

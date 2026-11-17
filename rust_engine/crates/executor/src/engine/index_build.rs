@@ -692,6 +692,10 @@ impl Engine {
             .or_default()
             .spann
             .insert(index_id, tree.clone());
+        // A chunk-backed tree owns no heap (`SpannHandle::mem_usage` is 0 for it),
+        // so this only matters if the loader ever hands back a built one - but the
+        // charge is what the watermarks read, and it should never be stale.
+        self.refresh_memindex_charge(table);
         Some(tree)
     }
 
@@ -1950,16 +1954,39 @@ impl Engine {
         // scan holds one of these read guards while it fetches rows, and that
         // fetch needs `tables`, so locking an index under `tables` closes the
         // cycle `Engine::text_index_for` documents.
-        let (text, sparse, mv, charged) = {
+        let (text, sparse, mv, hnsw, charged) = {
             let tables = self.tables.lock().unwrap();
             let Some(e) = tables.get(tkey) else {
                 return 0;
             };
+            // The graphs are locked *after* `tables` is dropped: a scan holds one of
+            // them while it waits for `tables` (`Engine::text_index_for`).
+            let hnsw: Vec<(
+                usize,
+                Arc<std::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
+            )> = e
+                .hnsw_mem
+                .iter()
+                .map(|(id, graph)| {
+                    (
+                        e.index_pending_bytes.get(id).copied().unwrap_or(0),
+                        graph.clone(),
+                    )
+                })
+                .collect();
             (
                 e.text.values().cloned().collect::<Vec<_>>(),
                 e.sparse.values().cloned().collect::<Vec<_>>(),
                 e.mv.values().cloned().collect::<Vec<_>>(),
-                e.index_pending_bytes.values().sum::<usize>()
+                hnsw,
+                // `index_pending_bytes` covers HNSW only through its own ids, which
+                // are accounted below (the larger of the two figures, never the sum:
+                // they are two estimates of one graph).
+                e.index_pending_bytes
+                    .iter()
+                    .filter(|(id, _)| !e.hnsw_mem.contains_key(id))
+                    .map(|(_, bytes)| *bytes)
+                    .sum::<usize>()
                     + e.secondary
                         .indexes
                         .values()
@@ -1990,10 +2017,26 @@ impl Engine {
                                 })
                                 .unwrap_or(0)
                         })
+                        .sum::<usize>()
+                    // The published trees themselves: centroids, member codes and
+                    // - with `encode = none` - the member vectors (`SpannIndex::
+                    // mem_usage`). A chunk-backed handle owns only its header and
+                    // reports 0, its slots being page cache.
+                    + e.spann
+                        .values()
+                        .map(|handle| handle.mem_usage())
                         .sum::<usize>(),
             )
         };
         let mut total = 0usize;
+        for (charge, graph) in hnsw {
+            // Two estimates of one graph: the write path's per-insert charge and the
+            // graph's own size. Neither is complete - a `CREATE INDEX` build charges
+            // nothing, and a seal shrinks the graph without the charge following - so
+            // the larger is the honest figure. Adding them double counts.
+            let size = graph.lock().map(|g| g.mem_usage()).unwrap_or(0);
+            total += charge.max(size);
+        }
         for idx in text {
             if let Ok(g) = idx.read() {
                 total += g.mem.mem_used();
@@ -3847,8 +3890,8 @@ impl Engine {
     /// Returned rather than logged because there is no operator surface for it
     /// yet: the `SHOW` variable list and the index listing both mirror the
     /// reference's wire format, and this counter has no counterpart there.
-    pub fn rebuild_suggested(&self) -> Vec<u64> {
-        let mut out: Vec<u64> = self
+    pub fn rebuild_suggested(&self) -> Vec<(String, u64)> {
+        let mut out: Vec<(String, u64)> = self
             .context
             .recall
             .lock()
@@ -3856,7 +3899,9 @@ impl Engine {
                 monitors
                     .iter()
                     .filter(|(_, monitor)| monitor.rebuild_suggested())
-                    .map(|(id, _)| *id)
+                    // An index id is only unique within its table, so both halves
+                    // are reported; the caller's list is a diagnostic.
+                    .map(|((table, id), _)| (table.clone(), *id))
                     .collect()
             })
             .unwrap_or_default();

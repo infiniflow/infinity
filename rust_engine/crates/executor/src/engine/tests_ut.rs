@@ -14210,15 +14210,19 @@ mod tests {
             .unwrap();
         assert_eq!(stamp_after, stamp, "the chunk file must not be rewritten");
 
-        // A write *does* invalidate it: the segment's live row count changes,
-        // so the next checkpoint has to publish a chunk that covers the new row.
+        // A write *does* invalidate it: the segment's live row count changes, so
+        // the next checkpoint publishes a chunk that covers the new row and
+        // deprecates the one it replaces - the segment keeps exactly one live
+        // snapshot, which is what makes `Cleanup` able to reclaim the old bytes
+        // without touching a reader that already mapped them.
         e.execute_blocking(&format!("INSERT INTO cq VALUES ({n}, {});", vector(n)))
             .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
         let grown: Vec<(u64, std::path::PathBuf)> =
             e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
-        assert!(
-            grown.len() > before.len(),
+        assert_eq!(grown.len(), 1, "one live snapshot per segment: {grown:?}");
+        assert_ne!(
+            grown[0].0, before[0].0,
             "a write must publish a fresh chunk: {grown:?}"
         );
 
@@ -14412,11 +14416,12 @@ mod tests {
         }
     }
 
-    /// §18/P5: an optimize pass folds a segment's spann chunks into one, and a
-    /// checkpoint's dump supersedes the older ones - so the "one chunk per
-    /// segment" invariant holds after the pass even when several dumps ran.
+    /// A second dump supersedes the first: the segment keeps one live snapshot, the
+    /// superseded chunk leaves the list with a `drop|idx_chunk|` marker, and
+    /// `cleanup_index_chunks` reclaims its bytes - the reader-safe path, so a reader
+    /// that already mapped the old chunk keeps it until it lets go.
     #[test]
-    fn an_optimize_folds_the_spann_chunks_of_a_segment() {
+    fn a_second_spann_dump_supersedes_the_previous_snapshot() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 31 + d * 47) % 977))
@@ -14453,8 +14458,9 @@ mod tests {
         };
         assert_eq!(chunks(&e).len(), 1, "the flush published one chunk");
 
-        // A write plus a second dump leaves the archive behind: the new chunk
-        // covers the whole segment, the old one is subsumed.
+        let first = chunks(&e)[0];
+        // A write plus a second dump: the new chunk covers the whole segment, so the
+        // old one is superseded rather than archived next to it.
         e.execute_blocking(&format!(
             "INSERT INTO co VALUES (40, {}), (41, {});",
             vector(40),
@@ -14462,12 +14468,25 @@ mod tests {
         ))
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(chunks(&e).len(), 2, "two dumps, two chunks");
+        let after = chunks(&e);
+        assert_eq!(after.len(), 1, "one live snapshot per segment: {after:?}");
+        assert_ne!(after[0], first, "the second dump republished the segment");
 
-        // One open chunk per index: the pass folds them.
-        e.set_max_open_chunks_per_index(1);
-        e.optimize_indexes().unwrap();
-        assert_eq!(chunks(&e).len(), 1, "the optimize must leave one chunk");
+        // The superseded id carries the marker the reclaimer reads.
+        let deprecated = e.deprecated_chunk_ids("default_db.co", "co_i", 0);
+        assert!(
+            deprecated.contains(&first),
+            "chunk {first} was superseded but not deprecated: {deprecated:?}"
+        );
+        // `Cleanup` is the only thing that deletes bytes, so the old file survives
+        // until it runs - that is what keeps a reader that mapped it valid.
+        let dir = e
+            .spann_chunk_dir("default_db.co", "co_i", 0)
+            .expect("segment dir");
+        let old = dir.join(format!("chunk_{first}.idx"));
+        assert!(old.exists(), "cleanup has not run yet");
+        e.cleanup_index_chunks().unwrap();
+        assert!(!old.exists(), "the superseded chunk was reclaimed");
 
         // And the folded chunk still answers for every row.
         let got = rows(

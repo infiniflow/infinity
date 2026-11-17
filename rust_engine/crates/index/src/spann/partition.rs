@@ -130,6 +130,14 @@ impl Partition {
         self.members.is_empty()
     }
 
+    /// Bytes the retained member vectors occupy (`encode = none` keeps them).
+    pub fn raw_bytes(&self) -> usize {
+        self.raw
+            .as_ref()
+            .map(|raw| raw.len() * std::mem::size_of::<f32>())
+            .unwrap_or(0)
+    }
+
     /// `R_p` recomputed from the stored member vectors (format self-check and
     /// the `encode = none` conformance path).
     pub fn raw_member(&self, index: usize) -> Option<&[f32]> {

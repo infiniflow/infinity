@@ -779,7 +779,7 @@ impl Engine {
     #[allow(clippy::too_many_arguments)]
     fn observe_recall(
         &self,
-        index_id: u64,
+        key: &crate::engine::recall::RecallKey,
         scan: knn_scan::PhysicalKnnScan<'_>,
         keep: &dyn Fn(&[Value]) -> bool,
         bmp_scores: &HashMap<usize, f64>,
@@ -792,7 +792,7 @@ impl Engine {
         }
         {
             let mut monitors = self.context.recall.lock().unwrap();
-            let Some(monitor) = monitors.get_mut(&index_id) else {
+            let Some(monitor) = monitors.get_mut(key) else {
                 return;
             };
             if !monitor.sample() {
@@ -821,7 +821,7 @@ impl Engine {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        if let Some(monitor) = self.context.recall.lock().unwrap().get_mut(&index_id) {
+        if let Some(monitor) = self.context.recall.lock().unwrap().get_mut(key) {
             let _ = monitor.observe(now, est, elapsed.as_secs_f32() * 1000.0);
         }
     }
@@ -3891,6 +3891,10 @@ impl Engine {
                 t_build.elapsed()
             );
         }
+        // The graph is heap and `memindex_bytes_of` now takes it from `mem_usage`,
+        // which no write charged: without this the watermarks never saw a graph
+        // `CREATE INDEX` built.
+        self.refresh_memindex_charge(table);
         Ok(())
     }
 
@@ -9075,7 +9079,7 @@ impl Engine {
         let query_started = std::time::Instant::now();
         // The index whose recall monitor decides the search width, set below
         // once the statement has picked an index.
-        let mut recall_id: Option<u64> = None;
+        let mut recall_key: Option<crate::engine::recall::RecallKey> = None;
         // An in-parenthesis `WHERE` filter also prunes candidates before ranking.
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(planner::predicate_expr(p, &schema)?),
@@ -9750,9 +9754,13 @@ impl Engine {
                     // different knobs in Cockroach
                     // (`vector_search_beam_size` vs `IndexOptions.BaseBeamSize`).
                     .unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
+                // A monitor belongs to one table's index: the id alone is unique only
+                // within the table, and a shared monitor handed a second table the
+                // first one's target, latency budget and width.
+                let monitor_key = (self.table_key(table), id);
                 let mut monitors = self.context.recall.lock().unwrap();
                 let monitor = monitors
-                    .entry(id)
+                    .entry(monitor_key.clone())
                     .or_insert_with(|| RecallMonitor::new(base));
                 if let Some(target) = knn_opts.recall_target {
                     monitor.set_target(target);
@@ -9760,7 +9768,7 @@ impl Engine {
                 if let Some(budget) = knn_opts.latency_budget_ms {
                     monitor.set_budget(budget);
                 }
-                recall_id = Some(id);
+                recall_key = Some(monitor_key);
                 // `WITH (beam = …)` is a hard override (§11.3 item 5): the
                 // monitor still learns from the query, it just does not set the
                 // width for it.
@@ -9846,7 +9854,7 @@ impl Engine {
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 index_id,
-                query: &qv,
+                query: qv,
                 rows: &rows,
                 live_rows: None,
                 live_count,
@@ -10143,9 +10151,9 @@ impl Engine {
         // §11.3 item 4: one query in `DEFAULT_SAMPLE_RATE` is also answered
         // exactly (from the warm vector cache, never by decoding the table), and
         // the gap between the two answers is what adapts the search width.
-        if let Some(id) = recall_id {
+        if let Some(key) = &recall_key {
             self.observe_recall(
-                id,
+                key,
                 scan,
                 &keep,
                 &bmp_scores,

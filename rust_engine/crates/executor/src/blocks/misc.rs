@@ -412,14 +412,16 @@ impl<'a> BlockCursor<'a> {
             }
             let Some(rows) = Engine::decode_vectors_of_block(
                 &self.meta.ids,
-                &self.meta.types,
-                &self.types,
+                crate::blocks::engine::VectorColumn {
+                    declared: &self.meta.types,
+                    storage: &self.types,
+                    col,
+                    dim,
+                    element_type,
+                },
                 id,
                 version,
                 block.as_ref(),
-                col,
-                dim,
-                element_type,
                 &wanted,
             ) else {
                 *complete = false;

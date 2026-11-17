@@ -14,6 +14,7 @@
 //! and a parent's key is smaller than its children's.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use super::kmeans::balanced_kmeans_2;
 use super::partition::Partition;
@@ -228,6 +229,10 @@ impl Builder<'_> {
             self.release();
         }
 
+        // A split by row count can leave one side a leaf and the other a subtree,
+        // so the two levels differ: the parent sits above its deeper child. That is
+        // allowed here - the descent and `collapse_top` both handle a branch that
+        // stops short of the bottom (see `mixed_depth_branches_stay_reachable`).
         let level = left.level.max(right.level) + 1;
         let members: Vec<(u64, &[f32])> = vec![
             (u64::from(left_key), left.centroid.as_slice()),
@@ -268,15 +273,38 @@ pub fn collapse_top(tree: BuiltTree, dim: usize, opts: &Options, rot: &Rotation)
     }
     let cut = tree.height - d;
 
+    // The new root's children are the children of the nodes being dropped - the
+    // `cut` level, and any shallower branch that hangs under those nodes. The
+    // bisection splits by row count, so branches differ in depth: re-parenting
+    // only the nodes *at* `cut` used to orphan a leaf that sat above it (its
+    // parent went away with the levels, and its rows became unreachable).
     let mut cut_keys: Vec<PartitionKey> = Vec::new();
-    let mut rest_keys: Vec<PartitionKey> = Vec::new();
-    for p in &tree.partitions {
-        if p.level == cut {
-            cut_keys.push(p.key);
-        } else if p.level < cut {
-            rest_keys.push(p.key);
+    let mut kept: HashSet<PartitionKey> = HashSet::new();
+    let mut above: Vec<PartitionKey> = tree
+        .get(tree.root)
+        .map(|root| root.children.clone())
+        .unwrap_or_default();
+    while let Some(key) = above.pop() {
+        let Some(p) = tree.get(key) else { continue };
+        if p.level > cut {
+            above.extend(p.children.iter().copied());
+            continue;
+        }
+        cut_keys.push(key);
+        // Everything below the frontier is kept as it is (the frontier node itself
+        // is re-numbered as a child of the new root, so it is not in `kept`).
+        let mut stack = p.children.clone();
+        while let Some(inner) = stack.pop() {
+            let Some(q) = tree.get(inner) else { continue };
+            kept.insert(inner);
+            stack.extend(q.children.iter().copied());
         }
     }
+    // Keys are DFS pre-order, so ordering both lists keeps the numbering (and the
+    // tree) the same as a serial build's.
+    cut_keys.sort_unstable();
+    let mut rest_keys: Vec<PartitionKey> = kept.into_iter().collect();
+    rest_keys.sort_unstable();
 
     let mut new_key: HashMap<PartitionKey, PartitionKey> = HashMap::new();
     let mut next: PartitionKey = 1;
