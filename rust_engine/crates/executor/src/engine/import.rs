@@ -539,6 +539,9 @@ impl Engine {
         // one statement that can put a whole segment into the spann mem index
         // at once - so it checks the bound too, here, with no gate held.
         self.dump_spann_over_capacity(table).await;
+        // `COPY` is also the statement that can outrun the checkpoint timer: keep
+        // the append buffer inside its budget the same way.
+        self.seal_pending_over_budget(table).await;
         let t_bottom = t3.elapsed();
         if profile {
             eprintln!(

@@ -3795,6 +3795,62 @@ impl Engine {
         Some(out)
     }
 
+    /// The embedding column of `rows_wanted` as `f32`, one block at a time.
+    ///
+    /// [`Self::decode_rows_of_values`] answers the same slots as **text** - the
+    /// form a result row needs and the form a vector query used to parse back
+    /// into numbers (measured: 240 us read + 27 us parse per 1536d row, which
+    /// made the exact rescoring of a rerank pool the whole query). This walks the
+    /// same slots for one embedding column and stops at the numbers.
+    ///
+    /// NULL slots are skipped: a rerank has no distance to a missing vector, and
+    /// `decode_rows_of_values` answers `Value::Null` for them as well.
+    pub(crate) fn decode_vectors_of_block(
+        ids: &[u64],
+        type_text: &[String],
+        types: &[i32],
+        id: BlockId,
+        version: &storage::definition::format::BlockVersionFile,
+        columns: &dyn BlockColumns,
+        col: usize,
+        dim: usize,
+        element_type: i32,
+        rows_wanted: &std::collections::HashSet<usize>,
+    ) -> Option<Vec<(usize, Vec<f32>)>> {
+        let row_count: usize = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count as usize)
+            .unwrap_or(0);
+        let column_id = ids.get(col).copied().unwrap_or(col as u64);
+        let (body, _outline) = columns.column(column_id)?;
+        let layout = layout_of(type_text.get(col)?, *types.get(col)?)?;
+        let (body_data, body_null) =
+            storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+        let base =
+            ((id.segment_id as usize) << 32) | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY);
+        let mut slots: Vec<usize> = rows_wanted
+            .iter()
+            .filter(|seq| **seq >= base && **seq < base + DEFAULT_BLOCK_CAPACITY)
+            .map(|seq| *seq - base)
+            .collect();
+        slots.sort_unstable();
+        let mut out = Vec::with_capacity(slots.len());
+        for row in slots {
+            if row >= row_count {
+                continue;
+            }
+            if body_null.len() > row / 8 && body_null[row / 8] & (1 << (row % 8)) == 0 {
+                continue;
+            }
+            let Some(values) = decode_embedding_f32(body_data, row, dim, element_type) else {
+                continue;
+            };
+            out.push((base + row, values));
+        }
+        Some(out)
+    }
+
     /// The append log as a reader needs it: one snapshot of the records, the
     /// stamps and the segment bases, taken **once** per scan (a per-row lookup
     /// would allocate three vectors per row).

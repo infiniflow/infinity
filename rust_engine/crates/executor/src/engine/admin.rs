@@ -909,6 +909,56 @@ impl Engine {
     /// The checkpoint itself, without the mode gate: [`Self::cleanup`] runs it
     /// on a read-only replica too, where the reference's cleanup task is
     /// allowed (`background_process_impl.cpp:109`).
+    /// Bytes of appended-but-unsealed rows the writer may hold.
+    pub(crate) fn pending_budget(&self) -> usize {
+        self.context
+            .pending_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// `[storage]`-style knob for [`Self::pending_budget`].
+    pub fn set_pending_budget(&self, bytes: usize) {
+        self.context
+            .pending_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Checkpoints when the table's append buffer passes its budget.
+    ///
+    /// `TableEntry::pending_rows` holds the parsed values of every row a commit
+    /// appended since the last checkpoint - it is the only copy the writer keeps,
+    /// and nothing bounds it: the reference flushes it from a *timer*, so a bulk
+    /// import that outruns the timer holds the table (measured: 400k x 1536d,
+    /// 8.6 GiB of RSS for a 2.3 GiB column, no checkpoint in between). The write
+    /// path is the only place that knows it is outrunning the timer, so it seals
+    /// by itself here.
+    ///
+    /// Called **after** the commit returned, with no bottom gate held: a
+    /// checkpoint takes `flush_lock` and then waits for that gate, which is the
+    /// cycle `dump_secondary_over_capacity_blocking` documents.
+    pub(crate) async fn seal_pending_over_budget(&self, table: &str) {
+        let budget = self.pending_budget();
+        if budget == 0 {
+            return;
+        }
+        let pending = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&self.table_key(table))
+                .map(|entry| entry.pending_bytes)
+                .unwrap_or(0)
+        };
+        if pending <= budget {
+            return;
+        }
+        // Best effort: the statement already committed, so a failure cannot be
+        // reported as its error - the rows stay buffered and the next write or
+        // the periodic checkpoint retries.
+        if let Err(err) = self.flush_storage().await {
+            eprintln!("checkpoint after the append buffer passed its budget: {err}");
+        }
+    }
+
     pub(crate) async fn flush_storage(&self) -> Result<()> {
         // One checkpoint at a time: the block mirror is rewritten in place.
         let _serial = self.storage.flush_lock.write().await;

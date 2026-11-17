@@ -187,6 +187,14 @@ pub struct QueryCode {
     pub lower_bound: f32,
     pub delta: f32,
     pub code: Vec<u8>,
+    /// [`Self::code`] as `f32`, in the same order.
+    ///
+    /// The per-member estimate is a masked sum of these values over the set bits
+    /// of the member's code: 1536 dimensions per member, per partition, per
+    /// query. Converting a `u8` inside that loop kept it at ~2 ns a dimension
+    /// (measured: 56 ms for 128 partitions at 1536d); the bytes cost one
+    /// conversion per dimension **per query** instead.
+    pub code_f32: Vec<f32>,
 }
 
 const TOLERANCE: f32 = 1e-5;
@@ -272,11 +280,14 @@ pub fn make_query(rot: &Rotation, rot_centroid: &[f32], q: &[f32]) -> QueryCode 
         1.0 / delta
     };
     let mut code = vec![0u8; dim];
+    let mut code_f32 = vec![0.0f32; dim];
     let mut sum = 0.0f32;
     for (d, x) in buf.iter().enumerate() {
         let val = ((*x - lower) * inv_delta).round();
         sum += val;
-        code[d] = val.clamp(0.0, 255.0) as u8;
+        let bucket = val.clamp(0.0, 255.0);
+        code[d] = bucket as u8;
+        code_f32[d] = bucket;
     }
     QueryCode {
         norm,
@@ -285,6 +296,7 @@ pub fn make_query(rot: &Rotation, rot_centroid: &[f32], q: &[f32]) -> QueryCode 
         lower_bound: lower,
         delta,
         code,
+        code_f32,
     }
 }
 
@@ -319,17 +331,59 @@ pub fn distance_estimate_parts(
     bits: &[u8],
     dim: usize,
 ) -> f32 {
-    let mut estimate = 0.0f32;
-    for (d, code) in q.code.iter().enumerate().take(dim) {
+    let estimate = masked_code_sum(&q.code_f32, bits, dim);
+    let ip = recover_ip(estimate, dim, sum, q.sum, q.lower_bound, q.delta);
+    recover_l2(ip / error, norm, q.norm)
+}
+
+/// Eight `f32` masks, one row per possible code byte: `BIT_MASK[b][k]` is `1.0`
+/// where bit `k` of `b` is set.
+const BIT_MASK: [[f32; 8]; 256] = bit_masks();
+
+const fn bit_masks() -> [[f32; 8]; 256] {
+    let mut table = [[0.0f32; 8]; 256];
+    let mut byte = 0usize;
+    while byte < 256 {
+        let mut k = 0usize;
+        while k < 8 {
+            table[byte][k] = if (byte >> k) & 1 == 1 { 1.0 } else { 0.0 };
+            k += 1;
+        }
+        byte += 1;
+    }
+    table
+}
+
+/// `Σ_{d < dim, bit d set} code[d]`, a byte of the member's code at a time.
+///
+/// The one-dimension-at-a-time form (a shift, a test, a `u8 -> f32` and an add)
+/// is the SPANN probe's hot loop: 128 members x 1536 dimensions per partition.
+/// Turning the byte into a mask row lets the eight lanes accumulate in one
+/// multiply-add, which is what eight dimensions of the reference's own SIMD pass
+/// cost.
+fn masked_code_sum(code: &[f32], bits: &[u8], dim: usize) -> f32 {
+    use std::simd::f32x8;
+    use std::simd::num::SimdFloat;
+    let n = dim.min(code.len());
+    let mut acc = f32x8::splat(0.0);
+    let mut at = 0usize;
+    while (at + 1) * 8 <= n {
+        let byte = bits.get(at).copied().unwrap_or(0);
+        acc += f32x8::from_slice(&code[at * 8..at * 8 + 8])
+            * f32x8::from_array(BIT_MASK[byte as usize]);
+        at += 1;
+    }
+    let mut estimate = acc.reduce_sum();
+    // The last `dim % 8` dimensions are not a whole byte of the code.
+    for d in at * 8..n {
         if bits
             .get(d / 8)
             .is_some_and(|byte| (byte >> (d % 8)) & 1 == 1)
         {
-            estimate += f32::from(*code);
+            estimate += code[d];
         }
     }
-    let ip = recover_ip(estimate, dim, sum, q.sum, q.lower_bound, q.delta);
-    recover_l2(ip / error, norm, q.norm)
+    estimate
 }
 
 /// A bound on `|estimate − true_squared_l2|`.

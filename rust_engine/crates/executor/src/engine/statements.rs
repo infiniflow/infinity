@@ -383,6 +383,7 @@ impl Engine {
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 spann_stats: Mutex::new(std::collections::HashMap::new()),
                 max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(6),
+                pending_budget: std::sync::atomic::AtomicUsize::new(512 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
                         .ok()
@@ -9677,6 +9678,13 @@ impl Engine {
         // below, so the ranking equals the exhaustive scan whenever the graph
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
+        // The query as `f32`, parsed **once**. The probe, the exact rescoring of
+        // its candidates and the exact scan all want the numbers, and each used
+        // to parse the literal again - at 1536d that is ~27 us a time.
+        let query_f32: Vec<f32> = query_items
+            .iter()
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
             if is_sparse || is_tensor {
                 return None;
@@ -9686,11 +9694,7 @@ impl Engine {
             if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
                 return None; // a single-vector index
             }
-            let qv: Vec<f32> = query_items
-                .iter()
-                .filter_map(|x| x.parse::<f64>().ok())
-                .map(|x| x as f32)
-                .collect();
+            let qv = &query_f32;
             if qv.is_empty() {
                 return None;
             }
@@ -9773,7 +9777,43 @@ impl Engine {
                                 && value.trim().eq_ignore_ascii_case("false")
                         })
                 });
-                width_override.unwrap_or_else(|| if adaptive { monitor.beam() } else { base })
+                // The width also has to follow the tree's shape.
+                //
+                // CockroachDB's C-SPANN keeps `BaseBeamSize` an absolute count of
+                // partitions per level (32, halved per level up to the root) and
+                // leaves recall to a deployment-level figure; its adaptive z-score
+                // pass is off for ordinary SQL queries. An absolute count works
+                // there because their partition size is a build-wide constant in
+                // practice. Ours is capped by `max_partition_size`, so the leaf
+                // count grows with the table and a fixed 32 probes a *shrinking
+                // share* of the leaves:
+                //
+                //   961 leaves (40k x 1536d):   32 = 3.3% -> recall@10 0.973
+                //   4033 leaves (200k x 1536d):  32 = 0.79% -> 0.918
+                //   4033 leaves (200k x 1536d): 121 = 3.0% -> 0.948
+                //
+                // So the width is the base raised to `LEAF_SHARE` percent of the
+                // leaves, capped at `LEAF_SHARE_CAP` to bound the probe: a share of
+                // the table is O(rows), and past the cap recall decays with size
+                // again - `WITH (beam = …)` / `nprobe` still name an exact width.
+                let partitions = {
+                    let tables = self.tables.lock().unwrap();
+                    tables
+                        .get(&self.table_key(table))
+                        .and_then(|entry| entry.spann.get(&id))
+                        .map(|handle| handle.shape().0)
+                        .unwrap_or(0)
+                };
+                let leaf_share = (partitions * crate::spann_mem::LEAF_SHARE)
+                    .div_ceil(100)
+                    .clamp(base, crate::spann_mem::LEAF_SHARE_CAP.max(base));
+                width_override.unwrap_or_else(|| {
+                    if adaptive {
+                        monitor.beam().max(leaf_share)
+                    } else {
+                        base
+                    }
+                })
             });
             // How many rows the graph has to cover for its answer to be
             // complete. The cache knows it when it is warm; otherwise it is the
@@ -9850,6 +9890,36 @@ impl Engine {
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
+                // The fast path: an unfiltered dense embedding whose declared
+                // shape matches the query. The row is decoded as `f32` out of its
+                // block (`BlockCursor::vectors`) instead of being rendered into
+                // the text form and parsed back - on 1536d that round trip was
+                // ~240 us of rendering plus ~27 us of parsing per candidate,
+                // which made the pool the entire query
+                // (`spann_query_profile_1536d`).
+                Some(cands)
+                    if !cands.is_empty()
+                        && !has_filter
+                        && !is_sparse
+                        && !is_tensor
+                        && crate::blocks::embedding_shape(&column_decl)
+                            .is_some_and(|(dim, _)| dim == query_f32.len()) =>
+                {
+                    let (dim, element_type) =
+                        crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
+                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                    ids.sort_unstable();
+                    let mut merged: Vec<(usize, f64, f64)> = Vec::with_capacity(ids.len());
+                    let mut cursor = self.block_cursor(table)?;
+                    for chunk in ids.chunks(RERANK_BATCH) {
+                        for (seq, stored) in cursor.vectors(col_idx, dim, element_type, chunk)? {
+                            let (sim, dist) = crate::vector_score_f32(&query_f32, &stored, &metric);
+                            merged.push((seq, sim, dist));
+                        }
+                    }
+                    streamed = Some(merged);
+                    Vec::new()
+                }
                 Some(cands) if !cands.is_empty() && !is_sparse && !is_tensor => {
                     let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
                     ids.sort_unstable();

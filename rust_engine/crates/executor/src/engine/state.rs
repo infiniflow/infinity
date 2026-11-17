@@ -5227,6 +5227,17 @@ pub(crate) struct Context {
     /// reference's default - a knob rather than a constant so a test can force a
     /// compaction with two dumps.
     pub(crate) max_open_chunks_per_index: std::sync::atomic::AtomicUsize,
+    /// Bytes of appended-but-unsealed rows the writer may hold before it
+    /// checkpoints by itself (`TableEntry::pending_bytes`).
+    ///
+    /// The reference bounds this with the buffer manager, whose flush is driven
+    /// by the periodic trigger - a timer, not a row or byte count. An import that
+    /// outruns the timer therefore holds the whole table: measured at 400k x
+    /// 1536d the writer's RSS reached 8.6 GiB for a 2.3 GiB column, because no
+    /// checkpoint ran while the batches were flying in. This is the missing
+    /// bound, and it belongs to the write path - the only thing that knows it is
+    /// outrunning the timer.
+    pub(crate) pending_budget: std::sync::atomic::AtomicUsize,
     /// `query_count` global/session variable: statements executed so far.
     pub(crate) query_count: std::sync::atomic::AtomicU64,
     /// `connected_timestamp` session variable: when the engine was opened.
@@ -9077,6 +9088,51 @@ pub(crate) fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
         _ => {
             // `l2` reports the *squared* Euclidean distance (no square root).
             let d: f64 = q.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
+            (1.0 / (1.0 + d), d)
+        }
+    }
+}
+
+/// [`vector_score`] over `f32` vectors: the rerank fast path decodes the stored
+/// embedding as `f32` (no text round trip) and scores it here.
+///
+/// The values are the block's own `f32` - the text [`vector_score`] reads is a
+/// rendering of exactly these bits - and `l2` goes through the reference's
+/// `F32L2` SIMD kernel (`index::vector::l2_sq`), so a distance can differ from
+/// the text path in the last bits of the sum, as the reference's SIMD path does.
+pub(crate) fn vector_score_f32(q: &[f32], v: &[f32], metric: &str) -> (f64, f64) {
+    match metric {
+        "ip" => {
+            let dot: f64 = q
+                .iter()
+                .zip(v)
+                .map(|(a, b)| f64::from(*a) * f64::from(*b))
+                .sum();
+            (dot, -dot)
+        }
+        "cosine" => {
+            let mut dot = 0.0f64;
+            let mut nq = 0.0f64;
+            let mut nv = 0.0f64;
+            for (a, b) in q.iter().zip(v) {
+                let (a, b) = (f64::from(*a), f64::from(*b));
+                dot += a * b;
+                nq += a * a;
+                nv += b * b;
+            }
+            let (nq, nv) = (nq.sqrt(), nv.sqrt());
+            let c = if nq > 0.0 && nv > 0.0 {
+                dot / (nq * nv)
+            } else {
+                0.0
+            };
+            (c, 1.0 - c)
+        }
+        _ => {
+            // `l2` reports the squared distance and needs neither the dot product
+            // nor either norm - `vector_score` computes them for every metric,
+            // which is four passes over a row where one does.
+            let d = f64::from(index::vector::l2_sq(q, v));
             (1.0 / (1.0 + d), d)
         }
     }

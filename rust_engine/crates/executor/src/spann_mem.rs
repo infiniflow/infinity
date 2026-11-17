@@ -330,6 +330,21 @@ impl SpannStats {
 /// a 1-bit code leaves the partition choice as the only lever.
 pub(crate) const DEFAULT_SEARCH_BEAM: usize = 32;
 
+/// The share of the leaves the search width probes, in percent.
+///
+/// Recall in a SPANN tree is governed by the *share* of leaves visited, not by an
+/// absolute count. Measured on 200k x 1536d against a brute force, 600 queries:
+/// a fixed beam of 32 is 0.79% of the 4033 leaves and gives recall@10 0.918; 3%
+/// of them gives 0.948; the same 3.3% at 961 leaves (40k rows) gives 0.973. So
+/// the width tracks the leaf count, and partition size being capped
+/// (`max_partition_size`) means 3% of the leaves is ~3% of the table's rows.
+pub(crate) const LEAF_SHARE: usize = 3;
+
+/// Ceiling on [`LEAF_SHARE`]-derived width: the share is O(rows), so past this the
+/// probe would cost milliseconds per query at 1536d. Recall decays with size again
+/// beyond it - `WITH (beam = …, nprobe = …)` names an exact width when it matters.
+pub(crate) const LEAF_SHARE_CAP: usize = 512;
+
 /// `vector_search_rerank_multiplier`: how many extra candidates the 1-bit
 /// ordering hands to the exact rescoring, per log2(beam)·log2(topn).
 pub(crate) const DEFAULT_RERANK_MULTIPLIER: usize = 50;

@@ -556,3 +556,62 @@ pub(crate) fn embedding_element_text(bytes: &[u8], element_type: i32) -> Option<
         _ => return None,
     })
 }
+
+/// One dense embedding slot as `f32`, straight from the block's bytes.
+///
+/// [`decode_value_shaped`] renders the same slot to text (1536 element
+/// renderings plus a join) and the vector query path parsed it back: a rerank
+/// candidate cost ~240 us to read and ~27 us to parse, so the exact rescoring of
+/// 1024 candidates was the whole query (measured, `spann_query_profile_1536d`).
+/// This is the same data without the round trip.
+///
+/// `None` means the slot is not there (short body), not that it is empty: a NULL
+/// is the null bitmap's business, which the caller checks before calling.
+pub(crate) fn decode_embedding_f32(
+    body: &[u8],
+    row: usize,
+    dim: usize,
+    element_type: i32,
+) -> Option<Vec<f32>> {
+    let mut out = Vec::with_capacity(dim);
+    if element_type == 0 {
+        // `kElemBit` packs `dim` bits per row, bit `k` at byte `k/8`.
+        let at = row * tensor_row_width(dim, element_type);
+        for k in 0..dim {
+            let byte = body.get(at + k / 8)?;
+            out.push(if byte & (1 << (k % 8)) != 0 { 1.0 } else { 0.0 });
+        }
+        return Some(out);
+    }
+    let width = storage::definition::format::element_width(element_type);
+    let at = row * dim * width;
+    // `FLOAT` (6) and `DOUBLE` (7) are the two widths a vector index is built
+    // over, and they are the whole row: a bulk decode here lets the loop
+    // vectorise, where `read_embedding_element`'s per-element `match` and
+    // `try_into` did not.
+    match element_type {
+        6 => {
+            let bytes = body.get(at..at + dim * 4)?;
+            for slot in bytes.chunks_exact(4) {
+                out.push(f32::from_le_bytes([slot[0], slot[1], slot[2], slot[3]]));
+            }
+        }
+        7 => {
+            let bytes = body.get(at..at + dim * 8)?;
+            for slot in bytes.chunks_exact(8) {
+                out.push(f64::from_le_bytes([
+                    slot[0], slot[1], slot[2], slot[3], slot[4], slot[5], slot[6], slot[7],
+                ]) as f32);
+            }
+        }
+        _ => {
+            for k in 0..dim {
+                let slot = body.get(at + k * width..at + (k + 1) * width)?;
+                out.push(
+                    storage::definition::format::read_embedding_element(slot, element_type)? as f32,
+                );
+            }
+        }
+    }
+    Some(out)
+}

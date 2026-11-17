@@ -958,6 +958,10 @@ impl Engine {
         // which is why it runs here - after the commit, with no bottom gate held
         // - and not inside the bottom half where the other index hooks fire.
         self.dump_spann_over_capacity(table).await;
+        // The append buffer is the writer's only copy of the rows since the last
+        // checkpoint, and the reference bounds it with a timer - which a bulk
+        // import outruns. Seal it here when it passes its budget.
+        self.seal_pending_over_budget(table).await;
         Ok(QueryResult::Inserted { count: row_count })
     }
 
