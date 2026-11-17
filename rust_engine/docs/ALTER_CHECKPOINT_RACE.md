@@ -747,9 +747,41 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 支持这一点的实测：同一用例、同一构建类型，修复前 44 轮 5 次失败，修复后 40 轮 0 次，
 中间只改了这三处。因此 §3.1 保留为「缺陷当时的机制」的记录，不再是待验证的假设。
 
-### 6.6 仍然待办
+### 6.6 字节门禁的结果
 
-- **字节门禁**：`test_cross_engine_bytes_*` 与 WAL 帧逐字节比对要等全部改动完成后一次跑。
-  两处需要特别核对：`PendingRows` 改了块内列序的来源；跨段切分改了 `row_ranges` 的数量，
-  而参考的 UPDATE 是**每块一个 `WalCmdAppendV2`**，端口是单命令多 range —— 行数 ≤ 一块时
-  两者一致，多块时需要确认帧字节。
+全部门禁在计划书完成后跑过一遍（`INFINITY_BYTES_ROOT` 指向独立目录，参考二进制不变）：
+
+| 门禁 | 结果 |
+|---|---|
+| `bytes_00_premises` | 通过 |
+| `bytes_10_encoding` | 通过 |
+| `bytes_20_table` | 通过 |
+| `bytes_30_segments` | 6/8（`test_a_compacted_table_*`、`test_a_cleanup_*` 失败） |
+| `bytes_40_wal` | 通过 |
+| `bytes_45_ddl` | 通过 |
+| `bytes_50_mutations` | 4/8（与改动前的基线**同一组**失败） |
+
+计划书关注的两处都核对过：
+
+- `PendingRows` 按列 id 存放，块内列序由 `schema_at(bound_ts).ids` 决定，`bytes_20_table`
+  与 `bytes_30_segments` 的块/列文件逐字节一致。
+- 跨段切分让 `row_ranges` 有两项；单段内的多块 UPDATE 仍是**每块一个** `WalCmdAppendV2`
+  （`append_command` 按 range 发出），`bytes_40_wal` 逐帧一致。
+
+### 6.7 剩余失败的两处根因
+
+**compaction 的 BMP 合并段**（`bytes_30_segments`）。参考的
+`PopulateIndex(…, kCompact)` 给合并段一个整段 chunk（`(4<<32, 230)`）；端口给出的是按
+block 切开的 15 个 16 行 chunk。链路是：`sparse_index_by_id` 重建时 `load_sealed` 把
+**source 段仍在 catalog 里的 chunk** 当成覆盖，于是合并段的 230 行看起来已 sealed，
+`SparseIndex::seal` 的 tail 为空，`publish_index_chunks` 只能走
+`publish_bmp_chunks_from_rows` 的按块兜底。要修得让 coverage 忽略已 deprecated 的段
+（`drop|seg|` 记录），而这条记录由 compaction 的提交回调写入，与 `PopulateIndex` 的调用
+次序需要一起调整。
+
+**重启后的二级索引 ts**（`bytes_50_mutations`）。`settle_append_ts` 用
+`log.resize(n - count, 0)` 把本次之前的记录清零，本意是"这些位置等下一次 settle 重写"；
+第二个进程里 `UPDATE` 传的是**行数**而不是记录数（一次 UPDATE 只产生一条 append 记录），
+于是把上一进程的 create ts 一并清掉，checkpoint 重写 `version` 时整表都记成了最新提交。
+调用点改成记录数即可，但它与 `catalog|blk`/`catalog|seg` 的 ts 传播相互牵动，改动后
+`bytes_10_encoding` 出现 `3130 vs 3132`，尚未收敛。
