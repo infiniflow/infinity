@@ -4348,23 +4348,17 @@ impl SparseIndex {
                 .unwrap_or(0)
                 .max(1) as usize)
                 .max(self.terms);
-            // A dumped chunk belongs in the segment's own directory.
-            let out_dir = match &self.chunk_root {
-                Some(root) => root.join(format!("seg_{segment}")),
-                None => self.dir.clone(),
-            };
-            if std::fs::create_dir_all(&out_dir).is_err() {
-                continue;
-            }
-            let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
+            // **Encoded in memory, not written to a file.** A BMP index is a
+            // self-describing byte image, so the reader can be built from the
+            // bytes the dump just produced - which is what the reference does
+            // (`BMPHandler::SaveToPtr` into a `BufferObj`, queried back through
+            // `LoadFromPtr`). Writing it to a `.bmp` first and mmapping it back
+            // left a file the reference never writes inside `idx_{id}/seg_{n}/`
+            // next to the chunk it does, which a cross-engine directory
+            // comparison counted as a second chunk.
+            let bytes = storage::bmp::encode_bmp(self.block_size, self.width, &docs, term_num);
             self.next_chunk += 1;
-            let path = out_dir.join(name);
-            if storage::bmp::write_bmp_file(&path, self.block_size, self.width, &docs, term_num)
-                .is_err()
-            {
-                continue;
-            }
-            if let Ok(reader) = storage::bmp::BmpReader::open(&path, self.width) {
+            if let Ok(reader) = storage::bmp::BmpReader::from_bytes(&bytes, self.width) {
                 self.sealed.push((segment, Arc::new(reader)));
             }
         }

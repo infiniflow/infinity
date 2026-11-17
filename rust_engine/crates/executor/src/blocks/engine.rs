@@ -1846,6 +1846,14 @@ impl Engine {
                 // the import's chunk layout (one per capacity for full-text, one
                 // for the whole segment for secondary and sparse).
                 let imported = self.imported_extent(table, *segment, *seg_rows).is_some();
+                // `DumpMemIndex` dumps a segment's whole sparse tail as **one**
+                // chunk: it takes one `GetAndSetNextChunkID` per segment
+                // (`new_txn_index_impl.cpp:141`) and hands the mem index to one
+                // `Dump`, so a table whose rows were inserted block by block
+                // still gets a single chunk. The per-block split is the
+                // **checkpoint**'s shape, which is why this is gated on the
+                // dump (`only.is_some()`) and not just on an import.
+                let dump_single_chunk = only.is_some();
                 // A plain `CREATE INDEX` leaves the type empty, which is the
                 // secondary default everywhere else (`is_secondary_kind`).
                 let chunks = if crate::is_secondary_kind(&im.index_type) {
@@ -1894,7 +1902,7 @@ impl Engine {
                             term_bound: crate::sparse_declared_bound(&declared).unwrap_or(0),
                             block_size: crate::index_block_size(im),
                             segment: *segment,
-                            single_chunk: imported,
+                            single_chunk: imported || dump_single_chunk,
                         },
                         &existing_chunks,
                         &mut next_id,

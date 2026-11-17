@@ -6440,7 +6440,7 @@ mod tests {
             crate::scheduler::block_on(e.dump_index_transaction("tsp", name)).unwrap();
             let files = e.index_files("tsp", name);
             assert!(
-                files.iter().any(|p| p.to_string_lossy().ends_with(".bmp")),
+                files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
                 "{name} wrote no chunk: {files:?}"
             );
         }
@@ -7098,7 +7098,11 @@ mod tests {
             }
             n
         };
-        assert_eq!(count("bmp"), 1);
+        // Nothing has been dumped yet: the rows above came from the write-time
+        // tail, which is the point of this case. The spill the tail uses is not
+        // an index file the catalog names, so the directory is still empty.
+        assert_eq!(count("idx"), 0, "no dump has run yet");
+        assert_eq!(count("bmp"), 0, "the spill is not a `.bmp` file");
 
         // The write-time tail is visible before the dump.
         e.execute_blocking("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
@@ -7112,10 +7116,12 @@ mod tests {
             ]
         );
 
-        // A dump transaction seals the tail as a second chunk and the ranking
-        // holds.
+        // A dump transaction seals the tail again and the ranking holds. The
+        // chunk is the segment's (`DumpMemIndex` takes one chunk id per
+        // segment), so the row count grows inside it rather than adding a
+        // second file.
         crate::scheduler::block_on(e.dump_all_memory_indexes());
-        assert_eq!(count("bmp"), 2);
+        assert_eq!(count("idx"), 1);
         assert_eq!(
             rows(&e, q),
             vec![

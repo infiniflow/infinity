@@ -202,12 +202,17 @@ pub const META_VERSION: &str = "meta|version";
 /// the reference writes once it has upgraded a catalog
 /// (`Storage::ConvertJsonIndexFormat`, `src/storage/storage_impl.cpp:1271`).
 ///
+/// It tracks the reference's own version: `src/bin/compilation_config.cppm`
+/// carries `v0.7.5-…` and `Config::CheckConfig` refuses anything else, so a
+/// catalog written with an older value makes the reference run its
+/// JSON-index conversion - which on a port-written catalog fails.
+///
 /// The reference reads it on every startup: a catalog **without** the key (or
 /// with a value that is not `x.y.z`) is taken as pre-0.7.0 and put through its
 /// JSON-index conversion, which on a port-written catalog aborts the startup
 /// (`Storage::AdminToWriter` → `WriterToAdmin`). The config's version is fixed:
 /// the reference refuses anything but this one (`Config::CheckConfig`).
-pub const CATALOG_VERSION: &str = "0.7.4";
+pub const CATALOG_VERSION: &str = "0.7.5";
 
 /// Drop tombstone for a table: `tbl|{db_name}|{tbl_name}|{ts}`.
 pub fn drop_table_marker(db_name: &str, table_name: &str, ts: u64) -> String {

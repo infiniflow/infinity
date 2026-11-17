@@ -901,8 +901,19 @@ impl Engine {
                     .get(&key)
                     .and_then(|e| e.sparse.get(&meta.id).cloned())
             };
+            // Two things count as "something to dump": the write-time tail, and
+            // a tail an earlier `seal` froze into memory. The seal no longer
+            // writes a `.bmp` file (`SparseIndex::seal` builds the reader from
+            // the bytes it encodes), so the published-chunk sweep below cannot
+            // see it - without this a second dump of the same index would find
+            // nothing to do and the chunk the first seal froze would never be
+            // written.
             return sparse
-                .and_then(|s| s.read().ok().map(|g| !g.tail.is_empty()))
+                .and_then(|s| {
+                    s.read()
+                        .ok()
+                        .map(|g| !g.tail.is_empty() || !g.sealed.is_empty())
+                })
                 .unwrap_or(false);
         }
         if kind.eq_ignore_ascii_case("PLAID")
