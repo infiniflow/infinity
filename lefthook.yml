@@ -112,23 +112,27 @@ pre-commit:
     # --- Python: ruff + ruff-format (the configuration is in pyproject.toml) --
     # `uvx` runs the project's pinned Python tooling without installing it into
     # the SDK's virtualenv; `uv` is the only package manager this repo uses.
+    # The Thrift-compiler output (`infinity_thrift_rpc/`) is excluded through
+    # `[tool.ruff] extend-exclude`, and both jobs pass `--force-exclude` because
+    # lefthook hands ruff an explicit file list, for which ruff otherwise
+    # ignores `exclude`/`extend-exclude`.
     - name: ruff
       glob: "*.py"
       stage_fixed: true
       run: |
         if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
-          uvx ruff check {staged_files}
+          uvx ruff check --force-exclude {staged_files}
         else
-          uvx ruff check --fix {staged_files}
+          uvx ruff check --force-exclude --fix {staged_files}
         fi
     - name: ruff-format
       glob: "*.py"
       stage_fixed: true
       run: |
         if [ "${LEFTHOOK_CHECK_ONLY:-}" = "1" ]; then
-          uvx ruff format --check {staged_files}
+          uvx ruff format --force-exclude --check {staged_files}
         else
-          uvx ruff format {staged_files}
+          uvx ruff format --force-exclude {staged_files}
         fi
 
 # CI-only hook: the checks that cost a workspace compile and therefore do not

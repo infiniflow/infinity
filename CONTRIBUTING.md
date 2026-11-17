@@ -48,7 +48,7 @@ lefthook install   # once per clone; writes .git/hooks/pre-commit
 |---|---|
 | `clang-format` | `clang-format-20` (Clang 20+, see the build requirements) |
 | `rustfmt` | `cargo fmt` for the `rust_engine` workspace |
-| `ruff`, `ruff-format` | `uvx ruff` |
+| `ruff`, `ruff-format` | `uvx ruff` (the generated Thrift bindings are excluded) |
 | `end-of-file-fixer`, `trailing-whitespace`, `mixed-line-ending` | `tools/hooks/check_files.py` |
 | `check-yaml`, `check-json`, `check-case-conflict`, `check-merge-conflict` | `tools/hooks/check_files.py` |
 
