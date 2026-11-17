@@ -786,6 +786,115 @@ mod tests {
         );
     }
 
+    /// A build that started while the table was still empty publishes **after**
+    /// the import appended its documents into that same cache. Replacing the
+    /// cache with it drops every row the writer indexed: the rows are in the
+    /// blocks, but the query path only rebuilds when the coverage counter says
+    /// the index is short, so `MATCH` answered nothing on one of three
+    /// concurrently imported tables until the engine restarted (the reported
+    /// failure: `COUNT(*)` right, every full-text query empty).
+    #[test]
+    fn an_older_build_does_not_replace_the_cached_index() {
+        let q = "SELECT id FROM ob SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ob (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX ob_body ON ob (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO ob VALUES ({i}, 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        assert_eq!(rows(&e, q).len(), 20);
+        let tkey = e.table_key("ob");
+        let index_id = e
+            .fulltext_index_id("ob", "body")
+            .expect("the full-text index is recorded in the catalog");
+        let epoch = e.tables.lock().unwrap().get(&tkey).unwrap().text_epoch;
+        // What the build read: the table while it was empty. Its document count
+        // is 0, its covered segments are none, and the epoch still matches.
+        let empty_dir = tempdir().unwrap();
+        let empty = TextIndex::new(
+            empty_dir.path().to_string_lossy().into_owned(),
+            TextTokenizer::default(),
+        );
+        assert_eq!(empty.total_docs(), 0);
+        let empty: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(empty));
+        assert_eq!(
+            e.publish_text_index(&tkey, index_id, epoch, empty),
+            crate::engine::statements::TextPublish::Superseded,
+            "an index holding fewer documents than the cache must not replace it"
+        );
+        assert_eq!(
+            rows(&e, q).len(),
+            20,
+            "and every query keeps answering from the cache the writers filled"
+        );
+    }
+
+    /// The coverage gate reads `TableEntry::live_rows`, a counter a full scan
+    /// publishes as-is (`cache_row_set`). A read that lands while an import's
+    /// blocks are still staged publishes `0`, and a cache holding the index
+    /// built on the empty table then passes `total_docs >= reserved` for a table
+    /// of twenty: every query answered from an empty index until a restart
+    /// recomputed the counter. A zero is confirmed against the blocks instead.
+    #[test]
+    fn an_empty_cache_is_not_complete_when_the_counter_reads_zero() {
+        let q = "SELECT id FROM zc SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE zc (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX zc_body ON zc (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO zc VALUES ({i}, 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        assert_eq!(rows(&e, q).len(), 20);
+        let tkey = e.table_key("zc");
+        let index_id = e
+            .fulltext_index_id("zc", "body")
+            .expect("the full-text index is recorded in the catalog");
+        // The state that read left behind: an index built on the empty table and
+        // a counter that says the table has no rows.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&tkey).expect("the table is cached");
+            let empty_dir = tempdir().unwrap();
+            let empty = TextIndex::new(
+                empty_dir.path().to_string_lossy().into_owned(),
+                TextTokenizer::default(),
+            );
+            entry
+                .text
+                .insert(index_id, std::sync::Arc::new(std::sync::RwLock::new(empty)));
+            entry
+                .text_built
+                .insert(index_id, (entry.text_epoch, crate::read_ts()));
+            entry.live_rows = Some(0);
+        }
+        assert_eq!(
+            rows(&e, q).len(),
+            20,
+            "a zero counter must not make an empty index look complete"
+        );
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .and_then(|entry| entry.live_rows),
+            Some(20),
+            "the counter is repaired from the blocks"
+        );
+    }
+
     /// A merge that lands **inside** a build renumbers every row the build just
     /// read, so its postings name ids nothing owns. The tokenizer/scan window is
     /// too narrow to hit by chance here, so the test drives it deterministically

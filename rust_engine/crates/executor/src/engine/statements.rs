@@ -117,6 +117,11 @@ pub(crate) enum TextPublish {
     /// what this statement sees, but a statement above the merge would resolve
     /// the ids it left behind. Answer this one from it, cache nothing.
     ReadTooOld,
+    /// The cache already holds more documents than the build read: the build
+    /// started before documents reached the index (an import appends to the
+    /// cached index itself) and publishing it would drop them from every later
+    /// statement. Keep the cache, answer this one from it.
+    Superseded,
 }
 
 /// Marks one table's bottom as running on this thread for as long as it lives.
@@ -4282,9 +4287,31 @@ impl Engine {
                 None => (None, None),
             }
         };
+        // A zero counter means one of two things, and only one of them makes an
+        // empty index complete: the table really is empty, or a reader published
+        // `cache_row_set`'s count from a snapshot it took while the rows were
+        // still staged in an import (`COPY` writes its blocks when the statement
+        // commits, not per batch). In the second case `complete >= reserved` is
+        // true for *any* index - an empty one built on the empty table included -
+        // and that index is then served to every query until the process
+        // restarts, which is the reported "one table returns no full-text rows,
+        // `COUNT(*)` is right". Confirm the zero against the blocks (one
+        // `version` read on a table that is genuinely empty) and repair the
+        // counter with what they say.
         let reserved = match reserved {
-            Some(n) => n,
-            None => self.row_count(table).unwrap_or(0),
+            Some(n) if n > 0 => n,
+            _ => {
+                let published = self.row_count(table).unwrap_or(0);
+                if published > 0 {
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey.clone())
+                        .or_default()
+                        .live_rows = Some(published);
+                }
+                published
+            }
         };
         let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
         if let Some(idx) = cached {
@@ -4428,6 +4455,20 @@ impl Engine {
             // rebuild could keep one `MATCH` running for the whole gate timeout
             // (`TestParallelFulltextIndexReadWrite`, 15 s window, 427 s case).
             TextPublish::ReadTooOld | TextPublish::Renumbered => Ok(shared),
+            // The cache covers documents this build never read (it started
+            // before they arrived). Answering from the build would be wrong for
+            // **this** statement too, and caching it would be wrong for every
+            // later one, so the statement continues on the cached index - the
+            // one the writers have been feeding.
+            TextPublish::Superseded => {
+                let cached = {
+                    let tables = self.tables.lock().unwrap();
+                    tables
+                        .get(&tkey)
+                        .and_then(|entry| entry.text.get(&index_id).cloned())
+                };
+                Ok(cached.unwrap_or(shared))
+            }
         }
     }
 
@@ -4448,6 +4489,27 @@ impl Engine {
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .covered_row_segments();
+        let built_docs = index.read().unwrap_or_else(|e| e.into_inner()).total_docs();
+        // The count the cache holds right now, taken **between** two short
+        // `tables` guards: the index lock may not be taken under `tables` (a
+        // reader holds the index while it fetches rows, and that fetch needs
+        // `tables`), so the handle is cloned out and measured after the guard
+        // is gone.
+        let (cached_before, cached_docs) = {
+            let cached = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(tkey)
+                    .and_then(|entry| entry.text.get(&index_id).cloned())
+            };
+            let docs = cached.as_ref().map(|cached| {
+                cached
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .total_docs()
+            });
+            (cached, docs)
+        };
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
@@ -4481,6 +4543,35 @@ impl Engine {
         // a ts above the merge, would resolve the ids it left behind.
         if read_ts < entry.text_min_ts {
             return TextPublish::ReadTooOld;
+        }
+        // **The cache is monotonic in coverage.** A build that started before the
+        // documents arrived - the index created on the empty table, its build
+        // still in flight when the import began appending to that very cache, or
+        // a rebuild that overlapped the import - holds fewer documents than the
+        // cache does now. Replacing the cache with it drops the rows the writer
+        // already indexed: they are in the blocks, but nothing in the query path
+        // rebuilds on its own while the coverage counter says the index is
+        // complete, so every `MATCH` answers nothing until the process restarts
+        // (the reported "one table of three returns no full-text rows after a
+        // concurrent import, `COUNT(*)` is right"). Answer this statement from
+        // the richer cache and publish nothing.
+        let superseded = match (&cached_before, entry.text.get(&index_id)) {
+            (Some(before), Some(now)) => {
+                // The count was read outside this guard (see above); only trust
+                // it while the object it describes is still the cached one.
+                Arc::ptr_eq(before, now) && cached_docs.is_some_and(|docs| docs > built_docs)
+            }
+            _ => false,
+        };
+        if superseded {
+            if ft_trace_enabled(tkey) {
+                eprintln!(
+                    "[FT] {tkey}.{index_id} publish refused: build has {built_docs} doc(s), the \
+                     cache has {}",
+                    cached_docs.unwrap_or(0)
+                );
+            }
+            return TextPublish::Superseded;
         }
         entry.text.insert(index_id, index);
         entry.text_built.insert(index_id, (epoch, read_ts));
