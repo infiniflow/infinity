@@ -2512,9 +2512,41 @@ impl Engine {
             // schema could not.
             let live_defaults = self.table_defaults(&table).unwrap_or_default();
             let live_ids = current_ids.clone();
+            // spann's mem list is fed from the rows too (`refresh_block_mirror_extra`
+            // does it on the live path), so a replayed row has to land there or
+            // the next query cannot see it: the tree only covers what the last
+            // dump built.
+            // The column's position in `live_ids` comes from the live schema by
+            // name: the frame's cells are already attributed by id, and
+            // `attributed` is keyed by id too.
+            let live_names = self.table_schema(&table).unwrap_or_default();
+            let spann_columns: Vec<(u64, u64)> = self
+                .storage
+                .catalog
+                .indexes_of_table(&table)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
+                .filter_map(|im| {
+                    let position = live_names.iter().position(|c| *c == im.column)?;
+                    Some((im.id, *live_ids.get(position)?))
+                })
+                .collect();
             {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(self.table_key(&table)).or_default();
+                for (index_id, column_id) in &spann_columns {
+                    let mem = entry.spann_mem.entry(*index_id).or_default();
+                    for (seq, cells) in &attributed {
+                        let Some(value) = cells.get(column_id) else {
+                            continue;
+                        };
+                        let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
+                        if !vector.is_empty() {
+                            mem.push((*seq as u64, vector));
+                        }
+                    }
+                }
                 entry.buffer_attributed_rows(attributed, &live_ids, &live_defaults);
                 entry.mirror_dirty = true;
                 entry.mirror_epoch += 1;
