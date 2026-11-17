@@ -6305,8 +6305,7 @@ impl<'a> EngineTxn<'a> {
                 txn.set_typed_commands(vec![self.engine.append_command(
                     &table,
                     &table_id,
-                    base,
-                    rows.len(),
+                    &[(base, rows.len())],
                     block,
                 )]);
             }
@@ -6828,6 +6827,22 @@ pub(crate) const ALLOC_QUEUE_CAPACITY: usize = 1024;
 pub(crate) struct RowRange {
     pub(crate) base: usize,
     pub(crate) append: usize,
+    /// The ranges this allocation covers, in order, and how many are valid.
+    ///
+    /// One range for an append that fits in the segment's remaining slots; two
+    /// when it crosses a segment boundary (`TableCache::PrepareAppendNolock`
+    /// splits at `DEFAULT_SEGMENT_CAPACITY - row_count_`). A segment's offset is
+    /// a `u32` and only `SEGMENT_ROW_CAPACITY` of its values are slots, so
+    /// letting one append run past the boundary hands out ids the reference has
+    /// no place for.
+    ///
+    /// An array, not a `Vec`: this travels through a `Mutex` the commit's
+    /// `before_wal` callback writes and the bottom half reads by value, and a
+    /// heap allocation there would be paid by every insert. Two is enough - a
+    /// single append cannot span three segments, because it is at most
+    /// `MAX_APPEND_ROWS` and a segment holds `SEGMENT_ROW_CAPACITY`.
+    pub(crate) ranges: [(usize, usize); 2],
+    pub(crate) range_count: usize,
 }
 
 impl RowRange {
@@ -6835,7 +6850,31 @@ impl RowRange {
         Self {
             base,
             append: usize::MAX,
+            ranges: [(base, 0), (0, 0)],
+            range_count: 0,
         }
+    }
+
+    /// The rows this allocation covers, in order.
+    pub(crate) fn ranges(&self) -> &[(usize, usize)] {
+        &self.ranges[..self.range_count]
+    }
+
+    /// The id of the `k`-th row of this allocation.
+    ///
+    /// Not `base + k`: an allocation that crossed a segment boundary has two
+    /// ranges and the ids jump at the seam (`segment << 32`).
+    pub(crate) fn seq_at(&self, k: usize) -> usize {
+        let mut offset = k;
+        for (base, count) in self.ranges() {
+            if offset < *count {
+                return base + offset;
+            }
+            offset -= count;
+        }
+        // Past the allocation: fall back to `base + k` so a caller that overruns
+        // still names a row instead of silently repeating the last one.
+        self.base + k
     }
 }
 

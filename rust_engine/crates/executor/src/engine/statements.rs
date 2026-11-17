@@ -1862,6 +1862,15 @@ impl Engine {
         copy: bool,
         ts: Option<u64>,
     ) -> Result<RowRange> {
+        if n > Self::MAX_APPEND_ROWS {
+            // `TableCache::PrepareAppendNolock` refuses this outright
+            // (`default_values.cppm:49`, 65536). It also bounds a single
+            // allocation to at most two ranges below.
+            return Err(Error::Invalid(format!(
+                "attempt to append {n} rows, the limit is {}",
+                Self::MAX_APPEND_ROWS
+            )));
+        }
         let key = self.table_key(table);
         // The segment floor is read **before** the entry is locked:
         // `next_segment_id` walks the block layout and the catalog, and both
@@ -1924,14 +1933,52 @@ impl Engine {
             seg = (seg + 1).max(floor);
             off = 0;
         }
+        // **Split at the segment boundary.** A segment's offset is a `u32` and
+        // only `SEGMENT_ROW_CAPACITY` (8,388,608) of its values are slots, so an
+        // append that runs past the last slot would hand out ids no block can
+        // hold - `block_of` would name a block past the segment's 1024, and the
+        // reference's `PrepareAppendNolock` never does that: it fills the
+        // current segment and puts the rest at offset 0 of the next one.
         let base = ((seg as usize) << 32) | off as usize;
-        off = off.saturating_add(n as u32);
-        entry.row_counter = Some((seg, off, copy));
-        entry
-            .segments
-            .entry(seg)
-            .and_modify(|s| s.rows = s.rows.max(off))
-            .or_insert(SegmentEntry { id: seg, rows: off });
+        let room = Self::SEGMENT_ROW_CAPACITY.saturating_sub(off as usize);
+        let mut ranges = [(base, 0usize), (0, 0usize)];
+        let mut range_count = 0usize;
+        let mut left = n;
+        let mut at_seg = seg;
+        let mut at_off = off as usize;
+        while left > 0 {
+            let take = left.min(Self::SEGMENT_ROW_CAPACITY - at_off);
+            let range_base = ((at_seg as usize) << 32) | at_off;
+            if range_count < ranges.len() {
+                ranges[range_count] = (range_base, take);
+                range_count += 1;
+            }
+            entry
+                .segments
+                .entry(at_seg)
+                .and_modify(|s| s.rows = s.rows.max((at_off + take) as u32))
+                .or_insert(SegmentEntry {
+                    id: at_seg,
+                    rows: (at_off + take) as u32,
+                });
+            at_off += take;
+            left -= take;
+            if left > 0 {
+                // The next segment: the catalog's next id, never a retired one.
+                at_seg = (at_seg + 1).max(floor);
+                at_off = 0;
+                debug_assert!(
+                    range_count < ranges.len(),
+                    "one append cannot span three segments"
+                );
+            }
+        }
+        if n == 0 {
+            ranges[0] = (base, 0);
+            range_count = 1;
+        }
+        let _ = room;
+        entry.row_counter = Some((at_seg, at_off as u32, copy));
         if n > 0 {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
@@ -1939,7 +1986,12 @@ impl Engine {
         drop(tables);
         // One `create` per append in the mirror's `version` file.
         let append = self.note_append(table, n, copy, ts);
-        Ok(RowRange { base, append })
+        Ok(RowRange {
+            base,
+            append,
+            ranges,
+            range_count,
+        })
     }
 
     /// The import's first batch: opens a segment of the statement's own and
@@ -2016,6 +2068,10 @@ impl Engine {
             RowRange {
                 base,
                 append: usize::MAX,
+                // The import caller already splits its batch at
+                // `SEGMENT_CAPACITY - offset` (`import.rs`), so one range.
+                ranges: [(base, n), (0, 0)],
+                range_count: 1,
             },
             ImportCursor {
                 segment: cursor.segment,
@@ -5836,6 +5892,16 @@ impl Engine {
     /// True unless `result_cache` is explicitly `off`.
     /// Rows a single imported segment can hold (`1024 * 8192`).
     pub const SEGMENT_ROW_CAPACITY: usize = 1024 * 8192;
+
+    /// `MAX_BLOCK_CAPACITY` (`default_values.cppm:49`): the largest single
+    /// append the allocator accepts.
+    ///
+    /// The reference refuses anything larger (`TableCache::PrepareAppendNolock`:
+    /// `if (row_count > MAX_BLOCK_CAPACITY or row_count == 0) UnrecoverableError`),
+    /// which is also what keeps one statement's row range inside a segment under
+    /// any realistic segment offset - but not unconditionally, so the split
+    /// below is still needed.
+    pub const MAX_APPEND_ROWS: usize = 65536;
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     pub(crate) const COPY_BATCH_ROWS: usize = 8192;

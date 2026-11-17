@@ -10,20 +10,24 @@ pub(crate) type PreparedTerms = (Vec<(String, u32, u16)>, usize);
 /// id, which the commit only hands out later). The terms are **taken** when the
 /// batch is inserted, so the type is built once and dropped.
 pub(crate) struct PreparedText {
-    base: usize,
+    /// The row id of each position in the batch, as the commit allocated them.
+    ///
+    /// A list, not `base + position`: an allocation that crossed a segment
+    /// boundary has two ranges and the ids jump at the seam.
+    seqs: Vec<usize>,
     columns: Vec<(String, Vec<Option<PreparedTerms>>)>,
 }
 
 impl PreparedText {
-    /// Points the batch at the row range the commit allocated.
-    pub(crate) fn set_base(&mut self, base: usize) {
-        self.base = base;
+    /// Points the batch at the row ids the commit allocated.
+    pub(crate) fn set_seqs(&mut self, seqs: Vec<usize>) {
+        self.seqs = seqs;
     }
 
     /// The terms for `seq`, taken out of the batch. `None` when the position is
     /// outside the batch or another pass already took it.
     fn take(&mut self, column: &str, seq: usize) -> Option<PreparedTerms> {
-        let position = seq.checked_sub(self.base)?;
+        let position = self.seqs.iter().position(|held| *held == seq)?;
         let (_, rows) = self.columns.iter_mut().find(|(name, _)| name == column)?;
         rows.get_mut(position)?.take()
     }
@@ -565,7 +569,43 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, false))
+        crate::scheduler::block_on(self.insert_in_batches(table, columns, rows, false))
+    }
+
+    /// Commits `rows` in batches of at most [`Engine::MAX_APPEND_ROWS`], one
+    /// transaction each.
+    ///
+    /// The reference gets this granularity for free: an `INSERT` carries a
+    /// `DataBlock`, and `TableCache::PrepareAppendNolock` refuses more than
+    /// `MAX_BLOCK_CAPACITY` rows. The port's primitive takes a `Vec`, and a
+    /// caller (`insert_literals`, the binary import, `COPY`) can hand over far
+    /// more - so the split is stated here rather than refusing the statement.
+    async fn insert_in_batches(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+        new_segment: bool,
+    ) -> Result<QueryResult> {
+        if rows.len() <= Self::MAX_APPEND_ROWS {
+            return self
+                .insert_literals_inner(table, columns, rows, new_segment)
+                .await;
+        }
+        let mut inserted = 0usize;
+        let mut left = rows;
+        while !left.is_empty() {
+            let take = left.len().min(Self::MAX_APPEND_ROWS);
+            let batch: Vec<Vec<Literal>> = left.drain(..take).collect();
+            match self
+                .insert_literals_inner(table, columns, batch, new_segment)
+                .await?
+            {
+                QueryResult::Inserted { count } => inserted += count,
+                other => return Ok(other),
+            }
+        }
+        Ok(QueryResult::Inserted { count: inserted })
     }
 
     /// `NewTxn::Import`: like [`Self::insert_literals`], but the batch always
@@ -576,7 +616,7 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
-        crate::scheduler::block_on(self.insert_literals_inner(table, columns, rows, true))
+        crate::scheduler::block_on(self.insert_in_batches(table, columns, rows, true))
     }
 
     pub async fn insert_literals_inner(
@@ -772,8 +812,7 @@ impl Engine {
                     txn.set_typed_commands(vec![self.append_command(
                         &alloc_table,
                         &alloc_table_id,
-                        range.base,
-                        alloc_rows,
+                        range.ranges(),
                         block,
                     )]);
                 }
@@ -800,6 +839,11 @@ impl Engine {
         // block's `created_` fields and its rows in one object; here the ts is
         // written below, right after the rows reach the buffer.
         let append_record = range.append;
+        // The id of the k-th row, which is **not** `base + k` when the
+        // allocation crossed a segment boundary: it has two ranges and the ids
+        // jump at the seam. Everything below states a row by its position in
+        // this batch, so this is the one place the seam is handled.
+        let range_seq = move |k: usize| range.seq_at(k);
         let row_count = rows.len();
         let bottom_row_count = rows.len();
         let bottom_rows = rows;
@@ -848,7 +892,7 @@ impl Engine {
                 let index_rows: Vec<(usize, Vec<String>)> = bottom_cells
                     .into_iter()
                     .enumerate()
-                    .map(|(k, cells)| (base + k, cells))
+                    .map(|(k, cells)| (range_seq(k), cells))
                     .collect();
                 // The index work runs on **this table's** bottom worker: every
                 // index has its own lock and two tables share none, so a
@@ -870,15 +914,15 @@ impl Engine {
                 // `num`).
                 engine.update_secondary_indexes_batch_rows(
                     &index_table,
-                    base,
                     &bottom_rows,
                     &schema,
+                    range_seq,
                 );
                 // The row ids are known now: point the pre-tokenised batch at
                 // the allocated range. A column that gained an index after the
                 // batch was tokenised is not covered and is tokenised here.
                 if let Some(prepared) = prepared_text.as_mut() {
-                    prepared.set_base(base);
+                    prepared.set_seqs((0..bottom_row_count).map(range_seq).collect());
                 }
                 engine.update_text_indexes_batch(
                     &index_table,
@@ -979,20 +1023,27 @@ impl Engine {
         &self,
         table: &str,
         table_id: &str,
-        base: usize,
-        count: usize,
+        ranges: &[(usize, usize)],
         block: Vec<storage::wal::block::BlockColumn>,
     ) -> storage::WalCmd {
         let (db_name, table_name) = split_table_name(table);
+        // One `row_ranges` entry per contiguous run: an append that crossed a
+        // segment boundary is two runs, and the reference's frame carries both
+        // (`WalCmdAppendV2::row_ranges_`).
         storage::WalCmd::Append {
             db_id: self.database_id(&db_name).to_string(),
             db_name,
             table_name,
             table_id: table_id.to_string(),
-            row_ranges: vec![(
-                storage::wal_entry::WalRowId::from_u64(base as u64),
-                count as u64,
-            )],
+            row_ranges: ranges
+                .iter()
+                .map(|(base, count)| {
+                    (
+                        storage::wal_entry::WalRowId::from_u64(*base as u64),
+                        *count as u64,
+                    )
+                })
+                .collect(),
             block,
         }
     }
@@ -1153,7 +1204,7 @@ impl Engine {
         let extra: Vec<(usize, Vec<Value>)> = rows
             .iter()
             .enumerate()
-            .map(|(k, row)| (base + k, row.clone()))
+            .map(|(k, row)| (range.seq_at(k), row.clone()))
             .collect();
         // The staged append record settles with its commit ts here, which is what
         // `committed_rows` reads; without it a checkpoint would not see the
@@ -1340,9 +1391,9 @@ impl Engine {
     pub(crate) fn update_secondary_indexes_batch_rows(
         &self,
         table: &str,
-        base: usize,
         rows: &[Vec<Literal>],
         schema: &[String],
+        seq_of: impl Fn(usize) -> usize,
     ) {
         if rows.is_empty() {
             return;
@@ -1352,7 +1403,9 @@ impl Engine {
             return;
         }
         for (k, row) in rows.iter().enumerate() {
-            let seq = (base + k) as u64;
+            // The id of the k-th row: `base + k` only while the allocation is
+            // one contiguous range (a segment boundary splits it).
+            let seq = seq_of(k) as u64;
             for target in &targets {
                 let Some(literal) = row.get(target.pos) else {
                     continue;
@@ -1888,7 +1941,10 @@ impl Engine {
         if columns.is_empty() {
             return None;
         }
-        Some(PreparedText { base: 0, columns })
+        Some(PreparedText {
+            seqs: Vec::new(),
+            columns,
+        })
     }
 
     /// Keeps existing inverted indexes in step with a batch of inserted or

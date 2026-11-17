@@ -12213,6 +12213,68 @@ mod tests {
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
     }
 
+    /// An append that reaches the end of a segment is **split** at the
+    /// boundary, exactly as `TableCache::PrepareAppendNolock` does.
+    ///
+    /// A segment's offset is a `u32` but only `SEGMENT_ROW_CAPACITY` of its
+    /// values are slots: letting one append run past the last slot hands out
+    /// ids no block can hold (`block_of` would name a block past the segment's
+    /// 1024), and the reference never does it.
+    #[test]
+    fn an_append_across_a_segment_boundary_is_split() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sgx (id INT);").unwrap();
+        let cap = Engine::SEGMENT_ROW_CAPACITY;
+        // Put the allocator four rows short of the segment's end. Reaching it
+        // by appending would take 8.4 M rows (and every append is capped at
+        // `MAX_APPEND_ROWS`), so the counter is set directly - it is the state
+        // a long series of appends leaves behind.
+        {
+            let key = e.table_key("sgx");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            entry.row_counter = Some((0, (cap - 4) as u32, false));
+            entry.segments.insert(
+                0,
+                crate::engine::state::SegmentEntry {
+                    id: 0,
+                    rows: (cap - 4) as u32,
+                },
+            );
+        }
+
+        // Ten rows: four close the segment, six open the next one.
+        let range = e.reserve_rows("sgx", 10, false).unwrap();
+        assert_eq!(
+            range.ranges(),
+            &[(cap - 4, 4), (1usize << 32, 6)],
+            "the allocation must state both runs"
+        );
+        // `seq_at` follows the seam: the first four rows continue the first
+        // segment, the rest start at offset 0 of the second.
+        assert_eq!(range.seq_at(0), cap - 4);
+        assert_eq!(range.seq_at(3), cap - 1);
+        assert_eq!(range.seq_at(4), 1usize << 32);
+        assert_eq!(range.seq_at(9), (1usize << 32) | 5);
+        // Neither segment overflows its slot range.
+        assert_eq!(e.segments("sgx"), vec![(0, cap as u32), (1, 6)]);
+    }
+
+    /// An append larger than `MAX_BLOCK_CAPACITY` is refused at the primitive,
+    /// as `TableCache::PrepareAppendNolock` refuses it; the statement-level
+    /// entry points split into batches instead.
+    #[test]
+    fn an_oversized_single_append_is_refused() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE big (id INT);").unwrap();
+        assert!(e
+            .reserve_rows("big", Engine::MAX_APPEND_ROWS + 1, true)
+            .is_err());
+        assert!(e.reserve_rows("big", Engine::MAX_APPEND_ROWS, true).is_ok());
+    }
+
     /// `NewTxn::BeginTS`: a reader pinned to a timestamp does not see a row
     /// committed after it, and does see one deleted after it.
     #[test]

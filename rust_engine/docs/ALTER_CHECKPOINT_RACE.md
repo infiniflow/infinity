@@ -189,7 +189,7 @@ rows=1 seq=0 [1, 2, "test", "tttt"]`。
 **一套**列集合（`snapshot_ids`）去编码所有行。两个位置轴不相容，这是第 3 节错位的结构性原因，
 也是第 4 节所有修法都不稳定的原因 —— 它们都还在「一套列集合套所有行」。
 
-### 5.1 新表示
+### 5.1 新表示（已实施）
 
 ```rust
 struct PendingRows {
@@ -200,54 +200,70 @@ struct PendingRows {
     /// 退役信息，只记元数据、不存值：
     /// `retired_at`（该批列退役的 commit ts）-> 退役的 column id。
     retired: BTreeMap<u64, Vec<u64>>,
-    /// 这段缓冲行的**起始行号**。行索引 `k` 对应行 id `base_row_id + k`。
-    base_row_id: RowId,
+    /// 缓冲行的行 id，升序。
+    row_ids: Vec<usize>,
+    /// 各列值体的字节数，running total（quota 每条语句读它）。
+    bytes: usize,
 }
 ```
-
-与初稿相比去掉了 `seqs`/`pos` 两个映射：它们的作用是用行 id 反查行索引，而 5.1.1 证明
-这段缓冲行在 id 空间里始终是**连续区间**，`base_row_id + k` 就是那个反查，O(1) 且不需要任何
-辅助结构。
 
 三条不变量：
 
 1. **行数恒等**：`columns` 里每个 vector 的长度都等于 `len()`；`len()` 是
    `columns.values().next().map(Vec::len).unwrap_or(0)`（空表为 0，此时无列）。
 2. **列集 = live 列 ∪ 仍有旧 bound 需要的退役列**。后者由 `retired` 判定，清空时机见 5.4。
-3. **格子按列 id 归属，不按位置**。写入时 `INSERT` 知道自己这一行每个值属于哪个 id，
-   直接落位；不需要 `reorder_row_text`，也不需要每行另存一份 commit ts。
+3. **格子按列 id 归属，不按位置**。写入时调用方按**行的 commit ts** 解析出该行的
+   `(column id, value)` 对，直接落位；不需要 `reorder_row_text`，也不需要每行另存 schema。
 
-### 5.1.1 `base_row_id` 的前提
+### 5.1.1 为什么用显式的 `row_ids` 而不是 `base_row_id + k`
 
-`base_row_id + k` 只有在「缓冲行是 `[base_row_id, base_row_id + len())` 这段连续区间」时
-才等于行 id。这个性质**不是假设，而是由三条现有机制保证的**：
+设计初稿用的是「起始行号 + 偏移」：缓冲行若是 `[base, base + len())` 一段连续区间，
+`base + k` 就是行 id 的反查，O(1) 且不需要辅助结构。**实施时否掉了**，因为这段区间
+并不总是连续，有两个独立来源：
 
-1. **行号在 commit-ts 顺序里分配**。`reserve_rows_at`（`dml.rs:748-767` 的 `before_wal`）
-   在冲突检查之后、WAL 之前发号，而只有最小的 commit ts 能进这一段（`turn_wait`），
-   所以发出的号序 == 提交序。
-2. **checkpoint 把窗口裁成已提交前缀**。`committed_rows(table, checkpoint_ts)`
-   （`statements.rs:1482-1499`）按 append journal 的 ts 累加，遇到 `stamp > bound` 就
-   `break`，得到的是一个**前缀长度**；`blocks/engine.rs:683-698` 用它裁 `counts`。
-   于是 checkpoint 写走的永远是「前缀」，buffer 剩下的是「后缀」，仍是连续区间。
-3. **块内连续性有硬断言**。`blocks/engine.rs:849-855` 要求
-   `seq == first_id + slot`，否则直接 `Err`。所以「checkpoint 写走了一堆不连续的行」
-   这种状态不可能悄悄存在。
+| 来源 | 后果 |
+|---|---|
+| **段边界的 gap** | 行 id 是 `segment << 32 \| offset`，而一个段只用 `SEGMENT_ROW_CAPACITY = 8,388,608` 个 offset（`statements.rs:5416`）。段 0 的最后一行是 `0x00000000_007FFFFF`，段 1 的第一行是 `0x00000001_00000000` —— 中间隔着近 42 亿个不存在的 id |
+| **compaction 删任意子集** | `compact_segments` 移除被合并段的行（`admin.rs:431` 的 `retain_buffered`），保留的是**任意子集**，不是前缀或后缀 |
 
-`checkpoint_ts` 取 `txn.current_ts()`（`admin.rs:10`），且该值单调不减，因此 2 成立的前提
-（bound 之前提交的是前缀）在每次 checkpoint 上都成立。
+checkpoint 确实只取前缀（`committed_rows` 按 ts 截断，`blocks/engine.rs:683`），
+但上面两条与它无关。显式 `Vec<usize>` 让三种情形统一：checkpoint 后缀、跨段 gap、
+compaction 子集。代价是每行 8 字节 —— 8.4M 行的 buffer 是 67 MB，而行数据本身
+（每行 N 个 `Value`）比它大一两个数量级。
 
-**会破坏这个前提、必须显式处理的地方**：
+**为什么不改成 `ranges`**（`Vec<(base, count)>`）：99% 的场景确实是 1 个 range，
+但 `row_id(k)` 是热路径（checkpoint 逐行、点读），现在是 `row_ids[k]` 一次访问，
+改成 range 后要二分或顺序扫；内存收益不到行数据的 5%；且 ranges 隐含「range 内稠密」，
+`retain` 按任意子集删除后无法表示，需要一条降级路径。**决定保持 `Vec<usize>`。**
 
-| 位置 | 为什么 | 处理 |
-|---|---|---|
-| `blocks/engine.rs:1115` 的 `retain_buffered` | 移除的是 checkpoint 写走的前缀 | 安全，但 `base_row_id` 要随之**前移**到新的首行 |
-| `engine/admin.rs:633` 的 `retain_buffered` | compaction 按**段**移除（`seq >> 32`），段 id 可能不连续（`reserve_rows_inline` 用 `(seg+1).max(floor)` 跳过已退役段） | 移除后必须**重算** `base_row_id = 剩余最小 seq`，并断言剩余仍连续；否则该表退回「分段存储」模式（见下） |
-| `blocks/engine.rs:2598/2616` 的 `retain_buffered` | 只改列形状，不删行 | 安全，`base_row_id` 不变 |
+如果将来 RSS 真的成为问题，可行的折中不是 ranges 而是「稀疏覆盖」：
+`base_row_id + len` 作快路径，另用一个 `Option<Vec<usize>>` 只在偏离稠密区间时存在。
+快路径仍是 O(1)，且能表达任意子集。
 
-如果断言失败（剩余行不连续），`PendingRows` 需要一个降级表示：保留一个
-`segments: BTreeMap<u32, SegmentRows>`（每个段一段连续区间），而不是单一 `base_row_id`。
-**当前所有路径都满足单区间**，所以先按单区间实现 + 断言，断言触发再引入降级表示 ——
-这样任何新的不连续来源都会以一个明确错误暴露，而不是静默写错块。
+### 5.1.2 段边界的实际处理：分配器切分，不是缓冲层
+
+`row_ids` 允许跨段，但**一个块的窗口必须稠密**（`blocks/engine.rs:862-870` 有硬断言：
+`seq == first_id + slot`）。所以跨段不能在块里表达，只能在分配器处解决。
+
+参考的做法是 `TableCache::PrepareAppendNolock`（`catalog_cache_impl.cpp:42-107`）：
+一次 append 若放不进当前段的剩余槽位，就**切成两个 range** ——
+`first_row_count = DEFAULT_SEGMENT_CAPACITY - row_count_` 填满当前段，
+余下的放新段 offset 0。它同时拒绝 `row_count > MAX_BLOCK_CAPACITY`（65536）。
+
+端口的 `reserve_rows_inline` 原先只做 `off.saturating_add(n as u32)`，没有切分也没有上限，
+这正是「跨段必然有 gap」这一问题的落点。现已按参考对齐：
+
+- 切分：`SEGMENT_ROW_CAPACITY - off` 填满当前段，余下开新段；
+- 上限：`MAX_APPEND_ROWS = 65536`，与 `MAX_BLOCK_CAPACITY` 一致；
+- `RowRange` 携带 `ranges: [(usize, usize); 2]` + `range_count`（不是 `Vec`：它要经过
+  commit 的 `before_wal` 回调与 bottom 的按值传递，每次插入都付一次堆分配不划算；
+  两次足够，因为单次 append ≤ 65536 而一段有 8,388,608 个槽）；
+- 语句层的 `insert_literals` / `import_literals` 按 `MAX_APPEND_ROWS` 分批提交，
+  与参考「一个 `DataBlock` 一次分配」的粒度一致，而不是把大语句拒掉。
+
+消费端随之改成用 `RowRange::seq_at(k)` 而不是 `base + k`：`publish_encoded_rows`、
+`update_secondary_indexes_batch_rows`（改为收 `seq_of`）、`PreparedText`（改存 `seqs`）、
+import extent（每个 range 各记一次）。
 
 ### 5.2 为什么这能消除错位
 
@@ -266,7 +282,7 @@ the next `ADD COLUMN`, so the new column inherited the old one's `{id}.col` file
 元数据」，理由见 5.7。准确的表述是：**编码不再按当前行位置摆放单元格**，但仍要按 bound
 选择输出列、类型、layout 和 default。
 
-### 5.3 写入语义
+### 5.3 写入语义（已实施）
 
 两个方向都要补齐，否则行数不守恒。退役 id 不是“一律丢弃”：DROP 不删除块里已有列值，
 因此一个在 DROP 前已经进入 buffer 的值，仍可能是 bound 早于 DROP 的 checkpoint 的唯一副本。
@@ -292,9 +308,15 @@ WAL 和 cells，不能把第一次执行的旧 cells 传进 `PendingRows`。所�
 
 第三种情形正是 `ADD COLUMN`：新列对所有历史行补 default，与参考的
 `AddColumnsDataInBlock`（`:1300-1308` 的 `AppendValue(default)` 循环）语义一致，只是对象
-从块缓冲换成了本结构。
+从块缓冲换成了本结构。实现上 `patch_buffered_add_columns` 现在只做
+`PendingRows::add_column(id, default)` —— 一个列一条 vector，不再按位置重写每一行。
 
-### 5.4 `retired` 的生命周期
+`drop_column` 的 effects 用 `u64::MAX` 作 `retired_at`：它跑在 commit 之后，拿不到那个
+commit 的 ts，而当前 `current_ts` 还没推进到它（取它会得到「比 DROP 更早」的值，让下一次
+checkpoint 误判该列仍 live）。`u64::MAX` 表示「等一次真正的 checkpoint 再判定」——
+`forget_retired_before(bound)` 只在 `bound != u64::MAX` 时清，因此留到下一次 checkpoint。
+
+### 5.4 `retired` 的生命周期（已实施）
 
 `retired` 只记「哪批列在哪个 ts 退役」，**不存值**；值留在 `columns` 里。这样既不复制一份
 行副本，又保住了 pre-DROP checkpoint 需要的数据。
@@ -521,98 +543,37 @@ bound_ts: u64,
 
 改名波及 67 处，按 §5.8 的第 4 步与 `TableSchemaAt` 改造一起做，避免两次触碰同一批代码。
 
-### 5.10 跨段：`segments` 不应切在列这一层
-
-`base_row_id` 的前提（5.1.1）在跨段时会失效：`reserve_rows_inline` 在
-`off >= SEGMENT_ROW_CAPACITY`（`statements.rs:5384`，`1024 * 8192 = 8,388,608`）时开新段，
-行 id 从 `0x…_00000000` 重新起跳，`base_row_id + k` 在段边界处不连续。
-
-一种直接的想法是把列本身按段分开：
-
-```rust
-// ✗ 不推荐
-segments: BTreeMap<u32, BTreeMap<u64, Vec<Value>>>
-```
-
-**列是表级概念，不是段级**。`schema_at(T)` / `TableSchemaAt` 按表给出列集合，同一个
-`column_id` 在所有段里是同一列。按段切分这一层会带来三个具体代价：
-
-1. **写盘要拼接**：`{id}.col` 是一个文件的全部行。跨段时要把 `segments[0][id]` 与
-   `segments[1][id]` 首尾相接 —— 一次 memcpy，正是列存想省掉的拷贝。
-2. **列级操作变成 O(段数)**：`DROP COLUMN` 要对每个段各删一次；
-   `ADD COLUMN` 要对每段各补一遍 default。
-3. **`retired` 语义错位**：退役是「某个 `retired_at` 之后这**列**不再 live」
-   （5.4），与段无关；按段分层后，同一列会有多份退役状态。
-
-正确的分层是**把段放在行索引上**，列保持表级：
-
-```rust
-struct PendingRows {
-    /// 表级：column id -> 全部行，长度 = `len()`。
-    /// 行按「段内连续、段间跳号」的顺序排列（即行 id 升序）。
-    columns: BTreeMap<u64, Vec<Value>>,
-    /// 行索引空间的段边界：段 id -> (起始行索引 k, 行数)。
-    /// 段数极少（8.4M 行才开一个新段），二分查找足够。
-    segment_spans: BTreeMap<u32, SegmentSpan>,
-    retired: BTreeMap<u64, Vec<u64>>,
-}
-```
-
-`k -> 行 id` 的映射于是有两种形态：
-
-| 情形 | 映射 | 成本 |
-|---|---|---|
-| 单段（绝对常态） | `base_row_id + k` | O(1)，`base_row_id` 仍然有用 |
-| 跨段 | 在 `segment_spans` 上二分，再 `段起始 id + (k - 段起始 k)` | O(log 段数)，段数 ≤ 几 |
-
-这样 `{id}.col` 天然是整列，不需要拼接；`ADD`/`DROP COLUMN` 仍是 O(1) 的列操作加一次
-O(行数) 的 default 填充（与今天等价）；`retired` 也保持表级语义。
-
-**实现建议**：`segment_spans` 作为成员加上，但**先按单段实现**
-（`base_row_id` 快路径 + `debug_assert!(segment_spans.len() <= 1)`），跨段时再激活二分。
-理由是 8.4M 行的缓冲在两次 checkpoint 之间几乎不可能出现，为一个罕见情形引入所有路径的
-分支不划算；而断言会让「真的跨段了」以一个明确错误暴露，而不是静默算错行号。
-激活条件写进单测：构造一个跨段的 buffer，断言二分给出的 id 与 `base_row_id + k` 在各自
-段内一致。
-
-### 5.11 `pending_bytes`：按列累加，不是瓶颈
+### 5.10 `pending_bytes`：不是瓶颈，按值体累加（已实施）
 
 先澄清它**不是性能瓶颈**。三个累加点，没有一个在每行的热路径上：
 
 | 位置 | 频率 | 成本 |
 |---|---|---|
-| `buffer_rows` 的 `row_bytes` 累加（`state.rs:4689`） | 每行一次 | `size_of_val` + 遍历该行的 `Value` 找 `Str`。5000 行/批是 5000 次短循环 |
-| `retain_buffered` 的全量重算（`state.rs:4717-4722`） | checkpoint / compaction / ADD / DROP 后 | O(剩余行数)，一次性 |
-| `budget_bytes` 的 `sum()`（`index_build.rs:1909-1914`） | 每条**语句**一次 | O(表数)，与行数无关 |
+| 插入时逐格累加（`PendingRows::buffer` / `buffer_attributed`） | 每行一次 | 每个 `Value` 一次 `size_of` + 一个 `Str` 长度判断 |
+| `retain` 的重算（`state.rs:5288`） | checkpoint / compaction / ADD / DROP 后 | O(剩余行数)，一次性 |
+| `budget_bytes` 的 `sum()`（`index_build.rs`） | 每条**语句**一次 | O(表数)，与行数无关 |
 
-列存改造后，第 1 项才是需要注意的地方：`row_bytes(&values)` 是「遍历一行的所有格」，而列存
-里一行的格分散在各列 vector 中，逐行跨列取值会变成「每行 N 次随机访问」。
+实施时用的是**一个总数** `bytes: usize`，不是按列的 `BTreeMap<u64, usize>`：列存之后
+「一行的格」本来就要逐列遍历（`buffer` 的插入循环），在那里顺手累加每一格，成本与原来的
+`row_bytes` 相同；再按列分开记只是多一张表要维护，`drop_column` 省下的那 O(1) 也不值得。
 
-**改法：按列累加**。
-
-```rust
-/// 每个列的值体字节，running total。
-column_bytes: BTreeMap<u64, usize>,
-```
-
-- `push` 一行：`for (id, v) in row { *column_bytes.entry(id) += value_body_bytes(v) }`
-- `drop_column`：`column_bytes.remove(id)` —— O(1)，不需要重算
-- `retain_buffered`：仍全量重算，但**按列**遍历（顺序访问，缓存友好）
-- `unsealed_bytes()` = `column_bytes.values().sum()` + 结构开销
-
-关键是 `value_body_bytes` **只看单个值**：
+`value_bytes` 只看单个值：
 
 ```rust
-fn value_body_bytes(v: &Value) -> usize {
-    std::mem::size_of::<Value>() + if let Value::Str(s) = v { s.len() } else { 0 }
+fn value_bytes(v: &Value) -> usize {
+    match v {
+        Value::Str(s) => s.len() + 24,
+        _ => 24,
+    }
 }
 ```
 
-列存反而让这件事更简单：值天然按列聚集，同一个 `Value` 变体相邻，分支预测与缓存都更好。
-`pending_pos` 那一项结构开销（`state.rs:4744`）在列存下换成按 `len()` 计的少量固定开销，
-不再依赖哈希表大小。
+**一个必须处理的边界**：`unsealed_bytes` 曾经是
+`pending_bytes + pending_pos.len() * …`，列存后改成按列数计固定开销 —— 但**空缓冲必须报 0**，
+否则每一次 quota 检查都会把它见过的每张表的列都算一遍（`quota_drains_the_append_buffer_of_an_unindexed_table`
+就是这么暴露的：缓冲已清空，返回值仍是 48）。
 
-### 5.12 `append_row_cache`：保持行存，不与 `PendingRows` 合并
+### 5.11 `append_row_cache`：保持行存，不与 `PendingRows` 合并
 
 调查结论：**不要跟着列存改**。它是另一种东西。
 
@@ -645,7 +606,7 @@ fn value_body_bytes(v: &Value) -> usize {
 
 这样 §5.6 代价表里「两份数据」的担忧可以消掉一半：重复的是**解析**，不是长期存储。
 
-### 5.13 compaction 与并发 append：`bound_ts` 必须保留上界
+### 5.12 compaction 与并发 append：`bound_ts` 必须保留上界
 
 上一轮讨论 `bound_ts` 时留了一个前提没查：compaction 在提交内写块（`admin.rs:656` 的
 `write_blocks_bounded_locked(table, compact_ts)`）时，是否可能出现「比它更晚提交的行混进
@@ -679,12 +640,17 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 建议在 `write_blocks_bounded_locked` 的文档里加一句「调用方必须持有该表的 bottom gate」，
 并在 compaction 的 gate 获取处加注释指向这一节。
 
-## 6 已实施：bound 上的完整 schema
+## 6 已实施
 
-§5.7（A1 + A2）与 §5.9 已经落地。这一节记的是**做了什么**与**怎么验的**；§5.1–5.5 的
-`PendingRows` 列存尚未开始，仍按 §5.8 的顺序待办。
+两个提交，各自独立可回退：
 
-### 6.1 改动
+| 提交 | 内容 |
+|---|---|
+| `7f47e777d` | bound 上的完整 schema（§5.7、§5.9）：`schema_at`、`keep` 同源、`checkpoint_ts` → `bound_ts` |
+| `b5865bf20` | 列式 `PendingRows`（§5.1–5.5、§5.10）：按列 id 组织、显式 `row_ids`、`retired` |
+| 本次 | 跨段分配修复（§5.1.2）：`reserve_rows_inline` 切段、`MAX_APPEND_ROWS`、`RowRange::seq_at` |
+
+### 6.1 bound 上的完整 schema
 
 | 项 | 位置 | 内容 |
 |---|---|---|
@@ -694,40 +660,66 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 | `keep` 列表 | `blocks/engine.rs` | 由 `meta.ids` 改为 `encode_meta.ids`。这是 A2：清理**先于**写盘，若 `keep` 用 live 列，本 pass 刚写出的 pre-DROP 列文件会在同一次调用里被删掉 |
 | outline 文件补全 | `blocks/engine.rs` | `meta.ids[i]` → `encode_meta.ids[i]`。`types` 早已来自 `encode_meta`，用 live 的 ids 配对是相反方向的撕裂 |
 | 改名 | `blocks/engine.rs`、`engine/admin.rs` | `checkpoint_ts` → `bound_ts`（28 + 1 处），并在 `write_blocks_mode_with` 的形参上写明「checkpoint 传 `current_ts()`；非 checkpoint 传自己的 commit ts，两者恰好相等即是它不是 checkpoint 事务的信号」 |
-| gate 前提 | `blocks/engine.rs` | `write_blocks_bounded_locked` 的文档写明「调用方必须持有该表的 bottom gate」，指向 §5.13 |
+| gate 前提 | `blocks/engine.rs` | `write_blocks_bounded_locked` 的文档写明「调用方必须持有该表的 bottom gate」，指向 §5.12 |
 
-### 6.2 验证
+### 6.2 列式 `PendingRows`
 
-**单元测试**（`catalog/src/lib.rs` 的 `tests` 模块，5 个）：
+- `TableEntry::pending_rows` 从 `Vec<(usize, Vec<Value>)>` 变成 `PendingRows`，`pending_pos`
+  删除（`row_ids` 的二分取代了它）；
+- `buffer_rows` 的签名变成 `(rows, ts_of, schema_at, live)`：按**每行的 commit ts** 解析它
+  写在哪套 schema 上，不同 ts 的行分组处理；
+- `patch_buffered_drop_column(table, id, retired_at)` 从「按位置删格」变成「按 id 退役」；
+  `patch_buffered_add_columns(table, ids, defaults)` 从「按位置重写每行」变成「加一条 vector」；
+- 重放路径不再把行重排到当前 schema（`reorder_row_text` / `default_cell_text` 已删除）：
+  它按 frame 的列 id 直接归属单元格，这是 pre-DROP 行能保留其值的原因；
+- `buffered_row` / `pending_rows_of` / `buffered_rows_for` 等读路径接受目标列序
+  （live ids）与默认值，把列式单元格物化成行视图。
+- `unsealed_bytes` 空缓冲返回 0。
 
-- `schema_at_sees_a_column_from_its_create_ts`：create/ADD 两个 ts 的窗口；
-- `a_dropped_column_is_gone_from_its_drop_ts_inclusive`：DROP 的 ts 上**已经**不可见（`<=`），
-  且 pre-DROP 一侧 `types` 仍可取到被删列（这正是 A1 要证明的）；
-- `a_recreated_column_has_a_new_id_and_both_incarnations_resolve`：同名重建得到新 id、
-  新类型，两侧都能解析到各自那一份；
-- `schema_at_returns_ids_ascending`：`table_meta_of` 依赖的排序不变量；
-- `schema_at_agrees_with_schema_ids_at`：两个视图在 5 个 ts 上给出一致的 id 集合。
+### 6.3 跨段分配
+
+- `reserve_rows_inline` 在 `SEGMENT_ROW_CAPACITY - off` 处切分，余下开新段；
+- `MAX_APPEND_ROWS = 65536`（= 参考的 `MAX_BLOCK_CAPACITY`），超出的单次分配报错；
+- `RowRange` 携带 `ranges: [(usize, usize); 2]` + `range_count`，并新增 `seq_at(k)`；
+- `insert_literals` / `import_literals` 按 `MAX_APPEND_ROWS` 分批提交；
+- 消费端改用 `seq_at`：`publish_encoded_rows`、`update_secondary_indexes_batch_rows`
+  （改收 `seq_of`）、`PreparedText`（改存 `seqs`）、import extent（每 range 一次）。
+
+### 6.4 验证
+
+**单元测试**：
+
+| 测试 | 验什么 |
+|---|---|
+| `catalog`：5 个 `schema_at_*` | create/ADD 两个 ts 的窗口、DROP 的 `<=` 边界、同名重建得到新 id 与类型、ids 升序、与 `schema_ids_at` 一致 |
+| `an_append_across_a_segment_boundary_is_split` | 段尾剩 4 槽时分配 10 行 → ranges 是 `[(cap-4, 4), (1<<32, 6)]`，`seq_at` 跨缝正确，两段都不越界 |
+| `an_oversized_single_append_is_refused` | `MAX_APPEND_ROWS + 1` 被拒，`MAX_APPEND_ROWS` 通过 |
 
 **回归**（`alter_ut::a_checkpoint_through_a_column_change_keeps_the_block_readable`）：
 
-| 批次 | 轮数 | 失败 |
+| 阶段 | 轮数 | 失败 |
 |---|---|---|
-| 改动前（两批合计，见旧记录） | 44 | 5 |
-| 改动后 | 40 | 0 |
+| 改动前（两批合计） | 44 | 5 |
+| bound-schema 修复后 | 40 | 0 |
 
 40 轮由两批各 20 轮组成，都是 debug 构建、4 vCPU、
-`cargo test -p executor --lib … -- --ignored`。用例因此从
-`known-defect:` 升级为 `slow:`，并已从 `.github/workflows/rust_engine.yml` 的
-`Slow reference cases` skip 名单与 `scripts/README.md` 的复现命令里移除 —— 它现在是门禁。
+`cargo test -p executor --lib … -- --ignored`。用例因此从 `known-defect:` 升级为
+`slow:`，并从 `.github/workflows/rust_engine.yml` 的 skip 名单与 `scripts/README.md`
+的复现命令里移除 —— 它现在是门禁。
 
-**全量**：`cargo test --workspace --lib` 全绿（`executor` 797 passed / 50 ignored，
+**全量**：`cargo test --workspace --lib` 全绿（`executor` 799 passed / 50 ignored，
 `catalog` 62，`index` 137，`storage` 495，`txn` 32），`cargo clippy --workspace
 --all-targets` 无告警。
 
-### 6.3 仍然待办
+### 6.5 仍然待办
 
-- §5.1–5.5 的 `PendingRows` 列存（含 `base_row_id`、`retired`、跨段 `segment_spans`）：
-  **未开始**。本次只修了「用哪个 schema 编码」，没有改缓冲的表示；§3.1 说的「buffer 里
-  同一列集合套宽度各异的行」这个结构前提仍在。它现在的表现是被 `schema_at` 的 bound
-  一致性挡住了，而不是消失。
-- §5.10 跨段、§5.11 `pending_bytes`、§5.12 `append_row_cache`、§3.1 的探针。
+- **§5.11 的 `append_row_cache` 去重复解析**：`publish_encoded_rows` 与
+  `append_row_cache` 解析同一批文本，可以让前者把 `Vec<Value>` 交给后者。两者在同一个
+  bottom 闭包里但**顺序相反**（`append_row_cache` 在 `publish_encoded_rows` 之前），
+  需要调序，不是加个参数。
+- **§3.1 的探针**：仍缺一次「在 ① ② ③ 三处打 `(thread_id, ts, ids)`，用失败运行对齐」
+  的验证。当前 40 轮全过，但 §3.1 的机制描述仍是「高度可能」而非已证。
+- **字节门禁**：`test_cross_engine_bytes_*` 与 WAL 帧逐字节比对要等全部改动完成后一次跑。
+  两处需要特别核对：`PendingRows` 改了块内列序的来源；跨段切分改了 `row_ranges` 的数量，
+  而参考的 UPDATE 是**每块一个 `WalCmdAppendV2`**，端口是单命令多 range —— 行数 ≤ 一块时
+  两者一致，多块时需要确认帧字节。

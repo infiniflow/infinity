@@ -2775,8 +2775,7 @@ impl Engine {
                                         self.append_command(
                                             &table_name,
                                             &table_id,
-                                            base,
-                                            row_count,
+                                            &[(base, row_count)],
                                             block,
                                         ),
                                     ]);
