@@ -1724,6 +1724,30 @@ impl Engine {
             .collect()
     }
 
+    /// The table's full-text columns, from the catalog.
+    ///
+    /// [`Self::index_column_map`] carries every index kind, so it cannot say
+    /// which columns a *text* index belongs to - a column with only a secondary
+    /// index has no text postings to write. A column that carries two full-text
+    /// indexes (a sparse-gram one and a regular one) is listed once.
+    fn fulltext_columns(&self, table: &str) -> Vec<String> {
+        let mut columns: Vec<String> = Vec::new();
+        for meta in self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+        {
+            if meta.id > 0
+                && meta.index_type.eq_ignore_ascii_case("FULLTEXT")
+                && !columns.contains(&meta.column)
+            {
+                columns.push(meta.column);
+            }
+        }
+        columns
+    }
+
     pub(crate) fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
@@ -1949,7 +1973,7 @@ impl Engine {
         }
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, SharedTextIndex)> = self
+        let mut indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
@@ -1961,6 +1985,30 @@ impl Engine {
                     .collect()
             })
             .unwrap_or_default();
+        // A writer must not depend on a reader having built the index. The
+        // reference's write path only needs the column's mem indexer, which it
+        // creates itself; here the documents go into the **cached** index, so a
+        // column whose index is not cached yet - a build still in flight, a cache
+        // a compaction dropped, a table entry that has not loaded it - was
+        // skipped in silence and its postings existed nowhere. A rebuild recovers
+        // them only from the blocks, and a `COPY` writes those when its statement
+        // commits, so the rows of the import that hit the window are exactly the
+        // ones a following build cannot see. Build the index here instead: the
+        // read is the one the first query would have done, at most once per
+        // column, and only while the cache has no entry for it.
+        if indexes.len() < by_id.len() {
+            for column in self.fulltext_columns(table) {
+                if schema.iter().all(|c| c != &column)
+                    || indexes.iter().any(|(cached, _)| cached == &column)
+                {
+                    continue;
+                }
+                let tokenizer = self.index_tokenizer(table, &column);
+                if let Ok(shared) = self.text_index_for(table, &column, tokenizer) {
+                    indexes.push((column, shared));
+                }
+            }
+        }
         for (column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;

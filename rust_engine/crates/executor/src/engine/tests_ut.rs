@@ -895,6 +895,68 @@ mod tests {
         );
     }
 
+    /// A batch whose column has no cached index used to be skipped in silence:
+    /// its postings existed nowhere, and the rebuild that follows can only
+    /// recover them from the blocks - which a `COPY` writes when its statement
+    /// commits, so they are exactly the rows it cannot see. The writer builds
+    /// the index itself now (once, and only while the cache has no entry).
+    #[test]
+    fn a_batch_without_a_cached_index_builds_it_instead_of_dropping_documents() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE wb (id INTEGER, body VARCHAR)")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX wb_body ON wb (body) USING FULLTEXT")
+            .unwrap();
+        for i in 0..10 {
+            e.execute_blocking(&format!(
+                "INSERT INTO wb VALUES ({i}, 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        let tkey = e.table_key("wb");
+        let index_id = e
+            .fulltext_index_id("wb", "body")
+            .expect("the full-text index is recorded in the catalog");
+        // What a compaction, or a table entry that has not loaded the index,
+        // leaves behind: the rows are there, the index object is not.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&tkey).expect("the table is cached");
+            entry.text.remove(&index_id);
+            entry.text_built.remove(&index_id);
+        }
+        for i in 10..20 {
+            e.execute_blocking(&format!(
+                "INSERT INTO wb VALUES ({i}, 'harmful chemical row{i}');"
+            ))
+            .unwrap();
+        }
+        // Before any query runs: the documents are in the index the writer built.
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&tkey).expect("the table is cached");
+            entry
+                .text
+                .get(&index_id)
+                .cloned()
+                .expect("the write path built the index instead of dropping the batch")
+        };
+        let docs = shared.read().unwrap().total_docs();
+        assert_eq!(
+            docs, 20,
+            "ten rows rebuilt from the blocks plus the batch the writer indexed"
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM wb SEARCH MATCH TEXT (body, 'harmful chemical', 100);"
+            )
+            .len(),
+            20
+        );
+    }
+
     /// A merge that lands **inside** a build renumbers every row the build just
     /// read, so its postings name ids nothing owns. The tokenizer/scan window is
     /// too narrow to hit by chance here, so the test drives it deterministically
