@@ -3288,14 +3288,6 @@ impl Engine {
             return Default::default();
         };
         let root = self.blocks_root();
-        let Some(types) = meta
-            .types
-            .iter()
-            .map(|t| column_type_of(t))
-            .collect::<Option<Vec<_>>>()
-        else {
-            return Default::default();
-        };
         let mut appends = Vec::new();
         let mut append_ts = Vec::new();
         let mut append_copy = Vec::new();
@@ -3309,9 +3301,17 @@ impl Engine {
                 continue;
             };
             let version = block.version();
-            let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, id, None) else {
-                continue;
-            };
+            // The `version` alone answers everything here: `created` gives the
+            // append totals, its last record the block's row count, and
+            // `deleted` the tombstones by slot. Decoding the block's cells - the
+            // 1536-d embedding of every row - was 125 s of a fresh process's
+            // first query on a 500k-row table, for a journal that never read a
+            // cell.
+            let rows = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as u64)
+                .unwrap_or(0);
             let mut seen = 0u64;
             for create in &version.created {
                 let cumulative = create.cumulative_row_count.max(0) as u64;
@@ -3325,10 +3325,12 @@ impl Engine {
                     .entry(id.segment_id)
                     .or_insert(create.create_ts);
             }
-            *segment_rows.entry(id.segment_id).or_default() += rows.len() as u64;
-            for (slot, (seq, _cells)) in rows.iter().enumerate() {
+            *segment_rows.entry(id.segment_id).or_default() += rows;
+            let base = ((id.segment_id as u64) << 32)
+                | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64);
+            for slot in 0..rows as usize {
                 if let Some(ts) = version.deleted.get(slot).copied().filter(|t| *t != 0) {
-                    deletes.push(*seq as u64);
+                    deletes.push(base | slot as u64);
                     delete_ts.push(ts);
                 }
             }
