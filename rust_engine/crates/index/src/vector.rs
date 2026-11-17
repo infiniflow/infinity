@@ -2730,10 +2730,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.DISABLED_SLOW_test_load` — build, save to the chunk
-    /// layout, load and search. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    /// layout, load and search. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_load (run with --ignored)"]
-    fn disabled_slow_test_load() {
+    #[ignore = "slow: C++ HnswHandlerTest.DISABLED_SLOW_test_load"]
+    fn hnsw_save_load_search() {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Plain, &data);
         let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Plain);
@@ -2741,10 +2741,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.DISABLED_RANDOME_test_parallel` — readers query
-    /// while a writer inserts. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    /// while a writer inserts. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_RANDOME_test_parallel (run with --ignored)"]
-    fn disabled_random_test_parallel() {
+    #[ignore = "slow: C++ HnswHandlerTest.DISABLED_RANDOME_test_parallel"]
+    fn hnsw_concurrent_read_write() {
         parallel_readers(Metric::L2, HnswEncoding::Plain);
     }
 }

@@ -135,7 +135,7 @@ mod tests {
     /// cargo test --release -p storage --lib simd::tests::maxsim_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn maxsim_throughput() {
         let (nq, nd, dim) = (32usize, 32usize, 128usize);
         let query: Vec<Vec<f32>> = (0..nq)

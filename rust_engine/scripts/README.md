@@ -55,8 +55,9 @@ cd rust_engine
 | `unit` | arch | `cargo test --workspace`（含 `analyzer`/`analyzer-ffi`），amd64 另跑 `cli smoke` 与 Gate A 基线（报告） |
 | `build` | engine × arch | 参考版在仓库的 builder 镜像里编（arm64 交叉编译），重写版在对应架构的 runner 上原生编；各上传一个 `bin-<engine>-<arch>` |
 | `restart` | engine × arch | Gate C 的重启用例，二进制由矩阵决定；rust 格子经 `infinity_rust_shim.sh` 启动 |
-| `sdk` | engine × arch | Gate B：未改动的 Python SDK（`python/test_pysdk`）打两个引擎；只在 nightly / 手动触发（30 个文件，单格几十分钟） |
+| `sdk` | engine × arch | Gate B：未改动的 Python SDK（`python/test_pysdk`）打两个引擎；PR 只跑 `not complex and not slow`，nightly / 手动另跑 `-m "slow and not complex"` 与 `python/parallel_test`（对应参考的 `reldeb_parallel_test`） |
 | `cross_engine` | arch | 格式门禁：一次跑两个引擎（`test_cross_engine_bytes_*` + `test_cross_engine_compat`） |
+| `slow` | — | nightly / 手动：miri、ASan、两档 `--ignored`、Gate E、kill -9 循环 |
 
 arm64 需要交叉编参考版，所以只在 push / nightly / 手动触发时跑；PR 只跑 amd64。
 
@@ -69,4 +70,25 @@ arm64 需要交叉编参考版，所以只在 push / nightly / 手动触发时�
 INFINITY_SERVER_BIN=$PWD/rust_engine/target/release/infinity \
   .venv/bin/python -m pytest -q -m "not slow" -k "not cross_engine" \
   python/restart_test --infinity_path=rust_engine/scripts/infinity_rust_shim.sh
+```
+
+**`slow` job 的两档 `--ignored`**：`Ignored tests` 跑全部 `#[ignore]` 用例但 `continue-on-error`（`bench:`/`diagnostic:` 的
+数字依赖机器）；`Slow reference cases` 按测试名跳掉非 `slow:` 类别后**门禁**，覆盖参考 `DISABLED_SLOW_*` 的
+37 个移植用例（含 `bmw_long_query_ut` 的 8 个）。本地复现门禁那一档：
+
+```bash
+cd rust_engine
+cargo test --workspace -- --ignored \
+  --skip probe_same_table_insert_concurrency --skip probe_bulk_delete_journal_scan \
+  --skip hnsw_production_scale --skip tensor_maxsim_throughput \
+  --skip flush_dump_wall_time_probe --skip a_checkpoint_scaling_probe \
+  --skip dot_throughput --skip position_lut_throughput --skip maxsim_throughput \
+  --skip diag_estimator_accuracy --skip diag_ranking_quality --skip diag_extra_bits \
+  --skip flat_rabitq --skip hnsw_rabitq --skip hnsw_lsg_rabitq \
+  --skip compress_hnsw_to_rabitq --skip compress_lsg_to_rabitq \
+  --skip minio_upload_meta_to_s3 --skip minio_client_roundtrip \
+  --skip minio_upload_object --skip minio_download_object \
+  --skip a_large_corpus_is_byte_identical_to_the_reference \
+  --skip a_checkpoint_through_a_column_change_keeps_the_block_readable \
+  --skip dump_index_task_row_cnt_exceed_memory_quota
 ```

@@ -34,6 +34,8 @@ pub mod bg_task;
 mod bg_task_ut;
 pub mod blocks;
 #[cfg(test)]
+mod bmw_long_query_ut;
+#[cfg(test)]
 mod buffer_obj_ut;
 #[cfg(test)]
 mod catalog_ut;

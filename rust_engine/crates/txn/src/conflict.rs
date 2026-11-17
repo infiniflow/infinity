@@ -447,9 +447,38 @@ fn rule(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
         // The reference has no overload of its own for a schema change: the
         // appends, updates, compactions and index creations on the table see it
         // through their rules. Two `ALTER TABLE`s serialise on the catalog.
-        TxnOp::AddColumn { .. } | TxnOp::DropColumn { .. } => None,
+        //
+        // **Append** is the exception, and it has to be: the appending rules
+        // above fire only when the append commits *second*. An append that is
+        // already in flight - it took its commit ts, wrote its WAL entry with
+        // the old column count, and has not finished its bottom half - is
+        // invisible to a `DROP`/`ADD COLUMN` that commits after it, and its
+        // rows then reach the block buffer at the old width while the catalog
+        // has the new one. `AppendInBlock` cannot see that either, so the block
+        // is encoded one cell off (`c3` taking the dropped `c2`'s value). The
+        // reference closes the window with the block's `unique_lock`
+        // (`new_txn_data_impl.cpp:938` vs `:1367`); this port has no block lock,
+        // so the schema change retries instead - by the time it runs again the
+        // append's bottom is done and the buffer matches the schema it is about
+        // to publish. `Retry`, not `NoRetry`: the statement itself is legal.
+        TxnOp::AddColumn { table: t } | TxnOp::DropColumn { table: t, .. } => match previous {
+            TxnOp::Append { table: a } | TxnOp::Import { table: a }
+                if a == t || a == bare_name(t) =>
+            {
+                Some(Retry)
+            }
+            // Two schema changes on one table are judged by the catalog, which
+            // serialises them; nothing else needs to be caught here.
+            _ => None,
+        },
         TxnOp::CreateDatabase { .. } | TxnOp::Cleanup | TxnOp::Checkpoint | TxnOp::Other => None,
     }
+}
+
+/// The bare table name of a possibly qualified one, so `db.t` and `t` in two
+/// different transactions are recognised as the same table.
+fn bare_name(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or(name)
 }
 
 fn conflict_between_drop(this: &TxnOp, previous: &TxnOp) -> bool {
@@ -491,9 +520,19 @@ mod tests {
             conflict_between(&append("db.t"), &add),
             Some(Conflict::NoRetry)
         );
-        // Directional: a schema change has no overload of its own, so it does
-        // not conflict when *it* commits second.
-        assert_eq!(conflict_between(&add, &append("db.t")), None);
+        // Symmetric, and `Retry` rather than `NoRetry`: an append already in
+        // flight carries the old column count in its WAL entry, so a schema
+        // change that commits after it must re-run against the settled buffer
+        // (`conflict.rs`'s `AddColumn` arm explains why the port needs this
+        // where the reference relies on the block lock).
+        assert_eq!(
+            conflict_between(&add, &append("db.t")),
+            Some(Conflict::Retry)
+        );
+        // ... and the two sides of a fully qualified name still match.
+        assert_eq!(conflict_between(&add, &append("t")), Some(Conflict::Retry));
+        // An append on another table is untouched.
+        assert_eq!(conflict_between(&add, &append("db.other")), None);
 
         let index = TxnOp::CreateIndex {
             table: "db.t".into(),

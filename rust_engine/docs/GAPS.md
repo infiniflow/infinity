@@ -22,6 +22,8 @@
 | 远程对象存储（`obj_key` 打包 + VirtualStore 上传、catalog 的 `meta/` 路径树同步） | 不移植；本地对象目录（`pm\|object\|` 记录 + 打包对象）仍按参考布局写 | 桶内布局与参考不同，跨引擎"同一桶互读"不成立 | `FORMAT_EQUIVALENCE_TESTS.md` §6.5 |
 | DiskANN | 不移植 | 该索引类型不可用 | 计划书 §2.6/R14 |
 | geo 类型（`Point`/`Line`/`LineSeg`/`Box`/`Circle`） | 不移植；`GeographyTryCastToVarlen` 随 cast 保留 | 这些列类型不可用 | `TEST_AUDIT.md` 的 `excluded` 行 |
+| `thrift/peer_server.thrift` 的 PeerService 线路（`python/test_cluster` 的 29 个用例） | 不移植：`server::peer` 的状态机、任务队列、心跳与改角色规则按类移植，但传输是进程内 `InProcessPeerTransport`，没有 TBinaryProtocol 监听 | 单进程内的成员管理行为可用；多节点部署与 `test_cluster` 的用例不可用（参考的 `debug_tsan_cluster_test` 因此没有对应格子） | `CLASS_MAP.md` §3.2 |
+| UBSan 通道（参考的 `debug_ubsan_pystart_test` / `_pysdk_test`） | 不移植：Rust 侧 `unsafe` 只留在 `storage` 的 mmap 与 `trim_allocator`，ASan 覆盖那个 crate，未定义行为由 `miri` 覆盖 `parser`/`planner` | 没有「带 UBSan 跑 SDK 套件」那一档；异常符号化路径不同 | `INVARIANT_MATRIX.md` E1 |
 
 ### 1.1 mem index 的 flush 持久化（有意的设计偏离）
 
@@ -44,7 +46,7 @@
 
 ## 2 未实现 / 未接线
 
-**本节没有未接线项。** 这一层的现状：
+**本节没有未接线项**（`CREATE INDEX` 的 HNSW/全文封存时机见 §2.9）。这一层的现状：
 
 - **行以列式块为存储本体**（方案 C）：`INSERT` 的行只进 `TableEntry::pending_rows`（`BufferObject` 的角色），块文件由 checkpoint（`flush_blocks` → `write_blocks`）写，`COPY` 例外（见下）。KV 里**没有任何行键**：`row:` 既不写也不读，`del:` 只剩事务命令流里的名字（`wal_delete_key`，用于构造 `WalCmdDeleteV2` 与行级冲突判定），不落盘；行侧车（`persistence/rowdata_*.bin`）与 `persistence/` 里的行记录一并去掉（该目录只剩参考版形状的空目录）。读全部把 buffer 盖在块上：整表 / 剪枝 / 列投影 / 点取 / 含墓碑 / 计数 / `row_is_present`；回放把 `WalCmd::Append`/`Delete` 交回 buffer（已落盘的 id 跳过），IMPORT 先写块再写 WAL 帧。
 - **封存块与索引段都走 mmap，参考的 `BufferManager` 不移植**：`MappedBlock`（`storage::buffer::mapped_block`）把块的每个 `{col}.col` 映射进来，列体是映射里的切片，槽位解码直接读 page cache；索引段由 `mapped::MappedFile` 映射。映射在进程内共享：`Context::block_maps` 每个 `BlockId` 只留一个 `Arc<MappedBlock>`，块被重写/压缩/删除/表被 drop 时按表丢弃（`drop_block_maps`）。未封存的行本来就在 `TableEntry::pending_rows`（每表一份，所有读者共享）。`BufferObj`/`BufferHandle`/`BufferPool`/`FileWorker`/`VarBuffer` 不再存在。`[buffer] buffer_manager_size` 仍然生效：
@@ -144,6 +146,27 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 `MATCH TEXT` 走倒排、`fast_rough_filter`、`compact_interval`、分析器家族（含 `STEM_LANG_*` 全套词干）、
 稀疏检索选项、快照，都按参考落地，逐条记录在 [`CLASS_MAP.md`](CLASS_MAP.md)（类/方法级）
 与 [`FORMAT_EQUIVALENCE_TESTS.md`](FORMAT_EQUIVALENCE_TESTS.md) §6（门禁级）。
+
+### 2.9 `CREATE INDEX` 的 HNSW / 全文不在建索引事务里封存
+
+参考的 `PrepareCommitCreateIndex` 对每段调 `PopulateIndex`，其中 HNSW（`PopulateHnswIndexInner:1827`）与
+全文（`PopulateIndex:1168` → `DumpSegmentMemIndex`）都会在**建索引事务内部**取一个 chunk id、
+写 `AddNewChunkIndex1` 记录并 `Dump` 出一块（`buffer_obj->Save()`），所以 DDL 一提交磁盘上就有 chunk。
+
+端口只对 secondary / BMP / IVF / 多值这样做：`query.rs` 的 `CreateIndex` 分支建完索引后调
+`publish_index_chunks`，而 HNSW 的图与全文的倒排段只留在内存索引里，第一次 `DumpIndex`
+（显式 dump 或 checkpoint 的首次 dump）才落 chunk。实测（`new_catalog_index_internal_ut::populate_index`，
+两段各 8192 行 + 建索引 + 后插一块 8192 行）：
+
+| kind | 参考 `check_index` | 端口 |
+|---|---|---|
+| secondary / IVF / BMP / EMVB | tail `(16384, 8192)`，chunk 0 覆盖前两块 | 一致 |
+| HNSW / FULLTEXT | tail `(16384, 8192)`，chunk 0 覆盖前两块 | tail `(0, 24576)`，chunk 0 尚未出现 |
+
+**影响**：查询答案一致（内存索引覆盖全部行）；差异是「建完索引立刻 kill 进程」时，重启后这两类索引的
+前两块要靠 `recover_mem_index` 从块里重建，而不是直接 map chunk——重启多一次重建，结果不变。
+门禁口径：`test_cross_engine_bytes_30_segments` 的 `_wait_for_segment_chunks` 会等 chunk 出现，
+所以列级比对不受影响；`populate_index` 用例按现状断言，并在注释里指向本节。
 
 ## 3 不可逐字节比对（参考侧不确定）
 

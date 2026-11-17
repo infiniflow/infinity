@@ -2924,7 +2924,7 @@ mod tests {
     /// Timing probe for same-table insert concurrency, run by hand:
     /// `cargo test --lib probe_same_table_insert_concurrency -- --ignored --nocapture`.
     #[test]
-    #[ignore = "timing probe"]
+    #[ignore = "bench: timing probe"]
     fn probe_same_table_insert_concurrency() {
         for threads in [1usize, 2, 4] {
             let dir = tempdir().unwrap();
@@ -2965,7 +2965,7 @@ mod tests {
     /// the hashed set keeps them flat.
     /// `cargo test --lib probe_bulk_delete_journal_scan -- --ignored --nocapture`.
     #[test]
-    #[ignore = "timing probe"]
+    #[ignore = "bench: timing probe"]
     fn probe_bulk_delete_journal_scan() {
         const BATCH: usize = 4_000;
         let dir = tempdir().unwrap();
@@ -5074,7 +5074,7 @@ mod tests {
     /// `INFINITY_BIG_TEST_ENCODE`, the build type with
     /// `INFINITY_BIG_TEST_BUILD_TYPE`.
     #[test]
-    #[ignore = "SLOW: 20k x 128 LVQ+LSG build"]
+    #[ignore = "slow: 20k x 128 LVQ+LSG build"]
     fn large_lvq_lsg_build_stays_stable() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean - the case an untrained LVQ mean
@@ -5223,7 +5223,7 @@ mod tests {
     /// Ignored because it builds a real graph:
     /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
     #[test]
-    #[ignore = "BENCH: HNSW production scale"]
+    #[ignore = "bench: HNSW production scale"]
     fn hnsw_production_scale() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean (so an untrained quantizer shows
@@ -5943,7 +5943,7 @@ mod tests {
     /// guarantees.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_index_lifecycle_is_coherent() {
         plaid_lifecycle(true);
@@ -6876,7 +6876,7 @@ mod tests {
     ///
     /// `#[ignore]`d for the unit lane: the ColBERT-SaR training it builds is the
     /// slowest case of the crate. `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
         let dir = tempdir().unwrap();
@@ -7642,7 +7642,7 @@ mod tests {
     /// cargo test --release -p executor --lib tensor_maxsim_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn tensor_maxsim_throughput() {
         let (nq, nd, dim) = (32usize, 32usize, 128usize);
         let q: Vec<Vec<f64>> = (0..nq)
@@ -7887,7 +7887,7 @@ mod tests {
     ///     secondary_stress_sustained_dumps -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "writes up to a million rows; run explicitly"]
+    #[ignore = "slow: writes up to a million rows"]
     fn secondary_stress_sustained_dumps() {
         let total: usize = std::env::var("INFINITY_STRESS_ROWS")
             .ok()
@@ -9577,7 +9577,7 @@ mod tests {
     /// Times the bulk dump. Not a gate: run it twice, with
     /// `INFINITY_FLUSH_DUMP_CONCURRENCY=1` and unset, to see the win.
     #[test]
-    #[ignore = "SLOW: a timing probe, not a gate"]
+    #[ignore = "bench: a timing probe, not a gate"]
     fn flush_dump_wall_time_probe() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
@@ -9684,7 +9684,7 @@ mod tests {
     /// caller dominates and the extra threads only add contention. Run with
     /// `cargo test -p executor --lib a_checkpoint_scaling_probe -- --ignored --nocapture`.
     #[test]
-    #[ignore = "wall-time probe: run it explicitly, the numbers are host dependent"]
+    #[ignore = "bench: wall-time probe, the numbers are host dependent"]
     fn a_checkpoint_scaling_probe() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
@@ -11328,8 +11328,8 @@ mod tests {
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts` — two threads
     /// create and drop the same database; conflicting commits are tolerated.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_parallel_ts (run with --ignored)"]
-    fn disabled_slow_test_parallel_ts() {
+    #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts"]
+    fn parallel_ts() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         let mut handles = Vec::new();
@@ -11356,8 +11356,8 @@ mod tests {
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table` —
     /// concurrent inserts into one table.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_parallel_insert_table (run with --ignored)"]
-    fn disabled_slow_test_parallel_insert_table() {
+    #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table"]
+    fn parallel_insert_table() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         e.execute_blocking("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
@@ -11593,10 +11593,10 @@ mod tests {
     }
 
     /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —
-    /// concurrent appends into one table. `#[ignore]` mirrors `DISABLED_`.
+    /// concurrent appends into one table. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_append_append_concurrent (run with --ignored)"]
-    fn disabled_slow_test_append_append_concurrent() {
+    #[ignore = "slow: C++ TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent"]
+    fn append_append_concurrent() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         e.execute_blocking("CREATE TABLE cac (id INT, name VARCHAR);")
@@ -11622,11 +11622,11 @@ mod tests {
 
     /// C++: `ParallelTest.DISABLED_SLOW_ChaosTest` — four threads for
     /// `kRunningTime` seconds mixing delete / vector search / update /
-    /// full-text search. `#[ignore]` mirrors `DISABLED_`; set
+    /// full-text search. Run it with `--ignored`; set
     /// `INFINITY_CHAOS_SECONDS` to shorten the run.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_ChaosTest (run with --ignored)"]
-    fn disabled_slow_chaos_test() {
+    #[ignore = "slow: C++ ParallelTest.DISABLED_SLOW_ChaosTest"]
+    fn chaos_test() {
         let seconds: u64 = std::env::var("INFINITY_CHAOS_SECONDS")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -11692,11 +11692,10 @@ mod tests {
 
     /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
     /// two blocks and checks the postings after the async dump; the port keeps
-    /// the same postings assertion and is `#[ignore]` exactly like the
-    /// `DISABLED_` case (run with `--ignored`).
+    /// the same postings assertion and runs under `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_Memory (run with --ignored)"]
-    fn disabled_slow_memory() {
+    #[ignore = "slow: C++ MemoryIndexerTest.DISABLED_SLOW_Memory"]
+    fn memory_indexer_memory() {
         let paragraphs = [
             "A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.",
             "An FST will read a set of strings on the input tape and generates a set of relations on the output tape. An FST can be thought of as a translator or relater between strings in a set.",
@@ -11729,8 +11728,8 @@ mod tests {
     /// "A B C" repeated seven times; every document has tf 7 for `a`, `b`, `c`
     /// at positions 0,3,6,…,18.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_SeekPosition (run with --ignored)"]
-    fn disabled_slow_seek_position() {
+    #[ignore = "slow: C++ MemoryIndexerTest.DISABLED_SLOW_SeekPosition"]
+    fn seek_position() {
         let paragraph = "A B C A B C A B C A B C A B C A B C A B C";
         let mut mem = MemoryIndexer::new();
         for i in 0..8192u64 {

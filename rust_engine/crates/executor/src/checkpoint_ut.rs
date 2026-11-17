@@ -219,7 +219,7 @@ fn checkpoint_internal_test_checkpoint0() {
 /// A long DDL/replay sequence: the table survives every checkpoint + restart,
 /// follows `RENAME`, and an index created afterwards survives another restart.
 #[test]
-#[ignore = "SLOW: 8192-row imports interleaved with 15 checkpoints/restarts"]
+#[ignore = "slow: 8192-row imports interleaved with 15 checkpoints/restarts"]
 fn checkpoint_internal_test_checkpoint1() {
     let dir = tempdir().unwrap();
     let mut e = Engine::open(dir.path()).unwrap();
@@ -346,7 +346,7 @@ fn checkpoint_internal_test_checkpoint2() {
 /// dropped the column can go, and both checkpoints and restarts happen in
 /// between.
 #[test]
-#[ignore = "SLOW: reference is a long DDL/checkpoint/restart sequence"]
+#[ignore = "slow: reference is a long DDL/checkpoint/restart sequence"]
 fn checkpoint_internal_test_checkpoint3() {
     let dir = tempdir().unwrap();
     let mut e = Engine::open(dir.path()).unwrap();
@@ -420,7 +420,7 @@ fn checkpoint_internal_test_checkpoint3() {
 /// One segment holding one block; a checkpoint, a restart and a compaction of
 /// that segment must all succeed and keep the rows.
 #[test]
-#[ignore = "SLOW: reference is a long checkpoint/compact/restart sequence"]
+#[ignore = "slow: reference is a long checkpoint/compact/restart sequence"]
 fn checkpoint_internal_test_checkpoint4() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();

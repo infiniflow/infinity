@@ -81,65 +81,67 @@ impl Engine {
         // (`GetChunkIDs1`) instead of scanning a spill set. The id is the
         // caller's: it is the record being rebuilt, not "the column's index".
         let set = self.index_segment_set(table);
-        // One chunk per **block**, as the reference does: the mem indexer is
-        // handed a block at a time (`InsertBlockData`,
-        // `secondary_index_in_mem_impl.cpp:104`) and dumps only that block into
-        // the chunk. The offsets stay segment-relative - the reader ORs every
-        // chunk's hits into a segment-wide bitmask (`TrunkReaderT::OutPut`,
-        // `index_filter_evaluators_impl.cpp:912`) - so only the split point
-        // changes here, not the values.
-        let block_rows = storage::format::DEFAULT_BLOCK_CAPACITY as u64;
+        // One chunk per **(index, segment)**, not per block: the reference's
+        // `PopulateSecondaryIndexInner` feeds every block of the segment into
+        // one `SecondaryIndexInMemT` (`InsertBlockData`) and then writes exactly
+        // one chunk from it (`GetChunkIndexMetaInfo` + `AddNewChunkIndex1`;
+        // `new_chunk_ids` receives a single id). Splitting by block multiplies
+        // the chunk count by the block count and moves every `base_row_id`: a
+        // reader still answers the same because the offsets are
+        // segment-relative (`TrunkReaderT::OutPut`,
+        // `index_filter_evaluators_impl.cpp:912`), but the persisted catalog no
+        // longer matches the reference.
         let mut readers = Vec::new();
         let mut meta: Vec<(u64, usize)> = Vec::new();
-        for (segment, entries) in by_segment {
-            let mut by_block: std::collections::BTreeMap<u64, Vec<_>> = Default::default();
-            for entry in entries {
-                by_block
-                    .entry(u64::from(entry.1) / block_rows)
-                    .or_default()
-                    .push(entry);
+        for (segment, mut entries) in by_segment {
+            // `Key::cmp` is the chunk's own order: u64 for integers and hashed
+            // text, the float order for a FLOAT/DOUBLE column.
+            entries.sort_by(|a, b| a.0.order(&b.0));
+            let next = self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
+            let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
+            if std::fs::create_dir_all(&seg_dir).is_err() {
+                continue;
             }
-            for (block, mut entries) in by_block {
-                // `Key::cmp` is the chunk's own order: u64 for integers and
-                // hashed text, the float order for a FLOAT/DOUBLE column.
-                entries.sort_by(|a, b| a.0.order(&b.0));
-                let next = self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
-                let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
-                if std::fs::create_dir_all(&seg_dir).is_err() {
-                    continue;
-                }
-                let path = seg_dir.join(format!("chunk_{next}.idx"));
-                if write_secondary_segment_typed(&path, kind, &entries).is_err() {
-                    continue;
-                }
-                // `AddNewChunkIndex1`.
-                let record = catalog::layout::IndexChunk {
-                    chunk_id: next,
-                    base_name: String::new(),
-                    base_row_id: (segment << 32) | (block * block_rows),
-                    row_count: entries.len() as u64,
-                    term_count: 0,
-                    index_size: 0,
-                    commit_ts: self.txn.current_ts().max(1),
-                };
-                let index = catalog::layout::IndexSegment {
-                    index_id,
-                    segment_id: segment as u32,
-                    chunks: vec![record.clone()],
-                };
-                let _ = self
-                    .storage
-                    .catalog
-                    .append_index_chunk(&set, &index, &record);
-                if let Ok(reader) =
-                    storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
-                {
-                    // The chunk's offsets are already segment-relative, so the
-                    // base is the segment alone; its `ChunkIndexMetaInfo` covers
-                    // the rows the block held.
-                    meta.push((segment << 32, entries.len()));
-                    readers.push((segment << 32, Arc::new(reader)));
-                }
+            let path = seg_dir.join(format!("chunk_{next}.idx"));
+            if write_secondary_segment_typed(&path, kind, &entries).is_err() {
+                continue;
+            }
+            // `ChunkIndexMetaInfo::row_count_` counts **data rows**, not
+            // entries (`SecondaryIndexInMemT::GetRowCount`): a JSON row
+            // contributes one entry per flattened term but one row.
+            let row_count = {
+                let mut offsets: Vec<u32> = entries.iter().map(|(_, offset)| *offset).collect();
+                offsets.sort_unstable();
+                offsets.dedup();
+                offsets.len()
+            };
+            // `AddNewChunkIndex1`.
+            let record = catalog::layout::IndexChunk {
+                chunk_id: next,
+                base_name: String::new(),
+                base_row_id: segment << 32,
+                row_count: row_count as u64,
+                term_count: 0,
+                index_size: 0,
+                commit_ts: self.txn.current_ts().max(1),
+            };
+            let index = catalog::layout::IndexSegment {
+                index_id,
+                segment_id: segment as u32,
+                chunks: vec![record.clone()],
+            };
+            let _ = self
+                .storage
+                .catalog
+                .append_index_chunk(&set, &index, &record);
+            if let Ok(reader) =
+                storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
+            {
+                // The chunk's offsets are already segment-relative, so the base
+                // is the segment alone; its `ChunkIndexMetaInfo` covers every
+                // row the segment holds.
+                meta.push((segment << 32, row_count));
+                readers.push((segment << 32, Arc::new(reader)));
             }
         }
         let tkey = self.table_key(table);

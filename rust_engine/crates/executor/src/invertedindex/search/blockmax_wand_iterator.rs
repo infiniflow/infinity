@@ -157,6 +157,17 @@ pub(crate) enum WandMode {
     Boolean,
 }
 
+/// The reference's `BlockMaxWandStats`: what one scan cost.
+#[cfg(test)]
+#[derive(Clone, Copy, Default, Debug)]
+pub(crate) struct WandStats {
+    pub iterations: u64,
+    pub docs_scored: usize,
+    pub child_advances: u64,
+    pub block_seeks: u64,
+    pub heap_ops: u64,
+}
+
 /// One (field, term) posting cursor: the reference's TermDocIterator.
 struct Cursor<'a> {
     /// Position of this cursor in creation order (field-major, then term).
@@ -502,6 +513,42 @@ impl<'a> BlockMaxWandIterator<'a> {
         (self.best, self.score_evaluations, self.max_scored_block)
     }
 
+    /// [`Self::run`] plus the counters of the scan it just finished.
+    #[cfg(test)]
+    pub(crate) fn run_with_stats(mut self) -> (Vec<(u64, f64)>, WandStats) {
+        self.drive();
+        let stats = self.stats();
+        (self.best, stats)
+    }
+
+    /// `Next(target)` without the top-k wrapper: the caller sees every candidate
+    /// the pruned path stops on, which is what a `topn=0` scan does.
+    #[cfg(test)]
+    pub(crate) fn step(&mut self, target: Option<u64>) -> bool {
+        self.next(target)
+    }
+
+    /// The document and exact score `step` stopped on.
+    #[cfg(test)]
+    pub(crate) fn current(&self) -> Option<(u64, f64)> {
+        self.doc_id.map(|doc| (doc, self.candidate_score))
+    }
+
+    /// The reference's `BlockMaxWandStats`.
+    #[cfg(test)]
+    pub(crate) fn stats(&self) -> WandStats {
+        WandStats {
+            iterations: self.rounds,
+            docs_scored: self.score_evaluations,
+            child_advances: self.child_advances,
+            // `jumps` counts the rounds that moved the prefix to a cursor that
+            // still sat before the pivot; the reference counts the same rounds
+            // as block seeks (`block_seeks_`).
+            block_seeks: self.jumps,
+            heap_ops: self.heap_ops,
+        }
+    }
+
     /// Hands a cursor the last round popped back to the heap, resolving the
     /// block cursor it was seek-ed to. A cursor that ran out is retired: its
     /// whole upper bound leaves the search.
@@ -582,9 +629,15 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.doc_id = None;
                 return false;
             };
-            // Reposition the cursors the last pivot parked on the candidate.
-            // Everything else still in the heap already sits above doc_id.
-            self.advance_prefix(target);
+            // Reposition every cursor below the target: the ones the last pivot
+            // parked on the candidate, and every cursor still in the heap that
+            // sits before it. A cursor the last round never parked on the
+            // candidate was left at its own document, and without this the next
+            // pivot would stop there and hand back a document *before* the one
+            // requested. The reference's heap variant does the same
+            // (`while (!head_.empty() && ctx_[head_.front()]->DocID() < target)
+            // PushBack(PopHead(), target)`, heap_blockmax_wand_iterator_impl.cpp:379).
+            self.skip_to(target);
         }
         loop {
             self.rounds += 1;
@@ -750,13 +803,9 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.doc_id = None;
                 return false;
             };
-            for i in std::mem::take(&mut self.prefix) {
-                let cursor = &mut self.cursors[i];
-                if cursor.cur.is_some_and(|doc| doc < target) {
-                    cursor.seek(target);
-                }
-                self.push_back(i);
-            }
+            // Same repositioning as the pruned path: the parked prefix and every
+            // heap cursor left below the target move up to it.
+            self.skip_to(target);
         }
         loop {
             self.prefix.clear();

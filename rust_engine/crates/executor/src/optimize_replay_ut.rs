@@ -129,8 +129,8 @@ fn optimize_index_then_drop_index() {
 /// C++ `src/unit_test/storage/new_catalog/optimize_index_ut.cpp:687`
 /// (`TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_optimize_index`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_optimize_index_and_optimize_index"]
-fn disabled_slow_optimize_index_and_optimize_index() {
+#[ignore = "slow: C++ TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_optimize_index"]
+fn optimize_index_and_optimize_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -151,8 +151,8 @@ fn disabled_slow_optimize_index_and_optimize_index() {
 /// C++ `src/unit_test/storage/new_catalog/optimize_index_ut.cpp:822`
 /// (`TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_dump_index`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_optimize_index_and_dump_index"]
-fn disabled_slow_optimize_index_and_dump_index() {
+#[ignore = "slow: C++ TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_dump_index"]
+fn optimize_index_and_dump_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -238,8 +238,8 @@ fn optimize_index_then_rename_table() {
 /// C++ `src/unit_test/storage/new_catalog/optimize_index_ut.cpp:1611`
 /// (`TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_compact_table`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_optimize_index_and_compact_table"]
-fn disabled_slow_optimize_index_and_compact_all_segments() {
+#[ignore = "slow: C++ TestTxnOptimizeIndex.DISABLED_SLOW_optimize_index_and_compact_table"]
+fn optimize_index_and_compact_table() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -271,8 +271,8 @@ fn prepare_replay(e: &Engine) {
 /// C++ `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp:413`
 /// (`TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_commit`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_optimize_commit"]
-fn disabled_slow_test_optimize_commit() {
+#[ignore = "slow: C++ TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_commit"]
+fn replay_optimize_commit() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     prepare_replay(&e);
@@ -294,8 +294,8 @@ fn disabled_slow_test_optimize_commit() {
 /// C++ `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp:455`
 /// (`TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_rollback`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_optimize_rollback"]
-fn disabled_slow_test_optimize_rollback() {
+#[ignore = "slow: C++ TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_rollback"]
+fn replay_optimize_rollback() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     prepare_replay(&e);
@@ -310,8 +310,8 @@ fn disabled_slow_test_optimize_rollback() {
 /// C++ `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp:511`
 /// (`TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_interrupt`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_optimize_interrupt"]
-fn disabled_slow_test_optimize_interrupt() {
+#[ignore = "slow: C++ TestTxnReplayOptimize.DISABLED_SLOW_test_optimize_interrupt"]
+fn replay_optimize_interrupt() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     prepare_replay(&e);
@@ -325,8 +325,8 @@ fn disabled_slow_test_optimize_interrupt() {
 /// C++ `src/unit_test/storage/new_catalog/replay_restore_ut.cpp:269`
 /// (`TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_table_snapshot`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_repaly_restore_table_snapshot"]
-fn disabled_slow_test_repaly_restore_table_snapshot() {
+#[ignore = "slow: C++ TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_table_snapshot"]
+fn replay_restore_table_snapshot() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -343,8 +343,8 @@ fn disabled_slow_test_repaly_restore_table_snapshot() {
 /// C++ `src/unit_test/storage/new_catalog/replay_restore_ut.cpp:331`
 /// (`TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_database_snapshot`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_repaly_restore_database_snapshot"]
-fn disabled_slow_test_repaly_restore_database_snapshot() {
+#[ignore = "slow: C++ TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_database_snapshot"]
+fn replay_restore_database_snapshot() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -361,8 +361,8 @@ fn disabled_slow_test_repaly_restore_database_snapshot() {
 /// C++ `src/unit_test/storage/new_catalog/replay_restore_ut.cpp:399`
 /// (`TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_system_snapshot`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_repaly_restore_system_snapshot"]
-fn disabled_slow_test_repaly_restore_system_snapshot() {
+#[ignore = "slow: C++ TestTxnReplayRestore.DISABLED_SLOW_test_repaly_restore_system_snapshot"]
+fn replay_restore_system_snapshot() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);

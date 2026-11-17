@@ -1975,7 +1975,7 @@ mod tests {
     ///
     /// `#[ignore]`d for the unit lane: the training this case builds dominates
     /// the crate's wall time. `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_mode_trains_and_searches_without_residuals() {
         const DIM: u32 = 32;
@@ -2100,7 +2100,7 @@ mod tests {
     /// both preserve the ColBERTSaR flag, the centroids and the document.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_move_semantics() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2133,7 +2133,7 @@ mod tests {
     /// serialized size.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_mem_usage() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2153,7 +2153,7 @@ mod tests {
     /// centroids merge into one 10-document index without residuals.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_merge() {
         let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
@@ -2262,7 +2262,7 @@ mod tests {
     /// bytes.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_size_smaller_than_plaid() {
         const DIM: u32 = 32;

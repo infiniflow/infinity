@@ -53,10 +53,16 @@ struct Shared {
 
 /// A background task processor (`BGTaskProcessor`).
 pub struct BGTaskProcessor {
-    /// `None` before `start` and after `stop`: dropping the last sender closes
-    /// the channel, so the worker's `recv().await` returns `None` and it exits
-    /// once the queue is drained.
+    /// Created in `new`, closed in `stop`. The reference's processor owns its
+    /// blocking queue from construction and `Start()` only takes the consumer
+    /// out of it (`BackgroundProcessor::Start`), so a task submitted before
+    /// `start` waits in the queue instead of being dropped: a quota breach can
+    /// arrive before the owner has started the pool (the tests rely on it - the
+    /// reference submits the dump from the append path and starts the processor
+    /// afterwards).
     jobs: Mutex<Option<tokio::sync::mpsc::Sender<Box<dyn BgTask>>>>,
+    /// The queue's receiving half, parked here between `new` and `start`.
+    queue: Mutex<Option<tokio::sync::mpsc::Receiver<Box<dyn BgTask>>>>,
     shared: Arc<Shared>,
     /// The worker's `JoinHandle`. A runtime task, so `stop` waits by aborting
     /// nothing - it closes the channel and parks until the worker's own
@@ -71,8 +77,10 @@ impl BGTaskProcessor {
         // tokio fan-out), so a second consumer would only let two dumps of one
         // table race. The parameter stays so the call shape matches the
         // reference's processor pool.
+        let (jobs, queue) = tokio::sync::mpsc::channel::<Box<dyn BgTask>>(QUEUE_CAPACITY);
         Self {
-            jobs: Mutex::new(None),
+            jobs: Mutex::new(Some(jobs)),
+            queue: Mutex::new(Some(queue)),
             shared: Arc::new(Shared {
                 outstanding: AtomicUsize::new(0),
                 idle: Mutex::new(()),
@@ -83,13 +91,18 @@ impl BGTaskProcessor {
     }
 
     /// Starts the worker task. Idempotent.
+    ///
+    /// The queue already exists (`new`), so this only attaches the consumer.
+    /// `start` is not what makes `submit` legal: a task submitted before it
+    /// waits in the same channel.
     pub fn start(self: &Arc<Self>) {
         let mut handles = self.handles.lock().unwrap();
         if !handles.is_empty() {
             return;
         }
-        let (jobs, mut queue) = tokio::sync::mpsc::channel::<Box<dyn BgTask>>(QUEUE_CAPACITY);
-        *self.jobs.lock().unwrap() = Some(jobs);
+        let Some(mut queue) = self.queue.lock().unwrap().take() else {
+            return;
+        };
         let shared = Arc::clone(&self.shared);
         let handle = crate::scheduler::scheduler().spawn_task(async move {
             while let Some(task) = queue.recv().await {
@@ -121,6 +134,10 @@ impl BGTaskProcessor {
     /// without running: callers that set a "proposed work" flag before
     /// submitting must clear it again, or the flag stays set for the rest of
     /// the process and stops new work from being proposed.
+    ///
+    /// A task submitted **before** `start` is queued, not rejected: the queue
+    /// exists from `new` (see the field comment), so `false` only ever means
+    /// "stopped" or "the queue is full".
     ///
     /// The send is `try_send`, not `blocking_send`: `submit` is called from
     /// `enforce_memindex_quota`, which already runs on a **runtime worker**

@@ -431,7 +431,7 @@ fn replay_of_the_test_alter_complex_sequence_around_a_checkpoint() {
 /// (`apply_replayed_rows` -> `ids_at` for a frame), which is tracked, not
 /// closed. Run with `--ignored` when working on that path.
 #[test]
-#[ignore = "reproduces a replay-side column-time mismatch under a racing checkpoint"]
+#[ignore = "known-defect: a replay-side column-time mismatch under a racing checkpoint"]
 fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
     for _ in 0..50 {
         let dir = tempdir().unwrap();
