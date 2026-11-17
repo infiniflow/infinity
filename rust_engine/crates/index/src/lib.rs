@@ -21,6 +21,7 @@ pub mod knn_flat;
 pub mod linscan;
 pub mod lsg;
 pub mod lvq;
+pub mod maintain;
 pub mod merge_knn;
 pub mod multivector;
 pub mod parallel;
@@ -29,6 +30,7 @@ pub mod plaid;
 pub mod rabitq;
 pub mod simd;
 pub mod smve;
+pub mod spann;
 pub mod sparse;
 pub mod vector;
 

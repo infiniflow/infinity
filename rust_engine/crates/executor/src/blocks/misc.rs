@@ -307,8 +307,136 @@ impl<'a> BlockCursor<'a> {
         out.sort_by_key(|(seq, _)| *seq);
         Ok(out)
     }
+    /// The embedding column of `ids` as `f32`, one decode per block the ids
+    /// touch: [`Self::rows`] for the one caller that wants numbers rather than
+    /// the row's text form (the exact rescoring of a vector query).
+    ///
+    /// A row the append buffer holds has no block bytes, so its cell is parsed
+    /// from the text it was written as - the same value, just not yet mirrored.
+    pub(crate) fn vectors(
+        &mut self,
+        col: usize,
+        dim: usize,
+        element_type: i32,
+        ids: &[u64],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let mut complete = true;
+        let mut out = self.vectors_of(col, dim, element_type, ids, &mut complete)?;
+        if !complete && self.refresh_visible() {
+            out = self.vectors_of(col, dim, element_type, ids, &mut complete)?;
+        }
+        Ok(out)
+    }
+
+    /// [`Self::vectors`] against the snapshot the cursor holds; the walk is the
+    /// one [`Self::rows_of`] does, with the cell decoded as `f32` instead of
+    /// rendered to text.
+    fn vectors_of(
+        &mut self,
+        col: usize,
+        dim: usize,
+        element_type: i32,
+        ids: &[u64],
+        complete: &mut bool,
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let mut sorted: Vec<usize> = ids.iter().map(|id| *id as usize).collect();
+        sorted.sort_unstable();
+        sorted.dedup();
+        let mut out: Vec<(usize, Vec<f32>)> = Vec::with_capacity(sorted.len());
+        let mut at = 0usize;
+        while at < sorted.len() {
+            let seq = sorted[at];
+            let segment = (seq >> 32) as u32;
+            let block_no = ((seq & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16;
+            let mut end = at + 1;
+            while end < sorted.len()
+                && (sorted[end] >> 32) as u32 == segment
+                && ((sorted[end] & 0xffff_ffff) / DEFAULT_BLOCK_CAPACITY) as u16 == block_no
+            {
+                end += 1;
+            }
+            let run = &sorted[at..end];
+            at = end;
+            let live: std::collections::HashSet<usize> = run
+                .iter()
+                .copied()
+                .filter(|seq| !self.dead.contains(&(*seq as u64)))
+                .collect();
+            let mut pending = self.engine.buffered_rows_for(&self.table, &live);
+            let mut wanted: std::collections::HashSet<usize> = Default::default();
+            for seq in &live {
+                if let Some(values) = pending.remove(seq) {
+                    if let Some(Value::Str(text)) = values.get(col) {
+                        let parsed = crate::parse_vec_f32(text);
+                        if parsed.len() == dim {
+                            out.push((*seq, parsed));
+                        }
+                    }
+                    continue;
+                }
+                wanted.insert(*seq);
+            }
+            if wanted.is_empty() {
+                continue;
+            }
+            if !self.visible.contains(&(segment, block_no)) {
+                *complete = false;
+                continue;
+            }
+            let id = BlockId {
+                db_id: self.engine.database_id_of(&self.table),
+                table_id: self.meta.id,
+                segment_id: segment,
+                block_id: block_no,
+            };
+            if self
+                .block
+                .as_ref()
+                .map(|(cached, _)| *cached != id)
+                .unwrap_or(true)
+            {
+                let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                    *complete = false;
+                    continue;
+                };
+                self.block = Some((id, block));
+            }
+            let (_, block) = self.block.as_ref().unwrap();
+            let version = block.version();
+            wanted.retain(|seq| {
+                let slot = (*seq & 0xffff_ffff) % DEFAULT_BLOCK_CAPACITY;
+                version.deleted.get(slot).copied().unwrap_or(0) == 0
+            });
+            if wanted.is_empty() {
+                continue;
+            }
+            let Some(rows) = Engine::decode_vectors_of_block(
+                &self.meta.ids,
+                crate::blocks::engine::VectorColumn {
+                    declared: &self.meta.types,
+                    storage: &self.types,
+                    col,
+                    dim,
+                    element_type,
+                },
+                id,
+                version,
+                block.as_ref(),
+                &wanted,
+            ) else {
+                *complete = false;
+                continue;
+            };
+            if rows.len() < wanted.len() {
+                *complete = false;
+            }
+            out.extend(rows);
+        }
+        out.sort_by_key(|(seq, _)| *seq);
+        Ok(out)
+    }
+
     /// The stored text of `seq`, ready to be written back under another id, or
-    /// `None` when the row is deleted or outside the visible blocks.
     ///
     /// Buffer first: a row written after the last checkpoint is in the append
     /// buffer. A row the blocks hold is re-encoded through the same text form

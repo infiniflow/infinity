@@ -376,8 +376,14 @@ impl Engine {
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
                 memindex_pending: Arc::new(std::sync::Mutex::new(MemIndexPending::default())),
+                watermarks: std::sync::Mutex::new(Watermarks::new(0)),
+                seal_scheduler: std::sync::Mutex::new(SealScheduler::new(1)),
+                recall: std::sync::Mutex::new(std::collections::HashMap::new()),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
+                spann_stats: Mutex::new(std::collections::HashMap::new()),
+                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(6),
+                pending_budget: std::sync::atomic::AtomicUsize::new(512 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
                         .ok()
@@ -416,6 +422,8 @@ impl Engine {
             cpu_sample: Mutex::new(None),
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
             profile_enabled: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(feature = "testing")]
+            armed_panic: std::sync::atomic::AtomicBool::new(false),
         };
         // If this directory was written by the C++ engine (its catalog keys are
         // in the catalog store, but the native catalog is empty), take over its
@@ -627,7 +635,12 @@ impl Engine {
                 self.recompute_memindex_total();
             }
         }
-        if self.budget_bytes() <= quota {
+        // §9.5: one ledger, three waterlines. `soft` asks for a background
+        // seal, `hard` escalates it to every tail of the table; there is no
+        // second (row-based) trigger deciding *when* to dump - rows bound what
+        // one index keeps, bytes decide the pressure.
+        let pressure = self.seal_pressure();
+        if pressure == Pressure::Normal {
             return;
         }
         if self.bg_processor.lock().unwrap().is_some() {
@@ -671,7 +684,7 @@ impl Engine {
             return;
         }
         self.refresh_memindex_charge(table);
-        if self.budget_bytes() <= quota {
+        if self.seal_pressure() == Pressure::Normal {
             return;
         }
         if self.bg_processor.lock().unwrap().is_some() {
@@ -748,6 +761,68 @@ impl Engine {
                 .unwrap()
                 .pending
                 .remove(&key);
+        }
+    }
+
+    /// Records one sampled query's recall (`SPANN_DESIGN.md` §11.3 item 4).
+    ///
+    /// The exact answer is computed by the *same* scoring code with the candidate
+    /// set removed, over the warm vector cache: no metric arithmetic is
+    /// duplicated, and the sample never decodes the table. A query that is not
+    /// scoring from the cache (cold cache, or a filtered query, which has none)
+    /// is skipped instead of paying for a full decode - the monitor is a
+    /// sampler, not a reason to make one query O(table).
+    ///
+    /// The monitor's lock is only held across the sample decision and the
+    /// update, never across the exact pass: that pass can take milliseconds, and
+    /// holding the map would serialise every other index's queries behind it.
+    #[allow(clippy::too_many_arguments)]
+    fn observe_recall(
+        &self,
+        key: &crate::engine::recall::RecallKey,
+        scan: knn_scan::PhysicalKnnScan<'_>,
+        keep: &dyn Fn(&[Value]) -> bool,
+        bmp_scores: &HashMap<usize, f64>,
+        mv_scores: &HashMap<usize, f64>,
+        scored: &[(usize, f64, f64)],
+        elapsed: std::time::Duration,
+    ) {
+        if scan.cache.is_none() || scored.is_empty() {
+            return;
+        }
+        {
+            let mut monitors = self.context.recall.lock().unwrap();
+            let Some(monitor) = monitors.get_mut(key) else {
+                return;
+            };
+            if !monitor.sample() {
+                return;
+            }
+        }
+        let exact_scan = knn_scan::PhysicalKnnScan {
+            vector_candidates: None,
+            ..scan
+        };
+        let Ok(state) = exact_scan.execute(keep, bmp_scores, mv_scores) else {
+            return;
+        };
+        let exact = exact_scan.finish(state).scored;
+        if exact.is_empty() {
+            return;
+        }
+        let wanted: std::collections::HashSet<usize> =
+            exact.iter().map(|(seq, _, _)| *seq).collect();
+        let found = scored
+            .iter()
+            .filter(|(seq, _, _)| wanted.contains(seq))
+            .count();
+        let est = found as f32 / wanted.len() as f32;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if let Some(monitor) = self.context.recall.lock().unwrap().get_mut(key) {
+            let _ = monitor.observe(now, est, elapsed.as_secs_f32() * 1000.0);
         }
     }
 
@@ -3816,6 +3891,10 @@ impl Engine {
                 t_build.elapsed()
             );
         }
+        // The graph is heap and `memindex_bytes_of` now takes it from `mem_usage`,
+        // which no write charged: without this the watermarks never saw a graph
+        // `CREATE INDEX` built.
+        self.refresh_memindex_charge(table);
         Ok(())
     }
 
@@ -4883,6 +4962,72 @@ impl Engine {
         Ok(out)
     }
 
+    /// The rows `filters` admit, as a row-id set, or `None` when their shapes
+    /// are not columnar-evaluable.
+    ///
+    /// [`Self::match_filter_rows`] decodes every column of every row; this
+    /// decodes only the columns the predicates name and evaluates them a column
+    /// at a time ([`crate::columnar_filter::predicate_mask`]). That is what
+    /// makes the vector index usable under a filter: building the mask must not
+    /// cost more than the scan the mask replaces.
+    ///
+    /// `None` is not "no rows" - it is "use the exact scan", which is the only
+    /// safe answer for a shape this module does not evaluate.
+    fn columnar_mask_rows(
+        &self,
+        table: &str,
+        filters: &[&Expr],
+    ) -> Option<std::collections::HashSet<usize>> {
+        if filters.is_empty() {
+            return None;
+        }
+        let mut wanted: Vec<usize> = Vec::new();
+        for filter in filters {
+            collect_columns(filter, &mut wanted);
+        }
+        wanted.sort_unstable();
+        wanted.dedup();
+        if wanted.is_empty() {
+            return None;
+        }
+        // A column the mask cannot read exactly must not be guessed at: a
+        // hidden `#_row_id` (past the catalog's columns) or a vector/tensor
+        // column decodes differently from the row path, and a wrong cell here
+        // drops a row the exact scan would keep - a false negative is the one
+        // error a pushed-down filter may not make.
+        let types = self.column_types(table).unwrap_or_default();
+        for pos in &wanted {
+            let decl = types.get(*pos)?;
+            if is_embedding_type(decl) || is_tensor_type(decl) || is_sparse_type(decl) {
+                return None;
+            }
+        }
+        let rows = self
+            .fetch_rows_with_ids_projected_some(table, &wanted)
+            .ok()?;
+        let seqs: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
+        let batch =
+            crate::columnar::Batch::from_rows(rows.into_iter().map(|(_, cells)| cells).collect());
+        let width = batch.width();
+        let column = |pos: usize| (pos < width).then_some(pos);
+        let mut keep: Option<Vec<bool>> = None;
+        for filter in filters {
+            let mask = crate::columnar_filter::predicate_mask(filter, &batch, &column)?;
+            let kept = crate::columnar_filter::matches(&mask);
+            keep = Some(match keep {
+                None => kept,
+                Some(prev) => prev.iter().zip(&kept).map(|(a, b)| *a && *b).collect(),
+            });
+        }
+        let keep = keep?;
+        Some(
+            seqs.into_iter()
+                .zip(keep)
+                .filter_map(|(seq, kept)| kept.then_some(seq))
+                .collect(),
+        )
+    }
+
     /// The row ids whose tensor parses, ascending: the document order a PLAID
     /// chunk was written in (`plaid_chunk` -> `column_docs`).
     ///
@@ -5442,6 +5587,55 @@ impl Engine {
             .row_set_from(table)?
             .into_iter()
             .map(|(seq, cells)| (seq, project(cells)))
+            .collect())
+    }
+
+    /// [`Self::fetch_rows_with_ids_projected`] over several columns: the shape a
+    /// predicate needs, and nothing else.
+    ///
+    /// The block read decodes only `idxs`, and the cells go through
+    /// [`Self::decode_cell`] so a text column keeps its text (`parse_value`
+    /// would turn the string `null` into NULL and make the mask reject a row the
+    /// row path keeps). Everything outside `idxs` is NULL: the result is a mask
+    /// input, never a result row.
+    pub(crate) fn fetch_rows_with_ids_projected_some(
+        &self,
+        table: &str,
+        idxs: &[usize],
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        if idxs.is_empty() {
+            return Ok(Vec::new());
+        }
+        let types = self.column_types(table).unwrap_or_default();
+        let width = idxs.iter().copied().max().map(|i| i + 1).unwrap_or(0);
+        let project = |cells: &[Value]| -> Vec<Value> {
+            let mut out = vec![Value::Null; width];
+            for &i in idxs {
+                if let Some(value) = cells.get(i) {
+                    out[i] = value.clone();
+                }
+            }
+            out
+        };
+        if !self.mirror_dirty(table) {
+            if let Ok((_, rows)) = self.read_blocks_pruned(table, idxs, &[]) {
+                let mut out = Vec::with_capacity(rows.len());
+                for (seq, cells) in rows {
+                    let mut row = vec![Value::Null; width];
+                    for &i in idxs {
+                        if let Some(cell) = cells.get(i) {
+                            row[i] = self.decode_cell(table, &types, i, cell)?;
+                        }
+                    }
+                    out.push((seq, row));
+                }
+                return Ok(out);
+            }
+        }
+        Ok(self
+            .row_set_from(table)?
+            .into_iter()
+            .map(|(seq, cells)| (seq, project(&cells)))
             .collect())
     }
 
@@ -6637,6 +6831,26 @@ impl Engine {
                         )));
                     }
                 }
+            }
+            "SPANN" => {
+                if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "{index_type} index requires a vector column, got '{ty}'"
+                    )));
+                }
+                for (k, _) in opts {
+                    if !crate::spann_mem::OPTION_KEYS
+                        .iter()
+                        .any(|known| known.eq_ignore_ascii_case(k))
+                    {
+                        return Err(Error::Invalid(format!(
+                            "invalid index parameter: unsupported SPANN option '{k}'"
+                        )));
+                    }
+                }
+                // The builder owns the value checks (ranges, metric spellings,
+                // encode names), so the DDL and the build agree by construction.
+                crate::spann_mem::options_from(opts)?;
             }
             "PLAID" => {
                 if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
@@ -8931,6 +9145,11 @@ impl Engine {
         }
         let schema = self.table_schema(table)?;
         let types = self.column_types(table)?;
+        // §11.3 item 4: the end-to-end latency a sampled query reports.
+        let query_started = std::time::Instant::now();
+        // The index whose recall monitor decides the search width, set below
+        // once the statement has picked an index.
+        let mut recall_key: Option<crate::engine::recall::RecallKey> = None;
         // An in-parenthesis `WHERE` filter also prunes candidates before ranking.
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(planner::predicate_expr(p, &schema)?),
@@ -9498,14 +9717,48 @@ impl Engine {
         // candidate set is known.
         let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
+        // The predicates a scored row must pass. Defined here rather than next
+        // to the scan because the streamed rerank below scores one batch at a
+        // time, before that scan exists.
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
         // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
         let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
+        // The rows the statement's predicates admit, as a row-id set.
+        //
+        // This is the reference's `CommonQueryFilter` bitmask built the cheap
+        // way: only the columns the predicate names are decoded, so a filter on
+        // `id` never reads the embedding or the text column. `None` means the
+        // shapes are not columnar-evaluable (LIKE, IN, a function, a column
+        // compared to a column), and then a filtered query keeps the exact scan
+        // - an index whose candidates the mask cannot prune would answer a short
+        // top-k (`docs/SPANN_DESIGN.md` §12.5).
+        let allowed: Option<std::collections::HashSet<usize>> = if has_filter {
+            let filters: Vec<&Expr> = pred
+                .into_iter()
+                .chain(in_filter.as_ref())
+                .chain(search_filter.as_ref())
+                .collect();
+            self.columnar_mask_rows(table, &filters)
+        } else {
+            None
+        };
         // Walk a persisted HNSW graph instead of every row when one is loaded
         // for this column (plan #70). The candidates are still scored exactly
         // below, so the ranking equals the exhaustive scan whenever the graph
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
+        // The query as `f32`, parsed **once**. The probe, the exact rescoring of
+        // its candidates and the exact scan all want the numbers, and each used
+        // to parse the literal again - at 1536d that is ~27 us a time.
+        let query_f32: Vec<f32> = query_items
+            .iter()
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
             if is_sparse || is_tensor {
                 return None;
@@ -9515,23 +9768,19 @@ impl Engine {
             if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
                 return None; // a single-vector index
             }
-            let qv: Vec<f32> = query_items
-                .iter()
-                .filter_map(|x| x.parse::<f64>().ok())
-                .map(|x| x as f32)
-                .collect();
+            let qv = &query_f32;
             if qv.is_empty() {
                 return None;
             }
-            // A predicate can exclude rows the graph returned, so the graph alone
-            // cannot decide the top-k: the reference re-scores every row the
-            // filter admits. Keep the exact scan for filtered queries.
-            if has_filter {
+            // A filtered query whose predicate the columnar evaluator does not
+            // cover has no mask to push down; the index would then return rows
+            // the filter rejects and the top-k could come out short.
+            if has_filter && allowed.is_none() {
                 return None;
             }
             // The index this scan reads: the one the statement named, else the
-            // column's first HNSW/IVF index.
-            let index_id = self
+            // column's first HNSW/IVF/SPANN index.
+            let meta = self
                 .storage
                 .catalog
                 .indexes_of_table(&self.qualified_table(table))
@@ -9540,9 +9789,110 @@ impl Engine {
                 .find(|im| {
                     im.column == col_name
                         && (im.index_type.eq_ignore_ascii_case("HNSW")
-                            || im.index_type.eq_ignore_ascii_case("IVF"))
+                            || im.index_type.eq_ignore_ascii_case("IVF")
+                            || im.index_type.eq_ignore_ascii_case("SPANN"))
+                });
+            let index_id = meta.as_ref().map(|im| im.id);
+            // §11.3 items 4/5: the monitor's beam is the search width, and a
+            // `WITH (recall_target = …)` on this statement overrides its target.
+            let beam = index_id.map(|id| {
+                // §15 writes `WITH (nprobe = 32)` for spann, and the SDK sends
+                // `nprobe` to every index type; for spann it *is* the search
+                // width (the number of partitions probed per level), so it is
+                // honoured as the same override `beam` is - only for spann, where
+                // the two words mean one thing.
+                let width_override = knn_opts.beam.or_else(|| {
+                    let spann = meta
+                        .as_ref()
+                        .is_some_and(|im| im.index_type.eq_ignore_ascii_case("SPANN"));
+                    if spann {
+                        knn_opts.nprobe.filter(|n| *n > 0)
+                    } else {
+                        None
+                    }
+                });
+                let base = meta
+                    .as_ref()
+                    .and_then(|im| {
+                        im.options
+                            .iter()
+                            .find(|(key, _)| key.eq_ignore_ascii_case("beam"))
+                            .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+                    })
+                    // The statement path defaults to the reference's *search*
+                    // width (32), not the index's build beam (8): the two are
+                    // different knobs in Cockroach
+                    // (`vector_search_beam_size` vs `IndexOptions.BaseBeamSize`).
+                    .unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
+                // A monitor belongs to one table's index: the id alone is unique only
+                // within the table, and a shared monitor handed a second table the
+                // first one's target, latency budget and width.
+                let monitor_key = (self.table_key(table), id);
+                let mut monitors = self.context.recall.lock().unwrap();
+                let monitor = monitors
+                    .entry(monitor_key.clone())
+                    .or_insert_with(|| RecallMonitor::new(base));
+                if let Some(target) = knn_opts.recall_target {
+                    monitor.set_target(target);
+                }
+                if let Some(budget) = knn_opts.latency_budget_ms {
+                    monitor.set_budget(budget);
+                }
+                recall_key = Some(monitor_key);
+                // `WITH (beam = …)` is a hard override (§11.3 item 5): the
+                // monitor still learns from the query, it just does not set the
+                // width for it.
+                //
+                // `adaptive_beam = false` on a spann index is the same override
+                // as a DDL-level policy (§15's example): the monitor keeps
+                // sampling - that is what `SHOW INDEX`'s recall estimate needs -
+                // but the width stays the index's own. Index types that have no
+                // such option keep the monitor's width.
+                let adaptive = !meta.as_ref().is_some_and(|im| {
+                    im.index_type.eq_ignore_ascii_case("SPANN")
+                        && im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("adaptive_beam")
+                                && value.trim().eq_ignore_ascii_case("false")
+                        })
+                });
+                // The width also has to follow the tree's shape.
+                //
+                // CockroachDB's C-SPANN keeps `BaseBeamSize` an absolute count of
+                // partitions per level (32, halved per level up to the root) and
+                // leaves recall to a deployment-level figure; its adaptive z-score
+                // pass is off for ordinary SQL queries. An absolute count works
+                // there because their partition size is a build-wide constant in
+                // practice. Ours is capped by `max_partition_size`, so the leaf
+                // count grows with the table and a fixed 32 probes a *shrinking
+                // share* of the leaves:
+                //
+                //   961 leaves (40k x 1536d):   32 = 3.3% -> recall@10 0.973
+                //   4033 leaves (200k x 1536d):  32 = 0.79% -> 0.918
+                //   4033 leaves (200k x 1536d): 121 = 3.0% -> 0.948
+                //
+                // So the width is the base raised to `LEAF_SHARE` percent of the
+                // leaves, capped at `LEAF_SHARE_CAP` to bound the probe: a share of
+                // the table is O(rows), and past the cap recall decays with size
+                // again - `WITH (beam = …)` / `nprobe` still name an exact width.
+                let partitions = {
+                    let tables = self.tables.lock().unwrap();
+                    tables
+                        .get(&self.table_key(table))
+                        .and_then(|entry| entry.spann.get(&id))
+                        .map(|handle| handle.shape().0)
+                        .unwrap_or(0)
+                };
+                let leaf_share = (partitions * crate::spann_mem::LEAF_SHARE)
+                    .div_ceil(100)
+                    .clamp(base, crate::spann_mem::LEAF_SHARE_CAP.max(base));
+                width_override.unwrap_or_else(|| {
+                    if adaptive {
+                        monitor.beam().max(leaf_share)
+                    } else {
+                        base
+                    }
                 })
-                .map(|im| im.id);
+            });
             // How many rows the graph has to cover for its answer to be
             // complete. The cache knows it when it is warm; otherwise it is the
             // count the write paths publish. Without either, the coverage test
@@ -9568,10 +9918,13 @@ impl Engine {
                     // is bounded work done once per table.
                     .or_else(|| self.row_count(table).ok().filter(|rows| *rows > 0))
             });
+            // `candidates ∪ uncovered`: the rows the index can win plus the rows
+            // it does not cover (`§9.7`). Both are scored exactly, so a partly
+            // covered table costs the uncovered rows instead of every row.
             self.knn_candidates(&knn_scan::KnnCandidateScan {
                 table,
                 index_id,
-                query: &qv,
+                query: qv,
                 rows: &rows,
                 live_rows: None,
                 live_count,
@@ -9579,7 +9932,10 @@ impl Engine {
                 topn,
                 metric: &metric,
                 options: &knn_opts,
+                allowed: allowed.as_ref(),
+                beam,
             })
+            .map(|probe| probe.rows())
         })();
         // An index answered: its candidates carry the vectors to score, so the
         // column is never read whole. Without one the exact scan wants the
@@ -9590,16 +9946,110 @@ impl Engine {
             (None, Some((col, dims))) => self.vector_cache_for(table, col, *dims).ok(),
             (None, None) => None,
         };
+        // The scan's own metadata, needed by the streamed per-batch scans below.
+        let column_decl = types
+            .get(col_idx)
+            .map(|t| t.to_ascii_uppercase())
+            .unwrap_or_default();
+        let query_elem_arg = arg_str(m.args.get(1));
+        // A dense candidate list is decoded and scored **one batch at a time**.
+        //
+        // The rerank pool is sized by the beam (hundreds of rows at 1 bit), and
+        // holding every decoded row at once is precisely the memory spann
+        // exists to save: 812 rows × 1536d × 4 B is 5 MB per concurrent query,
+        // plus the block pages they pull into the page cache. Each batch is
+        // reduced to its own top-n - a superset of the global top-n within that
+        // batch - so the union stays exact while the peak is O(batch · dim).
+        let mut streamed: Option<Vec<(usize, f64, f64)>> = None;
+        // 64 rows: one batch is ~400 KB at 1536d, small enough that the
+        // per-query working set stops mattering next to the index itself.
+        const RERANK_BATCH: usize = 64;
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
+                // The fast path: an unfiltered dense embedding whose declared
+                // shape matches the query. The row is decoded as `f32` out of its
+                // block (`BlockCursor::vectors`) instead of being rendered into
+                // the text form and parsed back - on 1536d that round trip was
+                // ~240 us of rendering plus ~27 us of parsing per candidate,
+                // which made the pool the entire query
+                // (`spann_query_profile_1536d`).
+                Some(cands)
+                    if !cands.is_empty()
+                        && !has_filter
+                        && !is_sparse
+                        && !is_tensor
+                        && crate::blocks::embedding_shape(&column_decl)
+                            .is_some_and(|(dim, _)| dim == query_f32.len()) =>
+                {
+                    let (dim, element_type) =
+                        crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
+                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                    ids.sort_unstable();
+                    let mut merged: Vec<(usize, f64, f64)> = Vec::with_capacity(ids.len());
+                    let mut cursor = self.block_cursor(table)?;
+                    for chunk in ids.chunks(RERANK_BATCH) {
+                        for (seq, stored) in cursor.vectors(col_idx, dim, element_type, chunk)? {
+                            let (sim, dist) = crate::vector_score_f32(&query_f32, &stored, &metric);
+                            merged.push((seq, sim, dist));
+                        }
+                    }
+                    streamed = Some(merged);
+                    Vec::new()
+                }
+                Some(cands) if !cands.is_empty() && !is_sparse && !is_tensor => {
+                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                    ids.sort_unstable();
+                    let none: HashMap<usize, f64> = HashMap::new();
+                    let mut merged: Vec<(usize, f64, f64)> = Vec::new();
+                    for chunk in ids.chunks(RERANK_BATCH) {
+                        let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
+                        if !has_filter {
+                            for (_, row) in got.iter_mut() {
+                                let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                *row = vec![Value::Null; col_idx + 1];
+                                row[col_idx] = value;
+                            }
+                        }
+                        let batch = knn_scan::PhysicalKnnScan {
+                            column_index: col_idx,
+                            column_type: &column_decl,
+                            is_sparse,
+                            is_tensor,
+                            is_bit_sparse: bit_sparse,
+                            query_items: &query_items,
+                            query_elem_type: query_elem_arg.as_deref(),
+                            topn,
+                            metric: &metric,
+                            threshold,
+                            rows: &got,
+                            cache: None,
+                            vector_candidates: None,
+                        };
+                        merged.extend(batch.finish(batch.execute(&keep, &none, &none)?).scored);
+                    }
+                    streamed = Some(merged);
+                    Vec::new()
+                }
                 // A predicate reads other columns, so a filtered query needs the
                 // whole row; an unfiltered one is scored from the vector column
                 // alone and gets its output rows from the block pass below.
+                //
+                // A point read here, not a block pass: the uncovered rows are
+                // the ones written after the index was built, and those live in
+                // the append buffer as often as in a block - a block-only read
+                // silently dropped them (`§12.6`).
                 Some(cands) if !cands.is_empty() => {
-                    let wanted: &[usize] = if has_filter { &[] } else { &[col_idx] };
-                    let (_, got) = self.read_blocks_candidates_values(table, wanted, cands)?;
+                    let ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                    let mut got = self.fetch_some_rows_with_ids(table, &ids)?;
+                    if !has_filter {
+                        for (_, row) in got.iter_mut() {
+                            let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
+                            *row = vec![Value::Null; col_idx + 1];
+                            row[col_idx] = value;
+                        }
+                    }
                     got
                 }
                 Some(_) => Vec::new(),
@@ -9737,16 +10187,6 @@ impl Engine {
         // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
         // (filters live in the filter-scan base; the index probe above is
         // `KnnCandidateScan`).
-        let keep = |row: &[Value]| {
-            pred.is_none_or(|p| p.eval_predicate(row))
-                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-        };
-        let column_decl = types
-            .get(col_idx)
-            .map(|t| t.to_ascii_uppercase())
-            .unwrap_or_default();
-        let query_elem_arg = arg_str(m.args.get(1));
         let scan = knn_scan::PhysicalKnnScan {
             column_index: col_idx,
             column_type: &column_decl,
@@ -9765,9 +10205,33 @@ impl Engine {
         // Scoring only ever reads the vector column, so the rows it decoded are
         // projections of it. The result rows are read separately (all columns),
         // which is why this scan cannot reuse them.
-        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
+        //
+        // A streamed rerank has already scored every batch and kept each
+        // batch's top-n; `finish` then orders that union and truncates it,
+        // which is the same answer for a monotone ranking key.
+        let state = match streamed {
+            Some(scored) => scan.finish(knn_scan::KnnScanOperatorState {
+                scored,
+                use_sim: scan.is_knn_min_heap(),
+            }),
+            None => scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?),
+        };
         let use_sim = state.use_sim;
         let scored = state.scored;
+        // §11.3 item 4: one query in `DEFAULT_SAMPLE_RATE` is also answered
+        // exactly (from the warm vector cache, never by decoding the table), and
+        // the gap between the two answers is what adapts the search width.
+        if let Some(key) = &recall_key {
+            self.observe_recall(
+                key,
+                scan,
+                &keep,
+                &bmp_scores,
+                &mv_scores,
+                &scored,
+                query_started.elapsed(),
+            );
+        }
 
         // The result rows are read from the blocks in one pass. The scoring pass
         // decoded only the vector column (a projection), so it cannot supply
@@ -10645,4 +11109,37 @@ fn query_field_qualifiers(query: &str) -> Vec<&str> {
         out.push(field);
     }
     out
+}
+
+/// Every column position `expr` reads, appended to `out`.
+///
+/// Used to project a filtered scan onto the columns its predicate names: a
+/// `WHERE id < 10` must not decode the embedding or the text column
+/// (`docs/SPANN_DESIGN.md` §12.5).
+fn collect_columns(expr: &Expr, out: &mut Vec<usize>) {
+    match expr {
+        Expr::Column(pos) => out.push(*pos),
+        Expr::FullText(pos, _, _) | Expr::Regex(pos, _) => out.push(*pos),
+        Expr::Literal(_) => {}
+        Expr::Cmp(a, _, b) | Expr::And(a, b) | Expr::Or(a, b) | Expr::Binary(a, _, b) => {
+            collect_columns(a, out);
+            collect_columns(b, out);
+        }
+        Expr::Not(a) | Expr::IsNull(a, _) => collect_columns(a, out),
+        Expr::Like(a, b, _, _) => {
+            collect_columns(a, out);
+            collect_columns(b, out);
+        }
+        Expr::In(a, list, _) => {
+            collect_columns(a, out);
+            for item in list {
+                collect_columns(item, out);
+            }
+        }
+        Expr::Func { args, .. } => {
+            for arg in args {
+                collect_columns(arg, out);
+            }
+        }
+    }
 }

@@ -1,5 +1,6 @@
 use super::*;
 use catalog::IndexMeta;
+use index::maintain::IndexMaintainer;
 
 /// One secondary index column's readers, snapshotted under the table lock so
 /// that the key lookups run without holding it: the sealed PGM chunks, the
@@ -613,6 +614,91 @@ impl Engine {
         Ok(())
     }
 
+    /// Loads the newest spann chunk of `index` (`docs/SPANN_DESIGN.md` §6).
+    ///
+    /// A rebuild-mode chunk is a whole-table snapshot, so the highest
+    /// `chunk_*.idx` id under `idx_{id}/seg_*/` **is** the index and the older
+    /// ones are superseded. The catalog's chunk list is not consulted: it is
+    /// keyed per segment, and the snapshot covers every segment anyway.
+    pub(crate) fn load_spann_index(
+        &self,
+        table: &str,
+        index: &str,
+        options: &[(String, String)],
+    ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
+        let table = self.qualified_table(table);
+        let opts = crate::spann_mem::options_from(options).ok()?;
+        let dir = self.hnsw_dir(&table, index)?;
+        // One chunk per segment (§6), so the index is the newest live chunk of
+        // **each** segment, not the newest chunk overall. The live chunk list,
+        // not a directory walk: a chunk an `optimize` superseded leaves the list
+        // the moment it is deprecated, while its bytes stay on disk until
+        // `Cleanup` (`live_chunk_files`, `GetChunkIDs1`).
+        let mut segments = self.segment_row_counts(&table);
+        if segments.is_empty() {
+            segments.push((0, 0));
+        }
+        segments.sort_by_key(|(segment, _)| *segment);
+        let mut chunks = Vec::new();
+        for (segment, rows) in segments {
+            if rows == 0 {
+                continue;
+            }
+            let mut best: Option<(u64, std::path::PathBuf)> = None;
+            for (id, path) in self.live_chunk_files(&table, index, segment, &dir) {
+                if best.as_ref().map(|(b, _)| id > *b).unwrap_or(true) {
+                    best = Some((id, path));
+                }
+            }
+            let Some((_, path)) = best else { continue };
+            // Mapped, not decoded: the slot bytes stay in page cache, which is
+            // what makes §19.3's 50M-in-8GB arithmetic work. The CRC of every
+            // section is still verified — once, here.
+            if let Ok(chunk) = storage::knn_index::spann::FileIndex::open(&path, &opts) {
+                chunks.push(std::sync::Arc::new(chunk));
+            }
+        }
+        if chunks.is_empty() {
+            return None;
+        }
+        Some(std::sync::Arc::new(crate::spann_mem::SpannHandle::File(
+            chunks,
+        )))
+    }
+
+    /// Lazily loads a spann index the first time a query needs it.
+    ///
+    /// The query path is the only thing that knows an index is wanted, and it is
+    /// also the only place that must not answer from a stale tree, so a restart
+    /// resolves on the first query instead of at open (`docs/SPANN_DESIGN.md`
+    /// §6).
+    pub(crate) fn spann_lazy_load(
+        &self,
+        table: &str,
+        index_id: u64,
+    ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
+        let meta = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.id == index_id && im.index_type.eq_ignore_ascii_case("SPANN"))?;
+        let tree = self.load_spann_index(&meta.table, &meta.name, &meta.options)?;
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(self.table_key(table))
+            .or_default()
+            .spann
+            .insert(index_id, tree.clone());
+        // A chunk-backed tree owns no heap (`SpannHandle::mem_usage` is 0 for it),
+        // so this only matters if the loader ever hands back a built one - but the
+        // charge is what the watermarks read, and it should never be stale.
+        self.refresh_memindex_charge(table);
+        Some(tree)
+    }
+
     /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
     /// query in the same process sees what `flush()` just mirrored.
     pub(crate) fn reload_vector_indexes(&self) {
@@ -704,6 +790,20 @@ impl Engine {
                         let gone = list.pop().unwrap();
                         total = total.saturating_sub(gone.bytes);
                     }
+                }
+            } else if im.index_type.eq_ignore_ascii_case("SPANN") {
+                // Rebuild-mode chunks are whole-table snapshots, so the newest
+                // chunk is the whole index; a stale one is superseded by id
+                // (`docs/SPANN_DESIGN.md` §9.4).
+                if let Some(tree) = self.load_spann_index(&im.table, &im.name, &im.options) {
+                    let tkey = self.table_key(&im.table);
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .spann
+                        .insert(im.id, tree);
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
@@ -1880,16 +1980,39 @@ impl Engine {
         // scan holds one of these read guards while it fetches rows, and that
         // fetch needs `tables`, so locking an index under `tables` closes the
         // cycle `Engine::text_index_for` documents.
-        let (text, sparse, mv, charged) = {
+        let (text, sparse, mv, hnsw, charged) = {
             let tables = self.tables.lock().unwrap();
             let Some(e) = tables.get(tkey) else {
                 return 0;
             };
+            // The graphs are locked *after* `tables` is dropped: a scan holds one of
+            // them while it waits for `tables` (`Engine::text_index_for`).
+            let hnsw: Vec<(
+                usize,
+                Arc<std::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
+            )> = e
+                .hnsw_mem
+                .iter()
+                .map(|(id, graph)| {
+                    (
+                        e.index_pending_bytes.get(id).copied().unwrap_or(0),
+                        graph.clone(),
+                    )
+                })
+                .collect();
             (
                 e.text.values().cloned().collect::<Vec<_>>(),
                 e.sparse.values().cloned().collect::<Vec<_>>(),
                 e.mv.values().cloned().collect::<Vec<_>>(),
-                e.index_pending_bytes.values().sum::<usize>()
+                hnsw,
+                // `index_pending_bytes` covers HNSW only through its own ids, which
+                // are accounted below (the larger of the two figures, never the sum:
+                // they are two estimates of one graph).
+                e.index_pending_bytes
+                    .iter()
+                    .filter(|(id, _)| !e.hnsw_mem.contains_key(id))
+                    .map(|(_, bytes)| *bytes)
+                    .sum::<usize>()
                     + e.secondary
                         .indexes
                         .values()
@@ -1902,10 +2025,44 @@ impl Engine {
                                 .map(|(_, v)| rows.len() * v.len() * std::mem::size_of::<f32>())
                                 .unwrap_or(0)
                         })
+                        .sum::<usize>()
+                    // §9.2's mem index is rows the spill ledger has to see: it
+                    // holds `id + vector` per pending row until a dump folds them
+                    // into the tree, and the row-count bound only caps it at
+                    // `max_partition_size × 64` rows - 8 MiB at 1536d, which is
+                    // small, but "small" is not "free" when the watermarks are
+                    // computed from this number.
+                    + e.spann_mem
+                        .values()
+                        .map(|rows| {
+                            rows.first()
+                                .map(|(_, v)| {
+                                    rows.len()
+                                        * (std::mem::size_of::<u64>()
+                                            + v.len() * std::mem::size_of::<f32>())
+                                })
+                                .unwrap_or(0)
+                        })
+                        .sum::<usize>()
+                    // The published trees themselves: centroids, member codes and
+                    // - with `encode = none` - the member vectors (`SpannIndex::
+                    // mem_usage`). A chunk-backed handle owns only its header and
+                    // reports 0, its slots being page cache.
+                    + e.spann
+                        .values()
+                        .map(|handle| handle.mem_usage())
                         .sum::<usize>(),
             )
         };
         let mut total = 0usize;
+        for (charge, graph) in hnsw {
+            // Two estimates of one graph: the write path's per-insert charge and the
+            // graph's own size. Neither is complete - a `CREATE INDEX` build charges
+            // nothing, and a seal shrinks the graph without the charge following - so
+            // the larger is the honest figure. Adding them double counts.
+            let size = graph.lock().map(|g| g.mem_usage()).unwrap_or(0);
+            total += charge.max(size);
+        }
         for idx in text {
             if let Ok(g) = idx.read() {
                 total += g.mem.mem_used();
@@ -3315,20 +3472,31 @@ impl Engine {
             // cardinalities, and `secondary_low_cardinality` resolves a column
             // to the first one, which is what the builder needs but not what
             // `SHOW INDEX` asks about.
-            other_parameters: other_params_of(&im.index_type, &im.options, || {
-                let column_type = meta
-                    .columns
-                    .iter()
-                    .position(|c| c == &im.column)
-                    .and_then(|at| meta.types.get(at))
-                    .map(|t| t.trim().to_ascii_uppercase())
-                    .unwrap_or_default();
-                column_type.starts_with("BOOL")
-                    || column_type.starts_with("JSON")
-                    || im.options.iter().any(|(key, value)| {
-                        key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
-                    })
-            }),
+            other_parameters: {
+                let base = other_params_of(&im.index_type, &im.options, || {
+                    let column_type = meta
+                        .columns
+                        .iter()
+                        .position(|c| c == &im.column)
+                        .and_then(|at| meta.types.get(at))
+                        .map(|t| t.trim().to_ascii_uppercase())
+                        .unwrap_or_default();
+                    column_type.starts_with("BOOL")
+                        || column_type.starts_with("JSON")
+                        || im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("CARDINALITY")
+                                && value.eq_ignore_ascii_case("low")
+                        })
+                });
+                // A spann index has runtime state worth reporting - partitions,
+                // mem rows, chunks, degradation, and the query counters - and
+                // `other_parameters` is the only field the RPC carries it in.
+                if im.index_type.eq_ignore_ascii_case("SPANN") {
+                    self.spann_telemetry_text(&table, &im, base)
+                } else {
+                    base
+                }
+            },
             column_id,
         })
     }
@@ -3544,7 +3712,14 @@ impl Engine {
     /// bottom gate.
     pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
         self.dump_all_sealed_blocks(only).await;
-        self.dump_largest_memory_index(only).await;
+        // §9.5: `hard` pressure seals **every** tail of the table - the point of
+        // the escalate level is that one seal is not enough. `soft` seals the
+        // one that gives the most memory back.
+        if self.seal_pressure() == Pressure::Hard {
+            self.dump_every_table_index(only).await;
+        } else {
+            self.dump_largest_memory_index(only).await;
+        }
         // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
         // are **not** sealed here. `seal_sparse_index` is only half a dump: it
         // calls `SealedTail::take`, which removes the entries and hands them
@@ -3631,35 +3806,145 @@ impl Engine {
     /// absorb every breach, and the table that just grew would never drain
     /// (`test_optimize_from_different_database` in the restart suite).
     async fn dump_largest_memory_index(&self, only: Option<&str>) {
+        let Some((tenant, im)) = self.pick_seal_candidate(only) else {
+            return;
+        };
+        let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        // The slot the pick took is released once the seal finished, so the
+        // per-tenant in-flight bound reflects real work.
+        if let Ok(mut scheduler) = self.context.seal_scheduler.lock() {
+            scheduler.done(&tenant);
+        }
+    }
+
+    /// §9.6's fair pick over the tails that hold bytes: weighted by pending
+    /// bytes per **database**, one seal per tenant in flight, and a tail that
+    /// has not been dumped for [`SEAL_STARVE_TICKS`] jumps the queue.
+    ///
+    /// The old rule was "largest wins, ties to the oldest dump". It is the same
+    /// greedy choice §9.6 calls a noisy-neighbour failure: a database holding
+    /// most of the bytes absorbed every seal while another database's tail grew
+    /// unbounded, and nothing counted the starvation.
+    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<(String, IndexMeta)> {
         let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        let mut largest: Option<(usize, u64, &IndexMeta)> = None;
-        for im in &indexes {
+        let mut picked: Vec<(SealCandidate, IndexMeta)> = Vec::new();
+        for im in indexes {
             if let Some(wanted) = &wanted {
                 if &self.table_key(&im.table) != wanted {
                     continue;
                 }
             }
-            if !self.index_has_memory_tail(&im.table, im) {
+            if !self.index_has_memory_tail(&im.table, &im) {
                 continue;
             }
             let bytes = self.index_memory_bytes(&im.table, im.id, &im.index_type);
             if bytes == 0 {
                 continue;
             }
-            let last_dump = self.last_dump_ts(&im.table, &im.name);
-            let better = match largest {
-                None => true,
-                Some((seen, seen_ts, _)) => bytes > seen || (bytes == seen && last_dump < seen_ts),
-            };
-            if better {
-                largest = Some((bytes, last_dump, im));
-            }
+            let tenant = im.table.split('.').next().unwrap_or(&im.table).to_string();
+            picked.push((
+                SealCandidate {
+                    tenant,
+                    bytes: bytes as u64,
+                    last_dump: self.last_dump_ts(&im.table, &im.name),
+                },
+                im,
+            ));
         }
-        let Some((_, _, im)) = largest else {
-            return;
-        };
-        let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        if picked.is_empty() {
+            return None;
+        }
+        let list: Vec<SealCandidate> = picked.iter().map(|(c, _)| c.clone()).collect();
+        let now = self.current_ts();
+        let mut scheduler = self.context.seal_scheduler.lock().unwrap();
+        let at = scheduler.pick(&list, now, SEAL_STARVE_TICKS)?;
+        let tenant = list[at].tenant.clone();
+        let (_, im) = picked.swap_remove(at);
+        Some((tenant, im))
+    }
+
+    /// Seals every tail of `only` (or of every table when `None`).
+    ///
+    /// Only reached under `hard` pressure: the normal path seals one index per
+    /// breach because a table with several indexes would otherwise spend a
+    /// transaction per index on every write. Under memory pressure that trade
+    /// flips - one transaction per tail is cheaper than being over the hard line.
+    async fn dump_every_table_index(&self, only: Option<&str>) {
+        let wanted = only.map(|table| self.table_key(table));
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        for im in indexes {
+            if let Some(wanted) = &wanted {
+                if &self.table_key(&im.table) != wanted {
+                    continue;
+                }
+            }
+            if !self.index_has_memory_tail(&im.table, &im) {
+                continue;
+            }
+            if self.index_memory_bytes(&im.table, im.id, &im.index_type) == 0 {
+                continue;
+            }
+            let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        }
+    }
+
+    /// The §9.5 waterline the byte ledger sits at, after the AIMD retune.
+    ///
+    /// One function computes it, so the write path and the explicit check cannot
+    /// disagree about which level they are at.
+    pub(crate) fn seal_pressure(&self) -> Pressure {
+        let budget = self
+            .context
+            .memindex_quota
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if budget == 0 {
+            return Pressure::Normal;
+        }
+        let pending = self.budget_bytes() as u64;
+        let mut marks = self.context.watermarks.lock().unwrap();
+        if marks.budget() != budget {
+            marks.set_budget(budget);
+        }
+        marks.retune(pending);
+        marks.level(pending)
+    }
+
+    /// The indexes whose recall stayed below target long enough to suggest a
+    /// rebuild (`SPANN_DESIGN.md` §11.3 item 4, §9.4's rebuild is the fix).
+    ///
+    /// Returned rather than logged because there is no operator surface for it
+    /// yet: the `SHOW` variable list and the index listing both mirror the
+    /// reference's wire format, and this counter has no counterpart there.
+    pub fn rebuild_suggested(&self) -> Vec<(String, u64)> {
+        let mut out: Vec<(String, u64)> = self
+            .context
+            .recall
+            .lock()
+            .map(|monitors| {
+                monitors
+                    .iter()
+                    .filter(|(_, monitor)| monitor.rebuild_suggested())
+                    // An index id is only unique within its table, so both halves
+                    // are reported; the caller's list is a diagnostic.
+                    .map(|((table, id), _)| (table.clone(), *id))
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort_unstable();
+        out
+    }
+
+    /// `index_seal_starvation` (§9.5): tails that jumped the queue because their
+    /// previous dump was too long ago. Not surfaced through `SHOW VARIABLE` - the
+    /// global variable list mirrors the reference's `global_name_map_`, and this
+    /// counter has no counterpart there.
+    pub fn index_seal_starvation(&self) -> u64 {
+        self.context
+            .seal_scheduler
+            .lock()
+            .map(|s| s.starvation())
+            .unwrap_or(0)
     }
 
     /// The commit ts of the last dump this index published, or 0 when it has
@@ -3681,7 +3966,7 @@ impl Engine {
     /// Narrower than [`Self::memindex_bytes_of`] on purpose: that one also
     /// counts the unsealed rows and the secondary/IVF tails, which this dump
     /// cannot release.
-    fn index_memory_bytes(&self, table: &str, index_id: u64, index_type: &str) -> usize {
+    pub(crate) fn index_memory_bytes(&self, table: &str, index_id: u64, index_type: &str) -> usize {
         let tkey = self.table_key(table);
         let kind = index_type.trim();
         if is_secondary_kind(kind) {
@@ -3695,16 +3980,34 @@ impl Engine {
                 .unwrap_or(0);
         }
         if kind.eq_ignore_ascii_case("HNSW") {
-            // Q8-quantised vectors, the same figure `note_hnsw_insert` charges
-            // through `index_pending_bytes`.
-            let pending = {
+            // Two figures, and the larger wins. `index_pending_bytes` is what
+            // the **write** path charges (Q8-quantised vectors, the same number
+            // `note_hnsw_insert` adds); the tail's own `mem_usage` is what a seal
+            // would actually release. A graph built by `CREATE INDEX` over an
+            // existing table charges nothing, so before `IndexMaintainer` it
+            // looked empty here and no quota could ever release it.
+            let (charged, tail) = {
                 let tables = self.tables.lock().unwrap();
-                tables
-                    .get(&tkey)
-                    .and_then(|entry| entry.index_pending_bytes.get(&index_id).copied())
-                    .unwrap_or(0)
+                match tables.get(&tkey) {
+                    Some(entry) => (
+                        entry
+                            .index_pending_bytes
+                            .get(&index_id)
+                            .copied()
+                            .unwrap_or(0),
+                        entry.hnsw_mem.get(&index_id).cloned(),
+                    ),
+                    None => (0, None),
+                }
             };
-            return pending;
+            let held = tail
+                .and_then(|m| {
+                    m.lock()
+                        .ok()
+                        .map(|guard| guard.maintainer().pending_bytes())
+                })
+                .unwrap_or(0);
+            return charged.max(held);
         }
         if kind.eq_ignore_ascii_case("IVF") {
             let tables = self.tables.lock().unwrap();
@@ -3833,6 +4136,71 @@ impl Engine {
         // for segments). Purge it here, on the thread that allocated it.
         if dumped {
             storage::trim_allocator();
+        }
+    }
+
+    /// `AppendMemIndex`'s row bound, applied to spann: after a write batch,
+    /// dump every spann mem index that reached `max_partition_size × 64` rows
+    /// (`docs/SPANN_DESIGN.md` §9.2).
+    ///
+    /// The bound is the index's own, not `[storage] mem_index_capacity`: the
+    /// spann mem index is the query's **candidate list** - every row in it is
+    /// handed to the exact rescoring on every KNN query, because the tree cannot
+    /// rank rows it does not hold - so what has to stay bounded is rows per
+    /// index, not bytes per engine. Without this, all the rows written between
+    /// two checkpoints are decoded by every query on the table.
+    ///
+    /// Runs **after** the commit returned, so no bottom gate is held: the dump is
+    /// a full `DumpMemIndex` transaction, which takes `flush_lock` while a
+    /// checkpoint holds it and then waits for that same gate - the cycle
+    /// `dump_secondary_over_capacity_blocking` documents. From a commit's bottom
+    /// half this must not be called.
+    pub(crate) async fn dump_spann_over_capacity(&self, table: &str) {
+        let tkey = self.table_key(table);
+        // Cheap gate first: a table with nothing queued pays one map lookup
+        // instead of a catalog read.
+        let pending: Vec<(u64, usize)> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .map(|entry| {
+                    entry
+                        .spann_mem
+                        .iter()
+                        .filter(|(_, rows)| !rows.is_empty())
+                        .map(|(id, rows)| (*id, rows.len()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        if pending.is_empty() {
+            return;
+        }
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
+            return;
+        };
+        let mut victims: Vec<(String, String)> = Vec::new();
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("SPANN") {
+                continue;
+            }
+            let Some(rows) = pending.iter().find(|(id, _)| *id == im.id).map(|(_, n)| *n) else {
+                continue;
+            };
+            let Ok(opts) = crate::spann_mem::options_from(&im.options) else {
+                continue;
+            };
+            if rows >= crate::spann_mem::mem_dump_threshold(&opts) {
+                victims.push((im.table.clone(), im.name.clone()));
+            }
+        }
+        for (table, index) in victims {
+            // A dump that fails leaves the rows in the mem index: they are still
+            // visible (the query merges the list), so the statement that
+            // triggered it has nothing to undo.
+            if self.dump_index_transaction(&table, &index).await.is_ok() {
+                storage::trim_allocator();
+            }
         }
     }
 

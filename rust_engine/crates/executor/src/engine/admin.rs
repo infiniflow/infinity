@@ -773,6 +773,124 @@ impl Engine {
         })
     }
 
+    /// Writes (or refreshes) the chunk of every spann index.
+    ///
+    /// `index_delta_mode = rebuild`: the chunk always describes the whole column
+    /// at `ts`, so a checkpoint can produce it without a tail and without
+    /// knowing which rows changed. A failure is not fatal to the checkpoint —
+    /// the index then answers from its previous chunk, and a query whose rows it
+    /// does not cover falls back to the exact scan.
+    pub(crate) fn publish_spann_chunks(&self, ts: u64) {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("SPANN") {
+                continue;
+            }
+            let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&im.table) else {
+                continue;
+            };
+            let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+        }
+    }
+
+    /// SPANN's optimize pass (§18, P5).
+    ///
+    /// The index is rebuild-mode, so "merge" is "dump once and keep one chunk":
+    ///
+    /// 1. **uncovered rows first** - a segment whose newest chunk no longer
+    ///    matches its live rows is dumped, which is also what clears that
+    ///    segment's rows from the mem index;
+    /// 2. then fold - a segment left with more than one live chunk keeps only the
+    ///    newest. A rebuild-mode chunk covers the *whole* segment, so every older
+    ///    one is strictly subsumed; `max_open_chunks_per_index` decides when a
+    ///    pass is worth running when nothing needs a dump (a crash between the
+    ///    commit and the deprecation leaves extra chunks behind).
+    ///
+    /// It runs after [`Self::optimize_index_chunks`], not inside that
+    /// transaction: a spann dump publishes its chunk records through the catalog
+    /// itself, and folding it into the same `DumpIndex` command would write the
+    /// record twice.
+    pub(crate) fn optimize_spann_indexes(&self, ts: u64) -> Result<()> {
+        let max_open = self.max_open_chunks_per_index();
+        for im in self.storage.catalog.list_indexes()? {
+            if !im.index_type.eq_ignore_ascii_case("SPANN") {
+                continue;
+            }
+            let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&im.table) else {
+                continue;
+            };
+            let Ok(index_id) = self.index_position(&im.table, &im.name) else {
+                continue;
+            };
+            let db_id = self.database_id_of(&im.table);
+            let recorded: std::collections::HashMap<(u32, u64), u64> =
+                catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(|(segment, chunks)| {
+                    chunks
+                        .into_iter()
+                        .map(move |(id, info)| ((segment, id), info.row_count))
+                })
+                .collect();
+            let segments = self.segment_row_counts(&im.table);
+            let mut needs_dump = false;
+            let mut over_cap = false;
+            for (segment, rows) in &segments {
+                let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, *segment) else {
+                    continue;
+                };
+                let live = self.live_chunk_files(&im.table, &im.name, *segment, &dir);
+                if live.len() > max_open {
+                    over_cap = true;
+                }
+                let covered = live
+                    .iter()
+                    .map(|(id, _)| *id)
+                    .max()
+                    .and_then(|id| recorded.get(&(*segment, id)).copied())
+                    .unwrap_or(0);
+                if covered != *rows {
+                    needs_dump = true;
+                }
+            }
+            if !needs_dump && !over_cap {
+                continue;
+            }
+            if needs_dump {
+                // Failure is not fatal to the pass: the index keeps answering
+                // from its previous chunk and the uncovered rows are scored
+                // exactly (§9.7).
+                let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+            }
+            for (segment, _) in &segments {
+                let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, *segment) else {
+                    continue;
+                };
+                let live = self.live_chunk_files(&im.table, &im.name, *segment, &dir);
+                let Some(newest) = live.iter().map(|(id, _)| *id).max() else {
+                    continue;
+                };
+                let old: Vec<u32> = live
+                    .iter()
+                    .filter(|(id, _)| *id != newest)
+                    .map(|(id, _)| *id as u32)
+                    .collect();
+                if !old.is_empty() {
+                    self.deprecate_chunks(&im.table, &im.name, *segment, &old, ts)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Drops the shared mappings of the spilled index files, so RSS tracks live
     /// structures rather than the page cache (C++ `BufferManager::Flush` drops
     /// the clean pages it wrote back).
@@ -791,6 +909,56 @@ impl Engine {
     /// The checkpoint itself, without the mode gate: [`Self::cleanup`] runs it
     /// on a read-only replica too, where the reference's cleanup task is
     /// allowed (`background_process_impl.cpp:109`).
+    /// Bytes of appended-but-unsealed rows the writer may hold.
+    pub(crate) fn pending_budget(&self) -> usize {
+        self.context
+            .pending_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// `[storage]`-style knob for [`Self::pending_budget`].
+    pub fn set_pending_budget(&self, bytes: usize) {
+        self.context
+            .pending_budget
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Checkpoints when the table's append buffer passes its budget.
+    ///
+    /// `TableEntry::pending_rows` holds the parsed values of every row a commit
+    /// appended since the last checkpoint - it is the only copy the writer keeps,
+    /// and nothing bounds it: the reference flushes it from a *timer*, so a bulk
+    /// import that outruns the timer holds the table (measured: 400k x 1536d,
+    /// 8.6 GiB of RSS for a 2.3 GiB column, no checkpoint in between). The write
+    /// path is the only place that knows it is outrunning the timer, so it seals
+    /// by itself here.
+    ///
+    /// Called **after** the commit returned, with no bottom gate held: a
+    /// checkpoint takes `flush_lock` and then waits for that gate, which is the
+    /// cycle `dump_secondary_over_capacity_blocking` documents.
+    pub(crate) async fn seal_pending_over_budget(&self, table: &str) {
+        let budget = self.pending_budget();
+        if budget == 0 {
+            return;
+        }
+        let pending = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&self.table_key(table))
+                .map(|entry| entry.pending_bytes)
+                .unwrap_or(0)
+        };
+        if pending <= budget {
+            return;
+        }
+        // Best effort: the statement already committed, so a failure cannot be
+        // reported as its error - the rows stay buffered and the next write or
+        // the periodic checkpoint retries.
+        if let Err(err) = self.flush_storage().await {
+            eprintln!("checkpoint after the append buffer passed its budget: {err}");
+        }
+    }
+
     pub(crate) async fn flush_storage(&self) -> Result<()> {
         // One checkpoint at a time: the block mirror is rewritten in place.
         let _serial = self.storage.flush_lock.write().await;
@@ -820,6 +988,12 @@ impl Engine {
                 eprintln!("object dir: persisting failed: {e}");
             }
         }
+        // spann is a **rebuild-mode** index (`docs/SPANN_DESIGN.md` §9.4): its
+        // chunk is a snapshot of the whole column, so the checkpoint — after the
+        // blocks are final — is the natural place to refresh it. There is no
+        // memory tail to seal, which is why it does not wait for a
+        // `DumpMemIndex`.
+        self.publish_spann_chunks(checkpoint_ts);
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Bound the page cache the way the reference's buffer manager does:
@@ -1060,6 +1234,11 @@ impl Engine {
         // it no longer matches the index state.
         self.index_epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.optimize_index_chunks().await
+        self.optimize_index_chunks().await?;
+        // SPANN is rebuild-mode: its optimize is a dump plus a fold, and until
+        // this call it had no branch at all - the doc's "OPTIMIZE INDEX does
+        // nothing for spann" was literally true.
+        let ts = self.checkpoint_ts();
+        self.optimize_spann_indexes(ts)
     }
 }

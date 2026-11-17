@@ -1166,6 +1166,7 @@ const (
 	IndexType_DiskAnn             IndexType = 7
 	IndexType_PLAID               IndexType = 8
 	IndexType_SMVE                IndexType = 9
+	IndexType_CSPANN              IndexType = 10
 )
 
 var knownIndexTypeValues = []IndexType{
@@ -1179,6 +1180,7 @@ var knownIndexTypeValues = []IndexType{
 	IndexType_DiskAnn,
 	IndexType_PLAID,
 	IndexType_SMVE,
+	IndexType_CSPANN,
 }
 
 func IndexTypeValues() iter.Seq[IndexType] {
@@ -1212,6 +1214,8 @@ func (p IndexType) String() string {
 		return "PLAID"
 	case IndexType_SMVE:
 		return "SMVE"
+	case IndexType_CSPANN:
+		return "CSPANN"
 	}
 	return "<UNSET>"
 }
@@ -1238,6 +1242,8 @@ func IndexTypeFromString(s string) (IndexType, error) {
 		return IndexType_PLAID, nil
 	case "SMVE":
 		return IndexType_SMVE, nil
+	case "CSPANN":
+		return IndexType_CSPANN, nil
 	}
 	return IndexType(0), fmt.Errorf("not a valid IndexType string")
 }

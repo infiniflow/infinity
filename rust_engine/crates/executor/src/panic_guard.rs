@@ -20,8 +20,11 @@
 //! `std::process::exit` from a library. The front ends deliberately do not know
 //! about either policy: they only ever see "this request failed".
 //!
-//! `cfg!(feature = "testing")` adds [`arm_injected_panic`], which makes the next
-//! statement panic so the boundaries can be exercised end to end.
+//! `cfg!(feature = "testing")` adds `Engine::arm_injected_panic`, which makes the
+//! next statement **on that engine** panic so the boundaries can be exercised end
+//! to end. The arming is per engine on purpose: a process-wide flag is consumed by
+//! whichever request happens to run next, which in a parallel test binary is
+//! usually another test's.
 
 use std::any::Any;
 use std::future::Future;
@@ -93,32 +96,27 @@ where
     .await
 }
 
+/// Per-statement check for [`Engine::arm_injected_panic`]; a no-op without the
+/// feature.
+///
+/// The arming lives **on the engine**, not in a process-wide static: the server's
+/// tests run in parallel (`cargo test` gives each test its own thread), and a
+/// global flag let one test's arming fire inside another test's query - the
+/// panic-isolation test failed because a `/configs` request had consumed it.
 #[cfg(feature = "testing")]
-mod injection {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    static ARMED: AtomicBool = AtomicBool::new(false);
-
-    /// Makes the next statement panic. Test-only: the `testing` feature is never
-    /// on in a shipped build.
-    pub fn arm_injected_panic() {
-        ARMED.store(true, Ordering::SeqCst);
-    }
-
-    /// Consumes the arming, if any.
-    pub(crate) fn take_injected_panic() -> bool {
-        ARMED.swap(false, Ordering::SeqCst)
+pub(crate) fn inject_statement_panic(armed: &std::sync::atomic::AtomicBool) {
+    if armed.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        panic!("injected panic: panic-isolation test");
     }
 }
 
 #[cfg(feature = "testing")]
-pub use injection::arm_injected_panic;
-
-/// Per-statement check for [`arm_injected_panic`]; a no-op without the feature.
-pub(crate) fn inject_statement_panic() {
-    #[cfg(feature = "testing")]
-    if injection::take_injected_panic() {
-        panic!("injected panic: panic-isolation test");
+impl crate::Engine {
+    /// Makes the next statement on this engine panic. Test-only: the `testing`
+    /// feature is never on in a shipped build.
+    pub fn arm_injected_panic(&self) {
+        self.armed_panic
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 

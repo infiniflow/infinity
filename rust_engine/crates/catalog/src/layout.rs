@@ -583,6 +583,15 @@ pub(crate) fn index_def_for(im: &IndexMeta, table: &TableLayout) -> Option<Index
             opt_num("BLOCK_SIZE", value_format::HNSW_BLOCK_SIZE),
             opt("LSG_CONFIG"),
         )),
+        // The port's own cluster-based vector index (`docs/SPANN_DESIGN.md`
+        // §13): a **new** `index_type` value, so a C++ reader refuses the record
+        // instead of decoding it as HNSW.
+        "SPANN" => Some(IndexDefValue::spann(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            &im.options,
+        )),
         "FULLTEXT" => Some(IndexDefValue::full_text(
             &im.name,
             &table.table_name,
@@ -3179,6 +3188,23 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
                 }
             }
         }
+    }
+    // spann has no C++ record, so its extras *are* its options: `IndexDefValue::spann`
+    // stores every `WITH (…)` pair and they come back verbatim (upper-cased,
+    // sorted), which keeps a reloaded record identical to the one written.
+    if def.base.index_type.eq_ignore_ascii_case("SPANN") {
+        options = def
+            .extra
+            .iter()
+            .map(|(k, v)| {
+                let value = match v {
+                    Json::Str(s) => s.clone(),
+                    other => other.compact(),
+                };
+                (k.to_ascii_uppercase(), value)
+            })
+            .collect();
+        options.sort_by(|a, b| a.0.cmp(&b.0));
     }
     Some(IndexMeta {
         name: def.base.index_name.clone(),

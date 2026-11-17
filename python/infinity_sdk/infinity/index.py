@@ -33,6 +33,8 @@ class IndexType(Enum):
     DiskAnn = 8
     PLAID = 9
     SMVE = 10
+    # The port's cluster-based vector index (rust_engine/docs/CSPANN_DESIGN.md).
+    CSPANN = 11
 
     def to_ttype(self):
         match self:
@@ -56,6 +58,8 @@ class IndexType(Enum):
                 return ttypes.IndexType.PLAID
             case IndexType.SMVE:
                 return ttypes.IndexType.SMVE
+            case IndexType.CSPANN:
+                return ttypes.IndexType.CSPANN
             case _:
                 raise InfinityException(
                     ErrorCode.INVALID_INDEX_TYPE, "Unknown index type"

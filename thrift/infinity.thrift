@@ -463,6 +463,9 @@ EMVB,
 DiskAnn,
 PLAID,
 SMVE,
+// The port's cluster-based vector index (rust_engine/docs/CSPANN_DESIGN.md).
+// Appended, not inserted: the ordinals above are on the wire.
+CSPANN,
 }
 
 struct IndexInfo {

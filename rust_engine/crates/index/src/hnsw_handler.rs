@@ -77,6 +77,23 @@ impl HnswHandler {
         }
     }
 
+    /// C++: `SearchIndex(q, k, filter, option)` - the filtered overload.
+    ///
+    /// `allow` is the reference's `BitmaskFilter`: a rejected vertex is still
+    /// traversed (dropping it would break the graph's connectivity) and only
+    /// kept out of the result heap. Labels are the caller's, so this takes the
+    /// graph's node index; `labels[node]` is the row.
+    pub fn search_index_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        option: KnnSearchOption,
+        allow: &dyn Fn(usize) -> bool,
+    ) -> Vec<(usize, f32)> {
+        let ef = option.ef.unwrap_or_else(|| self.index.ef_search());
+        self.index.search_filtered(query, k, ef, allow)
+    }
+
     /// C++: `MemUsage`.
     pub fn mem_usage(&self) -> usize {
         self.index.mem_usage()

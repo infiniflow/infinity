@@ -430,6 +430,10 @@ impl Engine {
                 entry.vector.remove(id);
                 entry.ivf.remove(id);
                 entry.ivf_mem.remove(id);
+                // A heap tree is charged to the table (`SpannIndex::mem_usage`),
+                // so a dropped index has to leave this map as well; the total is
+                // restated by the `recompute_memindex_total` at the end.
+                entry.spann.remove(id);
             }
             // The probe is a one-shot "have I looked for an HNSW index yet"
             // flag; a graph just went away, so the next write probes again.

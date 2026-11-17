@@ -4939,6 +4939,47 @@ pub(crate) struct TableEntry {
     /// IVF memory segment per index id: rows written since the last mirror
     /// dump, merged with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
+    /// spann trees per index id (`docs/SPANN_DESIGN.md`).
+    ///
+    /// v1 keeps them in memory: `CREATE INDEX … USING SPANN` builds the tree
+    /// and answers queries from it directly. The chunk format is implemented and
+    /// tested in `storage::knn_index::spann`; wiring the dump/load path (§9.4)
+    /// is the remaining step, after which this map holds what the loader
+    /// produced instead.
+    pub(crate) spann: HashMap<u64, Arc<crate::spann_mem::SpannHandle>>,
+    /// spann **mem index** per index id: the rows inserted since the last
+    /// dump, kept as `(row id, vector)`.
+    ///
+    /// An insert does not touch the tree (`docs/SPANN_DESIGN.md` §9.2): the row
+    /// lands here in O(1), queries merge this list with the published chunks, and
+    /// the next dump builds a tree that covers those rows and clears the list.
+    /// Encoding a row into the tree at insert time was the rejection: a leaf's
+    /// members are only 1-bit codes, so a split would need the original vectors
+    /// back from storage anyway.
+    ///
+    /// Two rules keep it bounded and honest:
+    ///
+    /// * a row deleted (or `UPDATE`d, which is delete + insert) is dropped here by
+    ///   `note_deleted_ids` - it is no longer live, so it must not be a candidate
+    ///   and must not count as covered;
+    /// * `max_partition_size × 64` rows trigger a dump
+    ///   (`Engine::dump_spann_over_capacity`), because every row in this list is
+    ///   re-scored exactly by **every** KNN query on the table.
+    ///
+    /// It is a memory-only structure, and what a restart leaves behind depends on
+    /// where the rows were:
+    ///
+    /// * rows that only reached the WAL are replayed into the append buffer, and
+    ///   the same hook that fills this map at insert time
+    ///   (`refresh_block_mirror_extra`) fills it again - the list is rebuilt for
+    ///   them, so they are candidates immediately;
+    /// * rows that are already in a block file are not re-buffered, so nothing
+    ///   re-registers them: they are simply not covered by the loaded chunk and
+    ///   `knn_candidates` answers them through `uncovered` - an exact scan of
+    ///   exactly those row ids - until the next dump folds them into the tree.
+    ///
+    /// Either way a restart costs work proportional to the gap, never a hole.
+    pub(crate) spann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,
@@ -5154,6 +5195,26 @@ pub(crate) struct Context {
     /// never drained (two databases, one HNSW index each, in
     /// `test_optimize_from_different_database`).
     pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
+    /// The three-level waterlines over the one byte ledger (`SPANN_DESIGN.md`
+    /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
+    /// table. Derived from `memindex_quota`, never set directly.
+    pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
+    /// The fair seal scheduler (§9.6): weights per database, one seal in flight
+    /// per tenant, and the `index_seal_starvation` counter.
+    pub(crate) seal_scheduler: std::sync::Mutex<crate::engine::maintain::SealScheduler>,
+    /// Per-index recall monitors (§11.3 item 4), keyed by table **and** catalog
+    /// index id: an id is unique within a table, not across the engine, so keying
+    /// on it alone let two tables with an index of the same id share one target,
+    /// one latency budget and one width.
+    ///
+    /// Sampling is on; the state is in memory because a target is a policy, not a
+    /// property of the data (a restart re-learns in a few sampled queries).
+    pub(crate) recall: std::sync::Mutex<
+        std::collections::HashMap<
+            crate::engine::recall::RecallKey,
+            crate::engine::recall::RecallMonitor,
+        >,
+    >,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,
@@ -5164,6 +5225,27 @@ pub(crate) struct Context {
     /// beyond it are evicted, and a scan that no longer sees full label
     /// coverage falls back to the exact scan.
     pub(crate) hnsw_budget: std::sync::atomic::AtomicUsize,
+    /// Per-index spann counters behind `SHOW INDEX` (§16.4), keyed by catalog
+    /// index id. They outlive the tree on purpose: every dump drops and rebuilds
+    /// it, and a counter that resets on a dump cannot answer what a query costs.
+    pub(crate) spann_stats:
+        Mutex<std::collections::HashMap<u64, Arc<crate::spann_mem::SpannStats>>>,
+    /// `max_open_chunks_per_index` (§18): once a segment has more live chunks
+    /// than this, an optimize pass folds them into one. Built in at 6 like the
+    /// reference's default - a knob rather than a constant so a test can force a
+    /// compaction with two dumps.
+    pub(crate) max_open_chunks_per_index: std::sync::atomic::AtomicUsize,
+    /// Bytes of appended-but-unsealed rows the writer may hold before it
+    /// checkpoints by itself (`TableEntry::pending_bytes`).
+    ///
+    /// The reference bounds this with the buffer manager, whose flush is driven
+    /// by the periodic trigger - a timer, not a row or byte count. An import that
+    /// outruns the timer therefore holds the whole table: measured at 400k x
+    /// 1536d the writer's RSS reached 8.6 GiB for a 2.3 GiB column, because no
+    /// checkpoint ran while the batches were flying in. This is the missing
+    /// bound, and it belongs to the write path - the only thing that knows it is
+    /// outrunning the timer.
+    pub(crate) pending_budget: std::sync::atomic::AtomicUsize,
     /// `query_count` global/session variable: statements executed so far.
     pub(crate) query_count: std::sync::atomic::AtomicU64,
     /// `connected_timestamp` session variable: when the engine was opened.
@@ -5287,6 +5369,12 @@ pub struct Engine {
     /// on, a finished statement is appended to the profile history. The
     /// running-query registry is kept either way, as `SHOW QUERIES` needs it.
     pub(crate) profile_enabled: std::sync::atomic::AtomicBool,
+    /// Test-only: the next statement **on this engine** panics
+    /// (`panic_guard::Engine::arm_injected_panic`). Per engine, not per process:
+    /// the server's tests run in parallel and a process-wide flag was consumed by
+    /// whichever request ran first, which was usually another test's.
+    #[cfg(feature = "testing")]
+    pub(crate) armed_panic: std::sync::atomic::AtomicBool,
 }
 
 impl Drop for Engine {
@@ -9008,6 +9096,51 @@ pub(crate) fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
         _ => {
             // `l2` reports the *squared* Euclidean distance (no square root).
             let d: f64 = q.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
+            (1.0 / (1.0 + d), d)
+        }
+    }
+}
+
+/// [`vector_score`] over `f32` vectors: the rerank fast path decodes the stored
+/// embedding as `f32` (no text round trip) and scores it here.
+///
+/// The values are the block's own `f32` - the text [`vector_score`] reads is a
+/// rendering of exactly these bits - and `l2` goes through the reference's
+/// `F32L2` SIMD kernel (`index::vector::l2_sq`), so a distance can differ from
+/// the text path in the last bits of the sum, as the reference's SIMD path does.
+pub(crate) fn vector_score_f32(q: &[f32], v: &[f32], metric: &str) -> (f64, f64) {
+    match metric {
+        "ip" => {
+            let dot: f64 = q
+                .iter()
+                .zip(v)
+                .map(|(a, b)| f64::from(*a) * f64::from(*b))
+                .sum();
+            (dot, -dot)
+        }
+        "cosine" => {
+            let mut dot = 0.0f64;
+            let mut nq = 0.0f64;
+            let mut nv = 0.0f64;
+            for (a, b) in q.iter().zip(v) {
+                let (a, b) = (f64::from(*a), f64::from(*b));
+                dot += a * b;
+                nq += a * a;
+                nv += b * b;
+            }
+            let (nq, nv) = (nq.sqrt(), nv.sqrt());
+            let c = if nq > 0.0 && nv > 0.0 {
+                dot / (nq * nv)
+            } else {
+                0.0
+            };
+            (c, 1.0 - c)
+        }
+        _ => {
+            // `l2` reports the squared distance and needs neither the dot product
+            // nor either norm - `vector_score` computes them for every metric,
+            // which is four passes over a row where one does.
+            let d = f64::from(index::vector::l2_sq(q, v));
             (1.0 / (1.0 + d), d)
         }
     }

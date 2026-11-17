@@ -695,7 +695,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Arc::new(Engine::open(dir.path()).unwrap());
 
-        executor::panic_guard::arm_injected_panic();
+        engine.arm_injected_panic();
         let failed = executor::block_on(simple_query_response_async(&engine, "SELECT 1;"));
         assert_eq!(failed[0], b'E', "an error frame, not a dropped connection");
         let text = String::from_utf8_lossy(&failed);

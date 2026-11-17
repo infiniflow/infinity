@@ -1193,7 +1193,7 @@ mod tests {
             .unwrap();
         assert!(engine.execute_blocking("SELECT * FROM t;").is_ok());
 
-        executor::panic_guard::arm_injected_panic();
+        engine.arm_injected_panic();
         let failed = executor::block_on(engine.execute("SELECT * FROM t;"))
             .expect_err("a panicking statement must answer with an error");
         assert!(failed.to_string().contains("injected panic"), "{failed}");
