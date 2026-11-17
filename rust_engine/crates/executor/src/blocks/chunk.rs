@@ -322,7 +322,15 @@ pub(crate) fn publish_chunk_files(
     if !hnsw {
         // One chunk per segment, but under **its own** id: a literal 0 would
         // append a second record next to the one `write_ivf_index` published.
-        let Some(id) = ids.into_iter().min() else {
+        //
+        // **Newest**, not smallest: an IVF chunk is a snapshot of the whole
+        // segment (`PopulateIvfIndexInner` builds from every block), so a
+        // segment dumped twice holds two generations of the same rows. Listing
+        // both made the reader sum two overlapping 100-row spans and report a
+        // 200-row segment with a gap at 100; the newest snapshot is the
+        // coverage, which is the same rule `write_ivf_index`'s `covered` check
+        // applies.
+        let Some(id) = ids.into_iter().max() else {
             return Vec::new();
         };
         return vec![IndexChunk {

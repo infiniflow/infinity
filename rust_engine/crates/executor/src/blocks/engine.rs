@@ -1592,6 +1592,24 @@ impl Engine {
     /// last checkpoint must touch the records it already published; the next
     /// mirror preserves the value from [`dump_ts_key`].
     pub(crate) fn stamp_chunk_ts(&self, table: &str, index: &str, ts: u64) -> Result<()> {
+        self.stamp_chunk_ts_of(table, index, ts, |_, _, _| true)
+    }
+
+    /// [`Self::stamp_chunk_ts`] for a subset of the index's chunks.
+    ///
+    /// `keep(segment, chunk_id, current_value)` decides which id records are
+    /// rewritten. An import uses it to stamp **only** the chunks it just
+    /// wrote: the records of the earlier imports already name their own
+    /// transactions, and rewriting those too shifted every one of them to the
+    /// newest ts (they are per-import `AddChunkIndexID1` values, not one
+    /// family-wide stamp).
+    pub(crate) fn stamp_chunk_ts_of(
+        &self,
+        table: &str,
+        index: &str,
+        ts: u64,
+        keep: impl Fn(u32, u64, &[u8]) -> bool,
+    ) -> Result<()> {
         let table = self.qualified_table(table);
         let db_id = self.database_id_of(&table);
         let table_id = self
@@ -1604,14 +1622,21 @@ impl Engine {
         let store = self.storage.catalog.store();
         let prefix = format!("idx_chunk|{db_id}|{table_id}|{index_id}|");
         let value = ts.to_string().into_bytes();
-        for (key, _) in store.scan_prefix(prefix.as_bytes())? {
+        for (key, current) in store.scan_prefix(prefix.as_bytes())? {
             let text = String::from_utf8_lossy(&key).to_string();
             // Only the id records (numeric suffix); `…|chunk_info` and
             // `…|next_chunk_id` are owned by the mirror.
-            let Some(suffix) = text.rsplit('|').next() else {
+            // `idx_chunk|{db}|{tbl}|{index}|{segment}|{chunk}`; `…|chunk_info`
+            // and `…|next_chunk_id` have a non-numeric last field and are left
+            // to the mirror.
+            let mut parts = text[prefix.len()..].split('|');
+            let (Some(segment), Some(id), None) = (parts.next(), parts.next(), parts.next()) else {
                 continue;
             };
-            if suffix.parse::<u64>().is_ok() {
+            let (Ok(segment), Ok(id)) = (segment.parse::<u32>(), id.parse::<u64>()) else {
+                continue;
+            };
+            if keep(segment, id, &current) {
                 store.put(&key, &value)?;
             }
         }
@@ -1902,6 +1927,14 @@ impl Engine {
                             term_bound: crate::sparse_declared_bound(&declared).unwrap_or(0),
                             block_size: crate::index_block_size(im),
                             segment: *segment,
+                            // `PopulateIndex` dumps a segment's whole
+                            // `BMPIndexInMem` once, so an **imported** segment
+                            // with no chunk yet is one chunk. A later
+                            // `DumpMemIndex` takes one id per block and dumps
+                            // block by block, which is why an existing record
+                            // makes this false even on an imported segment -
+                            // the reference leaves two chunks for "COPY, then
+                            // DUMP INDEX".
                             single_chunk: imported || dump_single_chunk,
                         },
                         &existing_chunks,
@@ -4191,14 +4224,6 @@ impl Engine {
         // live schema's column order.
         let order = self.table_schema_ids(&table).unwrap_or_default();
         let fill = self.fill_values(&table, &order);
-        if std::env::var_os("INF_PROBE_BUF").is_some() {
-            let t = self.tables.lock().unwrap();
-            eprintln!(
-                "[read] table={table} order={order:?} buf={:?} cells={:?}",
-                t.get(&key).map(|e| e.pending_rows.all_ids()),
-                t.get(&key).map(|e| e.pending_rows.row(0, &order, &fill))
-            );
-        }
         let tables = self.tables.lock().unwrap();
         let entry = tables.get(&key)?;
         let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(entry.pending_rows.len());
@@ -5490,7 +5515,13 @@ impl Engine {
                 return Ok((0, Vec::new()));
             }
             let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
-            Some(encode_hnsw_chunk_from(mem.index(), &labels))
+            // `HnswIndexInMem::begin_row_id_`: the chunk's record names the
+            // memory index's *first* row, not the segment's base - an
+            // incremental dump of one segment starts where the previous
+            // chunk ended (`GetChunkIndexMetaInfo`).
+            let first = mem.rows().first().copied().unwrap_or(0);
+            let (count, chunk) = encode_hnsw_chunk_from(mem.index(), &labels);
+            Some((chunk, first, count))
         } else {
             None
         };
@@ -5532,18 +5563,47 @@ impl Engine {
             if !new_chunk && !force_append && !chunks.is_empty() {
                 continue;
             }
+            // An **incremental** dump only writes the segments whose memory
+            // form holds rows the recorded chunks do not cover. The reference's
+            // `DumpMemIndex` dumps a segment's `MemIndex`, which holds exactly
+            // the rows appended since that segment's last dump, so a segment
+            // already covered contributes nothing. Without this a multi-segment
+            // table re-chunked its earlier segments on every import
+            // (`write_hnsw_chunk` rebuilds per segment once the buffered graph
+            // spans more than one) - three segments took six chunks instead of
+            // three, and a query then merged two generations of one segment.
+            if new_chunk && !force_append {
+                let covered: u64 = catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .find(|(seg, _)| seg == segment)
+                .and_then(|(_, list)| list.into_iter().map(|(_, info)| info.row_count).max())
+                .unwrap_or(0);
+                if covered >= *rows {
+                    continue;
+                }
+            }
+            // `(chunk bytes, its first row id, vector count)`. The row id is
+            // the chunk's own, so a second chunk of one segment starts where
+            // the first ended.
             let built = match &from_memory {
-                Some((count, chunk)) => Some((*count, chunk.clone())),
+                Some((chunk, first, count)) => Some((chunk.clone(), *first, *count)),
                 None => {
                     if *rows == 0 {
                         None
                     } else {
                         self.hnsw_chunk(&table, &column, &options, Some(*segment))
                             .ok()
+                            .map(|(count, chunk)| (chunk, u64::from(*segment) << 32, count))
                     }
                 }
             };
-            let Some((count, chunk)) = built else {
+            let Some((chunk, base_row_id, count)) = built else {
                 continue;
             };
             // `GetAndSetNextChunkID`: take the id and raise the counter in one
@@ -5569,11 +5629,14 @@ impl Engine {
             // directory, so the dump publishes the chunk it just wrote.
             self.record_chunk(
                 &set,
-                index_id as u64,
-                chunk_id,
-                *segment,
-                count as u64,
-                chunk.len() as u64,
+                crate::engine::RecordedChunk {
+                    index_id: index_id as u64,
+                    chunk_id,
+                    segment: *segment,
+                    base_row_id,
+                    row_count: count as u64,
+                    index_size: chunk.len() as u64,
+                },
             );
             written += count;
             // The chunks this one supersedes: the reference's
@@ -6718,14 +6781,25 @@ impl Engine {
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
     /// `column`'s vectors: a deterministic k-means partitions them into
     /// `centroid_count` parts (task #70).
-    pub(crate) fn ivf_chunk(
+    /// The IVF chunk of one segment from in-segment offset `from` on.
+    ///
+    /// `PopulateIvfIndexInner` builds from the segment's blocks, but the
+    /// **incremental** dump the quota and the append path perform covers only
+    /// the rows written since the previous dump of that segment
+    /// (`IVFIndexInMem::GetChunkIndexMetaInfo` reports `begin_row_id_` and
+    /// `input_row_count_`). The offsets stay segment-relative
+    /// (`RowID(segment, offset)`), so starting at `from` is what makes the
+    /// second chunk's `base_row_id` follow the first's.
+    pub(crate) fn ivf_chunk_from(
         &self,
         table: &str,
         column: &str,
         options: &IvfOptions,
         segment: Option<u32>,
+        from: u32,
     ) -> Result<(usize, Vec<u8>)> {
-        let vectors = self.column_vectors(table, column, segment)?;
+        let mut vectors = self.column_vectors(table, column, segment)?;
+        vectors.retain(|(label, _)| *label >= from);
         if vectors.is_empty() {
             return Err(Error::Invalid(format!(
                 "no vectors to index in '{table}.{column}'"
@@ -7026,7 +7100,13 @@ impl Engine {
             if covered >= rows {
                 continue;
             }
-            let (count, chunk) = self.ivf_chunk(&table, &column, &options, Some(segment))?;
+            // A dump writes the segment's **whole** vector set
+            // (`PopulateIvfIndexInner` builds from the segment's blocks and
+            // records `base_row_id = RowID(segment, 0)`), so the new chunk
+            // supersedes the previous snapshot rather than extending it.
+            let (count, chunk) =
+                self.ivf_chunk_from(&table, &column, &options, Some(segment), 0)?;
+            let base_offset = 0u32;
             let dir = self.blocks_root().join(format!(
                 "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                 meta.id
@@ -7046,24 +7126,33 @@ impl Engine {
             })?;
             // `AddNewChunkIndex1`: the reader enumerates this record, not the
             // directory.
+            // `index_size` is 0 in the record: `PopulateIvfIndexInner` passes
+            // `0 /*index_size*/` to `AddNewChunkIndex1`, and the reader treats
+            // zero as "use the file's own size".
+            // `base_row_id` is the chunk's **first row**, not the segment's
+            // base: a segment dumped twice has two chunks and the second
+            // starts where the first ended (`ChunkIndexMetaInfo::base_row_id_`
+            // is the memory index's `begin_row_id_`).
             let record = catalog::layout::IndexChunk {
                 chunk_id,
                 base_name: String::new(),
-                base_row_id: u64::from(segment) << 32,
+                base_row_id: (u64::from(segment) << 32) | u64::from(base_offset),
                 row_count: count as u64,
                 term_count: 0,
-                index_size: chunk.len() as u64,
-                commit_ts: self.txn.current_ts().max(1),
+                index_size: 0,
+                commit_ts: crate::engine::chunk_commit_ts(self),
             };
-            let index = catalog::layout::IndexSegment {
-                index_id: index_id as u64,
-                segment_id: segment,
-                chunks: vec![record.clone()],
-            };
-            let _ = self
-                .storage
-                .catalog
-                .append_index_chunk(&set, &index, &record);
+            // **Replace**: one record per segment (`AddNewChunkIndex1` after a
+            // `RemoveChunkIDs`, which is what `PopulateIvfIndexInner` does for a
+            // re-dump). The chunk covers the segment's whole vector set, so a
+            // second record would describe the same rows twice; the reference
+            // holds exactly one per (index, segment).
+            let _ = self.storage.catalog.replace_segment_chunks(
+                &set,
+                index_id as u64,
+                segment,
+                std::slice::from_ref(&record),
+            );
             written += count;
         }
         Ok(written)
@@ -7524,11 +7613,14 @@ impl Engine {
         // the next successful optimize.
         self.record_chunk(
             &set,
-            index_id,
-            next,
-            0,
-            merged.doc_num() as u64,
-            bytes.len() as u64,
+            crate::engine::RecordedChunk {
+                index_id,
+                chunk_id: next,
+                segment: 0,
+                base_row_id: 0,
+                row_count: merged.doc_num() as u64,
+                index_size: bytes.len() as u64,
+            },
         );
         Ok(Some(ChunkRewrite {
             segment: 0,
@@ -7578,11 +7670,14 @@ impl Engine {
             // is what the chunk covers; `count` here is the token total.
             self.record_chunk(
                 &set,
-                index_id,
-                chunk_id,
-                0,
-                docs_len as u64,
-                bytes.len() as u64,
+                crate::engine::RecordedChunk {
+                    index_id,
+                    chunk_id,
+                    segment: 0,
+                    base_row_id: 0,
+                    row_count: docs_len as u64,
+                    index_size: bytes.len() as u64,
+                },
             );
             // `SegmentIndexMeta::SavePlaidGlobalCentroids`: the trained
             // centroids and their quantizer live in a sidecar next to the
@@ -7661,11 +7756,14 @@ impl Engine {
         // The record's `row_cnt_` is the document count, not the token total.
         self.record_chunk(
             &set,
-            index_id,
-            next,
-            0,
-            fresh.len() as u64,
-            bytes.len() as u64,
+            crate::engine::RecordedChunk {
+                index_id,
+                chunk_id: next,
+                segment: 0,
+                base_row_id: 0,
+                row_count: fresh.len() as u64,
+                index_size: bytes.len() as u64,
+            },
         );
         Ok(indexed as usize + total)
     }

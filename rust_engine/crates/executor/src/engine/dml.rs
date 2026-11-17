@@ -119,15 +119,18 @@ impl Engine {
                 offsets.dedup();
                 offsets.len()
             };
-            // `AddNewChunkIndex1`.
+            // `ChunkIndexMetaInfo::base_row_id_` names the chunk's **first
+            // row**: a segment dumped twice has two chunks, and the second
+            // starts where the first ended rather than at the segment's base.
+            let first = entries.iter().map(|(_, offset)| *offset).min().unwrap_or(0);
             let record = catalog::layout::IndexChunk {
                 chunk_id: next,
                 base_name: String::new(),
-                base_row_id: segment << 32,
+                base_row_id: (segment << 32) | u64::from(first),
                 row_count: row_count as u64,
                 term_count: 0,
                 index_size: 0,
-                commit_ts: self.txn.current_ts().max(1),
+                commit_ts: chunk_commit_ts(self),
             };
             let index = catalog::layout::IndexSegment {
                 index_id,
@@ -149,11 +152,28 @@ impl Engine {
             }
         }
         let tkey = self.table_key(table);
+        // The readers are the **catalog's** chunk list, not this call's: a
+        // build restricted to one segment (`build_index_of_segment`, which is
+        // what an import does) writes one record, and replacing the list with
+        // just that one dropped every other segment's chunk from the in-memory
+        // reader set - a query then answered for the imported rows only.
+        let readers: Vec<(u64, Arc<storage::secondary_segment::SecondarySegmentReader>)> = self
+            .catalog_index_files(table, index_id)
+            .into_iter()
+            .filter_map(|(segment, _, path)| {
+                let reader =
+                    storage::secondary_segment::SecondarySegmentReader::open_with_kind(&path, kind)
+                        .ok()?;
+                Some(((segment as u64) << 32, Arc::new(reader)))
+            })
+            .collect();
+        let meta: Vec<(u64, usize)> = readers
+            .iter()
+            .map(|(base, reader)| (*base, reader.row_count()))
+            .collect();
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
         entry.secondary.disk.insert(index_id, readers);
-        // A rebuild replaces the whole chunk set, so its meta replaces the list
-        // a previous dump appended to.
         entry.secondary.chunk_meta.insert(index_id, meta);
     }
 
@@ -2277,6 +2297,26 @@ impl Engine {
             if self.has_block_layout(table) {
                 self.write_blocks_import(table, ts)?;
             }
+            // `PopulateIndex(…, DumpIndexCause::kImport)` for every index and
+            // every segment this statement wrote - inside the transaction, with
+            // the import's own ts, exactly as `NewTxn::Import` does before it
+            // returns. Without this each index is chunked by whichever *append*
+            // trigger fires first (the row capacity, or the memory quota's
+            // watermark, which reads every tail in the engine), so a 150k-row
+            // `COPY` ends up with the chunks of whatever batch boundaries the
+            // writer happened to reach - not the reference's one per segment.
+            //
+            // **Unbounded read**: the builders scan the rows, and a statement's
+            // own `read_ts` does not include the rows this commit just wrote
+            // (they were published into the buffer under `ts`, which is at or
+            // above the statement's snapshot). The reference's `PopulateIndex`
+            // reads the segment's blocks directly and has no such bound, so the
+            // populate runs at `u64::MAX` - the same visibility the index
+            // maintenance paths use. The table's gate is held, so no other
+            // writer can publish into the window this opens.
+            crate::engine::state::with_read_ts_override(u64::MAX, || {
+                self.populate_import_indexes(table, &segments_owned, ts);
+            });
         }
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomAppend` for the imported segments on the table's worker.

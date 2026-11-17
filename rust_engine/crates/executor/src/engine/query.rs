@@ -2019,15 +2019,11 @@ impl Engine {
                         self.bump_writes(table);
                         // `NewTxn::Import` populates every index of the table
                         // inside the import transaction (`PopulateIndex` per
-                        // segment), so the chunks exist as soon as the
-                        // statement returns - that is how a 100-row import
-                        // gets a full-text and a secondary chunk without any
-                        // dump ever running. The port rebuilds its full-text,
-                        // sparse and vector chunks from the rows at checkpoint
-                        // time, but a secondary chunk is derived from spill
-                        // files that a small import never fills, so build it
-                        // here.
-                        self.populate_secondary_indexes(table);
+                        // segment), which the import's own bottom now does
+                        // (`Engine::populate_import_indexes`), so the chunks
+                        // exist as soon as the statement returns - that is how a
+                        // 100-row import gets a full-text and a secondary chunk
+                        // without any dump ever running.
                     }
                     r
                 } else {

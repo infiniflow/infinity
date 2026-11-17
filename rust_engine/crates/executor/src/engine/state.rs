@@ -4653,6 +4653,12 @@ pub(crate) struct SecondaryIndexes {
 }
 
 impl TableEntry {
+    /// An `IMPORT` holds this table's indexes: the append-path dump triggers
+    /// are suppressed until it commits (see [`TableEntry::importing`]).
+    pub(crate) fn import_in_flight(&self) -> bool {
+        self.importing > 0
+    }
+
     /// Appends rows to the append buffer, keeping it **ordered by row id**.
     ///
     /// The cells are placed by **column id** ([`PendingRows`]).
@@ -4838,6 +4844,21 @@ impl TableEntry {
 pub(crate) struct TableEntry {
     /// Number of write batches (`COPY`/`INSERT`) seen by this process.
     pub(crate) write_batches: usize,
+    /// Set while an `IMPORT` transaction is staging rows and has not committed.
+    ///
+    /// `NewTxn::Import` never consults the memory-index tracer: the rows go into
+    /// the segment's blocks and `PopulateIndex` writes one chunk per index per
+    /// segment at the very end, inside the transaction. The port's staging loop
+    /// goes through the same per-batch index hooks an `INSERT` does, so without
+    /// this flag the row-capacity trigger and the memory quota's waterlines both
+    /// fire mid-import and cut an index's chunks at whichever batch boundary the
+    /// reader reached (a 150k-row `COPY` produced 4 full-text chunks of
+    /// 65536/24576/32768/27120 rows instead of the reference's
+    /// 65536/65536/18928, and 3 BMP chunks instead of 1).
+    ///
+    /// Only the **append** triggers are suppressed; the rows are still fed to
+    /// every index tail, so `populate_import_indexes` sees them.
+    pub(crate) importing: usize,
     /// Row ids the C++ block mirror was written from, in block order.
     ///
     /// The mirror is a snapshot: rows appended after it was written are read
@@ -5410,10 +5431,41 @@ thread_local! {
 
 /// The timestamp the current statement reads at (`u64::MAX` outside one).
 pub(crate) fn read_ts() -> u64 {
+    // A synchronous span that has to see rows its own statement just wrote
+    // (the import's in-transaction `PopulateIndex`, whose builders scan the
+    // table) sets this. It is a thread-local and not a task-local because the
+    // span it covers contains **no awaits**: it is entered and left inside one
+    // synchronous call on one thread, so there is nothing for a runtime worker
+    // to resume it on.
+    if let Some(ts) = READ_TS_OVERRIDE.with(|cell| cell.get()) {
+        return ts;
+    }
     match READ_TS.try_with(|ts| *ts) {
         Ok(ts) => ts,
         Err(_) => POOL_READ_TS.with(|cell| cell.get()),
     }
+}
+
+thread_local! {
+    /// Overrides [`read_ts`] for a synchronous span (see there).
+    static READ_TS_OVERRIDE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Runs `f` with [`read_ts`] pinned to `ts` for its duration.
+///
+/// Only for a **synchronous** span: a task-local scope cannot cover one that
+/// runs inside an already-scoped statement, and the callers here are single
+/// calls with no awaits inside.
+pub(crate) fn with_read_ts_override<T>(ts: u64, f: impl FnOnce() -> T) -> T {
+    struct Reset(Option<u64>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            READ_TS_OVERRIDE.with(|cell| cell.set(self.0));
+        }
+    }
+    let previous = READ_TS_OVERRIDE.with(|cell| cell.replace(Some(ts)));
+    let _restore = Reset(previous);
+    f()
 }
 
 /// Sets [`POOL_READ_TS`] for the duration of `f` (a blocking-pool job).

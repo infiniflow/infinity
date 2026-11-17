@@ -383,6 +383,24 @@ impl Engine {
     /// catalog record (the reference's per-`MemIndex` object), so a column with
     /// two secondary indexes builds two independent sets.
     pub(crate) fn build_index_of(&self, table: &str, column: &str, index_id: u64) -> Result<()> {
+        self.build_index_of_segment(table, column, index_id, None)
+    }
+
+    /// [`Self::build_index_of`] restricted to one `ROW_ID` segment.
+    ///
+    /// The reference's `PopulateIndex` is handed a `SegmentMeta` and builds only
+    /// that segment (`PopulateSecondaryIndexInner` reads its blocks), so an
+    /// import writes one chunk for the segment it just filled and never
+    /// re-chunks the earlier ones. The port's build scans the table, so the
+    /// restriction has to be stated - without it the second `COPY` of a table
+    /// wrote a second chunk for every earlier segment.
+    pub(crate) fn build_index_of_segment(
+        &self,
+        table: &str,
+        column: &str,
+        index_id: u64,
+        only_segment: Option<u32>,
+    ) -> Result<()> {
         let schema = self.table_schema(table)?;
         // Every secondary column has a chunk form, so the build only reads the
         // indexed column (not the wide vectors in the same row): `index_lookup`
@@ -489,6 +507,9 @@ impl Engine {
                 if seq as u64 >= base {
                     continue;
                 }
+                if only_segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
+                    continue;
+                }
                 let Some(value) = evaluate(&row) else {
                     continue;
                 };
@@ -529,6 +550,9 @@ impl Engine {
                 if seq as u64 >= base {
                     continue;
                 }
+                if only_segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
+                    continue;
+                }
                 let Some(Value::Int(v)) = evaluate(&row) else {
                     continue;
                 };
@@ -550,6 +574,9 @@ impl Engine {
                 // Rows from `base` on belong to the tail the write hook is
                 // feeding; the chunks below cover the ones before it.
                 if seq as u64 >= base {
+                    continue;
+                }
+                if only_segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
                     continue;
                 }
                 let key = match key_kind {
@@ -595,6 +622,9 @@ impl Engine {
                 // Rows from `base` on belong to the tail the write hook is
                 // feeding; the chunks below cover the ones before it.
                 if seq as u64 >= base {
+                    continue;
+                }
+                if only_segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
                     continue;
                 }
                 let Some(value) = evaluate(&row) else {
@@ -1236,6 +1266,123 @@ impl Engine {
         )))
     }
 
+    /// `PopulateIndex(…, DumpIndexCause::kImport)` for **every** index of the
+    /// table, one segment at a time, inside the import transaction
+    /// (`new_txn_data_impl.cpp:368-386`).
+    ///
+    /// The reference calls it at the end of `NewTxn::Import`, after the rows are
+    /// in the segment's blocks and before the transaction commits, so a `COPY`
+    /// leaves each index with a chunk that covers exactly the segment it wrote -
+    /// with the import's own commit ts, and **one** chunk per index per segment
+    /// (`PopulateFtIndexInner` dumps once per `mem_index_capacity` rows, the
+    /// others once per segment). Nothing here waits for a dump transaction, a
+    /// quota breach or a capacity trigger: those are the *append* path's
+    /// triggers, and firing them mid-import splits an index's chunks at
+    /// whatever batch boundary the writer happened to reach.
+    ///
+    /// `ts` is the import's commit ts, which is the value every chunk record
+    /// this writes carries (the reference records them inside the transaction).
+    ///
+    /// The caller holds the table's bottom gate, so no append can publish a row
+    /// behind this. Failures are swallowed per index: the rows are already
+    /// committed and readable, and a missing chunk only costs the query its
+    /// index (it falls back to the exact scan).
+    pub(crate) fn populate_import_indexes(&self, table: &str, segments: &[u32], ts: u64) {
+        let qualified = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
+            return;
+        };
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
+            return;
+        };
+        if indexes.is_empty() || segments.is_empty() {
+            return;
+        }
+        // No `flush_lock`: the caller holds the table's bottom gate and the
+        // import has not published yet, so no dump/checkpoint can be running
+        // against these indexes (both of those take the gate for the write).
+        // One seal per index, not one per (index, segment): the sealers walk
+        // the table's segments themselves (`write_hnsw_chunk` and
+        // `write_ivf_index` write one chunk per segment, `seal_text_index`
+        // writes the tail it holds), so looping over segments sealed the same
+        // tail again for every one of them and produced two chunks starting at
+        // the same row.
+        // Every record the fillers below write carries the import's ts: they
+        // run inside its transaction, before `current_ts()` moves
+        // (`AddChunkIndexID1` under `kStarted` stores what the commit resolves).
+        crate::engine::with_chunk_ts(ts, || {
+            for im in &indexes {
+                // The chunk ids the index already listed: only the ones this import
+                // writes get its ts. Each import is its own `AddChunkIndexID1`, so
+                // the records of the earlier ones keep the ts of the transaction
+                // that wrote them; stamping the whole family made every chunk of
+                // the table claim the newest import's ts.
+                let before: std::collections::HashSet<(u32, u64)> =
+                    catalog::layout::read_index_chunks(
+                        self.storage.catalog.store().as_ref(),
+                        &self.database_id_of(&qualified).to_string(),
+                        &meta.id.to_string(),
+                        &im.id.to_string(),
+                    )
+                    .unwrap_or_default()
+                    .into_iter()
+                    .flat_map(|(segment, chunks)| {
+                        chunks.into_iter().map(move |(id, _)| (segment, id))
+                    })
+                    .collect();
+                let _ = self.populate_one_index(&qualified, im, segments, ts);
+                // `AddChunkIndexID1` inside the transaction names the chunks the
+                // seal above wrote, stamped with the import's own commit ts (the
+                // reference records them under `kStarted` and resolves the value at
+                // commit). This is the same publish the explicit dump performs, so
+                // an index needs no second dump to become readable.
+                let _ =
+                    self.publish_index_chunks(&qualified, meta.id, Some((im.name.as_str(), ts)));
+                let _ = self.stamp_chunk_ts_of(&qualified, &im.name, ts, |segment, id, _| {
+                    !before.contains(&(segment, id))
+                });
+            }
+        });
+        // The chunk files are on disk; the readers map them on the next query.
+        self.reload_vector_indexes();
+    }
+
+    /// One index of [`Self::populate_import_indexes`].
+    ///
+    /// It is the seal a `DumpMemIndex` performs, not a rebuild from the blocks:
+    /// the staging loop already fed every index's memory form (`insert_secondary_keys`,
+    /// `update_text_indexes_batch`, `note_hnsw_insert`, `update_sparse_indexes`,
+    /// `note_ivf_insert`), which is exactly the state the reference's
+    /// `MemIndex` is in when `PopulateIndex` runs. Rebuilding here fed the
+    /// same rows a second time - a doubled HNSW graph (7059584 bytes where the
+    /// reference writes 3527104) and a second secondary chunk.
+    fn populate_one_index(
+        &self,
+        table: &str,
+        im: &IndexMeta,
+        segments: &[u32],
+        ts: u64,
+    ) -> Result<()> {
+        if is_secondary_kind(&im.index_type) {
+            // `PopulateSecondaryIndexInner` is handed one `SegmentMeta` and
+            // builds only that segment's blocks (`new_txn_data_impl.cpp:376`),
+            // so an import chunks exactly the segments it wrote.
+            for segment in segments {
+                self.build_index_of_segment(table, &im.column, im.id, Some(*segment))?;
+            }
+            return Ok(());
+        }
+        if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
+            // The text seal queues its chunks; recording them here (rather than
+            // through the append path's `record_sealed_text_chunks`) is what
+            // gives them the import's ts.
+            self.seal_text_index_at(table, im.id, Some(ts));
+            return Ok(());
+        }
+        self.seal_index_tail(table, im);
+        Ok(())
+    }
+
     /// Seals one index's memory tail into its spill/chunk files, in the form
     /// its kind dumps it: a secondary tail becomes `seg_{s}_tail{n}.idx`, a
     /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, a
@@ -1316,7 +1463,7 @@ impl Engine {
     /// Keyed by index id, so two HNSW indexes on one column own two graphs and
     /// the first dump cannot starve the second (`MemIndex` identity is
     /// `(index_id, segment)` in the reference).
-    fn release_hnsw_memory(&self, table: &str, index_id: u64) {
+    pub(crate) fn release_hnsw_memory(&self, table: &str, index_id: u64) {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         if let Some(e) = tables.get_mut(&key) {
@@ -1333,6 +1480,16 @@ impl Engine {
     /// `flush_lock`, which serialises dumps and checkpoints but is never taken
     /// on the query path.
     pub(crate) fn seal_text_index(&self, table: &str, index_id: u64) {
+        self.seal_text_index_at(table, index_id, None);
+    }
+
+    /// [`Self::seal_text_index`] with an explicit chunk ts.
+    ///
+    /// An import seals inside its own transaction, before it has been applied,
+    /// so its chunks must carry the import's commit ts rather than
+    /// `current_ts()` (`PopulateIndex` -> `AddNewChunkIndex1` under
+    /// `kStarted`). The append path passes `None`.
+    pub(crate) fn seal_text_index_at(&self, table: &str, index_id: u64, ts: Option<u64>) {
         let key = self.table_key(table);
         let shared = self
             .tables
@@ -1345,7 +1502,7 @@ impl Engine {
             // without the record and writes over them (`with_text_dir_gate`).
             Self::with_text_dir_gate(&shared, || {
                 crate::engine::state::seal_text_index_gated(&shared);
-                self.record_sealed_text_chunks_of(table, index_id);
+                self.record_sealed_text_chunks_of_at(table, index_id, ts);
             });
         }
     }
@@ -1386,8 +1543,20 @@ impl Engine {
     /// turns it into a record. The chunk id is the one the catalog says comes
     /// next (`SegmentIndexMeta::GetAndSetNextChunkID`), never a count of files.
     pub(crate) fn record_sealed_text_chunks(&self, table: &str, column: &str) {
+        // No explicit ts: `record_sealed_text_chunks_of_at` falls back to
+        // `chunk_commit_ts`, which honours an enclosing `with_chunk_ts`.
+        self.record_sealed_text_chunks_at(table, column, None);
+    }
+
+    /// [`Self::record_sealed_text_chunks`] with an explicit chunk ts.
+    ///
+    /// An import records its chunks **inside** the transaction
+    /// (`NewTxn::Import` -> `PopulateIndex`), so they carry its commit ts -
+    /// which is not yet `current_ts()` at that moment (the transaction has not
+    /// been applied). The append path passes `None` and takes `current_ts`.
+    pub(crate) fn record_sealed_text_chunks_at(&self, table: &str, column: &str, ts: Option<u64>) {
         for index_id in self.fulltext_index_ids(table, column) {
-            self.record_sealed_text_chunks_of(table, index_id);
+            self.record_sealed_text_chunks_of_at(table, index_id, ts);
         }
     }
 
@@ -1405,7 +1574,14 @@ impl Engine {
     }
 
     /// [`Self::record_sealed_text_chunks`] for one specific index.
-    pub(crate) fn record_sealed_text_chunks_of(&self, table: &str, index_id: u64) {
+    /// [`Self::record_sealed_text_chunks_at`] for one index, with an explicit
+    /// chunk ts (`None` takes `current_ts`).
+    pub(crate) fn record_sealed_text_chunks_of_at(
+        &self,
+        table: &str,
+        index_id: u64,
+        ts: Option<u64>,
+    ) {
         let key = self.table_key(table);
         let shared = self
             .tables
@@ -1487,7 +1663,7 @@ impl Engine {
                     &chunk.base_name,
                 ),
                 index_size: 0,
-                commit_ts: self.txn.current_ts(),
+                commit_ts: ts.unwrap_or_else(|| chunk_commit_ts(self)),
             };
             let index = catalog::layout::IndexSegment {
                 index_id,
@@ -1664,23 +1840,23 @@ impl Engine {
     /// A driver that writes a chunk itself (PLAID/IVF/index dumps) therefore has
     /// to publish its record in the same step, under the id
     /// [`Self::next_index_chunk_id`] handed out.
-    pub(crate) fn record_chunk(
-        &self,
-        set: &catalog::layout::SegmentSet,
-        index_id: u64,
-        chunk_id: u32,
-        segment: u32,
-        row_count: u64,
-        index_size: u64,
-    ) {
+    pub(crate) fn record_chunk(&self, set: &catalog::layout::SegmentSet, chunk: RecordedChunk) {
+        let RecordedChunk {
+            index_id,
+            chunk_id,
+            segment,
+            base_row_id,
+            row_count,
+            index_size,
+        } = chunk;
         let record = catalog::layout::IndexChunk {
             chunk_id,
             base_name: String::new(),
-            base_row_id: u64::from(segment) << 32,
+            base_row_id,
             row_count,
             term_count: 0,
             index_size,
-            commit_ts: self.txn.current_ts().max(1),
+            commit_ts: chunk_commit_ts(self),
         };
         let index = catalog::layout::IndexSegment {
             index_id,
@@ -1887,15 +2063,22 @@ impl Engine {
                     {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
-                    // `AddNewChunkIndex1`: the chunk is on disk, record it.
+                    // `ChunkIndexMetaInfo::base_row_id_` is the **first row**
+                    // this dump's memory index holds, not the segment's base: a
+                    // segment dumped twice has two chunks and the second starts
+                    // where the first ended (100 here, not 0).
+                    let first = entries.iter().map(|(_, offset)| *offset).min().unwrap_or(0);
                     let record = catalog::layout::IndexChunk {
                         chunk_id: next,
                         base_name: String::new(),
-                        base_row_id: segment << 32,
+                        base_row_id: (segment << 32) | u64::from(first),
                         row_count: entries.len() as u64,
                         term_count: 0,
                         index_size: 0,
-                        commit_ts: self.txn.current_ts().max(1),
+                        // `current_ts()` is still the previous commit while an
+                        // import's transaction is open; the import supplies its
+                        // ts through `with_chunk_ts`.
+                        commit_ts: chunk_commit_ts(self),
                     };
                     let index = catalog::layout::IndexSegment {
                         index_id,
@@ -2258,10 +2441,16 @@ impl Engine {
                 continue;
             }
             // `AddNewChunkIndex1`.
+            // First row of this chunk (see `write_secondary_pgm_chunks`).
+            let first = entries
+                .iter()
+                .flat_map(|(_, list)| list.iter().copied())
+                .min()
+                .unwrap_or(0);
             let record = catalog::layout::IndexChunk {
                 chunk_id: next,
                 base_name: String::new(),
-                base_row_id: segment << 32,
+                base_row_id: (segment << 32) | u64::from(first),
                 row_count: entries
                     .iter()
                     .flat_map(|(_, list)| list.iter().copied())
@@ -2269,7 +2458,7 @@ impl Engine {
                     .len() as u64,
                 term_count: 0,
                 index_size: 0,
-                commit_ts: self.txn.current_ts().max(1),
+                commit_ts: chunk_commit_ts(self),
             };
             let index = catalog::layout::IndexSegment {
                 index_id,
@@ -2523,7 +2712,7 @@ impl Engine {
                 row_count: pairs.len() as u64,
                 term_count: 0,
                 index_size: 0,
-                commit_ts: self.txn.current_ts().max(1),
+                commit_ts: chunk_commit_ts(self),
             };
             if self
                 .storage
@@ -2682,7 +2871,7 @@ impl Engine {
                 row_count,
                 term_count: 0,
                 index_size: 0,
-                commit_ts: self.txn.current_ts().max(1),
+                commit_ts: chunk_commit_ts(self),
             };
             let _ = self.storage.catalog.replace_segment_chunks(
                 &set,
@@ -4404,4 +4593,51 @@ fn other_params_of(
         }
         _ => String::new(),
     }
+}
+
+/// The commit ts a chunk record written on the **current call** carries.
+///
+/// Normally `current_ts()`. An import records its chunks inside its own
+/// transaction, before that transaction has been applied, so `current_ts()`
+/// there is still the *previous* commit - the reference's `AddChunkIndexID1`
+/// under `TxnState::kStarted` stores the value the transaction resolves at
+/// commit instead. [`with_chunk_ts`] is how the import states its ts.
+pub(crate) fn chunk_commit_ts(engine: &Engine) -> u64 {
+    CHUNK_TS
+        .with(|cell| cell.get())
+        .unwrap_or_else(|| engine.txn.current_ts())
+        .max(1)
+}
+
+thread_local! {
+    /// See [`chunk_commit_ts`]. A thread-local, not a task-local: the span it
+    /// covers is synchronous (no awaits inside), so nothing can resume it on
+    /// another worker.
+    static CHUNK_TS: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Runs `f` with [`chunk_commit_ts`] pinned to `ts`.
+pub(crate) fn with_chunk_ts<T>(ts: u64, f: impl FnOnce() -> T) -> T {
+    struct Reset(Option<u64>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CHUNK_TS.with(|cell| cell.set(self.0));
+        }
+    }
+    let previous = CHUNK_TS.with(|cell| cell.replace(Some(ts)));
+    let _restore = Reset(previous);
+    f()
+}
+
+/// One chunk a driver wrote itself and now publishes (`AddNewChunkIndex1`):
+/// what [`Engine::record_chunk`] needs, grouped because the fields are
+/// positional numbers a call site could easily swap.
+pub(crate) struct RecordedChunk {
+    pub(crate) index_id: u64,
+    pub(crate) chunk_id: u32,
+    pub(crate) segment: u32,
+    /// The chunk's **first row**, `segment << 32 | offset`.
+    pub(crate) base_row_id: u64,
+    pub(crate) row_count: u64,
+    pub(crate) index_size: u64,
 }

@@ -621,6 +621,14 @@ impl Engine {
         if quota == 0 {
             return;
         }
+        // An `IMPORT` in flight owns its indexes until it commits: the
+        // reference's `NewTxn::Import` never reaches the tracer (`PopulateIndex`
+        // is the only thing that dumps, once per index per segment, at the
+        // end). Firing the waterlines from the staging loop split the chunks at
+        // batch boundaries - see `TableEntry::importing`.
+        if table.is_some_and(|table| self.import_in_flight(table)) {
+            return;
+        }
         // No time gate. The reference's `MemIndexTracer::IncreaseMemoryUsage`
         // compares on **every** increase (`cur_index_memory_ >
         // index_memory_limit_ + proposed_dump_size_`, `memindex_tracer.cppm:103`)
@@ -690,6 +698,9 @@ impl Engine {
         if quota == 0 {
             return;
         }
+        if self.import_in_flight(table) {
+            return;
+        }
         self.refresh_memindex_charge(table);
         if self.seal_pressure() == Pressure::Normal {
             return;
@@ -702,6 +713,21 @@ impl Engine {
         // still names the table: the breach is that table's charge, and picking
         // the victim across the engine would leave it undrained.
         self.dump_under_pressure(Some(table)).await;
+    }
+
+    /// Whether an `IMPORT` is currently staging rows into `table`.
+    ///
+    /// While it is, the append path's dump triggers (the row capacity and the
+    /// memory quota) stay off: the reference's `NewTxn::Import` never reaches
+    /// them, and letting them fire cut an index's chunks at whatever batch
+    /// boundary the reader had reached. `populate_import_indexes` writes the
+    /// chunks once, inside the transaction, as `PopulateIndex` does.
+    pub(crate) fn import_in_flight(&self, table: &str) -> bool {
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&self.table_key(table))
+            .is_some_and(|entry| entry.import_in_flight())
     }
 
     /// Queues the background drain. The caller has already established that a
@@ -4672,7 +4698,14 @@ impl Engine {
             {
                 Self::with_text_dir_gate(shared, || {
                     crate::engine::state::seal_text_index_gated(shared);
-                    self.record_sealed_text_chunks(table, column);
+                    // `built_ts` is the merge's commit ts, and the chunks this
+                    // seal writes belong to that transaction
+                    // (`PopulateIndex(…, kCompact)`): recording them under
+                    // `current_ts()` (the previous commit) made the merged
+                    // segment's chunk claim a ts the reference never uses.
+                    crate::engine::with_chunk_ts(built_ts, || {
+                        self.record_sealed_text_chunks(table, column);
+                    });
                 });
             }
             {

@@ -11436,7 +11436,7 @@ mod tests {
                 base_row_id: recorded[0].base_row_id,
                 row_count: 2,
             });
-        e.record_sealed_text_chunks_of("once", index_id);
+        e.record_sealed_text_chunks_of_at("once", index_id, None);
         let after = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
         assert_eq!(after.len(), 1, "one chunk name took two records: {after:?}");
     }

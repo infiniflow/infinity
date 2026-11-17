@@ -2095,6 +2095,26 @@ impl SecondarySegmentReader {
         u32::from_le_bytes(self.map[at..at + 4].try_into().unwrap())
     }
 
+    /// Every `(key, offsets)` pair the chunk holds, in key order.
+    ///
+    /// A dump that merges a segment's chunks needs the whole content, not one
+    /// key's posting list; iterating here keeps the decode next to the layout
+    /// (`key(i)` / `offset(i)`), so a caller never re-derives the stride.
+    pub fn iter_entries(&self) -> Vec<(Key, Vec<u32>)> {
+        let mut out: Vec<(Key, Vec<u32>)> = Vec::new();
+        for i in 0..self.row_count {
+            let key = self.key(i);
+            let offset = self.offset(i);
+            match out.last_mut() {
+                Some((last, offsets)) if last.order(&key) == Ordering::Equal => {
+                    offsets.push(offset)
+                }
+                _ => out.push((key, vec![offset])),
+            }
+        }
+        out
+    }
+
     /// All segment offsets whose key equals `key`.
     pub fn lookup(&self, key: Key) -> Vec<u32> {
         if self.row_count == 0 {
