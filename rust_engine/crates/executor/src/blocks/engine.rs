@@ -1813,11 +1813,6 @@ impl Engine {
                     self.column_types(table).ok()?.get(ci).cloned()
                 })
                 .unwrap_or_default();
-            let sparse = if im.index_type.eq_ignore_ascii_case("BMP") {
-                Some(self.sparse_rows_by_block(table, &im.column, crate::index_block_size(im)))
-            } else {
-                None
-            };
             // The chunk record names the transaction whose dump sealed it
             // (`SegmentIndexMeta::AddChunkIndexID1`); the port's last `DumpIndex`
             // for this index is that transaction.
@@ -1867,18 +1862,6 @@ impl Engine {
                     Some((_, ts)) => ts,
                     None => dump_ts.max(self.import_ts(table, *segment).unwrap_or(0)),
                 };
-                // A segment that still holds exactly what one `COPY` wrote gets
-                // the import's chunk layout (one per capacity for full-text, one
-                // for the whole segment for secondary and sparse).
-                let imported = self.imported_extent(table, *segment, *seg_rows).is_some();
-                // `DumpMemIndex` dumps a segment's whole sparse tail as **one**
-                // chunk: it takes one `GetAndSetNextChunkID` per segment
-                // (`new_txn_index_impl.cpp:141`) and hands the mem index to one
-                // `Dump`, so a table whose rows were inserted block by block
-                // still gets a single chunk. The per-block split is the
-                // **checkpoint**'s shape, which is why this is gated on the
-                // dump (`only.is_some()`) and not just on an import.
-                let dump_single_chunk = only.is_some();
                 // A plain `CREATE INDEX` leaves the type empty, which is the
                 // secondary default everywhere else (`is_secondary_kind`).
                 let chunks = if crate::is_secondary_kind(&im.index_type) {
@@ -1907,7 +1890,6 @@ impl Engine {
                     // dump, so merging has to happen here. The id a record already
                     // named for a block is kept (`PopulateBMPIndexInner` and
                     // `DumpMemIndex` only *take* ids from `GetAndSetNextChunkID`).
-                    let empty = Default::default();
                     let set = SegmentSet {
                         db_id: db_id.to_string(),
                         table_id: table_id.to_string(),
@@ -1915,31 +1897,22 @@ impl Engine {
                     };
                     let mut next_id =
                         self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
-                    publish_bmp_chunks(
-                        &seg_dir,
-                        sparse
-                            .as_ref()
-                            .and_then(|m| m.get(segment))
-                            .cloned()
-                            .unwrap_or(empty),
-                        &crate::blocks::chunk::BmpChunkShape {
-                            width: crate::sparse_idx_width(&declared),
-                            term_bound: crate::sparse_declared_bound(&declared).unwrap_or(0),
-                            block_size: crate::index_block_size(im),
-                            segment: *segment,
-                            // `PopulateIndex` dumps a segment's whole
-                            // `BMPIndexInMem` once, so an **imported** segment
-                            // with no chunk yet is one chunk. A later
-                            // `DumpMemIndex` takes one id per block and dumps
-                            // block by block, which is why an existing record
-                            // makes this false even on an imported segment -
-                            // the reference leaves two chunks for "COPY, then
-                            // DUMP INDEX".
-                            single_chunk: imported || dump_single_chunk,
-                        },
-                        &existing_chunks,
-                        &mut next_id,
-                    )
+                    // The bytes the seal just encoded, one image per dump: the
+                    // reference's chunk **is** that image
+                    // (`BMPHandler::SaveToPtr`), so nothing is rebuilt from the
+                    // rows here.
+                    let pending: Vec<(u64, Vec<u8>, u32, usize)> = self
+                        .tables
+                        .lock()
+                        .unwrap()
+                        .get(&self.table_key(table))
+                        .and_then(|e| e.sparse.get(&im.id).cloned())
+                        .map(|shared| {
+                            let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
+                            std::mem::take(&mut guard.pending)
+                        })
+                        .unwrap_or_default();
+                    publish_bmp_chunks(&seg_dir, &pending, *segment, &existing_chunks, &mut next_id)
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                     // Written in place by the seal; its files are named after
                     // the chunk's base name, not `chunk_N.idx`. The ids come
@@ -2230,57 +2203,6 @@ impl Engine {
             }
         }
         Ok(())
-    }
-
-    /// A sparse column's documents, grouped by segment and then by physical
-    /// block, in the BMP encoder's form: `(row id within the segment,
-    /// [(term, value)])`.
-    ///
-    /// The segment is part of the key: every segment restarts its block ids at
-    /// zero, and the reference keeps one BMP index per segment
-    /// (`idx_{id}/seg_{s}/chunk_{block}.idx`).
-    pub(crate) fn sparse_rows_by_block(
-        &self,
-        table: &str,
-        column: &str,
-        block_size: usize,
-    ) -> std::collections::BTreeMap<
-        u32,
-        std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
-    > {
-        let mut by_block = std::collections::BTreeMap::new();
-        let Ok(schema) = self.table_schema(table) else {
-            return by_block;
-        };
-        let Some(ci) = schema.iter().position(|c| c == column) else {
-            return by_block;
-        };
-        let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
-            return by_block;
-        };
-        for (seq, cells) in rows {
-            let Some(Value::Str(text)) = cells.get(ci) else {
-                continue;
-            };
-            let entries: Vec<(i32, f32)> = crate::parse_sparse_str(text)
-                .into_iter()
-                .map(|(term, value)| (term as i32, value as f32))
-                .collect();
-            let row = seq as u64 & 0xffff_ffff;
-            // The chunk is the **index's** block (`WITH (block_size = N)`,
-            // `BMPAlg::block_fwd_`), not the table's 8192-row block storage
-            // block. Dividing by 8192 put every one of `test_mem_bmp`'s 35 rows
-            // in chunk 0, so the chunks' `base_row_id`s were all 0 and a
-            // reopened index covered only the first 15 rows of them.
-            let block_size = block_size.max(1) as u64;
-            by_block
-                .entry((seq >> 32) as u32)
-                .or_default()
-                .entry(row / block_size)
-                .or_default()
-                .push((row, entries));
-        }
-        by_block
     }
 
     /// Reads a table back from the C++ block layout.

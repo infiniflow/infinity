@@ -397,6 +397,15 @@ impl BmpReader {
         self.doc_ids.len()
     }
 
+    /// The **first** document id the chunk holds.
+    ///
+    /// `ChunkIndexMetaInfo::base_row_id_` is this value, not the segment's base:
+    /// a segment dumped twice has two chunks and the second starts where the
+    /// first ended (`BMPIndexInMem::GetChunkIndexMetaInfo`).
+    pub fn first_doc(&self) -> u32 {
+        self.doc_ids.first().copied().unwrap_or(0)
+    }
+
     /// `BMPAlgBase::SearchKnn`: `beta` term selection, threshold from the k-th
     /// posting score, block bounds, exact block scoring, and `alpha` early stop.
     pub fn search(

@@ -4154,6 +4154,16 @@ pub(crate) struct SparseIndex {
     pub(crate) tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
     /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
     pub(crate) sealed: Vec<(u64, Arc<storage::bmp::BmpReader>)>,
+    /// The bytes of every chunk a `seal` produced, in the order it produced
+    /// them, with the segment and first document of each.
+    ///
+    /// The chunk file is **this image** (`BMPHandler::SaveToPtr`): a BMP index
+    /// is self-describing, so the publish step writes exactly what the seal
+    /// encoded instead of re-deriving it from the table's rows - a rebuild
+    /// covered every row of the segment again and made two dumps' chunks
+    /// overlap.
+    #[allow(clippy::type_complexity)]
+    pub(crate) pending: Vec<(u64, Vec<u8>, u32, usize)>,
     /// Monotonic suffix so a later seal never overwrites an earlier spill.
     pub(crate) next_chunk: u64,
     pub(crate) tail_bytes: usize,
@@ -4241,6 +4251,7 @@ impl SparseIndex {
             terms: 0,
             tail: Default::default(),
             sealed: Vec::new(),
+            pending: Vec::new(),
             next_chunk,
             tail_bytes: 0,
             tail_generation: 0,
@@ -4359,6 +4370,9 @@ impl SparseIndex {
             let bytes = storage::bmp::encode_bmp(self.block_size, self.width, &docs, term_num);
             self.next_chunk += 1;
             if let Ok(reader) = storage::bmp::BmpReader::from_bytes(&bytes, self.width) {
+                let first = reader.first_doc();
+                let count = reader.doc_count();
+                self.pending.push((segment, bytes, first, count));
                 self.sealed.push((segment, Arc::new(reader)));
             }
         }

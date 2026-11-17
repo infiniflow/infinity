@@ -69,6 +69,28 @@ impl Engine {
                         .insert(im.id, segments.into_iter().map(Arc::new).collect());
                 }
             }
+            // A BMP index maps its chunks and rebuilds its tail from the rows
+            // they do not cover, like a secondary index: without this the
+            // registry has no entry after a reopen, so the write hook
+            // (`update_sparse_indexes`) has nothing to feed and the next
+            // `DumpIndex` seals an empty tail - which is why the second run of
+            // a mutated table produced no second chunk.
+            if im.index_type.eq_ignore_ascii_case("BMP")
+                && self
+                    .table_schema(&im.table)?
+                    .iter()
+                    .any(|c| c == &im.column)
+            {
+                let width = self
+                    .table_schema(&im.table)
+                    .ok()
+                    .and_then(|s| s.iter().position(|c| c == &im.column))
+                    .and_then(|i| self.column_types(&im.table).ok()?.get(i).cloned())
+                    .map(|ty| sparse_idx_width(&ty));
+                if let Some(width) = width {
+                    let _ = self.sparse_index_by_id(&im.table, &im.column, im.id, width);
+                }
+            }
             if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
                 let tkey = self.table_key(&im.table);

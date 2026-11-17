@@ -117,80 +117,32 @@ pub(crate) fn publish_lowcard_chunks_from_dir(seg_dir: &Path, segment: u32) -> V
     chunks
 }
 
-/// Rebuilds a sparse index's published chunks: one per block, from the rows.
+/// Publishes the chunks one BMP dump produced, from the memory index it sealed.
 ///
-/// The reference's chunk is the block, and every memory dump re-dumps the block
-/// it touches (`BMPIndexInMem::Dump` hands the whole in-memory `BMPAlg` to the
-/// chunk buffer), so two 100-row inserts into one block leave **one** chunk of
-/// 200 rows. The port's spill files are per dump, so the merge happens here.
-///
-/// The chunk id is the catalog's, not the block number: `PopulateBMPIndexInner`
-/// and `DumpMemIndex` both take one from `GetAndSetNextChunkID`, and that
-/// counter only moves forward. `existing` maps a chunk's first row id to the id
-/// a record already named, so a re-dump of the same block rewrites its own
-/// chunk instead of appending a second one; `next_id` hands out the ones no
-/// record names yet.
-/// Where and how a sparse chunk is encoded: the column's `IdxWidth` and
-/// declared term bound, the block size, the segment the chunk belongs to and
-/// whether the whole segment folds into one chunk (an `IMPORT` does).
-pub(crate) struct BmpChunkShape {
-    pub(crate) width: storage::bmp::IdxWidth,
-    pub(crate) term_bound: usize,
-    pub(crate) block_size: usize,
-    pub(crate) segment: u32,
-    pub(crate) single_chunk: bool,
-}
-
+/// `pending` is the images `SparseIndex::seal` just encoded - **one per
+/// `ROW_ID` segment**, each holding exactly the documents that dump covered. The
+/// reference's `DumpSegmentMemIndex` dumps the segment's `BMPIndexInMem` once
+/// and records its `ChunkIndexMetaInfo`, so this is the chunk: the bytes are
+/// the index image (`BMPHandler::SaveToPtr`) and `base_row_id` is its first
+/// document. Rebuilding from the table's rows (`sparse_rows_by_block`) put
+/// every row of the segment in the chunk, so a second dump re-covered the first
+/// one's range and the two records overlapped.
 pub(crate) fn publish_bmp_chunks(
     seg_dir: &Path,
-    by_block: std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
-    shape: &BmpChunkShape,
+    pending: &[(u64, Vec<u8>, u32, usize)],
+    segment: u32,
     existing: &std::collections::HashMap<u64, u32>,
     next_id: &mut u32,
 ) -> Vec<IndexChunk> {
-    let BmpChunkShape {
-        width,
-        term_bound,
-        block_size,
-        segment,
-        single_chunk,
-    } = *shape;
-    // `PopulateBMPIndexInner` adds every block of the segment to one
-    // `BMPIndexInMem` and dumps once, so an imported segment's sparse chunk
-    // covers all of its blocks.
-    let by_block: std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>> = match single_chunk
-    {
-        true => {
-            let docs: Vec<storage::bmp::SparseDoc> = by_block.into_values().flatten().collect();
-            if docs.is_empty() {
-                Default::default()
-            } else {
-                [(0u64, docs)].into_iter().collect()
-            }
-        }
-        false => by_block,
-    };
     let mut chunks = Vec::new();
-    for (block, mut docs) in by_block {
+    for (chunk_segment, bytes, first_doc, doc_count) in pending {
         if std::fs::create_dir_all(seg_dir).is_err() {
             break;
         }
-        docs.sort_by_key(|(row, _)| *row);
-        // The term space is the column's declared bound, widened to the terms
-        // this chunk actually holds (`BMPAlg` is constructed with the bound).
-        let term_num = docs
-            .iter()
-            .flat_map(|(_, entries)| entries.iter().map(|(term, _)| *term + 1))
-            .max()
-            .unwrap_or(0)
-            .max(1)
-            .max(term_bound as i32) as usize;
-        let bytes = storage::bmp::encode_bmp(block_size, width, &docs, term_num);
-        // `block` is the index's own block ordinal, so its first row is
-        // `block * block_size` (`BMPAlg`: `doc_id = block_id * block_size`).
-        let base_row_id = (u64::from(segment) << 32) | (block * block_size as u64);
-        // The id the record for **this block's** chunk already owns, else the
-        // counter the catalog keeps. A block never reuses a retired id.
+        if *chunk_segment != u64::from(segment) {
+            continue;
+        }
+        let base_row_id = (u64::from(segment) << 32) | u64::from(*first_doc);
         let chunk_id = match existing.get(&base_row_id) {
             Some(id) => *id,
             None => {
@@ -200,14 +152,14 @@ pub(crate) fn publish_bmp_chunks(
             }
         };
         let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
-        if storage::definition::format::write_synced(&path, &bytes).is_err() {
+        if storage::definition::format::write_synced(&path, bytes).is_err() {
             continue;
         }
         chunks.push(IndexChunk {
             chunk_id,
             base_name: String::new(),
             base_row_id,
-            row_count: docs.len() as u64,
+            row_count: *doc_count as u64,
             term_count: 0,
             index_size: 0,
             commit_ts: 0,
