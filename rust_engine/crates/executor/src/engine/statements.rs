@@ -5572,6 +5572,17 @@ impl Engine {
             .map(|m| m.id.to_string())
             .unwrap_or_default();
         let mut catalog_chunks: Vec<(u64, std::path::PathBuf, u64, u64)> = Vec::new();
+        // A segment a compaction deprecated is **not** coverage: its rows were
+        // renumbered into the merged segment, so counting its chunks made the
+        // merged segment's rows look sealed and the rebuild left the tail empty
+        // - the merged segment then got no chunk at all.
+        let dropped: std::collections::HashSet<u32> = self
+            .storage
+            .catalog
+            .dropped_segments(&db_id, &table_id)
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
         if let Ok(layers) = catalog::layout::read_index_chunks(
             self.storage.catalog.store().as_ref(),
             &db_id,
@@ -5592,6 +5603,9 @@ impl Engine {
                 else {
                     continue;
                 };
+                if dropped.contains(&segment) {
+                    continue;
+                }
                 catalog_chunks.push((u64::from(segment), path, info.base_row_id, info.row_count));
             }
         }

@@ -1781,17 +1781,31 @@ impl Engine {
         // **once**: `SparseIndex::pending` is drained by the first segment the
         // loop reaches, so a per-segment take left every later segment with an
         // empty list and it fell back to the block-by-block rebuild.
-        let bmp_pending: std::collections::HashMap<u32, Vec<PendingSparseChunk>> = {
-            let mut by_index: std::collections::HashMap<u32, Vec<PendingSparseChunk>> =
+        //
+        // Only the indexes **this call** publishes: a compaction publishes one
+        // index per call, so draining every index's list here left the merged
+        // segment's segment with nothing to write on the second call and it fell
+        // back to the block-by-block rebuild.
+        let bmp_pending: std::collections::HashMap<u64, Vec<PendingSparseChunk>> = {
+            let mut by_index: std::collections::HashMap<u64, Vec<PendingSparseChunk>> =
                 Default::default();
             let tables = self.tables.lock().unwrap();
             if let Some(entry) = tables.get(&self.table_key(table)) {
-                for (index_id, shared) in &entry.sparse {
+                for im in indexes {
+                    if !im.index_type.eq_ignore_ascii_case("BMP") {
+                        continue;
+                    }
+                    if only.is_some_and(|(name, _)| name != im.name) {
+                        continue;
+                    }
+                    let Some(shared) = entry.sparse.get(&im.id) else {
+                        continue;
+                    };
                     let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
                     if guard.pending.is_empty() {
                         continue;
                     }
-                    by_index.insert(*index_id as u32, std::mem::take(&mut guard.pending));
+                    by_index.insert(im.id, std::mem::take(&mut guard.pending));
                 }
             }
             by_index
@@ -1921,7 +1935,7 @@ impl Engine {
                     // (`BMPHandler::SaveToPtr`), so nothing is rebuilt from the
                     // rows here.
                     let pending: &[PendingSparseChunk] = bmp_pending
-                        .get(&(index_id as u32))
+                        .get(&(index_id as u64))
                         .map(Vec::as_slice)
                         .unwrap_or(&[]);
                     if pending.is_empty() && only.is_none() {
