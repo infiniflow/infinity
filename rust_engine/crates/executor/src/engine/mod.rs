@@ -55,12 +55,17 @@ mod tests_ut;
 pub(crate) mod export;
 pub(crate) mod import;
 pub(crate) mod index_build;
+pub(crate) mod maintain;
 pub(crate) mod query;
+pub(crate) mod recall;
 pub(crate) mod state;
 pub(crate) mod tasks;
 pub(crate) mod text_index;
 pub(crate) mod text_query;
 pub(crate) mod types;
+
+pub(crate) use maintain::{Pressure, SealCandidate, SealScheduler, Watermarks, SEAL_STARVE_TICKS};
+pub(crate) use recall::RecallMonitor;
 
 pub use state::*;
 pub(crate) use tasks::*;

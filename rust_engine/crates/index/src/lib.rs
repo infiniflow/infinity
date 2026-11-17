@@ -12,6 +12,7 @@
 #![feature(portable_simd)]
 
 pub mod bp;
+pub mod cspann;
 pub mod emvb;
 pub mod fulltext;
 pub mod hnsw_handler;
@@ -21,6 +22,7 @@ pub mod knn_flat;
 pub mod linscan;
 pub mod lsg;
 pub mod lvq;
+pub mod maintain;
 pub mod merge_knn;
 pub mod multivector;
 pub mod parallel;

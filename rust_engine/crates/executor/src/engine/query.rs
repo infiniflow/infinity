@@ -2223,6 +2223,39 @@ impl Engine {
                         }
                     }
                 }
+                // cspann is materialised by `CREATE INDEX` (`docs/CSPANN_DESIGN.md`
+                // D3/D4) and held in memory. The tree covers exactly the rows
+                // present when it was built; rows written afterwards leave the
+                // index *uncovered*, and `knn_candidates` then answers with the
+                // exact scan (§9.7) instead of a short top-k.
+                if effective_type.eq_ignore_ascii_case("CSPANN") && has_rows {
+                    if let Some(index_id) = created_index_id {
+                        let schema = self.table_schema(table)?;
+                        let Some(col) = schema.iter().position(|c| c == column) else {
+                            return Err(Error::Invalid(format!("unknown column '{column}'")));
+                        };
+                        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
+                        for (seq, text) in self.read_block_column_including_deleted(table, col) {
+                            rows.push((seq as u64, crate::engine::state::parse_vec_f32(&text)));
+                        }
+                        if !rows.is_empty() {
+                            let tree = crate::cspann_mem::build(rows, opts)?;
+                            let key = self.table_key(table);
+                            self.tables
+                                .lock()
+                                .unwrap()
+                                .entry(key)
+                                .or_default()
+                                .cspann
+                                .insert(
+                                    index_id,
+                                    std::sync::Arc::new(crate::cspann_mem::CspannHandle::Memory(
+                                        tree,
+                                    )),
+                                );
+                        }
+                    }
+                }
                 // A multi-vector index is materialised when it is created, so
                 // queries only read segment files; later inserts go to the
                 // memory tail and `flush()` dumps it.

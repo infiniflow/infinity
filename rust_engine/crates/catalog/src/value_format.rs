@@ -436,6 +436,10 @@ pub mod index_type {
     pub const EMVB: &str = "EMVB";
     pub const PLAID: &str = "PLAID";
     pub const SMVE: &str = "SMVE";
+    /// Not a C++ kind: the port's own cluster-based vector index
+    /// (`docs/CSPANN_DESIGN.md`). It takes a new value instead of reusing one
+    /// (§13), so the C++ engine refuses the record rather than misreading it.
+    pub const CSPANN: &str = "CSPANN";
 }
 
 /// Maps a `CREATE INDEX … USING <type>` keyword to the stored name.
@@ -451,6 +455,7 @@ pub fn index_type_name(using: &str) -> Option<&'static str> {
         "EMVB" => index_type::EMVB,
         "PLAID" => index_type::PLAID,
         "SMVE" => index_type::SMVE,
+        "CSPANN" => index_type::CSPANN,
         _ => return None,
     })
 }
@@ -892,6 +897,31 @@ impl IndexDefValue {
         ))
         .with("analyzer", Json::Str(analyzer.to_string()))
         .with("flag", Json::Int(FULLTEXT_OPTION_FLAG_ALL))
+    }
+
+    /// The port's cspann record: an `IndexBase` with the build options as
+    /// string extras.
+    ///
+    /// There is no C++ counterpart, so the extras are not the reference's
+    /// field-by-field layout; the reader (`IndexMeta::options`) only needs them
+    /// to round-trip, and every lookup on the engine side is
+    /// case-insensitive.
+    pub fn cspann(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        options: &[(String, String)],
+    ) -> Self {
+        let mut value = Self::new(IndexBaseValue::new(
+            index_type::CSPANN,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ));
+        for (key, option) in options {
+            value = value.with(&key.to_ascii_lowercase(), Json::Str(option.clone()));
+        }
+        value
     }
 
     /// `IndexSecondary::Serialize()` (`index_secondary_impl.cpp:117-124`).

@@ -8208,6 +8208,152 @@ mod tests {
         );
     }
 
+    /// `CSPANN_DESIGN.md` §9.5: the pressure level is *derived* from the one
+    /// byte ledger, not from a second (row-based) trigger.
+    #[test]
+    fn the_pressure_level_comes_from_the_byte_ledger() {
+        use crate::engine::Pressure;
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE pl (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO pl VALUES ");
+        for i in 0..200 {
+            sql.push_str(&format!("({i}, [{i}.0,{}.0,{}.0,1.0])", i + 1, i + 2));
+            if i < 199 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking("CREATE INDEX pl_i ON pl (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+
+        let pending = e.budget_bytes() as u64;
+        assert!(pending > 0, "the tail has bytes to account for");
+        // soft = budget/4, hard = budget/2: three times the pending bytes puts
+        // it above `soft` but below `hard`; 1.9x puts it above both.
+        e.set_memindex_quota(pending * 3);
+        assert_eq!(e.seal_pressure(), Pressure::Soft);
+        e.set_memindex_quota(pending * 19 / 10);
+        assert_eq!(e.seal_pressure(), Pressure::Hard);
+        e.set_memindex_quota(pending * 10);
+        assert_eq!(e.seal_pressure(), Pressure::Normal);
+        // `0` keeps the whole mechanism off, as before.
+        e.set_memindex_quota(0);
+        assert_eq!(e.seal_pressure(), Pressure::Normal);
+    }
+
+    /// `CREATE INDEX` builds a graph straight from the blocks, so the charge the
+    /// **write** path keeps (`index_pending_bytes`) stays zero. The seal
+    /// selector asks the tail itself (`IndexMaintainer::pending_bytes`), which is
+    /// what makes such a graph releasable at all.
+    #[test]
+    fn a_graph_built_by_create_index_is_visible_to_the_quota() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cg (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cg VALUES ");
+        for i in 0..300 {
+            sql.push_str(&format!("({i}, [{i}.0,{}.0,{}.0,1.0])", i + 1, i + 2));
+            if i < 299 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking("CREATE INDEX cg_i ON cg (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        let id = e.test_index_id("default_db.cg", "v", "HNSW");
+        assert_ne!(id, 0);
+        let charged = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("default_db.cg"))
+            .and_then(|entry| entry.index_pending_bytes.get(&id).copied())
+            .unwrap_or(0);
+        assert_eq!(charged, 0, "no write ran after CREATE INDEX");
+        let held = e.index_memory_bytes("default_db.cg", id, "HNSW");
+        assert!(held > 0, "the graph itself reports its bytes: {held}");
+    }
+
+    /// §9.5's escalate level: under `hard` pressure a table's seals stop at one
+    /// index and cover all of them. A BMP tail and a secondary tail on one table
+    /// make that observable - `soft` releases the larger, `hard` releases both.
+    ///
+    /// The sparse tail is used rather than an HNSW one because its size is the
+    /// live `tail_bytes`; an HNSW tail's size is the byte count the write path
+    /// charges, which `CREATE INDEX` alone does not raise.
+    #[test]
+    fn hard_pressure_seals_every_tail_of_the_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE hp (id INT, c INT, s SPARSE(FLOAT,10));")
+            .unwrap();
+        e.execute_blocking("CREATE INDEX hp_c ON hp (c);").unwrap();
+        e.execute_blocking("CREATE INDEX hp_s ON hp (s) USING BMP;")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO hp VALUES ");
+        for i in 0..500 {
+            sql.push_str(&format!("({i}, {}, [0:1.0, 1:2.0, 3:1.5])", i % 7));
+            if i < 499 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+
+        let tails = |e: &Engine| -> (usize, usize) {
+            let indexes = e.storage.catalog.list_indexes().unwrap();
+            let bytes = |name: &str| {
+                indexes
+                    .iter()
+                    .find(|im| im.name == name)
+                    .map(|im| e.index_memory_bytes(&im.table, im.id, &im.index_type))
+                    .unwrap_or(0)
+            };
+            (bytes("hp_c"), bytes("hp_s"))
+        };
+        let (sec, sparse) = tails(&e);
+        assert!(
+            sec > 0 && sparse > 0,
+            "both tails hold bytes ({sec}, {sparse})"
+        );
+        let held = (sec + sparse) as u64;
+
+        // soft = quota/4 and hard = quota/2, so 3x the held bytes puts the
+        // ledger above `soft` and below `hard`.
+        e.set_memindex_quota(held * 3);
+        crate::scheduler::block_on(e.enforce_memindex_quota(Some("hp")));
+        let (sec, sparse) = tails(&e);
+        assert_eq!(
+            (sec == 0) as usize + (sparse == 0) as usize,
+            1,
+            "soft pressure seals one tail, not both ({sec}, {sparse})"
+        );
+
+        // Refill both tails, then cross the hard line: every tail goes.
+        e.execute_blocking("INSERT INTO hp VALUES (900, 1, [0:9.0, 2:9.0]);")
+            .unwrap();
+        let (sec, sparse) = tails(&e);
+        let held = (sec + sparse) as u64;
+        assert!(held > 0, "the tails hold bytes again ({sec}, {sparse})");
+        e.set_memindex_quota(held * 19 / 10);
+        crate::scheduler::block_on(e.enforce_memindex_quota(Some("hp")));
+        let (sec, sparse) = tails(&e);
+        assert_eq!(
+            (sec, sparse),
+            (0, 0),
+            "hard pressure seals every tail of the table"
+        );
+        // The answers survive the seals.
+        assert_eq!(e.row_count("hp").unwrap(), 501);
+        let got = rows(&e, "SELECT id FROM hp WHERE c = 1 ORDER BY id LIMIT 1;");
+        assert_eq!(got, vec![vec!["1".to_string()]]);
+    }
+
     /// One quota governs every index form: when it is exceeded the tails are
     /// dumped and released, and the results stay correct.
     #[test]
@@ -13131,5 +13277,811 @@ mod tests {
         // The same answer after a restart: the chunks on disk are the truth.
         let reopened = Engine::open(dir.path()).unwrap();
         assert_eq!(collect(&reopened), live_rows(&reopened), "after a restart");
+    }
+
+    /// `CREATE INDEX … USING CSPANN` answers `SEARCH MATCH VECTOR`, and the
+    /// answer is the exact top-k once the candidate list is re-scored
+    /// (`docs/CSPANN_DESIGN.md` §8.6: a 1-bit code picks candidates, the
+    /// executor decides the order).
+    #[test]
+    fn cspann_answers_self_queries() {
+        let n = 200usize;
+        for metric in ["l2", "cosine"] {
+            let dir = tempdir().unwrap();
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE cs (id INT, v EMBEDDING(FLOAT,16));")
+                .unwrap();
+            let vector = |i: usize| -> String {
+                let body: Vec<String> = (0..16)
+                    .map(|d| format!("{}", (i * 17 + d * 31) % 1009))
+                    .collect();
+                format!("[{}]", body.join(","))
+            };
+            let mut sql = String::from("INSERT INTO cs VALUES ");
+            for i in 0..n {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < n {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(&format!(
+                "CREATE INDEX cs_i ON cs (v) USING CSPANN WITH \
+                 (metric='{metric}', max_partition_size=32, num_centroids=16);"
+            ))
+            .unwrap();
+
+            let mut hits = 0;
+            for i in 0..40usize {
+                let got = rows(
+                    &e,
+                    &format!(
+                        "SELECT id FROM cs SEARCH MATCH VECTOR (v, {}, 'float', '{metric}', 1);",
+                        vector(i)
+                    ),
+                );
+                if got == vec![vec![i.to_string()]] {
+                    hits += 1;
+                }
+            }
+            assert!(
+                hits >= 38,
+                "cspann recall@1 = {hits}/40 for metric {metric}"
+            );
+            let _ = crate::scheduler::block_on(e.flush());
+        }
+    }
+
+    /// Rows written after the tree was built leave it uncovered, so the query
+    /// path must fall back to the exact scan instead of answering a short
+    /// top-k (§9.7). This is what keeps a rebuild-mode index correct.
+    #[test]
+    fn cspann_falls_back_to_the_exact_scan_for_uncovered_rows() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE csf (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(
+            "INSERT INTO csf VALUES (1, [0.0,0.0,0.0,0.0]), (2, [1.0,0.0,0.0,0.0]);",
+        )
+        .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX csf_i ON csf (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=8);",
+        )
+        .unwrap();
+        // Written after the build: not in the tree, so the index is uncovered.
+        e.execute_blocking("INSERT INTO csf VALUES (3, [9.0,9.0,9.0,9.0]);")
+            .unwrap();
+        let got = rows(
+            &e,
+            "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
+        );
+        assert_eq!(got, vec![vec!["3".to_string()]]);
+
+        // The checkpoint rebuilds the chunk (`rebuild` delta mode), so after a
+        // flush the tree covers every row again — including the one that was
+        // written after the index was created.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let key = e.table_key("default_db.csf");
+        let covered = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
+        assert_eq!(covered, Some(3), "the flushed tree covers all three rows");
+        let got = rows(
+            &e,
+            "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
+        );
+        assert_eq!(got, vec![vec!["3".to_string()]]);
+    }
+
+    /// A `WHERE` on a scalar column no longer bypasses the vector index
+    /// (`docs/CSPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
+    /// graph search consumes, and the answer is the exact top-k over the rows
+    /// the filter admits.
+    #[test]
+    fn hnsw_filter_is_pushed_into_the_graph() {
+        let n = 400usize;
+        let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,0.0]", i + 1, i + 2) };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE hf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO hf VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {}, {})", i % 8, vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+
+        // The reference's acceptance (§12.5): identical row sets with and
+        // without the index, for a filter that leaves more rows than `k`.
+        let query = format!(
+            "SELECT id FROM hf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3) \
+             WHERE tag = 4 AND id > -1;",
+            vector(100)
+        );
+        let with_index = rows(&e, &query);
+        assert_eq!(with_index.len(), 3, "the filter admits more rows than k");
+        e.execute_blocking("DROP INDEX hf_i;").unwrap();
+        let exact = rows(&e, &query);
+        assert_eq!(
+            with_index, exact,
+            "the pushed-down mask answers the exact top-k"
+        );
+        e.execute_blocking("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+
+        // The mask reaches the graph search: the probe's candidates are all
+        // admitted rows, which a probe without the mask is not.
+        let allowed: std::collections::HashSet<usize> = e
+            .fetch_rows_with_ids("hf")
+            .unwrap()
+            .into_iter()
+            .filter(|(_, row)| row.get(1) == Some(&Value::Int(4)))
+            .map(|(seq, _)| seq)
+            .collect();
+        assert_eq!(allowed.len(), n / 8);
+        let index_id = e.test_index_id("default_db.hf", "v", "HNSW");
+        assert_ne!(index_id, 0, "the HNSW index is registered");
+        let q: Vec<f32> = (100..104).map(|d| d as f32).collect();
+        let probe = |allowed: Option<&std::collections::HashSet<usize>>| {
+            e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
+                table: "hf",
+                index_id: Some(index_id),
+                query: &q,
+                rows: &[],
+                live_rows: None,
+                live_count: Some(n),
+                cache: None,
+                topn: 3,
+                metric: "l2",
+                options: &Default::default(),
+                allowed,
+                beam: None,
+            })
+            .expect("the graph covers the table")
+        };
+        let filtered = probe(Some(&allowed));
+        assert!(
+            !filtered.candidates.is_empty(),
+            "a 12% selective mask must still fill a candidate list"
+        );
+        assert!(
+            filtered.candidates.iter().all(|seq| allowed.contains(seq)),
+            "the graph search kept a row the filter rejects"
+        );
+        assert!(filtered.uncovered.is_empty(), "the graph covers every row");
+        let unfiltered = probe(None);
+        assert!(
+            unfiltered
+                .candidates
+                .iter()
+                .any(|seq| !allowed.contains(seq)),
+            "without the mask the same probe names rows the filter rejects"
+        );
+    }
+
+    /// A row the index does not hold is scored exactly while the rest of the
+    /// table keeps answering from the graph. Before §9.7 any mismatch between
+    /// the labels and the live rows reverted to a full table scan - and a delete
+    /// alone was enough to cause one, because a tombstoned row stays in the
+    /// graph.
+    #[test]
+    fn hnsw_scores_uncovered_rows_without_a_table_scan() {
+        let n = 200usize;
+        let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,0.0]", i + 1, i + 2) };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE hu (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO hu VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking("CREATE INDEX hu_i ON hu (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        // No vector, so the graph never took the row: it is live and uncovered.
+        e.execute_blocking("INSERT INTO hu VALUES (999, NULL);")
+            .unwrap();
+
+        let index_id = e.test_index_id("default_db.hu", "v", "HNSW");
+        let q: Vec<f32> = (7..11).map(|d| d as f32).collect();
+        let probe = e
+            .knn_candidates(&crate::knn_scan::KnnCandidateScan {
+                table: "hu",
+                index_id: Some(index_id),
+                query: &q,
+                rows: &[],
+                live_rows: None,
+                live_count: Some(n + 1),
+                cache: None,
+                topn: 3,
+                metric: "l2",
+                options: &Default::default(),
+                allowed: None,
+                beam: None,
+            })
+            .expect("the graph still answers; only its tail is uncovered");
+        assert_eq!(
+            probe.uncovered.len(),
+            1,
+            "the row without a vector is the one the graph does not cover"
+        );
+        assert!(
+            !probe.candidates.is_empty(),
+            "the covered rows are still scored from the graph"
+        );
+        let uncovered_seq = probe.uncovered[0];
+        assert!(
+            !probe.candidates.contains(&uncovered_seq),
+            "an uncovered row is scored once, by the exact path"
+        );
+
+        // A delete leaves its row in the graph, so the label count no longer
+        // matches the live count - and the probe must answer anyway.
+        e.execute_blocking("DELETE FROM hu WHERE id = 3;").unwrap();
+        let probe = e
+            .knn_candidates(&crate::knn_scan::KnnCandidateScan {
+                table: "hu",
+                index_id: Some(index_id),
+                query: &q,
+                rows: &[],
+                live_rows: None,
+                live_count: Some(n),
+                cache: None,
+                topn: 3,
+                metric: "l2",
+                options: &Default::default(),
+                allowed: None,
+                beam: None,
+            })
+            .expect("a delete must not turn the index off");
+        assert!(probe.uncovered.is_empty(), "a delete uncovers nothing");
+        assert!(!probe.candidates.is_empty());
+
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM hu SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(7)
+            ),
+        );
+        assert_eq!(got, vec![vec!["7".to_string()]]);
+    }
+
+    /// A filter and a partly covered tree at once: the mask decides which hits
+    /// the tree keeps, and the row written after the build is scored by the
+    /// exact path - so the answer is the exact top-k over the admitted rows.
+    #[test]
+    fn cspann_filter_and_uncovered_tail_answer_together() {
+        let n = 200usize;
+        let vector =
+            |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,{}.0]", i + 1, i + 2, i + 3) };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cf VALUES ");
+        for i in 1..=n {
+            sql.push_str(&format!("({i}, {}, {})", i % 8, vector(i)));
+            if i < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cf_i ON cf (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        // Written after the build, and the nearest of its tag by a wide margin:
+        // only the uncovered fallback can find it.
+        e.execute_blocking(&format!("INSERT INTO cf VALUES (999, 7, {});", vector(500)))
+            .unwrap();
+
+        let query = format!(
+            "SELECT id FROM cf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 2) WHERE tag = 7;",
+            vector(500)
+        );
+        let got = rows(&e, &query);
+        assert_eq!(
+            got,
+            vec![vec!["999".to_string()], vec!["199".to_string()]],
+            "the uncovered row wins, the tree answers the rest"
+        );
+        // The same rows without an index: the mask and the fallback agree with
+        // the exact scan.
+        e.execute_blocking("DROP INDEX cf_i;").unwrap();
+        assert_eq!(rows(&e, &query), got);
+    }
+
+    /// The same contract on IVF: the probe's candidates are filtered by the
+    /// mask, and the answer matches the exact scan (`test_knn_ivf_*_filter.slt`).
+    #[test]
+    fn ivf_filter_matches_the_exact_scan() {
+        let n = 200usize;
+        let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,1.0]", i + 1, i + 2) };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ivf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO ivf VALUES ");
+        for i in 1..=n {
+            sql.push_str(&format!("({i}, {}, {})", i % 4, vector(i)));
+            if i < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking("CREATE INDEX ivf_i ON ivf (v) USING IVF WITH (metric='l2');")
+            .unwrap();
+
+        let query = format!(
+            "SELECT id FROM ivf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3) WHERE tag = 2;",
+            vector(150)
+        );
+        let with_index = rows(&e, &query);
+        assert_eq!(with_index.len(), 3);
+        assert!(
+            with_index
+                .iter()
+                .all(|row| row[0].parse::<usize>().unwrap() % 4 == 2),
+            "a filtered IVF scan kept a row the filter rejects: {with_index:?}"
+        );
+        e.execute_blocking("DROP INDEX ivf_i;").unwrap();
+        assert_eq!(rows(&e, &query), with_index);
+    }
+
+    /// The tree survives a restart: the checkpoint writes the chunk, and the
+    /// first query after reopening loads it lazily (§6/§9.4). The assertion on
+    /// `TableEntry::cspann` is what proves the *index* answered and not the
+    /// exact-scan fallback.
+    #[test]
+    fn cspann_survives_a_restart_and_answers_from_its_chunk() {
+        let n = 300usize;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..16)
+                .map(|d| format!("{}", (i * 23 + d * 37) % 997))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let queries: Vec<String> = (0..6)
+            .map(|k| {
+                format!(
+                    "SELECT id FROM csp SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3);",
+                    vector(k * 41)
+                )
+            })
+            .collect();
+        let dir = tempdir().unwrap();
+        let before: Vec<Vec<Vec<String>>> = {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE csp (id INT, v EMBEDDING(FLOAT,16));")
+                .unwrap();
+            let mut sql = String::from("INSERT INTO csp VALUES ");
+            for i in 0..n {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < n {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+            e.execute_blocking(
+                "CREATE INDEX csp_i ON csp (v) USING CSPANN WITH \
+                 (metric='l2', max_partition_size=32, num_centroids=16);",
+            )
+            .unwrap();
+            let answers = queries.iter().map(|q| rows(&e, q)).collect::<Vec<_>>();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            answers
+        };
+
+        let reopened = Engine::open(dir.path()).unwrap();
+        // Nothing loaded yet: the map is filled by the query below.
+        let key = reopened.table_key("default_db.csp");
+        let empty = reopened
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.cspann.is_empty())
+            .unwrap_or(true);
+        assert!(empty, "a fresh process must not have the tree in memory");
+
+        for (q, want) in queries.iter().zip(&before) {
+            assert_eq!(&rows(&reopened, q), want, "after a restart: {q}");
+        }
+        let loaded = reopened
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| !e.cspann.is_empty())
+            .unwrap_or(false);
+        assert!(loaded, "the query must have loaded the chunk into memory");
+    }
+
+    /// The numbers behind `docs/CSPANN_BENCH.md`.
+    ///
+    /// `cargo test -p executor cspann_bench --lib -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn cspann_bench_128d() {
+        const N: usize = 20_000;
+        const DIMS: usize = 128;
+        const CLUSTERS: usize = 64;
+        const QUERIES: usize = 100;
+        const TOPN: usize = 10;
+
+        fn noise(i: usize, d: usize) -> f32 {
+            let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ (d as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+            x ^= x >> 30;
+            x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            x ^= x >> 27;
+            ((x >> 40) as f32 / 16_777_216.0) * 2.0 - 1.0
+        }
+        // 20k rows, 64 clusters: the shape of a real embedding column (intra
+        // cluster spread comparable to the inter-centroid distance).
+        let vectors: Vec<Vec<f32>> = (0..N)
+            .map(|i| {
+                let c = i % CLUSTERS;
+                (0..DIMS)
+                    .map(|d| noise(c * 7919 + d, 3) * 20.0 + noise(i, d) * 3.0)
+                    .collect()
+            })
+            .collect();
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,{DIMS}));"
+        ))
+        .unwrap();
+        let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(N);
+        for (i, v) in vectors.iter().enumerate() {
+            let text = v
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            dataset.push(vec![
+                Literal::Int(i as i64),
+                Literal::Str(format!("[{text}]")),
+            ]);
+        }
+        e.insert_literals("default_db.bench", None, dataset)
+            .unwrap();
+
+        let started = std::time::Instant::now();
+        e.execute_blocking(
+            "CREATE INDEX bench_i ON bench (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=128, num_centroids=64);",
+        )
+        .unwrap();
+        let build = started.elapsed();
+        let index_id = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.name == "bench_i")
+            .expect("index record")
+            .id;
+        let tree = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("default_db.bench"))
+            .and_then(|entry| entry.cspann.get(&index_id).cloned())
+            .expect("the tree");
+        let bytes = tree.mem_usage();
+        let (partitions, height) = tree.shape();
+        eprintln!(
+            "build {N} rows x {DIMS}d: {build:?} | {partitions} partitions, height {height} | \
+             {:.1} MiB, {:.0} B/row, file-backed {}",
+            bytes as f64 / (1024.0 * 1024.0),
+            bytes as f64 / N as f64,
+            tree.is_file_backed()
+        );
+
+        // Index-level cost on its own: the SQL numbers include block decoding and
+        // exact rescoring, which dominates once the rows are sealed on disk.
+        let mut direct: Vec<std::time::Duration> = Vec::with_capacity(QUERIES);
+        for k in 0..QUERIES {
+            let row = k * (N / QUERIES);
+            let started = std::time::Instant::now();
+            let hits = tree.search(&vectors[row], 100, None);
+            direct.push(started.elapsed());
+            assert_eq!(hits.len(), 100);
+        }
+        direct.sort();
+        eprintln!("heap search p50 {:?}", direct[direct.len() / 2]);
+
+        let exact = |q: &[f32]| -> Vec<i64> {
+            let mut scored: Vec<(i64, f32)> = vectors
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i as i64, index::vector::l2_sq(q, v)))
+                .collect();
+            scored.sort_by(|a, b| a.1.total_cmp(&b.1));
+            scored.into_iter().take(TOPN).map(|(i, _)| i).collect()
+        };
+
+        let mut hits = 0usize;
+        let mut timings: Vec<std::time::Duration> = Vec::with_capacity(QUERIES);
+        for k in 0..QUERIES {
+            let row = k * (N / QUERIES);
+            let q = &vectors[row];
+            let text = q
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
+            );
+            timings.push(started.elapsed());
+            let want = exact(q);
+            let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            hits += got.iter().filter(|id| want.contains(id)).count();
+        }
+        timings.sort();
+        eprintln!(
+            "recall@{TOPN} = {:.3} | p50 {:?} | p95 {:?} | p99 {:?}",
+            hits as f64 / (QUERIES * TOPN) as f64,
+            timings[timings.len() / 2],
+            timings[timings.len() * 95 / 100],
+            timings[timings.len() * 99 / 100],
+        );
+
+        // After the checkpoint the index is served from its chunk (§6.4): the
+        // heap copy is dropped and the slot bytes come from page cache.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let mapped = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&e.table_key("default_db.bench"))
+            .and_then(|entry| entry.cspann.get(&index_id).cloned())
+            .expect("the reloaded index");
+        eprintln!(
+            "after flush: file-backed {} | heap {} B/row",
+            mapped.is_file_backed(),
+            mapped.mem_usage() as f64 / N as f64
+        );
+        let mut mapped_direct: Vec<std::time::Duration> = Vec::with_capacity(QUERIES);
+        for k in 0..QUERIES {
+            let row = k * (N / QUERIES);
+            let started = std::time::Instant::now();
+            let hits = mapped.search(&vectors[row], 100, None);
+            mapped_direct.push(started.elapsed());
+            assert_eq!(hits.len(), 100);
+        }
+        mapped_direct.sort();
+        eprintln!(
+            "mapped search p50 {:?}",
+            mapped_direct[mapped_direct.len() / 2]
+        );
+
+        let mut mhits = 0usize;
+        let mut mtimings: Vec<std::time::Duration> = Vec::with_capacity(QUERIES);
+        for k in 0..QUERIES {
+            let row = k * (N / QUERIES);
+            let q = &vectors[row];
+            let text = q
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
+            );
+            mtimings.push(started.elapsed());
+            let want = exact(q);
+            let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            mhits += got.iter().filter(|id| want.contains(id)).count();
+        }
+        mtimings.sort();
+        eprintln!(
+            "mapped recall@{TOPN} = {:.3} | p50 {:?} | p95 {:?}",
+            mhits as f64 / (QUERIES * TOPN) as f64,
+            mtimings[mtimings.len() / 2],
+            mtimings[mtimings.len() * 95 / 100],
+        );
+
+        // The same rows through HNSW, on the same SQL path, so §19's comparison
+        // stops being "one side is a graph search and the other is a full
+        // statement". A column resolves to one index at a time, so the cspann
+        // record is dropped first.
+        e.execute_blocking("DROP INDEX bench_i;").unwrap();
+        let started = std::time::Instant::now();
+        e.execute_blocking(
+            "CREATE INDEX bench_h ON bench (v) USING HNSW WITH \
+             (metric='l2', M=16, ef_construction=200);",
+        )
+        .unwrap();
+        eprintln!("hnsw build: {:?}", started.elapsed());
+        let mut hhits = 0usize;
+        let mut htimings: Vec<std::time::Duration> = Vec::with_capacity(QUERIES);
+        for k in 0..QUERIES {
+            let row = k * (N / QUERIES);
+            let q = &vectors[row];
+            let text = q
+                .iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
+            );
+            htimings.push(started.elapsed());
+            let want = exact(q);
+            let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
+            hhits += got.iter().filter(|id| want.contains(id)).count();
+        }
+        htimings.sort();
+        eprintln!(
+            "hnsw recall@{TOPN} = {:.3} | p50 {:?} | p95 {:?} | p99 {:?}",
+            hhits as f64 / (QUERIES * TOPN) as f64,
+            htimings[htimings.len() / 2],
+            htimings[htimings.len() * 95 / 100],
+            htimings[htimings.len() * 99 / 100],
+        );
+    }
+
+    /// The DDL validates the option names and the column type, and the values
+    /// are checked by the same parser the builder uses.
+    #[test]
+    fn cspann_rejects_invalid_ddl() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE csd (id INT, v EMBEDDING(FLOAT,4), s VARCHAR);")
+            .unwrap();
+        let bad_option =
+            match e.execute_blocking("CREATE INDEX csd_i ON csd (v) USING CSPANN WITH (M=16);") {
+                Ok(_) => panic!("an HNSW option must be rejected by a CSPANN index"),
+                Err(err) => format!("{err}"),
+            };
+        assert!(bad_option.contains("CSPANN"), "{bad_option}");
+
+        let bad_column = match e.execute_blocking("CREATE INDEX csd_j ON csd (s) USING CSPANN;") {
+            Ok(_) => panic!("a VARCHAR column has no vectors to index"),
+            Err(err) => format!("{err}"),
+        };
+        assert!(bad_column.contains("vector column"), "{bad_column}");
+    }
+
+    /// §19.6's "等延迟" comparison: sweep the search width of both indexes on the
+    /// same rows and read recall@10 at each p50.
+    ///
+    /// `cargo test -p executor --release cspann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn cspann_vs_hnsw_at_equal_latency() {
+        const N: usize = 20_000;
+        const DIMS: usize = 128;
+        const CLUSTERS: usize = 64;
+        const QUERIES: usize = 60;
+        const TOPN: usize = 10;
+
+        fn noise(i: usize, d: usize) -> f32 {
+            let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ (d as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+            x ^= x >> 30;
+            x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            x ^= x >> 27;
+            ((x >> 40) as f32 / 16_777_216.0) * 2.0 - 1.0
+        }
+        let vectors: Vec<Vec<f32>> = (0..N)
+            .map(|i| {
+                let c = i % CLUSTERS;
+                (0..DIMS)
+                    .map(|d| noise(c * 7919 + d, 3) * 20.0 + noise(i, d) * 3.0)
+                    .collect()
+            })
+            .collect();
+        let text = |v: &[f32]| -> String {
+            format!(
+                "[{}]",
+                v.iter()
+                    .map(|x| format!("{x:.3}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        for table in ["bench_h", "bench_c"] {
+            e.execute_blocking(&format!(
+                "CREATE TABLE {table} (id INT, v EMBEDDING(FLOAT,{DIMS}));"
+            ))
+            .unwrap();
+            let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(N);
+            for (i, v) in vectors.iter().enumerate() {
+                batch.push(vec![Literal::Int(i as i64), Literal::Str(text(v))]);
+            }
+            e.insert_literals(&format!("default_db.{table}"), None, batch)
+                .unwrap();
+        }
+        e.execute_blocking("CREATE INDEX bh ON bench_h (v) USING HNSW WITH (metric='l2');")
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX bc ON bench_c (v) USING CSPANN WITH (metric='l2', max_partition_size=128);",
+        )
+        .unwrap();
+
+        let exact = |q: &[f32]| -> Vec<i64> {
+            let mut scored: Vec<(i64, f32)> = vectors
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i as i64, index::vector::l2_sq(q, v)))
+                .collect();
+            scored.sort_by(|a, b| a.1.total_cmp(&b.1));
+            scored.into_iter().take(TOPN).map(|(i, _)| i).collect()
+        };
+        let rows_of = |sql: &str| -> Vec<i64> {
+            rows(&e, sql)
+                .into_iter()
+                .map(|row| row[0].parse().unwrap())
+                .collect()
+        };
+        println!("width |   cspann p50 / recall |   hnsw p50 / recall");
+        for width in [8usize, 16, 32, 64, 128] {
+            let mut lines = Vec::new();
+            for (kind, table, opt) in [
+                ("cspann", "bench_c", format!("beam={width}")),
+                ("hnsw", "bench_h", format!("ef={width}")),
+            ] {
+                let mut timings = Vec::new();
+                let mut hit = 0usize;
+                for k in 0..QUERIES {
+                    let row = k * (N / QUERIES);
+                    let sql = format!(
+                        "SELECT id FROM {table} SEARCH MATCH VECTOR (v, {}, 'float', 'l2', {TOPN}) \
+                         WITH ({opt});",
+                        text(&vectors[row])
+                    );
+                    let started = std::time::Instant::now();
+                    let got = rows_of(&sql);
+                    timings.push(started.elapsed());
+                    let want = exact(&vectors[row]);
+                    hit += got.iter().filter(|id| want.contains(id)).count();
+                }
+                timings.sort();
+                lines.push(format!(
+                    "{:>8} / {:.3}",
+                    format!("{:?}", timings[timings.len() / 2]),
+                    hit as f64 / (QUERIES * TOPN) as f64
+                ));
+                let _ = kind;
+            }
+            println!("{width:>5} | {} | {}", lines[0], lines[1]);
+        }
     }
 }

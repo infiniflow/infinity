@@ -4939,6 +4939,14 @@ pub(crate) struct TableEntry {
     /// IVF memory segment per index id: rows written since the last mirror
     /// dump, merged with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
+    /// cspann trees per index id (`docs/CSPANN_DESIGN.md`).
+    ///
+    /// v1 keeps them in memory: `CREATE INDEX … USING CSPANN` builds the tree
+    /// and answers queries from it directly. The chunk format is implemented and
+    /// tested in `storage::knn_index::cspann`; wiring the dump/load path (§9.4)
+    /// is the remaining step, after which this map holds what the loader
+    /// produced instead.
+    pub(crate) cspann: HashMap<u64, Arc<crate::cspann_mem::CspannHandle>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,
@@ -5154,6 +5162,18 @@ pub(crate) struct Context {
     /// never drained (two databases, one HNSW index each, in
     /// `test_optimize_from_different_database`).
     pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
+    /// The three-level waterlines over the one byte ledger (`CSPANN_DESIGN.md`
+    /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
+    /// table. Derived from `memindex_quota`, never set directly.
+    pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
+    /// The fair seal scheduler (§9.6): weights per database, one seal in flight
+    /// per tenant, and the `index_seal_starvation` counter.
+    pub(crate) seal_scheduler: std::sync::Mutex<crate::engine::maintain::SealScheduler>,
+    /// Per-index recall monitors (§11.3 item 4), keyed by catalog index id.
+    /// Sampling is on; the state is in memory because a target is a policy, not
+    /// a property of the data (a restart re-learns in a few sampled queries).
+    pub(crate) recall:
+        std::sync::Mutex<std::collections::HashMap<u64, crate::engine::recall::RecallMonitor>>,
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     pub(crate) object_store: Mutex<Option<Arc<storage::s3::S3Client>>>,

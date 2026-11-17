@@ -7394,6 +7394,9 @@ fn index_type_sql(code: i32) -> &'static str {
         7 => "DISKANN",
         8 => "PLAID",
         9 => "SMVE",
+        // `thrift/infinity.thrift`'s appended enum value
+        // (`rust_engine/docs/CSPANN_DESIGN.md`).
+        10 => "CSPANN",
         _ => "",
     }
 }
@@ -8716,6 +8719,32 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `thrift/infinity.thrift`'s `IndexType` ordinals are on the wire: a kind
+    /// appended to the IDL must get its own arm here, and an unknown value must
+    /// stay empty rather than silently becoming another index's kind - the
+    /// engine's `validate_index` then rejects the statement.
+    #[test]
+    fn every_thrift_index_type_maps_to_its_engine_kind() {
+        let expected = [
+            (0, "IVF"),
+            (1, "HNSW"),
+            (2, "FULLTEXT"),
+            (3, "BMP"),
+            (4, "SECONDARY"),
+            (5, "SECONDARY"),
+            (6, "EMVB"),
+            (7, "DISKANN"),
+            (8, "PLAID"),
+            (9, "SMVE"),
+            (10, "CSPANN"),
+        ];
+        for (code, kind) in expected {
+            assert_eq!(index_type_sql(code), kind, "thrift IndexType {code}");
+        }
+        assert_eq!(index_type_sql(11), "");
+        assert_eq!(index_type_sql(-1), "");
+    }
 
     /// A block is packed straight from its column buffers: an `INT` column stays
     /// four bytes per cell (`ColumnField::column_type` 3), a varchar cell is a

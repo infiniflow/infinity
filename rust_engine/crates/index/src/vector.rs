@@ -1698,6 +1698,14 @@ impl HnswIndex {
         self.search_query(self.store.make_query(q), k, ef)
     }
 
+    /// The `ef_search` the graph was built/loaded with, which an unfiltered
+    /// query falls back on. The filtered entry point has to name it explicitly,
+    /// and a caller that passes none must not silently search with a narrower
+    /// bottom layer.
+    pub fn ef_search(&self) -> usize {
+        self.ef_search
+    }
+
     /// C++ `KnnSearchSorted` with a non-zero `ef_`: the bottom layer returns
     /// up to `ef` candidates and the reference does **not** truncate them to
     /// `k` (`hnsw_alg.cppm:448-456`, which returns every `result_n`). The

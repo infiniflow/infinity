@@ -53,6 +53,7 @@ mod columnar_order;
 mod compact_replay_ut;
 #[cfg(test)]
 mod conflict_check_ut;
+mod cspann_mem;
 pub mod panic_guard;
 pub use blocks as cpp_blocks;
 pub mod data_table;

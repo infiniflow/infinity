@@ -2261,6 +2261,11 @@ impl Engine {
         self.context
             .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        // The waterlines are derived (`CSPANN_DESIGN.md` §9.5), so a new budget
+        // has to reach them before the next check reads it.
+        if let Ok(mut marks) = self.context.watermarks.lock() {
+            marks.set_budget(bytes);
+        }
     }
 
     /// Sets `[storage] mem_index_capacity` (rows). The reference dumps an

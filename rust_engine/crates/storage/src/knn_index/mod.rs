@@ -1,3 +1,4 @@
+pub mod cspann;
 pub mod emvb;
 pub mod knn_format;
 pub mod multivector;

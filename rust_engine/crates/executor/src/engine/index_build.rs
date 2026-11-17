@@ -1,5 +1,6 @@
 use super::*;
 use catalog::IndexMeta;
+use index::maintain::IndexMaintainer;
 
 /// One secondary index column's readers, snapshotted under the table lock so
 /// that the key lookups run without holding it: the sealed PGM chunks, the
@@ -613,6 +614,69 @@ impl Engine {
         Ok(())
     }
 
+    /// Loads the newest cspann chunk of `index` (`docs/CSPANN_DESIGN.md` §6).
+    ///
+    /// A rebuild-mode chunk is a whole-table snapshot, so the highest
+    /// `chunk_*.idx` id under `idx_{id}/seg_*/` **is** the index and the older
+    /// ones are superseded. The catalog's chunk list is not consulted: it is
+    /// keyed per segment, and the snapshot covers every segment anyway.
+    pub(crate) fn load_cspann_index(
+        &self,
+        table: &str,
+        index: &str,
+        options: &[(String, String)],
+    ) -> Option<std::sync::Arc<crate::cspann_mem::CspannHandle>> {
+        let table = self.qualified_table(table);
+        let opts = crate::cspann_mem::options_from(options).ok()?;
+        let dir = self.hnsw_dir(&table, index)?;
+        // The live chunk list, not a directory walk: a chunk an `optimize`
+        // superseded leaves the list the moment it is deprecated, while its bytes
+        // stay on disk until `Cleanup` (`live_chunk_files`, `GetChunkIDs1`).
+        let mut best: Option<(u64, std::path::PathBuf)> = None;
+        for (id, path) in self.live_chunk_files(&table, index, 0, &dir) {
+            if best.as_ref().map(|(b, _)| id > *b).unwrap_or(true) {
+                best = Some((id, path));
+            }
+        }
+        let (_, path) = best?;
+        // Mapped, not decoded: the slot bytes stay in page cache, which is what
+        // makes §19.3's 50M-in-8GB arithmetic work. The CRC of every section is
+        // still verified — once, here.
+        let index = storage::knn_index::cspann::FileIndex::open(&path, &opts).ok()?;
+        Some(std::sync::Arc::new(crate::cspann_mem::CspannHandle::File(
+            std::sync::Arc::new(index),
+        )))
+    }
+
+    /// Lazily loads a cspann index the first time a query needs it.
+    ///
+    /// The query path is the only thing that knows an index is wanted, and it is
+    /// also the only place that must not answer from a stale tree, so a restart
+    /// resolves on the first query instead of at open (`docs/CSPANN_DESIGN.md`
+    /// §6).
+    pub(crate) fn cspann_lazy_load(
+        &self,
+        table: &str,
+        index_id: u64,
+    ) -> Option<std::sync::Arc<crate::cspann_mem::CspannHandle>> {
+        let meta = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()?
+            .into_iter()
+            .find(|im| im.id == index_id && im.index_type.eq_ignore_ascii_case("CSPANN"))?;
+        let tree = self.load_cspann_index(&meta.table, &meta.name, &meta.options)?;
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(self.table_key(table))
+            .or_default()
+            .cspann
+            .insert(index_id, tree.clone());
+        Some(tree)
+    }
+
     /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
     /// query in the same process sees what `flush()` just mirrored.
     pub(crate) fn reload_vector_indexes(&self) {
@@ -704,6 +768,20 @@ impl Engine {
                         let gone = list.pop().unwrap();
                         total = total.saturating_sub(gone.bytes);
                     }
+                }
+            } else if im.index_type.eq_ignore_ascii_case("CSPANN") {
+                // Rebuild-mode chunks are whole-table snapshots, so the newest
+                // chunk is the whole index; a stale one is superseded by id
+                // (`docs/CSPANN_DESIGN.md` §9.4).
+                if let Some(tree) = self.load_cspann_index(&im.table, &im.name, &im.options) {
+                    let tkey = self.table_key(&im.table);
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .cspann
+                        .insert(im.id, tree);
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
@@ -3518,7 +3596,14 @@ impl Engine {
     /// bottom gate.
     pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
         self.dump_all_sealed_blocks(only).await;
-        self.dump_largest_memory_index(only).await;
+        // §9.5: `hard` pressure seals **every** tail of the table - the point of
+        // the escalate level is that one seal is not enough. `soft` seals the
+        // one that gives the most memory back.
+        if self.seal_pressure() == Pressure::Hard {
+            self.dump_every_table_index(only).await;
+        } else {
+            self.dump_largest_memory_index(only).await;
+        }
         // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
         // are **not** sealed here. `seal_sparse_index` is only half a dump: it
         // calls `SealedTail::take`, which removes the entries and hands them
@@ -3605,35 +3690,143 @@ impl Engine {
     /// absorb every breach, and the table that just grew would never drain
     /// (`test_optimize_from_different_database` in the restart suite).
     async fn dump_largest_memory_index(&self, only: Option<&str>) {
+        let Some((tenant, im)) = self.pick_seal_candidate(only) else {
+            return;
+        };
+        let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        // The slot the pick took is released once the seal finished, so the
+        // per-tenant in-flight bound reflects real work.
+        if let Ok(mut scheduler) = self.context.seal_scheduler.lock() {
+            scheduler.done(&tenant);
+        }
+    }
+
+    /// §9.6's fair pick over the tails that hold bytes: weighted by pending
+    /// bytes per **database**, one seal per tenant in flight, and a tail that
+    /// has not been dumped for [`SEAL_STARVE_TICKS`] jumps the queue.
+    ///
+    /// The old rule was "largest wins, ties to the oldest dump". It is the same
+    /// greedy choice §9.6 calls a noisy-neighbour failure: a database holding
+    /// most of the bytes absorbed every seal while another database's tail grew
+    /// unbounded, and nothing counted the starvation.
+    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<(String, IndexMeta)> {
         let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        let mut largest: Option<(usize, u64, &IndexMeta)> = None;
-        for im in &indexes {
+        let mut picked: Vec<(SealCandidate, IndexMeta)> = Vec::new();
+        for im in indexes {
             if let Some(wanted) = &wanted {
                 if &self.table_key(&im.table) != wanted {
                     continue;
                 }
             }
-            if !self.index_has_memory_tail(&im.table, im) {
+            if !self.index_has_memory_tail(&im.table, &im) {
                 continue;
             }
             let bytes = self.index_memory_bytes(&im.table, im.id, &im.index_type);
             if bytes == 0 {
                 continue;
             }
-            let last_dump = self.last_dump_ts(&im.table, &im.name);
-            let better = match largest {
-                None => true,
-                Some((seen, seen_ts, _)) => bytes > seen || (bytes == seen && last_dump < seen_ts),
-            };
-            if better {
-                largest = Some((bytes, last_dump, im));
-            }
+            let tenant = im.table.split('.').next().unwrap_or(&im.table).to_string();
+            picked.push((
+                SealCandidate {
+                    tenant,
+                    bytes: bytes as u64,
+                    last_dump: self.last_dump_ts(&im.table, &im.name),
+                },
+                im,
+            ));
         }
-        let Some((_, _, im)) = largest else {
-            return;
-        };
-        let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        if picked.is_empty() {
+            return None;
+        }
+        let list: Vec<SealCandidate> = picked.iter().map(|(c, _)| c.clone()).collect();
+        let now = self.current_ts();
+        let mut scheduler = self.context.seal_scheduler.lock().unwrap();
+        let at = scheduler.pick(&list, now, SEAL_STARVE_TICKS)?;
+        let tenant = list[at].tenant.clone();
+        let (_, im) = picked.swap_remove(at);
+        Some((tenant, im))
+    }
+
+    /// Seals every tail of `only` (or of every table when `None`).
+    ///
+    /// Only reached under `hard` pressure: the normal path seals one index per
+    /// breach because a table with several indexes would otherwise spend a
+    /// transaction per index on every write. Under memory pressure that trade
+    /// flips - one transaction per tail is cheaper than being over the hard line.
+    async fn dump_every_table_index(&self, only: Option<&str>) {
+        let wanted = only.map(|table| self.table_key(table));
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        for im in indexes {
+            if let Some(wanted) = &wanted {
+                if &self.table_key(&im.table) != wanted {
+                    continue;
+                }
+            }
+            if !self.index_has_memory_tail(&im.table, &im) {
+                continue;
+            }
+            if self.index_memory_bytes(&im.table, im.id, &im.index_type) == 0 {
+                continue;
+            }
+            let _ = self.dump_index_transaction(&im.table, &im.name).await;
+        }
+    }
+
+    /// The §9.5 waterline the byte ledger sits at, after the AIMD retune.
+    ///
+    /// One function computes it, so the write path and the explicit check cannot
+    /// disagree about which level they are at.
+    pub(crate) fn seal_pressure(&self) -> Pressure {
+        let budget = self
+            .context
+            .memindex_quota
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if budget == 0 {
+            return Pressure::Normal;
+        }
+        let pending = self.budget_bytes() as u64;
+        let mut marks = self.context.watermarks.lock().unwrap();
+        if marks.budget() != budget {
+            marks.set_budget(budget);
+        }
+        marks.retune(pending);
+        marks.level(pending)
+    }
+
+    /// The indexes whose recall stayed below target long enough to suggest a
+    /// rebuild (`CSPANN_DESIGN.md` §11.3 item 4, §9.4's rebuild is the fix).
+    ///
+    /// Returned rather than logged because there is no operator surface for it
+    /// yet: the `SHOW` variable list and the index listing both mirror the
+    /// reference's wire format, and this counter has no counterpart there.
+    pub fn rebuild_suggested(&self) -> Vec<u64> {
+        let mut out: Vec<u64> = self
+            .context
+            .recall
+            .lock()
+            .map(|monitors| {
+                monitors
+                    .iter()
+                    .filter(|(_, monitor)| monitor.rebuild_suggested())
+                    .map(|(id, _)| *id)
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort_unstable();
+        out
+    }
+
+    /// `index_seal_starvation` (§9.5): tails that jumped the queue because their
+    /// previous dump was too long ago. Not surfaced through `SHOW VARIABLE` - the
+    /// global variable list mirrors the reference's `global_name_map_`, and this
+    /// counter has no counterpart there.
+    pub fn index_seal_starvation(&self) -> u64 {
+        self.context
+            .seal_scheduler
+            .lock()
+            .map(|s| s.starvation())
+            .unwrap_or(0)
     }
 
     /// The commit ts of the last dump this index published, or 0 when it has
@@ -3655,7 +3848,7 @@ impl Engine {
     /// Narrower than [`Self::memindex_bytes_of`] on purpose: that one also
     /// counts the unsealed rows and the secondary/IVF tails, which this dump
     /// cannot release.
-    fn index_memory_bytes(&self, table: &str, index_id: u64, index_type: &str) -> usize {
+    pub(crate) fn index_memory_bytes(&self, table: &str, index_id: u64, index_type: &str) -> usize {
         let tkey = self.table_key(table);
         let kind = index_type.trim();
         if is_secondary_kind(kind) {
@@ -3669,16 +3862,34 @@ impl Engine {
                 .unwrap_or(0);
         }
         if kind.eq_ignore_ascii_case("HNSW") {
-            // Q8-quantised vectors, the same figure `note_hnsw_insert` charges
-            // through `index_pending_bytes`.
-            let pending = {
+            // Two figures, and the larger wins. `index_pending_bytes` is what
+            // the **write** path charges (Q8-quantised vectors, the same number
+            // `note_hnsw_insert` adds); the tail's own `mem_usage` is what a seal
+            // would actually release. A graph built by `CREATE INDEX` over an
+            // existing table charges nothing, so before `IndexMaintainer` it
+            // looked empty here and no quota could ever release it.
+            let (charged, tail) = {
                 let tables = self.tables.lock().unwrap();
-                tables
-                    .get(&tkey)
-                    .and_then(|entry| entry.index_pending_bytes.get(&index_id).copied())
-                    .unwrap_or(0)
+                match tables.get(&tkey) {
+                    Some(entry) => (
+                        entry
+                            .index_pending_bytes
+                            .get(&index_id)
+                            .copied()
+                            .unwrap_or(0),
+                        entry.hnsw_mem.get(&index_id).cloned(),
+                    ),
+                    None => (0, None),
+                }
             };
-            return pending;
+            let held = tail
+                .and_then(|m| {
+                    m.lock()
+                        .ok()
+                        .map(|guard| guard.maintainer().pending_bytes())
+                })
+                .unwrap_or(0);
+            return charged.max(held);
         }
         if kind.eq_ignore_ascii_case("IVF") {
             let tables = self.tables.lock().unwrap();

@@ -11,6 +11,16 @@ pub(crate) struct KnnScanOptions {
     pub nprobe: Option<usize>,
     pub ef: Option<usize>,
     pub threshold: Option<f64>,
+    /// `WITH (recall_target = …)`: §11.3 item 5's budget-shaped interface. The
+    /// target overrides the index's recall monitor for this statement.
+    pub recall_target: Option<f32>,
+    /// `WITH (latency_budget_ms = …)`: the latency half of the same interface.
+    /// Only ever used to *narrow* a search whose recall is already above target.
+    pub latency_budget_ms: Option<f32>,
+    /// `WITH (beam = …)`: §11.3 item 5's hard override of the search width. It
+    /// beats the recall monitor, which is what makes a bench able to hold the
+    /// width fixed while it sweeps.
+    pub beam: Option<usize>,
 }
 
 /// Looks up `name` in an option string, case-insensitively.
@@ -40,6 +50,15 @@ impl KnnScanOptions {
             nprobe: get("nprobe").and_then(|v| v.parse().ok()),
             ef: get("ef").and_then(|v| v.parse().ok()),
             threshold: get("threshold").and_then(|v| v.parse().ok()),
+            // Out-of-range values are dropped rather than clamped: a
+            // `recall_target` outside (0, 1] is a mistake, and silently
+            // searching at 100% recall would hide it. The range check lives in
+            // `RecallMonitor::set_target`.
+            recall_target: get("recall_target").and_then(|v| v.parse::<f32>().ok()),
+            latency_budget_ms: get("latency_budget_ms").and_then(|v| v.parse::<f32>().ok()),
+            beam: get("beam")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|b| *b > 0),
         }
     }
 }
@@ -74,6 +93,42 @@ pub(crate) struct KnnCandidateScan<'a> {
     pub topn: usize,
     pub metric: &'a str,
     pub options: &'a KnnScanOptions,
+    /// The rows the statement's predicates admit, when they could be evaluated
+    /// column-at-a-time. `None` means "no push-down": either the query has no
+    /// filter, or its shape is not columnar-evaluable, and then a filtered
+    /// query must not use the index at all (its candidates could all be
+    /// rejected, leaving a short top-k).
+    pub allowed: Option<&'a HashSet<usize>>,
+    /// The search width the recall monitor wants (§11.3 item 4). `None` keeps
+    /// the index's own `base_beam`.
+    pub beam: Option<usize>,
+}
+
+/// What the index probe answers with.
+///
+/// C++: the per-segment state `PhysicalKnnScan` keeps between `PlanWithIndex`
+/// and `MergeKnn`. The reference never has to say "scan the whole table":
+/// every segment either answers or is skipped, and a row no segment holds is
+/// scored by the block scan. This type is that contract - the candidates plus
+/// the live rows no segment covers (`docs/CSPANN_DESIGN.md` §9.7).
+pub(crate) struct KnnProbe {
+    /// Rows the index says can win; the caller scores them exactly.
+    pub candidates: HashSet<usize>,
+    /// Live rows the index does not hold. They are scored exactly as well, so a
+    /// partly covered table costs its uncovered rows instead of a decode of
+    /// every row - and they may still be in the append buffer, so the caller
+    /// reads them by id (block *and* buffer), not through a block pass.
+    pub uncovered: Vec<usize>,
+}
+
+impl KnnProbe {
+    /// Candidates and uncovered rows in one set: every row the exact rescoring
+    /// has to look at.
+    pub(crate) fn rows(&self) -> HashSet<usize> {
+        let mut out = self.candidates.clone();
+        out.extend(self.uncovered.iter().copied());
+        out
+    }
 }
 
 /// Whether the index covers every live row.
@@ -119,13 +174,116 @@ fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
 }
 
 impl Engine {
-    pub(crate) fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<HashSet<usize>> {
+    /// The live rows `covered` does not name.
+    ///
+    /// The ids come from the block versions - the same walk `count(*)` does -
+    /// and never from a decode, so a partly covered index costs a version pass
+    /// where it used to cost the whole table.
+    fn uncovered_rows(&self, q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> Vec<usize> {
+        if let Some(live) = q.live_rows {
+            return live
+                .iter()
+                .copied()
+                .filter(|seq| !covered.contains(seq))
+                .collect();
+        }
+        if let Some(guard) = q.cache.and_then(|c| c.read().ok()) {
+            return guard
+                .live
+                .iter()
+                .copied()
+                .filter(|seq| !covered.contains(seq))
+                .collect();
+        }
+        let mut out: Vec<usize> = self
+            .live_row_ids(q.table)
+            .into_iter()
+            .filter(|seq| !covered.contains(seq))
+            .collect();
+        out.sort_unstable();
+        out
+    }
+
+    /// The candidate budget for one probe: `topn * 4` (at least 64), widened by
+    /// the filter's selectivity (`§12.5` step 5).
+    ///
+    /// The reference does not widen and simply returns a short top-k under a
+    /// 1%-selective filter; a `k`-sized candidate list cannot fill `k` results
+    /// after the mask rejects most of its entries, so the list is grown by the
+    /// inverse selectivity, bounded by the table.
+    fn candidate_budget(&self, q: &KnnCandidateScan<'_>) -> usize {
+        let base = (q.topn * 4).max(64);
+        let Some(allowed) = q.allowed else {
+            return base;
+        };
+        let len = q
+            .live_count
+            .or_else(|| q.live_rows.map(<[usize]>::len))
+            .unwrap_or(0)
+            .max(allowed.len())
+            .max(1);
+        let selectivity = (allowed.len() as f64 / len as f64).max(1e-3);
+        let widened = ((base as f64) / selectivity).ceil() as usize;
+        // A candidate list longer than the table is pure work: no index can
+        // return more rows than it holds.
+        let cap = q
+            .live_count
+            .or_else(|| q.live_rows.map(<[usize]>::len))
+            .unwrap_or(usize::MAX);
+        widened.min(cap).max(base)
+    }
+
+    pub(crate) fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<KnnProbe> {
         let tkey = self.table_key(q.table);
         // IVF: probe `nprobe` centroids of every sealed chunk (C++
         // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
         // below, so ranking matches an exhaustive scan whenever the probe
         // covers the true top-k.
         let index_id = q.index_id?;
+        // cspann: one tree per index id, held in memory (`TableEntry::cspann`).
+        // The tree already speaks row ids, and the caller re-scores every
+        // candidate exactly, so the only failure mode is *coverage*: rows
+        // written after the tree was built are not in it and the exact scan
+        // has to run for those rows alone (`docs/CSPANN_DESIGN.md` §9.7).
+        let mut cspann = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.cspann.get(&index_id).cloned())
+        };
+        if cspann.is_none() {
+            // After a restart the tree only exists in its chunk, and this is the
+            // first place that knows somebody wants it.
+            cspann = self.cspann_lazy_load(q.table, index_id);
+        }
+        if let Some(index) = cspann {
+            if index.dim() != q.query.len() {
+                return None;
+            }
+            // §8.6: a 1-bit code orders distances to ~1%, so the index is asked
+            // for ~10× the top-n and the exact rescoring picks the winner.
+            let budget = crate::cspann_mem::candidate_budget(q.topn);
+            let hits = match q.allowed {
+                Some(allowed) => index.search_filtered(q.query, budget, q.beam, allowed),
+                None => index.search(q.query, budget, q.beam),
+            };
+            let candidates: HashSet<usize> = hits.into_iter().map(|(id, _)| id as usize).collect();
+            if all_covered(q, index.len()) {
+                return Some(KnnProbe {
+                    candidates,
+                    uncovered: Vec::new(),
+                });
+            }
+            // The tree's own row list says exactly which rows it holds; the
+            // rest are scored by the exact scan.
+            let covered: HashSet<usize> =
+                index.row_ids().into_iter().map(|id| id as usize).collect();
+            let uncovered = self.uncovered_rows(q, &covered);
+            return Some(KnnProbe {
+                candidates,
+                uncovered,
+            });
+        }
         let ivf = {
             let tables = self.tables.lock().unwrap();
             tables.get(&tkey).and_then(|e| {
@@ -142,6 +300,7 @@ impl Engine {
                 return None;
             }
             let nprobe = q.options.nprobe.unwrap_or(1);
+            let budget = self.candidate_budget(q);
             let mut covered: std::collections::HashSet<usize> = Default::default();
             let mut candidates: std::collections::HashSet<usize> = Default::default();
             // The memory segment: q.rows written since the last mirror dump.
@@ -153,17 +312,28 @@ impl Engine {
                 for offset in seg.offsets() {
                     covered.insert(offset as usize);
                 }
-                for offset in seg.candidates(q.query, (q.topn * 4).max(64), nprobe, q.metric) {
+                for offset in seg.candidates(q.query, budget, nprobe, q.metric) {
                     candidates.insert(offset as usize);
                 }
             }
-            // Rows written after the mirror are not covered; fall back to
-            // the exact scan rather than returning an incomplete top-k.
-            let all_covered = covers_set(q, &covered);
-            if !all_covered {
-                return None;
+            // IVF re-scores the probed centroids' rows, so the mask applies to
+            // the candidate list (`IVF_Filter` in `ivf_index_search.cppm`).
+            if let Some(allowed) = q.allowed {
+                candidates.retain(|seq| allowed.contains(seq));
             }
-            return Some(candidates);
+            // Rows written after the mirror are not covered; only those are
+            // read by the exact scan, not the table.
+            if covers_set(q, &covered) {
+                return Some(KnnProbe {
+                    candidates,
+                    uncovered: Vec::new(),
+                });
+            }
+            let uncovered = self.uncovered_rows(q, &covered);
+            return Some(KnnProbe {
+                candidates,
+                uncovered,
+            });
         }
         // Sealed segments. `CREATE INDEX` builds the graph into the memory
         // segment (`hnsw_mem`) and a checkpoint seals it into a chunk, so a
@@ -201,7 +371,7 @@ impl Engine {
         // `KnnSearchOption.ef_`: the candidate list size for the bottom
         // layer (`WITH (ef = ...)`).
         let search_option = index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
-        let k = (q.topn * 4).max(64);
+        let k = self.candidate_budget(q);
         let mut merge = index::merge_knn::MergeKnn::new(1, k, index::merge_knn::Compare::Max, None);
         merge.begin();
         for seg in &segments {
@@ -210,22 +380,42 @@ impl Engine {
             }
             labelled += seg.labels.len();
             let seg_k = k.min(seg.labels.len().max(1));
-            let hits: Vec<(f32, u64)> = seg
-                .index
-                .search_index(q.query, seg_k, search_option)
+            // The filter is pushed into the traversal (`hnsw_alg.cppm:133-148`):
+            // a vertex the mask rejects is still walked through and only kept
+            // out of the result heap, so the graph stays connected.
+            let raw: Vec<(usize, f32)> = match q.allowed {
+                Some(allowed) => {
+                    seg.index
+                        .search_index_filtered(q.query, seg_k, search_option, &|node| {
+                            seg.labels
+                                .get(node)
+                                .is_some_and(|label| allowed.contains(&(*label as usize)))
+                        })
+                }
+                None => seg.index.search_index(q.query, seg_k, search_option),
+            };
+            let hits: Vec<(f32, u64)> = raw
                 .into_iter()
                 .map(|(node, dist)| (dist, seg.labels[node] as u64))
                 .collect();
             merge.search(0, &hits);
         }
-        if let Some(mem) = mem {
+        if let Some(mem) = &mem {
             if let Ok(mem) = mem.lock() {
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
                 // fall back to the exact scan.
                 labelled += mem.rows().len();
-                for (row, dist) in mem.search_with_ef(q.query, k, q.options.ef) {
+                let hits = match q.allowed {
+                    Some(allowed) => {
+                        mem.search_filtered_with_ef(q.query, k, q.options.ef, &|row| {
+                            allowed.contains(&(row as usize))
+                        })
+                    }
+                    None => mem.search_with_ef(q.query, k, q.options.ef),
+                };
+                for (row, dist) in hits {
                     merge.add_result(0, dist, row);
                 }
             }
@@ -236,11 +426,30 @@ impl Engine {
             .into_iter()
             .map(|r| r as usize)
             .collect();
-        let uncovered = !all_covered(q, labelled);
-        if uncovered {
-            return None;
+        if all_covered(q, labelled) {
+            return Some(KnnProbe {
+                candidates,
+                uncovered: Vec::new(),
+            });
         }
-        Some(candidates)
+        // The counts disagree, so which rows are missing has to be answered with
+        // the labels themselves: a delete leaves its row in the graph (the
+        // segments stay append-only until compaction), which makes `labelled`
+        // exceed the live count for a graph that still covers every live row.
+        let mut covered: HashSet<usize> = HashSet::with_capacity(labelled);
+        for seg in &segments {
+            covered.extend(seg.labels.iter().map(|label| *label as usize));
+        }
+        if let Some(mem) = &mem {
+            if let Ok(mem) = mem.lock() {
+                covered.extend(mem.rows().iter().map(|row| *row as usize));
+            }
+        }
+        let uncovered = self.uncovered_rows(q, &covered);
+        Some(KnnProbe {
+            candidates,
+            uncovered,
+        })
     }
 }
 

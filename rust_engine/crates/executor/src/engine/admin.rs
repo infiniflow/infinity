@@ -773,6 +773,28 @@ impl Engine {
         })
     }
 
+    /// Writes (or refreshes) the chunk of every cspann index.
+    ///
+    /// `index_delta_mode = rebuild`: the chunk always describes the whole column
+    /// at `ts`, so a checkpoint can produce it without a tail and without
+    /// knowing which rows changed. A failure is not fatal to the checkpoint —
+    /// the index then answers from its previous chunk, and a query whose rows it
+    /// does not cover falls back to the exact scan.
+    pub(crate) fn publish_cspann_chunks(&self, ts: u64) {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("CSPANN") {
+                continue;
+            }
+            let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&im.table) else {
+                continue;
+            };
+            let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+        }
+    }
+
     /// Drops the shared mappings of the spilled index files, so RSS tracks live
     /// structures rather than the page cache (C++ `BufferManager::Flush` drops
     /// the clean pages it wrote back).
@@ -820,6 +842,12 @@ impl Engine {
                 eprintln!("object dir: persisting failed: {e}");
             }
         }
+        // cspann is a **rebuild-mode** index (`docs/CSPANN_DESIGN.md` §9.4): its
+        // chunk is a snapshot of the whole column, so the checkpoint — after the
+        // blocks are final — is the natural place to refresh it. There is no
+        // memory tail to seal, which is why it does not wait for a
+        // `DumpMemIndex`.
+        self.publish_cspann_chunks(checkpoint_ts);
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Bound the page cache the way the reference's buffer manager does:

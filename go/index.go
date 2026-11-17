@@ -30,6 +30,9 @@ const (
 	IndexTypeDiskAnn             IndexType = 8
 	IndexTypePLAID               IndexType = 9
 	IndexTypeSMVE                IndexType = 10
+	// IndexTypeCSPANN is the port's cluster-based vector index
+	// (rust_engine/docs/CSPANN_DESIGN.md).
+	IndexTypeCSPANN IndexType = 11
 )
 
 func (it IndexType) String() string {
@@ -54,6 +57,8 @@ func (it IndexType) String() string {
 		return "PLAID"
 	case IndexTypeSMVE:
 		return "SMVE"
+	case IndexTypeCSPANN:
+		return "CSPANN"
 	default:
 		return "Unknown"
 	}

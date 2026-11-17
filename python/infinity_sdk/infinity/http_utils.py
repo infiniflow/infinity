@@ -299,6 +299,12 @@ index_type_transfrom = {
     5: "SECONDARYFUNCTIONAL",
     6: "EMVB",
     7: "BMP",
+    8: "DISKANN",
+    9: "PLAID",
+    10: "SMVE",
+    # `IndexType.CSPANN` in `infinity.index` (the SDK enum is 1-based; the thrift
+    # one is 0-based, which is why this table is separate).
+    11: "CSPANN",
 }
 
 baseResponse = {

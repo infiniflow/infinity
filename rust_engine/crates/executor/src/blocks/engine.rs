@@ -1875,6 +1875,38 @@ impl Engine {
                         index_size: bytes.len() as u64,
                         commit_ts: chunk_ts,
                     }]
+                } else if im.index_type.eq_ignore_ascii_case("CSPANN") {
+                    // Rebuild-mode delta handling (`docs/CSPANN_DESIGN.md` §9.4):
+                    // the tree is rebuilt from the column and the chunk describes
+                    // one snapshot of the segment, so a dump always makes the
+                    // index cover every live row again.
+                    let Some(bytes) = self.cspann_chunk(table, &im.column, &im.options) else {
+                        continue;
+                    };
+                    let set = SegmentSet {
+                        db_id: db_id.to_string(),
+                        table_id: table_id.to_string(),
+                        segments: Vec::new(),
+                    };
+                    let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
+                    if std::fs::create_dir_all(&seg_dir).is_err()
+                        || storage::definition::format::write_synced(
+                            &seg_dir.join(format!("chunk_{chunk_id}.idx")),
+                            &bytes,
+                        )
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    vec![IndexChunk {
+                        chunk_id,
+                        base_name: String::new(),
+                        base_row_id: u64::from(*segment) << 32,
+                        row_count: *seg_rows,
+                        term_count: 0,
+                        index_size: bytes.len() as u64,
+                        commit_ts: chunk_ts,
+                    }]
                 } else {
                     let deprecated = self.deprecated_chunk_ids(table, &im.name, *segment);
                     publish_chunk_files(
@@ -2900,12 +2932,34 @@ impl Engine {
     /// A count never has to be refused: the files say how many rows they hold,
     /// and the journal says what changed above them (see [`Engine::row_count`]).
     pub(crate) fn block_visible_row_count(&self, table: &str) -> usize {
-        // The count answers the same question the scan does, so it is taken at
-        // the same timestamp - including which deletes have happened.
+        let mut rows = 0usize;
+        self.walk_visible_rows(table, |_| rows += 1);
+        rows
+    }
+
+    /// The live row ids the scan would read, without decoding a single cell.
+    ///
+    /// Same walk as [`Self::block_visible_row_count`] - one function, so the
+    /// two cannot disagree about which rows exist. The vector scan uses it to
+    /// ask "which rows does the index not cover" (`docs/CSPANN_DESIGN.md`
+    /// §9.7): before this, an index that covered all but a handful of rows made
+    /// the query decode the whole table.
+    pub(crate) fn live_row_ids(&self, table: &str) -> std::collections::HashSet<usize> {
+        let mut out = std::collections::HashSet::new();
+        self.walk_visible_rows(table, |seq| {
+            out.insert(seq);
+        });
+        out
+    }
+
+    /// Hands every live row id of `table` to `sink`, in block then buffer order.
+    ///
+    /// The count answers the same question the scan does, so it is taken at the
+    /// same timestamp - including which deletes have happened.
+    fn walk_visible_rows(&self, table: &str, mut sink: impl FnMut(usize)) {
         let read_ts = crate::read_ts();
         let deleted = self.tombstone_set_at(table, read_ts).unwrap_or_default();
         let pending = self.pending_rows_of(table);
-        let mut rows = 0usize;
         // Every row id the visible blocks cover, live or not: the append buffer
         // may still list one of them.
         let mut have: std::collections::HashSet<usize> = Default::default();
@@ -2914,22 +2968,20 @@ impl Engine {
                 continue;
             };
             let created = Self::created_at(&version, read_ts);
-            let mut live = 0usize;
+            let base = (id.segment_id as u64) << 32
+                | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64);
             for slot in 0..created {
                 if !Self::slot_visible(&version, slot, created, read_ts) {
                     continue;
                 }
-                live += 1;
                 // A delete the checkpoint has not written yet is in the table's
                 // delete log and not in the block's `version`; a delete it has
                 // written is in both, and counting it twice would under-report.
-                let seq = ((id.segment_id as u64) << 32)
-                    | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64 + slot as u64);
-                if deleted.contains(&seq) {
-                    live = live.saturating_sub(1);
+                let seq = base | slot as u64;
+                if !deleted.contains(&seq) {
+                    sink(seq as usize);
                 }
             }
-            rows += live;
             // A row the mirror has since written is still listed in the append
             // buffer. The scan drops such a row by id (it merges the buffer over
             // the blocks and skips ids the blocks already produced), so the
@@ -2937,8 +2989,6 @@ impl Engine {
             // from the buffer, but a rewrite that lands under another name - a
             // rename racing it - leaves them there, and counting both sides
             // reported twice the table.
-            let base = ((id.segment_id as u64) << 32)
-                | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64);
             for slot in 0..created as u64 {
                 have.insert((base + slot) as usize);
             }
@@ -2946,14 +2996,17 @@ impl Engine {
         // Rows a commit appended since the last checkpoint live in the append
         // buffer, not in a file yet.
         let view = self.append_view(table, read_ts);
-        rows + pending
-            .iter()
-            .filter(|(seq, _)| {
-                !have.contains(seq)
-                    && !deleted.contains(&(*seq as u64))
-                    && view.as_ref().is_none_or(|view| view.covers(*seq, read_ts))
-            })
-            .count()
+        for (seq, _) in &pending {
+            if have.contains(seq)
+                || deleted.contains(&(*seq as u64))
+                || view
+                    .as_ref()
+                    .is_some_and(|view| !view.covers(*seq, read_ts))
+            {
+                continue;
+            }
+            sink(*seq);
+        }
     }
 
     /// `NewCatalog::GetBlockVisibleRange` for one block of a visible segment:
@@ -6121,6 +6174,35 @@ impl Engine {
             .into_iter()
             .map(|(id, path)| (id, file_stamp(&path)))
             .collect()
+    }
+
+    /// Builds the cspann chunk body for `column`: one tree over every live row of
+    /// the table, serialised by `storage::knn_index::cspann::write`.
+    ///
+    /// The dump **rebuilds** instead of sealing an in-memory tail
+    /// (`docs/CSPANN_DESIGN.md` §9.4's `index_delta_mode = rebuild`). That costs
+    /// `O(rows · log(rows/max) · dims)` per dump and needs no tail bookkeeping,
+    /// and it is what makes every chunk a complete snapshot of the segment.
+    pub(crate) fn cspann_chunk(
+        &self,
+        table: &str,
+        column: &str,
+        options: &[(String, String)],
+    ) -> Option<Vec<u8>> {
+        let ci = self
+            .table_schema(table)
+            .ok()?
+            .iter()
+            .position(|c| c == column)?;
+        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
+        for (seq, text) in self.read_block_column_including_deleted(table, ci) {
+            rows.push((seq as u64, crate::engine::state::parse_vec_f32(&text)));
+        }
+        if rows.is_empty() {
+            return None;
+        }
+        let index = crate::cspann_mem::build(rows, options).ok()?;
+        storage::knn_index::cspann::write(&index).ok()
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for

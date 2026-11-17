@@ -110,6 +110,41 @@ impl HnswIndexInMem {
             .collect()
     }
 
+    /// [`Self::search_with_ef`] with the caller's filter: `allow` names the
+    /// **row ids** the statement admits, and a rejected vertex is still
+    /// traversed. This is the memory segment's half of the filter push-down
+    /// (`docs/CSPANN_DESIGN.md` §12.5) - the sealed chunks go through
+    /// [`HnswHandler::search_index_filtered`].
+    pub fn search_filtered_with_ef(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef: Option<usize>,
+        allow: &dyn Fn(u64) -> bool,
+    ) -> Vec<(u64, f32)> {
+        if query.len() != self.dims {
+            return Vec::new();
+        }
+        let ef = ef.unwrap_or_else(|| self.handler.index().ef_search());
+        self.handler
+            .search_index_filtered(query, k, KnnSearchOption { ef: Some(ef) }, &|node| {
+                self.rows.get(node).is_some_and(|row| allow(*row))
+            })
+            .into_iter()
+            .filter_map(|(node, score)| self.rows.get(node).map(|row| (*row, score)))
+            .collect()
+    }
+
+    /// The tail as the maintenance layer sees it (`CSPANN_DESIGN.md` §12.4).
+    ///
+    /// The byte figure is the graph's own (`mem_usage`), **not** the charge the
+    /// write path accumulates in `index_pending_bytes`: a graph built by
+    /// `CREATE INDEX` charges nothing there, so it used to look empty to the
+    /// quota and could never be released however many rows it held.
+    pub(crate) fn maintainer(&self) -> HnswMaintainer<'_> {
+        HnswMaintainer { tail: self }
+    }
+
     /// The graph, for dumping the segment as a C++ HNSW chunk.
     pub fn index(&self) -> &index::vector::HnswIndex {
         self.handler.index()
@@ -134,5 +169,39 @@ impl HnswIndexInMem {
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
+    }
+}
+
+/// A borrow of the in-memory HNSW segment, as the maintenance layer sees it.
+///
+/// A separate type rather than an impl on `HnswIndexInMem` because the segment is
+/// always behind the executor's `Arc<Mutex<…>>`; handing out a borrow keeps the
+/// trait off the lock and lets the caller read the numbers while holding it.
+pub(crate) struct HnswMaintainer<'a> {
+    pub(crate) tail: &'a HnswIndexInMem,
+}
+
+impl index::maintain::IndexMaintainer for HnswMaintainer<'_> {
+    fn kind(&self) -> &'static str {
+        "HNSW"
+    }
+
+    fn pending_bytes(&self) -> usize {
+        self.tail.mem_usage()
+    }
+
+    /// The segment *is* the tail: sealing it writes a chunk and drops the graph,
+    /// so nothing of it stays on the heap.
+    fn resident_bytes(&self) -> usize {
+        0
+    }
+
+    /// Serialising the graph is the cheap seal: no rebuild, no k-means.
+    fn optimize_cost(&self) -> f32 {
+        0.25
+    }
+
+    fn can_degrade(&self) -> bool {
+        true
     }
 }
