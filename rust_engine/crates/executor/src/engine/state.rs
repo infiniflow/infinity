@@ -4956,6 +4956,21 @@ pub(crate) struct TableEntry {
     /// Encoding a row into the tree at insert time was the rejection: a leaf's
     /// members are only 1-bit codes, so a split would need the original vectors
     /// back from storage anyway.
+    ///
+    /// Two rules keep it bounded and honest:
+    ///
+    /// * a row deleted (or `UPDATE`d, which is delete + insert) is dropped here by
+    ///   `note_deleted_ids` - it is no longer live, so it must not be a candidate
+    ///   and must not count as covered;
+    /// * `max_partition_size × 64` rows trigger a dump
+    ///   (`Engine::dump_cspann_over_capacity`), because every row in this list is
+    ///   re-scored exactly by **every** KNN query on the table.
+    ///
+    /// It is a memory-only structure: after a restart it is empty and the rows it
+    /// used to hold are simply not covered by the loaded chunk. That is the
+    /// documented rebuild-mode semantics - `knn_candidates` answers those rows
+    /// through `uncovered` (an exact scan of them alone) and the next dump folds
+    /// them into the tree, so a restart costs recall-neutral work, never holes.
     pub(crate) cspann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.

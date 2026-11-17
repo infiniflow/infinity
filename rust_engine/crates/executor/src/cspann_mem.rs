@@ -89,6 +89,25 @@ fn parse_usize(key: &str, value: &str) -> Result<usize> {
         .map_err(|_| Error::Invalid(format!("invalid {key} '{value}' (expected an integer)")))
 }
 
+/// How many partitions' worth of rows a cspann **mem index** may hold before a
+/// dump is triggered (`docs/CSPANN_DESIGN.md` §9.2).
+///
+/// The mem index is not a write buffer like HNSW's - it is the query's
+/// *candidate list*: every row in it is handed to the exact rescoring on every
+/// KNN query, because the tree cannot rank rows it does not hold. Unbounded, one
+/// import of a million rows between two checkpoints would turn each query into a
+/// million-row decode. Sixty-four partitions is the point where folding the rows
+/// into a tree (one k-means build over the segment) is cheaper than carrying
+/// them through every query.
+pub(crate) const MEM_INDEX_DUMP_FACTOR: usize = 64;
+
+/// The row bound of `opts`' mem index: `max_partition_size × 64`, never zero.
+pub(crate) fn mem_dump_threshold(opts: &Options) -> usize {
+    opts.max_partition_size
+        .saturating_mul(MEM_INDEX_DUMP_FACTOR)
+        .max(1)
+}
+
 /// A queryable cspann index: the tree a `CREATE INDEX` built, or the chunk a
 /// later checkpoint published (§6.4).
 ///
@@ -532,6 +551,22 @@ mod tests {
     #[test]
     fn empty_input_is_reported_as_invalid() {
         assert!(CspannIndex::build(Vec::new(), Options::default()).is_err());
+    }
+
+    #[test]
+    fn the_mem_index_row_bound_follows_max_partition_size() {
+        let opts = options_from(&pairs(&[("max_partition_size", "32")])).unwrap();
+        assert_eq!(mem_dump_threshold(&opts), 32 * MEM_INDEX_DUMP_FACTOR);
+        // The default (128) is 8192 rows: small enough that a checkpoint-less
+        // import dumps long before the list dominates the query.
+        assert_eq!(
+            mem_dump_threshold(&Options::default()),
+            128 * MEM_INDEX_DUMP_FACTOR
+        );
+        // Never zero, so the check cannot fire on an empty list forever.
+        let mut tiny = opts.clone();
+        tiny.max_partition_size = 0;
+        assert_eq!(mem_dump_threshold(&tiny), 1);
     }
 
     #[test]

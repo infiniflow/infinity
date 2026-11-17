@@ -13383,11 +13383,17 @@ mod tests {
         let _ = crate::scheduler::block_on(e.flush());
     }
 
-    /// Rows written after the tree was built leave it uncovered, so the query
-    /// path must fall back to the exact scan instead of answering a short
-    /// top-k (§9.7). This is what keeps a rebuild-mode index correct.
+    /// A row written **after** the build is answered from the mem index, not by
+    /// falling back to the exact scan (§9.2): the insert lands in the pending
+    /// list, the query merges that list with the tree's hits, and the answer is
+    /// still the true nearest - so an insert between two dumps costs neither a
+    /// scan of the table nor a stale answer.
+    ///
+    /// The dump is what makes the **tree** cover the row: the checkpoint rebuilds
+    /// the segment's chunk from its live rows, folds the new row in and clears the
+    /// list, so the same query afterwards answers out of `chunk_{n}.idx`.
     #[test]
-    fn cspann_falls_back_to_the_exact_scan_for_uncovered_rows() {
+    fn cspann_answers_a_row_written_after_the_build_from_the_mem_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute_blocking("CREATE TABLE csf (id INT, v EMBEDDING(FLOAT,4));")
@@ -13401,9 +13407,20 @@ mod tests {
              (metric='l2', max_partition_size=8);",
         )
         .unwrap();
-        // Written after the build: not in the tree, so the index is uncovered.
+        let key = e.table_key("default_db.csf");
+        let pending = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .unwrap_or(0)
+        };
+        assert_eq!(pending(&e), 0, "the build leaves nothing pending");
+        // Written after the build: not in the tree, so it is in the mem index.
         e.execute_blocking("INSERT INTO csf VALUES (3, [9.0,9.0,9.0,9.0]);")
             .unwrap();
+        assert_eq!(pending(&e), 1, "the insert must land in the mem index");
         let got = rows(
             &e,
             "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
@@ -13412,9 +13429,8 @@ mod tests {
 
         // The checkpoint rebuilds the chunk (`rebuild` delta mode), so after a
         // flush the tree covers every row again — including the one that was
-        // written after the index was created.
+        // written after the index was created — and the list is released.
         crate::scheduler::block_on(e.flush()).unwrap();
-        let key = e.table_key("default_db.csf");
         let covered = e
             .tables
             .lock()
@@ -13422,6 +13438,7 @@ mod tests {
             .get(&key)
             .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
         assert_eq!(covered, Some(3), "the flushed tree covers all three rows");
+        assert_eq!(pending(&e), 0, "the dump must release the mem index");
         let got = rows(
             &e,
             "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
@@ -13854,6 +13871,240 @@ mod tests {
             &format!("SELECT id FROM ci SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
         );
         assert_eq!(got.first().map(|r| r[0].clone()), Some("80".to_string()));
+    }
+
+    /// A delete takes its row out of the cspann mem index (§9.2).
+    ///
+    /// The mem list is half of the coverage count (`index.len() + mem.len()`), so
+    /// a tombstone left in it makes the index claim rows it does not hold:
+    /// `all_covered` answers "incomplete" and every query pays the row-set walk
+    /// the count check exists to avoid. It is also a candidate on every query,
+    /// i.e. a decode of a row nothing can return.
+    #[test]
+    fn a_delete_prunes_the_cspann_mem_index() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..8)
+                .map(|d| format!("{}.0", (i * 7 + d * 13) % 971))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cd VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cd_i ON cd (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let key = e.table_key("default_db.cd");
+        let pending = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .unwrap_or(0)
+        };
+        // Two rows after the dump: both in the mem index, nothing else.
+        let far = "[900.0,900.0,900.0,900.0,900.0,900.0,900.0,900.0]";
+        let gone = "[800.0,800.0,800.0,800.0,800.0,800.0,800.0,800.0]";
+        e.execute_blocking(&format!("INSERT INTO cd VALUES (40, {far}), (41, {gone});"))
+            .unwrap();
+        assert_eq!(pending(&e), 2, "both inserts must land in the mem index");
+
+        e.execute_blocking("DELETE FROM cd WHERE id = 41;").unwrap();
+        assert_eq!(pending(&e), 1, "the deleted row must leave the mem index");
+
+        let got = rows(
+            &e,
+            &format!("SELECT id FROM cd SEARCH MATCH VECTOR (v, {far}, 'float', 'l2', 3);"),
+        );
+        let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
+        assert_eq!(ids.first().map(String::as_str), Some("40"), "got {ids:?}");
+        assert!(
+            !ids.contains(&"41".to_string()),
+            "a deleted row must not be answered: {ids:?}"
+        );
+    }
+
+    /// `max_partition_size × 64` rows in a cspann mem index trigger a dump of
+    /// their own (§9.2), without waiting for the next checkpoint.
+    ///
+    /// Every row in that list is re-scored exactly by **every** KNN query on the
+    /// table, so an import that outruns the checkpoint interval would otherwise
+    /// turn each query into a scan of the gap. The bound is rows, not bytes
+    /// (§9.5's watermarks are the engine-wide budget, a different trigger).
+    #[test]
+    fn a_cspann_mem_index_dumps_at_its_row_bound() {
+        let n = 30usize;
+        let extra = 1100usize;
+        // A per-(row, dim) spread: a modular pattern repeats every modulus rows,
+        // and two identical vectors make the nearest neighbour a coin toss. The
+        // needle is the one all-negative row, which is what a 1-bit code can tell
+        // apart in a handful of sign bits.
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| {
+                    let x = (i as u64)
+                        .wrapping_mul(2_654_435_761)
+                        .wrapping_add((d as u64) * 40_503);
+                    format!("{}.0", (x >> 20) % 1000)
+                })
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let needle = "[-900.0,-901.0,-902.0,-903.0]";
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cb (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cb VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        // `max_partition_size = 16` -> the bound is 1024 rows.
+        e.execute_blocking(
+            "CREATE INDEX cb_i ON cb (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let key = e.table_key("default_db.cb");
+        let pending = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .unwrap_or(0)
+        };
+        assert_eq!(pending(&e), 0, "the checkpoint released the mem index");
+
+        // One statement, ending with the needle: the whole batch is in the mem
+        // index when the commit's bound check runs.
+        let mut sql = String::from("INSERT INTO cb VALUES ");
+        for i in n..n + extra {
+            sql.push_str(&format!("({i}, {}),", vector(i)));
+        }
+        let needle_id = n + extra;
+        sql.push_str(&format!("({needle_id}, {needle});"));
+        e.execute_blocking(&sql).unwrap();
+
+        // No `flush()` in between: the row bound alone has to dump.
+        assert_eq!(
+            pending(&e),
+            0,
+            "{extra} rows crossed the 1024-row bound, so the dump must have run"
+        );
+        let covered = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
+        assert_eq!(
+            covered,
+            Some(n + extra + 1),
+            "the dump's tree must cover the rows it released"
+        );
+        let got = rows(
+            &e,
+            &format!("SELECT id FROM cb SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
+        );
+        assert_eq!(
+            got.first().map(|r| r[0].clone()),
+            Some(needle_id.to_string())
+        );
+    }
+
+    /// The cspann mem index is memory only (§9.2), so after a restart it is empty
+    /// and the rows written since the last dump are not covered by the loaded
+    /// chunk. The query must answer them regardless: `uncovered` scores exactly
+    /// those row ids, so a restart costs the gap and never a hole - the semantics
+    /// the rebuild-mode chunk format is built on (§9.7).
+    #[test]
+    fn a_restart_answers_the_rows_written_after_the_last_dump() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 19 + d * 37) % 983))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cr (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cr VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cr_i ON cr (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        // Written after the dump, and never dumped: no `flush()` from here on.
+        let needle = "[700.0,701.0,702.0,703.0]";
+        e.execute_blocking(&format!("INSERT INTO cr VALUES (40, {needle});"))
+            .unwrap();
+        drop(e);
+
+        let reopened = Engine::open(dir.path()).unwrap();
+        let key = reopened.table_key("default_db.cr");
+        let pending: usize = reopened
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+            .unwrap_or(0);
+        assert_eq!(pending, 0, "the mem index does not survive a restart");
+
+        // The row is only in the recovered append buffer, and the chunk does not
+        // hold it: the answer has to come from the uncovered-row fallback.
+        let got = rows(
+            &reopened,
+            &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
+        );
+        assert_eq!(
+            got.first().map(|r| r[0].clone()),
+            Some("40".to_string()),
+            "a row written before the restart must still be answered: {got:?}"
+        );
+
+        // The next dump folds it into the tree, so the fallback is temporary.
+        crate::scheduler::block_on(reopened.flush()).unwrap();
+        let covered = reopened
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
+        assert_eq!(covered, Some(41), "the dump covers the recovered row");
     }
 
     /// A checkpoint must not rebuild a segment that has not changed (§9.4).

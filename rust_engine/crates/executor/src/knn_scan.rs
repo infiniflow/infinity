@@ -289,6 +289,12 @@ impl Engine {
             // candidates (the exact rescoring decides) and they are covered, so
             // an insert stays visible without turning the query into a scan of
             // the whole table (`docs/CSPANN_DESIGN.md` §9.2).
+            //
+            // Every row here is re-scored, which is why the list is bounded
+            // (`max_partition_size × 64` triggers a dump) and why a delete prunes
+            // it. It is memory-only: after a restart it is empty and the rows it
+            // held fall into `uncovered` below - an exact scan of exactly those
+            // rows, which is correct and costs the gap, not the table.
             let mem: Vec<usize> = {
                 let tables = self.tables.lock().unwrap();
                 tables

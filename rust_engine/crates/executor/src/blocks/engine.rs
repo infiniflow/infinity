@@ -1935,26 +1935,45 @@ impl Engine {
                     // without a chunk); the header catches an option change,
                     // which is the one case where the rows are identical but the
                     // tree is not.
+                    // A segment whose **mem index** still holds rows is never
+                    // reusable: the count test above cannot see an insert that a
+                    // delete balanced (8192 rows in, 8192 out leaves the live
+                    // count where the chunk left it), and reusing the chunk then
+                    // publishes nothing - so the caller's "the dump cleared the
+                    // mem index" never happens and the tail grows without bound.
+                    // A row id names its segment in the high half
+                    // (`seq = segment << 32 | offset`), so this is a scan of the
+                    // (row-bounded) mem list, not of the table.
+                    let pending_in_segment = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.cspann_mem.get(&(index_id as u64)))
+                            .is_some_and(|rows| {
+                                rows.iter().any(|(seq, _)| (*seq >> 32) as u32 == *segment)
+                            })
+                    };
                     let opts = crate::cspann_mem::options_from(&im.options).ok();
-                    let reusable = opts.is_some_and(|opts| {
-                        match self
-                            .live_chunk_files(table, &im.name, *segment, &seg_dir)
-                            .into_iter()
-                            .max_by_key(|(id, _)| *id)
-                        {
-                            Some((id, path)) => {
-                                recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
-                                    && storage::knn_index::cspann::read_header(&path).is_ok_and(
-                                        |h| {
-                                            h.metric == opts.metric
-                                                && h.encode == opts.encode
-                                                && h.seed == opts.seed
-                                        },
-                                    )
+                    let reusable = !pending_in_segment
+                        && opts.is_some_and(|opts| {
+                            match self
+                                .live_chunk_files(table, &im.name, *segment, &seg_dir)
+                                .into_iter()
+                                .max_by_key(|(id, _)| *id)
+                            {
+                                Some((id, path)) => {
+                                    recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
+                                        && storage::knn_index::cspann::read_header(&path).is_ok_and(
+                                            |h| {
+                                                h.metric == opts.metric
+                                                    && h.encode == opts.encode
+                                                    && h.seed == opts.seed
+                                            },
+                                        )
+                                }
+                                None => false,
                             }
-                            None => false,
-                        }
-                    });
+                        });
                     if reusable {
                         // Nothing to publish: the catalog already lists the chunk
                         // that covers this segment, and the loader takes the

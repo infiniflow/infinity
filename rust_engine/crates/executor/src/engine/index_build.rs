@@ -4039,6 +4039,71 @@ impl Engine {
         }
     }
 
+    /// `AppendMemIndex`'s row bound, applied to cspann: after a write batch,
+    /// dump every cspann mem index that reached `max_partition_size × 64` rows
+    /// (`docs/CSPANN_DESIGN.md` §9.2).
+    ///
+    /// The bound is the index's own, not `[storage] mem_index_capacity`: the
+    /// cspann mem index is the query's **candidate list** - every row in it is
+    /// handed to the exact rescoring on every KNN query, because the tree cannot
+    /// rank rows it does not hold - so what has to stay bounded is rows per
+    /// index, not bytes per engine. Without this, all the rows written between
+    /// two checkpoints are decoded by every query on the table.
+    ///
+    /// Runs **after** the commit returned, so no bottom gate is held: the dump is
+    /// a full `DumpMemIndex` transaction, which takes `flush_lock` while a
+    /// checkpoint holds it and then waits for that same gate - the cycle
+    /// `dump_secondary_over_capacity_blocking` documents. From a commit's bottom
+    /// half this must not be called.
+    pub(crate) async fn dump_cspann_over_capacity(&self, table: &str) {
+        let tkey = self.table_key(table);
+        // Cheap gate first: a table with nothing queued pays one map lookup
+        // instead of a catalog read.
+        let pending: Vec<(u64, usize)> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .map(|entry| {
+                    entry
+                        .cspann_mem
+                        .iter()
+                        .filter(|(_, rows)| !rows.is_empty())
+                        .map(|(id, rows)| (*id, rows.len()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        if pending.is_empty() {
+            return;
+        }
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
+            return;
+        };
+        let mut victims: Vec<(String, String)> = Vec::new();
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("CSPANN") {
+                continue;
+            }
+            let Some(rows) = pending.iter().find(|(id, _)| *id == im.id).map(|(_, n)| *n) else {
+                continue;
+            };
+            let Ok(opts) = crate::cspann_mem::options_from(&im.options) else {
+                continue;
+            };
+            if rows >= crate::cspann_mem::mem_dump_threshold(&opts) {
+                victims.push((im.table.clone(), im.name.clone()));
+            }
+        }
+        for (table, index) in victims {
+            // A dump that fails leaves the rows in the mem index: they are still
+            // visible (the query merges the list), so the statement that
+            // triggered it has nothing to undo.
+            if self.dump_index_transaction(&table, &index).await.is_ok() {
+                storage::trim_allocator();
+            }
+        }
+    }
+
     /// C++ `AppendMemIndex`: after a write batch, dump every secondary memory
     /// tail that reached `mem_index_capacity` rows. This is the row bound the
     /// reference applies at the end of the batch (the sibling of
