@@ -967,7 +967,11 @@ impl Engine {
         // the files. The frame's payload is what the store flush covers, which
         // is this same bound plus anything that committed while the mirror ran
         // (see the frame at the end of this function).
-        let checkpoint_ts = self.checkpoint_ts();
+        //
+        // Named `bound_ts` at the block writer: it is the **visibility bound**
+        // of the mirror, not this transaction's own ts (which a checkpoint does
+        // not have - it writes rows other transactions committed).
+        let bound_ts = self.checkpoint_ts();
         // The checkpoint **does not** dump the memory indexes: C++
         // `NewTxn::CheckpointTable` only flushes blocks, and a memory index
         // keeps its rows until a `DumpMemIndex` transaction seals them. The
@@ -980,7 +984,7 @@ impl Engine {
         // this function.
         // The C++ block mirror is the storage of record; a table it cannot
         // write (a column with no block layout) keeps its rows buffered only.
-        let mirror = self.flush_blocks(checkpoint_ts).await;
+        let mirror = self.flush_blocks(bound_ts).await;
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {

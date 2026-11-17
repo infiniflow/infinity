@@ -192,10 +192,10 @@ pub enum Conflict {
 /// `NewTxn::CheckConflictTxnStore` for the pair `(this, previous)`.
 ///
 /// **Directional**, like the reference: only the transaction that commits
-/// *later* runs the check, and only its own overload decides. A rule that
-/// exists on one side alone therefore does not fire when the other side
-/// commits second - `Append` knows about `DropColumn` (`retry=false`), while
-/// `DropColumn` has no overload at all.
+/// *later* runs the check, and only its own overload decides. Both orderings
+/// of append and a column change matter: an append that commits second after
+/// a `DropColumn` returns `NoRetry`, while a `DropColumn` that commits second
+/// returns `Retry` when an append is still in flight.
 pub fn conflict_between(this: &TxnOp, previous: &TxnOp) -> Option<Conflict> {
     rule(this, previous)
 }

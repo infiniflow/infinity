@@ -1671,6 +1671,50 @@ impl Catalog {
             .unwrap_or_default())
     }
 
+    /// The table's schema as of `ts`, complete enough to write a block.
+    ///
+    /// `schema_ids_at` answers "which ids", which is all a *reader* of the
+    /// buffer needs. A block writer also needs each column's declared type,
+    /// layout and default, and it must not take them from the **current**
+    /// table: a column dropped since `ts` is gone from there, and a column
+    /// added since `ts` has no cells in these rows. Rebuilding the `TableMeta`
+    /// from the record that was live at `ts` is what this returns.
+    ///
+    /// `None` when the table does not exist (no `catalog|tbl|` record), which
+    /// is distinct from "exists with no columns".
+    pub fn schema_at(&self, table: &str, ts: u64) -> Result<Option<TableMeta>> {
+        let (db_id, bare) = self.db_and_bare_name(table)?;
+        let Ok(db_id_num) = db_id.parse::<u64>() else {
+            return Ok(None);
+        };
+        let resolved = self.with_view(|store| {
+            let Some((table_id, _)) =
+                crate::layout::table_record(store, &db_id.to_string(), &bare)?
+            else {
+                return Ok(None);
+            };
+            let columns = crate::layout::schema_at(store, db_id_num, table_id, ts)?;
+            Ok(Some((table_id, columns)))
+        })?;
+        let Some((table_id, columns)) = resolved else {
+            return Ok(None);
+        };
+        if columns.is_empty() {
+            // The table existed but no column record is at or before `ts`:
+            // report it as "not yet", not as a schema-less table.
+            return Ok(None);
+        }
+        let layout = crate::layout::TableLayout {
+            db_name: String::new(),
+            db_id: db_id_num,
+            table_name: bare,
+            table_id,
+            columns,
+            next_column_id: 0,
+        };
+        Ok(Some(crate::layout::table_meta_of(&layout)))
+    }
+
     pub fn column_timeline(&self, table: &str) -> Result<Vec<(u64, Vec<u64>)>> {
         let (db_id, bare) = self.db_and_bare_name(table)?;
         let Ok(db_id) = db_id.parse::<u64>() else {
@@ -3287,5 +3331,212 @@ mod tests {
         c.publish_segments(&shrunk).unwrap();
         let back = crate::layout::read_segments(store.as_ref()).unwrap();
         assert_eq!(back, vec![shrunk]);
+    }
+
+    // ---- `Catalog::schema_at` -------------------------------------------
+    //
+    // The window rules are `column_timeline`'s, so these also pin that
+    // function's semantics - it had no test before.
+
+    /// Commits one DDL the way a statement does: capture its batch, restamp the
+    /// records to `ts`, apply them.
+    ///
+    /// `restamp` is what turns the sentinel a DDL writes into the
+    /// transaction's commit ts, so this is the only way to build a directory
+    /// whose column records carry several distinct timestamps.
+    fn ddl_at<F>(c: &Catalog, ts: u64, f: F)
+    where
+        F: FnOnce(&Catalog) -> Result<()>,
+    {
+        // The DDL has already run inside `capture`; only its batch is left.
+        let ((), mut batch) = c.capture(|| f(c)).unwrap();
+        Catalog::restamp(&mut batch, ts);
+        c.stage(&batch).unwrap();
+    }
+
+    fn schema_at_setup() -> (tempfile::TempDir, Catalog) {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.path()).unwrap());
+        let c = Catalog::with_store_catalog_only(store);
+        c.create_database("db", false).unwrap();
+        (dir, c)
+    }
+
+    fn names_at(c: &Catalog, ts: u64) -> Vec<String> {
+        c.schema_at("db.t", ts)
+            .unwrap()
+            .map(|m| m.columns)
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn schema_at_sees_a_column_from_its_create_ts() {
+        let (_dir, c) = schema_at_setup();
+        ddl_at(&c, 10, |c| {
+            c.create_table_typed(
+                "db.t",
+                &cols(&["c1"]),
+                &[None],
+                &[false],
+                &["INT".to_string()],
+                &[None],
+            )
+            .map(|_| ())
+        });
+        ddl_at(&c, 20, |c| {
+            c.add_columns_typed(
+                "db.t",
+                &["c2".to_string()],
+                &[Some("7".to_string())],
+                &[false],
+                &["INT".to_string()],
+                &[None],
+            )
+            .map(|_| ())
+        });
+
+        // Before the table existed: no schema (not "an empty one").
+        assert!(c.schema_at("db.t", 9).unwrap().is_none());
+        assert_eq!(names_at(&c, 10), vec!["c1"]);
+        assert_eq!(names_at(&c, 19), vec!["c1"]);
+        assert_eq!(names_at(&c, 20), vec!["c1", "c2"]);
+        assert_eq!(names_at(&c, 99), vec!["c1", "c2"]);
+    }
+
+    #[test]
+    fn a_dropped_column_is_gone_from_its_drop_ts_inclusive() {
+        let (_dir, c) = schema_at_setup();
+        ddl_at(&c, 10, |c| {
+            c.create_table_typed(
+                "db.t",
+                &cols(&["c1", "c2", "c3"]),
+                &[None, None, None],
+                &[false, false, false],
+                &["INT".to_string(), "INT".to_string(), "VARCHAR".to_string()],
+                &[None, None, None],
+            )
+            .map(|_| ())
+        });
+        ddl_at(&c, 20, |c| c.drop_column("db.t", "c2", &[]).map(|_| ()));
+
+        // Before the DROP: all three, with c2's metadata intact.
+        let before = c.schema_at("db.t", 19).unwrap().unwrap();
+        assert_eq!(before.columns, cols(&["c1", "c2", "c3"]));
+        assert_eq!(before.types[1], "INTEGER");
+        // At the drop ts: already gone (`<=`, not `<`). Getting this wrong
+        // writes the dropped column's file on the first checkpoint after it.
+        assert_eq!(names_at(&c, 20), vec!["c1", "c3"]);
+        assert_eq!(names_at(&c, 99), vec!["c1", "c3"]);
+    }
+
+    /// The case the checkpoint-race document is about: a column dropped and
+    /// created again is a **new record with a new id**, and a bound on each
+    /// side of the DROP must resolve the right one.
+    #[test]
+    fn a_recreated_column_has_a_new_id_and_both_incarnations_resolve() {
+        let (_dir, c) = schema_at_setup();
+        ddl_at(&c, 10, |c| {
+            c.create_table_typed(
+                "db.t",
+                &cols(&["c1", "c2"]),
+                &[None, None],
+                &[false, false],
+                &["INT".to_string(), "INT".to_string()],
+                &[None, None],
+            )
+            .map(|_| ())
+        });
+        ddl_at(&c, 20, |c| c.drop_column("db.t", "c2", &[]).map(|_| ()));
+        ddl_at(&c, 30, |c| {
+            c.add_columns_typed(
+                "db.t",
+                &["c2".to_string()],
+                &[Some("0.0".to_string())],
+                &[false],
+                &["FLOAT".to_string()],
+                &[None],
+            )
+            .map(|_| ())
+        });
+
+        let old = c.schema_at("db.t", 19).unwrap().unwrap();
+        let at = old
+            .columns
+            .iter()
+            .position(|c| c == "c2")
+            .expect("c2 was live before the DROP");
+        let old_id = old.ids[at];
+        assert_eq!(old.types[at], "INTEGER");
+
+        let new = c.schema_at("db.t", 30).unwrap().unwrap();
+        let at = new
+            .columns
+            .iter()
+            .position(|c| c == "c2")
+            .expect("c2 was recreated");
+        assert_ne!(new.ids[at], old_id, "ids are never recycled");
+        assert_eq!(new.types[at], "FLOAT", "the new incarnation's type");
+    }
+
+    /// `ids` must ascend: `table_meta_of` relies on `read_columns` ordering by
+    /// id, and the block writer walks the columns in that order.
+    #[test]
+    fn schema_at_returns_ids_ascending() {
+        let (_dir, c) = schema_at_setup();
+        ddl_at(&c, 10, |c| {
+            c.create_table_typed(
+                "db.t",
+                &cols(&["a", "b", "c"]),
+                &[None, None, None],
+                &[false, false, false],
+                &["INT".to_string(), "INT".to_string(), "INT".to_string()],
+                &[None, None, None],
+            )
+            .map(|_| ())
+        });
+        ddl_at(&c, 20, |c| c.drop_column("db.t", "b", &[]).map(|_| ()));
+        ddl_at(&c, 30, |c| {
+            c.add_columns_typed(
+                "db.t",
+                &["d".to_string()],
+                &[None],
+                &[false],
+                &["INT".to_string()],
+                &[None],
+            )
+            .map(|_| ())
+        });
+
+        let meta = c.schema_at("db.t", 30).unwrap().unwrap();
+        assert_eq!(meta.columns, cols(&["a", "c", "d"]));
+        assert!(meta.ids.windows(2).all(|w| w[0] < w[1]), "{:?}", meta.ids);
+    }
+
+    /// `schema_at` and `schema_ids_at` must agree on which columns are live:
+    /// they are two views of the same window.
+    #[test]
+    fn schema_at_agrees_with_schema_ids_at() {
+        let (_dir, c) = schema_at_setup();
+        ddl_at(&c, 10, |c| {
+            c.create_table_typed(
+                "db.t",
+                &cols(&["a", "b"]),
+                &[None, None],
+                &[false, false],
+                &["INT".to_string(), "INT".to_string()],
+                &[None, None],
+            )
+            .map(|_| ())
+        });
+        ddl_at(&c, 20, |c| c.drop_column("db.t", "a", &[]).map(|_| ()));
+        for ts in [10u64, 15, 20, 25, 99] {
+            let from_meta = c
+                .schema_at("db.t", ts)
+                .unwrap()
+                .map(|m| m.ids)
+                .unwrap_or_default();
+            let from_ids = c.schema_ids_at("db.t", ts).unwrap();
+            assert_eq!(from_meta, from_ids, "ts={ts}");
+        }
     }
 }

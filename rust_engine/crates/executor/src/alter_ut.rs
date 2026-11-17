@@ -423,15 +423,21 @@ fn replay_of_the_test_alter_complex_sequence_around_a_checkpoint() {
 /// `PeriodicTriggerThread` runs `checkpoint_wal()` + `flush()` on its own
 /// thread; fifty rounds of `INSERT / ADD / DROP / ADD / INSERT` run against it.
 ///
-/// `#[ignore]`d: it still reproduces a residual hole on a slow machine (the
-/// arm64 runner). After the restart a replayed row reads the old `c2` out of
-/// `c3` - `[["1","2","test"]]` instead of `[["1","test","tttt"]]`. The
-/// checkpoint writes no schema newer than its bound and an `ALTER` applies its
-/// cells before the commit is published, so the mismatch is on the replay side
-/// (`apply_replayed_rows` -> `ids_at` for a frame), which is tracked, not
-/// closed. Run with `--ignored` when working on that path.
+/// This is the regression for the column shift `docs/ALTER_CHECKPOINT_RACE.md`
+/// documents: a checkpoint used to take the buffer's four-cell rows and the
+/// *live* three-column table in one pass, so `2.col` got the dropped `c2`'s
+/// value and `3.col` got `c3`'s - the first row read `[["1","2","test"]]`
+/// instead of `[["1","test","tttt"]]`.
+///
+/// The write now resolves the whole schema **at its bound** (`schema_at`,
+/// including the dropped column's type and default), and the file sweep is
+/// driven by that same schema instead of the live one, so the pre-DROP
+/// columns and the rows that still carry them agree.
+///
+/// Fifty rounds against a checkpointing thread, so it is a `slow:` case: run
+/// it with `--ignored`.
 #[test]
-#[ignore = "known-defect: a replay-side column-time mismatch under a racing checkpoint"]
+#[ignore = "slow: a checkpoint racing ALTER TABLE must not shift a buffered row's columns"]
 fn a_checkpoint_through_a_column_change_keeps_the_block_readable() {
     for _ in 0..50 {
         let dir = tempdir().unwrap();

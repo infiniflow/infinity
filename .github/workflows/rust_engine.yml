@@ -1000,9 +1000,8 @@ jobs:
             # external:
             minio_upload_meta_to_s3 minio_client_roundtrip
             minio_upload_object minio_download_object
-            # golden: / known-defect:
+            # golden:
             a_large_corpus_is_byte_identical_to_the_reference
-            a_checkpoint_through_a_column_change_keeps_the_block_readable
             # open slow cases
             dump_index_task_row_cnt_exceed_memory_quota
           )

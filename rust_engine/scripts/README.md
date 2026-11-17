@@ -89,6 +89,5 @@ cargo test --workspace -- --ignored \
   --skip minio_upload_meta_to_s3 --skip minio_client_roundtrip \
   --skip minio_upload_object --skip minio_download_object \
   --skip a_large_corpus_is_byte_identical_to_the_reference \
-  --skip a_checkpoint_through_a_column_change_keeps_the_block_readable \
   --skip dump_index_task_row_cnt_exceed_memory_quota
 ```

@@ -347,14 +347,10 @@ impl Engine {
 
     /// [`Self::write_blocks_bounded`] for an async caller: it awaits the
     /// table's bottom gate instead of blocking on it.
-    pub async fn write_blocks_bounded_async(
-        &self,
-        table: &str,
-        checkpoint_ts: u64,
-    ) -> Result<usize> {
+    pub async fn write_blocks_bounded_async(&self, table: &str, bound_ts: u64) -> Result<usize> {
         let gate = self.bottom_gate(table);
         let _turn = gate.lock().await;
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// [`Self::write_blocks`] with the checkpoint's upper bound spelled out.
@@ -363,23 +359,26 @@ impl Engine {
     /// finished at its `begin_ts` (`NewTxn::Checkpoint` -> `GetRowCnt1` ->
     /// `BlockVersion::GetRowCount(begin_ts)`), so a row id handed out by a
     /// transaction still in flight stays out of the files.
-    pub fn write_blocks_bounded(&self, table: &str, checkpoint_ts: u64) -> Result<usize> {
+    pub fn write_blocks_bounded(&self, table: &str, bound_ts: u64) -> Result<usize> {
         // The reference's checkpoint flushes only the blocks whose data changed
         // since the last one (NewTxn::CheckpointTable writes a block when
         // block_lock->checkpoint_ts_ < min(checkpoint_ts, max_ts)), and a commit
         // writes only the blocks it appended to. So a bounded write is partial
         // too: the touched set is the blocks holding rows or deletes it carries.
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// [`Self::write_blocks_bounded`] for a caller that **already holds** the
     /// table's bottom gate (a checkpoint's per-table step).
-    pub(crate) fn write_blocks_bounded_locked(
-        &self,
-        table: &str,
-        checkpoint_ts: u64,
-    ) -> Result<usize> {
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+    ///
+    /// **The caller must hold that gate for as long as this runs.** It is what
+    /// makes `bound_ts` complete: a commit that names its own ts as the bound
+    /// (compaction, an import tail) is only safe because no later append can
+    /// reach the buffer while the gate is held - see
+    /// `docs/ALTER_CHECKPOINT_RACE.md` §5.13. Shortening the guard's scope to
+    /// before the write turns `bound_ts` into a real hole.
+    pub(crate) fn write_blocks_bounded_locked(&self, table: &str, bound_ts: u64) -> Result<usize> {
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// Writes only the blocks this commit's rows and deletes land in.
@@ -417,9 +416,9 @@ impl Engine {
         table: &str,
         extra: &[(usize, Vec<Value>)],
         full: bool,
-        checkpoint_ts: u64,
+        bound_ts: u64,
     ) -> Result<usize> {
-        self.write_blocks_mode_with(table, extra, full, checkpoint_ts, true)
+        self.write_blocks_mode_with(table, extra, full, bound_ts, true)
     }
 
     /// [`Self::write_blocks_mode`] with control over the file sync.
@@ -428,12 +427,27 @@ impl Engine {
     /// blocks in memory and its `IMPORT_V2` frame carries only the extent, so
     /// the checkpoint is what puts them on disk. Every other caller - a
     /// checkpoint, a compaction, a column rewrite - passes `true`.
+    /// The visibility bound of this write: only rows and deletes stamped at or
+    /// before it are written.
+    ///
+    /// A **checkpoint** passes `self.checkpoint_ts()` (`current_ts()`), the
+    /// newest commit that has finished - the rows of a transaction still in
+    /// flight must stay out of the files.
+    ///
+    /// A **non-checkpoint** caller (a commit writing its own blocks:
+    /// `write_blocks_commit`, `write_blocks_import`, `compact`) passes its own
+    /// commit ts. When the value handed here happens to equal the caller's own
+    /// commit ts, that is exactly the signal that this is not a checkpoint
+    /// transaction: there are no foreign rows to bound out, only the caller's
+    /// own, because it holds the table's `bottom_gate` across the write (see
+    /// `docs/ALTER_CHECKPOINT_RACE.md` §5.13). `u64::MAX` is the explicit
+    /// "no bound" spelling of the same case.
     pub(crate) fn write_blocks_mode_with(
         &self,
         table: &str,
         extra: &[(usize, Vec<Value>)],
         full: bool,
-        checkpoint_ts: u64,
+        bound_ts: u64,
         sync_files: bool,
     ) -> Result<usize> {
         // The block writer runs under the **table's bottom gate**: the reference
@@ -461,17 +475,29 @@ impl Engine {
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        // The checkpoint writes the schema **as of its bound** (`NewTxn::Checkpoint`
-        // reads `GetColumnDefs` at its begin ts): a column a transaction
-        // committed after that bound has no cells in these rows and no place in
-        // their files. The sweep below still uses the live schema, so the
-        // `{id}.col` of such a column stays where the ALTER put it.
-        let snapshot_ids = self
-            .storage
-            .catalog
-            .schema_ids_at(&table, checkpoint_ts)
-            .unwrap_or_else(|_| meta.ids.clone());
-        let encode_meta = meta.at_ids(&snapshot_ids);
+        // The schema **as of the bound** (`NewTxn::Checkpoint` reads
+        // `GetColumnDefs` at its begin ts), with each column's type, layout and
+        // default taken from the record that was live then - **not** from
+        // `meta`.
+        //
+        // `meta` is the *current* table. A column dropped since the bound is
+        // gone from it, so `meta.at_ids(snapshot_ids)` would silently skip that
+        // id (`TableMeta::at_ids` continues on an id it cannot find) and encode
+        // the row one cell short; a column added since the bound would bring
+        // its type and default along. Both are the same defect seen from
+        // opposite sides, and `schema_at` is the one place that resolves the
+        // whole column - id, order, type, default - on one timestamp.
+        //
+        // `bound_ts == u64::MAX` means "no bound" (a commit writing its own
+        // blocks, see `write_blocks_commit`): the live table is the answer.
+        let encode_meta = if bound_ts == u64::MAX {
+            meta.clone()
+        } else {
+            self.storage
+                .catalog
+                .schema_at(&table, bound_ts)?
+                .unwrap_or_else(|| meta.clone())
+        };
         let types: Vec<i32> = encode_meta
             .types
             .iter()
@@ -527,7 +553,7 @@ impl Engine {
                 let ts = delete_ts.get(k).copied().unwrap_or(0);
                 (*id as usize, if ts == 0 { DELETED_MIRROR_TS } else { ts })
             })
-            .filter(|(_, ts)| checkpoint_ts == u64::MAX || *ts <= checkpoint_ts)
+            .filter(|(_, ts)| bound_ts == u64::MAX || *ts <= bound_ts)
             .collect();
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
@@ -622,7 +648,7 @@ impl Engine {
         let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
         // The reference decides per block, by ts: a block is flushed when
-        // `record_ts < min(checkpoint_ts, block_max_ts)` where `record_ts` is
+        // `record_ts < min(bound_ts, block_max_ts)` where `record_ts` is
         // the ts at which the block was last written and `block_max_ts` the
         // newest change it holds (NewTxn::CheckpointTable).
         let touched: std::collections::HashSet<(u32, u16)> = if partial {
@@ -658,7 +684,7 @@ impl Engine {
                     .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
                     // No record means the block was never written: it has to be.
                     .unwrap_or(0);
-                if record < checkpoint_ts.min(ts) {
+                if record < bound_ts.min(ts) {
                     set.insert(key);
                 }
             }
@@ -690,14 +716,14 @@ impl Engine {
         // segment was left with rows and no file.
         let known_segments: Vec<u32> = counts.iter().map(|(segment, _)| *segment).collect();
         // `NewTxn::Checkpoint` writes the rows of the transactions that had
-        // finished by `checkpoint_ts`: a block holds the rows whose append was
+        // finished by `bound_ts`: a block holds the rows whose append was
         // stamped at or before it (`GetRowCnt1` -> `GetRowCount(begin_ts)`).
         // The allocator's per-segment count also covers ids handed out to a
         // transaction that has not committed yet, and those rows are in no
         // block, so the extent is clipped here. Because ids are allocated in
         // commit-ts order, the committed records are a prefix of the row ids.
-        if checkpoint_ts != u64::MAX {
-            let committed = self.committed_rows(&table, checkpoint_ts);
+        if bound_ts != u64::MAX {
+            let committed = self.committed_rows(&table, bound_ts);
             let mut seen = 0usize;
             let mut clipped: Vec<(u32, u64)> = Vec::with_capacity(counts.len());
             for (segment_id, rows) in counts {
@@ -869,7 +895,7 @@ impl Engine {
                 if !contiguous || chunk.len() > end - start || chunk.is_empty() {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
-                         committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
+                         committed at ts {bound_ts} (ids {}..{}, window {first_id}..{})",
                         chunk.len(),
                         end - start,
                         chunk.first().map(|(seq, _)| *seq).unwrap_or(0),
@@ -928,16 +954,22 @@ impl Engine {
                 let block_dir =
                     storage::definition::format::block_dir(db_id, meta.id, segment_id, id.block_id);
                 // A rewrite replaces the block's contents; a file the schema no
-                // longer has (`ALTER TABLE … DROP COLUMN` leaves `1.col`
-                // behind) must not survive next to it, or the reference reads
-                // a column the catalog does not know.
+                // longer has must not survive next to it, or the reference
+                // reads a column the catalog does not know.
+                //
+                // **`keep` is built from `encode_meta`, not from `meta`**, and
+                // this is load-bearing: the sweep below *deletes* every file
+                // this list does not name, and it runs **before** the write.
+                // A column the bound still had but the live table no longer
+                // does (a DROP after the bound) is written by this pass and
+                // must survive; naming only the live columns would delete the
+                // file this write just produced, silently turning "write the
+                // pre-DROP schema" into "write nothing for that column".
                 let mut keep: Vec<String> =
                     vec![storage::definition::format::VERSION_FILE.to_string()];
-                // The live schema, not the snapshot: a column added after the
-                // bound has a file here that this write does not produce.
-                for (i, id) in meta.ids.iter().enumerate() {
+                for (i, id) in encode_meta.ids.iter().enumerate() {
                     keep.push(storage::definition::format::column_file(*id));
-                    if meta
+                    if encode_meta
                         .types
                         .get(i)
                         .and_then(|t| column_type_of(t))
@@ -969,10 +1001,14 @@ impl Engine {
                 // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
                 // kVarBuffer type) and aborts the whole read when it is missing,
                 // even though the file is empty for a column whose data is inline.
+                // `types` is `encode_meta`'s, so the id must be too: pairing
+                // the bound's types with the live `meta.ids` is the reverse of
+                // the defect above (`meta.ids[i]` can name another column, or
+                // not exist once a DROP made `meta` shorter).
                 for (i, ty) in types.iter().enumerate() {
                     if is_var_buffer_type(*ty) {
                         let path = root.join(&block_dir).join(
-                            storage::definition::format::column_outline_file(meta.ids[i]),
+                            storage::definition::format::column_outline_file(encode_meta.ids[i]),
                         );
                         if !path.exists() {
                             let _ = storage::definition::format::write_synced(&path, b"");
@@ -1419,9 +1455,9 @@ impl Engine {
     /// block writer writes - and two tables share nothing, so they run side by
     /// side. The global steps (the checkpoint ts, the index-cache reload, the
     /// catalog layout, the final `store.flush`) stay in the caller.
-    pub async fn flush_blocks(&self, checkpoint_ts: u64) -> Result<()> {
+    pub async fn flush_blocks(&self, bound_ts: u64) -> Result<()> {
         let tables = self.storage.catalog.list_tables()?;
-        self.flush_tables(&tables, checkpoint_ts, checkpoint_workers())
+        self.flush_tables(&tables, bound_ts, checkpoint_workers())
             .await
     }
 
@@ -1433,13 +1469,13 @@ impl Engine {
     pub(crate) async fn flush_tables(
         &self,
         tables: &[catalog::TableMeta],
-        checkpoint_ts: u64,
+        bound_ts: u64,
         workers: usize,
     ) -> Result<()> {
         let workers = workers.min(tables.len()).max(1);
         if workers <= 1 {
             for meta in tables {
-                self.flush_table(meta, checkpoint_ts).await?;
+                self.flush_table(meta, bound_ts).await?;
             }
             return Ok(());
         }
@@ -1456,12 +1492,12 @@ impl Engine {
             let metas: Vec<catalog::TableMeta> = tables.to_vec();
             return crate::fanout::for_each_async(metas, workers, move |meta| {
                 let engine = engine.clone();
-                async move { engine.flush_table(&meta, checkpoint_ts).await }
+                async move { engine.flush_table(&meta, bound_ts).await }
             })
             .await;
         }
         for meta in tables {
-            self.flush_table(meta, checkpoint_ts).await?;
+            self.flush_table(meta, bound_ts).await?;
         }
         Ok(())
     }
@@ -1478,17 +1514,15 @@ impl Engine {
     /// touch the in-memory registries only after each write came back. No
     /// `std::sync::Mutex` is held across an await, and no blocking pool thread
     /// ever runs more than one file write.
-    async fn flush_table(&self, meta: &catalog::TableMeta, checkpoint_ts: u64) -> Result<()> {
+    async fn flush_table(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<()> {
         let key = self.table_key(&meta.name);
         let gate = self.bottom_gate(&key);
         let _turn = gate.lock().await;
         let _held = crate::engine::statements::HeldBottom::enter(&key);
         if meta.types.iter().all(|t| column_type_of(t).is_some()) {
             let table = meta.name.clone();
-            self.flush_leaf(move |engine| {
-                engine.write_blocks_bounded_locked(&table, checkpoint_ts)
-            })
-            .await?;
+            self.flush_leaf(move |engine| engine.write_blocks_bounded_locked(&table, bound_ts))
+                .await?;
         }
         // **No index work here.** `NewTxn::CheckpointTable`
         // (`new_txn_data_impl.cpp:1438`) walks the table's blocks and flushes
