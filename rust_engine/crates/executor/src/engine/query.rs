@@ -2248,7 +2248,23 @@ impl Engine {
                         // `spann_degraded = flat`). A later dump over a table that
                         // has grown builds the tree.
                         let rows = self.row_count(table)? + self.buffered_row_count(table);
-                        if rows >= options.min_rows {
+                        // A resident tree holds every member vector on the heap
+                        // (`rows * dims * 4` with `encode = none`), and the
+                        // checkpoint rebuilds the same column **per segment**
+                        // anyway - so a whole-table build is both the largest
+                        // allocation in the process and work that is thrown
+                        // away. Past the budget the index keeps only its catalog
+                        // record: the dump publishes one tree per segment and a
+                        // query that arrives before it answers by exact scan.
+                        let dims = self
+                            .column_types(table)?
+                            .get(col)
+                            .and_then(|t| crate::engine::types::type_dim(t))
+                            .unwrap_or(0);
+                        let resident = rows.saturating_mul(dims).saturating_mul(4);
+                        if rows >= options.min_rows
+                            && resident <= crate::spann_mem::MEMORY_TREE_MAX_BYTES
+                        {
                             let Some(built) =
                                 self.spann_build(table, col, options, &self.dir.join("tmp"), None)
                             else {

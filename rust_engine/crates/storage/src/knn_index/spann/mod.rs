@@ -10,21 +10,21 @@
 //! Layout (all integers little-endian):
 //!
 //! ```text
-//! 0    128      header
-//! 32   ..       section table: 6 × { offset u64, len u64 }
-//! 128  ..       Section A  partition metadata, 32 B per partition
+//! 0    160      header (v2)
+//! 40   ..       section table: 6 × { offset u64, len u64 }
+//! 160  ..       Section A  partition metadata, 32 B per partition
 //!      ..       Section B  centroids, dims × f32 per partition
 //!      ..       Section C  child keys, u32 per child
 //!      ..       Section D  slot pages, one 4 KB-aligned column group per partition
 //!      ..       Section E  full vectors (reserved for `encode = none`)
-//!      ..       Section F  row ids, u64 per covered row
+//!      ..       Section F  row offsets, u32 per covered row
 //! end  -32      trailer: 8 B magic + 6 × u32 CRC32C (one per section)
 //! ```
 //!
 //! Column groups inside a slot page (§6.2's columnar layout):
 //!
 //! ```text
-//! row_ids  : u64 × n
+//! row_off  : u32 × n     the segment's own offset
 //! norm     : f32 × n     ‖o − c‖
 //! raw_norm : f32 × n     ‖o‖²   (ip / cosine)
 //! sum      : f32 × n     popcount of the code
@@ -32,9 +32,12 @@
 //! codes    : u8 × n × ceil(dims/8)
 //! ```
 //!
-//! `row_id` is `u64` and not the design's `u32`: row ids are engine-wide and a
-//! chunk is not guaranteed to start at 0, so 4 bytes saved per row is not worth
-//! a silent truncation.
+//! `row_off` is `u32` because **the chunk is one segment's tree** (§3 I6): the
+//! segment lives in the header and the engine-wide id is reconstructed as
+//! `segment << 32 | row_off`. A v1 chunk stored the engine-wide id here, which
+//! cost 4 bytes per row and went stale the moment a compaction renumbered the
+//! segment - those files are refused (`VERSION`), because a chunk is derived
+//! data and the fix is to rebuild it.
 
 use index::spann::{
     partition::{metric_score, Member, Partition},
@@ -53,7 +56,28 @@ pub use writer::{write, write_to};
 /// than guessed at - the pre-rename `CSPANN\0\1` files included.
 pub const MAGIC: [u8; 8] = *b"SPANN\x00\x00\x01";
 const TRAILER_MAGIC: [u8; 8] = *b"SPEND\x00\x00\x01";
-pub const HEADER_LEN: usize = 128;
+/// Bytes of a chunk header.
+///
+/// v2 grew it from 128 to 160: the fixed fields gained `segment_id`, and the
+/// section table moved to 40 so the id sits inside the 8-byte alignment
+/// `SPANN_FORMAT.md` tabulates.
+pub const HEADER_LEN: usize = 160;
+/// The only version this build writes and reads.
+///
+/// v1 stored the engine-wide `segment << 32 | offset` in every slot (8 bytes).
+/// v2 stores the segment's own offset (4 bytes) and puts the segment in the
+/// header, so a chunk that says `1` is refused rather than misread: a spann
+/// chunk is derived data (`index_delta_mode = rebuild`), so the answer is to
+/// rebuild it, not to guess at its ids.
+pub const VERSION: u16 = 2;
+/// Where the section table starts inside the header: `magic(8) ver(2)
+/// header_len(2) dims(4) metric(1) encode(1) rot_algo(1) pad(1) seed(8)
+/// partitions(4) segment(4) pad(4)`, then 6 × `{offset u64, len u64}`.
+pub const SECTION_TABLE_AT: usize = 40;
+/// Bytes per row id: the slot's leading column and one entry of section F.
+/// A row id is a segment-local offset, so the segment's 32 bits live once, in
+/// the header (§6.2).
+pub const ROW_ID_BYTES: usize = 4;
 /// Bytes per partition in section A.
 pub const META_ENTRY: usize = 32;
 pub const SECTION_COUNT: usize = 6;
@@ -91,6 +115,17 @@ pub struct ChunkHeader {
     pub rot_algo: u8,
     pub seed: u64,
     pub partitions: usize,
+    /// The segment this tree was built over. Slots and section F hold the
+    /// segment's **own** offsets; `segment << 32 | offset` is what the engine
+    /// sees (`docs/SPANN_DESIGN.md` §6.2).
+    pub segment: u32,
+}
+
+impl ChunkHeader {
+    /// The high half of every row id this chunk names.
+    pub fn row_base(&self) -> u64 {
+        u64::from(self.segment) << 32
+    }
 }
 
 /// Per-partition metadata (§6.1 section A).
@@ -117,6 +152,8 @@ pub struct SlotView<'a> {
     codes: &'a [u8],
     count: usize,
     code_bytes: usize,
+    /// `segment << 32`: the high half the page does not store (§6.2).
+    row_base: u64,
 }
 
 impl SlotView<'_> {
@@ -132,10 +169,9 @@ impl SlotView<'_> {
         if i >= self.count {
             return None;
         }
-        let at = i * 8;
-        Some(u64::from_le_bytes(
-            self.row_ids.get(at..at + 8)?.try_into().ok()?,
-        ))
+        let at = i * 4;
+        let off = u32::from_le_bytes(self.row_ids.get(at..at + 4)?.try_into().ok()?);
+        Some(self.row_base | u64::from(off))
     }
 
     fn f32_at(column: &[u8], i: usize) -> f32 {
@@ -211,9 +247,9 @@ impl Layout {
             return Err(SpannError::Corrupt("bad magic".to_string()));
         }
         let version = u16::from_le_bytes([bytes[8], bytes[9]]);
-        if version != 1 {
+        if version != VERSION {
             return Err(SpannError::Corrupt(format!(
-                "unsupported version {version}"
+                "unsupported version {version} (this build writes {VERSION}; rebuild the index)"
             )));
         }
         let header_len = u16::from_le_bytes([bytes[10], bytes[11]]) as usize;
@@ -243,6 +279,7 @@ impl Layout {
         if partitions == 0 {
             return Err(SpannError::Corrupt("no partitions".to_string()));
         }
+        let segment = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
 
         // Section table, then bounds and CRCs.
         let tail = bytes.len() - TRAILER_LEN;
@@ -251,7 +288,7 @@ impl Layout {
         }
         let mut sections = [(0usize, 0usize); SECTION_COUNT];
         for section in 0..SECTION_COUNT {
-            let at = 32 + section * 16;
+            let at = SECTION_TABLE_AT + section * 16;
             let offset = u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap()) as usize;
             let len = u64::from_le_bytes(bytes[at + 8..at + 16].try_into().unwrap()) as usize;
             let end = offset
@@ -292,6 +329,7 @@ impl Layout {
                 rot_algo,
                 seed,
                 partitions,
+                segment,
             },
             sections,
         })
@@ -386,7 +424,8 @@ impl<'a> Chunk<'a> {
         let meta = self.meta(key)?;
         let count = meta.count as usize;
         let code_bytes = self.code_bytes();
-        let block_len = count * (24 + code_bytes);
+        // One slot: row_off u32 + norm/raw_norm/sum/error f32 + code.
+        let block_len = count * (20 + code_bytes);
         let start = meta.slots_off as usize;
         let slots = self.section(Section::Slots).get(start..start + block_len)?;
         let mut at = 0usize;
@@ -395,7 +434,7 @@ impl<'a> Chunk<'a> {
             at += bytes;
             out
         };
-        let row_ids = take(count * 8);
+        let row_ids = take(count * 4);
         let norm = take(count * 4);
         let raw_norm = take(count * 4);
         let sum = take(count * 4);
@@ -410,15 +449,23 @@ impl<'a> Chunk<'a> {
             codes,
             count,
             code_bytes,
+            // A branch's word is a child key, not a row (§6.2), so only a leaf
+            // gets the segment prefix.
+            row_base: if meta.level <= 1 {
+                self.header.row_base()
+            } else {
+                0
+            },
         })
     }
 
     pub fn row_ids(&self) -> Vec<u64> {
+        let base = self.header.row_base();
         self.section(Section::RowIds)
-            .as_chunks::<8>()
+            .as_chunks::<4>()
             .0
             .iter()
-            .map(|b| u64::from_le_bytes(*b))
+            .map(|b| base | u64::from(u32::from_le_bytes(*b)))
             .collect()
     }
 
@@ -547,7 +594,8 @@ impl Default for Crc32c {
 ///
 /// [`FileIndex::open`] verifies every section's CRC, i.e. reads the whole file.
 /// A publisher that only wants to know whether the chunk it already has was
-/// built with the catalog's options must not pay that: this reads 128 bytes.
+/// built with the catalog's options must not pay that: this reads `HEADER_LEN`
+/// bytes.
 pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, SpannError> {
     use std::io::Read;
     let mut file =
@@ -557,6 +605,12 @@ pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, Spa
         .map_err(|e| SpannError::Corrupt(format!("read header: {e}")))?;
     if head[0..8] != MAGIC {
         return Err(SpannError::Corrupt("bad magic".to_string()));
+    }
+    let version = u16::from_le_bytes([head[8], head[9]]);
+    if version != VERSION {
+        return Err(SpannError::Corrupt(format!(
+            "unsupported version {version} (this build writes {VERSION}; rebuild the index)"
+        )));
     }
     let dims = u32::from_le_bytes(head[12..16].try_into().unwrap()) as usize;
     let metric = match head[16] {
@@ -577,6 +631,7 @@ pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, Spa
         rot_algo: head[18],
         seed: u64::from_le_bytes(head[20..28].try_into().unwrap()),
         partitions: u32::from_le_bytes(head[28..32].try_into().unwrap()) as usize,
+        segment: u32::from_le_bytes(head[32..36].try_into().unwrap()),
     })
 }
 
@@ -701,7 +756,7 @@ impl FileIndex {
     }
 
     pub fn len(&self) -> usize {
-        self.layout.sections[Section::RowIds as usize].1 / 8
+        self.layout.sections[Section::RowIds as usize].1 / ROW_ID_BYTES
     }
 
     pub fn is_empty(&self) -> bool {
@@ -889,13 +944,13 @@ mod tests {
     #[test]
     fn streaming_and_in_memory_writes_agree() {
         let index = SpannIndex::build(rows(300, 16), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let path = std::env::temp_dir().join(format!(
             "spann-writer-{}-{:?}.idx",
             std::process::id(),
             std::thread::current().id()
         ));
-        let len = write_to(&index, &path).unwrap();
+        let len = write_to(&index, &path, 0).unwrap();
         let streamed = std::fs::read(&path).unwrap();
         let opened = FileIndex::open(&path, &opts()).unwrap();
         let _ = std::fs::remove_file(&path);
@@ -910,7 +965,7 @@ mod tests {
     fn round_trip_preserves_the_tree_and_the_answers() {
         let data = rows(300, 16);
         let index = SpannIndex::build(data.clone(), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
 
         assert_eq!(chunk.header().dims, 16);
@@ -959,7 +1014,7 @@ mod tests {
     fn file_index_matches_the_in_memory_tree() {
         let data = rows(400, 16);
         let index = SpannIndex::build(data.clone(), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("chunk_0.idx");
         std::fs::write(&path, &bytes).unwrap();
@@ -1009,7 +1064,7 @@ mod tests {
                 options.metric = metric;
                 options.encode = encode;
                 let index = SpannIndex::build(data.clone(), options.clone()).unwrap();
-                let bytes = write(&index);
+                let bytes = write(&index, 0);
                 if encode == Encode::None {
                     // The v1 chunk stores rabitq codes only, so a `none` index has
                     // no mapped counterpart - and writing one must be refused
@@ -1082,7 +1137,7 @@ mod tests {
     #[test]
     fn slot_pages_are_page_aligned_and_complete() {
         let index = SpannIndex::build(rows(200, 8), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
         let slots_offset = chunk.sections[Section::Slots as usize].0;
         assert_eq!(slots_offset % SLOT_ALIGN, 0);
@@ -1100,7 +1155,7 @@ mod tests {
     #[test]
     fn a_flipped_byte_is_rejected_by_the_checksum() {
         let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let (offset, len) = Chunk::parse(&bytes).unwrap().sections[Section::Centroids as usize];
         assert!(len > 0);
         let mut corrupt = bytes.clone();
@@ -1115,7 +1170,7 @@ mod tests {
     #[test]
     fn truncated_or_foreign_files_are_rejected() {
         let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
 
         let err = Chunk::parse(&bytes[..HEADER_LEN]).unwrap_err();
         assert!(matches!(err, SpannError::Corrupt(_)));
@@ -1129,7 +1184,8 @@ mod tests {
 
         // A valid header that claims a section beyond EOF.
         let mut bad_table = bytes.clone();
-        bad_table[32..40].copy_from_slice(&(u64::MAX / 2).to_le_bytes());
+        bad_table[SECTION_TABLE_AT..SECTION_TABLE_AT + 8]
+            .copy_from_slice(&(u64::MAX / 2).to_le_bytes());
         assert!(matches!(
             Chunk::parse(&bad_table).unwrap_err(),
             SpannError::Corrupt(_)
@@ -1139,7 +1195,7 @@ mod tests {
     #[test]
     fn catalog_mismatch_is_rejected() {
         let index = SpannIndex::build(rows(50, 8), opts()).unwrap();
-        let bytes = write(&index).unwrap();
+        let bytes = write(&index, 0).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
 
         let mut other = opts();
@@ -1168,7 +1224,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            write(&index).unwrap_err(),
+            write(&index, 0).unwrap_err(),
             SpannError::InvalidOption("encode", _)
         ));
     }

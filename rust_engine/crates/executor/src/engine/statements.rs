@@ -2206,6 +2206,59 @@ impl Engine {
         Ok(())
     }
 
+    /// [`Self::publish_encoded_rows`] over a `COPY`'s staged rows.
+    ///
+    /// The rows may be spilled to disk ([`crate::engine::import::StagedRows`]),
+    /// so they are replayed instead of borrowed. `after_batch` runs at every
+    /// import batch boundary: the caller settles that batch's append record and
+    /// writes the block it landed in, which empties the append buffer again -
+    /// otherwise the buffer holds the whole statement's rows, and the peak is
+    /// the segment (a 500k-row segment of 1536d embeddings is ~6 GiB of cells).
+    pub(crate) fn publish_staged_rows(
+        &self,
+        table: &str,
+        rows: &crate::engine::import::StagedRows,
+        batches: &[usize],
+        mut after_batch: impl FnMut(usize) -> Result<()>,
+    ) -> Result<()> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
+        let take = batches.first().copied().unwrap_or(0);
+        // One batch's cells, shared between the row walk and the batch
+        // boundary: the batch that just filled it is handed to the buffer and
+        // the vector is emptied, so the peak is a batch and not the statement.
+        let published: std::cell::RefCell<Vec<(usize, Vec<Value>)>> =
+            std::cell::RefCell::new(Vec::with_capacity(take));
+        rows.replay_batches(
+            batches,
+            |seq, text| {
+                let values = match self.parse_stored_row(table, &defaults, &types, text.as_bytes())
+                {
+                    Ok(values) => values,
+                    // Never drop a row because its text form would not parse:
+                    // the cells are simply that text, which is what the writer
+                    // stores.
+                    Err(_) => text
+                        .split('\t')
+                        .map(|c| Value::Str(c.to_string()))
+                        .collect(),
+                };
+                published.borrow_mut().push((seq, values));
+                Ok(())
+            },
+            |batch| {
+                let batch_rows = std::mem::take(&mut *published.borrow_mut());
+                if !batch_rows.is_empty() {
+                    self.refresh_block_mirror_extra(table, &batch_rows)?;
+                }
+                after_batch(batch)
+            },
+        )
+    }
+
     /// The `(db_id, table_id, table_key)` of a table from its catalog key.
     pub(crate) fn table_ident(&self, table: &str) -> Result<Option<(String, String, String)>> {
         let bare = table.rsplit('.').next().unwrap_or(table);

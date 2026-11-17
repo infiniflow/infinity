@@ -19,8 +19,8 @@ use index::spann::{Encode, SpannIndex};
 use index::vector::Metric;
 
 use super::{
-    Crc32c, Section, SpannError, HEADER_LEN, MAGIC, META_ENTRY, SECTION_COUNT, SLOT_ALIGN,
-    TRAILER_LEN, TRAILER_MAGIC,
+    Crc32c, Section, SpannError, HEADER_LEN, MAGIC, META_ENTRY, SECTION_COUNT, SECTION_TABLE_AT,
+    SLOT_ALIGN, TRAILER_LEN, TRAILER_MAGIC, VERSION,
 };
 
 /// Rounds `value` up to `align`.
@@ -29,18 +29,25 @@ pub(crate) const fn align_up(value: usize, align: usize) -> usize {
 }
 
 /// The chunk for `index`, in memory.
-pub fn write(index: &SpannIndex) -> Result<Vec<u8>, SpannError> {
+///
+/// `segment` is the segment the tree was built over: the slots store the
+/// segment's own offsets (§6.2), so every member id must be inside it.
+pub fn write(index: &SpannIndex, segment: u32) -> Result<Vec<u8>, SpannError> {
     let mut out: Vec<u8> = Vec::new();
-    sections(index, &mut out)?;
+    sections(index, segment, &mut out)?;
     Ok(out)
 }
 
 /// The chunk for `index`, streamed into `path`; returns its length in bytes.
-pub fn write_to(index: &SpannIndex, path: impl AsRef<std::path::Path>) -> Result<u64, SpannError> {
+pub fn write_to(
+    index: &SpannIndex,
+    path: impl AsRef<std::path::Path>,
+    segment: u32,
+) -> Result<u64, SpannError> {
     let file = std::fs::File::create(path)
         .map_err(|e| SpannError::Corrupt(format!("create chunk: {e}")))?;
     let mut out = std::io::BufWriter::with_capacity(1 << 20, file);
-    sections(index, &mut out)?;
+    sections(index, segment, &mut out)?;
     let file = out
         .into_inner()
         .map_err(|e| SpannError::Corrupt(format!("flush chunk: {e}")))?;
@@ -78,21 +85,36 @@ fn pad_to<W: Write>(out: &mut W, pos: &mut usize, target: usize) -> Result<(), S
     Ok(())
 }
 
-fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError> {
+/// The segment-local half of `id`, or an error naming the mismatch.
+///
+/// A chunk is one segment's tree, so an id from another segment means the
+/// caller built it over the wrong rows - writing the low half alone would
+/// silently alias them onto this segment's rows.
+fn segment_offset(id: u64, segment: u32) -> Result<u32, SpannError> {
+    if (id >> 32) as u32 != segment {
+        return Err(SpannError::InvalidOption(
+            "segment",
+            format!("row id {id:#x} is not in segment {segment}"),
+        ));
+    }
+    Ok(id as u32)
+}
+
+fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(), SpannError> {
     let opts = index.opts();
     if opts.encode != Encode::Rabitq {
-        // Section E is reserved; v1 only ships the production encoding.
+        // Section E is reserved; the format only ships the production encoding.
         return Err(SpannError::InvalidOption(
             "encode",
-            "chunk format v1 only stores rabitq codes".to_string(),
+            "chunk format v2 only stores rabitq codes".to_string(),
         ));
     }
     let dims = index.dim();
     let parts = index.partitions();
     let row_ids = index.row_ids();
     let code_bytes = code_bytes(dims);
-    // One slot is id + norm + raw_norm + sum + error + code.
-    let slot_bytes = 8 + 4 * 4 + code_bytes;
+    // One slot is row_off + norm + raw_norm + sum + error + code (§6.2).
+    let slot_bytes = 4 + 4 * 4 + code_bytes;
     // Where each partition's page starts inside section D, and how many bytes of
     // it are payload. A page is padded *up to* the alignment so the next one
     // starts aligned, which means the last page carries no trailing padding -
@@ -118,7 +140,7 @@ fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError>
         (parts.iter().map(|p| p.children.len()).sum::<usize>() * 4) as u64;
     lens[Section::Slots as usize] = slots_len as u64;
     lens[Section::Vectors as usize] = 0;
-    lens[Section::RowIds as usize] = (row_ids.len() * 8) as u64;
+    lens[Section::RowIds as usize] = (row_ids.len() * 4) as u64;
 
     // Layout: header, then each section aligned (slot pages to a page).
     let mut table = [(0u64, 0u64); SECTION_COUNT];
@@ -138,7 +160,7 @@ fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError>
 
     let mut header = [0u8; HEADER_LEN];
     header[0..8].copy_from_slice(&MAGIC);
-    header[8..10].copy_from_slice(&1u16.to_le_bytes());
+    header[8..10].copy_from_slice(&VERSION.to_le_bytes());
     header[10..12].copy_from_slice(&(HEADER_LEN as u16).to_le_bytes());
     header[12..16].copy_from_slice(&(dims as u32).to_le_bytes());
     header[16] = match opts.metric {
@@ -154,8 +176,9 @@ fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError>
     header[19] = 0;
     header[20..28].copy_from_slice(&opts.seed.to_le_bytes());
     header[28..32].copy_from_slice(&(parts.len() as u32).to_le_bytes());
+    header[32..36].copy_from_slice(&segment.to_le_bytes());
     for (i, (offset, len)) in table.iter().enumerate() {
-        let at = 32 + i * 16;
+        let at = SECTION_TABLE_AT + i * 16;
         header[at..at + 8].copy_from_slice(&offset.to_le_bytes());
         header[at + 8..at + 16].copy_from_slice(&len.to_le_bytes());
     }
@@ -222,10 +245,21 @@ fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError>
     for (i, part) in parts.iter().enumerate() {
         let mut n = 0usize;
         for member in &part.members {
+            // A leaf's member is a row; a branch's "members" are its child keys
+            // (`build_subtree` builds it from the two centroids), so only a leaf
+            // carries a row offset here. Both fit in 4 bytes, which is why the
+            // column is `u32` for every level (§6.2).
+            let word = if part.is_leaf() {
+                segment_offset(member.id, segment)?
+            } else {
+                u32::try_from(member.id).map_err(|_| {
+                    SpannError::Corrupt(format!("child key {:#x} does not fit in u32", member.id))
+                })?
+            };
             buf.clear();
-            buf.extend_from_slice(&member.id.to_le_bytes());
+            buf.extend_from_slice(&word.to_le_bytes());
             put(out, &mut crc, &mut pos, &buf)?;
-            n += 8;
+            n += 4;
         }
         for group in 0..4 {
             buf.clear();
@@ -274,9 +308,9 @@ fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError>
     let mut crc = Crc32c::new();
     for chunk in row_ids.chunks(4096) {
         buf.clear();
-        buf.reserve(chunk.len() * 8);
+        buf.reserve(chunk.len() * 4);
         for id in chunk {
-            buf.extend_from_slice(&id.to_le_bytes());
+            buf.extend_from_slice(&segment_offset(*id, segment)?.to_le_bytes());
         }
         put(out, &mut crc, &mut pos, &buf)?;
     }

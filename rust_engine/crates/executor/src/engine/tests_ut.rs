@@ -13856,6 +13856,121 @@ mod tests {
         assert_eq!(got, vec![vec!["3".to_string()]]);
     }
 
+    /// A merge renumbers every row (`segment << 32 | offset`), so a tree built
+    /// on the old ids cannot be kept: each of its entries would name a
+    /// *different* row after the compaction, which is a wrong answer rather
+    /// than a stale entry. `compact_segments` drops the handles and the mem
+    /// index and rebuilds the merged segment's tree in the same commit
+    /// (`docs/SPANN_DESIGN.md` §9.8), so the index comes back over the new ids
+    /// instead of falling back to the exact scan until the next checkpoint.
+    #[test]
+    fn compaction_retires_the_spann_tree_built_on_the_old_row_ids() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE csc (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        // The first component is the row's own id, so the nearest neighbour of
+        // a self-query is unique (no ties at distance 0).
+        let vector = |i: usize| -> String {
+            format!(
+                "[{i}.0,{}.0,{}.0,{}.0]",
+                (i * 7) % 97,
+                (i * 13) % 89,
+                (i * 29) % 83
+            )
+        };
+        let n = 200usize;
+        let mut sql = String::from("INSERT INTO csc VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX csc_i ON csc (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        let key = e.table_key("default_db.csc");
+        let trees = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.spann.len())
+                .unwrap_or(0)
+        };
+        let pending = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.spann_mem.values().map(Vec::len).sum::<usize>())
+                .unwrap_or(0)
+        };
+        assert_eq!(trees(&e), 1, "CREATE INDEX did not publish a tree");
+        // A row written after the build sits in the mem index; a checkpoint
+        // moves it into the block, which is where the merge reads from (a row
+        // still buffered is not part of the compaction).
+        e.execute_blocking(&format!("INSERT INTO csc VALUES (999, {});", vector(999)))
+            .unwrap();
+        assert_eq!(pending(&e), 1);
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        // `compact_all_segments` merges unconditionally, even one segment: the
+        // rows all move to a fresh segment id.
+        e.compact_all_segments("csc").unwrap();
+        // The merged segment's tree is rebuilt inside the compaction (§9.8), so
+        // the handle is back - over the **new** ids, covering every live row.
+        let segments: std::collections::HashSet<u32> = e
+            .segment_row_counts("csc")
+            .into_iter()
+            .map(|(s, _)| s)
+            .collect();
+        assert_eq!(segments.len(), 1, "{segments:?}");
+        let (handles, ids) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = tables.get(&key);
+            (
+                entry.map(|entry| entry.spann.len()).unwrap_or(0),
+                entry
+                    .and_then(|entry| entry.spann.values().next().map(|tree| tree.row_ids()))
+                    .unwrap_or_default(),
+            )
+        };
+        assert_eq!(
+            handles, 1,
+            "the compaction must rebuild the merged segment's tree"
+        );
+        assert_eq!(ids.len(), n + 1, "the rebuilt tree must cover every row");
+        assert!(
+            ids.iter()
+                .all(|id| segments.contains(&((*id >> 32) as u32))),
+            "the rebuilt tree still names a retired segment: {ids:?}"
+        );
+
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM csc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(42)
+            ),
+        );
+        assert_eq!(got, vec![vec!["42".to_string()]]);
+        // Still right for the row the merge moved out of the mem index.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM csc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(999)
+            ),
+        );
+        assert_eq!(got, vec![vec!["999".to_string()]]);
+    }
+
     /// A `WHERE` on a scalar column no longer bypasses the vector index
     /// (`docs/SPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
     /// graph search consumes, and the answer is the exact top-k over the rows
@@ -15260,12 +15375,22 @@ mod tests {
             }
         }
         let per_query = started.elapsed() / queries.max(1) as u32;
-        // A second identical pass: a query path that materialised the column (or
-        // cached decoded rows) would keep growing here.
-        for q in 0..queries {
-            rows(&e, &query((q * 37) % rows_total));
-            if q % 10 == 0 {
-                sample(&mut peak);
+        // Three more identical passes over the same mapped chunk. Every pass has to
+        // answer (a cursor that leaked a block handle runs dry instead), and the
+        // resident floor at the start of each pass is where a per-query allocation
+        // would pile up. The floor is reported rather than asserted: page cache
+        // cannot be told apart from the heap on this platform, and the passes touch
+        // more of a table this size each time. The numbers that only the heap can
+        // move are asserted below.
+        let mut floors: Vec<u64> = Vec::new();
+        for pass in 0..3usize {
+            floors.push(crate::engine::state::process_rss_bytes());
+            for q in 0..queries {
+                let got = rows(&e, &query((q * 37 + pass) % rows_total));
+                assert_eq!(got.len(), 10, "top-10 on pass {pass}");
+                if q % 10 == 0 {
+                    sample(&mut peak);
+                }
             }
         }
         let rss_after = crate::engine::state::process_rss_bytes();
@@ -15300,6 +15425,70 @@ mod tests {
             sample(&mut peak);
         }
         let recall = hits as f64 / wanted_total as f64;
+        // Leak check, on the two numbers a leak can actually move: the heap the
+        // index holds (`spann_mem_bytes`; a mapped chunk is page cache, not heap) and
+        // the chunk files on disk (a superseded snapshot that never got deprecated
+        // keeps its bytes - see `publish_index_chunks`).
+        let info = e.show_index_info("big", "big_i").expect("index info");
+        assert!(
+            info.other_parameters.contains("spann_file_backed = true"),
+            "the index never left the heap: {}",
+            info.other_parameters
+        );
+        assert!(
+            info.other_parameters.contains("spann_mem_bytes = 0"),
+            "the query path left heap behind: {}",
+            info.other_parameters
+        );
+        crate::scheduler::block_on(e.flush()).unwrap();
+        e.cleanup_index_chunks().unwrap();
+        let mut chunks_before: Vec<u64> = Vec::new();
+        for (segment, _) in e.segment_row_counts("default_db.big") {
+            let Some(dir) = e.spann_chunk_dir("default_db.big", "big_i", segment) else {
+                continue;
+            };
+            let live: Vec<u64> = e
+                .live_chunk_files("default_db.big", "big_i", segment, &dir)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            // Every `chunk_*.idx` left in the directory has to be a live one: the
+            // rest were deprecated and `cleanup_index_chunks` reclaimed them above.
+            let on_disk = std::fs::read_dir(&dir)
+                .map(|entries| {
+                    entries
+                        .filter_map(|entry| entry.ok())
+                        .filter(|entry| entry.file_name().to_string_lossy().starts_with("chunk_"))
+                        .count()
+                })
+                .unwrap_or(0);
+            assert_eq!(
+                on_disk,
+                live.len(),
+                "segment {segment} keeps {on_disk} chunk files for {} live chunks",
+                live.len()
+            );
+            chunks_before.extend(live);
+        }
+        chunks_before.sort_unstable();
+        // A flush with nothing written publishes nothing: the ids are the same, so
+        // the snapshot path did not run and no bytes were rewritten.
+        let mut chunks_after: Vec<u64> = Vec::new();
+        for (segment, _) in e.segment_row_counts("default_db.big") {
+            let Some(dir) = e.spann_chunk_dir("default_db.big", "big_i", segment) else {
+                continue;
+            };
+            chunks_after.extend(
+                e.live_chunk_files("default_db.big", "big_i", segment, &dir)
+                    .into_iter()
+                    .map(|(id, _)| id),
+            );
+        }
+        chunks_after.sort_unstable();
+        assert_eq!(
+            chunks_before, chunks_after,
+            "a bare flush republished a chunk"
+        );
         let raw_bytes = rows_total * dim * std::mem::size_of::<f32>();
         let chunk_bytes: u64 = e
             .live_chunk_files(
@@ -15330,6 +15519,7 @@ mod tests {
         }
         let on_disk = dir_bytes(dir.path());
         let pending_budget = e.pending_budget();
+        let floor_mib: Vec<u64> = floors.iter().map(|b| b / (1024 * 1024)).collect();
         eprintln!(
             "\n  rows {rows_total} x {dim}d | raw {:.0} MiB | on disk {:.0} MiB (chunk {:.1} MiB) | \
              buffer budget {buffer_mb} MiB\n  \
@@ -15338,6 +15528,8 @@ mod tests {
              RSS {} MiB (baseline)\n  \
              {queries} x2 queries (nprobe {beam}): {per_query:?}/query, peak {} MiB \
              (baseline +{} MiB)\n  \
+             stability: {} live chunks after cleanup, resident floor per pass \
+             {floor_mib:?} MiB\n  \
              recall@10 {recall:.3} at nprobe {beam}",
             raw_bytes as f64 / (1024.0 * 1024.0),
             on_disk as f64 / (1024.0 * 1024.0),
@@ -15348,6 +15540,7 @@ mod tests {
             rss_before / (1024 * 1024),
             peak / (1024 * 1024),
             peak.saturating_sub(rss_before) / (1024 * 1024),
+            chunks_before.len(),
         );
         // The append buffer must stay inside its own budget. The seal runs at the
         // end of the statement that crossed the budget, so the only slack is that
@@ -15963,6 +16156,571 @@ mod tests {
             htimings[htimings.len() / 2],
             htimings[htimings.len() * 95 / 100],
             htimings[htimings.len() * 99 / 100],
+        );
+    }
+
+    /// A `COPY` of an `EMBEDDING` column: the CSV field is the same bracketed
+    /// literal the `INSERT` path accepts, quoted because it carries commas.
+    /// Every import seals its own segment, which is what the scale run uses to
+    /// get one tree per segment.
+    #[test]
+    fn copy_loads_an_embedding_column_into_its_own_segment() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ce (id INT, v EMBEDDING(FLOAT,3));")
+            .unwrap();
+        for part in 0..2 {
+            let path = dir.path().join(format!("ce{part}.csv"));
+            let text: String = (0..100)
+                .map(|i| {
+                    let row = part * 100 + i;
+                    format!("{row},\"[{}.0,{}.0,{}.0]\"\n", row, row + 1, row + 2)
+                })
+                .collect();
+            std::fs::write(&path, text).unwrap();
+            e.execute_blocking(&format!(
+                "COPY ce FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                path.display()
+            ))
+            .unwrap();
+        }
+        assert_eq!(e.segments("ce").len(), 2, "each COPY seals a segment");
+        assert_eq!(e.row_count("ce").unwrap(), 200);
+        let got = rows(&e, "SELECT id FROM ce WHERE id = 199;");
+        assert_eq!(got, vec![vec!["199".to_string()]]);
+        let got = rows(
+            &e,
+            "SELECT id FROM ce SEARCH MATCH VECTOR (v, [199.0,200.0,201.0], 'float', 'l2', 1);",
+        );
+        assert_eq!(got, vec![vec!["199".to_string()]]);
+    }
+
+    /// Large-scale end-to-end run over **two segments**, i.e. two trees that a
+    /// query searches in parallel and merges (§3 I6/I8, §8.1).
+    ///
+    /// Each half is inserted into its own segment (one `flush` apart), the
+    /// checkpoint gives each segment its own chunk, and the engine is reopened
+    /// so the handle is the multi-tree `File` form - the same shape a restarted
+    /// server serves. Recall is measured against a brute force over the same
+    /// generator.
+    ///
+    /// `INFINITY_SPANN_SCALE_ROWS` sets the total (default 200k, 128d):
+    /// `cargo test --release -p executor spann_scale --lib -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn spann_scale_two_segments_128d() {
+        const DIMS: usize = 128;
+        const CLUSTERS: usize = 512;
+        const TOPN: usize = 10;
+        let total: usize = std::env::var("INFINITY_SPANN_SCALE_ROWS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200_000);
+        let queries = 20usize;
+        let noise = |i: usize, d: usize| -> f32 {
+            let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ (d as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+            x ^= x >> 30;
+            x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            x ^= x >> 27;
+            ((x >> 40) as f32 / 16_777_216.0) * 2.0 - 1.0
+        };
+        // One resident copy: the truth pass and the queries read the same
+        // vectors, and regenerating 128 hashes per row per pass dominates the
+        // run at this size.
+        let vectors: Vec<Vec<f32>> = (0..total)
+            .map(|i| {
+                let c = i % CLUSTERS;
+                (0..DIMS)
+                    .map(|d| noise(c * 7919 + d, 3) * 20.0 + noise(i, d) * 3.0)
+                    .collect()
+            })
+            .collect();
+        let literal = |v: &[f32]| -> String {
+            let body: Vec<String> = v.iter().map(|x| format!("{x:.3}")).collect();
+            format!("[{}]", body.join(","))
+        };
+
+        let dir = tempdir().unwrap();
+        let per = total / 2;
+        let build = {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking(&format!(
+                "CREATE TABLE sc (id INT, v EMBEDDING(FLOAT,{DIMS}));"
+            ))
+            .unwrap();
+            for part in 0..2 {
+                let path = dir.path().join(format!("sc{part}.csv"));
+                let mut body = String::with_capacity(per * (DIMS * 9 + 16));
+                for i in 0..per {
+                    let row = part * per + i;
+                    body.push_str(&row.to_string());
+                    body.push_str(",\"");
+                    body.push_str(&literal(&vectors[row]));
+                    body.push_str("\"\n");
+                }
+                std::fs::write(&path, body).unwrap();
+                // Every COPY seals its own segment, which is exactly the shape
+                // the run needs: one tree per segment after the checkpoint.
+                e.execute_blocking(&format!(
+                    "COPY sc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                    path.display()
+                ))
+                .unwrap();
+            }
+            let segments = e.segment_row_counts("sc").len();
+            assert_eq!(segments, 2, "the run needs two segments: {segments}");
+            let started = std::time::Instant::now();
+            e.execute_blocking(&format!(
+                "CREATE INDEX sc_i ON sc (v) USING SPANN WITH \
+                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids={CLUSTERS});"
+            ))
+            .unwrap();
+            let build = started.elapsed();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            eprintln!(
+                "build {total} rows x {DIMS}d over {segments} segments: {build:?} ({:.0} rows/s)",
+                total as f64 / build.as_secs_f64()
+            );
+            build
+        };
+        assert!(build.as_secs() < 600, "{build:?}");
+
+        // Reopened: nothing is resident, so the first query maps every
+        // segment's chunk and fans out over all of them.
+        let e = Engine::open(dir.path()).unwrap();
+        let key = e.table_key("default_db.sc");
+        let index_id = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.name == "sc_i")
+            .expect("index record")
+            .id;
+
+        let mut latencies: Vec<std::time::Duration> = Vec::with_capacity(queries);
+        let mut hits = 0usize;
+        for k in 0..queries {
+            let row = (k * 7919) % total;
+            let q = &vectors[row];
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM sc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', {TOPN});",
+                    literal(q)
+                ),
+            );
+            let elapsed = started.elapsed();
+            latencies.push(elapsed);
+            eprintln!("  q{k}: {elapsed:?} -> {} rows", got.len());
+            let mut truth: Vec<(usize, f32)> = (0..total)
+                .map(|i| (i, index::vector::l2_sq(q, &vectors[i])))
+                .collect();
+            truth.sort_by(|a, b| a.1.total_cmp(&b.1));
+            let want: std::collections::HashSet<String> =
+                truth[..TOPN].iter().map(|(i, _)| i.to_string()).collect();
+            hits += got.iter().filter(|row| want.contains(&row[0])).count();
+        }
+        // The first query is the cold one: it maps every segment's chunk and
+        // pays the page-fault bill, so it is reported apart from the rest.
+        let cold = latencies.remove(0);
+        latencies.sort();
+        let warm_p95 = latencies[latencies.len() * 95 / 100];
+
+        let (chunks, covered, partitions) = {
+            let tables = e.tables.lock().unwrap();
+            match tables
+                .get(&key)
+                .and_then(|entry| entry.spann.get(&index_id))
+            {
+                Some(handle) => match &**handle {
+                    crate::spann_mem::SpannHandle::File(chunks) => {
+                        (chunks.len(), handle.len(), handle.shape().0)
+                    }
+                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
+                },
+                None => (0, 0, 0),
+            }
+        };
+        eprintln!(
+            "reopened: {chunks} tree(s), {covered} covered rows, {partitions} partitions | \
+             recall@{TOPN} = {:.3} | cold {cold:?} | warm p50 {:?} | warm p95 {:?} | warm p99 {:?}",
+            hits as f64 / (queries * TOPN) as f64,
+            latencies[latencies.len() / 2],
+            warm_p95,
+            latencies[latencies.len() * 99 / 100],
+        );
+        assert_eq!(chunks, 2, "each segment must serve its own tree");
+        assert_eq!(covered, total, "the trees must cover every row");
+        assert!(
+            hits as f64 / (queries * TOPN) as f64 >= 0.8,
+            "recall@{TOPN} = {} / {}",
+            hits,
+            queries * TOPN
+        );
+        // A regression that falls back to the exact scan (say, a tree the
+        // compaction forgot to rebuild, §9.8) shows up here as tens of
+        // milliseconds per query, not as a wrong answer.
+        assert!(
+            warm_p95 < std::time::Duration::from_millis(200),
+            "warm p95 {warm_p95:?} looks like a full scan"
+        );
+    }
+
+    /// 2M × 1536d over eight segments: the scale `SPANN_DESIGN.md` §16.4 aims
+    /// at, with one tree per segment and a query that fans out over all of them
+    /// (§3 I8, §8.1).
+    ///
+    /// Two things keep this runnable on a laptop, and both are about `COPY`
+    /// rather than about the index:
+    ///
+    /// * the import is **streamed**: one `COPY` per segment, each from a CSV
+    ///   that is generated, imported, then deleted. `COPY` stages the encoded
+    ///   text of every row it reads (`import.rs`'s `encoded_rows`), so a single
+    ///   2M-row import would need ~24 GB of text; eight imports of 250k need
+    ///   ~3 GB at a time.
+    /// * vectors are **regenerated**, not held: 2M × 1536 × 4 B = 12.3 GB
+    ///   resident, so the truth pass pays CPU instead of RAM.
+    ///
+    /// Knobs: `INFINITY_SPANN_SCALE_ROWS` (2,000,000),
+    /// `INFINITY_SPANN_SCALE_SEGMENTS` (8), `INFINITY_SPANN_SCALE_PROBES` (20),
+    /// `INFINITY_SPANN_TRUTH_QUERIES` (3).
+    ///
+    /// `cargo test --release -p executor spann_scale_1536d --lib -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn spann_scale_1536d() {
+        const CENTERS: usize = 4096;
+        const TOPN: usize = 10;
+        let env_usize = |name: &str, default: usize| -> usize {
+            std::env::var(name)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(default)
+        };
+        // The reference's width by default; a narrower column is what a 15M-row
+        // run has to use on this machine (`INFINITY_SPANN_SCALE_DIM`).
+        #[allow(non_snake_case)]
+        let DIM = env_usize("INFINITY_SPANN_SCALE_DIM", 1536);
+        let total = env_usize("INFINITY_SPANN_SCALE_ROWS", 500_000);
+        let parts = env_usize("INFINITY_SPANN_SCALE_SEGMENTS", 2).max(1);
+        let probes = env_usize("INFINITY_SPANN_SCALE_PROBES", 5);
+        let truth_queries = env_usize("INFINITY_SPANN_TRUTH_QUERIES", 1);
+
+        let unit = |a: u64, b: u64| -> f32 {
+            let mut x = a
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
+            x ^= x >> 33;
+            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
+            x ^= x >> 29;
+            (x % 100_000) as f32 / 100_000.0
+        };
+        // Rounded to the three decimals the CSV carries, so the stored row and
+        // the regenerated row are the same number.
+        let value = |i: usize, d: usize| -> f32 {
+            let centre = (i % CENTERS) as u64;
+            let x = unit(centre, d as u64) * 20.0
+                + (unit(centre ^ 0x5DEE_CE66, (d as u64) * 31 + i as u64) - 0.5) * 0.6;
+            (x * 1000.0).round() / 1000.0
+        };
+        fn write_part(
+            path: &std::path::Path,
+            base: usize,
+            rows: usize,
+            dim: usize,
+            value: &dyn Fn(usize, usize) -> f32,
+        ) {
+            use std::fmt::Write as _;
+            use std::io::Write as _;
+            let file = std::fs::File::create(path).unwrap();
+            let mut out = std::io::BufWriter::with_capacity(1 << 22, file);
+            let mut line = String::with_capacity(dim * 9 + 24);
+            for i in base..base + rows {
+                line.clear();
+                write!(line, "{i},\"[").unwrap();
+                for d in 0..dim {
+                    if d > 0 {
+                        line.push(',');
+                    }
+                    write!(line, "{:.3}", value(i, d)).unwrap();
+                }
+                line.push_str("]\"\n");
+                out.write_all(line.as_bytes()).unwrap();
+            }
+            out.flush().unwrap();
+        }
+
+        // A **fixed** directory, not a `tempdir`: a 2M-row build costs an hour,
+        // and a query-level change must not pay for it again. Delete the
+        // directory (or change the shape) to force a rebuild.
+        let dir = std::env::temp_dir().join(format!("spann_scale_{total}x{DIM}_{parts}s"));
+        let marker = dir.join("built");
+        let per = total.div_ceil(parts);
+        if marker.exists() {
+            eprintln!("reusing the built table at {}", dir.display());
+        } else {
+            std::fs::create_dir_all(&dir).unwrap();
+            let e = Engine::open(&dir).unwrap();
+            e.execute_blocking(&format!(
+                "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{DIM}));"
+            ))
+            .unwrap();
+            let started = std::time::Instant::now();
+            for part in 0..parts {
+                let base = part * per;
+                let rows = per.min(total - base);
+                if rows == 0 {
+                    break;
+                }
+                let path = dir.join(format!("big{part}.csv"));
+                write_part(&path, base, rows, DIM, &value);
+                let copied = std::time::Instant::now();
+                e.execute_blocking(&format!(
+                    "COPY big FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                    path.display()
+                ))
+                .unwrap();
+                // The CSV is 3 GB at this size; the import already holds what
+                // it needs, so drop it before the next part is generated.
+                std::fs::remove_file(&path).unwrap();
+                eprintln!(
+                    "  part {part}: {rows} rows imported in {:?} ({:.0} rows/s)",
+                    copied.elapsed(),
+                    rows as f64 / copied.elapsed().as_secs_f64()
+                );
+            }
+            let imported = started.elapsed();
+            let segments = e.segment_row_counts("big").len();
+            let built = std::time::Instant::now();
+            e.execute_blocking(
+                "CREATE INDEX big_i ON big (v) USING SPANN WITH \
+                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=2048);",
+            )
+            .unwrap();
+            let build = built.elapsed();
+            let published = std::time::Instant::now();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            eprintln!(
+                "build {total} x {DIM}d over {segments} segments: import {imported:?} \
+                 ({:.0} rows/s), tree {build:?} ({:.0} rows/s), publish {:?}",
+                total as f64 / imported.as_secs_f64(),
+                total as f64 / build.as_secs_f64(),
+                published.elapsed()
+            );
+            assert_eq!(segments, parts, "one COPY per segment: {segments}");
+            let build = built.elapsed();
+            assert!(build.as_secs() < 3_600, "{build:?}");
+            // The marker is what makes the next run a query-only run; it goes
+            // down only after the chunks are published.
+            std::fs::write(&marker, b"ok").unwrap();
+        }
+
+        let e = Engine::open(&dir).unwrap();
+        let key = e.table_key("default_db.big");
+        let index_id = e.test_index_id("default_db.big", "v", "SPANN");
+
+        // Split the cold start in two: loading maps both chunks and verifies
+        // every section's CRC (I/O + checksum), while the query that follows is
+        // what pays for decoding candidate blocks. Timing them together is how
+        // a 114 s first query gets blamed on "the index".
+        let loaded_at = std::time::Instant::now();
+        let loaded = e.spann_lazy_load("big", index_id);
+        eprintln!(
+            "  lazy load: {:?} -> {:?} covered rows",
+            loaded_at.elapsed(),
+            loaded.as_ref().map(|handle| handle.len())
+        );
+        // Same vector, three scopes: the index alone (`handle.search`), the SQL
+        // path with a tiny rerank pool, and the SQL path with the default pool.
+        // The three numbers are what separate "the descent is slow" from "the
+        // candidate rows are slow".
+        let (idx_ms, few_ms) = {
+            let cold_row = 12345usize % total;
+            let q: Vec<f32> = (0..DIM).map(|d| value(cold_row, d)).collect();
+            let text: String = {
+                let mut out = String::with_capacity(DIM * 9 + 8);
+                out.push('[');
+                for (d, x) in q.iter().enumerate() {
+                    if d > 0 {
+                        out.push(',');
+                    }
+                    out.push_str(&format!("{x:.3}"));
+                }
+                out.push(']');
+                out
+            };
+            let started = std::time::Instant::now();
+            let hits = loaded
+                .as_ref()
+                .map(|handle| handle.search(&q, TOPN, None).len())
+                .unwrap_or(0);
+            let idx = started.elapsed();
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {text}, 'float', 'l2', {TOPN}) \
+                     WITH (rerank_multiplier = 0);"
+                ),
+            );
+            let few = started.elapsed();
+            eprintln!(
+                "  cold index-only search: {idx:?} ({hits} hits) | \
+                 SQL rerank=0: {few:?} ({} rows)",
+                got.len()
+            );
+            (idx, few)
+        };
+        let _ = (idx_ms, few_ms);
+
+        // Self-hit: each probe's own vector must come back first. Exact by
+        // construction (the row's stored vector *is* the probe), so a miss means
+        // the descent never visited that row's leaf.
+        let mut self_hits = 0usize;
+        let mut warm: Vec<std::time::Duration> = Vec::with_capacity(probes);
+        for p in 0..probes {
+            let row = (p * 79_999 + 12_345) % total;
+            let text: String = {
+                let mut out = String::with_capacity(DIM * 9 + 8);
+                out.push('[');
+                for d in 0..DIM {
+                    if d > 0 {
+                        out.push(',');
+                    }
+                    out.push_str(&format!("{:.3}", value(row, d)));
+                }
+                out.push(']');
+                out
+            };
+            let started = std::time::Instant::now();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {text}, 'float', 'l2', {TOPN});"
+                ),
+            );
+            let elapsed = started.elapsed();
+            if p > 0 {
+                warm.push(elapsed);
+            }
+            let want = row.to_string();
+            let hit = got.first().is_some_and(|r| r[0] == want);
+            self_hits += usize::from(hit);
+            eprintln!(
+                "  probe {p} (row {row}): {elapsed:?} -> {} rows, self-hit {hit}",
+                got.len()
+            );
+        }
+
+        // The handles are loaded on the first query (`spann_lazy_load`), so the
+        // shape is read after the probes, not right after `open`.
+        let (chunks, covered, partitions) = {
+            let tables = e.tables.lock().unwrap();
+            match tables
+                .get(&key)
+                .and_then(|entry| entry.spann.get(&index_id))
+            {
+                Some(handle) => match &**handle {
+                    crate::spann_mem::SpannHandle::File(chunks) => {
+                        (chunks.len(), handle.len(), handle.shape().0)
+                    }
+                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
+                },
+                None => (0, 0, 0),
+            }
+        };
+        eprintln!("reopened: {chunks} tree(s), {covered} covered rows, {partitions} partitions");
+        // What the probe actually cost: `beam_actual` is how many leaves each
+        // tree visited, and every candidate beyond that is a block decode - the
+        // number that decides whether 1536d queries are index-bound or
+        // candidate-bound.
+        let stats = e.spann_stats(index_id).snapshot();
+        eprintln!(
+            "  stats: beam_actual {:.1}, candidates/query {:.1}",
+            stats.beam_actual, stats.candidates_per_query
+        );
+        assert_eq!(covered, total, "the trees must cover every row");
+
+        // Exact recall on a few probes: a full pass over the generator is the
+        // truth, and it costs 2M × 1536 hashes instead of 12.3 GB of RAM.
+        let mut truth_hits = 0usize;
+        let mut truth_total = 0usize;
+        for t in 0..truth_queries {
+            let row = (t * 7919 + 424_242) % total;
+            let q: Vec<f32> = (0..DIM).map(|d| value(row, d)).collect();
+            let started = std::time::Instant::now();
+            let mut best: Vec<(f32, usize)> = Vec::with_capacity(TOPN + 1);
+            for i in 0..total {
+                let mut acc = 0.0f32;
+                for (d, x) in q.iter().enumerate() {
+                    let diff = x - value(i, d);
+                    acc += diff * diff;
+                }
+                if best.len() == TOPN && acc >= best[TOPN - 1].0 {
+                    continue;
+                }
+                let at = best.partition_point(|(score, _)| *score <= acc);
+                best.insert(at, (acc, i));
+                best.truncate(TOPN);
+            }
+            let scan = started.elapsed();
+            let truth: Vec<String> = best.iter().map(|(_, i)| i.to_string()).collect();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', {TOPN});",
+                    {
+                        let mut out = String::with_capacity(DIM * 9 + 8);
+                        out.push('[');
+                        for (d, x) in q.iter().enumerate() {
+                            if d > 0 {
+                                out.push(',');
+                            }
+                            out.push_str(&format!("{x:.3}"));
+                        }
+                        out.push(']');
+                        out
+                    }
+                ),
+            );
+            let found = got
+                .iter()
+                .filter(|r| truth.iter().any(|want| *want == r[0]))
+                .count();
+            truth_hits += found;
+            truth_total += TOPN;
+            eprintln!(
+                "  truth q{t} (row {row}): {found}/{TOPN} of the exact top-{TOPN} \
+                 in {scan:?} (scan), {:?} (end to end)",
+                started.elapsed()
+            );
+        }
+        warm.sort();
+        eprintln!(
+            "self-hit@1 = {}/{} | recall@{TOPN} = {}/{} | warm p50 {:?} | warm p95 {:?}",
+            self_hits,
+            probes,
+            truth_hits,
+            truth_total,
+            warm[warm.len() / 2],
+            warm[warm.len() * 95 / 100],
+        );
+        // Not a hard requirement: at 1536d the default beam probes ~5% of the
+        // leaves (`beam_actual` below), so a self-query can miss its own row -
+        // that is a recall number, and the exact recall below is the one with a
+        // floor. A run that answers from the exact scan would hit 100% here, so
+        // this is also what tells "the tree is thin" apart from "no tree".
+        assert!(
+            self_hits * 2 >= probes,
+            "self-hit {self_hits}/{probes}: the tree answers worse than chance"
+        );
+        assert!(
+            truth_hits as f64 / truth_total as f64 >= 0.8,
+            "recall@{TOPN} = {truth_hits} / {truth_total}"
         );
     }
 

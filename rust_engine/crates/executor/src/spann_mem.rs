@@ -162,13 +162,30 @@ impl SpannHandle {
         match self {
             SpannHandle::Memory(index) => index.search(q, k, beam),
             SpannHandle::File(chunks) => {
+                // One tree per segment (§3 I6) and the trees share nothing, so a
+                // query is N independent descents (§8.1). A single segment keeps
+                // the serial loop - a fan-out for one item buys no parallelism.
+                let per_chunk: Vec<Vec<(u64, f32)>> =
+                    if chunks.len() > 1 && !crate::fanout::on_a_runtime_worker() {
+                        let items: Vec<Arc<storage::knn_index::spann::FileIndex>> = chunks.to_vec();
+                        let shared_query: Arc<[f32]> = Arc::from(q);
+                        let workers = chunks.len();
+                        match crate::fanout::map_blocking(items, workers, move |chunk| {
+                            Ok(chunk.search(shared_query.as_ref(), k, beam))
+                        }) {
+                            Ok(answers) => answers,
+                            // A fan-out that cannot spawn falls back to this
+                            // thread: a missing segment is a wrong answer, not a
+                            // slow one.
+                            Err(_) => chunks.iter().map(|c| c.search(q, k, beam)).collect(),
+                        }
+                    } else {
+                        chunks.iter().map(|c| c.search(q, k, beam)).collect()
+                    };
                 // Every segment answers with its own `k`, and the union is what
                 // the caller's exact rescoring sees: truncating per segment
                 // instead would drop rows that only lose to another segment's.
-                let mut merged: Vec<(u64, f32)> = Vec::new();
-                for chunk in chunks {
-                    merged.extend(chunk.search(q, k, beam));
-                }
+                let mut merged: Vec<(u64, f32)> = per_chunk.into_iter().flatten().collect();
                 merge_chunks(&mut merged);
                 merged.truncate(k);
                 merged
@@ -212,16 +229,43 @@ impl SpannHandle {
         // pool. Widening the beam costs centroid distances; widening the pool
         // costs decoded rows - which is why the old `k / selectivity` version
         // asked for the whole table at 1% selectivity.
-        let ids: std::collections::HashSet<u64> = allowed.iter().map(|id| *id as u64).collect();
+        // One mask for every segment: the bitmap is rows of the whole table, and
+        // a per-chunk copy would rebuild it once per segment per attempt.
+        let ids: Arc<std::collections::HashSet<u64>> =
+            Arc::new(allowed.iter().map(|id| *id as u64).collect());
         let mut width = beam.unwrap_or(DEFAULT_SEARCH_BEAM).max(1);
         for attempt in 0..3 {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
                 SpannHandle::File(chunks) => {
-                    let mut merged: Vec<(u64, f32)> = Vec::new();
-                    for chunk in chunks {
-                        merged.extend(chunk.search_filtered(q, k, Some(width), &ids));
-                    }
+                    let per_chunk: Vec<Vec<(u64, f32)>> = if chunks.len() > 1
+                        && !crate::fanout::on_a_runtime_worker()
+                    {
+                        let items: Vec<Arc<storage::knn_index::spann::FileIndex>> = chunks.to_vec();
+                        let shared_query: Arc<[f32]> = Arc::from(q);
+                        let shared_ids = Arc::clone(&ids);
+                        let workers = chunks.len();
+                        match crate::fanout::map_blocking(items, workers, move |chunk| {
+                            Ok(chunk.search_filtered(
+                                shared_query.as_ref(),
+                                k,
+                                Some(width),
+                                &shared_ids,
+                            ))
+                        }) {
+                            Ok(answers) => answers,
+                            Err(_) => chunks
+                                .iter()
+                                .map(|c| c.search_filtered(q, k, Some(width), &ids))
+                                .collect(),
+                        }
+                    } else {
+                        chunks
+                            .iter()
+                            .map(|c| c.search_filtered(q, k, Some(width), &ids))
+                            .collect()
+                    };
+                    let mut merged: Vec<(u64, f32)> = per_chunk.into_iter().flatten().collect();
                     merge_chunks(&mut merged);
                     merged.truncate(k);
                     merged
@@ -318,6 +362,19 @@ impl SpannStats {
         }
     }
 }
+
+/// Memory a `CREATE INDEX` may spend on a whole-table **resident** tree before
+/// it leaves the build to the per-segment dump.
+///
+/// The resident tree holds one member vector per row (`encode = none`), so its
+/// cost is `rows * dims * 4` on the heap - and it is work the checkpoint then
+/// repeats segment by segment (`Engine::spann_chunk`), because the published
+/// chunk is per segment. On 4M x 1536d that whole-table build wrote a 24.5 GiB
+/// scratch file and spent hours in k-means for a tree the dump replaced
+/// afterwards. Past this budget the index is created without a resident tree:
+/// the catalog record exists, the dump builds one tree per segment, and a query
+/// that arrives before the dump answers by exact scan (§9.7).
+pub(crate) const MEMORY_TREE_MAX_BYTES: usize = 512 * 1024 * 1024;
 
 /// The SQL-layer default search width: Cockroach's `vector_search_beam_size`,
 /// whose global default is 32. The index's own `Options::base_beam` stays 8 for
@@ -552,7 +609,7 @@ impl crate::Engine {
         path: &std::path::Path,
     ) -> Option<u64> {
         let index = self.spann_build(table, column, opts, &self.dir.join("tmp"), Some(segment))?;
-        let len = storage::knn_index::spann::write_to(&index, path).ok()?;
+        let len = storage::knn_index::spann::write_to(&index, path, segment).ok()?;
         // `write_to` streams through a buffered handle; a crash before the data
         // reaches the platter would leave a chunk the catalog already lists.
         std::fs::File::open(path).and_then(|f| f.sync_all()).ok()?;
@@ -658,25 +715,24 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let options = options_from(&pairs(&[("max_partition_size", "32")])).unwrap();
         let dim = 8;
-        let chunk = |name: &str, base: u64, sign: f32| {
+        let chunk = |name: &str, segment: u32, sign: f32| {
+            // Row ids are `segment << 32 | offset`, and the chunk stores only
+            // the offset (§6.2) - `write_to` refuses an id from another segment.
             let rows: Vec<(u64, Vec<f32>)> = (0..40)
                 .map(|i| {
                     let mut v = vec![0.0f32; dim];
                     v[0] = sign * (1.0 + i as f32 * 0.01);
                     v[1] = (i % 5) as f32 * 0.1;
-                    (base + i as u64, v)
+                    ((u64::from(segment) << 32) | i as u64, v)
                 })
                 .collect();
             let index = SpannIndex::build(rows, options.clone()).unwrap();
             let path = dir.join(name);
-            storage::knn_index::spann::write_to(&index, &path).unwrap();
+            storage::knn_index::spann::write_to(&index, &path, segment).unwrap();
             let opened = storage::knn_index::spann::FileIndex::open(&path, &options).unwrap();
             Arc::new(opened)
         };
-        let handle = SpannHandle::File(vec![
-            chunk("seg0.idx", 0, 1.0),
-            chunk("seg1.idx", 1000, -1.0),
-        ]);
+        let handle = SpannHandle::File(vec![chunk("seg0.idx", 0, 1.0), chunk("seg1.idx", 1, -1.0)]);
         assert_eq!(handle.len(), 80, "coverage is the sum of the chunks");
 
         // The origin is between the two clusters, so the six nearest rows are
@@ -684,8 +740,8 @@ mod tests {
         // with a single sign.
         let hits = handle.search(&vec![0.0f32; dim], 6, Some(8));
         assert_eq!(hits.len(), 6);
-        let first = hits.iter().filter(|(id, _)| *id < 1000).count();
-        let second = hits.iter().filter(|(id, _)| *id >= 1000).count();
+        let first = hits.iter().filter(|(id, _)| *id >> 32 == 0).count();
+        let second = hits.iter().filter(|(id, _)| *id >> 32 == 1).count();
         assert!(
             first > 0 && second > 0,
             "both segments must contribute: {hits:?}"

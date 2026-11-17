@@ -2167,7 +2167,7 @@ impl Engine {
         table: &str,
         mut t: Txn,
         segments: &[u32],
-        encoded_rows: &[(usize, String)],
+        staged_rows: &crate::engine::import::StagedRows,
         batches: &[usize],
     ) -> Result<u64> {
         let mut cmds = Vec::new();
@@ -2203,7 +2203,6 @@ impl Engine {
         // blocks that never got written and that slice's rows were gone.
         let segments_owned: Vec<u32> = segments.to_vec();
         let batches_owned: Vec<usize> = batches.to_vec();
-        let encoded_owned: Vec<(usize, String)> = encoded_rows.to_vec();
         let table_owned = table.to_string();
         // The append records are created here (the WAL frame names them) but
         // **stamped after the rows are published**. The reference keeps a
@@ -2250,10 +2249,14 @@ impl Engine {
             let gate = self.bottom_gate(table);
             let _turn = gate.lock().await;
             let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
-            self.publish_encoded_rows(table, &encoded_owned)?;
-            // The buffer holds the values now; the stored text of the whole
-            // file (hundreds of MB) has no reader left.
-            drop(encoded_owned);
+            // The rows are replayed from the staged set a batch at a time (the
+            // text may be on disk), but the block write still happens once, for
+            // the whole statement: the block's `created` boundaries come from
+            // the append journal, which carries every batch of this transaction,
+            // so a write that saw only one batch would size a block from rows it
+            // was never handed ("block 0.0 holds 8191 of the 8192 rows committed
+            // at ts 10").
+            self.publish_staged_rows(table, staged_rows, &batches_owned, |_batch| Ok(()))?;
             // The rows are readable now, so the records may carry this
             // transaction's ts (`BlockVersion::Append(commit_ts, …)`).
             for record in &records_owned {

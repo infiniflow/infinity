@@ -398,6 +398,41 @@ impl Engine {
         }
     }
 
+    /// Rebuilds the spann trees of the segments this compaction renumbered
+    /// (`docs/SPANN_DESIGN.md` §9.8).
+    ///
+    /// The commit dropped every handle, because a tree names
+    /// `segment << 32 | offset` and a merge renumbers the rows - keeping one
+    /// answers with the wrong row, not just a stale one. Without this pass the
+    /// index would stay flat until the next checkpoint; `publish_index_chunks`
+    /// only dumps a segment whose chunk no longer matches its live rows, so the
+    /// untouched segments keep their chunks and only the merged one is built.
+    ///
+    /// The handle is reloaded right away: `spann_lazy_load` is the same path a
+    /// restart takes, and a failure there is not fatal - the query falls back
+    /// to the exact scan.
+    fn rebuild_compacted_spann(&self, table: &str, ts: u64) {
+        let qualified = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
+            return;
+        };
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
+            return;
+        };
+        for im in indexes
+            .iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
+        {
+            if let Err(e) =
+                self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)))
+            {
+                eprintln!("[SPANN] rebuild {} after compaction: {e}", im.name);
+                continue;
+            }
+            self.spann_lazy_load(table, im.id);
+        }
+    }
+
     /// Keeps `merged_segment`'s chunks and drops the ones the compaction
     /// actually retired.
     ///
@@ -617,6 +652,16 @@ impl Engine {
                     entry.vector.clear();
                     entry.ivf.clear();
                     entry.ivf_mem.clear();
+                    // A spann tree is built per segment over `segment << 32 | offset`
+                    // (`docs/SPANN_DESIGN.md` §3 I6, §9.8): once the merge renumbers
+                    // the rows, every id in it names a different row, so the handle
+                    // is not "a few stale entries" but a wrong answer. Drop both the
+                    // trees and the mem index; the next checkpoint rebuilds the
+                    // merged segment's chunk (`publish_spann_chunks`), and until then
+                    // `knn_candidates` falls back to the exact scan instead of
+                    // serving the retired ids.
+                    entry.spann.clear();
+                    entry.spann_mem.clear();
                     entry.block_index = None;
                     entry.block_rows = None;
                     entry.live_rows = Some(live_rows);
@@ -761,6 +806,15 @@ impl Engine {
         // segment's rows would otherwise stay in a memory tail and the old
         // chunks (whose row ids the merge retired) would keep answering.
         self.populate_compacted_indexes(table, next_seg, &source_ids);
+        // The trees of the merged segments were dropped with the commit (their
+        // row ids are gone, §9.8). Rebuild them here instead of waiting for the
+        // next checkpoint: the segment is fresh, so its chunk no longer matches
+        // its live rows and `publish_index_chunks_of` dumps exactly that one.
+        self.rebuild_compacted_spann(table, compact_ts);
+        // The spann handles and their mem index were just dropped: the byte
+        // ledger the watermarks read has to follow, or the table stays charged
+        // for a tree nobody holds.
+        self.refresh_memindex_charge(table);
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
         // The commit is published only when `_visible` drops (end of scope), and
