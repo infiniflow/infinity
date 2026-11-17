@@ -4162,8 +4162,7 @@ pub(crate) struct SparseIndex {
     /// encoded instead of re-deriving it from the table's rows - a rebuild
     /// covered every row of the segment again and made two dumps' chunks
     /// overlap.
-    #[allow(clippy::type_complexity)]
-    pub(crate) pending: Vec<(u64, Vec<u8>, u32, usize)>,
+    pub(crate) pending: Vec<PendingSparseChunk>,
     /// Monotonic suffix so a later seal never overwrites an earlier spill.
     pub(crate) next_chunk: u64,
     pub(crate) tail_bytes: usize,
@@ -4184,6 +4183,10 @@ pub(crate) struct SparseIndex {
 
 /// The in-memory `BMPAlg` over the sparse tail, plus the `ROW_ID` of each
 /// indexed document (`BMPAlg` documents are dense ids).
+/// One BMP chunk a seal encoded: the `ROW_ID` segment, the image
+/// (`BMPHandler::SaveToPtr`), its first document and its document count.
+pub(crate) type PendingSparseChunk = (u64, Vec<u8>, u32, usize);
+
 pub(crate) struct SparseTailBmp {
     pub(crate) generation: u64,
     pub(crate) alg: index::sparse::BmpAlg,

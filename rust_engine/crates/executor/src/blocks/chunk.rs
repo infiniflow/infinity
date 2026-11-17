@@ -129,7 +129,7 @@ pub(crate) fn publish_lowcard_chunks_from_dir(seg_dir: &Path, segment: u32) -> V
 /// one's range and the two records overlapped.
 pub(crate) fn publish_bmp_chunks(
     seg_dir: &Path,
-    pending: &[(u64, Vec<u8>, u32, usize)],
+    pending: &[crate::engine::PendingSparseChunk],
     segment: u32,
     existing: &std::collections::HashMap<u64, u32>,
     next_id: &mut u32,
@@ -463,4 +463,60 @@ pub fn encode_fulltext_chunk(
     let dic = storage::invertedindex::format::encode_dic(&region, &fst.finish());
     let len = storage::invertedindex::format::encode_column_lengths(lengths);
     (dic, pos, len)
+}
+
+/// Rebuilds one segment's sparse chunks from its rows: one per index block.
+///
+/// The **checkpoint** path: it mirrors the index without sealing it, so there
+/// is no image to publish and the chunks are derived from the column. A dump
+/// publishes the image the seal encoded instead (`publish_bmp_chunks`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn publish_bmp_chunks_from_rows(
+    seg_dir: &Path,
+    by_block: std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
+    segment: u32,
+    term_bound: usize,
+    width: storage::bmp::IdxWidth,
+    block_size: usize,
+    existing: &std::collections::HashMap<u64, u32>,
+    next_id: &mut u32,
+) -> Vec<IndexChunk> {
+    let mut chunks = Vec::new();
+    for (block, mut docs) in by_block {
+        if std::fs::create_dir_all(seg_dir).is_err() {
+            break;
+        }
+        docs.sort_by_key(|(row, _)| *row);
+        let term_num = docs
+            .iter()
+            .flat_map(|(_, entries)| entries.iter().map(|(term, _)| *term + 1))
+            .max()
+            .unwrap_or(0)
+            .max(1)
+            .max(term_bound as i32) as usize;
+        let bytes = storage::bmp::encode_bmp(block_size, width, &docs, term_num);
+        let base_row_id = (u64::from(segment) << 32) | (block * block_size.max(1) as u64);
+        let chunk_id = match existing.get(&base_row_id) {
+            Some(id) => *id,
+            None => {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            }
+        };
+        let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
+        if storage::definition::format::write_synced(&path, &bytes).is_err() {
+            continue;
+        }
+        chunks.push(IndexChunk {
+            chunk_id,
+            base_name: String::new(),
+            base_row_id,
+            row_count: docs.len() as u64,
+            term_count: 0,
+            index_size: 0,
+            commit_ts: 0,
+        });
+    }
+    chunks
 }

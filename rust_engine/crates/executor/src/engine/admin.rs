@@ -378,6 +378,10 @@ impl Engine {
                     continue;
                 }
                 if im.index_type.eq_ignore_ascii_case("BMP") {
+                    // Rebuild the index over the merged rows and seal it: the
+                    // seal encodes the image the chunk has to be
+                    // (`BMPHandler::SaveToPtr`), and `publish_index_chunks`
+                    // writes exactly that.
                     let width = self
                         .table_schema(table)
                         .ok()

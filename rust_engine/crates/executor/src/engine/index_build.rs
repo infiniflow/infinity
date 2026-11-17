@@ -3604,6 +3604,36 @@ impl Engine {
     /// Dumps the sparse memory tail of one column.
     pub(crate) fn seal_sparse_index(&self, table: &str, index_id: u64) {
         let key = self.table_key(table);
+        // A table opened from disk has no BMP index registered until a query or
+        // an insert materialises it, and a seal with no index seals nothing -
+        // the import's `PopulateIndex` then published the block-by-block
+        // fallback instead of one chunk per segment. Materialise it first.
+        let missing = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .is_none_or(|e| !e.sparse.contains_key(&index_id));
+        if missing {
+            if let Some((column, width)) = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .ok()
+                .and_then(|list| list.into_iter().find(|im| im.id == index_id))
+                .and_then(|im| {
+                    let width = self
+                        .table_schema(table)
+                        .ok()
+                        .and_then(|s| s.iter().position(|c| c == &im.column))
+                        .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                        .map(|ty| sparse_idx_width(&ty))?;
+                    Some((im.column, width))
+                })
+            {
+                let _ = self.sparse_index_by_id(table, &column, index_id, width);
+            }
+        }
         let shared = self
             .tables
             .lock()

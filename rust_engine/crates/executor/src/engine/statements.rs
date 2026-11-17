@@ -1660,6 +1660,9 @@ impl Engine {
             return;
         }
         let mut log = self.append_ts(table);
+        // `resize` **down** to `n - count` zeroes the records before this
+        // statement's own, which is deliberate: the journal is not a history -
+        // a record whose ts is zero is one the next settle rewrites.
         log.resize(n.saturating_sub(count), 0);
         log.resize(n, ts);
         let tkey = self.table_key(table);

@@ -1777,6 +1777,25 @@ impl Engine {
         // replacement has a record, so `cleanup_index_chunks` can reclaim the bytes of
         // the superseded snapshot without a reader ever losing the one it has open.
         let mut spann_superseded: Vec<(String, u32, Vec<u32>, u64)> = Vec::new();
+        // The BMP images every seal since the last publish produced, taken
+        // **once**: `SparseIndex::pending` is drained by the first segment the
+        // loop reaches, so a per-segment take left every later segment with an
+        // empty list and it fell back to the block-by-block rebuild.
+        let bmp_pending: std::collections::HashMap<u32, Vec<PendingSparseChunk>> = {
+            let mut by_index: std::collections::HashMap<u32, Vec<PendingSparseChunk>> =
+                Default::default();
+            let tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get(&self.table_key(table)) {
+                for (index_id, shared) in &entry.sparse {
+                    let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
+                    if guard.pending.is_empty() {
+                        continue;
+                    }
+                    by_index.insert(*index_id as u32, std::mem::take(&mut guard.pending));
+                }
+            }
+            by_index
+        };
         for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
@@ -1901,18 +1920,47 @@ impl Engine {
                     // reference's chunk **is** that image
                     // (`BMPHandler::SaveToPtr`), so nothing is rebuilt from the
                     // rows here.
-                    let pending: Vec<(u64, Vec<u8>, u32, usize)> = self
-                        .tables
-                        .lock()
-                        .unwrap()
-                        .get(&self.table_key(table))
-                        .and_then(|e| e.sparse.get(&im.id).cloned())
-                        .map(|shared| {
-                            let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
-                            std::mem::take(&mut guard.pending)
-                        })
-                        .unwrap_or_default();
-                    publish_bmp_chunks(&seg_dir, &pending, *segment, &existing_chunks, &mut next_id)
+                    let pending: &[PendingSparseChunk] = bmp_pending
+                        .get(&(index_id as u32))
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]);
+                    if pending.is_empty() && only.is_none() {
+                        // A **checkpoint** does not touch an index
+                        // (`NewTxn::CheckpointTable`), so it publishes nothing
+                        // new here: the records a dump wrote are the chunk list.
+                        // Deriving chunks block by block instead appended a
+                        // second family beside them (60 rows became four 16-row
+                        // chunks next to the dump's one).
+                        continue;
+                    }
+                    if pending.is_empty() {
+                        // A **checkpoint** mirrors the index without sealing it
+                        // (`NewTxn::CheckpointTable` never touches an index), so
+                        // there is no fresh image and the chunks are derived
+                        // from the rows.
+                        let by_segment = self
+                            .sparse_rows_by_block(table, &im.column, crate::index_block_size(im))
+                            .remove(segment)
+                            .unwrap_or_default();
+                        publish_bmp_chunks_from_rows(
+                            &seg_dir,
+                            by_segment,
+                            *segment,
+                            crate::sparse_declared_bound(&declared).unwrap_or(0),
+                            crate::sparse_idx_width(&declared),
+                            crate::index_block_size(im),
+                            &existing_chunks,
+                            &mut next_id,
+                        )
+                    } else {
+                        publish_bmp_chunks(
+                            &seg_dir,
+                            pending,
+                            *segment,
+                            &existing_chunks,
+                            &mut next_id,
+                        )
+                    }
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                     // Written in place by the seal; its files are named after
                     // the chunk's base name, not `chunk_N.idx`. The ids come
@@ -2203,6 +2251,50 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn sparse_rows_by_block(
+        &self,
+        table: &str,
+        column: &str,
+        block_size: usize,
+    ) -> std::collections::BTreeMap<
+        u32,
+        std::collections::BTreeMap<u64, Vec<storage::bmp::SparseDoc>>,
+    > {
+        let mut by_block = std::collections::BTreeMap::new();
+        let Ok(schema) = self.table_schema(table) else {
+            return by_block;
+        };
+        let Some(ci) = schema.iter().position(|c| c == column) else {
+            return by_block;
+        };
+        let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
+            return by_block;
+        };
+        for (seq, cells) in rows {
+            let Some(Value::Str(text)) = cells.get(ci) else {
+                continue;
+            };
+            let entries: Vec<(i32, f32)> = crate::parse_sparse_str(text)
+                .into_iter()
+                .map(|(term, value)| (term as i32, value as f32))
+                .collect();
+            let row = seq as u64 & 0xffff_ffff;
+            // The chunk is the **index's** block (`WITH (block_size = N)`,
+            // `BMPAlg::block_fwd_`), not the table's 8192-row block storage
+            // block. Dividing by 8192 put every one of `test_mem_bmp`'s 35 rows
+            // in chunk 0, so the chunks' `base_row_id`s were all 0 and a
+            // reopened index covered only the first 15 rows of them.
+            let block_size = block_size.max(1) as u64;
+            by_block
+                .entry((seq >> 32) as u32)
+                .or_default()
+                .entry(row / block_size)
+                .or_default()
+                .push((row, entries));
+        }
+        by_block
     }
 
     /// Reads a table back from the C++ block layout.
