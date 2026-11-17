@@ -756,10 +756,12 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 | `bytes_00_premises` | 通过 |
 | `bytes_10_encoding` | 通过 |
 | `bytes_20_table` | 通过 |
-| `bytes_30_segments` | 6/8（`test_a_compacted_table_*`、`test_a_cleanup_*` 失败） |
+| `bytes_30_segments` | **8/8 通过** |
 | `bytes_40_wal` | 通过 |
 | `bytes_45_ddl` | 通过 |
 | `bytes_50_mutations` | 4/8（与改动前的基线**同一组**失败） |
+
+合计 34 passed / 4 failed / 1 skipped。
 
 计划书关注的两处都核对过：
 
@@ -768,20 +770,21 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 - 跨段切分让 `row_ranges` 有两项；单段内的多块 UPDATE 仍是**每块一个** `WalCmdAppendV2`
   （`append_command` 按 range 发出），`bytes_40_wal` 逐帧一致。
 
-### 6.7 剩余失败的两处根因
+### 6.7 仍然失败的一处：重启后的 create ts
 
-**compaction 的 BMP 合并段**（`bytes_30_segments`）。参考的
-`PopulateIndex(…, kCompact)` 给合并段一个整段 chunk（`(4<<32, 230)`）；端口给出的是按
-block 切开的 15 个 16 行 chunk。链路是：`sparse_index_by_id` 重建时 `load_sealed` 把
-**source 段仍在 catalog 里的 chunk** 当成覆盖，于是合并段的 230 行看起来已 sealed，
-`SparseIndex::seal` 的 tail 为空，`publish_index_chunks` 只能走
-`publish_bmp_chunks_from_rows` 的按块兜底。要修得让 coverage 忽略已 deprecated 的段
-（`drop|seg|` 记录），而这条记录由 compaction 的提交回调写入，与 `PopulateIndex` 的调用
-次序需要一起调整。
+`bytes_50_mutations` 的 4 个用例（`test_the_bytes_after_deletes_updates_and_a_restart` 等）
+在两个引擎的目录上逐字节比对 `seg_0/blk_0/version` 时不一致：参考的首个 `create` 是 18
+（第一次 INSERT 的提交 ts），端口是 34/36（第二个进程的提交 ts）。这与本计划书的改动无关
+——把工作区回退到改动前的提交，同一组用例同样失败。
 
-**重启后的二级索引 ts**（`bytes_50_mutations`）。`settle_append_ts` 用
-`log.resize(n - count, 0)` 把本次之前的记录清零，本意是"这些位置等下一次 settle 重写"；
-第二个进程里 `UPDATE` 传的是**行数**而不是记录数（一次 UPDATE 只产生一条 append 记录），
-于是把上一进程的 create ts 一并清掉，checkpoint 重写 `version` 时整表都记成了最新提交。
-调用点改成记录数即可，但它与 `catalog|blk`/`catalog|seg` 的 ts 传播相互牵动，改动后
-`bytes_10_encoding` 出现 `3130 vs 3132`，尚未收敛。
+链路已经定位到两处：
+
+1. `settle_append_ts(&table, count, ts)` 的参数是**记录数**，而 `delete_bottom` 收到的是
+   `AppendRecords`（行数）。一次 `UPDATE` 只产生一条 append 记录，传 10 行使
+   `log.resize(n - 10, 0)` 把本次之前的记录一并清零，上一进程的 create ts 就丢了。
+2. 只把调用点改成 `1` 还不够：`catalog|blk` / `catalog|seg` 的 ts 由 `version` 的首个
+   `create` 反推（`block_ts = batches.first()`），改完之后 `bytes_10_encoding` 出现
+   `3130 vs 3132`。两者必须一起改——`version` 保留每个 append 的真实 ts，而
+   `catalog|blk|` 沿用块创建时的值。
+
+这条链牵动 `apply_replayed_rows`、`journals_from_blocks` 与 checkpoint 的块重写，尚未收敛。
