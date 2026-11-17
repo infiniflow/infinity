@@ -614,20 +614,20 @@ impl Engine {
         Ok(())
     }
 
-    /// Loads the newest cspann chunk of `index` (`docs/CSPANN_DESIGN.md` §6).
+    /// Loads the newest spann chunk of `index` (`docs/SPANN_DESIGN.md` §6).
     ///
     /// A rebuild-mode chunk is a whole-table snapshot, so the highest
     /// `chunk_*.idx` id under `idx_{id}/seg_*/` **is** the index and the older
     /// ones are superseded. The catalog's chunk list is not consulted: it is
     /// keyed per segment, and the snapshot covers every segment anyway.
-    pub(crate) fn load_cspann_index(
+    pub(crate) fn load_spann_index(
         &self,
         table: &str,
         index: &str,
         options: &[(String, String)],
-    ) -> Option<std::sync::Arc<crate::cspann_mem::CspannHandle>> {
+    ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
         let table = self.qualified_table(table);
-        let opts = crate::cspann_mem::options_from(options).ok()?;
+        let opts = crate::spann_mem::options_from(options).ok()?;
         let dir = self.hnsw_dir(&table, index)?;
         // One chunk per segment (§6), so the index is the newest live chunk of
         // **each** segment, not the newest chunk overall. The live chunk list,
@@ -654,43 +654,43 @@ impl Engine {
             // Mapped, not decoded: the slot bytes stay in page cache, which is
             // what makes §19.3's 50M-in-8GB arithmetic work. The CRC of every
             // section is still verified — once, here.
-            if let Ok(chunk) = storage::knn_index::cspann::FileIndex::open(&path, &opts) {
+            if let Ok(chunk) = storage::knn_index::spann::FileIndex::open(&path, &opts) {
                 chunks.push(std::sync::Arc::new(chunk));
             }
         }
         if chunks.is_empty() {
             return None;
         }
-        Some(std::sync::Arc::new(crate::cspann_mem::CspannHandle::File(
+        Some(std::sync::Arc::new(crate::spann_mem::SpannHandle::File(
             chunks,
         )))
     }
 
-    /// Lazily loads a cspann index the first time a query needs it.
+    /// Lazily loads a spann index the first time a query needs it.
     ///
     /// The query path is the only thing that knows an index is wanted, and it is
     /// also the only place that must not answer from a stale tree, so a restart
-    /// resolves on the first query instead of at open (`docs/CSPANN_DESIGN.md`
+    /// resolves on the first query instead of at open (`docs/SPANN_DESIGN.md`
     /// §6).
-    pub(crate) fn cspann_lazy_load(
+    pub(crate) fn spann_lazy_load(
         &self,
         table: &str,
         index_id: u64,
-    ) -> Option<std::sync::Arc<crate::cspann_mem::CspannHandle>> {
+    ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
         let meta = self
             .storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
             .ok()?
             .into_iter()
-            .find(|im| im.id == index_id && im.index_type.eq_ignore_ascii_case("CSPANN"))?;
-        let tree = self.load_cspann_index(&meta.table, &meta.name, &meta.options)?;
+            .find(|im| im.id == index_id && im.index_type.eq_ignore_ascii_case("SPANN"))?;
+        let tree = self.load_spann_index(&meta.table, &meta.name, &meta.options)?;
         self.tables
             .lock()
             .unwrap()
             .entry(self.table_key(table))
             .or_default()
-            .cspann
+            .spann
             .insert(index_id, tree.clone());
         Some(tree)
     }
@@ -787,18 +787,18 @@ impl Engine {
                         total = total.saturating_sub(gone.bytes);
                     }
                 }
-            } else if im.index_type.eq_ignore_ascii_case("CSPANN") {
+            } else if im.index_type.eq_ignore_ascii_case("SPANN") {
                 // Rebuild-mode chunks are whole-table snapshots, so the newest
                 // chunk is the whole index; a stale one is superseded by id
-                // (`docs/CSPANN_DESIGN.md` §9.4).
-                if let Some(tree) = self.load_cspann_index(&im.table, &im.name, &im.options) {
+                // (`docs/SPANN_DESIGN.md` §9.4).
+                if let Some(tree) = self.load_spann_index(&im.table, &im.name, &im.options) {
                     let tkey = self.table_key(&im.table);
                     self.tables
                         .lock()
                         .unwrap()
                         .entry(tkey)
                         .or_default()
-                        .cspann
+                        .spann
                         .insert(im.id, tree);
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
@@ -3813,7 +3813,7 @@ impl Engine {
     }
 
     /// The indexes whose recall stayed below target long enough to suggest a
-    /// rebuild (`CSPANN_DESIGN.md` §11.3 item 4, §9.4's rebuild is the fix).
+    /// rebuild (`SPANN_DESIGN.md` §11.3 item 4, §9.4's rebuild is the fix).
     ///
     /// Returned rather than logged because there is no operator surface for it
     /// yet: the `SHOW` variable list and the index listing both mirror the
@@ -4039,12 +4039,12 @@ impl Engine {
         }
     }
 
-    /// `AppendMemIndex`'s row bound, applied to cspann: after a write batch,
-    /// dump every cspann mem index that reached `max_partition_size × 64` rows
-    /// (`docs/CSPANN_DESIGN.md` §9.2).
+    /// `AppendMemIndex`'s row bound, applied to spann: after a write batch,
+    /// dump every spann mem index that reached `max_partition_size × 64` rows
+    /// (`docs/SPANN_DESIGN.md` §9.2).
     ///
     /// The bound is the index's own, not `[storage] mem_index_capacity`: the
-    /// cspann mem index is the query's **candidate list** - every row in it is
+    /// spann mem index is the query's **candidate list** - every row in it is
     /// handed to the exact rescoring on every KNN query, because the tree cannot
     /// rank rows it does not hold - so what has to stay bounded is rows per
     /// index, not bytes per engine. Without this, all the rows written between
@@ -4055,7 +4055,7 @@ impl Engine {
     /// checkpoint holds it and then waits for that same gate - the cycle
     /// `dump_secondary_over_capacity_blocking` documents. From a commit's bottom
     /// half this must not be called.
-    pub(crate) async fn dump_cspann_over_capacity(&self, table: &str) {
+    pub(crate) async fn dump_spann_over_capacity(&self, table: &str) {
         let tkey = self.table_key(table);
         // Cheap gate first: a table with nothing queued pays one map lookup
         // instead of a catalog read.
@@ -4065,7 +4065,7 @@ impl Engine {
                 .get(&tkey)
                 .map(|entry| {
                     entry
-                        .cspann_mem
+                        .spann_mem
                         .iter()
                         .filter(|(_, rows)| !rows.is_empty())
                         .map(|(id, rows)| (*id, rows.len()))
@@ -4081,16 +4081,16 @@ impl Engine {
         };
         let mut victims: Vec<(String, String)> = Vec::new();
         for im in indexes {
-            if !im.index_type.eq_ignore_ascii_case("CSPANN") {
+            if !im.index_type.eq_ignore_ascii_case("SPANN") {
                 continue;
             }
             let Some(rows) = pending.iter().find(|(id, _)| *id == im.id).map(|(_, n)| *n) else {
                 continue;
             };
-            let Ok(opts) = crate::cspann_mem::options_from(&im.options) else {
+            let Ok(opts) = crate::spann_mem::options_from(&im.options) else {
                 continue;
             };
-            if rows >= crate::cspann_mem::mem_dump_threshold(&opts) {
+            if rows >= crate::spann_mem::mem_dump_threshold(&opts) {
                 victims.push((im.table.clone(), im.name.clone()));
             }
         }

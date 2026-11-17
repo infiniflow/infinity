@@ -1,4 +1,4 @@
-//! Chunk serialisation (`docs/CSPANN_DESIGN.md` §6).
+//! Chunk serialisation (`docs/SPANN_DESIGN.md` §6).
 //!
 //! Two entry points over one implementation:
 //!
@@ -14,12 +14,12 @@
 
 use std::io::Write;
 
-use index::cspann::quantize::code_bytes;
-use index::cspann::{CspannIndex, Encode};
+use index::spann::quantize::code_bytes;
+use index::spann::{Encode, SpannIndex};
 use index::vector::Metric;
 
 use super::{
-    Crc32c, CspannError, Section, HEADER_LEN, MAGIC, META_ENTRY, SECTION_COUNT, SLOT_ALIGN,
+    Crc32c, Section, SpannError, HEADER_LEN, MAGIC, META_ENTRY, SECTION_COUNT, SLOT_ALIGN,
     TRAILER_LEN, TRAILER_MAGIC,
 };
 
@@ -29,27 +29,24 @@ pub(crate) const fn align_up(value: usize, align: usize) -> usize {
 }
 
 /// The chunk for `index`, in memory.
-pub fn write(index: &CspannIndex) -> Result<Vec<u8>, CspannError> {
+pub fn write(index: &SpannIndex) -> Result<Vec<u8>, SpannError> {
     let mut out: Vec<u8> = Vec::new();
     sections(index, &mut out)?;
     Ok(out)
 }
 
 /// The chunk for `index`, streamed into `path`; returns its length in bytes.
-pub fn write_to(
-    index: &CspannIndex,
-    path: impl AsRef<std::path::Path>,
-) -> Result<u64, CspannError> {
+pub fn write_to(index: &SpannIndex, path: impl AsRef<std::path::Path>) -> Result<u64, SpannError> {
     let file = std::fs::File::create(path)
-        .map_err(|e| CspannError::Corrupt(format!("create chunk: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("create chunk: {e}")))?;
     let mut out = std::io::BufWriter::with_capacity(1 << 20, file);
     sections(index, &mut out)?;
     let file = out
         .into_inner()
-        .map_err(|e| CspannError::Corrupt(format!("flush chunk: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("flush chunk: {e}")))?;
     file.metadata()
         .map(|m| m.len())
-        .map_err(|e| CspannError::Corrupt(format!("stat chunk: {e}")))
+        .map_err(|e| SpannError::Corrupt(format!("stat chunk: {e}")))
 }
 
 fn put<W: Write>(
@@ -57,9 +54,9 @@ fn put<W: Write>(
     crc: &mut Crc32c,
     pos: &mut usize,
     bytes: &[u8],
-) -> Result<(), CspannError> {
+) -> Result<(), SpannError> {
     out.write_all(bytes)
-        .map_err(|e| CspannError::Corrupt(format!("write chunk: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("write chunk: {e}")))?;
     crc.update(bytes);
     *pos += bytes.len();
     Ok(())
@@ -70,22 +67,22 @@ fn put<W: Write>(
 /// The padding sits *between* sections, so it belongs to no checksum - but the
 /// reader addresses every section by the table, which means the bytes have to be
 /// there or every later section reads shifted.
-fn pad_to<W: Write>(out: &mut W, pos: &mut usize, target: usize) -> Result<(), CspannError> {
+fn pad_to<W: Write>(out: &mut W, pos: &mut usize, target: usize) -> Result<(), SpannError> {
     const ZEROS: [u8; 64] = [0; 64];
     while *pos < target {
         let take = (target - *pos).min(ZEROS.len());
         out.write_all(&ZEROS[..take])
-            .map_err(|e| CspannError::Corrupt(format!("write padding: {e}")))?;
+            .map_err(|e| SpannError::Corrupt(format!("write padding: {e}")))?;
         *pos += take;
     }
     Ok(())
 }
 
-fn sections<W: Write>(index: &CspannIndex, out: &mut W) -> Result<(), CspannError> {
+fn sections<W: Write>(index: &SpannIndex, out: &mut W) -> Result<(), SpannError> {
     let opts = index.opts();
     if opts.encode != Encode::Rabitq {
         // Section E is reserved; v1 only ships the production encoding.
-        return Err(CspannError::InvalidOption(
+        return Err(SpannError::InvalidOption(
             "encode",
             "chunk format v1 only stores rabitq codes".to_string(),
         ));
@@ -163,7 +160,7 @@ fn sections<W: Write>(index: &CspannIndex, out: &mut W) -> Result<(), CspannErro
         header[at + 8..at + 16].copy_from_slice(&len.to_le_bytes());
     }
     out.write_all(&header)
-        .map_err(|e| CspannError::Corrupt(format!("write header: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("write header: {e}")))?;
     let mut pos = HEADER_LEN;
 
     let mut crcs = [0u32; SECTION_COUNT];
@@ -292,6 +289,6 @@ fn sections<W: Write>(index: &CspannIndex, out: &mut W) -> Result<(), CspannErro
         trailer[at..at + 4].copy_from_slice(&crc.to_le_bytes());
     }
     out.write_all(&trailer)
-        .map_err(|e| CspannError::Corrupt(format!("write trailer: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("write trailer: {e}")))?;
     Ok(())
 }

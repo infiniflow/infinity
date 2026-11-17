@@ -8208,7 +8208,7 @@ mod tests {
         );
     }
 
-    /// `CSPANN_DESIGN.md` §9.5: the pressure level is *derived* from the one
+    /// `SPANN_DESIGN.md` §9.5: the pressure level is *derived* from the one
     /// byte ledger, not from a second (row-based) trigger.
     #[test]
     fn the_pressure_level_comes_from_the_byte_ledger() {
@@ -13279,12 +13279,12 @@ mod tests {
         assert_eq!(collect(&reopened), live_rows(&reopened), "after a restart");
     }
 
-    /// `CREATE INDEX … USING CSPANN` answers `SEARCH MATCH VECTOR`, and the
+    /// `CREATE INDEX … USING SPANN` answers `SEARCH MATCH VECTOR`, and the
     /// answer is the exact top-k once the candidate list is re-scored
-    /// (`docs/CSPANN_DESIGN.md` §8.6: a 1-bit code picks candidates, the
+    /// (`docs/SPANN_DESIGN.md` §8.6: a 1-bit code picks candidates, the
     /// executor decides the order).
     #[test]
-    fn cspann_answers_self_queries() {
+    fn spann_answers_self_queries() {
         let n = 200usize;
         for metric in ["l2", "cosine"] {
             let dir = tempdir().unwrap();
@@ -13307,7 +13307,7 @@ mod tests {
             sql.push(';');
             e.execute_blocking(&sql).unwrap();
             e.execute_blocking(&format!(
-                "CREATE INDEX cs_i ON cs (v) USING CSPANN WITH \
+                "CREATE INDEX cs_i ON cs (v) USING SPANN WITH \
                  (metric='{metric}', max_partition_size=32, num_centroids=16);"
             ))
             .unwrap();
@@ -13325,10 +13325,7 @@ mod tests {
                     hits += 1;
                 }
             }
-            assert!(
-                hits >= 38,
-                "cspann recall@1 = {hits}/40 for metric {metric}"
-            );
+            assert!(hits >= 38, "spann recall@1 = {hits}/40 for metric {metric}");
             let _ = crate::scheduler::block_on(e.flush());
         }
     }
@@ -13338,7 +13335,7 @@ mod tests {
     /// materialised pass would: 600 rows give ~812 candidates over ~10 batches,
     /// and a self-query still has to find its own row in the top-10.
     #[test]
-    fn cspann_streamed_rerank_answers_across_many_batches() {
+    fn spann_streamed_rerank_answers_across_many_batches() {
         let n = 600usize;
         let dim = 16usize;
         let dir = tempdir().unwrap();
@@ -13361,7 +13358,7 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX csb_i ON csb (v) USING CSPANN WITH \
+            "CREATE INDEX csb_i ON csb (v) USING SPANN WITH \
              (metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
@@ -13393,7 +13390,7 @@ mod tests {
     /// the segment's chunk from its live rows, folds the new row in and clears the
     /// list, so the same query afterwards answers out of `chunk_{n}.idx`.
     #[test]
-    fn cspann_answers_a_row_written_after_the_build_from_the_mem_index() {
+    fn spann_answers_a_row_written_after_the_build_from_the_mem_index() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute_blocking("CREATE TABLE csf (id INT, v EMBEDDING(FLOAT,4));")
@@ -13403,7 +13400,7 @@ mod tests {
         )
         .unwrap();
         e.execute_blocking(
-            "CREATE INDEX csf_i ON csf (v) USING CSPANN WITH \
+            "CREATE INDEX csf_i ON csf (v) USING SPANN WITH \
              (metric='l2', max_partition_size=8);",
         )
         .unwrap();
@@ -13413,7 +13410,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .map(|entry| entry.spann_mem.values().map(Vec::len).sum::<usize>())
                 .unwrap_or(0)
         };
         assert_eq!(pending(&e), 0, "the build leaves nothing pending");
@@ -13436,7 +13433,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
+            .and_then(|entry| entry.spann.values().next().map(|tree| tree.len()));
         assert_eq!(covered, Some(3), "the flushed tree covers all three rows");
         assert_eq!(pending(&e), 0, "the dump must release the mem index");
         let got = rows(
@@ -13447,7 +13444,7 @@ mod tests {
     }
 
     /// A `WHERE` on a scalar column no longer bypasses the vector index
-    /// (`docs/CSPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
+    /// (`docs/SPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
     /// graph search consumes, and the answer is the exact top-k over the rows
     /// the filter admits.
     #[test]
@@ -13635,7 +13632,7 @@ mod tests {
     /// the tree keeps, and the row written after the build is scored by the
     /// exact path - so the answer is the exact top-k over the admitted rows.
     #[test]
-    fn cspann_filter_and_uncovered_tail_answer_together() {
+    fn spann_filter_and_uncovered_tail_answer_together() {
         let n = 200usize;
         let vector =
             |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,{}.0]", i + 1, i + 2, i + 3) };
@@ -13653,7 +13650,7 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX cf_i ON cf (v) USING CSPANN WITH \
+            "CREATE INDEX cf_i ON cf (v) USING SPANN WITH \
              (metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
@@ -13718,10 +13715,10 @@ mod tests {
 
     /// The tree survives a restart: the checkpoint writes the chunk, and the
     /// first query after reopening loads it lazily (§6/§9.4). The assertion on
-    /// `TableEntry::cspann` is what proves the *index* answered and not the
+    /// `TableEntry::spann` is what proves the *index* answered and not the
     /// exact-scan fallback.
     #[test]
-    fn cspann_survives_a_restart_and_answers_from_its_chunk() {
+    fn spann_survives_a_restart_and_answers_from_its_chunk() {
         let n = 300usize;
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..16)
@@ -13752,7 +13749,7 @@ mod tests {
             sql.push(';');
             e.execute_blocking(&sql).unwrap();
             e.execute_blocking(
-                "CREATE INDEX csp_i ON csp (v) USING CSPANN WITH \
+                "CREATE INDEX csp_i ON csp (v) USING SPANN WITH \
                  (metric='l2', max_partition_size=32, num_centroids=16);",
             )
             .unwrap();
@@ -13769,7 +13766,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| e.cspann.is_empty())
+            .map(|e| e.spann.is_empty())
             .unwrap_or(true);
         assert!(empty, "a fresh process must not have the tree in memory");
 
@@ -13781,7 +13778,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| !e.cspann.is_empty())
+            .map(|e| !e.spann.is_empty())
             .unwrap_or(false);
         assert!(loaded, "the query must have loaded the chunk into memory");
     }
@@ -13814,7 +13811,7 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX ci_i ON ci (v) USING CSPANN WITH \
+            "CREATE INDEX ci_i ON ci (v) USING SPANN WITH \
              (metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
@@ -13832,7 +13829,7 @@ mod tests {
             .get(&key)
             .map(|entry| {
                 entry
-                    .cspann_mem
+                    .spann_mem
                     .values()
                     .map(|rows| rows.len())
                     .sum::<usize>()
@@ -13859,7 +13856,7 @@ mod tests {
             .get(&key)
             .map(|entry| {
                 entry
-                    .cspann_mem
+                    .spann_mem
                     .values()
                     .map(|rows| rows.len())
                     .sum::<usize>()
@@ -13873,7 +13870,7 @@ mod tests {
         assert_eq!(got.first().map(|r| r[0].clone()), Some("80".to_string()));
     }
 
-    /// A delete takes its row out of the cspann mem index (§9.2).
+    /// A delete takes its row out of the spann mem index (§9.2).
     ///
     /// The mem list is half of the coverage count (`index.len() + mem.len()`), so
     /// a tombstone left in it makes the index claim rows it does not hold:
@@ -13881,7 +13878,7 @@ mod tests {
     /// the count check exists to avoid. It is also a candidate on every query,
     /// i.e. a decode of a row nothing can return.
     #[test]
-    fn a_delete_prunes_the_cspann_mem_index() {
+    fn a_delete_prunes_the_spann_mem_index() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..8)
                 .map(|d| format!("{}.0", (i * 7 + d * 13) % 971))
@@ -13902,7 +13899,7 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX cd_i ON cd (v) USING CSPANN WITH \
+            "CREATE INDEX cd_i ON cd (v) USING SPANN WITH \
              (metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
@@ -13914,7 +13911,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .map(|entry| entry.spann_mem.values().map(Vec::len).sum::<usize>())
                 .unwrap_or(0)
         };
         // Two rows after the dump: both in the mem index, nothing else.
@@ -13939,7 +13936,7 @@ mod tests {
         );
     }
 
-    /// `max_partition_size × 64` rows in a cspann mem index trigger a dump of
+    /// `max_partition_size × 64` rows in a spann mem index trigger a dump of
     /// their own (§9.2), without waiting for the next checkpoint.
     ///
     /// Every row in that list is re-scored exactly by **every** KNN query on the
@@ -13947,7 +13944,7 @@ mod tests {
     /// turn each query into a scan of the gap. The bound is rows, not bytes
     /// (§9.5's watermarks are the engine-wide budget, a different trigger).
     #[test]
-    fn a_cspann_mem_index_dumps_at_its_row_bound() {
+    fn a_spann_mem_index_dumps_at_its_row_bound() {
         let n = 30usize;
         let extra = 1100usize;
         // A per-(row, dim) spread: a modular pattern repeats every modulus rows,
@@ -13981,7 +13978,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         // `max_partition_size = 16` -> the bound is 1024 rows.
         e.execute_blocking(
-            "CREATE INDEX cb_i ON cb (v) USING CSPANN WITH \
+            "CREATE INDEX cb_i ON cb (v) USING SPANN WITH \
              (metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
@@ -13992,7 +13989,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
+                .map(|entry| entry.spann_mem.values().map(Vec::len).sum::<usize>())
                 .unwrap_or(0)
         };
         assert_eq!(pending(&e), 0, "the checkpoint released the mem index");
@@ -14018,7 +14015,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
+            .and_then(|entry| entry.spann.values().next().map(|tree| tree.len()));
         assert_eq!(
             covered,
             Some(n + extra + 1),
@@ -14034,11 +14031,20 @@ mod tests {
         );
     }
 
-    /// The cspann mem index is memory only (§9.2), so after a restart it is empty
-    /// and the rows written since the last dump are not covered by the loaded
-    /// chunk. The query must answer them regardless: `uncovered` scores exactly
-    /// those row ids, so a restart costs the gap and never a hole - the semantics
-    /// the rebuild-mode chunk format is built on (§9.7).
+    /// A restart is a **rebuild**, not a loss (§9.2/§9.7): the mem index itself is
+    /// never persisted, and what covers the gap afterwards depends on where the
+    /// rows were when the process stopped.
+    ///
+    /// * Rows that only lived in the WAL are replayed into the append buffer, and
+    ///   the same hook that registered them at insert time
+    ///   (`refresh_block_mirror_extra`) registers their vectors again - so the mem
+    ///   index comes back for them and the query answers them as candidates.
+    /// * Rows already in a block file but never folded into a chunk (a crash
+    ///   between the block write and the chunk publish) are **not** re-buffered,
+    ///   so the mem index stays empty for them and the query has to fall back to
+    ///   `uncovered`: an exact scan of exactly those row ids, not of the table.
+    ///
+    /// Both cases must answer the row.
     #[test]
     fn a_restart_answers_the_rows_written_after_the_last_dump() {
         let vector = |i: usize| -> String {
@@ -14061,50 +14067,94 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX cr_i ON cr (v) USING CSPANN WITH \
+            "CREATE INDEX cr_i ON cr (v) USING SPANN WITH \
              (metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
+        let key = e.table_key("default_db.cr");
+        let pending = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.spann_mem.values().map(Vec::len).sum::<usize>())
+                .unwrap_or(0)
+        };
+        let covered = |e: &Engine| -> Option<usize> {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.values().next().map(|tree| tree.len()))
+        };
 
-        // Written after the dump, and never dumped: no `flush()` from here on.
-        let needle = "[700.0,701.0,702.0,703.0]";
-        e.execute_blocking(&format!("INSERT INTO cr VALUES (40, {needle});"))
+        // Case 1: the row only ever reached the WAL.
+        let first = "[700.0,701.0,702.0,703.0]";
+        e.execute_blocking(&format!("INSERT INTO cr VALUES (40, {first});"))
             .unwrap();
         drop(e);
 
         let reopened = Engine::open(dir.path()).unwrap();
-        let key = reopened.table_key("default_db.cr");
-        let pending: usize = reopened
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .map(|entry| entry.cspann_mem.values().map(Vec::len).sum::<usize>())
-            .unwrap_or(0);
-        assert_eq!(pending, 0, "the mem index does not survive a restart");
-
-        // The row is only in the recovered append buffer, and the chunk does not
-        // hold it: the answer has to come from the uncovered-row fallback.
+        assert_eq!(
+            pending(&reopened),
+            1,
+            "replay re-registers the vectors of the rows it re-buffers"
+        );
         let got = rows(
             &reopened,
-            &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
+            &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {first}, 'float', 'l2', 1);"),
         );
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some("40".to_string()),
             "a row written before the restart must still be answered: {got:?}"
         );
+        // The tree is loaded lazily, so this is only meaningful after the query.
+        assert_eq!(
+            covered(&reopened),
+            Some(40),
+            "the chunk still holds the dump"
+        );
 
-        // The next dump folds it into the tree, so the fallback is temporary.
-        crate::scheduler::block_on(reopened.flush()).unwrap();
-        let covered = reopened
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|entry| entry.cspann.values().next().map(|tree| tree.len()));
-        assert_eq!(covered, Some(41), "the dump covers the recovered row");
+        // Case 2: the row reached a block file, the chunk never saw it - the
+        // window a crash leaves behind. `write_blocks_commit` is exactly that
+        // half: the mirror is written, no chunk is published.
+        let second = "[-700.0,-701.0,-702.0,-703.0]";
+        reopened
+            .execute_blocking(&format!("INSERT INTO cr VALUES (41, {second});"))
+            .unwrap();
+        assert_eq!(pending(&reopened), 2, "both rows sit in the mem index");
+        reopened
+            .write_blocks_commit(&key, reopened.txn.current_ts())
+            .unwrap();
+        drop(reopened);
+
+        let again = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            pending(&again),
+            0,
+            "a row replayed off disk is not re-registered, so the mem index is empty"
+        );
+        let got = rows(
+            &again,
+            &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {second}, 'float', 'l2', 1);"),
+        );
+        assert_eq!(
+            got.first().map(|r| r[0].clone()),
+            Some("41".to_string()),
+            "the uncovered-row fallback must answer a row the chunk does not hold: {got:?}"
+        );
+        assert_eq!(
+            covered(&again),
+            Some(40),
+            "the chunk does not hold either new row"
+        );
+
+        // The next dump folds both into the tree, so the fallback is temporary.
+        crate::scheduler::block_on(again.flush()).unwrap();
+        assert_eq!(covered(&again), Some(42), "the dump covers both rows");
+        assert_eq!(pending(&again), 0);
     }
 
     /// A checkpoint must not rebuild a segment that has not changed (§9.4).
@@ -14115,7 +14165,7 @@ mod tests {
     /// against the segment's live rows, so a delete (which lowers it) or a
     /// compaction (which renames the segment) still rebuilds.
     #[test]
-    fn a_checkpoint_reuses_an_unchanged_cspann_chunk() {
+    fn a_checkpoint_reuses_an_unchanged_spann_chunk() {
         let n = 120usize;
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..8)
@@ -14137,7 +14187,7 @@ mod tests {
         sql.push(';');
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
-            "CREATE INDEX cq_i ON cq (v) USING CSPANN WITH \
+            "CREATE INDEX cq_i ON cq (v) USING SPANN WITH \
              (metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
@@ -14186,12 +14236,12 @@ mod tests {
         assert!(!got.is_empty());
     }
 
-    /// The numbers behind `docs/CSPANN_BENCH.md`.
+    /// The numbers behind `docs/SPANN_BENCH.md`.
     ///
-    /// `cargo test -p executor cspann_bench --lib -- --ignored --nocapture`
+    /// `cargo test -p executor spann_bench --lib -- --ignored --nocapture`
     #[test]
     #[ignore]
-    fn cspann_bench_128d() {
+    fn spann_bench_128d() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
         const CLUSTERS: usize = 64;
@@ -14240,7 +14290,7 @@ mod tests {
 
         let started = std::time::Instant::now();
         e.execute_blocking(
-            "CREATE INDEX bench_i ON bench (v) USING CSPANN WITH \
+            "CREATE INDEX bench_i ON bench (v) USING SPANN WITH \
              (metric='l2', max_partition_size=128, num_centroids=64);",
         )
         .unwrap();
@@ -14259,7 +14309,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&e.table_key("default_db.bench"))
-            .and_then(|entry| entry.cspann.get(&index_id).cloned())
+            .and_then(|entry| entry.spann.get(&index_id).cloned())
             .expect("the tree");
         let bytes = tree.mem_usage();
         let (partitions, height) = tree.shape();
@@ -14331,7 +14381,7 @@ mod tests {
             .lock()
             .unwrap()
             .get(&e.table_key("default_db.bench"))
-            .and_then(|entry| entry.cspann.get(&index_id).cloned())
+            .and_then(|entry| entry.spann.get(&index_id).cloned())
             .expect("the reloaded index");
         eprintln!(
             "after flush: file-backed {} | heap {} B/row",
@@ -14382,7 +14432,7 @@ mod tests {
 
         // The same rows through HNSW, on the same SQL path, so §19's comparison
         // stops being "one side is a graph search and the other is a full
-        // statement". A column resolves to one index at a time, so the cspann
+        // statement". A column resolves to one index at a time, so the spann
         // record is dropped first.
         e.execute_blocking("DROP INDEX bench_i;").unwrap();
         let started = std::time::Instant::now();
@@ -14425,19 +14475,19 @@ mod tests {
     /// The DDL validates the option names and the column type, and the values
     /// are checked by the same parser the builder uses.
     #[test]
-    fn cspann_rejects_invalid_ddl() {
+    fn spann_rejects_invalid_ddl() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         e.execute_blocking("CREATE TABLE csd (id INT, v EMBEDDING(FLOAT,4), s VARCHAR);")
             .unwrap();
         let bad_option =
-            match e.execute_blocking("CREATE INDEX csd_i ON csd (v) USING CSPANN WITH (M=16);") {
-                Ok(_) => panic!("an HNSW option must be rejected by a CSPANN index"),
+            match e.execute_blocking("CREATE INDEX csd_i ON csd (v) USING SPANN WITH (M=16);") {
+                Ok(_) => panic!("an HNSW option must be rejected by a SPANN index"),
                 Err(err) => format!("{err}"),
             };
-        assert!(bad_option.contains("CSPANN"), "{bad_option}");
+        assert!(bad_option.contains("SPANN"), "{bad_option}");
 
-        let bad_column = match e.execute_blocking("CREATE INDEX csd_j ON csd (s) USING CSPANN;") {
+        let bad_column = match e.execute_blocking("CREATE INDEX csd_j ON csd (s) USING SPANN;") {
             Ok(_) => panic!("a VARCHAR column has no vectors to index"),
             Err(err) => format!("{err}"),
         };
@@ -14447,10 +14497,10 @@ mod tests {
     /// §19.6's "等延迟" comparison: sweep the search width of both indexes on the
     /// same rows and read recall@10 at each p50.
     ///
-    /// `cargo test -p executor --release cspann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
+    /// `cargo test -p executor --release spann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
     #[test]
     #[ignore]
-    fn cspann_vs_hnsw_at_equal_latency() {
+    fn spann_vs_hnsw_at_equal_latency() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
         const CLUSTERS: usize = 64;
@@ -14499,7 +14549,7 @@ mod tests {
         e.execute_blocking("CREATE INDEX bh ON bench_h (v) USING HNSW WITH (metric='l2');")
             .unwrap();
         e.execute_blocking(
-            "CREATE INDEX bc ON bench_c (v) USING CSPANN WITH (metric='l2', max_partition_size=128);",
+            "CREATE INDEX bc ON bench_c (v) USING SPANN WITH (metric='l2', max_partition_size=128);",
         )
         .unwrap();
 
@@ -14518,11 +14568,11 @@ mod tests {
                 .map(|row| row[0].parse().unwrap())
                 .collect()
         };
-        println!("width |   cspann p50 / recall |   hnsw p50 / recall");
+        println!("width |   spann p50 / recall |   hnsw p50 / recall");
         for width in [8usize, 16, 32, 64, 128] {
             let mut lines = Vec::new();
             for (kind, table, opt) in [
-                ("cspann", "bench_c", format!("beam={width}")),
+                ("spann", "bench_c", format!("beam={width}")),
                 ("hnsw", "bench_h", format!("ef={width}")),
             ] {
                 let mut timings = Vec::new();

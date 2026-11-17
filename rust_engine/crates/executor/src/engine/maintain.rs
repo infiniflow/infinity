@@ -1,4 +1,4 @@
-//! Index maintenance accounting and scheduling (`CSPANN_DESIGN.md` §9.5, §9.6).
+//! Index maintenance accounting and scheduling (`SPANN_DESIGN.md` §9.5, §9.6).
 //!
 //! Two pieces live here, both of them **pure policy**: they read numbers the
 //! engine already keeps and decide *when* to seal and *which* tail to seal.

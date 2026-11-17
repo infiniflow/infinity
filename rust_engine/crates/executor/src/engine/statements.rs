@@ -419,6 +419,8 @@ impl Engine {
             cpu_sample: Mutex::new(None),
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
             profile_enabled: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(feature = "testing")]
+            armed_panic: std::sync::atomic::AtomicBool::new(false),
         };
         // If this directory was written by the C++ engine (its catalog keys are
         // in the catalog store, but the native catalog is empty), take over its
@@ -759,7 +761,7 @@ impl Engine {
         }
     }
 
-    /// Records one sampled query's recall (`CSPANN_DESIGN.md` §11.3 item 4).
+    /// Records one sampled query's recall (`SPANN_DESIGN.md` §11.3 item 4).
     ///
     /// The exact answer is computed by the *same* scoring code with the candidate
     /// set removed, over the warm vector cache: no metric arithmetic is
@@ -6753,25 +6755,25 @@ impl Engine {
                     }
                 }
             }
-            "CSPANN" => {
+            "SPANN" => {
                 if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
                     return Err(Error::Invalid(format!(
                         "{index_type} index requires a vector column, got '{ty}'"
                     )));
                 }
                 for (k, _) in opts {
-                    if !crate::cspann_mem::OPTION_KEYS
+                    if !crate::spann_mem::OPTION_KEYS
                         .iter()
                         .any(|known| known.eq_ignore_ascii_case(k))
                     {
                         return Err(Error::Invalid(format!(
-                            "invalid index parameter: unsupported CSPANN option '{k}'"
+                            "invalid index parameter: unsupported SPANN option '{k}'"
                         )));
                     }
                 }
                 // The builder owns the value checks (ranges, metric spellings,
                 // encode names), so the DDL and the build agree by construction.
-                crate::cspann_mem::options_from(opts)?;
+                crate::spann_mem::options_from(opts)?;
             }
             "PLAID" => {
                 if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
@@ -9657,7 +9659,7 @@ impl Engine {
         // shapes are not columnar-evaluable (LIKE, IN, a function, a column
         // compared to a column), and then a filtered query keeps the exact scan
         // - an index whose candidates the mask cannot prune would answer a short
-        // top-k (`docs/CSPANN_DESIGN.md` §12.5).
+        // top-k (`docs/SPANN_DESIGN.md` §12.5).
         let allowed: Option<std::collections::HashSet<usize>> = if has_filter {
             let filters: Vec<&Expr> = pred
                 .into_iter()
@@ -9697,7 +9699,7 @@ impl Engine {
                 return None;
             }
             // The index this scan reads: the one the statement named, else the
-            // column's first HNSW/IVF/CSPANN index.
+            // column's first HNSW/IVF/SPANN index.
             let meta = self
                 .storage
                 .catalog
@@ -9708,7 +9710,7 @@ impl Engine {
                     im.column == col_name
                         && (im.index_type.eq_ignore_ascii_case("HNSW")
                             || im.index_type.eq_ignore_ascii_case("IVF")
-                            || im.index_type.eq_ignore_ascii_case("CSPANN"))
+                            || im.index_type.eq_ignore_ascii_case("SPANN"))
                 });
             let index_id = meta.as_ref().map(|im| im.id);
             // §11.3 items 4/5: the monitor's beam is the search width, and a
@@ -9726,7 +9728,7 @@ impl Engine {
                     // width (32), not the index's build beam (8): the two are
                     // different knobs in Cockroach
                     // (`vector_search_beam_size` vs `IndexOptions.BaseBeamSize`).
-                    .unwrap_or(crate::cspann_mem::DEFAULT_SEARCH_BEAM);
+                    .unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
                 let mut monitors = self.context.recall.lock().unwrap();
                 let monitor = monitors
                     .entry(id)
@@ -9805,7 +9807,7 @@ impl Engine {
         // A dense candidate list is decoded and scored **one batch at a time**.
         //
         // The rerank pool is sized by the beam (hundreds of rows at 1 bit), and
-        // holding every decoded row at once is precisely the memory cspann
+        // holding every decoded row at once is precisely the memory spann
         // exists to save: 812 rows × 1536d × 4 B is 5 MB per concurrent query,
         // plus the block pages they pull into the page cache. Each batch is
         // reduced to its own top-n - a superset of the global top-n within that
@@ -10935,7 +10937,7 @@ fn query_field_qualifiers(query: &str) -> Vec<&str> {
 ///
 /// Used to project a filtered scan onto the columns its predicate names: a
 /// `WHERE id < 10` must not decode the embedding or the text column
-/// (`docs/CSPANN_DESIGN.md` §12.5).
+/// (`docs/SPANN_DESIGN.md` §12.5).
 fn collect_columns(expr: &Expr, out: &mut Vec<usize>) {
     match expr {
         Expr::Column(pos) => out.push(*pos),

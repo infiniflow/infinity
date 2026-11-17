@@ -119,7 +119,7 @@ pub(crate) struct KnnCandidateScan<'a> {
 /// and `MergeKnn`. The reference never has to say "scan the whole table":
 /// every segment either answers or is skipped, and a row no segment holds is
 /// scored by the block scan. This type is that contract - the candidates plus
-/// the live rows no segment covers (`docs/CSPANN_DESIGN.md` §9.7).
+/// the live rows no segment covers (`docs/SPANN_DESIGN.md` §9.7).
 pub(crate) struct KnnProbe {
     /// Rows the index says can win; the caller scores them exactly.
     pub candidates: HashSet<usize>,
@@ -249,23 +249,23 @@ impl Engine {
         // below, so ranking matches an exhaustive scan whenever the probe
         // covers the true top-k.
         let index_id = q.index_id?;
-        // cspann: one tree per index id, held in memory (`TableEntry::cspann`).
+        // spann: one tree per index id, held in memory (`TableEntry::spann`).
         // The tree already speaks row ids, and the caller re-scores every
         // candidate exactly, so the only failure mode is *coverage*: rows
         // written after the tree was built are not in it and the exact scan
-        // has to run for those rows alone (`docs/CSPANN_DESIGN.md` §9.7).
-        let mut cspann = {
+        // has to run for those rows alone (`docs/SPANN_DESIGN.md` §9.7).
+        let mut spann = {
             let tables = self.tables.lock().unwrap();
             tables
                 .get(&tkey)
-                .and_then(|e| e.cspann.get(&index_id).cloned())
+                .and_then(|e| e.spann.get(&index_id).cloned())
         };
-        if cspann.is_none() {
+        if spann.is_none() {
             // After a restart the tree only exists in its chunk, and this is the
             // first place that knows somebody wants it.
-            cspann = self.cspann_lazy_load(q.table, index_id);
+            spann = self.spann_lazy_load(q.table, index_id);
         }
-        if let Some(index) = cspann {
+        if let Some(index) = spann {
             if index.dim() != q.query.len() {
                 return None;
             }
@@ -273,12 +273,12 @@ impl Engine {
             // over a rerank pool sized by the reference's formula (the beam and
             // the multiplier both widen it) and the exact rescoring picks the
             // winner. The pool is an I/O budget: the caller streams it.
-            let width = q.beam.unwrap_or(crate::cspann_mem::DEFAULT_SEARCH_BEAM);
+            let width = q.beam.unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
             let multiplier = q
                 .options
                 .rerank_multiplier
-                .unwrap_or(crate::cspann_mem::DEFAULT_RERANK_MULTIPLIER);
-            let budget = crate::cspann_mem::candidate_budget(q.topn, width, multiplier);
+                .unwrap_or(crate::spann_mem::DEFAULT_RERANK_MULTIPLIER);
+            let budget = crate::spann_mem::candidate_budget(q.topn, width, multiplier);
             let hits = match q.allowed {
                 Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
                 None => index.search(q.query, budget, Some(width)),
@@ -288,18 +288,19 @@ impl Engine {
             // The mem index: rows inserted since the last dump. They are
             // candidates (the exact rescoring decides) and they are covered, so
             // an insert stays visible without turning the query into a scan of
-            // the whole table (`docs/CSPANN_DESIGN.md` §9.2).
+            // the whole table (`docs/SPANN_DESIGN.md` §9.2).
             //
             // Every row here is re-scored, which is why the list is bounded
             // (`max_partition_size × 64` triggers a dump) and why a delete prunes
-            // it. It is memory-only: after a restart it is empty and the rows it
-            // held fall into `uncovered` below - an exact scan of exactly those
-            // rows, which is correct and costs the gap, not the table.
+            // it. It is memory-only: a restart rebuilds it only for the rows the
+            // WAL replay re-buffers, so rows that were already in a block file
+            // fall into `uncovered` below - an exact scan of exactly those rows,
+            // which is correct and costs the gap, not the table.
             let mem: Vec<usize> = {
                 let tables = self.tables.lock().unwrap();
                 tables
                     .get(&tkey)
-                    .and_then(|e| e.cspann_mem.get(&index_id))
+                    .and_then(|e| e.spann_mem.get(&index_id))
                     .map(|rows| rows.iter().map(|(seq, _)| *seq as usize).collect())
                     .unwrap_or_default()
             };

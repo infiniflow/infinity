@@ -2,14 +2,14 @@
 //!
 //! The first version took `&[(u64, Vec<f32>)]`, which forces every vector into
 //! RAM before the tree can start: at 1536d that is 6 KB per row, i.e. 6 GB for
-//! a 1M-row build and 300 GB at the scale cspann exists for. Building only ever
+//! a 1M-row build and 300 GB at the scale spann exists for. Building only ever
 //! needs *random read* of one vector at a time (k-means centroids, split
 //! assignment, encoding), so the builder takes this trait instead and the caller
 //! decides what is resident:
 //!
 //! * [`Memory`] - the in-process form, used by tests and by `CREATE INDEX` on
 //!   small tables;
-//! * `storage::knn_index::cspann::MappedSource` - the production form, an
+//! * `storage::knn_index::spann::MappedSource` - the production form, an
 //!   `f32` scratch file the builder maps, so peak RSS is the tree's codes plus
 //!   one page-cache window rather than the whole column.
 //!

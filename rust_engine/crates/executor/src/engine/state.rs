@@ -4939,18 +4939,18 @@ pub(crate) struct TableEntry {
     /// IVF memory segment per index id: rows written since the last mirror
     /// dump, merged with the sealed chunks at query time.
     pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
-    /// cspann trees per index id (`docs/CSPANN_DESIGN.md`).
+    /// spann trees per index id (`docs/SPANN_DESIGN.md`).
     ///
-    /// v1 keeps them in memory: `CREATE INDEX … USING CSPANN` builds the tree
+    /// v1 keeps them in memory: `CREATE INDEX … USING SPANN` builds the tree
     /// and answers queries from it directly. The chunk format is implemented and
-    /// tested in `storage::knn_index::cspann`; wiring the dump/load path (§9.4)
+    /// tested in `storage::knn_index::spann`; wiring the dump/load path (§9.4)
     /// is the remaining step, after which this map holds what the loader
     /// produced instead.
-    pub(crate) cspann: HashMap<u64, Arc<crate::cspann_mem::CspannHandle>>,
-    /// cspann **mem index** per index id: the rows inserted since the last
+    pub(crate) spann: HashMap<u64, Arc<crate::spann_mem::SpannHandle>>,
+    /// spann **mem index** per index id: the rows inserted since the last
     /// dump, kept as `(row id, vector)`.
     ///
-    /// An insert does not touch the tree (`docs/CSPANN_DESIGN.md` §9.2): the row
+    /// An insert does not touch the tree (`docs/SPANN_DESIGN.md` §9.2): the row
     /// lands here in O(1), queries merge this list with the published chunks, and
     /// the next dump builds a tree that covers those rows and clears the list.
     /// Encoding a row into the tree at insert time was the rejection: a leaf's
@@ -4963,15 +4963,23 @@ pub(crate) struct TableEntry {
     ///   `note_deleted_ids` - it is no longer live, so it must not be a candidate
     ///   and must not count as covered;
     /// * `max_partition_size × 64` rows trigger a dump
-    ///   (`Engine::dump_cspann_over_capacity`), because every row in this list is
+    ///   (`Engine::dump_spann_over_capacity`), because every row in this list is
     ///   re-scored exactly by **every** KNN query on the table.
     ///
-    /// It is a memory-only structure: after a restart it is empty and the rows it
-    /// used to hold are simply not covered by the loaded chunk. That is the
-    /// documented rebuild-mode semantics - `knn_candidates` answers those rows
-    /// through `uncovered` (an exact scan of them alone) and the next dump folds
-    /// them into the tree, so a restart costs recall-neutral work, never holes.
-    pub(crate) cspann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
+    /// It is a memory-only structure, and what a restart leaves behind depends on
+    /// where the rows were:
+    ///
+    /// * rows that only reached the WAL are replayed into the append buffer, and
+    ///   the same hook that fills this map at insert time
+    ///   (`refresh_block_mirror_extra`) fills it again - the list is rebuilt for
+    ///   them, so they are candidates immediately;
+    /// * rows that are already in a block file are not re-buffered, so nothing
+    ///   re-registers them: they are simply not covered by the loaded chunk and
+    ///   `knn_candidates` answers them through `uncovered` - an exact scan of
+    ///   exactly those row ids - until the next dump folds them into the tree.
+    ///
+    /// Either way a restart costs work proportional to the gap, never a hole.
+    pub(crate) spann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,
@@ -5187,7 +5195,7 @@ pub(crate) struct Context {
     /// never drained (two databases, one HNSW index each, in
     /// `test_optimize_from_different_database`).
     pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
-    /// The three-level waterlines over the one byte ledger (`CSPANN_DESIGN.md`
+    /// The three-level waterlines over the one byte ledger (`SPANN_DESIGN.md`
     /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
     /// table. Derived from `memindex_quota`, never set directly.
     pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
@@ -5332,6 +5340,12 @@ pub struct Engine {
     /// on, a finished statement is appended to the profile history. The
     /// running-query registry is kept either way, as `SHOW QUERIES` needs it.
     pub(crate) profile_enabled: std::sync::atomic::AtomicBool,
+    /// Test-only: the next statement **on this engine** panics
+    /// (`panic_guard::Engine::arm_injected_panic`). Per engine, not per process:
+    /// the server's tests run in parallel and a process-wide flag was consumed by
+    /// whichever request ran first, which was usually another test's.
+    #[cfg(feature = "testing")]
+    pub(crate) armed_panic: std::sync::atomic::AtomicBool,
 }
 
 impl Drop for Engine {

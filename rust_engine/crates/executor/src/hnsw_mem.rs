@@ -113,7 +113,7 @@ impl HnswIndexInMem {
     /// [`Self::search_with_ef`] with the caller's filter: `allow` names the
     /// **row ids** the statement admits, and a rejected vertex is still
     /// traversed. This is the memory segment's half of the filter push-down
-    /// (`docs/CSPANN_DESIGN.md` §12.5) - the sealed chunks go through
+    /// (`docs/SPANN_DESIGN.md` §12.5) - the sealed chunks go through
     /// [`HnswHandler::search_index_filtered`].
     pub fn search_filtered_with_ef(
         &self,
@@ -135,7 +135,7 @@ impl HnswIndexInMem {
             .collect()
     }
 
-    /// The tail as the maintenance layer sees it (`CSPANN_DESIGN.md` §12.4).
+    /// The tail as the maintenance layer sees it (`SPANN_DESIGN.md` §12.4).
     ///
     /// The byte figure is the graph's own (`mem_usage`), **not** the charge the
     /// write path accumulates in `index_pending_bytes`: a graph built by

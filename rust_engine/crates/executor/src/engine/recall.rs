@@ -1,4 +1,4 @@
-//! Recall monitoring and the query-time budget knobs (`CSPANN_DESIGN.md` §11.3
+//! Recall monitoring and the query-time budget knobs (`SPANN_DESIGN.md` §11.3
 //! items 4 and 5, §11.4).
 //!
 //! The index answers an *approximate* top-k, so the only honest way to keep a

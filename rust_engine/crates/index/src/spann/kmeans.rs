@@ -1,8 +1,8 @@
 //! Balanced 2-means: the structural primitive of the tree.
 //!
-//! Cockroach's `cspann/kmeans.go` builds `BalancedKMeans` and always calls it
+//! Cockroach's `spann/kmeans.go` builds `BalancedKMeans` and always calls it
 //! with `k = 2` (it bisects until a partition fits `max_partition_size`); the
-//! Rust port keeps that shape (`CSPANN_DESIGN.md` §4 `kmeans.rs`), which makes
+//! Rust port keeps that shape (`SPANN_DESIGN.md` §4 `kmeans.rs`), which makes
 //! the tree a balanced binary one and keeps `num_centroids` implied by the data
 //! volume instead of fixed (`D3`).
 //!

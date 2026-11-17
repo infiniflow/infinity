@@ -7,7 +7,7 @@
 //! path.
 //!
 //! `encode = none` keeps the raw member vectors beside the codes so the tree can
-//! be validated against a brute-force scan byte for byte (`CSPANN_DESIGN.md`
+//! be validated against a brute-force scan byte for byte (`SPANN_DESIGN.md`
 //! §16 P1 exit criterion).
 
 use crate::vector::{l2_sq, Metric};
@@ -83,7 +83,7 @@ impl Partition {
         }
     }
 
-    /// Rebuilds a node from decoded storage (`CSPANN_DESIGN.md` §6.3): the
+    /// Rebuilds a node from decoded storage (`SPANN_DESIGN.md` §6.3): the
     /// chunk reader hands us the columns it just parsed, so the search path is
     /// identical to the build-time one.
     #[allow(clippy::too_many_arguments)]

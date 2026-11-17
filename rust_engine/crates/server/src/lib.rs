@@ -7395,8 +7395,8 @@ fn index_type_sql(code: i32) -> &'static str {
         8 => "PLAID",
         9 => "SMVE",
         // `thrift/infinity.thrift`'s appended enum value
-        // (`rust_engine/docs/CSPANN_DESIGN.md`).
-        10 => "CSPANN",
+        // (`rust_engine/docs/SPANN_DESIGN.md`).
+        10 => "SPANN",
         _ => "",
     }
 }
@@ -8737,7 +8737,7 @@ mod tests {
             (7, "DISKANN"),
             (8, "PLAID"),
             (9, "SMVE"),
-            (10, "CSPANN"),
+            (10, "SPANN"),
         ];
         for (code, kind) in expected {
             assert_eq!(index_type_sql(code), kind, "thrift IndexType {code}");

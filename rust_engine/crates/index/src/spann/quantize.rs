@@ -1,4 +1,4 @@
-//! RaBitQ-style 1-bit-per-dimension codes for one partition (`CSPANN_DESIGN.md`
+//! RaBitQ-style 1-bit-per-dimension codes for one partition (`SPANN_DESIGN.md`
 //! §6.2 / §8.5).
 //!
 //! Everything here is measured **relative to the partition centroid**, which is

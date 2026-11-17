@@ -1,4 +1,4 @@
-//! cspann: the cluster-based vector index of `docs/CSPANN_DESIGN.md`.
+//! spann: the cluster-based vector index of `docs/SPANN_DESIGN.md`.
 //!
 //! The crate boundary follows §3.2: this module depends only on `crate::vector`
 //! (`Metric`, `l2_sq`), `crate::rabitq` (the sign-flip RNG shared with the HNSW
@@ -31,7 +31,7 @@ pub use partition::{Member, Partition};
 pub use quantize::{Code, QueryCode, Rotation};
 pub use search::{Beam, SearchSet};
 pub use source::{Memory, VectorSource};
-pub use store::{CspannStore, MemStore};
+pub use store::{MemStore, SpannStore};
 
 use std::fmt::{self, Display};
 
@@ -44,7 +44,7 @@ pub type PartitionKey = u32;
 /// The root is always key 0 (pre-order numbering).
 pub const ROOT_KEY: PartitionKey = 0;
 
-/// Slot encoding (`CSPANN_DESIGN.md` §6.2 / D1).
+/// Slot encoding (`SPANN_DESIGN.md` §6.2 / D1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Encode {
     /// Raw `f32` vectors, for validating the tree against a brute-force scan.
@@ -86,7 +86,7 @@ impl Encode {
     }
 }
 
-/// Build-time knobs (`CSPANN_DESIGN.md` §11.3, D3/D4).
+/// Build-time knobs (`SPANN_DESIGN.md` §11.3, D3/D4).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options {
     pub metric: Metric,
@@ -124,39 +124,39 @@ impl Default for Options {
 }
 
 impl Options {
-    pub fn validate(&self) -> Result<(), CspannError> {
+    pub fn validate(&self) -> Result<(), SpannError> {
         if self.max_partition_size < 4 {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "max_partition_size",
                 "must be >= 4".to_string(),
             ));
         }
         if self.min_partition_size < 2 || self.min_partition_size > self.max_partition_size {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "min_partition_size",
                 "must be in 2..=max_partition_size".to_string(),
             ));
         }
         if !(0.3..=1.0).contains(&self.fill_factor) {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "fill_factor",
                 "must be within 0.3..=1.0".to_string(),
             ));
         }
         if self.kmeans_iterations == 0 || self.kmeans_iterations > 64 {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "kmeans_iterations",
                 "must be in 1..=64".to_string(),
             ));
         }
         if self.base_beam == 0 || self.base_beam > 256 {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "beam",
                 "must be in 1..=256".to_string(),
             ));
         }
         if self.root_fanout < 2 || self.root_fanout > 4096 {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "num_centroids",
                 "must be in 2..=4096".to_string(),
             ));
@@ -166,7 +166,7 @@ impl Options {
 }
 
 #[derive(Debug)]
-pub enum CspannError {
+pub enum SpannError {
     Empty,
     DimensionMismatch {
         expected: usize,
@@ -177,36 +177,36 @@ pub enum CspannError {
     Corrupt(String),
 }
 
-impl Display for CspannError {
+impl Display for SpannError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CspannError::Empty => write!(f, "cspann: no rows to index"),
-            CspannError::DimensionMismatch { expected, actual } => {
-                write!(f, "cspann: expected dim {expected}, got {actual}")
+            SpannError::Empty => write!(f, "spann: no rows to index"),
+            SpannError::DimensionMismatch { expected, actual } => {
+                write!(f, "spann: expected dim {expected}, got {actual}")
             }
-            CspannError::InvalidOption(name, why) => write!(f, "cspann: invalid {name}: {why}"),
-            CspannError::Corrupt(what) => write!(f, "cspann: corrupt chunk: {what}"),
+            SpannError::InvalidOption(name, why) => write!(f, "spann: invalid {name}: {why}"),
+            SpannError::Corrupt(what) => write!(f, "spann: corrupt chunk: {what}"),
         }
     }
 }
 
-impl std::error::Error for CspannError {}
+impl std::error::Error for SpannError {}
 
-/// A built cspann index.
+/// A built spann index.
 #[derive(Debug)]
-pub struct CspannIndex {
+pub struct SpannIndex {
     opts: Options,
     dim: usize,
     rotation: Rotation,
     store: MemStore,
 }
 
-impl CspannIndex {
+impl SpannIndex {
     /// Builds the tree from `(row id, vector)` pairs held in memory.
     ///
     /// Convenience wrapper over [`Self::build_from_source`] for callers that
     /// already have the column resident (tests, small `CREATE INDEX`).
-    pub fn build(rows: Vec<(u64, Vec<f32>)>, opts: Options) -> Result<Self, CspannError> {
+    pub fn build(rows: Vec<(u64, Vec<f32>)>, opts: Options) -> Result<Self, SpannError> {
         Self::build_from_source(&Memory::new(rows), opts)
     }
 
@@ -215,14 +215,14 @@ impl CspannIndex {
     /// This is the out-of-core entry point: the builder only ever reads one
     /// vector at a time, so a source backed by a mapped scratch file keeps the
     /// 6 KB/row (1536d) column out of RSS.
-    pub fn build_from_source(src: &dyn VectorSource, opts: Options) -> Result<Self, CspannError> {
+    pub fn build_from_source(src: &dyn VectorSource, opts: Options) -> Result<Self, SpannError> {
         opts.validate()?;
         if src.is_empty() {
-            return Err(CspannError::Empty);
+            return Err(SpannError::Empty);
         }
         let dim = src.vector(0).len();
         if dim == 0 {
-            return Err(CspannError::InvalidOption(
+            return Err(SpannError::InvalidOption(
                 "dims",
                 "vector dimension must be > 0".to_string(),
             ));
@@ -230,7 +230,7 @@ impl CspannIndex {
         for i in 0..src.len() {
             let actual = src.vector(i).len();
             if actual != dim {
-                return Err(CspannError::DimensionMismatch {
+                return Err(SpannError::DimensionMismatch {
                     expected: dim,
                     actual,
                 });
@@ -304,7 +304,7 @@ impl CspannIndex {
         self.store.partitions()
     }
 
-    /// Heap bytes the tree owns, for §10's budget and the `cspann_bytes` gauge.
+    /// Heap bytes the tree owns, for §10's budget and the `spann_bytes` gauge.
     ///
     /// Counts the two centroids per partition, the child key table and the
     /// members (meta + code); it excludes the allocator's slack and the raw
@@ -504,7 +504,7 @@ mod tests {
     #[test]
     fn tree_invariants_hold() {
         let rows = clustered(700, 8, 7);
-        let index = CspannIndex::build(rows.clone(), opts(64, Encode::Rabitq)).unwrap();
+        let index = SpannIndex::build(rows.clone(), opts(64, Encode::Rabitq)).unwrap();
         assert_eq!(index.len(), 700);
         assert!(index.height() >= 2, "height {}", index.height());
 
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn encode_none_reproduces_the_exact_top_k() {
         let rows = clustered(600, 8, 6);
-        let index = CspannIndex::build(rows.clone(), opts(48, Encode::None)).unwrap();
+        let index = SpannIndex::build(rows.clone(), opts(48, Encode::None)).unwrap();
         for query in rows.iter().take(12) {
             let got: Vec<u64> = index
                 .search(&query.1, 10, Some(usize::MAX))
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn filtered_search_answers_from_the_admitted_rows() {
         let rows = random_points(400, 8, 6);
-        let index = CspannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
+        let index = SpannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
 
         // One admitted row: whatever the beam, that row is the only answer.
         let one: std::collections::HashSet<u64> = [rows[7].0].into_iter().collect();
@@ -604,7 +604,7 @@ mod tests {
             .into_iter()
             .map(|(id, v)| (id, v.into_iter().map(|x| x / 100.0).collect()))
             .collect();
-        let index = CspannIndex::build(rows.clone(), opts(32, Encode::None)).unwrap();
+        let index = SpannIndex::build(rows.clone(), opts(32, Encode::None)).unwrap();
         for query in rows.iter().take(12) {
             let got: Vec<u64> = index
                 .search(&query.1, 10, Some(usize::MAX))
@@ -623,7 +623,7 @@ mod tests {
         let rows = random_points(600, 64, 8);
         // `max_partition_size = 128` with 600 rows gives ~8 leaves, which the
         // default beam of 8 covers completely: the only loss left is the codec.
-        let index = CspannIndex::build(rows.clone(), opts(128, Encode::Rabitq)).unwrap();
+        let index = SpannIndex::build(rows.clone(), opts(128, Encode::Rabitq)).unwrap();
         let mut hits = 0usize;
         let mut total = 0usize;
         for query in rows.iter().take(20) {
@@ -659,8 +659,8 @@ mod tests {
     #[test]
     fn build_is_deterministic() {
         let rows = clustered(300, 6, 5);
-        let a = CspannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
-        let b = CspannIndex::build(rows, opts(32, Encode::Rabitq)).unwrap();
+        let a = SpannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
+        let b = SpannIndex::build(rows, opts(32, Encode::Rabitq)).unwrap();
         let ca: Vec<(u32, Vec<f32>)> = a
             .partitions()
             .iter()
@@ -677,7 +677,7 @@ mod tests {
     #[test]
     fn small_input_stays_a_single_leaf() {
         let rows = clustered(10, 4, 2);
-        let index = CspannIndex::build(rows, opts(128, Encode::Rabitq)).unwrap();
+        let index = SpannIndex::build(rows, opts(128, Encode::Rabitq)).unwrap();
         assert_eq!(index.height(), 1);
         assert_eq!(index.partitions().len(), 1);
         assert!(index.search(&[0.0, 0.0, 0.0, 0.0], 3, None).len() == 3);
@@ -685,27 +685,27 @@ mod tests {
 
     #[test]
     fn rejects_bad_input() {
-        let err = CspannIndex::build(Vec::new(), Options::default()).unwrap_err();
-        assert!(matches!(err, CspannError::Empty));
+        let err = SpannIndex::build(Vec::new(), Options::default()).unwrap_err();
+        assert!(matches!(err, SpannError::Empty));
 
         let rows = vec![(1u64, vec![1.0f32, 2.0]), (2, vec![1.0])];
-        let err = CspannIndex::build(rows, Options::default()).unwrap_err();
-        assert!(matches!(err, CspannError::DimensionMismatch { .. }));
+        let err = SpannIndex::build(rows, Options::default()).unwrap_err();
+        assert!(matches!(err, SpannError::DimensionMismatch { .. }));
 
         let bad = Options {
             base_beam: 0,
             ..Options::default()
         };
         assert!(matches!(
-            CspannIndex::build(vec![(1, vec![1.0])], bad).unwrap_err(),
-            CspannError::InvalidOption("beam", _)
+            SpannIndex::build(vec![(1, vec![1.0])], bad).unwrap_err(),
+            SpannError::InvalidOption("beam", _)
         ));
     }
 
     #[test]
     fn search_tolerates_a_wrong_query_dimension() {
         let rows = clustered(20, 4, 2);
-        let index = CspannIndex::build(rows, opts(16, Encode::Rabitq)).unwrap();
+        let index = SpannIndex::build(rows, opts(16, Encode::Rabitq)).unwrap();
         assert!(index.search(&[1.0, 2.0], 5, None).is_empty());
     }
 }

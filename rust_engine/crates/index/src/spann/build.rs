@@ -1,4 +1,4 @@
-//! Tree construction (`CSPANN_DESIGN.md` §4 `build.rs`, §5, §11.2).
+//! Tree construction (`SPANN_DESIGN.md` §4 `build.rs`, §5, §11.2).
 //!
 //! Cockroach's `BuildSubtree` recursively bisects a partition until it fits
 //! `max_partition_size`, then assigns levels bottom-up (`leaf = 1`, parent =
@@ -162,7 +162,7 @@ impl Builder<'_> {
     /// `key` is passed in rather than allocated here, so a parent can compute
     /// both children's keys from the split sizes and then build them
     /// concurrently - the numbering stays the DFS pre-order the format expects
-    /// (`CSPANN_DESIGN.md` §4), it just no longer needs a mutable counter.
+    /// (`SPANN_DESIGN.md` §4), it just no longer needs a mutable counter.
     fn build_subtree(&self, indices: &mut [usize], key: PartitionKey) -> Subtree {
         if indices.len() <= self.opts.max_partition_size {
             let members: Vec<(u64, &[f32])> = indices
@@ -359,7 +359,7 @@ pub fn keeps_raw(encode: Encode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cspann::source::Memory;
+    use crate::spann::source::Memory;
 
     /// Rows under `key`, counted from the leaves.
     fn rows_under(tree: &BuiltTree, key: PartitionKey) -> usize {
@@ -373,7 +373,7 @@ mod tests {
             .sum()
     }
 
-    /// The format numbers nodes in DFS pre-order (`CSPANN_DESIGN.md` §4), and the
+    /// The format numbers nodes in DFS pre-order (`SPANN_DESIGN.md` §4), and the
     /// parallel build hands both children their keys *before* either exists - so
     /// this is the property that keeps a parallel tree byte-identical to a serial
     /// one. It also checks `subtree_nodes` against the tree actually built.

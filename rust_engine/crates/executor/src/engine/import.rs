@@ -536,9 +536,9 @@ impl Engine {
         drop(_turn);
         drop(_visible);
         // §9.2's row bound. `COPY` has a commit path of its own, and it is the
-        // one statement that can put a whole segment into the cspann mem index
+        // one statement that can put a whole segment into the spann mem index
         // at once - so it checks the bound too, here, with no gate held.
-        self.dump_cspann_over_capacity(table).await;
+        self.dump_spann_over_capacity(table).await;
         let t_bottom = t3.elapsed();
         if profile {
             eprintln!(

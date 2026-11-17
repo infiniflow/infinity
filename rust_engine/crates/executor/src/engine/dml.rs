@@ -395,7 +395,7 @@ impl Engine {
         if let Some(set) = entry.deleted_set.as_mut() {
             Arc::make_mut(set).extend(ids.iter().map(|s| *s as u64));
         }
-        // A deleted row leaves the cspann mem index with it (`docs/CSPANN_DESIGN.md`
+        // A deleted row leaves the spann mem index with it (`docs/SPANN_DESIGN.md`
         // §9.2). This is not only about the wasted decode: the mem list is half of
         // the coverage count (`index.len() + mem.len()`), so a tombstone left in it
         // makes the index look like it holds rows it does not, `all_covered` then
@@ -403,9 +403,9 @@ impl Engine {
         // count check exists to avoid. A rollback has nothing to undo here - the
         // rows it drops were never in the tree - and an `UPDATE` is a delete plus an
         // insert, so both halves go through this hook.
-        if !entry.cspann_mem.is_empty() {
+        if !entry.spann_mem.is_empty() {
             let gone: std::collections::HashSet<u64> = ids.iter().map(|s| *s as u64).collect();
-            for rows in entry.cspann_mem.values_mut() {
+            for rows in entry.spann_mem.values_mut() {
                 rows.retain(|(seq, _)| !gone.contains(seq));
             }
         }
@@ -952,12 +952,12 @@ impl Engine {
         if !self.has_index_declaration(table) {
             self.enforce_quota_after_append(table).await;
         }
-        // §9.2's row bound, not §9.5's byte watermarks: a cspann mem index is the
+        // §9.2's row bound, not §9.5's byte watermarks: a spann mem index is the
         // query's candidate list, so one import can put a million rows into
         // every KNN query's rerank pool. This dump is a transaction of its own,
         // which is why it runs here - after the commit, with no bottom gate held
         // - and not inside the bottom half where the other index hooks fire.
-        self.dump_cspann_over_capacity(table).await;
+        self.dump_spann_over_capacity(table).await;
         Ok(QueryResult::Inserted { count: row_count })
     }
 
@@ -2281,7 +2281,7 @@ impl Engine {
         self.context
             .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
-        // The waterlines are derived (`CSPANN_DESIGN.md` §9.5), so a new budget
+        // The waterlines are derived (`SPANN_DESIGN.md` §9.5), so a new budget
         // has to reach them before the next check reads it.
         if let Ok(mut marks) = self.context.watermarks.lock() {
             marks.set_budget(bytes);

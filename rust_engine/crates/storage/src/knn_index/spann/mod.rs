@@ -1,4 +1,4 @@
-//! The cspann chunk format (`docs/CSPANN_DESIGN.md` §6).
+//! The spann chunk format (`docs/SPANN_DESIGN.md` §6).
 //!
 //! One chunk = one immutable tree. The header is self-describing on purpose:
 //! the HNSW chunk (`knn_format.rs`) has no magic, no version and no checksum and
@@ -36,19 +36,23 @@
 //! chunk is not guaranteed to start at 0, so 4 bytes saved per row is not worth
 //! a silent truncation.
 
-use index::cspann::{
+use index::spann::{
     partition::{metric_score, Member, Partition},
     quantize::{self, Code, Rotation},
     search::{self, Beam, SearchSet},
-    CspannError, CspannIndex, Encode, Options, PartitionKey, ROOT_KEY,
+    Encode, Options, PartitionKey, SpannError, SpannIndex, ROOT_KEY,
 };
 use index::vector::{l2_sq, Metric};
 
 mod writer;
 pub use writer::{write, write_to};
 
-pub const MAGIC: [u8; 8] = *b"CSPANN\x00\x01";
-const TRAILER_MAGIC: [u8; 8] = *b"CSPEND\x00\x01";
+/// The chunk's signature: the name, a NUL pad (the field is eight bytes wide so
+/// the offsets that follow are the ones `docs/SPANN_FORMAT.md` tabulates) and the
+/// format version. A chunk whose signature is anything else is rejected rather
+/// than guessed at - the pre-rename `CSPANN\0\1` files included.
+pub const MAGIC: [u8; 8] = *b"SPANN\x00\x00\x01";
+const TRAILER_MAGIC: [u8; 8] = *b"SPEND\x00\x00\x01";
 pub const HEADER_LEN: usize = 128;
 /// Bytes per partition in section A.
 pub const META_ENTRY: usize = 32;
@@ -199,51 +203,51 @@ pub struct Layout {
 impl Layout {
     /// Reads magic, version, header fields, the section table, and verifies one
     /// CRC32C per section.
-    pub fn open(bytes: &[u8]) -> Result<Self, CspannError> {
+    pub fn open(bytes: &[u8]) -> Result<Self, SpannError> {
         if bytes.len() < HEADER_LEN + TRAILER_LEN {
-            return Err(CspannError::Corrupt("file shorter than header".to_string()));
+            return Err(SpannError::Corrupt("file shorter than header".to_string()));
         }
         if bytes[0..8] != MAGIC {
-            return Err(CspannError::Corrupt("bad magic".to_string()));
+            return Err(SpannError::Corrupt("bad magic".to_string()));
         }
         let version = u16::from_le_bytes([bytes[8], bytes[9]]);
         if version != 1 {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "unsupported version {version}"
             )));
         }
         let header_len = u16::from_le_bytes([bytes[10], bytes[11]]) as usize;
         if header_len != HEADER_LEN {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "header length {header_len}, expected {HEADER_LEN}"
             )));
         }
         let dims = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
         if dims == 0 {
-            return Err(CspannError::Corrupt("zero dimension".to_string()));
+            return Err(SpannError::Corrupt("zero dimension".to_string()));
         }
         let metric = match bytes[16] {
             0 => Metric::L2,
             1 => Metric::Ip,
             2 => Metric::Cos,
-            other => return Err(CspannError::Corrupt(format!("bad metric {other}"))),
+            other => return Err(SpannError::Corrupt(format!("bad metric {other}"))),
         };
         let encode = match bytes[17] {
             0 => Encode::None,
             1 => Encode::Rabitq,
-            other => return Err(CspannError::Corrupt(format!("bad encode {other}"))),
+            other => return Err(SpannError::Corrupt(format!("bad encode {other}"))),
         };
         let rot_algo = bytes[18];
         let seed = u64::from_le_bytes(bytes[20..28].try_into().unwrap());
         let partitions = u32::from_le_bytes(bytes[28..32].try_into().unwrap()) as usize;
         if partitions == 0 {
-            return Err(CspannError::Corrupt("no partitions".to_string()));
+            return Err(SpannError::Corrupt("no partitions".to_string()));
         }
 
         // Section table, then bounds and CRCs.
         let tail = bytes.len() - TRAILER_LEN;
         if bytes[tail..tail + 8] != TRAILER_MAGIC {
-            return Err(CspannError::Corrupt("missing trailer".to_string()));
+            return Err(SpannError::Corrupt("missing trailer".to_string()));
         }
         let mut sections = [(0usize, 0usize); SECTION_COUNT];
         for section in 0..SECTION_COUNT {
@@ -252,9 +256,9 @@ impl Layout {
             let len = u64::from_le_bytes(bytes[at + 8..at + 16].try_into().unwrap()) as usize;
             let end = offset
                 .checked_add(len)
-                .ok_or_else(|| CspannError::Corrupt("section overflow".to_string()))?;
+                .ok_or_else(|| SpannError::Corrupt("section overflow".to_string()))?;
             if offset < HEADER_LEN || end > tail {
-                return Err(CspannError::Corrupt(format!(
+                return Err(SpannError::Corrupt(format!(
                     "section {} out of bounds ({offset}..{end}, file {tail})",
                     SECTION_NAMES[section]
                 )));
@@ -266,7 +270,7 @@ impl Layout {
             );
             let got = crc32c(&bytes[offset..end]);
             if want != got {
-                return Err(CspannError::Corrupt(format!(
+                return Err(SpannError::Corrupt(format!(
                     "section {} checksum {got:#x} != {want:#x}",
                     SECTION_NAMES[section]
                 )));
@@ -276,7 +280,7 @@ impl Layout {
 
         let meta_len = sections[Section::Meta as usize].1;
         if meta_len != partitions * META_ENTRY {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "meta section {meta_len} B for {partitions} partitions"
             )));
         }
@@ -296,7 +300,7 @@ impl Layout {
 
 impl<'a> Chunk<'a> {
     /// Parses and verifies `bytes` (the open-time path).
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, CspannError> {
+    pub fn parse(bytes: &'a [u8]) -> Result<Self, SpannError> {
         Ok(Self::from_layout(bytes, Layout::open(bytes)?))
     }
 
@@ -317,7 +321,7 @@ impl<'a> Chunk<'a> {
     pub fn code_bytes(&self) -> usize {
         match self.header.encode {
             Encode::None => self.header.dims * 4,
-            Encode::Rabitq => index::cspann::quantize::code_bytes(self.header.dims),
+            Encode::Rabitq => index::spann::quantize::code_bytes(self.header.dims),
         }
     }
 
@@ -429,21 +433,21 @@ impl<'a> Chunk<'a> {
     /// Rebuilds the searchable index. The caller passes the options it read from
     /// the catalog; `metric`, `encode` and `seed` must match the header, because
     /// they change what the codes mean.
-    pub fn to_index(&self, opts: Options) -> Result<CspannIndex, CspannError> {
+    pub fn to_index(&self, opts: Options) -> Result<SpannIndex, SpannError> {
         if opts.metric != self.header.metric {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "metric mismatch: catalog {:?}, chunk {:?}",
                 opts.metric, self.header.metric
             )));
         }
         if opts.encode != self.header.encode {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "encode mismatch: catalog {:?}, chunk {:?}",
                 opts.encode, self.header.encode
             )));
         }
         if opts.seed != self.header.seed {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "seed mismatch: catalog {}, chunk {}",
                 opts.seed, self.header.seed
             )));
@@ -453,22 +457,22 @@ impl<'a> Chunk<'a> {
         for key in 0..self.header.partitions as PartitionKey {
             let meta = self
                 .meta(key)
-                .ok_or_else(|| CspannError::Corrupt(format!("missing meta {key}")))?;
+                .ok_or_else(|| SpannError::Corrupt(format!("missing meta {key}")))?;
             let centroid = self
                 .centroid(key)
-                .ok_or_else(|| CspannError::Corrupt(format!("missing centroid {key}")))?;
+                .ok_or_else(|| SpannError::Corrupt(format!("missing centroid {key}")))?;
             let rot_centroid = rotation.apply(&centroid);
             let view = self
                 .slots(key)
-                .ok_or_else(|| CspannError::Corrupt(format!("missing slots {key}")))?;
+                .ok_or_else(|| SpannError::Corrupt(format!("missing slots {key}")))?;
             let mut members = Vec::with_capacity(view.len());
             for i in 0..view.len() {
                 let id = view
                     .row_id(i)
-                    .ok_or_else(|| CspannError::Corrupt(format!("slot {i} of {key}")))?;
+                    .ok_or_else(|| SpannError::Corrupt(format!("slot {i} of {key}")))?;
                 let code = view
                     .code(i)
-                    .ok_or_else(|| CspannError::Corrupt(format!("code {i} of {key}")))?;
+                    .ok_or_else(|| SpannError::Corrupt(format!("code {i} of {key}")))?;
                 members.push(Member { id, code });
             }
             let children: Vec<PartitionKey> = self.children(key);
@@ -484,7 +488,7 @@ impl<'a> Chunk<'a> {
             ));
         }
         let height = self.height();
-        Ok(CspannIndex::from_parts(
+        Ok(SpannIndex::from_parts(
             opts,
             self.header.dims,
             rotation,
@@ -494,8 +498,6 @@ impl<'a> Chunk<'a> {
         ))
     }
 }
-
-/// Serialises a built index into the chunk format.
 
 /// CRC-32C (Castagnoli), the polynomial §6.1 names. Bitwise on purpose: the
 /// chunk hashes run once per file, not per query.
@@ -546,27 +548,27 @@ impl Default for Crc32c {
 /// [`FileIndex::open`] verifies every section's CRC, i.e. reads the whole file.
 /// A publisher that only wants to know whether the chunk it already has was
 /// built with the catalog's options must not pay that: this reads 128 bytes.
-pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, CspannError> {
+pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, SpannError> {
     use std::io::Read;
     let mut file =
-        std::fs::File::open(path).map_err(|e| CspannError::Corrupt(format!("open chunk: {e}")))?;
+        std::fs::File::open(path).map_err(|e| SpannError::Corrupt(format!("open chunk: {e}")))?;
     let mut head = [0u8; HEADER_LEN];
     file.read_exact(&mut head)
-        .map_err(|e| CspannError::Corrupt(format!("read header: {e}")))?;
+        .map_err(|e| SpannError::Corrupt(format!("read header: {e}")))?;
     if head[0..8] != MAGIC {
-        return Err(CspannError::Corrupt("bad magic".to_string()));
+        return Err(SpannError::Corrupt("bad magic".to_string()));
     }
     let dims = u32::from_le_bytes(head[12..16].try_into().unwrap()) as usize;
     let metric = match head[16] {
         0 => Metric::L2,
         1 => Metric::Ip,
         2 => Metric::Cos,
-        other => return Err(CspannError::Corrupt(format!("bad metric {other}"))),
+        other => return Err(SpannError::Corrupt(format!("bad metric {other}"))),
     };
     let encode = match head[17] {
         0 => Encode::None,
         1 => Encode::Rabitq,
-        other => return Err(CspannError::Corrupt(format!("bad encode {other}"))),
+        other => return Err(SpannError::Corrupt(format!("bad encode {other}"))),
     };
     Ok(ChunkHeader {
         dims,
@@ -578,12 +580,12 @@ pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, Csp
     })
 }
 
-/// A [`index::cspann::VectorSource`] over a mapped `f32` scratch file.
+/// A [`index::spann::VectorSource`] over a mapped `f32` scratch file.
 ///
 /// A build needs random access to every vector (k-means centroids, split
 /// assignment, encoding), which is what forced the whole column resident before
 /// this existed: 6 KB/row at 1536d, i.e. 6 GB for 1M rows and 300 GB at the
-/// scale cspann is for. Mapping a scratch file the caller wrote during the
+/// scale spann is for. Mapping a scratch file the caller wrote during the
 /// block pass keeps those pages in page cache instead of anonymous memory, so
 /// the build's RSS is the tree's codes plus whatever the kernel keeps around.
 pub struct ScratchSource {
@@ -599,11 +601,11 @@ impl ScratchSource {
         path: impl AsRef<std::path::Path>,
         ids: Vec<u64>,
         dim: usize,
-    ) -> Result<Self, CspannError> {
+    ) -> Result<Self, SpannError> {
         let map = crate::buffer::mapped::MappedFile::open_path(path)
-            .map_err(|e| CspannError::Corrupt(format!("map scratch: {e}")))?;
+            .map_err(|e| SpannError::Corrupt(format!("map scratch: {e}")))?;
         if map.len() != ids.len() * dim * 4 {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "scratch is {} bytes, expected {} for {} rows x {dim} dims",
                 map.len(),
                 ids.len() * dim * 4,
@@ -614,7 +616,7 @@ impl ScratchSource {
     }
 }
 
-impl index::cspann::VectorSource for ScratchSource {
+impl index::spann::VectorSource for ScratchSource {
     fn len(&self) -> usize {
         self.ids.len()
     }
@@ -640,9 +642,9 @@ pub fn build_from_scratch(
     ids: Vec<u64>,
     dim: usize,
     opts: Options,
-) -> Result<CspannIndex, CspannError> {
+) -> Result<SpannIndex, SpannError> {
     let src = ScratchSource::open(path, ids, dim)?;
-    CspannIndex::build_from_source(&src, opts)
+    SpannIndex::build_from_source(&src, opts)
 }
 
 /// A chunk served straight out of its file (§6.4's out-of-core path).
@@ -662,15 +664,15 @@ pub struct FileIndex {
 }
 
 impl FileIndex {
-    pub fn open(path: impl AsRef<std::path::Path>, opts: &Options) -> Result<Self, CspannError> {
+    pub fn open(path: impl AsRef<std::path::Path>, opts: &Options) -> Result<Self, SpannError> {
         let map = crate::mapped::MappedFile::open_path(path)
-            .map_err(|e| CspannError::Corrupt(format!("map: {e}")))?;
+            .map_err(|e| SpannError::Corrupt(format!("map: {e}")))?;
         let layout = Layout::open(&map)?;
         if layout.header.metric != opts.metric
             || layout.header.encode != opts.encode
             || layout.header.seed != opts.seed
         {
-            return Err(CspannError::Corrupt(format!(
+            return Err(SpannError::Corrupt(format!(
                 "catalog ({:?}/{:?}/{}) and chunk ({:?}/{:?}/{}) disagree",
                 opts.metric,
                 opts.encode,
@@ -713,7 +715,7 @@ impl FileIndex {
     /// Every row id the chunk covers, ascending (section F). The coverage check
     /// asks which rows the tree does *not* hold, so a partly covered table
     /// scores its tail instead of the whole table
-    /// (`docs/CSPANN_DESIGN.md` §9.7).
+    /// (`docs/SPANN_DESIGN.md` §9.7).
     pub fn row_ids(&self) -> Vec<u64> {
         self.chunk().row_ids()
     }
@@ -727,7 +729,7 @@ impl FileIndex {
         self.layout.header.partitions
     }
 
-    /// Same descent as `CspannIndex::search`, but every partition is read from
+    /// Same descent as `SpannIndex::search`, but every partition is read from
     /// the mapping (`§8.4`: beam per level, radius bound, exact rescoring by the
     /// caller).
     pub fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
@@ -835,7 +837,7 @@ impl FileIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use index::cspann::CspannIndex;
+    use index::spann::SpannIndex;
 
     fn rows(n: usize, dim: usize) -> Vec<(u64, Vec<f32>)> {
         (0..n)
@@ -866,10 +868,10 @@ mod tests {
     /// `write`'s output, including the CRC trailers.
     #[test]
     fn streaming_and_in_memory_writes_agree() {
-        let index = CspannIndex::build(rows(300, 16), opts()).unwrap();
+        let index = SpannIndex::build(rows(300, 16), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let path = std::env::temp_dir().join(format!(
-            "cspann-writer-{}-{:?}.idx",
+            "spann-writer-{}-{:?}.idx",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -887,7 +889,7 @@ mod tests {
     #[test]
     fn round_trip_preserves_the_tree_and_the_answers() {
         let data = rows(300, 16);
-        let index = CspannIndex::build(data.clone(), opts()).unwrap();
+        let index = SpannIndex::build(data.clone(), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
 
@@ -936,7 +938,7 @@ mod tests {
     #[test]
     fn file_index_matches_the_in_memory_tree() {
         let data = rows(400, 16);
-        let index = CspannIndex::build(data.clone(), opts()).unwrap();
+        let index = SpannIndex::build(data.clone(), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("chunk_0.idx");
@@ -974,7 +976,7 @@ mod tests {
 
     #[test]
     fn slot_pages_are_page_aligned_and_complete() {
-        let index = CspannIndex::build(rows(200, 8), opts()).unwrap();
+        let index = SpannIndex::build(rows(200, 8), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
         let slots_offset = chunk.sections[Section::Slots as usize].0;
@@ -992,7 +994,7 @@ mod tests {
 
     #[test]
     fn a_flipped_byte_is_rejected_by_the_checksum() {
-        let index = CspannIndex::build(rows(120, 8), opts()).unwrap();
+        let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let (offset, len) = Chunk::parse(&bytes).unwrap().sections[Section::Centroids as usize];
         assert!(len > 0);
@@ -1000,24 +1002,24 @@ mod tests {
         corrupt[offset + 3] ^= 0x40;
         let err = Chunk::parse(&corrupt).unwrap_err();
         assert!(
-            matches!(&err, CspannError::Corrupt(msg) if msg.contains("checksum")),
+            matches!(&err, SpannError::Corrupt(msg) if msg.contains("checksum")),
             "{err}"
         );
     }
 
     #[test]
     fn truncated_or_foreign_files_are_rejected() {
-        let index = CspannIndex::build(rows(120, 8), opts()).unwrap();
+        let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
         let bytes = write(&index).unwrap();
 
         let err = Chunk::parse(&bytes[..HEADER_LEN]).unwrap_err();
-        assert!(matches!(err, CspannError::Corrupt(_)));
+        assert!(matches!(err, SpannError::Corrupt(_)));
 
         let mut wrong_magic = bytes.clone();
         wrong_magic[0] = b'X';
         assert!(matches!(
             Chunk::parse(&wrong_magic).unwrap_err(),
-            CspannError::Corrupt(_)
+            SpannError::Corrupt(_)
         ));
 
         // A valid header that claims a section beyond EOF.
@@ -1025,13 +1027,13 @@ mod tests {
         bad_table[32..40].copy_from_slice(&(u64::MAX / 2).to_le_bytes());
         assert!(matches!(
             Chunk::parse(&bad_table).unwrap_err(),
-            CspannError::Corrupt(_)
+            SpannError::Corrupt(_)
         ));
     }
 
     #[test]
     fn catalog_mismatch_is_rejected() {
-        let index = CspannIndex::build(rows(50, 8), opts()).unwrap();
+        let index = SpannIndex::build(rows(50, 8), opts()).unwrap();
         let bytes = write(&index).unwrap();
         let chunk = Chunk::parse(&bytes).unwrap();
 
@@ -1039,20 +1041,20 @@ mod tests {
         other.seed ^= 1;
         assert!(matches!(
             chunk.to_index(other).unwrap_err(),
-            CspannError::Corrupt(_)
+            SpannError::Corrupt(_)
         ));
 
         let mut cos = opts();
         cos.metric = Metric::Cos;
         assert!(matches!(
             chunk.to_index(cos).unwrap_err(),
-            CspannError::Corrupt(_)
+            SpannError::Corrupt(_)
         ));
     }
 
     #[test]
     fn encode_none_is_not_persisted_yet() {
-        let index = CspannIndex::build(
+        let index = SpannIndex::build(
             rows(20, 8),
             Options {
                 encode: Encode::None,
@@ -1062,7 +1064,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             write(&index).unwrap_err(),
-            CspannError::InvalidOption("encode", _)
+            SpannError::InvalidOption("encode", _)
         ));
     }
 }

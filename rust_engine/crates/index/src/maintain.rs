@@ -1,4 +1,4 @@
-//! What every index tells the maintenance layer (`CSPANN_DESIGN.md` §12.4).
+//! What every index tells the maintenance layer (`SPANN_DESIGN.md` §12.4).
 //!
 //! The quota check and the seal scheduler both need the same three answers from
 //! a tail - how many bytes it holds, how many would stay resident after a seal,
@@ -16,7 +16,7 @@
 
 /// The accounting and decision surface of one in-memory index tail.
 pub trait IndexMaintainer: Send + Sync {
-    /// `"HNSW"`, `"CSPANN"`, `"fulltext"`, … - the kind the scheduler reports.
+    /// `"HNSW"`, `"SPANN"`, `"fulltext"`, … - the kind the scheduler reports.
     fn kind(&self) -> &'static str;
 
     /// Bytes the tail holds right now: what the byte ledger compares against

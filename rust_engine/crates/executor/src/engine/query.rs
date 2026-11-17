@@ -512,7 +512,8 @@ impl Engine {
         stmts: Vec<Statement>,
         text: &str,
     ) -> Result<Vec<QueryResult>> {
-        crate::panic_guard::inject_statement_panic();
+        #[cfg(feature = "testing")]
+        crate::panic_guard::inject_statement_panic(&self.armed_panic);
         let mut out = Vec::new();
         for s in stmts {
             // `NewTxnManager::BeginTxnShared` runs once per statement, read-only
@@ -2223,12 +2224,12 @@ impl Engine {
                         }
                     }
                 }
-                // cspann is materialised by `CREATE INDEX` (`docs/CSPANN_DESIGN.md`
+                // spann is materialised by `CREATE INDEX` (`docs/SPANN_DESIGN.md`
                 // D3/D4) and held in memory. The tree covers exactly the rows
                 // present when it was built; rows written afterwards leave the
                 // index *uncovered*, and `knn_candidates` then answers with the
                 // exact scan (§9.7) instead of a short top-k.
-                if effective_type.eq_ignore_ascii_case("CSPANN") && has_rows {
+                if effective_type.eq_ignore_ascii_case("SPANN") && has_rows {
                     if let Some(index_id) = created_index_id {
                         let schema = self.table_schema(table)?;
                         let Some(col) = schema.iter().position(|c| c == column) else {
@@ -2236,10 +2237,10 @@ impl Engine {
                         };
                         // Out-of-core build: scratch file + mapping, so the
                         // column is never resident as text or as one flat `f32`
-                        // buffer (see `Engine::cspann_build`).
-                        let options = crate::cspann_mem::options_from(opts)?;
+                        // buffer (see `Engine::spann_build`).
+                        let options = crate::spann_mem::options_from(opts)?;
                         let Some(built) =
-                            self.cspann_build(table, col, options, &self.dir.join("tmp"), None)
+                            self.spann_build(table, col, options, &self.dir.join("tmp"), None)
                         else {
                             return Err(Error::Invalid(format!(
                                 "no vectors to index in '{table}.{column}'"
@@ -2253,10 +2254,10 @@ impl Engine {
                                 .unwrap()
                                 .entry(key)
                                 .or_default()
-                                .cspann
+                                .spann
                                 .insert(
                                     index_id,
-                                    std::sync::Arc::new(crate::cspann_mem::CspannHandle::Memory(
+                                    std::sync::Arc::new(crate::spann_mem::SpannHandle::Memory(
                                         tree,
                                     )),
                                 );

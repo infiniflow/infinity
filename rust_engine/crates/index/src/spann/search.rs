@@ -3,7 +3,7 @@
 //! `SearchSet` mirrors Cockroach's `search_set.go`: entries sort by
 //! `(distance, errorBound, key)`, the heap only prunes once it is full, and
 //! `maybe_closer` decides whether a *new* candidate can displace the current
-//! worst one. `CSPANN_DESIGN.md` §8.4 fixes the thresholds; the pruning rule is
+//! worst one. `SPANN_DESIGN.md` §8.4 fixes the thresholds; the pruning rule is
 //! what keeps a probe over a 128-slot partition from allocating per candidate.
 //!
 //! Scores are "smaller is better" for every metric: L2 stores the squared

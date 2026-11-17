@@ -12,7 +12,6 @@
 #![feature(portable_simd)]
 
 pub mod bp;
-pub mod cspann;
 pub mod emvb;
 pub mod fulltext;
 pub mod hnsw_handler;
@@ -31,6 +30,7 @@ pub mod plaid;
 pub mod rabitq;
 pub mod simd;
 pub mod smve;
+pub mod spann;
 pub mod sparse;
 pub mod vector;
 

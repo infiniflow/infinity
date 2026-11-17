@@ -1346,16 +1346,16 @@ impl Engine {
             .iter()
             .map(|(seq, row)| (*seq, coerce_row(row, &coercions)))
             .collect();
-        // cspann's mem index: the row goes here, **not** into the tree
-        // (`docs/CSPANN_DESIGN.md` §9.2). One vector copy per row, and the next
+        // spann's mem index: the row goes here, **not** into the tree
+        // (`docs/SPANN_DESIGN.md` §9.2). One vector copy per row, and the next
         // dump builds the tree that covers these rows and clears the list.
-        let cspann_columns: Vec<(u64, usize)> = self
+        let spann_columns: Vec<(u64, usize)> = self
             .storage
             .catalog
             .indexes_of_table(&table)
             .unwrap_or_default()
             .into_iter()
-            .filter(|im| im.index_type.eq_ignore_ascii_case("CSPANN"))
+            .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
             .filter_map(|im| {
                 let position = self
                     .table_schema(&table)
@@ -1369,8 +1369,8 @@ impl Engine {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             // Before `buffer_rows`, which consumes `rows`.
-            for (index_id, column) in &cspann_columns {
-                let mem = entry.cspann_mem.entry(*index_id).or_default();
+            for (index_id, column) in &spann_columns {
+                let mem = entry.spann_mem.entry(*index_id).or_default();
                 mem.reserve(rows.len());
                 for (seq, row) in &rows {
                     let Some(value) = row.get(*column) else {
@@ -1672,10 +1672,10 @@ impl Engine {
             segments.push((0, 0));
         }
         let mut published = Vec::new();
-        // cspann indexes whose chunk was (re)written in this pass: their mem
+        // spann indexes whose chunk was (re)written in this pass: their mem
         // index is the rows that chunk now covers, so it is cleared once the
         // records are appended below.
-        let mut cspann_ready: Vec<u64> = Vec::new();
+        let mut spann_ready: Vec<u64> = Vec::new();
         for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
@@ -1745,7 +1745,7 @@ impl Engine {
                 .flat_map(|(_, chunks)| chunks)
                 .map(|(id, info)| (info.base_row_id, *id as u32))
                 .collect();
-            // `(segment, chunk id) -> row_count`, for the cspann reuse check: a
+            // `(segment, chunk id) -> row_count`, for the spann reuse check: a
             // chunk records how many rows it covers, and a segment that has not
             // changed since its chunk was written has exactly that many.
             let recorded_rows: std::collections::HashMap<(u32, u64), u64> = recorded_chunks
@@ -1923,8 +1923,8 @@ impl Engine {
                         index_size: bytes.len() as u64,
                         commit_ts: chunk_ts,
                     }]
-                } else if im.index_type.eq_ignore_ascii_case("CSPANN") {
-                    // Incremental dump (`docs/CSPANN_DESIGN.md` §9.4): a sealed
+                } else if im.index_type.eq_ignore_ascii_case("SPANN") {
+                    // Incremental dump (`docs/SPANN_DESIGN.md` §9.4): a sealed
                     // segment is immutable, so a live chunk that already covers
                     // this segment's live rows **and was built with the catalog's
                     // options** is still the answer, and rebuilding it would only
@@ -1948,12 +1948,12 @@ impl Engine {
                         let tables = self.tables.lock().unwrap();
                         tables
                             .get(&self.table_key(table))
-                            .and_then(|entry| entry.cspann_mem.get(&(index_id as u64)))
+                            .and_then(|entry| entry.spann_mem.get(&(index_id as u64)))
                             .is_some_and(|rows| {
                                 rows.iter().any(|(seq, _)| (*seq >> 32) as u32 == *segment)
                             })
                     };
-                    let opts = crate::cspann_mem::options_from(&im.options).ok();
+                    let opts = crate::spann_mem::options_from(&im.options).ok();
                     let reusable = !pending_in_segment
                         && opts.is_some_and(|opts| {
                             match self
@@ -1963,7 +1963,7 @@ impl Engine {
                             {
                                 Some((id, path)) => {
                                     recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
-                                        && storage::knn_index::cspann::read_header(&path).is_ok_and(
+                                        && storage::knn_index::spann::read_header(&path).is_ok_and(
                                             |h| {
                                                 h.metric == opts.metric
                                                     && h.encode == opts.encode
@@ -1996,11 +1996,11 @@ impl Engine {
                     // One chunk per segment, streamed: the tree that has to be
                     // resident is this segment's, not the table's.
                     let Some(index_size) =
-                        self.cspann_chunk(table, &im.column, &im.options, *segment, &path)
+                        self.spann_chunk(table, &im.column, &im.options, *segment, &path)
                     else {
                         continue;
                     };
-                    cspann_ready.push(index_id as u64);
+                    spann_ready.push(index_id as u64);
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),
@@ -2081,11 +2081,11 @@ impl Engine {
             }
         }
         // The published chunks cover the rows the mem index was holding.
-        if !cspann_ready.is_empty() {
+        if !spann_ready.is_empty() {
             let key = self.table_key(table);
             if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-                for id in cspann_ready {
-                    entry.cspann_mem.remove(&id);
+                for id in spann_ready {
+                    entry.spann_mem.remove(&id);
                 }
             }
         }
@@ -3053,7 +3053,7 @@ impl Engine {
     ///
     /// Same walk as [`Self::block_visible_row_count`] - one function, so the
     /// two cannot disagree about which rows exist. The vector scan uses it to
-    /// ask "which rows does the index not cover" (`docs/CSPANN_DESIGN.md`
+    /// ask "which rows does the index not cover" (`docs/SPANN_DESIGN.md`
     /// §9.7): before this, an index that covered all but a handful of rows made
     /// the query decode the whole table.
     pub(crate) fn live_row_ids(&self, table: &str) -> std::collections::HashSet<usize> {
@@ -6344,14 +6344,14 @@ impl Engine {
             .collect()
     }
 
-    /// Builds the cspann chunk body for `column`: one tree over every live row of
-    /// the table, serialised by `storage::knn_index::cspann::write`.
+    /// Builds the spann chunk body for `column`: one tree over every live row of
+    /// the table, serialised by `storage::knn_index::spann::write`.
     ///
     /// The dump **rebuilds** instead of sealing an in-memory tail
-    /// (`docs/CSPANN_DESIGN.md` §9.4's `index_delta_mode = rebuild`). That costs
+    /// (`docs/SPANN_DESIGN.md` §9.4's `index_delta_mode = rebuild`). That costs
     /// `O(rows · log(rows/max) · dims)` per dump and needs no tail bookkeeping,
     /// and it is what makes every chunk a complete snapshot of the segment.
-    pub(crate) fn cspann_chunk(
+    pub(crate) fn spann_chunk(
         &self,
         table: &str,
         column: &str,
@@ -6369,8 +6369,8 @@ impl Engine {
         // streamed straight to `path`. Neither the text (~15 KB/row at 1536d)
         // nor the `f32` column (6 KB/row) nor the serialised chunk (208 B/row)
         // has to be resident, and a dump only ever holds one segment's tree.
-        let opts = crate::cspann_mem::options_from(options).ok()?;
-        self.cspann_write_chunk(table, ci, opts, segment, path)
+        let opts = crate::spann_mem::options_from(options).ok()?;
+        self.spann_write_chunk(table, ci, opts, segment, path)
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for

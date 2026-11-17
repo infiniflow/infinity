@@ -3436,7 +3436,7 @@ mod tests {
             .unwrap();
         let body = "{\"sql\":\"SELECT * FROM t;\"}";
 
-        executor::panic_guard::arm_injected_panic();
+        engine.arm_injected_panic();
         let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/query", body));
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("injected panic"), "{b}");

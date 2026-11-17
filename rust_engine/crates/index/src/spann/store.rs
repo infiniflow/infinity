@@ -1,15 +1,15 @@
-//! The read-side store abstraction (`CSPANN_DESIGN.md` §7).
+//! The read-side store abstraction (`SPANN_DESIGN.md` §7).
 //!
 //! The search algorithm only needs four things: the root key, the height, a
 //! lookup by key, and the partitions themselves. `MemStore` is the in-memory
 //! implementation used by the algorithm tests and by the build path; the chunk
-//! store (`crates/storage/src/knn_index/cspann`) implements the same trait over
+//! store (`crates/storage/src/knn_index/spann`) implements the same trait over
 //! an mmap, which is what makes §6.4's out-of-core claim testable without a
 //! second copy of the algorithms.
 //!
 //! Mutation is deliberately absent: the tail lives in the executor as a
 //! `PendingTail` of codes (§9.2) and never rewrites a built tree, so there is
-//! no `CspannMutStore` yet.
+//! no `SpannMutStore` yet.
 
 use std::collections::HashMap;
 
@@ -18,7 +18,7 @@ use super::partition::Partition;
 use super::PartitionKey;
 
 /// Read access to a built tree.
-pub trait CspannStore {
+pub trait SpannStore {
     fn dims(&self) -> usize;
     fn root(&self) -> PartitionKey;
     fn height(&self) -> u32;
@@ -81,7 +81,7 @@ impl MemStore {
     }
 }
 
-impl CspannStore for MemStore {
+impl SpannStore for MemStore {
     fn dims(&self) -> usize {
         self.dims
     }
@@ -110,7 +110,7 @@ impl CspannStore for MemStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cspann::{CspannIndex, Encode, Options};
+    use crate::spann::{Encode, Options, SpannIndex};
     use crate::vector::Metric;
 
     #[test]
@@ -124,7 +124,7 @@ mod tests {
             encode: Encode::Rabitq,
             ..Options::default()
         };
-        let index = CspannIndex::build(rows, opts).unwrap();
+        let index = SpannIndex::build(rows, opts).unwrap();
         let store = index.store();
         assert_eq!(store.len(), 300);
         assert!(store.height() >= 2);
