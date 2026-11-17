@@ -9638,6 +9638,14 @@ impl Engine {
         // candidate set is known.
         let has_filter = pred.is_some() || in_filter.is_some() || search_filter.is_some();
         let mut rows: Vec<(usize, Vec<Value>)> = Vec::new();
+        // The predicates a scored row must pass. Defined here rather than next
+        // to the scan because the streamed rerank below scores one batch at a
+        // time, before that scan exists.
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
         // The cache path scores from `score_cache` and never touches `rows`.
         // A `bit` sparse column scores and renders as an integer.
         let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
@@ -9714,7 +9722,11 @@ impl Engine {
                             .find(|(key, _)| key.eq_ignore_ascii_case("beam"))
                             .and_then(|(_, value)| value.trim().parse::<usize>().ok())
                     })
-                    .unwrap_or_else(|| index::cspann::Options::default().base_beam);
+                    // The statement path defaults to the reference's *search*
+                    // width (32), not the index's build beam (8): the two are
+                    // different knobs in Cockroach
+                    // (`vector_search_beam_size` vs `IndexOptions.BaseBeamSize`).
+                    .unwrap_or(crate::cspann_mem::DEFAULT_SEARCH_BEAM);
                 let mut monitors = self.context.recall.lock().unwrap();
                 let monitor = monitors
                     .entry(id)
@@ -9784,10 +9796,62 @@ impl Engine {
             (None, Some((col, dims))) => self.vector_cache_for(table, col, *dims).ok(),
             (None, None) => None,
         };
+        // The scan's own metadata, needed by the streamed per-batch scans below.
+        let column_decl = types
+            .get(col_idx)
+            .map(|t| t.to_ascii_uppercase())
+            .unwrap_or_default();
+        let query_elem_arg = arg_str(m.args.get(1));
+        // A dense candidate list is decoded and scored **one batch at a time**.
+        //
+        // The rerank pool is sized by the beam (hundreds of rows at 1 bit), and
+        // holding every decoded row at once is precisely the memory cspann
+        // exists to save: 812 rows × 1536d × 4 B is 5 MB per concurrent query,
+        // plus the block pages they pull into the page cache. Each batch is
+        // reduced to its own top-n - a superset of the global top-n within that
+        // batch - so the union stays exact while the peak is O(batch · dim).
+        let mut streamed: Option<Vec<(usize, f64, f64)>> = None;
+        // 64 rows: one batch is ~400 KB at 1536d, small enough that the
+        // per-query working set stops mattering next to the index itself.
+        const RERANK_BATCH: usize = 64;
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
             rows = match &vector_candidates {
+                Some(cands) if !cands.is_empty() && !is_sparse && !is_tensor => {
+                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                    ids.sort_unstable();
+                    let none: HashMap<usize, f64> = HashMap::new();
+                    let mut merged: Vec<(usize, f64, f64)> = Vec::new();
+                    for chunk in ids.chunks(RERANK_BATCH) {
+                        let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
+                        if !has_filter {
+                            for (_, row) in got.iter_mut() {
+                                let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                *row = vec![Value::Null; col_idx + 1];
+                                row[col_idx] = value;
+                            }
+                        }
+                        let batch = knn_scan::PhysicalKnnScan {
+                            column_index: col_idx,
+                            column_type: &column_decl,
+                            is_sparse,
+                            is_tensor,
+                            is_bit_sparse: bit_sparse,
+                            query_items: &query_items,
+                            query_elem_type: query_elem_arg.as_deref(),
+                            topn,
+                            metric: &metric,
+                            threshold,
+                            rows: &got,
+                            cache: None,
+                            vector_candidates: None,
+                        };
+                        merged.extend(batch.finish(batch.execute(&keep, &none, &none)?).scored);
+                    }
+                    streamed = Some(merged);
+                    Vec::new()
+                }
                 // A predicate reads other columns, so a filtered query needs the
                 // whole row; an unfiltered one is scored from the vector column
                 // alone and gets its output rows from the block pass below.
@@ -9943,16 +10007,6 @@ impl Engine {
         // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
         // (filters live in the filter-scan base; the index probe above is
         // `KnnCandidateScan`).
-        let keep = |row: &[Value]| {
-            pred.is_none_or(|p| p.eval_predicate(row))
-                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
-        };
-        let column_decl = types
-            .get(col_idx)
-            .map(|t| t.to_ascii_uppercase())
-            .unwrap_or_default();
-        let query_elem_arg = arg_str(m.args.get(1));
         let scan = knn_scan::PhysicalKnnScan {
             column_index: col_idx,
             column_type: &column_decl,
@@ -9971,7 +10025,17 @@ impl Engine {
         // Scoring only ever reads the vector column, so the rows it decoded are
         // projections of it. The result rows are read separately (all columns),
         // which is why this scan cannot reuse them.
-        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
+        //
+        // A streamed rerank has already scored every batch and kept each
+        // batch's top-n; `finish` then orders that union and truncates it,
+        // which is the same answer for a monotone ranking key.
+        let state = match streamed {
+            Some(scored) => scan.finish(knn_scan::KnnScanOperatorState {
+                scored,
+                use_sim: scan.is_knn_min_heap(),
+            }),
+            None => scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?),
+        };
         let use_sim = state.use_sim;
         let scored = state.scored;
         // §11.3 item 4: one query in `DEFAULT_SAMPLE_RATE` is also answered

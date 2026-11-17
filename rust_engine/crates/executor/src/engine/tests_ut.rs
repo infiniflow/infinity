@@ -13333,6 +13333,56 @@ mod tests {
         }
     }
 
+    /// The rerank pool is streamed in batches (`RERANK_BATCH` rows at a time),
+    /// so a pool wider than one batch must answer exactly what a single
+    /// materialised pass would: 600 rows give ~812 candidates over ~10 batches,
+    /// and a self-query still has to find its own row in the top-10.
+    #[test]
+    fn cspann_streamed_rerank_answers_across_many_batches() {
+        let n = 600usize;
+        let dim = 16usize;
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE csb (id INT, v EMBEDDING(FLOAT,16));")
+            .unwrap();
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}.5", (i * 17 + d * 31) % 1009))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let mut sql = String::from("INSERT INTO csb VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX csb_i ON csb (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+
+        // The pool is `candidate_budget(10, 32, 50)` = 812, clamped to the 600
+        // rows the tree holds: several batches of `RERANK_BATCH`.
+        for i in (0..n).step_by(60) {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM csb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+                    vector(i)
+                ),
+            );
+            let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
+            assert_eq!(ids.len(), 10, "row {i}: {ids:?}");
+            assert!(ids.contains(&i.to_string()), "row {i} missing from {ids:?}");
+        }
+        let _ = crate::scheduler::block_on(e.flush());
+    }
+
     /// Rows written after the tree was built leave it uncovered, so the query
     /// path must fall back to the exact scan instead of answering a short
     /// top-k (§9.7). This is what keeps a rebuild-mode index correct.
@@ -13717,6 +13767,172 @@ mod tests {
             .map(|e| !e.cspann.is_empty())
             .unwrap_or(false);
         assert!(loaded, "the query must have loaded the chunk into memory");
+    }
+
+    /// An insert must be queryable **before** the next dump.
+    ///
+    /// The row goes into the index's mem index (O(1) append), and the query
+    /// merges it with the published chunks; the tree is only built at the next
+    /// flush. Before this, the row was "uncovered" and every such query fell back
+    /// to scanning the whole table.
+    #[test]
+    fn an_insert_is_visible_before_the_next_dump() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..8)
+                .map(|d| format!("{}", (i * 11 + d * 23) % 977))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ci (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO ci VALUES ");
+        for i in 0..80 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 80 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX ci_i ON ci (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        // A row nothing else resembles, inserted after the dump.
+        let needle = "[100000,100001,100002,100003,100004,100005,100006,100007]";
+        e.execute_blocking(&format!("INSERT INTO ci VALUES (80, {needle});"))
+            .unwrap();
+        let key = e.table_key("default_db.ci");
+        let pending = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| {
+                entry
+                    .cspann_mem
+                    .values()
+                    .map(|rows| rows.len())
+                    .sum::<usize>()
+            })
+            .unwrap_or(0);
+        assert_eq!(pending, 1, "the insert must land in the mem index");
+
+        let got = rows(
+            &e,
+            &format!("SELECT id FROM ci SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
+        );
+        assert_eq!(
+            got.first().map(|r| r[0].clone()),
+            Some("80".to_string()),
+            "the new row must be the nearest, got {got:?}"
+        );
+
+        // The dump builds the tree that covers it and releases the mem index.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let pending = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| {
+                entry
+                    .cspann_mem
+                    .values()
+                    .map(|rows| rows.len())
+                    .sum::<usize>()
+            })
+            .unwrap_or(0);
+        assert_eq!(pending, 0, "the dump must clear the mem index");
+        let got = rows(
+            &e,
+            &format!("SELECT id FROM ci SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("80".to_string()));
+    }
+
+    /// A checkpoint must not rebuild a segment that has not changed (§9.4).
+    ///
+    /// Before this, every dump rebuilt the whole table into segment 0's chunk:
+    /// a 1M-row table paid a full k-means build on every checkpoint even when
+    /// nothing was written. The reuse test is the chunk's own `row_count`
+    /// against the segment's live rows, so a delete (which lowers it) or a
+    /// compaction (which renames the segment) still rebuilds.
+    #[test]
+    fn a_checkpoint_reuses_an_unchanged_cspann_chunk() {
+        let n = 120usize;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..8)
+                .map(|d| format!("{}", (i * 13 + d * 29) % 983))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cq (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cq VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cq_i ON cq (v) USING CSPANN WITH \
+             (metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let before: Vec<(u64, std::path::PathBuf)> =
+            e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
+        assert_eq!(before.len(), 1, "one chunk for one segment: {before:?}");
+        let stamp = std::fs::metadata(&before[0].1)
+            .and_then(|m| m.modified())
+            .unwrap();
+
+        // Nothing was written, so the second checkpoint has nothing to publish.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let after: Vec<(u64, std::path::PathBuf)> =
+            e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
+        assert_eq!(after, before, "the chunk list must not grow");
+        let stamp_after = std::fs::metadata(&after[0].1)
+            .and_then(|m| m.modified())
+            .unwrap();
+        assert_eq!(stamp_after, stamp, "the chunk file must not be rewritten");
+
+        // A write *does* invalidate it: the segment's live row count changes,
+        // so the next checkpoint has to publish a chunk that covers the new row.
+        e.execute_blocking(&format!("INSERT INTO cq VALUES ({n}, {});", vector(n)))
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let grown: Vec<(u64, std::path::PathBuf)> =
+            e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
+        assert!(
+            grown.len() > before.len(),
+            "a write must publish a fresh chunk: {grown:?}"
+        );
+
+        // And it still answers after a restart, i.e. the reuse left a chunk the
+        // loader can find.
+        drop(e);
+        let reopened = Engine::open(dir.path()).unwrap();
+        let got = rows(
+            &reopened,
+            &format!(
+                "SELECT id FROM cq SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3);",
+                vector(7)
+            ),
+        );
+        assert!(!got.is_empty());
     }
 
     /// The numbers behind `docs/CSPANN_BENCH.md`.

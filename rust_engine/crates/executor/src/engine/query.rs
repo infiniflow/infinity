@@ -2234,12 +2234,19 @@ impl Engine {
                         let Some(col) = schema.iter().position(|c| c == column) else {
                             return Err(Error::Invalid(format!("unknown column '{column}'")));
                         };
-                        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
-                        for (seq, text) in self.read_block_column_including_deleted(table, col) {
-                            rows.push((seq as u64, crate::engine::state::parse_vec_f32(&text)));
-                        }
-                        if !rows.is_empty() {
-                            let tree = crate::cspann_mem::build(rows, opts)?;
+                        // Out-of-core build: scratch file + mapping, so the
+                        // column is never resident as text or as one flat `f32`
+                        // buffer (see `Engine::cspann_build`).
+                        let options = crate::cspann_mem::options_from(opts)?;
+                        let Some(built) =
+                            self.cspann_build(table, col, options, &self.dir.join("tmp"), None)
+                        else {
+                            return Err(Error::Invalid(format!(
+                                "no vectors to index in '{table}.{column}'"
+                            )));
+                        };
+                        {
+                            let tree = std::sync::Arc::new(built);
                             let key = self.table_key(table);
                             self.tables
                                 .lock()

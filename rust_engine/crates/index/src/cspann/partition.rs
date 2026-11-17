@@ -45,11 +45,15 @@ pub struct Partition {
 
 impl Partition {
     /// Builds a node from `(member id, vector)` pairs.
+    ///
+    /// The vectors are borrowed (`&[f32]`) rather than owned: a build over a
+    /// mapped scratch file must not copy the column into `Vec<f32>` per member
+    /// (6 KB each at 1536d), and a leaf's codes are all the node keeps.
     pub fn build(
         key: PartitionKey,
         level: u32,
         dim: usize,
-        members: &[(u64, Vec<f32>)],
+        members: &[(u64, &[f32])],
         rot: &Rotation,
         encode: Encode,
     ) -> Self {
@@ -152,14 +156,26 @@ impl Partition {
     }
 
     /// Scores every member into `out`.
+    /// Scores the leaf's members into `out`.
+    ///
+    /// `allowed` is the statement's filter bitmap. It is tested **here**, per
+    /// slot, instead of after the fact: widening the candidate pool by
+    /// `1/selectivity` was how a filter reached the tree before, and at 1%
+    /// selectivity that asked for the whole table (`§12.5`).
     pub fn search_into(
         &self,
         query: &QueryCode,
         q_raw: &[f32],
         metric: Metric,
         out: &mut SearchSet,
+        allowed: Option<&std::collections::HashSet<u64>>,
     ) {
         for (index, member) in self.members.iter().enumerate() {
+            if let Some(allowed) = allowed {
+                if !allowed.contains(&member.id) {
+                    continue;
+                }
+            }
             let (squared, err) = match self.raw_member(index) {
                 Some(raw) => (l2_sq(q_raw, raw), 0.0f32),
                 None => (
@@ -193,13 +209,13 @@ pub fn metric_score(metric: Metric, squared: f32, err: f32, q_raw: f32, o_raw: f
     }
 }
 
-fn mean_of(members: &[(u64, Vec<f32>)], dim: usize) -> Vec<f32> {
+fn mean_of(members: &[(u64, &[f32])], dim: usize) -> Vec<f32> {
     let mut out = vec![0.0f32; dim];
     if members.is_empty() {
         return out;
     }
     for (_, v) in members {
-        for (o, x) in out.iter_mut().zip(v) {
+        for (o, x) in out.iter_mut().zip(v.iter()) {
             *o += *x;
         }
     }
@@ -227,15 +243,20 @@ mod tests {
             .collect()
     }
 
+    /// Borrowed members, the shape `Partition::build` takes.
+    fn refs(pts: &[(u64, Vec<f32>)]) -> Vec<(u64, &[f32])> {
+        pts.iter().map(|(id, v)| (*id, v.as_slice())).collect()
+    }
+
     #[test]
     fn search_finds_the_nearest_members() {
         let pts = points(32);
         let rot = Rotation::new(4, 5);
-        let part = Partition::build(1, 1, 4, &pts, &rot, Encode::None);
+        let part = Partition::build(1, 1, 4, &refs(&pts), &rot, Encode::None);
         let q = [7.75, 1.5, 1.0, -1.0];
         let mut set = SearchSet::new(3, 0);
         let qc = part.make_query(&rot, &q);
-        part.search_into(&qc, &q, Metric::L2, &mut set);
+        part.search_into(&qc, &q, Metric::L2, &mut set, None);
         let ids: Vec<u64> = set.into_sorted().into_iter().map(|(id, _)| id).collect();
 
         let mut exact: Vec<(u64, f32)> = pts.iter().map(|(id, v)| (*id, l2_sq(&q, v))).collect();
@@ -249,11 +270,11 @@ mod tests {
     fn encode_none_matches_the_brute_force_top_k() {
         let pts = points(64);
         let rot = Rotation::new(4, 5);
-        let part = Partition::build(1, 1, 4, &pts, &rot, Encode::None);
+        let part = Partition::build(1, 1, 4, &refs(&pts), &rot, Encode::None);
         let q = [12.3, 2.2, 0.9, -1.1];
         let mut set = SearchSet::new(5, 0);
         let qc = part.make_query(&rot, &q);
-        part.search_into(&qc, &q, Metric::L2, &mut set);
+        part.search_into(&qc, &q, Metric::L2, &mut set, None);
         let got: Vec<u64> = set.into_sorted().into_iter().map(|(id, _)| id).collect();
 
         let mut exact: Vec<(u64, f32)> = pts.iter().map(|(id, v)| (*id, l2_sq(&q, v))).collect();
@@ -266,7 +287,7 @@ mod tests {
     fn radius_bounds_every_member() {
         let pts = points(16);
         let rot = Rotation::new(4, 5);
-        let part = Partition::build(1, 1, 4, &pts, &rot, Encode::Rabitq);
+        let part = Partition::build(1, 1, 4, &refs(&pts), &rot, Encode::Rabitq);
         for (_, v) in &pts {
             assert!(l2_sq(v, &part.centroid).sqrt() <= part.radius + 1e-5);
         }

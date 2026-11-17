@@ -629,22 +629,40 @@ impl Engine {
         let table = self.qualified_table(table);
         let opts = crate::cspann_mem::options_from(options).ok()?;
         let dir = self.hnsw_dir(&table, index)?;
-        // The live chunk list, not a directory walk: a chunk an `optimize`
-        // superseded leaves the list the moment it is deprecated, while its bytes
-        // stay on disk until `Cleanup` (`live_chunk_files`, `GetChunkIDs1`).
-        let mut best: Option<(u64, std::path::PathBuf)> = None;
-        for (id, path) in self.live_chunk_files(&table, index, 0, &dir) {
-            if best.as_ref().map(|(b, _)| id > *b).unwrap_or(true) {
-                best = Some((id, path));
+        // One chunk per segment (§6), so the index is the newest live chunk of
+        // **each** segment, not the newest chunk overall. The live chunk list,
+        // not a directory walk: a chunk an `optimize` superseded leaves the list
+        // the moment it is deprecated, while its bytes stay on disk until
+        // `Cleanup` (`live_chunk_files`, `GetChunkIDs1`).
+        let mut segments = self.segment_row_counts(&table);
+        if segments.is_empty() {
+            segments.push((0, 0));
+        }
+        segments.sort_by_key(|(segment, _)| *segment);
+        let mut chunks = Vec::new();
+        for (segment, rows) in segments {
+            if rows == 0 {
+                continue;
+            }
+            let mut best: Option<(u64, std::path::PathBuf)> = None;
+            for (id, path) in self.live_chunk_files(&table, index, segment, &dir) {
+                if best.as_ref().map(|(b, _)| id > *b).unwrap_or(true) {
+                    best = Some((id, path));
+                }
+            }
+            let Some((_, path)) = best else { continue };
+            // Mapped, not decoded: the slot bytes stay in page cache, which is
+            // what makes §19.3's 50M-in-8GB arithmetic work. The CRC of every
+            // section is still verified — once, here.
+            if let Ok(chunk) = storage::knn_index::cspann::FileIndex::open(&path, &opts) {
+                chunks.push(std::sync::Arc::new(chunk));
             }
         }
-        let (_, path) = best?;
-        // Mapped, not decoded: the slot bytes stay in page cache, which is what
-        // makes §19.3's 50M-in-8GB arithmetic work. The CRC of every section is
-        // still verified — once, here.
-        let index = storage::knn_index::cspann::FileIndex::open(&path, &opts).ok()?;
+        if chunks.is_empty() {
+            return None;
+        }
         Some(std::sync::Arc::new(crate::cspann_mem::CspannHandle::File(
-            std::sync::Arc::new(index),
+            chunks,
         )))
     }
 

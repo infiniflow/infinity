@@ -1346,9 +1346,42 @@ impl Engine {
             .iter()
             .map(|(seq, row)| (*seq, coerce_row(row, &coercions)))
             .collect();
+        // cspann's mem index: the row goes here, **not** into the tree
+        // (`docs/CSPANN_DESIGN.md` §9.2). One vector copy per row, and the next
+        // dump builds the tree that covers these rows and clears the list.
+        let cspann_columns: Vec<(u64, usize)> = self
+            .storage
+            .catalog
+            .indexes_of_table(&table)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("CSPANN"))
+            .filter_map(|im| {
+                let position = self
+                    .table_schema(&table)
+                    .ok()?
+                    .iter()
+                    .position(|c| c == &im.column)?;
+                Some((im.id, position))
+            })
+            .collect();
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
+            // Before `buffer_rows`, which consumes `rows`.
+            for (index_id, column) in &cspann_columns {
+                let mem = entry.cspann_mem.entry(*index_id).or_default();
+                mem.reserve(rows.len());
+                for (seq, row) in &rows {
+                    let Some(value) = row.get(*column) else {
+                        continue;
+                    };
+                    let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
+                    if !vector.is_empty() {
+                        mem.push((*seq as u64, vector));
+                    }
+                }
+            }
             entry.buffer_rows(rows);
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
@@ -1639,6 +1672,10 @@ impl Engine {
             segments.push((0, 0));
         }
         let mut published = Vec::new();
+        // cspann indexes whose chunk was (re)written in this pass: their mem
+        // index is the rows that chunk now covers, so it is cleared once the
+        // records are appended below.
+        let mut cspann_ready: Vec<u64> = Vec::new();
         for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
@@ -1696,17 +1733,28 @@ impl Engine {
             // The chunk records this index already has, by first row id: a
             // re-dump of a block rewrites its own chunk under its own id
             // instead of appending a second one.
-            let existing_chunks: std::collections::HashMap<u64, u32> =
-                catalog::layout::read_index_chunks(
-                    self.storage.catalog.store().as_ref(),
-                    &db_id.to_string(),
-                    &table_id.to_string(),
-                    &index_id.to_string(),
-                )
-                .unwrap_or_default()
-                .into_iter()
+            let recorded_chunks = catalog::layout::read_index_chunks(
+                self.storage.catalog.store().as_ref(),
+                &db_id.to_string(),
+                &table_id.to_string(),
+                &index_id.to_string(),
+            )
+            .unwrap_or_default();
+            let existing_chunks: std::collections::HashMap<u64, u32> = recorded_chunks
+                .iter()
                 .flat_map(|(_, chunks)| chunks)
-                .map(|(id, info)| (info.base_row_id, id as u32))
+                .map(|(id, info)| (info.base_row_id, *id as u32))
+                .collect();
+            // `(segment, chunk id) -> row_count`, for the cspann reuse check: a
+            // chunk records how many rows it covers, and a segment that has not
+            // changed since its chunk was written has exactly that many.
+            let recorded_rows: std::collections::HashMap<(u32, u64), u64> = recorded_chunks
+                .iter()
+                .flat_map(|(segment, chunks)| {
+                    chunks
+                        .iter()
+                        .map(move |(id, info)| ((*segment, *id), info.row_count))
+                })
                 .collect();
             for (segment, seg_rows) in &segments {
                 let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
@@ -1876,35 +1924,71 @@ impl Engine {
                         commit_ts: chunk_ts,
                     }]
                 } else if im.index_type.eq_ignore_ascii_case("CSPANN") {
-                    // Rebuild-mode delta handling (`docs/CSPANN_DESIGN.md` §9.4):
-                    // the tree is rebuilt from the column and the chunk describes
+                    // Incremental dump (`docs/CSPANN_DESIGN.md` §9.4): a sealed
+                    // segment is immutable, so a live chunk that already covers
+                    // this segment's live rows **and was built with the catalog's
+                    // options** is still the answer, and rebuilding it would only
+                    // re-derive the same tree.
+                    //
+                    // The row count catches a delete (it lowers the live count)
+                    // and a compaction (which renames the segment, leaving it
+                    // without a chunk); the header catches an option change,
+                    // which is the one case where the rows are identical but the
+                    // tree is not.
+                    let opts = crate::cspann_mem::options_from(&im.options).ok();
+                    let reusable = opts.is_some_and(|opts| {
+                        match self
+                            .live_chunk_files(table, &im.name, *segment, &seg_dir)
+                            .into_iter()
+                            .max_by_key(|(id, _)| *id)
+                        {
+                            Some((id, path)) => {
+                                recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
+                                    && storage::knn_index::cspann::read_header(&path).is_ok_and(
+                                        |h| {
+                                            h.metric == opts.metric
+                                                && h.encode == opts.encode
+                                                && h.seed == opts.seed
+                                        },
+                                    )
+                            }
+                            None => false,
+                        }
+                    });
+                    if reusable {
+                        // Nothing to publish: the catalog already lists the chunk
+                        // that covers this segment, and the loader takes the
+                        // newest one per segment.
+                        continue;
+                    }
+                    // The tree is rebuilt from the column and the chunk describes
                     // one snapshot of the segment, so a dump always makes the
                     // index cover every live row again.
-                    let Some(bytes) = self.cspann_chunk(table, &im.column, &im.options) else {
-                        continue;
-                    };
                     let set = SegmentSet {
                         db_id: db_id.to_string(),
                         table_id: table_id.to_string(),
                         segments: Vec::new(),
                     };
                     let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
-                    if std::fs::create_dir_all(&seg_dir).is_err()
-                        || storage::definition::format::write_synced(
-                            &seg_dir.join(format!("chunk_{chunk_id}.idx")),
-                            &bytes,
-                        )
-                        .is_err()
-                    {
+                    if std::fs::create_dir_all(&seg_dir).is_err() {
                         continue;
                     }
+                    let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
+                    // One chunk per segment, streamed: the tree that has to be
+                    // resident is this segment's, not the table's.
+                    let Some(index_size) =
+                        self.cspann_chunk(table, &im.column, &im.options, *segment, &path)
+                    else {
+                        continue;
+                    };
+                    cspann_ready.push(index_id as u64);
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),
                         base_row_id: u64::from(*segment) << 32,
                         row_count: *seg_rows,
                         term_count: 0,
-                        index_size: bytes.len() as u64,
+                        index_size,
                         commit_ts: chunk_ts,
                     }]
                 } else {
@@ -1975,6 +2059,15 @@ impl Engine {
                     continue;
                 }
                 let _ = self.storage.catalog.append_index_chunk(&set, index, chunk);
+            }
+        }
+        // The published chunks cover the rows the mem index was holding.
+        if !cspann_ready.is_empty() {
+            let key = self.table_key(table);
+            if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+                for id in cspann_ready {
+                    entry.cspann_mem.remove(&id);
+                }
             }
         }
         Ok(())
@@ -4822,6 +4915,62 @@ impl Engine {
         out
     }
 
+    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
+    /// time**.
+    ///
+    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
+    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
+    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
+    /// builder needs. Handing each cell to the caller lets it parse and drop the
+    /// text per block, so a build's peak is the vectors plus one block's text.
+    pub(crate) fn for_each_block_cell(
+        &self,
+        table: &str,
+        column: usize,
+        segment: Option<u32>,
+        mut f: impl FnMut(usize, &str),
+    ) {
+        let table = self.qualified_table(table);
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
+            return;
+        };
+        let Some(types) = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return;
+        };
+        let root = self.blocks_root();
+        let wanted = [column];
+        for id in self.visible_block_ids(&table) {
+            if segment.is_some_and(|s| id.segment_id != s) {
+                continue;
+            }
+            if let Some(cells) =
+                self.decode_block_cells(&table, &root, &meta, &types, id, Some(&wanted))
+            {
+                for (seq, cells) in cells {
+                    if let Some(text) = cells.get(column) {
+                        f(seq, text);
+                    }
+                }
+            }
+        }
+        // Rows that are still in the append buffer have no block yet. Their seq
+        // carries the segment in its high half (`base_row_id = segment << 32`).
+        for (seq, values) in self.pending_rows_of(&table) {
+            if segment.is_some_and(|s| (seq as u64 >> 32) as u32 != s) {
+                continue;
+            }
+            if let Some(v) = values.get(column) {
+                let text = mirror_cell_text(v);
+                f(seq, &text);
+            }
+        }
+    }
+
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
     ///
     /// The graph is built by the engine's own `HnswIndex` and serialized with the
@@ -6188,21 +6337,21 @@ impl Engine {
         table: &str,
         column: &str,
         options: &[(String, String)],
-    ) -> Option<Vec<u8>> {
+        segment: u32,
+        path: &std::path::Path,
+    ) -> Option<u64> {
         let ci = self
             .table_schema(table)
             .ok()?
             .iter()
             .position(|c| c == column)?;
-        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
-        for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            rows.push((seq as u64, crate::engine::state::parse_vec_f32(&text)));
-        }
-        if rows.is_empty() {
-            return None;
-        }
-        let index = crate::cspann_mem::build(rows, options).ok()?;
-        storage::knn_index::cspann::write(&index).ok()
+        // Out-of-core and per segment: the column is streamed into a scratch
+        // file, the tree is built over a mapping of it, and the chunk is
+        // streamed straight to `path`. Neither the text (~15 KB/row at 1536d)
+        // nor the `f32` column (6 KB/row) nor the serialised chunk (208 B/row)
+        // has to be resident, and a dump only ever holds one segment's tree.
+        let opts = crate::cspann_mem::options_from(options).ok()?;
+        self.cspann_write_chunk(table, ci, opts, segment, path)
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for

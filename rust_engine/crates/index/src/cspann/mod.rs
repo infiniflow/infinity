@@ -23,12 +23,14 @@ pub mod kmeans;
 pub mod partition;
 pub mod quantize;
 pub mod search;
+pub mod source;
 pub mod store;
 
 pub use build::{build_tree, BuiltTree};
 pub use partition::{Member, Partition};
 pub use quantize::{Code, QueryCode, Rotation};
 pub use search::{Beam, SearchSet};
+pub use source::{Memory, VectorSource};
 pub use store::{CspannStore, MemStore};
 
 use std::fmt::{self, Display};
@@ -200,30 +202,43 @@ pub struct CspannIndex {
 }
 
 impl CspannIndex {
-    /// Builds the tree from `(row id, vector)` pairs.
+    /// Builds the tree from `(row id, vector)` pairs held in memory.
+    ///
+    /// Convenience wrapper over [`Self::build_from_source`] for callers that
+    /// already have the column resident (tests, small `CREATE INDEX`).
     pub fn build(rows: Vec<(u64, Vec<f32>)>, opts: Options) -> Result<Self, CspannError> {
+        Self::build_from_source(&Memory::new(rows), opts)
+    }
+
+    /// Builds the tree over any [`VectorSource`].
+    ///
+    /// This is the out-of-core entry point: the builder only ever reads one
+    /// vector at a time, so a source backed by a mapped scratch file keeps the
+    /// 6 KB/row (1536d) column out of RSS.
+    pub fn build_from_source(src: &dyn VectorSource, opts: Options) -> Result<Self, CspannError> {
         opts.validate()?;
-        if rows.is_empty() {
+        if src.is_empty() {
             return Err(CspannError::Empty);
         }
-        let dim = rows[0].1.len();
+        let dim = src.vector(0).len();
         if dim == 0 {
             return Err(CspannError::InvalidOption(
                 "dims",
                 "vector dimension must be > 0".to_string(),
             ));
         }
-        for (_, v) in &rows {
-            if v.len() != dim {
+        for i in 0..src.len() {
+            let actual = src.vector(i).len();
+            if actual != dim {
                 return Err(CspannError::DimensionMismatch {
                     expected: dim,
-                    actual: v.len(),
+                    actual,
                 });
             }
         }
         let rotation = Rotation::new(dim, opts.seed);
         let tree = build::collapse_top(
-            build_tree(&rows, dim, &opts, &rotation),
+            build_tree(src, dim, &opts, &rotation),
             dim,
             &opts,
             &rotation,
@@ -335,6 +350,28 @@ impl CspannIndex {
     /// disables the beam truncation (only the radius bound prunes), which is the
     /// `encode = none` exactness check.
     pub fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, beam, None)
+    }
+
+    /// [`Self::search`] restricted to the rows `allowed` admits, with the mask
+    /// tested per slot (`Partition::search_into`).
+    pub fn search_filtered(
+        &self,
+        q: &[f32],
+        k: usize,
+        beam: Option<usize>,
+        allowed: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, beam, Some(allowed))
+    }
+
+    fn search_masked(
+        &self,
+        q: &[f32],
+        k: usize,
+        beam: Option<usize>,
+        allowed: Option<&std::collections::HashSet<u64>>,
+    ) -> Vec<(u64, f32)> {
         if k == 0 || q.len() != self.dim {
             return Vec::new();
         }
@@ -342,11 +379,14 @@ impl CspannIndex {
             return Vec::new();
         };
         let width = beam.unwrap_or(self.opts.base_beam).max(1);
-        let mut current: Vec<PartitionKey> = vec![root.key];
+        let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, root.key)];
         let mut level = root.level;
         while level > 1 {
-            let mut next = Beam::new(width);
-            for key in &current {
+            // Interior levels narrow: the root of a 1M-row tree holds a handful
+            // of children, so spending the leaf width there only scans
+            // centroids (see `search::level_width`).
+            let mut next = Beam::new(search::level_width(width, level - 1));
+            for (_, key) in &current {
                 let Some(p) = self.store.partition(*key) else {
                     continue;
                 };
@@ -356,7 +396,7 @@ impl CspannIndex {
                     }
                 }
             }
-            current = next.into_keys();
+            current = next.into_items();
             if current.is_empty() {
                 return Vec::new();
             }
@@ -364,7 +404,11 @@ impl CspannIndex {
         }
 
         let mut set = SearchSet::with_default_capacity(k);
-        for key in &current {
+        // `current` is sorted by lower bound, so the first partition that cannot
+        // beat the incumbent k-th result ends the leaf scan: that is the
+        // descent's early stop, and it is what lets a wide beam stay cheap when
+        // the query is unambiguous.
+        for (bound, key) in &current {
             let Some(p) = self.store.partition(*key) else {
                 continue;
             };
@@ -372,13 +416,13 @@ impl CspannIndex {
             // ‖q−c‖ − R, which only holds for L2 (§8.3).
             if self.opts.metric.is_l2() {
                 if let Some(kth) = set.kth_upper() {
-                    if p.lower_bound(q, self.opts.metric) > kth {
-                        continue;
+                    if !search::l2_can_beat(*bound, kth) {
+                        break;
                     }
                 }
             }
             let query = p.make_query(&self.rotation, q);
-            p.search_into(&query, q, self.opts.metric, &mut set);
+            p.search_into(&query, q, self.opts.metric, &mut set, allowed);
         }
         set.into_sorted()
     }
@@ -489,6 +533,78 @@ mod tests {
     fn encode_none_reproduces_the_exact_top_k() {
         let rows = clustered(600, 8, 6);
         let index = CspannIndex::build(rows.clone(), opts(48, Encode::None)).unwrap();
+        for query in rows.iter().take(12) {
+            let got: Vec<u64> = index
+                .search(&query.1, 10, Some(usize::MAX))
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(got, exact(&rows, &query.1, 10), "query row {}", query.0);
+        }
+    }
+
+    /// The same exactness check in the *tight* distance regime, where every
+    /// squared distance is below 1 (normalised embeddings look like this).
+    ///
+    /// It is a regression guard for the radius prune: that test used to compare
+    /// the partition's **distance** bound against the **squared** k-th score,
+    /// which silently dropped partitions whose bound sat between `kth` and
+    /// `√kth` - the band this fixture fills, and the reason a cosine index lost
+    /// recall that an L2 fixture never showed.
+    /// A filtered search answers from the admitted rows only, with the mask
+    /// tested per slot (§12.5).
+    ///
+    /// The old path asked for `k / selectivity` candidates and filtered them
+    /// afterwards, so a 1%-selective filter over 20k rows asked for the whole
+    /// table and decoded it. Here the answer must equal the exact best among the
+    /// admitted rows for every mask.
+    #[test]
+    fn filtered_search_answers_from_the_admitted_rows() {
+        let rows = random_points(400, 8, 6);
+        let index = CspannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
+
+        // One admitted row: whatever the beam, that row is the only answer.
+        let one: std::collections::HashSet<u64> = [rows[7].0].into_iter().collect();
+        let hits = index.search_filtered(&rows[200].1, 5, Some(usize::MAX), &one);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].0, rows[7].0);
+
+        // A sparse mask: the answer must be the exact best *among the mask*.
+        let mask: std::collections::HashSet<u64> = rows
+            .iter()
+            .map(|(id, _)| *id)
+            .filter(|id| id % 97 == 0)
+            .collect();
+        let query = &rows[123].1;
+        let mut want: Vec<(u64, f32)> = rows
+            .iter()
+            .filter(|(id, _)| mask.contains(id))
+            .map(|(id, v)| {
+                let d: f32 = v
+                    .iter()
+                    .zip(query.iter())
+                    .map(|(a, b)| (a - b) * (a - b))
+                    .sum();
+                (*id, d)
+            })
+            .collect();
+        want.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let got = index.search_filtered(query, 3, Some(usize::MAX), &mask);
+        assert_eq!(got.len(), 3, "the mask has enough rows: {got:?}");
+        assert_eq!(
+            got.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+            want.iter().take(3).map(|(id, _)| *id).collect::<Vec<_>>()
+        );
+        assert!(got.iter().all(|(id, _)| mask.contains(id)));
+    }
+
+    #[test]
+    fn tight_cluster_reproduces_the_exact_top_k() {
+        let rows: Vec<(u64, Vec<f32>)> = random_points(400, 16, 5)
+            .into_iter()
+            .map(|(id, v)| (id, v.into_iter().map(|x| x / 100.0).collect()))
+            .collect();
+        let index = CspannIndex::build(rows.clone(), opts(32, Encode::None)).unwrap();
         for query in rows.iter().take(12) {
             let got: Vec<u64> = index
                 .search(&query.1, 10, Some(usize::MAX))

@@ -4947,6 +4947,16 @@ pub(crate) struct TableEntry {
     /// is the remaining step, after which this map holds what the loader
     /// produced instead.
     pub(crate) cspann: HashMap<u64, Arc<crate::cspann_mem::CspannHandle>>,
+    /// cspann **mem index** per index id: the rows inserted since the last
+    /// dump, kept as `(row id, vector)`.
+    ///
+    /// An insert does not touch the tree (`docs/CSPANN_DESIGN.md` §9.2): the row
+    /// lands here in O(1), queries merge this list with the published chunks, and
+    /// the next dump builds a tree that covers those rows and clears the list.
+    /// Encoding a row into the tree at insert time was the rejection: a leaf's
+    /// members are only 1-bit codes, so a split would need the original vectors
+    /// back from storage anyway.
+    pub(crate) cspann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,

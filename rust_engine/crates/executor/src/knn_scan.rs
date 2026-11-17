@@ -21,6 +21,11 @@ pub(crate) struct KnnScanOptions {
     /// beats the recall monitor, which is what makes a bench able to hold the
     /// width fixed while it sweeps.
     pub beam: Option<usize>,
+    /// `WITH (rerank_multiplier = …)`: Cockroach's session knob
+    /// (`vector_search_rerank_multiplier`, 0..=100). It scales how many
+    /// candidates the 1-bit ordering hands to the exact rescoring without
+    /// touching the search width, which is the cheap half of the recall trade.
+    pub rerank_multiplier: Option<usize>,
 }
 
 /// Looks up `name` in an option string, case-insensitively.
@@ -59,6 +64,10 @@ impl KnnScanOptions {
             beam: get("beam")
                 .and_then(|v| v.parse::<usize>().ok())
                 .filter(|b| *b > 0),
+            // Cockroach rejects the same range (0..=100) instead of clamping.
+            rerank_multiplier: get("rerank_multiplier")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|m| *m <= 100),
         }
     }
 }
@@ -260,15 +269,36 @@ impl Engine {
             if index.dim() != q.query.len() {
                 return None;
             }
-            // §8.6: a 1-bit code orders distances to ~1%, so the index is asked
-            // for ~10× the top-n and the exact rescoring picks the winner.
-            let budget = crate::cspann_mem::candidate_budget(q.topn);
+            // §8.6: a 1-bit code orders distances to ~1%, so the index hands
+            // over a rerank pool sized by the reference's formula (the beam and
+            // the multiplier both widen it) and the exact rescoring picks the
+            // winner. The pool is an I/O budget: the caller streams it.
+            let width = q.beam.unwrap_or(crate::cspann_mem::DEFAULT_SEARCH_BEAM);
+            let multiplier = q
+                .options
+                .rerank_multiplier
+                .unwrap_or(crate::cspann_mem::DEFAULT_RERANK_MULTIPLIER);
+            let budget = crate::cspann_mem::candidate_budget(q.topn, width, multiplier);
             let hits = match q.allowed {
-                Some(allowed) => index.search_filtered(q.query, budget, q.beam, allowed),
-                None => index.search(q.query, budget, q.beam),
+                Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
+                None => index.search(q.query, budget, Some(width)),
             };
-            let candidates: HashSet<usize> = hits.into_iter().map(|(id, _)| id as usize).collect();
-            if all_covered(q, index.len()) {
+            let mut candidates: HashSet<usize> =
+                hits.into_iter().map(|(id, _)| id as usize).collect();
+            // The mem index: rows inserted since the last dump. They are
+            // candidates (the exact rescoring decides) and they are covered, so
+            // an insert stays visible without turning the query into a scan of
+            // the whole table (`docs/CSPANN_DESIGN.md` §9.2).
+            let mem: Vec<usize> = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.cspann_mem.get(&index_id))
+                    .map(|rows| rows.iter().map(|(seq, _)| *seq as usize).collect())
+                    .unwrap_or_default()
+            };
+            candidates.extend(mem.iter().copied());
+            if all_covered(q, index.len() + mem.len()) {
                 return Some(KnnProbe {
                     candidates,
                     uncovered: Vec::new(),
@@ -276,8 +306,9 @@ impl Engine {
             }
             // The tree's own row list says exactly which rows it holds; the
             // rest are scored by the exact scan.
-            let covered: HashSet<usize> =
+            let mut covered: HashSet<usize> =
                 index.row_ids().into_iter().map(|id| id as usize).collect();
+            covered.extend(mem);
             let uncovered = self.uncovered_rows(q, &covered);
             return Some(KnnProbe {
                 candidates,
@@ -813,6 +844,37 @@ mod tests {
     /// C++ `PhysicalKnnScan::Execute` finish: similarity metrics rank
     /// descending, distance metrics ascending; equal scores keep the lower
     /// row id; `threshold` and `topn` apply after ordering.
+    #[test]
+    fn finishing_batches_then_merging_equals_finishing_everything() {
+        // The streamed rerank (statements.rs) scores the candidate pool one
+        // batch at a time and finishes each batch to its own top-n. This is the
+        // property that makes it exact: the global top-n is the top-n of the
+        // union of the per-batch top-ns, for any monotone ranking key.
+        let scored: Vec<(usize, f64, f64)> = (0..40)
+            .map(|i| (i, 1.0 / (i as f64 + 1.0), i as f64))
+            .collect();
+        let scan = scan("l2", None);
+
+        let all = scan.finish(KnnScanOperatorState {
+            scored: scored.clone(),
+            use_sim: false,
+        });
+
+        let mut merged: Vec<(usize, f64, f64)> = Vec::new();
+        for batch in scored.chunks(7) {
+            let part = scan.finish(KnnScanOperatorState {
+                scored: batch.to_vec(),
+                use_sim: false,
+            });
+            merged.extend(part.scored);
+        }
+        let merged = scan.finish(KnnScanOperatorState {
+            scored: merged,
+            use_sim: false,
+        });
+        assert_eq!(merged.scored, all.scored);
+    }
+
     #[test]
     fn finish_ranks_by_metric_and_applies_threshold_and_topn() {
         let state = KnnScanOperatorState {

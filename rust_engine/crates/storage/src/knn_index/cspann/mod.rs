@@ -38,11 +38,14 @@
 
 use index::cspann::{
     partition::{metric_score, Member, Partition},
-    quantize::{self, code_bytes, Code, Rotation},
-    search::{Beam, SearchSet},
+    quantize::{self, Code, Rotation},
+    search::{self, Beam, SearchSet},
     CspannError, CspannIndex, Encode, Options, PartitionKey, ROOT_KEY,
 };
 use index::vector::{l2_sq, Metric};
+
+mod writer;
+pub use writer::{write, write_to};
 
 pub const MAGIC: [u8; 8] = *b"CSPANN\x00\x01";
 const TRAILER_MAGIC: [u8; 8] = *b"CSPEND\x00\x01";
@@ -493,141 +496,153 @@ impl<'a> Chunk<'a> {
 }
 
 /// Serialises a built index into the chunk format.
-pub fn write(index: &CspannIndex) -> Result<Vec<u8>, CspannError> {
-    let opts = index.opts();
-    if opts.encode != Encode::Rabitq {
-        // Section E is reserved; v1 only ships the production encoding.
-        return Err(CspannError::InvalidOption(
-            "encode",
-            "chunk format v1 only stores rabitq codes".to_string(),
-        ));
-    }
-    let dims = index.dim();
-    let parts = index.partitions();
-    let code_bytes = code_bytes(dims);
-
-    let mut meta = Vec::with_capacity(parts.len() * META_ENTRY);
-    let mut centroids = Vec::with_capacity(parts.len() * dims * 4);
-    let mut children = Vec::new();
-    let mut slots: Vec<u8> = Vec::new();
-    for part in parts {
-        while !slots.len().is_multiple_of(SLOT_ALIGN) {
-            slots.push(0);
-        }
-        let centroids_off = centroids.len() as u32;
-        for x in &part.centroid {
-            centroids.extend_from_slice(&x.to_le_bytes());
-        }
-        let children_off = children.len() / 4;
-        for child in &part.children {
-            children.extend_from_slice(&child.to_le_bytes());
-        }
-        let slots_off = slots.len() as u32;
-
-        let count = part.members.len();
-        for member in &part.members {
-            slots.extend_from_slice(&member.id.to_le_bytes());
-        }
-        for member in &part.members {
-            slots.extend_from_slice(&member.code.norm.to_le_bytes());
-        }
-        for member in &part.members {
-            slots.extend_from_slice(&member.code.raw_norm.to_le_bytes());
-        }
-        for member in &part.members {
-            slots.extend_from_slice(&member.code.sum.to_le_bytes());
-        }
-        for member in &part.members {
-            slots.extend_from_slice(&member.code.error.to_le_bytes());
-        }
-        for member in &part.members {
-            debug_assert_eq!(member.code.bits.len(), code_bytes);
-            slots.extend_from_slice(&member.code.bits);
-        }
-
-        meta.extend_from_slice(&part.key.to_le_bytes());
-        meta.extend_from_slice(&(part.level as u16).to_le_bytes());
-        meta.extend_from_slice(&(count as u16).to_le_bytes());
-        meta.extend_from_slice(&part.radius.to_le_bytes());
-        meta.extend_from_slice(&centroids_off.to_le_bytes());
-        meta.extend_from_slice(&slots_off.to_le_bytes());
-        meta.extend_from_slice(&(children_off as u32).to_le_bytes());
-        meta.extend_from_slice(&(part.children.len() as u16).to_le_bytes());
-        meta.extend_from_slice(&0u16.to_le_bytes());
-        meta.extend_from_slice(&0u32.to_le_bytes());
-    }
-
-    let mut row_ids = Vec::new();
-    for id in index.row_ids() {
-        row_ids.extend_from_slice(&id.to_le_bytes());
-    }
-
-    let sections: [&[u8]; SECTION_COUNT] = [&meta, &centroids, &children, &slots, &[], &row_ids];
-
-    // Layout: header, then each section 8-byte aligned (slot pages to a page).
-    let mut out: Vec<u8> = vec![0; HEADER_LEN];
-    let mut table = [(0u64, 0u64); SECTION_COUNT];
-    for (i, bytes) in sections.iter().enumerate() {
-        let align = if i == Section::Slots as usize {
-            SLOT_ALIGN
-        } else {
-            8
-        };
-        while !out.len().is_multiple_of(align) {
-            out.push(0);
-        }
-        table[i] = (out.len() as u64, bytes.len() as u64);
-        out.extend_from_slice(bytes);
-    }
-
-    let mut trailer = Vec::with_capacity(TRAILER_LEN);
-    trailer.extend_from_slice(&TRAILER_MAGIC);
-    for (i, bytes) in sections.iter().enumerate() {
-        trailer.extend_from_slice(&crc32c(bytes).to_le_bytes());
-        let _ = i;
-    }
-    out.extend_from_slice(&trailer);
-
-    out[0..8].copy_from_slice(&MAGIC);
-    out[8..10].copy_from_slice(&1u16.to_le_bytes());
-    out[10..12].copy_from_slice(&(HEADER_LEN as u16).to_le_bytes());
-    out[12..16].copy_from_slice(&(dims as u32).to_le_bytes());
-    out[16] = match opts.metric {
-        Metric::L2 => 0,
-        Metric::Ip => 1,
-        Metric::Cos => 2,
-    };
-    out[17] = match opts.encode {
-        Encode::None => 0,
-        Encode::Rabitq => 1,
-    };
-    out[18] = 1; // rot_algo: 1 = block-diagonal RHT
-    out[19] = 0;
-    out[20..28].copy_from_slice(&opts.seed.to_le_bytes());
-    out[28..32].copy_from_slice(&(parts.len() as u32).to_le_bytes());
-    for (i, (offset, len)) in table.iter().enumerate() {
-        let at = 32 + i * 16;
-        out[at..at + 8].copy_from_slice(&offset.to_le_bytes());
-        out[at + 8..at + 16].copy_from_slice(&len.to_le_bytes());
-    }
-    Ok(out)
-}
 
 /// CRC-32C (Castagnoli), the polynomial §6.1 names. Bitwise on purpose: the
 /// chunk hashes run once per file, not per query.
 pub fn crc32c(data: &[u8]) -> u32 {
-    let mut crc = !0u32;
-    for byte in data {
-        crc ^= u32::from(*byte);
-        for _ in 0..8 {
-            crc = if crc & 1 != 0 {
-                (crc >> 1) ^ 0x82F6_3B78
-            } else {
-                crc >> 1
-            };
-        }
+    let mut crc = Crc32c::new();
+    crc.update(data);
+    crc.finish()
+}
+
+/// Incremental CRC-32C, so a section can be hashed while it is being written
+/// instead of being buffered first (`writer::write_to`).
+#[derive(Clone, Copy, Debug)]
+pub struct Crc32c(u32);
+
+impl Crc32c {
+    pub fn new() -> Self {
+        Self(!0)
     }
-    !crc
+
+    pub fn update(&mut self, data: &[u8]) {
+        let mut crc = self.0;
+        for byte in data {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                crc = if crc & 1 != 0 {
+                    (crc >> 1) ^ 0x82F6_3B78
+                } else {
+                    crc >> 1
+                };
+            }
+        }
+        self.0 = crc;
+    }
+
+    pub fn finish(self) -> u32 {
+        !self.0
+    }
+}
+
+impl Default for Crc32c {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reads only the header of the chunk at `path`.
+///
+/// [`FileIndex::open`] verifies every section's CRC, i.e. reads the whole file.
+/// A publisher that only wants to know whether the chunk it already has was
+/// built with the catalog's options must not pay that: this reads 128 bytes.
+pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, CspannError> {
+    use std::io::Read;
+    let mut file =
+        std::fs::File::open(path).map_err(|e| CspannError::Corrupt(format!("open chunk: {e}")))?;
+    let mut head = [0u8; HEADER_LEN];
+    file.read_exact(&mut head)
+        .map_err(|e| CspannError::Corrupt(format!("read header: {e}")))?;
+    if head[0..8] != MAGIC {
+        return Err(CspannError::Corrupt("bad magic".to_string()));
+    }
+    let dims = u32::from_le_bytes(head[12..16].try_into().unwrap()) as usize;
+    let metric = match head[16] {
+        0 => Metric::L2,
+        1 => Metric::Ip,
+        2 => Metric::Cos,
+        other => return Err(CspannError::Corrupt(format!("bad metric {other}"))),
+    };
+    let encode = match head[17] {
+        0 => Encode::None,
+        1 => Encode::Rabitq,
+        other => return Err(CspannError::Corrupt(format!("bad encode {other}"))),
+    };
+    Ok(ChunkHeader {
+        dims,
+        metric,
+        encode,
+        rot_algo: head[18],
+        seed: u64::from_le_bytes(head[20..28].try_into().unwrap()),
+        partitions: u32::from_le_bytes(head[28..32].try_into().unwrap()) as usize,
+    })
+}
+
+/// A [`index::cspann::VectorSource`] over a mapped `f32` scratch file.
+///
+/// A build needs random access to every vector (k-means centroids, split
+/// assignment, encoding), which is what forced the whole column resident before
+/// this existed: 6 KB/row at 1536d, i.e. 6 GB for 1M rows and 300 GB at the
+/// scale cspann is for. Mapping a scratch file the caller wrote during the
+/// block pass keeps those pages in page cache instead of anonymous memory, so
+/// the build's RSS is the tree's codes plus whatever the kernel keeps around.
+pub struct ScratchSource {
+    ids: Vec<u64>,
+    dim: usize,
+    map: crate::buffer::mapped::MappedFile,
+}
+
+impl ScratchSource {
+    /// Maps `path`, which must hold `ids.len() * dim` little-endian `f32`s in
+    /// id order.
+    pub fn open(
+        path: impl AsRef<std::path::Path>,
+        ids: Vec<u64>,
+        dim: usize,
+    ) -> Result<Self, CspannError> {
+        let map = crate::buffer::mapped::MappedFile::open_path(path)
+            .map_err(|e| CspannError::Corrupt(format!("map scratch: {e}")))?;
+        if map.len() != ids.len() * dim * 4 {
+            return Err(CspannError::Corrupt(format!(
+                "scratch is {} bytes, expected {} for {} rows x {dim} dims",
+                map.len(),
+                ids.len() * dim * 4,
+                ids.len()
+            )));
+        }
+        Ok(Self { ids, dim, map })
+    }
+}
+
+impl index::cspann::VectorSource for ScratchSource {
+    fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    fn id(&self, index: usize) -> u64 {
+        self.ids[index]
+    }
+
+    #[allow(unsafe_code)]
+    fn vector(&self, index: usize) -> &[f32] {
+        let at = index * self.dim * 4;
+        let bytes = &self.map[at..at + self.dim * 4];
+        // SAFETY: a mapping is page aligned, so `at` (a multiple of 4) yields an
+        // `f32`-aligned pointer; the slice is exactly `dim` floats inside the
+        // mapping, and `ScratchSource` only ever reads it.
+        unsafe { std::slice::from_raw_parts(bytes.as_ptr().cast::<f32>(), self.dim) }
+    }
+}
+
+/// Builds a tree from a mapped scratch file (see [`ScratchSource`]).
+pub fn build_from_scratch(
+    path: impl AsRef<std::path::Path>,
+    ids: Vec<u64>,
+    dim: usize,
+    opts: Options,
+) -> Result<CspannIndex, CspannError> {
+    let src = ScratchSource::open(path, ids, dim)?;
+    CspannIndex::build_from_source(&src, opts)
 }
 
 /// A chunk served straight out of its file (§6.4's out-of-core path).
@@ -703,18 +718,42 @@ impl FileIndex {
         self.chunk().row_ids()
     }
 
-    pub fn partitions(&self) -> usize {
-        self.layout.header.partitions
-    }
-
+    /// The metric the chunk was built with; a merged result set orders by it.
     pub fn metric(&self) -> Metric {
         self.layout.header.metric
+    }
+
+    pub fn partitions(&self) -> usize {
+        self.layout.header.partitions
     }
 
     /// Same descent as `CspannIndex::search`, but every partition is read from
     /// the mapping (`§8.4`: beam per level, radius bound, exact rescoring by the
     /// caller).
     pub fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, beam, None)
+    }
+
+    /// [`Self::search`] with the statement's filter bitmap, tested per slot while
+    /// the page is being read (`§12.5`): a filtered query must not have to widen
+    /// its candidate pool to the size of the table.
+    pub fn search_filtered(
+        &self,
+        q: &[f32],
+        k: usize,
+        beam: Option<usize>,
+        allowed: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, beam, Some(allowed))
+    }
+
+    fn search_masked(
+        &self,
+        q: &[f32],
+        k: usize,
+        beam: Option<usize>,
+        allowed: Option<&std::collections::HashSet<u64>>,
+    ) -> Vec<(u64, f32)> {
         let dims = self.dims();
         if k == 0 || q.len() != dims {
             return Vec::new();
@@ -723,11 +762,12 @@ impl FileIndex {
         let metric = self.layout.header.metric;
         let width = beam.unwrap_or(self.beam).max(1);
 
-        let mut current: Vec<PartitionKey> = vec![ROOT_KEY];
+        let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, ROOT_KEY)];
         let mut level = chunk.height();
         while level > 1 {
-            let mut next = Beam::new(width);
-            for key in &current {
+            // Same narrowing as the heap path (`search::level_width`).
+            let mut next = Beam::new(search::level_width(width, level - 1));
+            for (_, key) in &current {
                 for child in chunk.children(*key) {
                     let Some(centroid) = chunk.centroid(child) else {
                         continue;
@@ -742,7 +782,7 @@ impl FileIndex {
                     next.push(lower, child);
                 }
             }
-            current = next.into_keys();
+            current = next.into_items();
             if current.is_empty() {
                 return Vec::new();
             }
@@ -750,13 +790,22 @@ impl FileIndex {
         }
 
         let mut set = SearchSet::with_default_capacity(k);
-        for key in &current {
+        for (bound, key) in &current {
             let Some(slots) = chunk.slots(*key) else {
                 continue;
             };
             let Some(centroid) = chunk.centroid(*key) else {
                 continue;
             };
+            // Early stop: the beam is sorted by bound, and the bounds here are
+            // distances while the L2 scores are squared (`search::l2_can_beat`).
+            if metric.is_l2() {
+                if let Some(kth) = set.kth_upper() {
+                    if !search::l2_can_beat(*bound, kth) {
+                        break;
+                    }
+                }
+            }
             let rot_centroid = self.rotation.apply(&centroid);
             let query = quantize::make_query(&self.rotation, &rot_centroid, q);
             for i in 0..slots.len() {
@@ -765,6 +814,11 @@ impl FileIndex {
                 else {
                     continue;
                 };
+                if let Some(allowed) = allowed {
+                    if !allowed.contains(&row) {
+                        continue;
+                    }
+                }
                 // Scored from the raw columns: no per-member allocation, which is
                 // what made the first mapped version 3.4× slower than heap.
                 let squared =
@@ -805,6 +859,29 @@ mod tests {
     #[test]
     fn crc32c_matches_the_reference_vector() {
         assert_eq!(crc32c(b"123456789"), 0xE306_9283);
+    }
+
+    /// The streaming writer and the in-memory one are the same bytes: a dump
+    /// that goes straight to a file must be readable by everything that reads
+    /// `write`'s output, including the CRC trailers.
+    #[test]
+    fn streaming_and_in_memory_writes_agree() {
+        let index = CspannIndex::build(rows(300, 16), opts()).unwrap();
+        let bytes = write(&index).unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "cspann-writer-{}-{:?}.idx",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let len = write_to(&index, &path).unwrap();
+        let streamed = std::fs::read(&path).unwrap();
+        let opened = FileIndex::open(&path, &opts()).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(len as usize, bytes.len());
+        assert_eq!(streamed, bytes);
+        assert_eq!(opened.len(), index.len());
+        assert_eq!(opened.height(), index.height());
     }
 
     #[test]

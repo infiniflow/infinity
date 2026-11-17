@@ -157,6 +157,34 @@ impl SearchSet {
     }
 }
 
+/// The beam width at `level` (Cockroach's `beamSize /= 2^(level-LeafLevel)`).
+///
+/// Only the leaf level keeps the caller's width, because only the leaf scan
+/// decides recall. Every level above it holds exponentially fewer partitions,
+/// so widening the beam up there buys nothing and costs centroid distances;
+/// keeping it at the leaf width is what made a `beam = 32` query pay the root's
+/// whole level for no answer.
+pub fn level_width(base: usize, level: u32) -> usize {
+    let base = base.max(1);
+    if level <= 1 {
+        return base;
+    }
+    (base >> (level - 1).min(31)).max(1)
+}
+
+/// Whether a partition whose L2 **distance** lower bound is `lower_bound` can
+/// still beat an incumbent k-th result scored as a **squared** distance.
+///
+/// The two numbers live in different units: `Partition::lower_bound` returns
+/// `‖q−c‖ − R`, while every L2 score in [`SearchSet`] is `‖q−o‖²`. Comparing
+/// them directly (the first version did) prunes a partition whenever its bound
+/// crosses the *squared* k-th distance, which for normalised vectors - where
+/// `d² < d < 1` is the common case - drops partitions that genuinely hold the
+/// answer. Squaring the bound restores the inequality `d ≥ lb ⟹ d² ≥ lb²`.
+pub fn l2_can_beat(lower_bound: f32, kth_squared: f32) -> bool {
+    lower_bound * lower_bound <= kth_squared
+}
+
 /// A fixed-width beam of partitions, ordered by their lower bound.
 #[derive(Debug)]
 pub struct Beam {
@@ -197,6 +225,14 @@ impl Beam {
     pub fn into_keys(mut self) -> Vec<PartitionKey> {
         self.prune();
         self.items.into_iter().map(|(_, key)| key).collect()
+    }
+
+    /// [`Self::into_keys`] with the bounds kept: the leaf scan tests them
+    /// against the incumbent k-th result, and recomputing a centroid distance
+    /// per partition at the leaf level is pure waste.
+    pub fn into_items(mut self) -> Vec<(f32, PartitionKey)> {
+        self.prune();
+        self.items
     }
 
     pub fn keys(&self) -> Vec<PartitionKey> {
@@ -263,5 +299,41 @@ mod tests {
             beam.push(lb, key);
         }
         assert_eq!(beam.into_keys(), vec![4, 2]);
+    }
+
+    #[test]
+    fn into_items_keeps_the_bound_of_each_key() {
+        let mut beam = Beam::new(2);
+        for (lb, key) in [(5.0f32, 1u32), (1.0, 2), (0.5, 4)] {
+            beam.push(lb, key);
+        }
+        assert_eq!(beam.into_items(), vec![(0.5, 4), (1.0, 2)]);
+    }
+
+    /// Cockroach's `beamSize /= 2^(level-LeafLevel)`: only the leaf level keeps
+    /// the caller's width, every level above it is halved again.
+    #[test]
+    fn level_width_narrows_interior_levels() {
+        assert_eq!(level_width(32, 1), 32);
+        assert_eq!(level_width(32, 2), 16);
+        assert_eq!(level_width(32, 3), 8);
+        assert_eq!(level_width(32, 4), 4);
+        // Never zero, even for a beam of 1 at a tall tree.
+        assert_eq!(level_width(1, 9), 1);
+        assert_eq!(level_width(0, 3), 1);
+    }
+
+    /// The bound is a distance and the k-th result is a squared distance; the
+    /// first version compared them directly, which pruned every partition whose
+    /// bound fell between `kth` and `√kth` - i.e. most of them once vectors are
+    /// normalised.
+    #[test]
+    fn squared_bound_is_compared_in_the_right_units() {
+        // lb = 0.3 puts members at d² ≥ 0.09, inside kth = 0.25: keep it.
+        assert!(l2_can_beat(0.3, 0.25));
+        // lb = 0.6 puts members at d² ≥ 0.36, outside kth = 0.25: prune it.
+        assert!(!l2_can_beat(0.6, 0.25));
+        // A bound of exactly √kth is still admissible (ties are kept).
+        assert!(l2_can_beat(0.5, 0.25));
     }
 }

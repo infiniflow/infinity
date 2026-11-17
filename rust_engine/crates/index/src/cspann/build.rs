@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use super::kmeans::balanced_kmeans_2;
 use super::partition::Partition;
 use super::quantize::Rotation;
+use super::source::VectorSource;
 use super::{Encode, Options, PartitionKey, ROOT_KEY};
 
 /// The tree as built, before any storage decision is made.
@@ -49,7 +50,9 @@ impl BuiltTree {
 const PARALLEL_MIN_ROWS: usize = 256;
 
 struct Builder<'a> {
-    rows: &'a [(u64, Vec<f32>)],
+    /// Random-read access to the vectors: the caller decides whether they live
+    /// in RAM or in a mapped scratch file (see `source`).
+    src: &'a dyn VectorSource,
     dim: usize,
     opts: &'a Options,
     rot: &'a Rotation,
@@ -72,22 +75,17 @@ struct Subtree {
     parts: Vec<(PartitionKey, Partition)>,
 }
 
-/// Builds the whole tree from `(row id, vector)` pairs.
-pub fn build_tree(
-    rows: &[(u64, Vec<f32>)],
-    dim: usize,
-    opts: &Options,
-    rot: &Rotation,
-) -> BuiltTree {
+/// Builds the whole tree over `src`.
+pub fn build_tree(src: &dyn VectorSource, dim: usize, opts: &Options, rot: &Rotation) -> BuiltTree {
     let builder = Builder {
-        rows,
+        src,
         dim,
         opts,
         rot,
         active: std::sync::atomic::AtomicUsize::new(0),
         workers: workers(),
     };
-    let mut indices: Vec<usize> = (0..rows.len()).collect();
+    let mut indices: Vec<usize> = (0..src.len()).collect();
     let mut built = builder.build_subtree(&mut indices, ROOT_KEY);
     // `parts` is in build order (any order, now that keys are explicit): the
     // tree vector is indexed by key, so place each node where it belongs.
@@ -104,7 +102,7 @@ pub fn build_tree(
         .collect();
     debug_assert_eq!(
         partitions.len(),
-        subtree_nodes(rows.len(), opts.max_partition_size)
+        subtree_nodes(src.len(), opts.max_partition_size)
     );
     BuiltTree {
         partitions,
@@ -167,9 +165,9 @@ impl Builder<'_> {
     /// (`CSPANN_DESIGN.md` §4), it just no longer needs a mutable counter.
     fn build_subtree(&self, indices: &mut [usize], key: PartitionKey) -> Subtree {
         if indices.len() <= self.opts.max_partition_size {
-            let members: Vec<(u64, Vec<f32>)> = indices
+            let members: Vec<(u64, &[f32])> = indices
                 .iter()
-                .map(|i| (self.rows[*i].0, self.rows[*i].1.clone()))
+                .map(|i| (self.src.id(*i), self.src.vector(*i)))
                 .collect();
             let part = Partition::build(key, 1, self.dim, &members, self.rot, self.opts.encode);
             return Subtree {
@@ -180,7 +178,7 @@ impl Builder<'_> {
         }
 
         // Bisect: `BalancedKMeans(k=2)` over the slice's vectors.
-        let vectors: Vec<&[f32]> = indices.iter().map(|i| self.rows[*i].1.as_slice()).collect();
+        let vectors: Vec<&[f32]> = indices.iter().map(|i| self.src.vector(*i)).collect();
         let split = balanced_kmeans_2(
             &vectors,
             self.dim,
@@ -231,9 +229,9 @@ impl Builder<'_> {
         }
 
         let level = left.level.max(right.level) + 1;
-        let members: Vec<(u64, Vec<f32>)> = vec![
-            (u64::from(left_key), left.centroid.clone()),
-            (u64::from(right_key), right.centroid.clone()),
+        let members: Vec<(u64, &[f32])> = vec![
+            (u64::from(left_key), left.centroid.as_slice()),
+            (u64::from(right_key), right.centroid.as_slice()),
         ];
         let mut part = Partition::build(key, level, self.dim, &members, self.rot, self.opts.encode);
         part.children = vec![left_key, right_key];
@@ -292,12 +290,18 @@ pub fn collapse_top(tree: BuiltTree, dim: usize, opts: &Options, rot: &Rotation)
     }
 
     let mut parts: Vec<Partition> = Vec::with_capacity(next as usize);
-    let members: Vec<(u64, Vec<f32>)> = cut_keys
+    // The wide root's members are the cut level's centroids; they are borrowed
+    // for the one `Partition::build` call, which keeps only their codes.
+    let centroids: Vec<(u64, Vec<f32>)> = cut_keys
         .iter()
         .filter_map(|key| {
             tree.get(*key)
                 .map(|p| (u64::from(new_key[key]), p.centroid.clone()))
         })
+        .collect();
+    let members: Vec<(u64, &[f32])> = centroids
+        .iter()
+        .map(|(id, c)| (*id, c.as_slice()))
         .collect();
     let mut root = Partition::build(ROOT_KEY, cut + 1, dim, &members, rot, opts.encode);
     root.children = cut_keys.iter().map(|key| new_key[key]).collect();
@@ -355,6 +359,7 @@ pub fn keeps_raw(encode: Encode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cspann::source::Memory;
 
     /// Rows under `key`, counted from the leaves.
     fn rows_under(tree: &BuiltTree, key: PartitionKey) -> usize {
@@ -393,7 +398,7 @@ mod tests {
                 ..Options::default()
             };
             let rot = Rotation::new(3, opts.seed);
-            let tree = build_tree(&rows, 3, &opts, &rot);
+            let tree = build_tree(&Memory::new(rows), 3, &opts, &rot);
             assert_eq!(
                 tree.partitions.len(),
                 subtree_nodes(n, max),
@@ -438,8 +443,8 @@ mod tests {
             ..Options::default()
         };
         let rot = Rotation::new(3, opts.seed);
-        let a = build_tree(&rows, 3, &opts, &rot);
-        let b = build_tree(&rows, 3, &opts, &rot);
+        let a = build_tree(&Memory::new(rows.clone()), 3, &opts, &rot);
+        let b = build_tree(&Memory::new(rows), 3, &opts, &rot);
         assert_eq!(a.height, b.height);
         assert_eq!(a.partitions.len(), b.partitions.len());
         for (x, y) in a.partitions.iter().zip(&b.partitions) {
