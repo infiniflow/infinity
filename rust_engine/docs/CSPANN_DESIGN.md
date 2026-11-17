@@ -618,7 +618,9 @@ HNSW 做不到这一点——它的顶点里没有 row_id，只能靠尾部 labe
 | 既有回归 | `cargo test -p executor --lib` **844 passed**；7 个失败是 `INFINITY_RESOURCE_PATH` 缺失的 analyzer 资源问题，与本改动无关 |
 | SLT | `infinity conformance test/sql/dql/knn`：38 个文件全通过（含 `test_knn_hnsw_{l2,ip}_filter`、`test_knn_ivf_{l2,ip}_filter`） |
 
-**仍未做**：只有 `PendingTail`（理由见上表：没有 tail 可抽干）。
+**`PendingTail` 已实施**（改为 mem index）：`INSERT` 把 `(row id, vector)` 追加到
+`TableEntry::cspann_mem`（O(1)，不碰树），查询把它的行同时当候选与已覆盖，dump 建树后清空。
+它不是「每行建索引」：叶分区只存 1-bit 码，插入时若触发 split 必须回表取原始向量。
 §12.4 的 `Coverage::uncovered_ranges()` 实际落成了 `KnnProbe::uncovered` 的**行号集合**——
 比区间更精确（未覆盖的往往不是连续区间），回退的代价依旧只与「未覆盖行数」成正比。
 
@@ -883,7 +885,9 @@ C++ 侧对照（`HNSW_BENCH.md` §结果，只说明 Rust 图实现没有明显�
 > HNSW 是逐点插入）；其余各行是更早一次运行的值，两次的查询延迟有 ±10% 抖动。
 >
 > **在这个区间 HNSW 全面更好**，与 §19.7 的选型表一致：128d、数据全进 RAM 时不该用 cspann。
-> cspann 的三个价值条件（1536d / 超出 RAM / 50M×8 GB）尚未实测，其中最后一条还依赖 §6.4 的 mmap 读。
+> cspann 的三个价值条件（1536d / 超出 RAM / 50M×8 GB）仍**未实测**：机制都在了（mmap 读、
+> 分段 chunk、流式构建与写盘），但 1M/50M×1536d 的 RSS、召回与 p50 一次都没跑过，
+> 所以「50M 装进 8 GB」目前仍是推断而不是结论。
 公平比较只有一种：**等延迟比召回**（§19.6）。
 
 ### 19.6 对比协议（新增基准时必须遵守）
@@ -952,8 +956,8 @@ C++ 侧对照（`HNSW_BENCH.md` §结果，只说明 Rust 图实现没有明显�
 | 3 | `num_centroids` 由填充率推导，根为宽分区 | 二分建树后 **`collapse_top` 折叠顶部**为宽根（`root_fanout`，默认 64） | 不做折叠时 beam=8 在第 5 层只能覆盖 8/2^k 个叶子，实测召回上限 **0.35** |
 | 4 | `ef` = 候选表大小 | 执行层按参考的 **`IncreaseRerankResults`**：`maxResults = max(ceil(1.2·topn), 10)`、`maxExtraResults = ⌊log2(beam)·log2(topn)⌋ × multiplier`（默认 50，`WITH (rerank_multiplier=…)` 可覆盖），上限 1024 行（`cspann_mem::candidate_budget`） | 固定 `10×topn` 只在 `beam=8` 附近等于参考值，无法表达「加宽 beam 而不是加宽池」；实测固定池让召回在 beam≥32 处假性饱和于 0.945，换公式后 beam=128 到 **0.997**（`CSPANN_BENCH.md` §2.4）。池子只影响 I/O——重排按 64 行一批流式解码，常驻是 `O(批·dim)` |
 | 5 | `(dist, errorBound)` 早停 | 界为 `2·‖o−c‖·‖q−c‖·√(2(1−error))`（由 `⟨u,û⟩` 直接推出） | 查询端 255 桶量化的贡献未计入；实测比基底误差小两个数量级，记录在 `quantize::error_bound` 的文档里 |
-| 6 | §9.2 的 `PendingTail` | **取 §9.4 的 `rebuild` 模式**：没有 tail，checkpoint 时按整列重建一棵树并发布新 chunk | 少一套 tail 记账与 flush 同源逻辑；代价是每次 checkpoint 重建一次（20k 行 **93.6 ms**，1M 行按 213k 行/s 外推 ≈ 4.7 s，`CSPANN_BENCH.md` §2.3） |
-| 7 | chunk 落盘/装载 | **已接通**：checkpoint 写 `idx_{id}/seg_0/chunk_{n}.idx`（`publish_index_chunks_of` 的 CSPANN 分支），重启后查询时 `cspann_lazy_load` → `Chunk::parse` → `to_index` | 惰性加载而不是开库时全量装载：索引只在有人查询时才占内存（§10 的 100 万索引场景） |
+| 6 | §9.2 的 `PendingTail` | **两条都做了**：写路径进 `cspann_mem`（mem index，O(1)），dump 仍是 `rebuild` 模式（按段建树），并在 chunk 记录落定后清空 mem index | 插入不碰树，所以没有「插入触发 split 却拿不到原始向量」的问题；树只在 dump 时按段重建，**未变更的段直接复用原 chunk**（`a_checkpoint_reuses_an_unchanged_cspann_chunk`） |
+| 7 | chunk 落盘/装载 | **已接通且按段**：checkpoint 为每个 `seg_s` 流式写 `idx_{id}/seg_{s}/chunk_{n}.idx`（`cspann_chunk` → `write_to`），重启后 `cspann_lazy_load` 取**每段最新** chunk 映射为 `FileIndex`，句柄合并各段结果 | 惰性加载而不是开库时全量装载；分段既让 dump 的峰值是「一段的树」，也让一次 checkpoint 只重建被写过的段 |
 | 8 | `min_partition_size` 默认 32 | DDL 侧若 `max_partition_size` 更小则自动收敛为 `max/2` | 避免「只写 `max_partition_size=8`」被默认值判为非法 |
 | 9 | §11.3 的 `RecallMonitor` 配置**存 catalog** | 状态在内存（`MemoryContext::recall`），目标/budget 由语句的 `WITH` 覆盖 | 一个只调搜索宽度的数不值得改目录格式；重启后几条抽样查询就重新收敛 |
 | 10 | 配额只看 `index_pending_bytes`（写路径记账） | HNSW 的口径改为 `max(charge, 图自身 mem_usage())` | `CREATE INDEX` 直接从块建图，不走写路径，charge 恒为 0 → 图再大也回收不了（`a_graph_built_by_create_index_is_visible_to_the_quota`） |
@@ -967,9 +971,9 @@ WAL：`wal_bridge::index_def_from_json` 对 `CSPANN` 返回 `None`，帧回落�
 
 ```bash
 cd rust_engine
-env -u CXX -u CC cargo test -p index   cspann --lib      # 24
-env -u CXX -u CC cargo test -p storage cspann --lib      # 7
-env -u CXX -u CC cargo test -p executor cspann --lib     # 9
+env -u CXX -u CC cargo test -p index   cspann --lib      # 34
+env -u CXX -u CC cargo test -p storage cspann --lib      # 9
+env -u CXX -u CC cargo test -p executor cspann --lib     # 14
 env -u CXX -u CC cargo run -q -p cli --bin infinity -- \
     conformance ../test/sql/dql/knn/embedding/test_knn_cspann_l2.slt
 ```
@@ -982,7 +986,8 @@ env -u CXX -u CC cargo run -q -p cli --bin infinity -- \
 1. ~~dump / load 接线~~（已完成，见 §20.1 的持久化行）。
 2. ~~mmap 读路径~~（已完成：`FileIndex` + `CspannHandle::File`，索引层耗时与堆内相差 0.9%，
        见 `CSPANN_BENCH.md` §2.1）。剩下的只是**规模实测**（50M 需要离线跑一次）。
-3. **filter 下沉（§12.5）**：与 HNSW 共用同一套 `allowed` 位图，cspann 用 slot 的 `row_ids` 列求交。
+3. ~~filter 下沉（§12.5）~~（已完成：`Partition::search_into` 与 `FileIndex::search_masked` 逐槽位判
+       `allowed`；结果不足 `k` 时加宽 **beam** 而不是候选池，`filtered_search_answers_from_the_admitted_rows`）。
 4. ~~并行构图~~（已完成：**93.6 ms / 20k 行 = 213k 行/s**，10× 于 §16.4 的 20.8k 行/s 验收线）。
    两处改动：①左右子树并发建（key 在分裂后即可算出，仍是 DFS 先序）；
    ②`rebalance` 从「每移一点重扫整簇」改成「一次排序取前 m 远」，`O(n·moves) → O(n log n)`——
