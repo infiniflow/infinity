@@ -123,10 +123,21 @@ rows=1 seq=0 [1, 2, "test", "tttt"]`。
   （`statements.rs:5311-5317`）。所以「按 pre-drop schema 解析、按 post-drop 补齐」也能产出
   一个宽度对得上、内容错位的行 —— 不能只靠「长度相等」判断正常。
 
-**尚缺的一条探针**：现有探针能证明「① ② ③ 不一致」，但还没钉住是哪一次 checkpoint、
-在哪个线程上撞到了这个交错。下一步应在 ① ② ③ 各打一次 `(thread_id, monotonic ts, ids)`
-并让 DDL 侧打 commit ts，用一次失败运行对齐三者，确认是「checkpoint 内部三次读」而不是
-「上一次 checkpoint 的快照」。在那之前，本节结论应视为**高度可能**而非已证。
+**这一节描述的是修复前的代码。** 上面三步都是当时 `write_blocks_mode_with` 的实际行为；
+现在 ① 与 ② 已经合并成一次 `catalog.schema_at(&table, bound_ts)`（`blocks/engine.rs:441-446`），
+`meta` 只在 `bound_ts == u64::MAX` 时使用；③ 也不再「用一套列集合套宽度各异的行」——
+`PendingRows::row(k, &encode_meta.ids, &encode_defaults)` 按编码列集合逐格取值，
+buffer 里多出来的退役列在这一步被丢弃，缺的列取该列的默认值。
+
+因此本节证明的是**缺陷当时的机制**，不是现在的行为。实测支持这一点：修复后
+`alter_ut::a_checkpoint_through_a_column_change_keeps_the_block_readable` 40 轮 0 失败
+（见 §6.4），而修复前 44 轮 5 次失败。
+
+**关于「探针仍未补齐」**：这条待办可以关闭。它原本要求在一次失败运行里对齐 ① ② ③ 的
+`(thread_id, ts, ids)`，以区分「checkpoint 内部三次读」与「上一次 checkpoint 的快照」。
+两个理由让它不再必要：其一，①②③ 已经不存在——`encode_meta` 是唯一的列集来源，
+buffer 也按它物化，「三读不一致」这个状态在新代码里无法构造；其二，修复前那批失败
+（44 轮 5 次）与新代码的 0/40 是同一用例、同一构建类型，而中间只改了这三处。
 
 ### 3.2 参考为什么没有这个窗口
 
@@ -711,14 +722,33 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 `catalog` 62，`index` 137，`storage` 495，`txn` 32），`cargo clippy --workspace
 --all-targets` 无告警。
 
-### 6.5 仍然待办
+### 6.5 两项待办的调查结论
 
-- **§5.11 的 `append_row_cache` 去重复解析**：`publish_encoded_rows` 与
-  `append_row_cache` 解析同一批文本，可以让前者把 `Vec<Value>` 交给后者。两者在同一个
-  bottom 闭包里但**顺序相反**（`append_row_cache` 在 `publish_encoded_rows` 之前），
-  需要调序，不是加个参数。
-- **§3.1 的探针**：仍缺一次「在 ① ② ③ 三处打 `(thread_id, ts, ids)`，用失败运行对齐」
-  的验证。当前 40 轮全过，但 §3.1 的机制描述仍是「高度可能」而非已证。
+**§5.11 的 `append_row_cache` 重复解析：已消除。**
+
+`append_row_cache` 原来在 bottom 里跑在 `publish_encoded_rows` **之前**，把同一批
+`encoded` 文本用 `parse_stored_row` 再解析一遍。现在改成：
+
+- `publish_encoded_rows_with(table, rows, also)` 把每批解析结果交给回调；
+- 回调是 `note_row_cache(table, &[(usize, Vec<Value>)])`，只入缓存不再解析；
+- bottom 里那次调用删除（`dml.rs` 的 `parse_stored_row` 调用数从 1 降到 0）；
+- 重放路径本来就有解码好的行，也走 `note_row_cache`。
+
+顺带修掉一个跨段缺陷：`append_row_cache` 原来用 `base + k`，跨段时会把第二段的行缓存在
+第一段的 id 上。现在它取已算好的 seq，不再自己做加法。
+
+**§3.1 的探针：可以关闭。**
+
+`§3.1` 描述的是修复前三读不一致（`meta` / `schema_ids_at` / `buffer` 快照分三次取）的机制。
+现在 ① 与 ② 合并成一次 `catalog.schema_at(&table, bound_ts)`，③ 也改成按 `encode_meta.ids`
+物化（buffer 里多出的退役列被丢弃、缺的列取默认值）——「三读不一致」这个状态在新代码里
+无法构造，所以那支探针失去了对象。
+
+支持这一点的实测：同一用例、同一构建类型，修复前 44 轮 5 次失败，修复后 40 轮 0 次，
+中间只改了这三处。因此 §3.1 保留为「缺陷当时的机制」的记录，不再是待验证的假设。
+
+### 6.6 仍然待办
+
 - **字节门禁**：`test_cross_engine_bytes_*` 与 WAL 帧逐字节比对要等全部改动完成后一次跑。
   两处需要特别核对：`PendingRows` 改了块内列序的来源；跨段切分改了 `row_ranges` 的数量，
   而参考的 UPDATE 是**每块一个 `WalCmdAppendV2`**，端口是单命令多 range —— 行数 ≤ 一块时

@@ -6082,7 +6082,20 @@ pub(crate) async fn run_bottom(
         }
         engine.bump_writes(table);
         engine.note_live_rows(table, append.rows.len() as isize);
-        engine.append_row_cache(table, append.base, &append.encoded);
+        // The frame's rows are already decoded (`buffer_attributed_rows` took
+        // them), so the cache takes them as they are - no second parse.
+        let replay_rows: Vec<(usize, Vec<Value>)> = append
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(k, row)| {
+                (
+                    append.base + k,
+                    row.iter().map(Value::from_literal).collect::<Vec<_>>(),
+                )
+            })
+            .collect();
+        engine.note_row_cache(table, &replay_rows);
     }
     // A delete is a mark in the block version (`DeleteInBlock`): the rows keep
     // their index entries, which a reader drops by the version (or the delete

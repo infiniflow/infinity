@@ -157,29 +157,23 @@ impl Engine {
         entry.secondary.chunk_meta.insert(index_id, meta);
     }
 
-    /// Appends a committed batch to the decoded-row cache, if the table has one.
-    pub(crate) fn append_row_cache(&self, table: &str, base: usize, encoded: &[String]) {
-        let key = self.table_key(table);
-        if !self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .map(|e| e.row_cache.is_some())
-            .unwrap_or(false)
-        {
+    /// Appends an already-decoded batch to the row cache, if the table has one.
+    ///
+    /// `rows` is what `publish_encoded_rows` just parsed: the cache used to
+    /// parse the same stored text a second time, which doubled the parse for
+    /// every insert on a scalar table.
+    pub(crate) fn note_row_cache(&self, table: &str, rows: &[(usize, Vec<Value>)]) {
+        if rows.is_empty() {
             return;
         }
-        // Decode through the same path as a scan: the stored text is the
-        // canonical rendering (e.g. a FLOAT column renders `1.000000` even when
-        // the literal was `1`).
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        let types = self.column_types(table).unwrap_or_default();
-        let mut decoded = Vec::with_capacity(encoded.len());
-        for text in encoded {
-            match self.parse_stored_row(table, &defaults, &types, text.as_bytes()) {
-                Ok(values) => decoded.push(values),
-                Err(_) => return,
+        let key = self.table_key(table);
+        {
+            let tables = self.tables.lock().unwrap();
+            let Some(entry) = tables.get(&key) else {
+                return;
+            };
+            if entry.row_cache.is_none() {
+                return;
             }
         }
         let mut tables = self.tables.lock().unwrap();
@@ -193,12 +187,13 @@ impl Engine {
         // a batch that starts after everything it already holds. Two commits
         // whose bottoms finished out of order would otherwise leave it unsorted;
         // dropping it costs one cache miss, not a wrong answer.
-        if cache.rows.last().is_some_and(|(last, _)| *last >= base) {
+        let first = rows[0].0;
+        if cache.rows.last().is_some_and(|(last, _)| *last >= first) {
             entry.row_cache = None;
             return;
         }
-        for (k, values) in decoded.into_iter().enumerate() {
-            cache.push(base + k, values);
+        for (seq, values) in rows {
+            cache.push(*seq, values.clone());
         }
         if cache.bytes > ROW_CACHE_BUDGET_BYTES {
             entry.row_cache = None;
@@ -943,7 +938,6 @@ impl Engine {
             engine.refresh_memindex_charge(&bottom_table);
             engine.bump_writes(&bottom_table);
             engine.note_live_rows(&bottom_table, bottom_row_count as isize);
-            engine.append_row_cache(&bottom_table, base, &bottom_encoded);
             // No row key for the multi-value/tensor tables either: their WAL
             // frame is decoded back into row text by `block::to_data_block`
             // (tensor and sparse columns render their text form), so the block
@@ -957,9 +951,15 @@ impl Engine {
             let published: Vec<(usize, &str)> = bottom_encoded
                 .iter()
                 .enumerate()
-                .map(|(k, text)| (base + k, text.as_str()))
+                .map(|(k, text)| (range_seq(k), text.as_str()))
                 .collect();
-            engine.publish_encoded_rows(&bottom_table, &published)?;
+            // The decoded-row cache rides on this parse: it used to run
+            // *before* this call and parse the same text again, which doubled
+            // the parse for every insert on a scalar table.
+            engine.publish_encoded_rows_with(&bottom_table, &published, |table, batch| {
+                engine.note_row_cache(table, batch);
+                Ok(())
+            })?;
             // The rows are readable now (`AppendInBlock`), so the record may
             // carry this transaction's ts (`BlockVersion::Append(commit_ts, …)`).
             engine.settle_append_at(&bottom_table, append_record, ts);

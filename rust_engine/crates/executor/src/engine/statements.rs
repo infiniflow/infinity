@@ -2263,6 +2263,24 @@ impl Engine {
         table: &str,
         rows: &[(usize, T)],
     ) -> Result<()> {
+        self.publish_encoded_rows_with(table, rows, |_, _| Ok(()))
+    }
+
+    /// [`Self::publish_encoded_rows`], handing each parsed batch to `also`.
+    ///
+    /// The caller that also maintains the decoded-row cache passes a closure
+    /// here: it gets the `Vec<Value>` this parse produced instead of parsing the
+    /// same text a second time (`append_row_cache` used to).
+    pub(crate) fn publish_encoded_rows_with<T, F>(
+        &self,
+        table: &str,
+        rows: &[(usize, T)],
+        mut also: F,
+    ) -> Result<()>
+    where
+        T: AsRef<[u8]>,
+        F: FnMut(&str, &[(usize, Vec<Value>)]) -> Result<()>,
+    {
         if rows.is_empty() {
             return Ok(());
         }
@@ -2286,11 +2304,13 @@ impl Engine {
                 }
             }
             if published.len() >= CHUNK {
+                also(table, &published)?;
                 self.refresh_block_mirror_extra(table, &published)?;
                 published.clear();
             }
         }
         if !published.is_empty() {
+            also(table, &published)?;
             self.refresh_block_mirror_extra(table, &published)?;
         }
         Ok(())
