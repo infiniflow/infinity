@@ -2239,14 +2239,23 @@ impl Engine {
                         // column is never resident as text or as one flat `f32`
                         // buffer (see `Engine::spann_build`).
                         let options = crate::spann_mem::options_from(opts)?;
-                        let Some(built) =
-                            self.spann_build(table, col, options, &self.dir.join("tmp"), None)
-                        else {
-                            return Err(Error::Invalid(format!(
-                                "no vectors to index in '{table}.{column}'"
-                            )));
-                        };
-                        {
+                        // §18's open question resolved as *degrade*: below
+                        // `min_rows` (1024 by default) the index is created but
+                        // no tree is built. A k-means over a few hundred rows
+                        // costs more than the one-pass exact scan it would
+                        // accelerate, and the catalog entry still makes the
+                        // column's intent explicit (`SHOW INDEX` reports
+                        // `spann_degraded = flat`). A later dump over a table that
+                        // has grown builds the tree.
+                        let rows = self.row_count(table)? + self.buffered_row_count(table);
+                        if rows >= options.min_rows {
+                            let Some(built) =
+                                self.spann_build(table, col, options, &self.dir.join("tmp"), None)
+                            else {
+                                return Err(Error::Invalid(format!(
+                                    "no vectors to index in '{table}.{column}'"
+                                )));
+                            };
                             let tree = std::sync::Arc::new(built);
                             let key = self.table_key(table);
                             self.tables

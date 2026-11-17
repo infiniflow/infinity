@@ -13308,7 +13308,7 @@ mod tests {
             e.execute_blocking(&sql).unwrap();
             e.execute_blocking(&format!(
                 "CREATE INDEX cs_i ON cs (v) USING SPANN WITH \
-                 (metric='{metric}', max_partition_size=32, num_centroids=16);"
+                 (min_rows = 1, metric='{metric}', max_partition_size=32, num_centroids=16);"
             ))
             .unwrap();
 
@@ -13359,7 +13359,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX csb_i ON csb (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=32, num_centroids=16);",
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
 
@@ -13401,7 +13401,7 @@ mod tests {
         .unwrap();
         e.execute_blocking(
             "CREATE INDEX csf_i ON csf (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=8);",
+             (min_rows = 1, metric='l2', max_partition_size=8);",
         )
         .unwrap();
         let key = e.table_key("default_db.csf");
@@ -13651,7 +13651,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX cf_i ON cf (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=32, num_centroids=16);",
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
         // Written after the build, and the nearest of its tag by a wide margin:
@@ -13750,7 +13750,7 @@ mod tests {
             e.execute_blocking(&sql).unwrap();
             e.execute_blocking(
                 "CREATE INDEX csp_i ON csp (v) USING SPANN WITH \
-                 (metric='l2', max_partition_size=32, num_centroids=16);",
+                 (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
             )
             .unwrap();
             let answers = queries.iter().map(|q| rows(&e, q)).collect::<Vec<_>>();
@@ -13812,7 +13812,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX ci_i ON ci (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=32, num_centroids=16);",
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
@@ -13900,7 +13900,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX cd_i ON cd (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=16, num_centroids=8);",
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
@@ -13979,7 +13979,7 @@ mod tests {
         // `max_partition_size = 16` -> the bound is 1024 rows.
         e.execute_blocking(
             "CREATE INDEX cb_i ON cb (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=16, num_centroids=8);",
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
@@ -14068,7 +14068,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX cr_i ON cr (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=16, num_centroids=8);",
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
@@ -14188,7 +14188,7 @@ mod tests {
         e.execute_blocking(&sql).unwrap();
         e.execute_blocking(
             "CREATE INDEX cq_i ON cq (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=32, num_centroids=16);",
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
         .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
@@ -14234,6 +14234,561 @@ mod tests {
             ),
         );
         assert!(!got.is_empty());
+    }
+
+    /// A spann index below `min_rows` stays **degraded** (`flat`): the catalog
+    /// entry exists, no tree is built, and the exact scan answers - which is what
+    /// the index would cost at that size anyway (§18's open question, resolved as
+    /// "degrade rather than build").
+    #[test]
+    fn a_small_spann_index_stays_flat_until_it_has_enough_rows() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 23 + d * 41) % 967))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sm (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO sm VALUES ");
+        for i in 0..20 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 20 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        // No `min_rows`: the default is 1024, so 20 rows stay flat.
+        e.execute_blocking(
+            "CREATE INDEX sm_i ON sm (v) USING SPANN WITH (metric='l2', max_partition_size=16);",
+        )
+        .unwrap();
+        let key = e.table_key("default_db.sm");
+        let trees = |e: &Engine| -> usize {
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.spann.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(trees(&e), 0, "no tree below min_rows");
+        // Neither does a checkpoint build one.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(trees(&e), 0, "a flush must not build a tree below min_rows");
+
+        // The answer is still exact: with no tree the probe returns `None` and
+        // the scan runs over the table.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM sm SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(7)
+            ),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
+
+        let info = e.show_index_info("sm", "sm_i").expect("index info");
+        assert!(
+            info.other_parameters.contains("spann_degraded = flat"),
+            "{}",
+            info.other_parameters
+        );
+        assert!(
+            info.other_parameters.contains("min_rows = 1024"),
+            "{}",
+            info.other_parameters
+        );
+
+        // The same shape with `min_rows = 1` builds a tree, so the gate is the
+        // option and not the small table.
+        e.execute_blocking("CREATE TABLE smt (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute_blocking(&sql.replace("INTO sm ", "INTO smt "))
+            .unwrap();
+        e.execute_blocking(
+            "CREATE INDEX smt_i ON smt (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16);",
+        )
+        .unwrap();
+        let tkey = e.table_key("default_db.smt");
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .map(|entry| entry.spann.len())
+                .unwrap_or(0),
+            1
+        );
+        let info = e.show_index_info("smt", "smt_i").expect("index info");
+        assert!(
+            info.other_parameters.contains("spann_degraded = tree"),
+            "{}",
+            info.other_parameters
+        );
+    }
+
+    /// `SHOW INDEX` carries the §16.4 telemetry, and the numbers are what the
+    /// queries actually did - including `nprobe` being the IVF spelling of the
+    /// search width (§15 promised it and the probe ignored it for spann).
+    #[test]
+    fn spann_telemetry_reports_the_query_shape() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 29 + d * 43) % 971))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tg (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO tg VALUES ");
+        for i in 0..64 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 64 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX tg_i ON tg (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.tg", "tg_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+
+        for id in 0..2 {
+            rows(
+                &e,
+                &format!(
+                    "SELECT id FROM tg SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1) \
+                     WITH (nprobe = 16);",
+                    vector(id * 7)
+                ),
+            );
+        }
+        let stats = e.spann_stats(index_id).snapshot();
+        assert_eq!(stats.queries, 2, "two indexed queries");
+        assert_eq!(stats.beam_actual, 16.0, "`nprobe` must reach the probe");
+        assert!(stats.candidates_per_query > 0.0);
+
+        let info = e.show_index_info("tg", "tg_i").expect("index info");
+        let text = info.other_parameters.as_str();
+        for expected in [
+            "metric = l2",
+            "encode_type = rabitq",
+            "max_partition_size = 16",
+            "adaptive_beam = false",
+            "spann_partitions = ",
+            // 64 rows at 16 per leaf: four leaves and a root.
+            "spann_height = 2",
+            "spann_rows = 64",
+            "spann_mem_rows = 0",
+            "spann_mem_bytes = 0",
+            "spann_file_backed = ",
+            "spann_chunks = 1",
+            "spann_max_open_chunks = 6",
+            "spann_degraded = tree",
+            "spann_compaction_backlog = 0",
+            "spann_candidates_per_query = ",
+            "spann_beam_actual = 16.0",
+            "spann_early_stop_ratio = ",
+            "spann_recall_estimate = ",
+        ] {
+            assert!(text.contains(expected), "missing '{expected}' in: {text}");
+        }
+    }
+
+    /// §18/P5: an optimize pass folds a segment's spann chunks into one, and a
+    /// checkpoint's dump supersedes the older ones - so the "one chunk per
+    /// segment" invariant holds after the pass even when several dumps ran.
+    #[test]
+    fn an_optimize_folds_the_spann_chunks_of_a_segment() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 31 + d * 47) % 977))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE co (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO co VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX co_i ON co (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let chunks = |e: &Engine| -> Vec<u64> {
+            let dir = e
+                .spann_chunk_dir("default_db.co", "co_i", 0)
+                .expect("segment dir");
+            e.live_chunk_files("default_db.co", "co_i", 0, &dir)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect()
+        };
+        assert_eq!(chunks(&e).len(), 1, "the flush published one chunk");
+
+        // A write plus a second dump leaves the archive behind: the new chunk
+        // covers the whole segment, the old one is subsumed.
+        e.execute_blocking(&format!(
+            "INSERT INTO co VALUES (40, {}), (41, {});",
+            vector(40),
+            vector(41)
+        ))
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(chunks(&e).len(), 2, "two dumps, two chunks");
+
+        // One open chunk per index: the pass folds them.
+        e.set_max_open_chunks_per_index(1);
+        e.optimize_indexes().unwrap();
+        assert_eq!(chunks(&e).len(), 1, "the optimize must leave one chunk");
+
+        // And the folded chunk still answers for every row.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM co SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(41)
+            ),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("41".to_string()));
+        let info = e.show_index_info("co", "co_i").expect("index info");
+        assert!(
+            info.other_parameters
+                .contains("spann_compaction_backlog = 0"),
+            "{}",
+            info.other_parameters
+        );
+    }
+
+    /// §9.5's ledger counts the spann mem index: pending rows are anonymous
+    /// memory, and a byte the watermarks cannot see is a seal they never fire.
+    #[test]
+    fn a_spann_mem_index_is_charged_to_the_byte_ledger() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 37 + d * 53) % 979))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cb2 (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cb2 VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cb2_i ON cb2 (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let key = e.table_key("default_db.cb2");
+        assert_eq!(e.memindex_bytes_of(&key), 0, "nothing pending after a dump");
+
+        let before = e.memindex_bytes_of(&key);
+        e.execute_blocking(&format!(
+            "INSERT INTO cb2 VALUES (40, {}), (41, {}), (42, {});",
+            vector(40),
+            vector(41),
+            vector(42)
+        ))
+        .unwrap();
+        let charged = e.memindex_bytes_of(&key);
+        // 3 rows x (row id 8 B + 4 f32); the exact number is the engine's, the
+        // point is that the ledger sees them at all.
+        assert!(
+            charged >= before + 3 * (8 + 4 * 4),
+            "charged {charged} for 3 pending rows (was {before})"
+        );
+    }
+
+    /// §17.5: the catalog still lists a chunk whose file is gone. The loader must
+    /// skip it and the query must fall back - not fail, and not answer short.
+    #[test]
+    fn a_spann_chunk_file_that_vanished_falls_back_to_the_exact_scan() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 41 + d * 59) % 983))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cv (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO cv VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX cv_i ON cv (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let seg_dir = e
+            .spann_chunk_dir("default_db.cv", "cv_i", 0)
+            .expect("segment dir");
+        drop(e);
+
+        // The crash window: the records are committed, the bytes were never
+        // written (or were lost). A stray `chunk_N.idx.tmp` must not be read as
+        // one either - an interrupted rename leaves exactly that.
+        let mut removed = 0;
+        for entry in std::fs::read_dir(&seg_dir).unwrap().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("chunk_") && name.ends_with(".idx") {
+                std::fs::remove_file(entry.path()).unwrap();
+                removed += 1;
+            }
+        }
+        assert_eq!(removed, 1, "the flushed chunk should be there");
+        std::fs::write(seg_dir.join("chunk_9.idx.tmp"), b"half a header").unwrap();
+
+        let reopened = Engine::open(dir.path()).unwrap();
+        let got = rows(
+            &reopened,
+            &format!(
+                "SELECT id FROM cv SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(11)
+            ),
+        );
+        assert_eq!(
+            got.first().map(|r| r[0].clone()),
+            Some("11".to_string()),
+            "a lost chunk must fall back to the exact scan: {got:?}"
+        );
+        let trees = reopened
+            .tables
+            .lock()
+            .unwrap()
+            .get(&reopened.table_key("default_db.cv"))
+            .map(|entry| entry.spann.len())
+            .unwrap_or(0);
+        assert_eq!(trees, 0, "no tree can be loaded from a missing chunk");
+    }
+
+    /// Large-scale validation with a **small resident set** (§16.4).
+    ///
+    /// 50M × 1536d does not fit on a laptop, so what the reference numbers are
+    /// about is measured instead: a dataset larger than the resident budget must
+    /// be answered out of the mapped chunk, with RSS tracking the pages a query
+    /// touches rather than the column.
+    ///
+    /// * the vectors are **never stored** - the generator is the ground truth, so
+    ///   the process does not hold the data it indexes;
+    /// * the rows are written in batches, so the writer never holds the table;
+    /// * after the dump the tree must be file-backed with a zero heap footprint;
+    /// * 200 queries then recall@10 against a brute force over every row, and the
+    ///   RSS delta must stay under half the raw column.
+    ///
+    /// `INFINITY_SPANN_SCALE_ROWS` (default 20000) and
+    /// `INFINITY_SPANN_SCALE_DIM` (default 128) size it; at the default the raw
+    /// column is 10 MiB and the bound asserted below is 5 MiB.
+    ///
+    /// `cargo test -p executor spann_out_of_core --lib -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn spann_out_of_core_keeps_the_resident_set_small() {
+        let env_usize = |name: &str, default: usize| -> usize {
+            std::env::var(name)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(default)
+        };
+        let rows_total = env_usize("INFINITY_SPANN_SCALE_ROWS", 20_000);
+        let dim = env_usize("INFINITY_SPANN_SCALE_DIM", 128);
+        let value = |i: usize, d: usize| -> f32 {
+            let x = (i as u64)
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add((d as u64).wrapping_mul(1_442_695_040_888_963_407));
+            ((x >> 40) % 2000) as f32 / 100.0
+        };
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim).map(|d| format!("{:.2}", value(i, d))).collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
+        ))
+        .unwrap();
+        let batch = 2_000;
+        let mut written = 0;
+        while written < rows_total {
+            let end = (written + batch).min(rows_total);
+            let mut sql = String::from("INSERT INTO big VALUES ");
+            for i in written..end {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < end {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+            written = end;
+        }
+        e.execute_blocking(
+            "CREATE INDEX big_i ON big (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
+        )
+        .unwrap();
+        let built = std::time::Instant::now();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let dump = built.elapsed();
+
+        // The dump must leave the tree on disk: heap zero, pages mapped.
+        let key = e.table_key("default_db.big");
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.big", "big_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+        let handle = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.spann.get(&index_id).cloned())
+            .expect("the tree");
+        assert!(
+            handle.is_file_backed(),
+            "the dump must leave a mapped chunk"
+        );
+        assert_eq!(
+            handle.mem_usage(),
+            0,
+            "a mapped chunk has no heap footprint"
+        );
+        let (partitions, height) = handle.shape();
+        let tree_rows = handle.len();
+        assert_eq!(tree_rows, rows_total, "the chunk covers every row");
+
+        // Warm one query (it faults in the header and the beam's partitions),
+        // then measure what 200 of them cost.
+        let query = |i: usize| -> String {
+            format!(
+                "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+                vector(i)
+            )
+        };
+        let rss_before = crate::engine::state::process_rss_bytes();
+        let started = std::time::Instant::now();
+        for q in 0..200 {
+            let got = rows(&e, &query(q * 37 % rows_total));
+            assert_eq!(got.len(), 10, "top-10 on a covered table");
+        }
+        let per_query = started.elapsed() / 200;
+        let rss_after = crate::engine::state::process_rss_bytes();
+        // A second identical pass: a query path that materialised the column (or
+        // cached the decoded vectors) would keep growing here. This is the part
+        // that holds at any size, so it is the one asserted unconditionally.
+        for q in 0..200 {
+            rows(&e, &query(q * 37 % rows_total));
+        }
+        let rss_settled = crate::engine::state::process_rss_bytes();
+
+        // Recall against a brute force over the generator (no stored copy).
+        let scored = 20;
+        let mut hits = 0usize;
+        let mut wanted_total = 0usize;
+        for q in 0..scored {
+            let probe = q * 97 % rows_total;
+            let target: Vec<f32> = (0..dim).map(|d| value(probe, d)).collect();
+            let mut truth: Vec<(usize, f32)> = (0..rows_total)
+                .map(|i| {
+                    let distance: f32 = (0..dim)
+                        .map(|d| {
+                            let diff = value(i, d) - target[d];
+                            diff * diff
+                        })
+                        .sum();
+                    (i, distance)
+                })
+                .collect();
+            truth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            let wanted: std::collections::HashSet<String> =
+                truth.iter().take(10).map(|(i, _)| i.to_string()).collect();
+            let got: std::collections::HashSet<String> = rows(&e, &query(probe))
+                .into_iter()
+                .map(|r| r[0].clone())
+                .collect();
+            wanted_total += wanted.len();
+            hits += got.intersection(&wanted).count();
+        }
+        let recall = hits as f64 / wanted_total as f64;
+        let raw_bytes = rows_total * dim * std::mem::size_of::<f32>();
+        let settled = rss_settled.saturating_sub(rss_after);
+        eprintln!(
+            "{rows_total} rows x {dim}d: dump {dump:?} | {partitions} partitions, height {height} | \
+             {per_query:?}/query | RSS +{} KiB then +{} KiB (second pass) of {:.1} MiB raw | \
+             recall@10 {:.3}",
+            (rss_after.saturating_sub(rss_before)) / 1024,
+            settled / 1024,
+            raw_bytes as f64 / (1024.0 * 1024.0),
+            recall
+        );
+        assert!(
+            settled < 4 * 1024 * 1024,
+            "a second query pass grew RSS by {settled} bytes: something is accumulating"
+        );
+        // The absolute bound is only meaningful once the column is larger than the
+        // fixed cost of a debug-build query (text, AST, result rows), so it is
+        // asserted at the default sizes and reported for smaller overrides.
+        if raw_bytes > 8 * 1024 * 1024 {
+            assert!(
+                rss_after.saturating_sub(rss_before) < (raw_bytes / 2) as u64,
+                "RSS grew by {} bytes for a {raw_bytes}-byte column: the query path \
+                 materialised it",
+                rss_after.saturating_sub(rss_before)
+            );
+        }
+        assert!(
+            recall >= 0.9,
+            "recall@10 {recall:.3} at beam 32 over a mapped chunk"
+        );
     }
 
     /// The numbers behind `docs/SPANN_BENCH.md`.
@@ -14291,7 +14846,7 @@ mod tests {
         let started = std::time::Instant::now();
         e.execute_blocking(
             "CREATE INDEX bench_i ON bench (v) USING SPANN WITH \
-             (metric='l2', max_partition_size=128, num_centroids=64);",
+             (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
         )
         .unwrap();
         let build = started.elapsed();
@@ -14549,7 +15104,7 @@ mod tests {
         e.execute_blocking("CREATE INDEX bh ON bench_h (v) USING HNSW WITH (metric='l2');")
             .unwrap();
         e.execute_blocking(
-            "CREATE INDEX bc ON bench_c (v) USING SPANN WITH (metric='l2', max_partition_size=128);",
+            "CREATE INDEX bc ON bench_c (v) USING SPANN WITH (min_rows = 1, metric='l2', max_partition_size=128);",
         )
         .unwrap();
 

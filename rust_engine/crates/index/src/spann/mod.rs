@@ -105,6 +105,15 @@ pub struct Options {
     /// Root fan-out: `num_centroids` of §11.2. The bisection tree is collapsed
     /// above `log2(root_fanout)` levels into one wide root (`build::collapse_top`).
     pub root_fanout: usize,
+    /// Below this many rows the index stays **degraded** (`flat`): building a
+    /// tree over a handful of rows costs a k-means and a rotation for nothing,
+    /// and the exact scan is both faster and complete (§18's open question; the
+    /// default is the reference's 1024).
+    pub min_rows: usize,
+    /// Let the recall monitor choose the search width per query (§11.3 item 4).
+    /// Off by default: widening is a *statistical* bet, and an operator who wants
+    /// repeatable latency asks for it explicitly with `adaptive_beam = true`.
+    pub adaptive_beam: bool,
 }
 
 impl Default for Options {
@@ -119,6 +128,8 @@ impl Default for Options {
             seed: 0x5EED_1234_ABCD_0001,
             base_beam: 8,
             root_fanout: 64,
+            min_rows: 1024,
+            adaptive_beam: false,
         }
     }
 }
@@ -498,6 +509,10 @@ mod tests {
             seed: 12345,
             base_beam: 8,
             root_fanout: 64,
+            // The tree tests build trees on purpose: the degradation gate lives in
+            // the executor's DDL/query path, not here.
+            min_rows: 0,
+            adaptive_beam: false,
         }
     }
 

@@ -22,6 +22,8 @@ pub(crate) const OPTION_KEYS: &[&str] = &[
     "KMEANS_ITERATIONS",
     "SEED",
     "BEAM",
+    "MIN_ROWS",
+    "ADAPTIVE_BEAM",
 ];
 
 /// Translates the DDL options into the builder's knobs.
@@ -67,6 +69,14 @@ pub(crate) fn options_from(opts: &[(String, String)]) -> Result<Options> {
                 })?;
             }
             "BEAM" => out.base_beam = parse_usize(key, value)?,
+            "MIN_ROWS" => out.min_rows = parse_usize(key, value)?,
+            "ADAPTIVE_BEAM" => {
+                out.adaptive_beam = value.parse::<bool>().map_err(|_| {
+                    Error::Invalid(format!(
+                        "invalid adaptive_beam '{value}' (expected 'true' or 'false')"
+                    ))
+                })?;
+            }
             other => {
                 return Err(Error::Invalid(format!(
                     "invalid index parameter: unsupported SPANN option '{other}'"
@@ -231,9 +241,7 @@ impl SpannHandle {
         Vec::new()
     }
 
-    /// `(partitions, height)`, for the bench and the `SHOW INDEX` telemetry
-    /// (the latter is not wired yet, hence the allowance).
-    #[allow(dead_code)]
+    /// `(partitions, height)`, reported by `SHOW INDEX` (§16.4).
     pub(crate) fn shape(&self) -> (usize, u32) {
         match self {
             SpannHandle::Memory(index) => (index.partitions().len(), index.height()),
@@ -246,10 +254,8 @@ impl SpannHandle {
 
     /// Heap bytes this handle holds. A file-backed index holds only its header
     /// and section table, so the answer is 0 and the slot pages show up as page
-    /// cache instead (`RssFile`, §19.6).
-    ///
-    /// Only the bench reads it today; the `spann_bytes` gauge (§16.3) will.
-    #[allow(dead_code)]
+    /// cache instead (`RssFile`, §19.6). `SHOW INDEX` reports it as
+    /// `spann_mem_bytes`.
     pub(crate) fn mem_usage(&self) -> usize {
         match self {
             SpannHandle::Memory(index) => index.mem_usage(),
@@ -257,9 +263,64 @@ impl SpannHandle {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn is_file_backed(&self) -> bool {
         matches!(self, SpannHandle::File(_))
+    }
+}
+
+/// The per-index counters behind `SHOW INDEX` (§16.4).
+///
+/// They live on the engine, keyed by index id, rather than on the tree: a tree is
+/// dropped and rebuilt by every dump, and a counter that resets on a dump cannot
+/// answer "what does a query cost on this index".
+#[derive(Default)]
+pub(crate) struct SpannStats {
+    queries: std::sync::atomic::AtomicU64,
+    candidates: std::sync::atomic::AtomicU64,
+    beam: std::sync::atomic::AtomicU64,
+    /// Queries whose search returned fewer candidates than the budget allowed:
+    /// the beam ran out of partitions before the pool filled, i.e. the search
+    /// stopped early instead of being cut off by the budget.
+    early_stops: std::sync::atomic::AtomicU64,
+}
+
+/// [`SpannStats`] read out once, so one `SHOW INDEX` sees one instant.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct SpannStatsSnapshot {
+    pub queries: u64,
+    pub candidates_per_query: f64,
+    pub beam_actual: f64,
+    pub early_stop_ratio: f64,
+}
+
+impl SpannStats {
+    pub(crate) fn record(&self, candidates: usize, beam: usize, budget: usize) {
+        use std::sync::atomic::Ordering;
+        self.queries.fetch_add(1, Ordering::Relaxed);
+        self.candidates
+            .fetch_add(candidates as u64, Ordering::Relaxed);
+        self.beam.fetch_add(beam as u64, Ordering::Relaxed);
+        if candidates < budget {
+            self.early_stops.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub(crate) fn snapshot(&self) -> SpannStatsSnapshot {
+        use std::sync::atomic::Ordering;
+        let queries = self.queries.load(Ordering::Relaxed);
+        let per = |total: u64| {
+            if queries == 0 {
+                0.0
+            } else {
+                total as f64 / queries as f64
+            }
+        };
+        SpannStatsSnapshot {
+            queries,
+            candidates_per_query: per(self.candidates.load(Ordering::Relaxed)),
+            beam_actual: per(self.beam.load(Ordering::Relaxed)),
+            early_stop_ratio: per(self.early_stops.load(Ordering::Relaxed)),
+        }
     }
 }
 
@@ -297,6 +358,144 @@ pub(crate) fn candidate_budget(topn: usize, beam: usize, multiplier: usize) -> u
 }
 
 impl crate::Engine {
+    /// The counters `SHOW INDEX` reads for `index_id`, created on first use.
+    pub(crate) fn spann_stats(&self, index_id: u64) -> Arc<SpannStats> {
+        let mut map = self.context.spann_stats.lock().unwrap();
+        map.entry(index_id).or_default().clone()
+    }
+
+    /// `max_open_chunks_per_index` (§18): the live-chunk count that makes an
+    /// optimize pass fold a segment's chunks into one.
+    pub(crate) fn max_open_chunks_per_index(&self) -> usize {
+        self.context
+            .max_open_chunks_per_index
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .max(1)
+    }
+
+    pub fn set_max_open_chunks_per_index(&self, chunks: usize) {
+        self.context
+            .max_open_chunks_per_index
+            .store(chunks.max(1), std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// The directory a segment's spann chunk is written to
+    /// (`idx_{index_id}/seg_{segment}` - the same layout HNSW uses).
+    pub(crate) fn spann_chunk_dir(
+        &self,
+        table: &str,
+        index_name: &str,
+        segment: u32,
+    ) -> Option<std::path::PathBuf> {
+        let table = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let index_id = self.index_position(&table, index_name).ok()?;
+        let db_id = self.database_id_of(&table);
+        Some(
+            self.blocks_root()
+                .join(format!("db_{db_id}/tbl_{}", meta.id))
+                .join(format!("idx_{index_id}/seg_{segment}")),
+        )
+    }
+
+    /// The `SHOW INDEX` telemetry for one spann index (§16.4), appended to the
+    /// parameter string the RPC returns.
+    ///
+    /// Every number here is a property of **this** index: `spann_degraded` says
+    /// whether it answers from a tree or from the exact scan, and
+    /// `spann_compaction_backlog` counts the chunks its segments have not folded
+    /// yet - the state an operator needs to decide "is this index thin or fat",
+    /// which the C++ `segment_index_count` alone does not say.
+    pub(crate) fn spann_telemetry_text(
+        &self,
+        table: &str,
+        im: &catalog::IndexMeta,
+        base: String,
+    ) -> String {
+        let Ok(opts) = options_from(&im.options) else {
+            return base;
+        };
+        let tkey = self.table_key(table);
+        let rows = self.row_count(&tkey).unwrap_or(0) + self.buffered_row_count(&tkey);
+        let (partitions, height, tree_rows, mem_rows, mem_bytes, file_backed) = {
+            let tables = self.tables.lock().unwrap();
+            let entry = tables.get(&tkey);
+            let mem_rows = entry
+                .and_then(|e| e.spann_mem.get(&im.id))
+                .map(Vec::len)
+                .unwrap_or(0);
+            match entry.and_then(|e| e.spann.get(&im.id)) {
+                Some(handle) => {
+                    let (partitions, height) = handle.shape();
+                    (
+                        partitions,
+                        height,
+                        handle.len(),
+                        mem_rows,
+                        handle.mem_usage(),
+                        handle.is_file_backed(),
+                    )
+                }
+                None => (0, 0, 0, mem_rows, 0, false),
+            }
+        };
+        let mut chunks = 0usize;
+        let mut backlog = 0usize;
+        for (segment, _) in self.segment_row_counts(&tkey) {
+            let Some(dir) = self.spann_chunk_dir(&tkey, &im.name, segment) else {
+                continue;
+            };
+            let live = self.live_chunk_files(&tkey, &im.name, segment, &dir);
+            chunks += live.len();
+            backlog += live.len().saturating_sub(1);
+        }
+        // `flat` is not a failure: below `min_rows` a tree costs a k-means for a
+        // scan the exact path already answers in one pass (§18's open question).
+        let degraded = if rows < opts.min_rows || tree_rows == 0 {
+            "flat"
+        } else {
+            "tree"
+        };
+        let stats = self.spann_stats(im.id).snapshot();
+        let recall = self
+            .context
+            .recall
+            .lock()
+            .unwrap()
+            .get(&im.id)
+            .and_then(|monitor| monitor.estimate())
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "n/a".to_string());
+        let metric = match opts.metric {
+            Metric::L2 => "l2",
+            Metric::Ip => "ip",
+            Metric::Cos => "cosine",
+        };
+        let encode = match opts.encode {
+            Encode::Rabitq => "rabitq",
+            Encode::None => "none",
+        };
+        format!(
+            "{base}, metric = {metric}, encode_type = {encode}, \
+             max_partition_size = {}, min_rows = {}, adaptive_beam = {}, \
+             spann_partitions = {partitions}, spann_height = {height}, \
+             spann_rows = {tree_rows}, spann_mem_rows = {mem_rows}, \
+             spann_mem_bytes = {mem_bytes}, spann_file_backed = {file_backed}, \
+             spann_chunks = {chunks}, \
+             spann_max_open_chunks = {}, spann_degraded = {degraded}, \
+             spann_compaction_backlog = {backlog}, \
+             spann_candidates_per_query = {:.1}, spann_beam_actual = {:.1}, \
+             spann_early_stop_ratio = {:.3}, spann_recall_estimate = {recall}",
+            opts.max_partition_size,
+            opts.min_rows,
+            opts.adaptive_beam,
+            self.max_open_chunks_per_index(),
+            stats.candidates_per_query,
+            stats.beam_actual,
+            stats.early_stop_ratio,
+        )
+    }
+
     /// Builds a spann tree over `column` **without holding the column in RAM**.
     ///
     /// Two passes over the data, both cheap in memory:

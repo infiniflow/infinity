@@ -795,6 +795,102 @@ impl Engine {
         }
     }
 
+    /// SPANN's optimize pass (§18, P5).
+    ///
+    /// The index is rebuild-mode, so "merge" is "dump once and keep one chunk":
+    ///
+    /// 1. **uncovered rows first** - a segment whose newest chunk no longer
+    ///    matches its live rows is dumped, which is also what clears that
+    ///    segment's rows from the mem index;
+    /// 2. then fold - a segment left with more than one live chunk keeps only the
+    ///    newest. A rebuild-mode chunk covers the *whole* segment, so every older
+    ///    one is strictly subsumed; `max_open_chunks_per_index` decides when a
+    ///    pass is worth running when nothing needs a dump (a crash between the
+    ///    commit and the deprecation leaves extra chunks behind).
+    ///
+    /// It runs after [`Self::optimize_index_chunks`], not inside that
+    /// transaction: a spann dump publishes its chunk records through the catalog
+    /// itself, and folding it into the same `DumpIndex` command would write the
+    /// record twice.
+    pub(crate) fn optimize_spann_indexes(&self, ts: u64) -> Result<()> {
+        let max_open = self.max_open_chunks_per_index();
+        for im in self.storage.catalog.list_indexes()? {
+            if !im.index_type.eq_ignore_ascii_case("SPANN") {
+                continue;
+            }
+            let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&im.table) else {
+                continue;
+            };
+            let Ok(index_id) = self.index_position(&im.table, &im.name) else {
+                continue;
+            };
+            let db_id = self.database_id_of(&im.table);
+            let recorded: std::collections::HashMap<(u32, u64), u64> =
+                catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(|(segment, chunks)| {
+                    chunks
+                        .into_iter()
+                        .map(move |(id, info)| ((segment, id), info.row_count))
+                })
+                .collect();
+            let segments = self.segment_row_counts(&im.table);
+            let mut needs_dump = false;
+            let mut over_cap = false;
+            for (segment, rows) in &segments {
+                let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, *segment) else {
+                    continue;
+                };
+                let live = self.live_chunk_files(&im.table, &im.name, *segment, &dir);
+                if live.len() > max_open {
+                    over_cap = true;
+                }
+                let covered = live
+                    .iter()
+                    .map(|(id, _)| *id)
+                    .max()
+                    .and_then(|id| recorded.get(&(*segment, id)).copied())
+                    .unwrap_or(0);
+                if covered != *rows {
+                    needs_dump = true;
+                }
+            }
+            if !needs_dump && !over_cap {
+                continue;
+            }
+            if needs_dump {
+                // Failure is not fatal to the pass: the index keeps answering
+                // from its previous chunk and the uncovered rows are scored
+                // exactly (§9.7).
+                let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+            }
+            for (segment, _) in &segments {
+                let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, *segment) else {
+                    continue;
+                };
+                let live = self.live_chunk_files(&im.table, &im.name, *segment, &dir);
+                let Some(newest) = live.iter().map(|(id, _)| *id).max() else {
+                    continue;
+                };
+                let old: Vec<u32> = live
+                    .iter()
+                    .filter(|(id, _)| *id != newest)
+                    .map(|(id, _)| *id as u32)
+                    .collect();
+                if !old.is_empty() {
+                    self.deprecate_chunks(&im.table, &im.name, *segment, &old, ts)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Drops the shared mappings of the spilled index files, so RSS tracks live
     /// structures rather than the page cache (C++ `BufferManager::Flush` drops
     /// the clean pages it wrote back).
@@ -1088,6 +1184,11 @@ impl Engine {
         // it no longer matches the index state.
         self.index_epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.optimize_index_chunks().await
+        self.optimize_index_chunks().await?;
+        // SPANN is rebuild-mode: its optimize is a dump plus a fold, and until
+        // this call it had no branch at all - the doc's "OPTIMIZE INDEX does
+        // nothing for spann" was literally true.
+        let ts = self.checkpoint_ts();
+        self.optimize_spann_indexes(ts)
     }
 }

@@ -273,7 +273,15 @@ impl Engine {
             // over a rerank pool sized by the reference's formula (the beam and
             // the multiplier both widen it) and the exact rescoring picks the
             // winner. The pool is an I/O budget: the caller streams it.
-            let width = q.beam.unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
+            //
+            // `nprobe` is the IVF spelling of the same knob and the SDK sends it
+            // to every index type, so it is honoured as the width when the
+            // statement did not name `beam` (§15 promised that and the port
+            // ignored it).
+            let width = q
+                .beam
+                .or(q.options.nprobe.filter(|n| *n > 0))
+                .unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
             let multiplier = q
                 .options
                 .rerank_multiplier
@@ -283,6 +291,11 @@ impl Engine {
                 Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
                 None => index.search(q.query, budget, Some(width)),
             };
+            // §16.4 telemetry: what this query actually cost. `hits.len() <
+            // budget` means the beam ran out of partitions before the pool
+            // filled - the search stopped early instead of being cut off by the
+            // budget.
+            self.spann_stats(index_id).record(hits.len(), width, budget);
             let mut candidates: HashSet<usize> =
                 hits.into_iter().map(|(id, _)| id as usize).collect();
             // The mem index: rows inserted since the last dump. They are

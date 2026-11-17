@@ -381,6 +381,8 @@ impl Engine {
                 recall: std::sync::Mutex::new(std::collections::HashMap::new()),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
+                spann_stats: Mutex::new(std::collections::HashMap::new()),
+                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(6),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
                         .ok()
@@ -9716,6 +9718,21 @@ impl Engine {
             // §11.3 items 4/5: the monitor's beam is the search width, and a
             // `WITH (recall_target = …)` on this statement overrides its target.
             let beam = index_id.map(|id| {
+                // §15 writes `WITH (nprobe = 32)` for spann, and the SDK sends
+                // `nprobe` to every index type; for spann it *is* the search
+                // width (the number of partitions probed per level), so it is
+                // honoured as the same override `beam` is - only for spann, where
+                // the two words mean one thing.
+                let width_override = knn_opts.beam.or_else(|| {
+                    let spann = meta
+                        .as_ref()
+                        .is_some_and(|im| im.index_type.eq_ignore_ascii_case("SPANN"));
+                    if spann {
+                        knn_opts.nprobe.filter(|n| *n > 0)
+                    } else {
+                        None
+                    }
+                });
                 let base = meta
                     .as_ref()
                     .and_then(|im| {
@@ -9743,7 +9760,20 @@ impl Engine {
                 // `WITH (beam = …)` is a hard override (§11.3 item 5): the
                 // monitor still learns from the query, it just does not set the
                 // width for it.
-                knn_opts.beam.unwrap_or_else(|| monitor.beam())
+                //
+                // `adaptive_beam = false` on a spann index is the same override
+                // as a DDL-level policy (§15's example): the monitor keeps
+                // sampling - that is what `SHOW INDEX`'s recall estimate needs -
+                // but the width stays the index's own. Index types that have no
+                // such option keep the monitor's width.
+                let adaptive = !meta.as_ref().is_some_and(|im| {
+                    im.index_type.eq_ignore_ascii_case("SPANN")
+                        && im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("adaptive_beam")
+                                && value.trim().eq_ignore_ascii_case("false")
+                        })
+                });
+                width_override.unwrap_or_else(|| if adaptive { monitor.beam() } else { base })
             });
             // How many rows the graph has to cover for its answer to be
             // complete. The cache knows it when it is warm; otherwise it is the

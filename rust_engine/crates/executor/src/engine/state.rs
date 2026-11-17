@@ -5217,6 +5217,16 @@ pub(crate) struct Context {
     /// beyond it are evicted, and a scan that no longer sees full label
     /// coverage falls back to the exact scan.
     pub(crate) hnsw_budget: std::sync::atomic::AtomicUsize,
+    /// Per-index spann counters behind `SHOW INDEX` (§16.4), keyed by catalog
+    /// index id. They outlive the tree on purpose: every dump drops and rebuilds
+    /// it, and a counter that resets on a dump cannot answer what a query costs.
+    pub(crate) spann_stats:
+        Mutex<std::collections::HashMap<u64, Arc<crate::spann_mem::SpannStats>>>,
+    /// `max_open_chunks_per_index` (§18): once a segment has more live chunks
+    /// than this, an optimize pass folds them into one. Built in at 6 like the
+    /// reference's default - a knob rather than a constant so a test can force a
+    /// compaction with two dumps.
+    pub(crate) max_open_chunks_per_index: std::sync::atomic::AtomicUsize,
     /// `query_count` global/session variable: statements executed so far.
     pub(crate) query_count: std::sync::atomic::AtomicU64,
     /// `connected_timestamp` session variable: when the engine was opened.

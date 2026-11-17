@@ -974,6 +974,91 @@ mod tests {
         assert!(FileIndex::open(&path, &cos).is_err());
     }
 
+    /// §17.2's conformance: the same operations must answer identically on the
+    /// in-memory tree (`MemStore`) and on the mapped chunk (`MmapStore`). The
+    /// single-shape case above is the happy path; this is the matrix - every
+    /// metric, both encodings, a range of `k` (including `k > n`), a narrow and a
+    /// wide beam, and the filtered probe.
+    #[test]
+    fn every_operation_matches_between_the_memory_tree_and_the_mapped_chunk() {
+        let data = rows(300, 8);
+        let dir = tempfile::tempdir().unwrap();
+        for metric in [Metric::L2, Metric::Cos, Metric::Ip] {
+            for encode in [Encode::Rabitq, Encode::None] {
+                let mut options = opts();
+                options.metric = metric;
+                options.encode = encode;
+                let index = SpannIndex::build(data.clone(), options.clone()).unwrap();
+                let bytes = write(&index);
+                if encode == Encode::None {
+                    // The v1 chunk stores rabitq codes only, so a `none` index has
+                    // no mapped counterpart - and writing one must be refused
+                    // rather than silently re-encoded (the build path keeps
+                    // working, which is what the `encode = none` tests cover).
+                    assert!(
+                        bytes.is_err(),
+                        "a `none` index must not be serialised into a v1 chunk"
+                    );
+                    continue;
+                }
+                let path = dir.path().join(format!("chunk_{metric:?}_{encode:?}.idx"));
+                std::fs::write(&path, bytes.unwrap()).unwrap();
+                let file = FileIndex::open(&path, &options).unwrap();
+                assert_eq!(file.len(), index.len(), "{metric:?}/{encode:?}");
+                assert_eq!(file.height(), index.height(), "{metric:?}/{encode:?}");
+
+                let queries: Vec<&Vec<f32>> = data.iter().take(6).map(|row| &row.1).collect();
+                for (k, beam) in [
+                    (1usize, None),
+                    (10, None),
+                    (10, Some(1)),
+                    (10, Some(64)),
+                    // `k` above the row count: both paths have to return every
+                    // row rather than a short or a padded answer.
+                    (data.len(), Some(4)),
+                ] {
+                    for query in &queries {
+                        let memory: Vec<(u64, f32)> = index.search(query, k, beam);
+                        let mapped: Vec<(u64, f32)> = file.search(query, k, beam);
+                        assert_eq!(
+                            memory.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+                            mapped.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+                            "{metric:?}/{encode:?} k={k} beam={beam:?}"
+                        );
+                        for ((_, a), (_, b)) in memory.iter().zip(&mapped) {
+                            assert!(
+                                (a - b).abs() <= 1e-3 * a.abs().max(1.0),
+                                "{metric:?}/{encode:?} k={k} beam={beam:?}: {a} vs {b}"
+                            );
+                        }
+                    }
+                }
+
+                // The filtered probe is the path the statement takes whenever a
+                // predicate was pushed down, so it has to agree too.
+                let allowed: std::collections::HashSet<u64> =
+                    (0..data.len() as u64).filter(|i| i % 3 == 0).collect();
+                for query in &queries {
+                    let memory: Vec<u64> = index
+                        .search_filtered(query, 10, Some(8), &allowed)
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect();
+                    let mapped: Vec<u64> = file
+                        .search_filtered(query, 10, Some(8), &allowed)
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect();
+                    assert_eq!(memory, mapped, "{metric:?}/{encode:?} filtered");
+                    assert!(
+                        mapped.iter().all(|id| allowed.contains(id)),
+                        "{metric:?}/{encode:?}: the probe returned a filtered-out row"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn slot_pages_are_page_aligned_and_complete() {
         let index = SpannIndex::build(rows(200, 8), opts()).unwrap();

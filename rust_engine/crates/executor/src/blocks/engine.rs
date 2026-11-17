@@ -5687,6 +5687,19 @@ impl Engine {
                 }
                 continue;
             }
+            // A spann segment can hold several chunks (a dump per checkpoint, and
+            // an optimize folds them), so its superseded files have to be
+            // reclaimed too - without this branch the bytes of every archived
+            // chunk stayed on disk forever.
+            if im.index_type.eq_ignore_ascii_case("SPANN") {
+                for (segment, _) in self.segment_row_counts(&im.table) {
+                    let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, segment) else {
+                        continue;
+                    };
+                    self.reclaim_deprecated_chunks(&im.table, &im.name, segment, &dir)?;
+                }
+                continue;
+            }
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
@@ -6370,6 +6383,20 @@ impl Engine {
         // nor the `f32` column (6 KB/row) nor the serialised chunk (208 B/row)
         // has to be resident, and a dump only ever holds one segment's tree.
         let opts = crate::spann_mem::options_from(options).ok()?;
+        // §18's degradation, on the dump side: a segment below `min_rows` stays
+        // `flat`. Publishing a tree for a handful of rows would put a k-means on
+        // every checkpoint for a table the exact scan answers in one pass, and
+        // the rows stay visible either way (they are live rows of the segment,
+        // so `knn_candidates` scores them through `uncovered`).
+        let rows = self
+            .segment_row_counts(table)
+            .into_iter()
+            .find(|(seg, _)| *seg == segment)
+            .map(|(_, rows)| rows as usize)
+            .unwrap_or(0);
+        if rows < opts.min_rows {
+            return None;
+        }
         self.spann_write_chunk(table, ci, opts, segment, path)
     }
 

@@ -1972,6 +1972,24 @@ impl Engine {
                                 .map(|(_, v)| rows.len() * v.len() * std::mem::size_of::<f32>())
                                 .unwrap_or(0)
                         })
+                        .sum::<usize>()
+                    // §9.2's mem index is rows the spill ledger has to see: it
+                    // holds `id + vector` per pending row until a dump folds them
+                    // into the tree, and the row-count bound only caps it at
+                    // `max_partition_size × 64` rows - 8 MiB at 1536d, which is
+                    // small, but "small" is not "free" when the watermarks are
+                    // computed from this number.
+                    + e.spann_mem
+                        .values()
+                        .map(|rows| {
+                            rows.first()
+                                .map(|(_, v)| {
+                                    rows.len()
+                                        * (std::mem::size_of::<u64>()
+                                            + v.len() * std::mem::size_of::<f32>())
+                                })
+                                .unwrap_or(0)
+                        })
                         .sum::<usize>(),
             )
         };
@@ -3385,20 +3403,31 @@ impl Engine {
             // cardinalities, and `secondary_low_cardinality` resolves a column
             // to the first one, which is what the builder needs but not what
             // `SHOW INDEX` asks about.
-            other_parameters: other_params_of(&im.index_type, &im.options, || {
-                let column_type = meta
-                    .columns
-                    .iter()
-                    .position(|c| c == &im.column)
-                    .and_then(|at| meta.types.get(at))
-                    .map(|t| t.trim().to_ascii_uppercase())
-                    .unwrap_or_default();
-                column_type.starts_with("BOOL")
-                    || column_type.starts_with("JSON")
-                    || im.options.iter().any(|(key, value)| {
-                        key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
-                    })
-            }),
+            other_parameters: {
+                let base = other_params_of(&im.index_type, &im.options, || {
+                    let column_type = meta
+                        .columns
+                        .iter()
+                        .position(|c| c == &im.column)
+                        .and_then(|at| meta.types.get(at))
+                        .map(|t| t.trim().to_ascii_uppercase())
+                        .unwrap_or_default();
+                    column_type.starts_with("BOOL")
+                        || column_type.starts_with("JSON")
+                        || im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("CARDINALITY")
+                                && value.eq_ignore_ascii_case("low")
+                        })
+                });
+                // A spann index has runtime state worth reporting - partitions,
+                // mem rows, chunks, degradation, and the query counters - and
+                // `other_parameters` is the only field the RPC carries it in.
+                if im.index_type.eq_ignore_ascii_case("SPANN") {
+                    self.spann_telemetry_text(&table, &im, base)
+                } else {
+                    base
+                }
+            },
             column_id,
         })
     }
