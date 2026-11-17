@@ -3,9 +3,12 @@
 //! Every parallel site in the engine is "N independent items, same function":
 //! a checkpoint's tables, a rebuild's tables, a scan's blocks, a segment's term
 //! batches, an HNSW build's buckets. This module is the one primitive they
-//! share. It creates no threads and owns no pool: the bound is the caller's
-//! `workers`, enforced by permits, and a fan-out inside a fan-out just takes
-//! permits from its own gate instead of starving a second scheduler.
+//! share. It creates no threads and **no runtime**: it spawns on the caller's
+//! runtime, or on the engine's when the calling thread has none entered (see
+//! [`install_runtime`]). A caller outside the engine brings its own runtime.
+//! The bound is the caller's `workers`, enforced by permits, and a fan-out
+//! inside a fan-out just takes permits from its own gate instead of starving a
+//! second scheduler.
 //!
 //! The item handed to [`for_each_blocking`] / [`map_blocking`] must already be
 //! **one blocking unit** - the caller has split its work until what is left is
@@ -21,55 +24,35 @@ use tokio::runtime::Handle;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 
-/// The process-wide runtime a fan-out spawns on when the calling thread has
-/// none entered (the checkpoint trigger thread, a `block_on` adapter, a CLI
-/// helper). The engine installs its own runtime here at startup.
+/// The process's runtime, recorded for the threads that have none entered.
+///
+/// The engine installs its scheduler's runtime here when it starts, which is
+/// the only runtime the process runs: a fan-out on a thread whose context is
+/// empty (the checkpoint trigger thread, a synchronous `Engine::execute_blocking`,
+/// a blocking-pool body) spawns there instead of on a pool of its own.
 static FAN_OUT_RUNTIME: std::sync::OnceLock<Handle> = std::sync::OnceLock::new();
 
-/// Records the runtime every fan-out falls back to.
+/// Records the runtime a fan-out spawns on from a thread that has none.
 ///
-/// Called once by the engine's scheduler when its runtime starts. A fan-out on
-/// a thread with an entered runtime uses that one; a thread without one (the
-/// periodic checkpoint trigger, a synchronous `Engine::execute_blocking`) uses
-/// this, so the work still runs in parallel instead of collapsing to the
-/// calling thread.
+/// Called once by the engine's scheduler when its runtime starts; the first
+/// install wins. This crate never builds a runtime of its own - a caller that
+/// wants parallelism outside the engine (an example, a benchmark) brings a
+/// runtime and runs the call inside it, which the fan-out picks up as the
+/// calling thread's own.
 pub fn install_runtime(handle: Handle) {
     let _ = FAN_OUT_RUNTIME.set(handle);
 }
 
 /// The runtime to spawn on: the caller's when it is multi-threaded, else the
-/// installed one, else a lazily created fallback (see [`fallback_runtime`]).
+/// installed one. `None` means there is no runtime anywhere - the caller then
+/// runs the items on its own thread.
 fn spawn_runtime() -> Option<Handle> {
     if let Ok(handle) = Handle::try_current() {
         if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
             return Some(handle);
         }
     }
-    FAN_OUT_RUNTIME
-        .get()
-        .cloned()
-        .or_else(|| Some(fallback_runtime().handle().clone()))
-}
-
-/// The runtime for callers that have none: a benchmark, an example, a unit
-/// test of this crate, `cargo run -p cli -- conformance` without the server.
-///
-/// It is created once and lives for the process, so the cost is paid once and
-/// a fan-out there is still real parallelism instead of a silent serial pass.
-fn fallback_runtime() -> &'static tokio::runtime::Runtime {
-    static FALLBACK: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
-    FALLBACK.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(
-                std::thread::available_parallelism()
-                    .map(|n| n.get())
-                    .unwrap_or(1),
-            )
-            .thread_name("fan-out")
-            .enable_all()
-            .build()
-            .expect("build the fan-out runtime")
-    })
+    FAN_OUT_RUNTIME.get().cloned()
 }
 
 /// Whether this thread is **already** running a fan-out body, or is about to
@@ -201,10 +184,11 @@ where
         return Ok(Vec::new());
     }
     let workers = workers.clamp(1, items.len());
-    // No runtime anywhere (a standalone test, an example): there is nothing to
-    // spawn on, so the items run here in order. A `current_thread` caller is
-    // treated the same way only when nothing was installed - spawning onto that
-    // runtime would deadlock, because the single thread is the one waiting.
+    // No runtime anywhere (a standalone unit test, a caller outside the
+    // engine that brought none): there is nothing to spawn on, so the items
+    // run here in order. A `current_thread` caller lands here too when nothing
+    // was installed - spawning onto that runtime would deadlock, because the
+    // single thread is the one waiting.
     let Some(runtime) = spawn_runtime() else {
         // Same contract serially: every item runs, the first error is what the
         // caller gets. Stopping at the first failure would leave the tables
@@ -401,20 +385,56 @@ mod tests {
     /// most that many bodies are in flight.
     #[test]
     fn the_bound_is_the_callers() {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_all()
+            .build()
+            .unwrap();
         let items: Vec<usize> = (0..16).collect();
         let live = Arc::new(AtomicUsize::new(0));
         let peak = Arc::new(AtomicUsize::new(0));
         let (l, p) = (Arc::clone(&live), Arc::clone(&peak));
-        for_each_blocking(items, 3, move |_| {
-            let now = l.fetch_add(1, Ordering::SeqCst) + 1;
-            p.fetch_max(now, Ordering::SeqCst);
-            std::thread::sleep(std::time::Duration::from_millis(4));
-            l.fetch_sub(1, Ordering::SeqCst);
+        runtime.block_on(async move {
+            for_each_blocking(items, 3, move |_| {
+                let now = l.fetch_add(1, Ordering::SeqCst) + 1;
+                p.fetch_max(now, Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(4));
+                l.fetch_sub(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .unwrap();
+        });
+        assert!(peak.load(Ordering::SeqCst) <= 3);
+    }
+
+    /// With no runtime anywhere the items run on the calling thread, in order.
+    /// This is the branch a caller gets when it brought no runtime and nothing
+    /// installed one - the crate itself never builds a pool to avoid it.
+    #[test]
+    fn without_a_runtime_the_items_run_on_the_calling_thread() {
+        // `spawn_runtime` only looks at the entered runtime and the installed
+        // handle, so this test is meaningful exactly while nothing installed
+        // one in this process. Tests share a binary; skip if that changed.
+        if FAN_OUT_RUNTIME.get().is_some() {
+            return;
+        }
+        let here = std::thread::current().id();
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = Arc::clone(&seen);
+        for_each_blocking((0..4).collect(), 4, move |item| {
+            record
+                .lock()
+                .unwrap()
+                .push((item, std::thread::current().id()));
             Ok(())
         })
         .unwrap();
-        // Without a runtime the pass is serial, which is within the bound too.
-        assert!(peak.load(Ordering::SeqCst) <= 3);
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 4);
+        for (item, thread) in seen.iter() {
+            assert_eq!(*thread, here, "item {item} did not run on the caller");
+        }
+        assert!(seen.windows(2).all(|w| w[0].0 < w[1].0), "order changed");
     }
 
     /// A failure reaches the caller, and every item still ran (a checkpoint

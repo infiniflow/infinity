@@ -2,6 +2,11 @@
 //! measures as `INDEX hnsw build`), serially and bucket-parallel.
 //!
 //! `cargo run --release -p infinity-index --example hnsw_build_bench -- [rows] [dims] [threads]`
+//!
+//! The bucket build fans out on **a runtime the caller provides** - the engine
+//! installs its own scheduler runtime, and a standalone binary has to bring one
+//! (the index crate never builds a pool of its own). Without it the buckets
+//! would run one after another on this thread.
 
 use std::time::Instant;
 
@@ -23,16 +28,33 @@ fn dataset(rows: usize, dims: usize) -> Vec<Vec<f32>> {
         .collect()
 }
 
+/// The runtime the bucket build spawns its tasks on.
+///
+/// It stands in for the engine's `task-scheduler`: same multi-thread geometry,
+/// and the buckets join it the way a statement's fan-out joins the engine's.
+fn runtime(workers: usize) -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(workers.max(1))
+        .enable_all()
+        .thread_name("hnsw-bench")
+        .build()
+        .expect("build the bench runtime")
+}
+
 fn main() {
     let mut args = std::env::args().skip(1);
     let rows: usize = args.next().and_then(|s| s.parse().ok()).unwrap_or(20_000);
     let dims: usize = args.next().and_then(|s| s.parse().ok()).unwrap_or(4);
     let threads: usize = args.next().and_then(|s| s.parse().ok()).unwrap_or(1);
     let data = dataset(rows, dims);
+    let rt = runtime(threads);
 
     let mut index = HnswIndex::with_encoding(dims, 16, 200, 64, Metric::L2, HnswEncoding::Plain);
     let t = Instant::now();
-    let added = index.add_batch(&data, threads);
+    // The build runs inside the runtime, so its buckets spawn onto it and this
+    // thread parks while they run - the same shape a statement has, where the
+    // build sits on the blocking pool and the buckets join the scheduler.
+    let added = rt.block_on(async { index.add_batch(&data, threads) });
     let build = t.elapsed();
     println!(
         "rows {rows} dims {dims} threads {threads} built {added} in {:.4}s  levels {}",

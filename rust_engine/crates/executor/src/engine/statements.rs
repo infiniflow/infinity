@@ -273,6 +273,13 @@ impl Engine {
     }
 
     pub fn open_with_options(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
+        // The engine's runtime, created before any engine work. Every fan-out
+        // below (a rebuild's tables, a segment's term batches, an HNSW build's
+        // buckets) spawns on the runtime installed here, and `index::parallel`
+        // has no pool of its own: a fan-out that ran first would silently
+        // collapse to the calling thread. Opening the engine is the point where
+        // that stops being possible.
+        let _ = crate::scheduler::scheduler();
         let dir: PathBuf = dir.as_ref().to_path_buf();
         // `Config::SnapshotDir()`: snapshots live next to the data root unless
         // the caller names a directory (the CLI always does).

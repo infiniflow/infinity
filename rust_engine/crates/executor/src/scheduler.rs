@@ -66,9 +66,11 @@ impl TaskScheduler {
         }
         let runtime = builder.build().expect("build the task scheduler runtime");
         // The fan-out primitive (`index::parallel`) spawns its tasks on the
-        // calling thread's runtime when there is one. The checkpoint trigger
-        // thread and the synchronous `block_on` adapters have none, so they use
-        // this as the fallback instead of collapsing to a serial pass.
+        // calling thread's runtime when there is one, and on this one when
+        // there is not: the checkpoint trigger thread and the synchronous
+        // `block_on` adapters have none. This is the process's only runtime -
+        // `index::parallel` never builds a second pool, so a caller outside the
+        // engine has to bring its own.
         index::parallel::install_runtime(runtime.handle().clone());
         Self { runtime }
     }
