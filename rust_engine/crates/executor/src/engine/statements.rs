@@ -1366,6 +1366,38 @@ impl Engine {
         catalog
     }
 
+    /// The table's live column ids, in schema order.
+    ///
+    /// The buffer is keyed by column id, so a reader that walks it positionally
+    /// needs the id order the table has **now** - that is what turns its cells
+    /// into the `Vec<Value>` a plan indexes by position.
+    pub(crate) fn table_schema_ids(&self, table: &str) -> Result<Vec<u64>> {
+        Ok(self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
+            .ids)
+    }
+
+    /// The default of each column of `ids`, as a value the buffer can fill a
+    /// row with: a column the row predates takes this.
+    pub(crate) fn fill_values(&self, table: &str, ids: &[u64]) -> Vec<Value> {
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(table) else {
+            return vec![Value::Null; ids.len()];
+        };
+        ids.iter()
+            .map(|id| {
+                meta.ids
+                    .iter()
+                    .position(|want| want == id)
+                    .and_then(|at| meta.defaults.get(at).cloned().flatten())
+                    .map(|text| Value::from_literal(&default_literal(&text)))
+                    .unwrap_or(Value::Null)
+            })
+            .collect()
+    }
+
     pub(crate) fn table_schema(&self, table: &str) -> Result<Vec<String>> {
         Ok(self
             .storage

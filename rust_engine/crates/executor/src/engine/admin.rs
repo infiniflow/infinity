@@ -417,6 +417,24 @@ impl Engine {
         let sources: std::collections::HashSet<u32> = sources.iter().copied().collect();
         let mut source_ids: Vec<u32> = sources.iter().copied().collect();
         source_ids.sort_unstable();
+        // This pass moves rows by reading the **block files**. A segment the
+        // append buffer still holds rows for has not got all of its rows there
+        // yet, so those rows are written first - the reference reads rows out of
+        // its blocks too, and it can always do so because `AppendInBlock` puts
+        // them there during the commit. Skipping such a segment instead would
+        // mean "a compaction right after an insert does nothing", which is what
+        // `compact_all_segments`'s callers rely on it not doing.
+        if source_ids.iter().any(|s| {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&self.table_key(table)).is_some_and(|e| {
+                (0..e.pending_rows.len()).any(|k| (e.pending_rows.row_id(k) >> 32) as u32 == *s)
+            })
+        }) {
+            // No bound: every buffered row of this table is already committed
+            // (a checkpoint's bound only decides which rows the *files* claim),
+            // so this writes them all.
+            let _ = self.write_blocks_bounded_locked(table, u64::MAX);
+        }
         // The layout the row ids were allocated in, before anything moves:
         // `next_seg` counts from every segment, and the append log is rebased
         // against it.
@@ -997,7 +1015,7 @@ impl Engine {
         // blocks are final — is the natural place to refresh it. There is no
         // memory tail to seal, which is why it does not wait for a
         // `DumpMemIndex`.
-        self.publish_spann_chunks(checkpoint_ts);
+        self.publish_spann_chunks(bound_ts);
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Bound the page cache the way the reference's buffer manager does:

@@ -4659,73 +4659,140 @@ pub(crate) struct SecondaryIndexes {
 }
 
 impl TableEntry {
-    /// Appends rows to the append buffer, keeping it **ordered by row id** and
-    /// `pending_pos` current.
+    /// Appends rows to the append buffer, keeping it **ordered by row id**.
     ///
-    /// The block writer, the range scans and the checkpoint all walk
-    /// `pending_rows` as the table's row order, so a batch that lands behind
-    /// rows already buffered (two commits whose bottoms finished out of order,
-    /// now possible because the insert path no longer serialises its commits)
-    /// is merged in at its place instead of appended. Rows normally arrive after
-    /// everything buffered, so the fast path is still a push.
-    pub(crate) fn buffer_rows(&mut self, rows: impl IntoIterator<Item = (usize, Vec<Value>)>) {
-        let mut batch: Vec<(usize, Vec<Value>)> = rows.into_iter().collect();
+    /// The cells are placed by **column id** ([`PendingRows`]).
+    ///
+    /// The schema a row was written under is decided **per row**, from its row
+    /// id: `schemas` maps a row's commit ts to the column order at that ts
+    /// (`(ids, defaults)`), and `ts_of(seq)` says which commit produced it. That
+    /// is what makes a row that committed before a `DROP COLUMN` keep its cell
+    /// for the dropped column instead of having it land on the column that took
+    /// the position - the defect `docs/ALTER_CHECKPOINT_RACE.md` records.
+    ///
+    /// The block writer, the range scans and the checkpoint all walk the buffer
+    /// as the table's row order, so a batch that lands behind rows already
+    /// buffered (two commits whose bottoms finished out of order) is merged in
+    /// at its place instead of appended.
+    pub(crate) fn buffer_rows<F, S, L>(
+        &mut self,
+        rows: impl IntoIterator<Item = (usize, Vec<Value>)>,
+        ts_of: F,
+        schema_at: S,
+        live: L,
+    ) where
+        F: Fn(usize) -> Option<u64>,
+        // `Some((ids, defaults))` for a ts; `None` when the catalog cannot
+        // resolve it, and then `live` is used.
+        S: Fn(u64) -> Option<Schema>,
+        // The live schema's `(ids, defaults)`, for a row whose ts is unknown.
+        L: Fn() -> Schema,
+    {
+        let mut batch: Vec<(usize, Vec<Value>, Option<u64>)> = rows
+            .into_iter()
+            .map(|(seq, values)| {
+                let ts = ts_of(seq);
+                (seq, values, ts)
+            })
+            .collect();
         if batch.is_empty() {
             return;
         }
-        // The map is kept in step on every path. Leaving it alone on an append
-        // was worth ~8 s on an 8 M-row `COPY`, but the buffer has to stay both
-        // sorted and addressable under concurrent writers, and the append fast
-        // path could not promise the first: two writers interleaving their
-        // commits hand over a batch whose head is past the buffer's last id
-        // and whose tail is not, and extending it left `pending_rows` unsorted.
-        // A binary search over that answers "absent" for rows that are there.
-        if self
-            .pending_rows
-            .last()
-            .is_none_or(|(last, _)| *last < batch[0].0)
-        {
-            self.pending_rows.reserve(batch.len());
-            let mut bytes = 0usize;
-            for (seq, values) in batch {
-                bytes += Self::row_bytes(&values);
-                self.pending_pos.insert(seq, self.pending_rows.len());
-                self.pending_rows.push((seq, values));
+        // Resolve each row's schema once per distinct ts: a batch from one
+        // commit shares one, and a `COPY` carries thousands of rows.
+        let mut resolved: std::collections::HashMap<u64, Option<Schema>> = Default::default();
+        for (_, _, ts) in &batch {
+            if let Some(ts) = ts {
+                resolved.entry(*ts).or_insert_with(|| schema_at(*ts));
             }
-            self.pending_bytes += bytes;
-            return;
         }
-        batch.sort_by_key(|(seq, _)| *seq);
-        let mut bytes = 0usize;
-        for (seq, values) in batch {
-            bytes += Self::row_bytes(&values);
-            let at = self
-                .pending_rows
-                .partition_point(|(buffered, _)| *buffered < seq);
-            self.pending_rows.insert(at, (seq, values));
+        let before = self.pending_rows.bytes();
+        // Rows sharing a ts share a schema, so group before inserting: the
+        // columnar buffer takes one `cell_of` per batch.
+        let mut groups: std::collections::BTreeMap<Option<u64>, Vec<(usize, Vec<Value>)>> =
+            Default::default();
+        for (seq, values, ts) in batch.drain(..) {
+            groups.entry(ts).or_default().push((seq, values));
         }
-        self.pending_bytes += bytes;
-        self.pending_pos.clear();
-        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
-            self.pending_pos.insert(*seq, at);
+        for (ts, rows) in groups {
+            // A row with no stamp (a replay rebuilt it, or the append log has
+            // not recorded this batch yet) is resolved from the live schema -
+            // which is what wrote it, and what the caller passed as a fallback
+            // for a ts that resolves to nothing.
+            let (ids, defaults) = ts
+                .and_then(|ts| resolved.get(&ts).cloned().flatten())
+                .unwrap_or_else(&live);
+            let cell_of = |values: &[Value]| -> Vec<(u64, Value)> {
+                ids.iter().copied().zip(values.iter().cloned()).collect()
+            };
+            // A column this row does not carry is filled from the **live**
+            // default when this batch's schema has none: the row predates the
+            // column (an `ADD COLUMN` after it), so its schema cannot offer the
+            // value the column was created with.
+            let live_pair = live();
+            let default_of = |id: u64| -> Value {
+                ids.iter()
+                    .position(|want| *want == id)
+                    .and_then(|at| defaults.get(at).cloned().flatten())
+                    .or_else(|| {
+                        live_pair
+                            .0
+                            .iter()
+                            .position(|want| *want == id)
+                            .and_then(|at| live_pair.1.get(at).cloned().flatten())
+                    })
+                    .map(|text| Value::from_literal(&default_literal(&text)))
+                    .unwrap_or(Value::Null)
+            };
+            self.pending_rows.buffer(rows, cell_of, default_of);
         }
+        self.pending_bytes += self.pending_rows.bytes().saturating_sub(before);
     }
 
-    /// Drops the buffered rows `keep` rejects, keeping `pending_pos` current.
+    /// Buffers rows whose cells are already attributed to column ids.
+    ///
+    /// `defaults` is the **live** schema's, for the columns a row does not
+    /// carry: a row written before an `ADD COLUMN` takes that column's default.
+    pub(crate) fn buffer_attributed_rows(
+        &mut self,
+        rows: impl IntoIterator<Item = (usize, std::collections::BTreeMap<u64, Value>)>,
+        ids: &[u64],
+        defaults: &[Option<String>],
+    ) {
+        let before = self.pending_rows.bytes();
+        self.pending_rows.buffer_attributed(rows, |id| {
+            ids.iter()
+                .position(|want| *want == id)
+                .and_then(|at| defaults.get(at).cloned().flatten())
+                .map(|text| Value::from_literal(&default_literal(&text)))
+                .unwrap_or(Value::Null)
+        });
+        self.pending_bytes += self.pending_rows.bytes().saturating_sub(before);
+    }
+
+    /// Drops the buffered rows `keep` rejects.
     pub(crate) fn retain_buffered(&mut self, mut keep: impl FnMut(&(usize, Vec<Value>)) -> bool) {
-        self.pending_rows.retain(|row| keep(row));
-        self.pending_pos.clear();
-        // Rebuilt here rather than adjusted by the rows dropped: the walk is
-        // one pass over what is left, which is what `retain` and the map
-        // rebuild below already cost, and it cannot drift from the buffer.
-        self.pending_bytes = self
-            .pending_rows
-            .iter()
-            .map(|(_, values)| Self::row_bytes(values))
-            .sum();
-        for (at, (seq, _)) in self.pending_rows.iter().enumerate() {
-            self.pending_pos.insert(*seq, at);
+        // The predicate is stated over rows, which the columnar buffer builds
+        // on demand: a table's buffer is small enough (checkpoint-bounded) for
+        // that to be cheaper than a second row-ordered copy.
+        // The predicate only decides *whether* a row stays, so the order the
+        // row is materialised in does not matter: the buffer's own is enough.
+        let order: Vec<u64> = self.pending_rows.all_ids();
+        let mut keeps_ids: Vec<usize> = Vec::new();
+        for k in 0..self.pending_rows.len() {
+            let seq = self.pending_rows.row_id(k);
+            if let Some(row) = self.pending_rows.row_or_null(k, &order) {
+                if keep(&(seq, row)) {
+                    keeps_ids.push(seq);
+                }
+            }
         }
+        let wanted: std::collections::HashSet<usize> = keeps_ids.into_iter().collect();
+        let before = self.pending_rows.bytes();
+        self.pending_rows.retain(|seq| wanted.contains(&seq));
+        self.pending_bytes = self
+            .pending_bytes
+            .saturating_sub(before.saturating_sub(self.pending_rows.bytes()));
     }
 
     /// The memory the unsealed rows of this table hold.
@@ -4741,53 +4808,28 @@ impl TableEntry {
     /// memory it reports. Approximate by design - it is a quota input, not a
     /// byte-exact report.
     pub(crate) fn unsealed_bytes(&self) -> usize {
-        // Key, value and the control byte a `HashMap` entry carries, doubled to
-        // cover the slack the table keeps for its load factor.
-        self.pending_bytes + self.pending_pos.len() * (std::mem::size_of::<usize>() * 2 + 1) * 2
-    }
-
-    /// What one buffered row costs, for the running total.
-    fn row_bytes(values: &[Value]) -> usize {
-        let mut bytes = std::mem::size_of::<(usize, Vec<Value>)>() + std::mem::size_of_val(values);
-        for value in values {
-            if let Value::Str(text) = value {
-                bytes += text.len();
-            }
+        // The buffer is columnar, so the structure's own overhead is a small
+        // fixed amount per column - and **nothing** when no row is buffered:
+        // an empty table must report zero, or every quota check counts the
+        // columns of every table it has ever seen.
+        if self.pending_rows.is_empty() {
+            return 0;
         }
-        bytes
+        self.pending_bytes + self.pending_rows.column_count() * std::mem::size_of::<Vec<Value>>()
     }
 
     /// The buffered row `seq`, if the commit that appended it is still above
     /// the last checkpoint.
-    pub(crate) fn buffered_row(&self, seq: usize) -> Option<&Vec<Value>> {
-        // The map is only a fast path, and it is allowed to be stale: an append
-        // does not update it (a bulk `COPY` appends and never looks a row up),
-        // so every position past the append point is off. A hit is therefore
-        // only trusted when the row at that position really is `seq`.
-        if let Some(at) = self.pending_pos.get(&seq) {
-            if let Some((buffered, values)) = self.pending_rows.get(*at) {
-                if *buffered == seq {
-                    return Some(values);
-                }
-            }
-        }
-        // The buffer is sorted by id, so the search answers every case: a miss
-        // in the map, and a position the map has not caught up with. A linear
-        // fallback covers a buffer that lost its order anyway (an append that
-        // raced another writer): answering "absent" for a row that is there
-        // loses it from the reader, which is worse than the scan.
-        let at = self
-            .pending_rows
-            .partition_point(|(buffered, _)| *buffered < seq);
-        if let Some((buffered, values)) = self.pending_rows.get(at) {
-            if *buffered == seq {
-                return Some(values);
-            }
-        }
+    ///
+    /// The buffer is columnar, so this **materialises** the row: the cells live
+    /// in one vector per column and there is no contiguous row to borrow. A
+    /// caller that needs a few cells should go through
+    /// [`TableEntry::buffered_row_cell`] instead.
+    pub(crate) fn buffered_row(&self, seq: usize) -> Option<Vec<Value>> {
+        let order: Vec<u64> = self.pending_rows.all_ids();
         self.pending_rows
-            .iter()
-            .find(|(buffered, _)| *buffered == seq)
-            .map(|(_, values)| values)
+            .index_of(seq)
+            .and_then(|k| self.pending_rows.row_or_null(k, &order))
     }
 }
 
@@ -4822,7 +4864,7 @@ pub(crate) struct TableEntry {
     /// way the reference's buffer object is shared by all of its handle
     /// holders. A sealed block needs no such buffer - it is mapped (see
     /// `Context::block_maps`).
-    pub(crate) pending_rows: Vec<(usize, Vec<Value>)>,
+    pub(crate) pending_rows: PendingRows,
     /// The memory `pending_rows` holds, kept as a running total.
     ///
     /// The quota reads this on every write statement, and summing a million
@@ -4833,13 +4875,6 @@ pub(crate) struct TableEntry {
     /// Bytes this table's in-memory index forms held when the process-wide
     /// total was last updated for it (see `Context::memindex_total`).
     pub(crate) memindex_bytes: usize,
-    /// `seq -> position in pending_rows`.
-    ///
-    /// A point read asks for one row at a time (`BlockCursor::row`), and
-    /// scanning the buffer per call made a 5k-row `DELETE` quadratic against a
-    /// 20k-row buffer (34% of the statement). Kept in step by
-    /// [`Self::buffer_rows`] / [`Self::retain_buffered`].
-    pub(crate) pending_pos: std::collections::HashMap<usize, usize>,
     /// `(segment, offset, sealed)` of the row-id allocator.
     pub(crate) row_counter: Option<(u32, u32, bool)>,
     /// Cumulative row count after every append transaction of this table
@@ -5022,6 +5057,343 @@ pub(crate) struct SegmentEntry {
     pub(crate) id: u32,
     /// Number of rows in the segment (`SegmentEntry::row_count`).
     pub(crate) rows: u32,
+}
+
+/// One schema snapshot: the columns in order, and each column's default.
+type Schema = (Vec<u64>, Vec<Option<String>>);
+
+/// The rows a commit appended that the block **files** do not have yet - the
+/// reference's `BufferObject`, keyed by column id instead of by position.
+///
+/// Every row of a block is laid out positionally against *some* schema, and the
+/// buffer holds rows written under several: an `INSERT` that committed before
+/// an `ALTER TABLE … DROP COLUMN` carries a cell for the dropped column, one
+/// that committed after carries a cell for the column that replaced it, and a
+/// checkpoint must encode both without moving either cell into a neighbour.
+/// Holding the cells under their **column id** is what makes that possible:
+/// the id never changes and is never recycled (a `DROP` retires it), so a cell
+/// keeps its identity across every schema change.
+///
+/// Three invariants:
+///
+/// 1. every column vector is `len()` long (a row that lacks a column gets that
+///    column's default);
+/// 2. `columns` holds the **live** columns plus any retired column whose cells
+///    a checkpoint bounded before the `DROP` may still have to write - see
+///    `retired`;
+/// 3. a row's index `k` maps to row id `base_row_id + k` (see `base_row_id`).
+#[derive(Default, Clone)]
+pub(crate) struct PendingRows {
+    /// Column id -> one cell per row, ascending by id.
+    columns: std::collections::BTreeMap<u64, Vec<Value>>,
+    /// `retired_at` (the DROP's commit ts) -> the column ids it retired.
+    ///
+    /// Their cells stay in `columns`: a checkpoint whose bound is **before**
+    /// the DROP still has to write that column, and this buffer is the only
+    /// copy of those cells. They are dropped once a checkpoint bounded at or
+    /// after `retired_at` has run.
+    retired: std::collections::BTreeMap<u64, Vec<u64>>,
+    /// Row ids of the buffered rows, ascending.
+    ///
+    /// Not a `base_row_id + k` range: a checkpoint takes a **prefix**, so what
+    /// it leaves is a suffix and a base would do - but a compaction removes the
+    /// rows of the segments it merged, which are an arbitrary subset, and a
+    /// segment boundary is itself a gap in the id space (`segment << 32`, with
+    /// only 8,388,608 slots used per segment). The explicit list is what makes
+    /// both cases one shape; it costs one `usize` per buffered row, which the
+    /// rows themselves dwarf.
+    row_ids: Vec<usize>,
+    /// Bytes the cells hold, kept as a running total (the quota reads it on
+    /// every write statement, so summing a million rows there is not an
+    /// option).
+    bytes: usize,
+}
+
+impl PendingRows {
+    /// Number of buffered rows (0 when no column has been added yet).
+    pub(crate) fn len(&self) -> usize {
+        self.columns.values().next().map(Vec::len).unwrap_or(0)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The bytes the cells hold, for the quota's running total.
+    pub(crate) fn bytes(&self) -> usize {
+        self.bytes
+    }
+
+    /// How many columns this buffer holds (live plus not-yet-forgotten retired).
+    pub(crate) fn column_count(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// Every column id this buffer holds, ascending.
+    pub(crate) fn all_ids(&self) -> Vec<u64> {
+        self.columns.keys().copied().collect()
+    }
+
+    /// Row id of the row at index `k`.
+    pub(crate) fn row_id(&self, k: usize) -> usize {
+        self.row_ids[k]
+    }
+
+    /// Index of row id `seq`, when it is buffered.
+    pub(crate) fn index_of(&self, seq: usize) -> Option<usize> {
+        self.row_ids.binary_search(&seq).ok()
+    }
+
+    /// One row, materialised in `order`'s column order.
+    ///
+    /// `order` is the schema the *caller* reads positionally - normally the
+    /// table's live `ids`, with `fill` giving a column's default for the ids it
+    /// names. A column `order` names but this buffer does not hold (one added
+    /// after these rows) takes that default; a column the buffer holds but
+    /// `order` does not name is dropped from the row, which is what makes a
+    /// retired column invisible to a reader whose schema no longer has it.
+    ///
+    /// The buffer is columnar, so this allocates: a point read that wants a few
+    /// cells should use [`Self::row_cells`] instead.
+    pub(crate) fn row(&self, k: usize, order: &[u64], fill: &[Value]) -> Option<Vec<Value>> {
+        if k >= self.len() {
+            return None;
+        }
+        Some(
+            order
+                .iter()
+                .enumerate()
+                .map(|(at, id)| {
+                    self.columns
+                        .get(id)
+                        .and_then(|cells| cells.get(k))
+                        .cloned()
+                        .unwrap_or_else(|| fill.get(at).cloned().unwrap_or(Value::Null))
+                })
+                .collect(),
+        )
+    }
+
+    /// One cell, `None` when the row is out of range or has no such column.
+    ///
+    /// A reader that wants one column of many rows (`for_each_buffered_cell`)
+    /// goes through this rather than materialising each row.
+    pub(crate) fn cell(&self, k: usize, id: u64) -> Option<&Value> {
+        if k >= self.len() {
+            return None;
+        }
+        self.columns.get(&id)?.get(k)
+    }
+
+    /// [`Self::row`] with `null` for a column this buffer does not hold.
+    pub(crate) fn row_or_null(&self, k: usize, order: &[u64]) -> Option<Vec<Value>> {
+        self.row(k, order, &[])
+    }
+
+    /// Appends or merges a batch of rows, keeping the buffer ordered by row id.
+    ///
+    /// `cell_of` maps a row's `Vec<Value>` onto `(column id, value)` pairs - it
+    /// is how the caller states which schema the row was written under. A
+    /// column this buffer does not have yet is created and back-filled with
+    /// `default_of(id)` for the rows already buffered; a row that lacks a
+    /// column gets that column's default, so every vector keeps `len()` long.
+    ///
+    /// A batch that starts after everything buffered appends (the common case:
+    /// ids are handed out in commit order); anything else merges in id order,
+    /// because two commits whose bottoms finished out of order can hand over a
+    /// batch behind the tail.
+    pub(crate) fn buffer<F, D>(
+        &mut self,
+        rows: impl IntoIterator<Item = (usize, Vec<Value>)>,
+        mut cell_of: F,
+        mut default_of: D,
+    ) where
+        F: FnMut(&[Value]) -> Vec<(u64, Value)>,
+        D: FnMut(u64) -> Value,
+    {
+        // `(row id, column id -> value)` per row, cells ascending by id.
+        let mut batch: Vec<(usize, std::collections::BTreeMap<u64, Value>)> = rows
+            .into_iter()
+            .map(|(seq, values)| (seq, cell_of(&values).into_iter().collect()))
+            .collect();
+        if batch.is_empty() {
+            return;
+        }
+        // Every column this batch mentions, plus every column already here:
+        // the union is the buffer's width after the batch.
+        let mut wanted: std::collections::BTreeSet<u64> = self.columns.keys().copied().collect();
+        for (_, cells) in &batch {
+            wanted.extend(cells.keys().copied());
+        }
+        // A column that appears for the first time is back-filled for the rows
+        // already buffered; a column already here keeps its cells.
+        let have = self.len();
+        for id in &wanted {
+            if !self.columns.contains_key(id) {
+                self.columns.insert(*id, vec![default_of(*id); have]);
+            }
+        }
+        let cols: Vec<u64> = self.columns.keys().copied().collect();
+        batch.sort_by_key(|(seq, _)| *seq);
+        for (seq, cells) in batch {
+            let k = self.row_ids.partition_point(|held| *held < seq);
+            let at_tail = k == self.row_ids.len();
+            if at_tail {
+                self.row_ids.push(seq);
+            } else {
+                self.row_ids.insert(k, seq);
+            }
+            for id in &cols {
+                let value = cells.get(id).cloned().unwrap_or_else(|| default_of(*id));
+                if at_tail {
+                    self.columns.get_mut(id).unwrap().push(value);
+                } else {
+                    self.columns.get_mut(id).unwrap().insert(k, value);
+                }
+            }
+            self.bytes += cells.values().map(value_bytes).sum::<usize>();
+        }
+        debug_assert!(
+            self.columns.values().all(|c| c.len() == self.len()),
+            "a column vector drifted from the row count"
+        );
+    }
+
+    /// Appends rows whose cells are already attributed to column ids.
+    ///
+    /// The replay path knows each row's frame ids, so it can state the
+    /// attribution directly instead of going through a schema lookup. Columns
+    /// the buffer does not have yet are created and back-filled; a row that
+    /// lacks one of the buffer's columns gets `default_of(id)`.
+    pub(crate) fn buffer_attributed<D>(
+        &mut self,
+        rows: impl IntoIterator<Item = (usize, std::collections::BTreeMap<u64, Value>)>,
+        mut default_of: D,
+    ) where
+        D: FnMut(u64) -> Value,
+    {
+        let mut batch: Vec<(usize, std::collections::BTreeMap<u64, Value>)> =
+            rows.into_iter().collect();
+        if batch.is_empty() {
+            return;
+        }
+        let mut wanted: std::collections::BTreeSet<u64> = self.columns.keys().copied().collect();
+        for (_, cells) in &batch {
+            wanted.extend(cells.keys().copied());
+        }
+        let have = self.len();
+        for id in &wanted {
+            if !self.columns.contains_key(id) {
+                self.columns.insert(*id, vec![default_of(*id); have]);
+            }
+        }
+        let cols: Vec<u64> = self.columns.keys().copied().collect();
+        batch.sort_by_key(|(seq, _)| *seq);
+        for (seq, cells) in batch {
+            let k = self.row_ids.partition_point(|held| *held < seq);
+            let at_tail = k == self.row_ids.len();
+            if at_tail {
+                self.row_ids.push(seq);
+            } else {
+                self.row_ids.insert(k, seq);
+            }
+            for id in &cols {
+                let value = cells.get(id).cloned().unwrap_or_else(|| default_of(*id));
+                if at_tail {
+                    self.columns.get_mut(id).unwrap().push(value);
+                } else {
+                    self.columns.get_mut(id).unwrap().insert(k, value);
+                }
+            }
+            self.bytes += cells.values().map(value_bytes).sum::<usize>();
+        }
+        debug_assert!(
+            self.columns.values().all(|c| c.len() == self.len()),
+            "a column vector drifted from the row count"
+        );
+    }
+
+    /// Drops the rows `keep` rejects and recomputes the running total.
+    pub(crate) fn retain(&mut self, mut keep: impl FnMut(usize) -> bool) {
+        let rows = self.len();
+        let doomed: Vec<bool> = (0..rows).map(|k| !keep(self.row_id(k))).collect();
+        if !doomed.iter().any(|d| *d) {
+            return;
+        }
+        // The surviving ids go with the surviving cells. Nothing assumes they
+        // are contiguous: a compaction drops an arbitrary subset, and a segment
+        // boundary is a gap in the id space anyway (`segment << 32`).
+        let mut shelf = std::mem::take(&mut self.row_ids);
+        let mut k = 0usize;
+        shelf.retain(|_| {
+            let keep = !doomed[k];
+            k += 1;
+            keep
+        });
+        self.row_ids = shelf;
+        for values in self.columns.values_mut() {
+            let mut k = 0usize;
+            values.retain(|_| {
+                let keep = !doomed[k];
+                k += 1;
+                keep
+            });
+        }
+        self.bytes = self
+            .columns
+            .values()
+            .flat_map(|cells| cells.iter())
+            .map(value_bytes)
+            .sum();
+        debug_assert!(
+            self.columns.values().all(|c| c.len() == self.len()),
+            "a column vector drifted from the row count"
+        );
+    }
+
+    /// Removes a column, keeping its cells for a checkpoint bounded before
+    /// `retired_at` (see the type's docs).
+    pub(crate) fn retire(&mut self, id: u64, retired_at: u64) {
+        if !self.columns.contains_key(&id) {
+            return;
+        }
+        self.retired.entry(retired_at).or_default().push(id);
+        // The cells stay: a pre-DROP checkpoint still writes this column.
+    }
+
+    /// Drops the retired columns a checkpoint bounded at or after their
+    /// `retired_at` no longer needs.
+    pub(crate) fn forget_retired_before(&mut self, bound: u64) {
+        let done: Vec<u64> = self
+            .retired
+            .range(..=bound)
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect();
+        if done.is_empty() {
+            return;
+        }
+        for id in &done {
+            self.columns.remove(id);
+        }
+        self.retired.retain(|ts, _| *ts > bound);
+        self.bytes = self
+            .columns
+            .values()
+            .flat_map(|cells| cells.iter())
+            .map(value_bytes)
+            .sum();
+    }
+
+    /// Adds a column (an `ADD COLUMN` against the rows already buffered): it
+    /// gets `default` for every buffered row.
+    pub(crate) fn add_column(&mut self, id: u64, default: Value) {
+        if self.columns.contains_key(&id) {
+            return;
+        }
+        let rows = self.len();
+        self.bytes += value_bytes(&default) * rows;
+        self.columns.entry(id).or_insert(vec![default; rows]);
+    }
 }
 
 /// A table's decoded rows, bounded by [`ROW_CACHE_BUDGET_BYTES`].

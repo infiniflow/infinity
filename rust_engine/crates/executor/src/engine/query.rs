@@ -1393,13 +1393,17 @@ impl Engine {
                 let dc_cmd = self.drop_columns_command(table, column)?;
                 // `GetBlockIDs1`: the blocks the column files live in. Read
                 // before the DDL, because the marker set is part of its batch.
-                // The column's position is read here too: after the DDL the
-                // schema no longer has it.
-                let drop_position = self
+                // The column's **id** is read here too: after the DDL the
+                // schema no longer has it, and the buffer is keyed by id (the
+                // block files are named `{id}.col`), not by position.
+                let drop_id = self
                     .storage
                     .catalog
                     .get_table_by_name(table)?
-                    .and_then(|m| m.columns.iter().position(|c| c == column));
+                    .and_then(|m| {
+                        let at = m.columns.iter().position(|c| c == column)?;
+                        Some(m.ids[at])
+                    });
                 let blocks: Vec<(u32, u16)> = self
                     .visible_block_ids(table)
                     .into_iter()
@@ -1421,15 +1425,17 @@ impl Engine {
                         {
                             let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
                         }
-                        Ok(((), drop_position))
+                        Ok(((), drop_id))
                     },
-                    |position| async move {
-                        // A buffered row has no block file to leave alone: it
-                        // loses the cell at the column's position, exactly as
-                        // the reference's block buffer does. Applied only once
-                        // the transaction has won.
-                        if let Some(position) = position {
-                            self.patch_buffered_drop_column(table, position);
+                    |id| async move {
+                        // A buffered row has no block file to leave alone. The
+                        // column is **retired by id**, not removed: its cells
+                        // stay until a checkpoint bounded at or after this
+                        // commit has written them, because a bound before the
+                        // DROP still has to write that column and the buffer is
+                        // the only copy of its unreached rows.
+                        if let Some(id) = id {
+                            self.patch_buffered_drop_column(table, id, u64::MAX);
                         }
                         Ok(())
                     },
@@ -1528,7 +1534,18 @@ impl Engine {
                         // yet (`AddColumnsData` walks the segments and would
                         // skip them): the reference's block *buffer* gains the
                         // column, so they get the default cell here.
-                        self.patch_buffered_add_columns(table, base_index as usize, &added);
+                        //
+                        // Keyed by the ids the DDL just handed out (the table's
+                        // live id list from `base_index` on), so this is one new
+                        // vector per column instead of a positional rewrite of
+                        // every buffered row.
+                        let added_ids: Vec<u64> = self
+                            .storage
+                            .catalog
+                            .get_table_by_name(table)?
+                            .map(|m| m.ids.iter().copied().skip(base_index as usize).collect())
+                            .unwrap_or_default();
+                        self.patch_buffered_add_columns(table, &added_ids, &added);
                         // And the blocks that already exist get one file for
                         // each new column, before the commit is visible.
                         // `add_column_files_async` awaits the table's bottom

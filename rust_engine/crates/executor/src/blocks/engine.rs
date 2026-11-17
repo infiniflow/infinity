@@ -41,36 +41,6 @@ fn ids_at(timeline: &[(u64, Vec<u64>)], ts: u64, current: &[u64]) -> Vec<u64> {
     }
 }
 
-/// Rewrites one replayed row onto the table's current columns.
-///
-/// The frame's cells follow `frame_ids` - the column ids that were live when
-/// the row was written - while the append buffer (and every block) is
-/// positional against the current schema. Matching by id is what makes a row
-/// survive a schema change: a cell whose column was dropped is discarded, and
-/// a column the row predates takes the default it was added with. Counting
-/// positions instead put a dropped column's value into its neighbour.
-fn reorder_row_text(
-    text: &str,
-    frame_ids: &[u64],
-    current_ids: &[u64],
-    defaults: &[Option<String>],
-) -> String {
-    if frame_ids == current_ids {
-        return text.to_string();
-    }
-    let cells: Vec<&str> = text.split('\t').collect();
-    let mut out: Vec<String> = Vec::with_capacity(current_ids.len());
-    for (position, id) in current_ids.iter().enumerate() {
-        match frame_ids.iter().position(|frame| frame == id) {
-            Some(at) => out.push(cells.get(at).copied().unwrap_or_default().to_string()),
-            None => out.push(default_cell_text(
-                defaults.get(position).cloned().flatten().as_deref(),
-            )),
-        }
-    }
-    out.join("\t")
-}
-
 /// One row's cells, either owned or borrowed from the write's row set.
 ///
 /// The mirror copies nothing it does not have to: a bulk `COPY` publishes its
@@ -195,14 +165,6 @@ fn is_id_ordered(rows: &[(usize, Vec<Value>)]) -> bool {
 }
 
 /// The stored text form of a column default: the same value `AddColumnsData`
-/// writes into the block, so the buffered row and the block agree.
-fn default_cell_text(default: Option<&str>) -> String {
-    match default {
-        Some(text) => mirror_cell_text(&Value::from_literal(&default_literal(text))),
-        None => mirror_cell_text(&Value::Null),
-    }
-}
-
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
@@ -618,12 +580,33 @@ impl Engine {
         // Taken under the lock: a checkpoint that queued behind this one must
         // not see a stale snapshot of the append buffer, or its own rows would
         // be dropped from the files by the write that lands last.
-        let buffered = {
+        // Rows, not the columnar buffer: this write is positional (it encodes
+        // against `encode_meta`), so it needs one row per id. The buffer is
+        // columnar on disk-facing paths only (see `PendingRows`).
+        // Read positionally against `encode_meta`, which is the schema this
+        // write encodes: a cell the buffer holds for a column this bound does
+        // not have is dropped here, and a column the bound has but the buffer
+        // does not yields `null` (the row predates it).
+        let encode_defaults: Vec<Value> = encode_meta
+            .defaults
+            .iter()
+            .map(|d| {
+                d.as_deref()
+                    .map(|text| Value::from_literal(&default_literal(text)))
+                    .unwrap_or(Value::Null)
+            })
+            .collect();
+        let buffered: Vec<(usize, Vec<Value>)> = {
             let tables = self.tables.lock().unwrap();
-            tables
-                .get(&tkey)
-                .map(|e| e.pending_rows.clone())
-                .unwrap_or_default()
+            match tables.get(&tkey) {
+                Some(e) => (0..e.pending_rows.len())
+                    .filter_map(|k| {
+                        let row = e.pending_rows.row(k, &encode_meta.ids, &encode_defaults)?;
+                        Some((e.pending_rows.row_id(k), row))
+                    })
+                    .collect(),
+                None => Vec::new(),
+            }
         };
         let mut merged: Vec<(usize, Vec<Value>)> = extra.to_vec();
         if !buffered.is_empty() {
@@ -1165,6 +1148,15 @@ impl Engine {
         // would drop a row whose window was short; clearing the whole buffer
         // would drop the rows a concurrent commit added meanwhile.
         entry.retain_buffered(|(seq, _)| !written_ids.contains(seq));
+        // This write covered every row at or before its bound, so a column
+        // retired at or before that bound will never be needed again: every
+        // later checkpoint has a bound at least as large (`bound_ts` is
+        // monotonic) and so will not select it. Dropping the cells here is what
+        // keeps a table that keeps adding and dropping columns from growing.
+        if bound_ts != u64::MAX {
+            entry.pending_rows.forget_retired_before(bound_ts);
+            entry.pending_bytes = entry.pending_rows.bytes();
+        }
         // The mark retires only when nothing is left to write and no commit
         // landed while this one ran.
         let covered = entry.mirror_epoch == epoch && entry.pending_rows.is_empty();
@@ -1398,6 +1390,34 @@ impl Engine {
             .iter()
             .map(|(seq, row)| (*seq, coerce_row(row, &coercions)))
             .collect();
+        // The buffer is keyed by column id, so each row's cells have to be
+        // attributed to the schema **it was written under** - not to the table's
+        // current one. The row id decides: `append_ts_of` gives the commit that
+        // produced it, and `schema_at` gives the column order at that ts.
+        //
+        // Resolving the live schema once and reusing it for the whole batch is
+        // the common case (every row of one commit shares it); a row with no
+        // stamp (a replay rebuilt one) falls back to the live schema, which is
+        // what wrote it.
+        let totals = self.append_totals(&table);
+        let stamps = self.append_ts(&table);
+        let live = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let ts_of = |seq: usize| -> Option<u64> {
+            append_ts_of((seq & 0xffff_ffff) as u64, &totals, &stamps)
+        };
+        let resolve = |ts: u64| -> Option<(Vec<u64>, Vec<Option<String>>)> {
+            match self.storage.catalog.schema_at(&table, ts) {
+                Ok(Some(m)) => Some((m.ids, m.defaults)),
+                // A bound that resolves to nothing (or a catalog error) uses the
+                // live schema: the batch was written by the commit that is
+                // committing now, whose schema is the live one.
+                _ => Some((live.ids.clone(), live.defaults.clone())),
+            }
+        };
         // spann's mem index: the row goes here, **not** into the tree
         // (`docs/SPANN_DESIGN.md` §9.2). One vector copy per row, and the next
         // dump builds the tree that covers these rows and clears the list.
@@ -1434,7 +1454,9 @@ impl Engine {
                     }
                 }
             }
-            entry.buffer_rows(rows);
+            entry.buffer_rows(rows, ts_of, resolve, || {
+                (live.ids.clone(), live.defaults.clone())
+            });
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
@@ -2424,7 +2446,6 @@ impl Engine {
                     .unwrap_or_default()
             });
             let frame_ids = ids_at(timeline, append.commit_ts, &current_ids);
-            let defaults = self.table_defaults(&table).unwrap_or_default();
             let types = meta.types.clone();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
@@ -2436,30 +2457,71 @@ impl Engine {
                     .map(|(seq, _)| seq)
                     .collect()
             });
-            let mut batch = Vec::with_capacity(append.rows.len());
+            // The cells are attributed to the ids the frame was written with,
+            // **not** reordered onto the current schema: a cell whose column
+            // was dropped since still belongs to that column, and a checkpoint
+            // bounded before the DROP still has to write it
+            // (`docs/ALTER_CHECKPOINT_RACE.md` §5). Reordering here discarded
+            // it, which is what made a pre-DROP row read a value from the
+            // wrong column once the buffer became columnar.
+            let mut attributed: Vec<(usize, std::collections::BTreeMap<u64, Value>)> =
+                Vec::with_capacity(append.rows.len());
             for (seq, text) in &append.rows {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
-                // The row is placed on the ids its frame was written with;
-                // `None` means a snapshot restore hides them, and the text is
-                // already in the schema the restore left behind.
-                let text = reorder_row_text(text, &frame_ids, &current_ids, &defaults);
-                // A row whose text form the row parser cannot rebuild is not
-                // buffered: the append buffer is the only place a row the block
-                // files do not hold can live, and the port keeps no row journal
-                // to hold its text instead.
-                if let Ok(row) = self.parse_stored_row(&table, &defaults, &types, text.as_bytes()) {
-                    batch.push((*seq as usize, row));
+                let cells: Vec<&str> = text.split('\t').collect();
+                let mut placed: std::collections::BTreeMap<u64, Value> = Default::default();
+                for (at, id) in frame_ids.iter().enumerate() {
+                    let Some(cell) = cells.get(at) else { break };
+                    // The type is the frame's own column's: the live `types` no
+                    // longer describes a column dropped since, and using the
+                    // live one would decode the cell with the wrong decoder.
+                    let frame_type = self
+                        .storage
+                        .catalog
+                        .schema_at(&table, append.commit_ts)
+                        .ok()
+                        .flatten()
+                        .and_then(|m| {
+                            let pos = m.ids.iter().position(|want| want == id)?;
+                            m.types.get(pos).cloned()
+                        });
+                    let declared = frame_type.unwrap_or_else(|| {
+                        types
+                            .get(
+                                current_ids
+                                    .iter()
+                                    .position(|want| want == id)
+                                    .unwrap_or(usize::MAX),
+                            )
+                            .cloned()
+                            .unwrap_or_default()
+                    });
+                    if let Ok(value) = self.decode_cell(&table, &[declared], 0, cell) {
+                        placed.insert(*id, value);
+                    }
                 }
+                attributed.push((*seq as usize, placed));
             }
             // One `create` per append transaction, stamped with its commit ts.
-            self.note_append(&table, batch.len(), false, None);
+            self.note_append(&table, attributed.len(), false, None);
             self.settle_append_ts(&table, 1, append.commit_ts);
+            // Straight into the columnar buffer, with the attribution the frame
+            // gave: the live schema only supplies the defaults a row's own
+            // schema could not.
+            let live_defaults = self.table_defaults(&table).unwrap_or_default();
+            let live_ids = current_ids.clone();
+            {
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(self.table_key(&table)).or_default();
+                entry.buffer_attributed_rows(attributed, &live_ids, &live_defaults);
+                entry.mirror_dirty = true;
+                entry.mirror_epoch += 1;
+            }
             if !rows.contains_key(&table) {
                 order.push(table.clone());
             }
-            rows.entry(table).or_default().extend(batch);
         }
         for delete in &deletes {
             let table = self.qualified_table(&delete.table);
@@ -2802,39 +2864,35 @@ impl Engine {
     /// the reference's block **buffer** gains the column instead. Append the
     /// default cell to each buffered row, so the mirror writes it with the
     /// block.
-    pub(crate) fn patch_buffered_add_columns(&self, table: &str, first: usize, defaults: &[Value]) {
+    pub(crate) fn patch_buffered_add_columns(&self, table: &str, ids: &[u64], defaults: &[Value]) {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get_mut(&key) else {
             return;
         };
-        for (_, cells) in entry.pending_rows.iter_mut() {
-            cells.truncate(first);
-            cells.extend(defaults.iter().cloned());
+        // Keyed by id, so this is one vector per new column rather than a
+        // positional rewrite of every row: the buffer's other columns are not
+        // touched at all.
+        for (id, default) in ids.iter().zip(defaults) {
+            entry.pending_rows.add_column(*id, default.clone());
         }
-        // The cells changed shape, so the running byte total is stale: an added
-        // column with a large default would otherwise be uncharged, and the
-        // buffer could cross the quota before anything counted it. DDL is off
-        // the write path, so the extra pass is affordable.
-        entry.retain_buffered(|_| true);
+        entry.pending_bytes = entry.pending_rows.bytes();
     }
 
-    /// The buffer half of `DropColumnsData`: a buffered row loses the cell the
-    /// schema no longer has (`position` is where the column was).
-    pub(crate) fn patch_buffered_drop_column(&self, table: &str, position: usize) {
+    /// The buffer half of `DropColumnsData`: the column is **retired by id**.
+    ///
+    /// Its cells stay until a checkpoint bounded at or after `retired_at` has
+    /// run (`PendingRows::forget_retired_before`): a bound before the DROP
+    /// still has to write that column, and this buffer is the only copy of the
+    /// rows that never reached a block. Removing the cells here is what used to
+    /// shift every later column one slot left.
+    pub(crate) fn patch_buffered_drop_column(&self, table: &str, id: u64, retired_at: u64) {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get_mut(&key) else {
             return;
         };
-        for (_, cells) in entry.pending_rows.iter_mut() {
-            if position < cells.len() {
-                cells.remove(position);
-            }
-        }
-        // The dropped column's bytes are still in the running total, which would
-        // make the quota think the buffer is bigger than it is and drain early.
-        entry.retain_buffered(|_| true);
+        entry.pending_rows.retire(id, retired_at);
     }
 
     /// `Cleanup` for an `ALTER TABLE … DROP COLUMN`: removes the block column
@@ -3964,11 +4022,22 @@ impl Engine {
     /// (the reference's `BufferObject` for the blocks they land in).
     pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
         let key = self.table_key(table);
+        // A reader is positional against the table's **live** schema: that is
+        // the `Vec<Value>` every caller of this method destructures by index.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let fill = self.fill_values(table, &order);
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| e.pending_rows.clone())
+            .map(|e| {
+                (0..e.pending_rows.len())
+                    .filter_map(|k| {
+                        let row = e.pending_rows.row(k, &order, &fill)?;
+                        Some((e.pending_rows.row_id(k), row))
+                    })
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -3993,11 +4062,17 @@ impl Engine {
         if entry.pending_rows.is_empty() {
             return Default::default();
         }
+        // The caller indexes the row by **position** against the live schema,
+        // so the cells are laid out in that order here - not the buffer's own.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let fill = self.fill_values(table, &order);
         ids.iter()
             .filter_map(|seq| {
+                let k = entry.pending_rows.index_of(*seq)?;
                 entry
-                    .buffered_row(*seq)
-                    .map(|values| (*seq, values.clone()))
+                    .pending_rows
+                    .row(k, &order, &fill)
+                    .map(|values| (*seq, values))
             })
             .collect()
     }
@@ -4011,7 +4086,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.buffered_row(seq).cloned())
+            .and_then(|e| e.buffered_row(seq))
     }
 
     /// The stored text of one buffered row, for the paths that read a table the
@@ -4072,18 +4147,35 @@ impl Engine {
         // whole row first (`pending_rows_of`) copied the columns this read does
         // not want - a 20,000-row point filter copied 20,000 varchar strings to
         // throw them away.
+        // The caller indexes the row by **position**, so materialise it in the
+        // live schema's column order.
+        let order = self.table_schema_ids(&table).unwrap_or_default();
+        let fill = self.fill_values(&table, &order);
+        if std::env::var_os("INF_PROBE_BUF").is_some() {
+            let t = self.tables.lock().unwrap();
+            eprintln!(
+                "[read] table={table} order={order:?} buf={:?} cells={:?}",
+                t.get(&key).map(|e| e.pending_rows.all_ids()),
+                t.get(&key).map(|e| e.pending_rows.row(0, &order, &fill))
+            );
+        }
         let tables = self.tables.lock().unwrap();
         let entry = tables.get(&key)?;
         let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(entry.pending_rows.len());
-        for (seq, values) in &entry.pending_rows {
-            if dead.contains(&(*seq as u64)) {
+        for k in 0..entry.pending_rows.len() {
+            let seq = entry.pending_rows.row_id(k);
+            if dead.contains(&(seq as u64)) {
                 continue;
             }
             if let Some(view) = &view {
-                if !view.covers(*seq, read_ts) {
+                if !view.covers(seq, read_ts) {
                     continue;
                 }
             }
+            let Some(values) = entry.pending_rows.row(k, &order, &fill) else {
+                continue;
+            };
+            let values = &values;
             let cells: Vec<Value> = values
                 .iter()
                 .enumerate()
@@ -4092,7 +4184,7 @@ impl Engine {
                     _ => v.clone(),
                 })
                 .collect();
-            out.push((*seq, cells));
+            out.push((seq, cells));
         }
         drop(tables);
         out.sort_by_key(|(seq, _)| *seq);
@@ -4297,6 +4389,8 @@ impl Engine {
         // scan (20k buffered rows made every query 20 ms slower).
         let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         let view = self.append_view(&table, read_ts);
+        let order = self.table_schema_ids(&table).unwrap_or_default();
+        let fill = self.fill_values(&table, &order);
         let buffered_empty = {
             let tables = self.tables.lock().unwrap();
             tables
@@ -4307,7 +4401,17 @@ impl Engine {
         if !buffered_empty {
             let tables = self.tables.lock().unwrap();
             let entry = tables.get(&self.table_key(&table));
-            for (seq, values) in entry.map(|e| e.pending_rows.as_slice()).unwrap_or(&[]) {
+            let rows: Vec<(usize, Vec<Value>)> = entry
+                .map(|e| {
+                    (0..e.pending_rows.len())
+                        .filter_map(|k| {
+                            let row = e.pending_rows.row(k, &order, &fill)?;
+                            Some((e.pending_rows.row_id(k), row))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for (seq, values) in &rows {
                 let seq = *seq;
                 if dead.contains(&(seq as u64)) {
                     continue;
@@ -4404,11 +4508,19 @@ impl Engine {
                 Some(entry) if !entry.pending_rows.is_empty() => {
                     let requested: std::collections::HashSet<usize> =
                         rows.iter().map(|seq| *seq as usize).collect();
-                    entry
-                        .pending_rows
-                        .iter()
-                        .filter(|(seq, _)| requested.contains(seq))
-                        .cloned()
+                    (0..entry.pending_rows.len())
+                        .filter_map(|k| {
+                            let seq = entry.pending_rows.row_id(k);
+                            requested.contains(&seq).then(|| {
+                                (
+                                    seq,
+                                    entry
+                                        .pending_rows
+                                        .row_or_null(k, &meta.ids)
+                                        .unwrap_or_default(),
+                                )
+                            })
+                        })
                         .collect()
                 }
                 _ => Default::default(),
@@ -5093,12 +5205,19 @@ impl Engine {
         let Some(entry) = tables.get(&key) else {
             return;
         };
-        for (seq, values) in &entry.pending_rows {
-            if segment.is_some_and(|only| (*seq as u64 >> 32) as u32 != only) {
+        // The buffer is columnar, so the column is picked by position through
+        // the live schema first, then its cells are walked in row order.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let Some(id) = order.get(column).copied() else {
+            return;
+        };
+        for k in 0..entry.pending_rows.len() {
+            let seq = entry.pending_rows.row_id(k);
+            if segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
                 continue;
             }
-            if let Some(value) = values.get(column) {
-                sink(*seq, &mirror_cell_text(value));
+            if let Some(value) = entry.pending_rows.cell(k, id) {
+                sink(seq, &mirror_cell_text(value));
             }
         }
     }
