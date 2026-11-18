@@ -1190,7 +1190,7 @@ mod tests {
         index.maintain(&fetch, usize::MAX).unwrap();
 
         let before = index.store().stored_rows();
-        let extra = vec![(9_999u64, vec![3.0f32, 3.0, 3.0, 3.0])];
+        let extra = [(9_999u64, vec![3.0f32, 3.0, 3.0, 3.0])];
         let extra_batch: Vec<(u64, &[f32])> =
             extra.iter().map(|(id, v)| (*id, v.as_slice())).collect();
         index.insert(&extra_batch, &fetch).unwrap();

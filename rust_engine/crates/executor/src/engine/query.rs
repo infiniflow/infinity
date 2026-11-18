@@ -2303,7 +2303,7 @@ impl Engine {
                             // rebuild on every dump.
                             let store = storage::knn_index::spann::RocksSpannStore::new(
                                 self.storage.catalog.store().clone(),
-                                index_id as u64,
+                                index_id,
                                 dims,
                             );
                             if let Err(err) = store.clear() {

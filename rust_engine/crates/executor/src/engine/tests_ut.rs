@@ -15130,10 +15130,10 @@ mod tests {
         // checkpoint) rather than one whole-table build at the end.
         let index_first = env_usize("INFINITY_SPANN_SCALE_INDEX_FIRST_ROWS", 0);
         let create_index = || {
-            e.execute_blocking(&format!(
+            e.execute_blocking(
                 "CREATE INDEX big_i ON big (v) USING SPANN WITH \
-                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);"
-            ))
+                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
+            )
             .unwrap();
         };
         let chunk = 500usize;
@@ -16209,8 +16209,10 @@ mod tests {
         // coverage count. Anything neither explains is the SQL layer.
         {
             let qv = vector_f32(probe_row(0));
-            let mut opts = crate::knn_scan::KnnScanOptions::default();
-            opts.nprobe = Some(1);
+            let opts = crate::knn_scan::KnnScanOptions {
+                nprobe: Some(1),
+                ..Default::default()
+            };
             let scan = |live: Option<usize>| {
                 e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
                     table: "big",

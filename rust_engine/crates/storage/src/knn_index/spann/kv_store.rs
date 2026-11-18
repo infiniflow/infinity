@@ -306,7 +306,7 @@ mod tests {
     fn delete_removes_both_the_member_and_the_mapping() {
         let dir = tempfile::tempdir().unwrap();
         let (db, index) = open(dir.path());
-        let vectors = vec![(1u64, vec![1.0f32; 8]), (2, vec![2.0; 8])];
+        let vectors = [(1u64, vec![1.0f32; 8]), (2, vec![2.0; 8])];
         let batch: Vec<(u64, &[f32])> = vectors.iter().map(|(id, v)| (*id, v.as_slice())).collect();
         let fetch = |row: u64| {
             vectors
@@ -315,7 +315,7 @@ mod tests {
                 .map(|(_, v)| v.clone())
         };
         index.insert(&batch, &fetch).unwrap();
-        assert_eq!(index.delete(1).unwrap(), true);
+        assert!(index.delete(1).unwrap());
 
         let store = RocksSpannStore::new(db.clone(), 7, 8);
         assert_eq!(store.row_partition(1).unwrap(), None);
