@@ -808,3 +808,26 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 修法：判据改成"**有没有东西可发布**"，而不是"谁在调用"。`pending` 为空且段目录里已有
 `chunk_*.idx`（或目录里没有 chunk 但 catalog 已记录）时不发布。按行重建只保留给"这个段
 从来没有 chunk"的情形。改完 `test_mem_bmp` 连跑 4 次全过，重启套件 46 passed。
+
+### 6.10 已知未覆盖：二级索引 chunk 的 `row_count` 与稀疏 offset
+
+PR review 指出的一处**已知缺口**，这里记下口径而不是当作已修：
+
+`write_secondary_pgm_chunks` 每个段写一个 chunk，记录里的 `row_count` 是该段**去重后的
+offset 个数**，而 `base_row_id` 是该段最小的 offset。重开时 `load_secondary_index` 把
+`[base, base + row_count)` 当作覆盖区间（`index_build.rs` 的 `covered`），
+`index_secondary_gap` 再按"offset 是否落在某个区间内"判断缺口。
+
+两者在**一段内 offset 不连续**时不一致：段内只有 offset 0 与 8192 两行时
+`row_count = 2`，区间 `[0, 2)` 覆盖不到 8192，那一行会被重新喂进尾巴（索引里因此有
+两份 posting），下一次 dump 会把它写进 chunk。
+
+参考的 `CountMemIndexGapInSegment` 用的是**合并后区间**与**块的行数**求差，同样按区间
+判断，所以这不是端口的偏差，而是两边共同的近似。要真正修掉需要把 chunk 的覆盖从区间换成
+"chunk 实际持有的 offset 集合" —— 二级 chunk 的 `keys + offsets` 布局里 offsets 就在文件里，
+解析一次即可。改动面涉及 `merge_covered_ranges`、`index_has_uncovered_rows` 与
+`index_secondary_gap` 三处口径，未在本轮做。
+
+影响面：只在"同一段内 offset 有空洞"（删除或 `UPDATE` 留下的空位、以及 `IMPORT` 与
+`INSERT` 混合写同一段）时出现，且表现为重复 posting 而不是丢行；查询结果按 row id 去重
+后仍然正确，字节门禁不比较重启后的这一层。
