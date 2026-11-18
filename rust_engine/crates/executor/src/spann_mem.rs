@@ -568,17 +568,19 @@ impl crate::Engine {
 
     /// Builds a spann tree over `column` **without holding the column in RAM**.
     ///
-    /// Two passes over the data, both cheap in memory:
+    /// The vectors are read where they already are: `EMBEDDING(FLOAT, dim)` is
+    /// `ColumnLayout::Fixed(dim * 4)` of inline `f32`, so `blocks::spann_source`
+    /// hands the builder a slice of the block that holds the row - no text
+    /// rendering, no second copy of the column on disk, no mapping of one.
     ///
-    /// 1. [`Self::spann_scratch`] streams the column block by block, parses
-    ///    each cell and writes the `f32`s to a scratch file - the text of a row
-    ///    (~15 KB at 1536d) never outlives its block;
-    /// 2. the tree is built over a *mapping* of that file
-    ///    (`storage::knn_index::spann::build_from_scratch`), so the 6 KB/row of
-    ///    vectors are page cache, not anonymous memory.
+    /// Two cases still go through [`Self::spann_scratch`]: a non-`f32` element
+    /// type (`FLOAT16`/`DOUBLE`/`BIT`, whose body is not an `f32` array) and rows
+    /// still in the append buffer (they have no block body yet). Both are rare
+    /// next to a sealed column of `FLOAT` embeddings, and both need the same
+    /// "one random read per member" contract the builder has.
     ///
-    /// Peak RSS is therefore the finished tree's codes (208 B/row at 1536d) plus
-    /// one block, instead of `text + f32` for the whole table.
+    /// Peak heap is therefore the finished tree's codes (208 B/row at 1536d)
+    /// plus one block, instead of `text + f32` for the whole table.
     pub(crate) fn spann_build(
         &self,
         table: &str,
@@ -602,6 +604,15 @@ impl crate::Engine {
         dir: &std::path::Path,
         segments: Option<&std::collections::HashSet<u32>>,
     ) -> Option<index::spann::SpannIndex> {
+        // The vectors are already in the column: reading them in place - a
+        // borrow of the block's `f32` payload - is the build's whole input, so
+        // no scratch copy of the column is written or mapped (§19.3).
+        if let Some(source) = self.spann_vector_source(table, column, segments) {
+            return index::spann::SpannIndex::build_from_source(&source, opts).ok();
+        }
+        // A non-`f32` element type or rows still in the append buffer: both are
+        // the cases the scratch exists for, and both are rare next to a sealed
+        // column of `FLOAT` embeddings.
         let (ids, dim, path) = self.spann_scratch(table, column, segments, dir).ok()??;
         let built = storage::knn_index::spann::build_from_scratch(&path, ids, dim, opts).ok();
         let _ = std::fs::remove_file(&path);
