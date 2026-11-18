@@ -14877,7 +14877,10 @@ mod tests {
     ///
     /// Sized by `INFINITY_SPANN_SCALE_ROWS` / `_DIM` / `_CENTERS`; the defaults
     /// are what a debug run finishes in well under a minute, the numbers that
-    /// matter are printed so a larger run can be compared against them.
+    /// matter are printed so a larger run can be compared against them. A run
+    /// that does not fit in RAM uses `_BULK=1` (the literal/COPY path),
+    /// `_FLUSH_ROWS` (a checkpoint every N rows) and `_INDEX_FIRST_ROWS` (build
+    /// the index early, then ingest through the incremental write path).
     #[test]
     #[ignore = "scale test: INFINITY_SPANN_SCALE_ROWS / _DIM / _CENTERS size it; run manually"]
     fn spann_incremental_scale() {
@@ -14915,26 +14918,76 @@ mod tests {
             "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
         ))
         .unwrap();
+        // How the rows go in, and how often a checkpoint runs. The SQL path is
+        // what every other test exercises (parse, plan, execute); the literal
+        // path is the SDK/COPY shape and is what makes a few million rows at
+        // 1536d finish in bounded time - one batch of text exists at a time
+        // instead of the whole column.
+        let bulk = std::env::var("INFINITY_SPANN_SCALE_BULK").as_deref() == Ok("1");
+        // A checkpoint every N rows: the memory tail and the append buffer only
+        // leave memory at a checkpoint, so without one a 2M x 1536d run holds
+        // 12 GiB of vectors plus their text.
+        let flush_rows = env_usize("INFINITY_SPANN_SCALE_FLUSH_ROWS", 0);
+        // Create the index **before** the bulk of the rows: that is the
+        // incremental write path (one partition per write, drained by a
+        // checkpoint) rather than one whole-table build at the end.
+        let index_first = env_usize("INFINITY_SPANN_SCALE_INDEX_FIRST_ROWS", 0);
+        let create_index = || {
+            e.execute_blocking(&format!(
+                "CREATE INDEX big_i ON big (v) USING SPANN WITH \
+                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);"
+            ))
+            .unwrap();
+        };
+        let chunk = 500usize;
+        let mut peak_rss = crate::engine::state::process_rss_bytes();
+        let mut created_at = 0usize;
+        let mut written = 0usize;
         let started = std::time::Instant::now();
-        for chunk in (0..total).collect::<Vec<_>>().chunks(500) {
-            let mut sql = String::from("INSERT INTO big VALUES ");
-            for (at, i) in chunk.iter().enumerate() {
-                if at > 0 {
-                    sql.push(',');
+        while written < total {
+            let end = (written + chunk).min(total);
+            if bulk {
+                let rows: Vec<Vec<Literal>> = (written..end)
+                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
+                    .collect();
+                e.insert_literals("default_db.big", None, rows).unwrap();
+            } else {
+                let mut sql = String::from("INSERT INTO big VALUES ");
+                for (at, i) in (written..end).enumerate() {
+                    if at > 0 {
+                        sql.push(',');
+                    }
+                    sql.push_str(&format!("({i}, {})", vector(i)));
                 }
-                sql.push_str(&format!("({i}, {})", vector(*i)));
+                sql.push(';');
+                e.execute_blocking(&sql).unwrap();
             }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
+            written = end;
+            if index_first > 0 && created_at == 0 && written >= index_first {
+                create_index();
+                created_at = written;
+                eprintln!("index created at {written} rows, {:?}", started.elapsed());
+            }
+            if flush_rows > 0 && written % flush_rows < chunk {
+                crate::scheduler::block_on(e.flush()).unwrap();
+                eprintln!(
+                    "flushed at {written} rows, {:?}, RSS {} MiB",
+                    started.elapsed(),
+                    crate::engine::state::process_rss_bytes() / (1024 * 1024)
+                );
+            }
+            peak_rss = peak_rss.max(crate::engine::state::process_rss_bytes());
         }
         let import = started.elapsed();
+        eprintln!(
+            "load: {total} rows in {import:?}, peak RSS {} MiB",
+            peak_rss / (1024 * 1024)
+        );
 
         let built = std::time::Instant::now();
-        e.execute_blocking(&format!(
-            "CREATE INDEX big_i ON big (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);"
-        ))
-        .unwrap();
+        if created_at == 0 {
+            create_index();
+        }
         let build = built.elapsed();
 
         let info = e.show_index_info("big", "big_i").expect("index info");

@@ -2248,20 +2248,20 @@ impl Engine {
                         // `spann_degraded = flat`). A later dump over a table that
                         // has grown builds the tree.
                         let rows = self.row_count(table)? + self.buffered_row_count(table);
-                        // A resident tree holds every member vector on the heap
-                        // (`rows * dims * 4` with `encode = none`), and the
-                        // checkpoint rebuilds the same column **per segment**
-                        // anyway - so a whole-table build is both the largest
-                        // allocation in the process and work that is thrown
-                        // away. Past the budget the index keeps only its catalog
-                        // record: the dump publishes one tree per segment and a
-                        // query that arrives before it answers by exact scan.
+                        // The tree the build hands over is what has to be
+                        // budgeted, not the column: the build is out-of-core, so
+                        // a leaf keeps one code per row and the vectors stay in
+                        // the mapped scratch file. The old `rows * dims * 4`
+                        // formula dated from the resident builder and, at 1536d,
+                        // refused every table past ~87k rows - 12.3 GB of
+                        // vectors that were never resident at 2M rows.
                         let dims = self
                             .column_types(table)?
                             .get(col)
                             .and_then(|t| crate::engine::types::type_dim(t))
                             .unwrap_or(0);
-                        let resident = rows.saturating_mul(dims).saturating_mul(4);
+                        let resident = rows
+                            .saturating_mul(crate::spann_mem::build_bytes_per_row(&options, dims));
                         if rows >= options.min_rows
                             && resident <= crate::spann_mem::MEMORY_TREE_MAX_BYTES
                         {

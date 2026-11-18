@@ -27,7 +27,6 @@ pub(crate) const OPTION_KEYS: &[&str] = &[
     "ADAPTIVE_BEAM",
 ];
 
-/// Translates the DDL options into the builder's knobs.
 /// Copies a freshly built `SpannIndex` into the RocksDB store, so the builder's
 /// tree is the one the incremental path maintains from then on. `CREATE INDEX`
 /// pays one build; every write after it touches a single partition.
@@ -98,6 +97,7 @@ pub(crate) fn import_spann_tree(
     Ok(())
 }
 
+/// Translates the DDL options into the builder's knobs.
 pub(crate) fn options_from(opts: &[(String, String)]) -> Result<Options> {
     let mut out = Options::default();
     for (key, value) in opts {
@@ -457,18 +457,33 @@ impl SpannStats {
     }
 }
 
-/// Memory a `CREATE INDEX` may spend on a whole-table **resident** tree before
-/// it leaves the build to the per-segment dump.
+/// Memory a `CREATE INDEX` may spend on the whole-table tree.
 ///
-/// The resident tree holds one member vector per row (`encode = none`), so its
-/// cost is `rows * dims * 4` on the heap - and it is work the checkpoint then
-/// repeats segment by segment (`Engine::spann_chunk`), because the published
-/// chunk is per segment. On 4M x 1536d that whole-table build wrote a 24.5 GiB
-/// scratch file and spent hours in k-means for a tree the dump replaced
-/// afterwards. Past this budget the index is created without a resident tree:
-/// the catalog record exists, the dump builds one tree per segment, and a query
-/// that arrives before the dump answers by exact scan (§9.7).
+/// The build itself is out-of-core ([`crate::Engine::spann_build`]: a mapped
+/// scratch file plus one code per member, [`build_bytes_per_row`]), so what this
+/// bounds is the tree the builder hands to `import_spann_tree`, not the column.
+/// `encode = none` is the exception - it keeps the raw members - and that is why
+/// the estimate is per row rather than a constant.
+///
+/// Past this budget the index is created without a tree: the catalog record
+/// exists, the checkpoint publishes one tree per segment (the v2 dump), and a
+/// query that arrives before it answers by exact scan (§9.7).
 pub(crate) const MEMORY_TREE_MAX_BYTES: usize = 512 * 1024 * 1024;
+
+/// The heap a whole-table build costs per row, for [`MEMORY_TREE_MAX_BYTES`].
+///
+/// A leaf keeps one `Member` per row: its id, the 16 bytes of correction
+/// factors (norm, raw norm, popcount, dot) and a `dims / 8`-byte rabitq code
+/// behind a `Vec` header - 224 B at 1536d, which matches the 208 B the format
+/// documentation quotes for the code itself. `encode = none` keeps the raw
+/// vector beside the code instead.
+pub(crate) fn build_bytes_per_row(opts: &Options, dims: usize) -> usize {
+    let per_row = match opts.encode {
+        Encode::None => dims * std::mem::size_of::<f32>(),
+        Encode::Rabitq => dims / 8,
+    };
+    per_row + 8 + 16 + 32
+}
 
 /// The SQL-layer default search width: Cockroach's `vector_search_beam_size`,
 /// whose global default is 32. The index's own `Options::base_beam` stays 8 for
