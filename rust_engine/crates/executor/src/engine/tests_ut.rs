@@ -2924,7 +2924,7 @@ mod tests {
     /// Timing probe for same-table insert concurrency, run by hand:
     /// `cargo test --lib probe_same_table_insert_concurrency -- --ignored --nocapture`.
     #[test]
-    #[ignore = "timing probe"]
+    #[ignore = "bench: timing probe"]
     fn probe_same_table_insert_concurrency() {
         for threads in [1usize, 2, 4] {
             let dir = tempdir().unwrap();
@@ -2965,7 +2965,7 @@ mod tests {
     /// the hashed set keeps them flat.
     /// `cargo test --lib probe_bulk_delete_journal_scan -- --ignored --nocapture`.
     #[test]
-    #[ignore = "timing probe"]
+    #[ignore = "bench: timing probe"]
     fn probe_bulk_delete_journal_scan() {
         const BATCH: usize = 4_000;
         let dir = tempdir().unwrap();
@@ -5074,7 +5074,7 @@ mod tests {
     /// `INFINITY_BIG_TEST_ENCODE`, the build type with
     /// `INFINITY_BIG_TEST_BUILD_TYPE`.
     #[test]
-    #[ignore = "SLOW: 20k x 128 LVQ+LSG build"]
+    #[ignore = "slow: 20k x 128 LVQ+LSG build"]
     fn large_lvq_lsg_build_stays_stable() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean - the case an untrained LVQ mean
@@ -5223,7 +5223,7 @@ mod tests {
     /// Ignored because it builds a real graph:
     /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
     #[test]
-    #[ignore = "BENCH: HNSW production scale"]
+    #[ignore = "bench: HNSW production scale"]
     fn hnsw_production_scale() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean (so an untrained quantizer shows
@@ -5943,7 +5943,7 @@ mod tests {
     /// guarantees.
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_index_lifecycle_is_coherent() {
         plaid_lifecycle(true);
@@ -6440,7 +6440,7 @@ mod tests {
             crate::scheduler::block_on(e.dump_index_transaction("tsp", name)).unwrap();
             let files = e.index_files("tsp", name);
             assert!(
-                files.iter().any(|p| p.to_string_lossy().ends_with(".bmp")),
+                files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
                 "{name} wrote no chunk: {files:?}"
             );
         }
@@ -6876,7 +6876,7 @@ mod tests {
     ///
     /// `#[ignore]`d for the unit lane: the ColBERT-SaR training it builds is the
     /// slowest case of the crate. `--ignored` still runs it.
-    #[ignore = "SLOW: ColBERT-SaR training; runs under --ignored"]
+    #[ignore = "slow: ColBERT-SaR training"]
     #[test]
     fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
         let dir = tempdir().unwrap();
@@ -7098,7 +7098,11 @@ mod tests {
             }
             n
         };
-        assert_eq!(count("bmp"), 1);
+        // Nothing has been dumped yet: the rows above came from the write-time
+        // tail, which is the point of this case. The spill the tail uses is not
+        // an index file the catalog names, so the directory is still empty.
+        assert_eq!(count("idx"), 0, "no dump has run yet");
+        assert_eq!(count("bmp"), 0, "the spill is not a `.bmp` file");
 
         // The write-time tail is visible before the dump.
         e.execute_blocking("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
@@ -7112,10 +7116,14 @@ mod tests {
             ]
         );
 
-        // A dump transaction seals the tail as a second chunk and the ranking
-        // holds.
+        // A dump transaction seals the tail and the ranking holds. Each dump
+        // appends **its own** chunk: `BMPIndexInMem::GetChunkIndexMetaInfo`
+        // reports the memory index's `begin_row_id_` and its own row count, so
+        // the first dump's chunk keeps the two rows it sealed and the second
+        // holds the row added afterwards (measured on the reference: two
+        // `chunk_N.idx` for this script).
         crate::scheduler::block_on(e.dump_all_memory_indexes());
-        assert_eq!(count("bmp"), 2);
+        assert_eq!(count("idx"), 2);
         assert_eq!(
             rows(&e, q),
             vec![
@@ -7642,7 +7650,7 @@ mod tests {
     /// cargo test --release -p executor --lib tensor_maxsim_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn tensor_maxsim_throughput() {
         let (nq, nd, dim) = (32usize, 32usize, 128usize);
         let q: Vec<Vec<f64>> = (0..nq)
@@ -7887,7 +7895,7 @@ mod tests {
     ///     secondary_stress_sustained_dumps -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "writes up to a million rows; run explicitly"]
+    #[ignore = "slow: writes up to a million rows"]
     fn secondary_stress_sustained_dumps() {
         let total: usize = std::env::var("INFINITY_STRESS_ROWS")
             .ok()
@@ -9577,7 +9585,7 @@ mod tests {
     /// Times the bulk dump. Not a gate: run it twice, with
     /// `INFINITY_FLUSH_DUMP_CONCURRENCY=1` and unset, to see the win.
     #[test]
-    #[ignore = "SLOW: a timing probe, not a gate"]
+    #[ignore = "bench: a timing probe, not a gate"]
     fn flush_dump_wall_time_probe() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
@@ -9684,7 +9692,7 @@ mod tests {
     /// caller dominates and the extra threads only add contention. Run with
     /// `cargo test -p executor --lib a_checkpoint_scaling_probe -- --ignored --nocapture`.
     #[test]
-    #[ignore = "wall-time probe: run it explicitly, the numbers are host dependent"]
+    #[ignore = "bench: wall-time probe, the numbers are host dependent"]
     fn a_checkpoint_scaling_probe() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
@@ -9877,6 +9885,44 @@ mod tests {
         let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
                  (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
         assert_eq!(rows(&e, q), vec![vec!["5".to_string()]]);
+    }
+
+    /// A secondary chunk covers the offsets it **holds**, not
+    /// `[base_row_id, base_row_id + row_count)`: deleting rows leaves holes in a
+    /// segment, and a row past the first hole is still in the chunk. Judging
+    /// coverage by the span re-indexed those rows, so a reopen answered a row
+    /// twice and the next dump persisted the duplicate.
+    #[test]
+    fn a_reopened_secondary_index_does_not_reindex_the_rows_it_already_holds() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE sc (id INT, v INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX sc_v ON sc (v) USING SECONDARY;")
+                .unwrap();
+            let rows: Vec<String> = (0..40).map(|i| format!("({i}, {})", i * 10)).collect();
+            e.execute_blocking(&format!("INSERT INTO sc VALUES {};", rows.join(",")))
+                .unwrap();
+            // Holes inside the segment: every other row of the first half goes.
+            e.execute_blocking("DELETE FROM sc WHERE id % 2 = 0 AND id < 20;")
+                .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_all_memory_indexes());
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        // Every surviving row is found exactly once.
+        for i in (1..20).step_by(2) {
+            let query = format!("SELECT id FROM sc WHERE v = {};", i * 10);
+            let found = rows(&e, &query);
+            assert_eq!(
+                found,
+                vec![vec![i.to_string()]],
+                "value {} answered {found:?}",
+                i * 10
+            );
+        }
+        assert_eq!(e.row_count("sc").unwrap(), 30);
     }
 
     /// `storage_type = scalar_quantization` writes the C++ SQ chunk layout and
@@ -10368,6 +10414,88 @@ mod tests {
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
+    /// A retired column's cells are given back once a checkpoint has passed the
+    /// `DROP`. The retirement is stamped with the commit ts of the statement
+    /// that dropped the column; if it were `u64::MAX`, no checkpoint bound would
+    /// ever reach it and every later insert would keep writing a default cell
+    /// for a column nobody can read.
+    #[test]
+    fn a_dropped_column_leaves_the_append_buffer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dc2 (a INT, b VARCHAR, c INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO dc2 VALUES (1, 'x', 2);")
+            .unwrap();
+        let id_b = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.dc2")
+            .unwrap()
+            .unwrap()
+            .ids[1];
+        e.execute_blocking("ALTER TABLE dc2 DROP COLUMN (b);")
+            .unwrap();
+        let buffered = || {
+            e.tables
+                .lock()
+                .unwrap()
+                .values()
+                .map(|t| t.pending_rows.column_count())
+                .max()
+                .unwrap_or(0)
+        };
+        assert_eq!(
+            buffered(),
+            3,
+            "the cells stay until a checkpoint covers them"
+        );
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(
+            buffered(),
+            2,
+            "a checkpoint past the DROP releases the column"
+        );
+        assert!(
+            !e.tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|t| t.pending_rows.all_ids().contains(&id_b)),
+            "the retired id is gone from the buffer"
+        );
+    }
+
+    /// A multi-batch `INSERT` that fails in a later batch must not have
+    /// committed the earlier ones: `insert_in_batches` splits one statement into
+    /// several transactions, so the whole request is validated before the first
+    /// one runs.
+    #[test]
+    fn a_bad_row_in_a_later_batch_commits_nothing() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE mb (a INT NOT NULL);")
+            .unwrap();
+        let rows_n = Engine::MAX_APPEND_ROWS + 10;
+        let rows: Vec<String> = (0..rows_n)
+            .map(|i| {
+                if i == rows_n - 1 {
+                    "null".to_string()
+                } else {
+                    i.to_string()
+                }
+            })
+            .map(|v| format!("({v})"))
+            .collect();
+        let sql = format!("INSERT INTO mb VALUES {};", rows.join(","));
+        assert!(e.execute_blocking(&sql).is_err(), "the bad row fails");
+        assert_eq!(
+            e.row_count("mb").unwrap(),
+            0,
+            "no batch was committed before the failure"
+        );
+    }
+
     /// Port of the reference's `ConflictCheckTest.conflict_check_delete`: three
     /// transactions delete the same row, the first commit wins and the other
     /// two get `kTxnConflict`; overlapping sets behave the same way.
@@ -10394,30 +10522,30 @@ mod tests {
         let t1 = stale_delete(&e);
         let t2 = stale_delete(&e);
         let t3 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)).unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t1)).unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t2)),
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t3)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)).unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], &[], t4)).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let a = stale_delete(&e);
         let b = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a))
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], &[], a))
             .unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], 0, &[], b)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], &[], b)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);
@@ -11328,8 +11456,8 @@ mod tests {
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts` — two threads
     /// create and drop the same database; conflicting commits are tolerated.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_parallel_ts (run with --ignored)"]
-    fn disabled_slow_test_parallel_ts() {
+    #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts"]
+    fn parallel_ts() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         let mut handles = Vec::new();
@@ -11356,8 +11484,8 @@ mod tests {
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table` —
     /// concurrent inserts into one table.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_parallel_insert_table (run with --ignored)"]
-    fn disabled_slow_test_parallel_insert_table() {
+    #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table"]
+    fn parallel_insert_table() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         e.execute_blocking("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
@@ -11430,7 +11558,7 @@ mod tests {
                 base_row_id: recorded[0].base_row_id,
                 row_count: 2,
             });
-        e.record_sealed_text_chunks_of("once", index_id);
+        e.record_sealed_text_chunks_of_at("once", index_id, None);
         let after = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
         assert_eq!(after.len(), 1, "one chunk name took two records: {after:?}");
     }
@@ -11593,10 +11721,10 @@ mod tests {
     }
 
     /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —
-    /// concurrent appends into one table. `#[ignore]` mirrors `DISABLED_`.
+    /// concurrent appends into one table. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_append_append_concurrent (run with --ignored)"]
-    fn disabled_slow_test_append_append_concurrent() {
+    #[ignore = "slow: C++ TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent"]
+    fn append_append_concurrent() {
         let dir = tempdir().unwrap();
         let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
         e.execute_blocking("CREATE TABLE cac (id INT, name VARCHAR);")
@@ -11622,11 +11750,11 @@ mod tests {
 
     /// C++: `ParallelTest.DISABLED_SLOW_ChaosTest` — four threads for
     /// `kRunningTime` seconds mixing delete / vector search / update /
-    /// full-text search. `#[ignore]` mirrors `DISABLED_`; set
+    /// full-text search. Run it with `--ignored`; set
     /// `INFINITY_CHAOS_SECONDS` to shorten the run.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_ChaosTest (run with --ignored)"]
-    fn disabled_slow_chaos_test() {
+    #[ignore = "slow: C++ ParallelTest.DISABLED_SLOW_ChaosTest"]
+    fn chaos_test() {
         let seconds: u64 = std::env::var("INFINITY_CHAOS_SECONDS")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -11692,11 +11820,10 @@ mod tests {
 
     /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
     /// two blocks and checks the postings after the async dump; the port keeps
-    /// the same postings assertion and is `#[ignore]` exactly like the
-    /// `DISABLED_` case (run with `--ignored`).
+    /// the same postings assertion and runs under `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_Memory (run with --ignored)"]
-    fn disabled_slow_memory() {
+    #[ignore = "slow: C++ MemoryIndexerTest.DISABLED_SLOW_Memory"]
+    fn memory_indexer_memory() {
         let paragraphs = [
             "A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.",
             "An FST will read a set of strings on the input tape and generates a set of relations on the output tape. An FST can be thought of as a translator or relater between strings in a set.",
@@ -11729,8 +11856,8 @@ mod tests {
     /// "A B C" repeated seven times; every document has tf 7 for `a`, `b`, `c`
     /// at positions 0,3,6,…,18.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_SeekPosition (run with --ignored)"]
-    fn disabled_slow_seek_position() {
+    #[ignore = "slow: C++ MemoryIndexerTest.DISABLED_SLOW_SeekPosition"]
+    fn seek_position() {
         let paragraph = "A B C A B C A B C A B C A B C A B C A B C";
         let mut mem = MemoryIndexer::new();
         for i in 0..8192u64 {
@@ -12212,6 +12339,68 @@ mod tests {
         e.reserve_rows("sg", 4, false).unwrap();
         e.reserve_rows("sg", 4, false).unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
+    }
+
+    /// An append that reaches the end of a segment is **split** at the
+    /// boundary, exactly as `TableCache::PrepareAppendNolock` does.
+    ///
+    /// A segment's offset is a `u32` but only `SEGMENT_ROW_CAPACITY` of its
+    /// values are slots: letting one append run past the last slot hands out
+    /// ids no block can hold (`block_of` would name a block past the segment's
+    /// 1024), and the reference never does it.
+    #[test]
+    fn an_append_across_a_segment_boundary_is_split() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE sgx (id INT);").unwrap();
+        let cap = Engine::SEGMENT_ROW_CAPACITY;
+        // Put the allocator four rows short of the segment's end. Reaching it
+        // by appending would take 8.4 M rows (and every append is capped at
+        // `MAX_APPEND_ROWS`), so the counter is set directly - it is the state
+        // a long series of appends leaves behind.
+        {
+            let key = e.table_key("sgx");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            entry.row_counter = Some((0, (cap - 4) as u32, false));
+            entry.segments.insert(
+                0,
+                crate::engine::state::SegmentEntry {
+                    id: 0,
+                    rows: (cap - 4) as u32,
+                },
+            );
+        }
+
+        // Ten rows: four close the segment, six open the next one.
+        let range = e.reserve_rows("sgx", 10, false).unwrap();
+        assert_eq!(
+            range.ranges(),
+            &[(cap - 4, 4), (1usize << 32, 6)],
+            "the allocation must state both runs"
+        );
+        // `seq_at` follows the seam: the first four rows continue the first
+        // segment, the rest start at offset 0 of the second.
+        assert_eq!(range.seq_at(0), cap - 4);
+        assert_eq!(range.seq_at(3), cap - 1);
+        assert_eq!(range.seq_at(4), 1usize << 32);
+        assert_eq!(range.seq_at(9), (1usize << 32) | 5);
+        // Neither segment overflows its slot range.
+        assert_eq!(e.segments("sgx"), vec![(0, cap as u32), (1, 6)]);
+    }
+
+    /// An append larger than `MAX_BLOCK_CAPACITY` is refused at the primitive,
+    /// as `TableCache::PrepareAppendNolock` refuses it; the statement-level
+    /// entry points split into batches instead.
+    #[test]
+    fn an_oversized_single_append_is_refused() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE big (id INT);").unwrap();
+        assert!(e
+            .reserve_rows("big", Engine::MAX_APPEND_ROWS + 1, true)
+            .is_err());
+        assert!(e.reserve_rows("big", Engine::MAX_APPEND_ROWS, true).is_ok());
     }
 
     /// `NewTxn::BeginTS`: a reader pinned to a timestamp does not see a row
@@ -14769,7 +14958,7 @@ mod tests {
     ///
     /// `cargo test --release -p executor spann_out_of_core --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "diagnostic: prints the resident set, asserts nothing host independent"]
     fn spann_out_of_core_keeps_the_resident_set_small() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
@@ -15182,7 +15371,7 @@ mod tests {
     ///
     /// `cargo test --release -p executor spann_query_profile --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "diagnostic: prints the query profile, asserts nothing"]
     fn spann_query_profile_1536d() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
@@ -15433,7 +15622,7 @@ mod tests {
     ///
     /// `cargo test -p executor spann_bench --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "bench: throughput probe, host dependent"]
     fn spann_bench_128d() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
@@ -15692,7 +15881,7 @@ mod tests {
     ///
     /// `cargo test -p executor --release spann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "bench: latency comparison, host dependent"]
     fn spann_vs_hnsw_at_equal_latency() {
         const N: usize = 20_000;
         const DIMS: usize = 128;

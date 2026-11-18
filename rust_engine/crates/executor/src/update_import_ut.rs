@@ -768,8 +768,8 @@ fn import_then_drop_index() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:5958`
 /// (`TestTxnImport.DISABLED_SLOW_test_import_and_compact`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_import_and_compact"]
-fn disabled_slow_test_import_and_compact() {
+#[ignore = "slow: C++ TestTxnImport.DISABLED_SLOW_test_import_and_compact"]
+fn import_and_compact() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);

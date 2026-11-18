@@ -1945,6 +1945,20 @@ mod tests {
             .collect()
     }
 
+    /// The runtime a bucket-parallel build spawns its tasks on.
+    ///
+    /// The index crate builds no runtime of its own, so a test that means to
+    /// exercise the parallel path has to bring one - otherwise `add_batch`
+    /// finds no runtime and builds bucket by bucket on this thread, which still
+    /// answers the same queries and would let a broken bucket path pass.
+    fn build_runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_all()
+            .build()
+            .expect("build the test runtime")
+    }
+
     #[test]
     fn flat_exact_top1() {
         let data = dataset(50, 4);
@@ -1980,7 +1994,10 @@ mod tests {
         for v in &data {
             serial.add(v);
         }
-        assert_eq!(parallel.add_batch(&data, 4), data.len());
+        // Inside a runtime, so the batch really takes the bucket-parallel path.
+        let rt = build_runtime();
+        let built = rt.block_on(async { parallel.add_batch(&data, 4) });
+        assert_eq!(built, data.len());
         assert_eq!(parallel.len(), serial.len());
         let mut rng = Rng::new(11);
         let mut hits = 0usize;
@@ -2014,6 +2031,7 @@ mod tests {
     #[test]
     fn quantized_batch_build_matches_serial_answers() {
         let data = dataset(1200, 8);
+        let rt = build_runtime();
         for encoding in [HnswEncoding::Lvq, HnswEncoding::Rabitq] {
             let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
             serial.train_store(&data, None);
@@ -2022,7 +2040,8 @@ mod tests {
             }
             let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
             parallel.train_store(&data, None);
-            assert_eq!(parallel.add_batch(&data, 4), data.len());
+            let built = rt.block_on(async { parallel.add_batch(&data, 4) });
+            assert_eq!(built, data.len());
             assert_eq!(parallel.len(), serial.len());
             // A serial build must not have been taken: with 1200 vertices and 4
             // threads the batch path splits into buckets, and every one of them
@@ -2730,10 +2749,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.DISABLED_SLOW_test_load` — build, save to the chunk
-    /// layout, load and search. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    /// layout, load and search. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_SLOW_test_load (run with --ignored)"]
-    fn disabled_slow_test_load() {
+    #[ignore = "slow: C++ HnswHandlerTest.DISABLED_SLOW_test_load"]
+    fn hnsw_save_load_search() {
         let data = data();
         let index = build(Metric::L2, HnswEncoding::Plain, &data);
         let restored = chunk_roundtrip(&index, Metric::L2, HnswEncoding::Plain);
@@ -2741,10 +2760,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.DISABLED_RANDOME_test_parallel` — readers query
-    /// while a writer inserts. `#[ignore]` mirrors the C++ `DISABLED_` case.
+    /// while a writer inserts. Run it with `--ignored`.
     #[test]
-    #[ignore = "C++ DISABLED_RANDOME_test_parallel (run with --ignored)"]
-    fn disabled_random_test_parallel() {
+    #[ignore = "slow: C++ HnswHandlerTest.DISABLED_RANDOME_test_parallel"]
+    fn hnsw_concurrent_read_write() {
         parallel_readers(Metric::L2, HnswEncoding::Plain);
     }
 }

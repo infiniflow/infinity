@@ -1393,13 +1393,17 @@ impl Engine {
                 let dc_cmd = self.drop_columns_command(table, column)?;
                 // `GetBlockIDs1`: the blocks the column files live in. Read
                 // before the DDL, because the marker set is part of its batch.
-                // The column's position is read here too: after the DDL the
-                // schema no longer has it.
-                let drop_position = self
+                // The column's **id** is read here too: after the DDL the
+                // schema no longer has it, and the buffer is keyed by id (the
+                // block files are named `{id}.col`), not by position.
+                let drop_id = self
                     .storage
                     .catalog
                     .get_table_by_name(table)?
-                    .and_then(|m| m.columns.iter().position(|c| c == column));
+                    .and_then(|m| {
+                        let at = m.columns.iter().position(|c| c == column)?;
+                        Some(m.ids[at])
+                    });
                 let blocks: Vec<(u32, u16)> = self
                     .visible_block_ids(table)
                     .into_iter()
@@ -1421,15 +1425,23 @@ impl Engine {
                         {
                             let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
                         }
-                        Ok(((), drop_position))
+                        Ok(((), drop_id))
                     },
-                    |position| async move {
-                        // A buffered row has no block file to leave alone: it
-                        // loses the cell at the column's position, exactly as
-                        // the reference's block buffer does. Applied only once
-                        // the transaction has won.
-                        if let Some(position) = position {
-                            self.patch_buffered_drop_column(table, position);
+                    |id, commit_ts| async move {
+                        // A buffered row has no block file to leave alone. The
+                        // column is **retired by id**, not removed: its cells
+                        // stay until a checkpoint bounded at or after this
+                        // commit has written them, because a bound before the
+                        // DROP still has to write that column and the buffer is
+                        // the only copy of its unreached rows.
+                        //
+                        // The retirement is stamped with the DROP's own commit
+                        // ts, which is finite: `u64::MAX` was a value no
+                        // checkpoint bound ever reaches, so the cells stayed for
+                        // the life of the process and every later insert kept
+                        // writing a default for them.
+                        if let Some(id) = id {
+                            self.patch_buffered_drop_column(table, id, commit_ts);
                         }
                         Ok(())
                     },
@@ -1523,12 +1535,23 @@ impl Engine {
                         )?;
                         Ok(((), ac_blocks))
                     },
-                    |blocks| async move {
+                    |blocks, _commit_ts| async move {
                         // Rows still in the append buffer have no block file
                         // yet (`AddColumnsData` walks the segments and would
                         // skip them): the reference's block *buffer* gains the
                         // column, so they get the default cell here.
-                        self.patch_buffered_add_columns(table, base_index as usize, &added);
+                        //
+                        // Keyed by the ids the DDL just handed out (the table's
+                        // live id list from `base_index` on), so this is one new
+                        // vector per column instead of a positional rewrite of
+                        // every buffered row.
+                        let added_ids: Vec<u64> = self
+                            .storage
+                            .catalog
+                            .get_table_by_name(table)?
+                            .map(|m| m.ids.iter().copied().skip(base_index as usize).collect())
+                            .unwrap_or_default();
+                        self.patch_buffered_add_columns(table, &added_ids, &added);
                         // And the blocks that already exist get one file for
                         // each new column, before the commit is visible.
                         // `add_column_files_async` awaits the table's bottom
@@ -2002,15 +2025,11 @@ impl Engine {
                         self.bump_writes(table);
                         // `NewTxn::Import` populates every index of the table
                         // inside the import transaction (`PopulateIndex` per
-                        // segment), so the chunks exist as soon as the
-                        // statement returns - that is how a 100-row import
-                        // gets a full-text and a secondary chunk without any
-                        // dump ever running. The port rebuilds its full-text,
-                        // sparse and vector chunks from the rows at checkpoint
-                        // time, but a secondary chunk is derived from spill
-                        // files that a small import never fills, so build it
-                        // here.
-                        self.populate_secondary_indexes(table);
+                        // segment), which the import's own bottom now does
+                        // (`Engine::populate_import_indexes`), so the chunks
+                        // exist as soon as the statement returns - that is how a
+                        // 100-row import gets a full-text and a secondary chunk
+                        // without any dump ever running.
                     }
                     r
                 } else {
@@ -2613,7 +2632,7 @@ impl Engine {
                 }
                 if !to_del.is_empty() {
                     let t = self.txn.begin();
-                    self.commit_with_deletes(table, &to_del, 0, &[], t).await?;
+                    self.commit_with_deletes(table, &to_del, &[], t).await?;
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),
@@ -2745,21 +2764,23 @@ impl Engine {
                     let block = typed_append_block(&literals, &types);
                     let table_name = table.to_string();
                     let table_ident = self.table_ident(table)?;
-                    let row_count = literals.len();
-                    let base = self
-                        .commit_rewritten_rows(table, &to_del, &new_rows, t, move |txn, base| {
+                    let allocation = self
+                        .commit_rewritten_rows(table, &to_del, &new_rows, t, move |txn, range| {
                             if let Some((_, table_id, _)) = table_ident {
                                 // A row the WAL encoder cannot express keeps
                                 // its `DeleteV2` only: the new cells reach the
                                 // block buffer, and no row record is kept.
                                 if let Some(block) = block {
+                                    // Both ranges: a rewrite that crosses a
+                                    // segment seam gets the next segment's ids
+                                    // for its tail, and the frame says so
+                                    // (`WalCmdAppendV2::row_ranges_`).
                                     txn.set_typed_commands(vec![
                                         self.delete_command(&table_name, &table_id, &delete_ids),
                                         self.append_command(
                                             &table_name,
                                             &table_id,
-                                            base,
-                                            row_count,
+                                            range.ranges(),
                                             block,
                                         ),
                                     ]);
@@ -2784,10 +2805,11 @@ impl Engine {
                             let mut row_texts: Vec<(usize, Vec<String>)> =
                                 Vec::with_capacity(new_rows.len());
                             for (k, nr) in new_rows.iter().enumerate() {
-                                self.update_indexes_on_insert_text(table, base + k, nr, &schema)?;
+                                let seq = allocation.seq_at(k);
+                                self.update_indexes_on_insert_text(table, seq, nr, &schema)?;
                                 let texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
-                                row_texts.push((base + k, texts));
+                                row_texts.push((seq, texts));
                             }
                             let batch: Vec<(usize, &[String])> = row_texts
                                 .iter()

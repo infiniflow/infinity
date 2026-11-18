@@ -447,12 +447,38 @@ pub(crate) fn encode_value_with_shape(
     Ok(Some(bytes))
 }
 
-/// The commit ts of the append that wrote row `offset`, from the append log.
+/// The commit ts of the append that wrote row `seq`, from the append log.
 ///
-/// `totals[i]` is the cumulative row count after append `i` and `ts[i]` its
-/// commit ts; a row lands in the first append whose total passes it.
-pub(crate) fn append_ts_of(offset: u64, totals: &[u64], ts: &[u64]) -> Option<u64> {
-    let i = totals.partition_point(|total| *total <= offset);
+/// `totals[i]` is the cumulative **table-wide** row count after append `i` and
+/// `ts[i]` its commit ts; a row lands in the first append whose total passes
+/// its table-wide ordinal.
+///
+/// `seq` is a full row id (`segment << 32 | in-segment offset`), and the
+/// ordinal is what the segment map makes of it: the offset plus the rows every
+/// earlier segment holds. Comparing the raw in-segment offset against the
+/// table-wide totals read the *first* append's ts for any row whose offset is
+/// below it - every row of a second segment starts at offset 0 - so a
+/// checkpoint could stamp a block with a ts that predates its rows and skip it.
+///
+/// `segments` must be every segment the table has, ascending; a table with one
+/// segment has the same basis either way, which is why this went unnoticed.
+pub(crate) fn append_ts_of(
+    seq: u64,
+    segments: &[(u32, u64)],
+    totals: &[u64],
+    ts: &[u64],
+) -> Option<u64> {
+    let segment = (seq >> 32) as u32;
+    let offset = seq & 0xffff_ffff;
+    let mut before = 0u64;
+    for (id, rows) in segments {
+        if *id >= segment {
+            break;
+        }
+        before += rows;
+    }
+    let ordinal = before + offset;
+    let i = totals.partition_point(|total| *total <= ordinal);
     ts.get(i).copied().filter(|t| *t != 0)
 }
 

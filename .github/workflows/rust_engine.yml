@@ -727,6 +727,24 @@ jobs:
           ./scripts/wait_for_infinity.sh
       - name: Python SDK suite
         run: .venv/bin/python -m pytest -q python/test_pysdk -m "not complex and not slow" --tb=short
+      - name: Python SDK slow cases
+        # The reference's `reldeb_parallel_test` runs the same files with
+        # `-m "not complex"`, i.e. including `@pytest.mark.slow`: the cases that
+        # build 10k tables, 10k databases and long-abandoned rows. They are the
+        # ones a nightly needs and a PR does not, so they only run when the
+        # workflow is dispatched or scheduled.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: .venv/bin/python -m pytest -q python/test_pysdk -m "slow and not complex" --tb=short
+      - name: Parallel suite (Python)
+        # `python/parallel_test`: the reference's `debug_tsan_parallel_test`
+        # target. Its Go counterpart above drives the same engine from
+        # goroutines; this one keeps the Python form because the client-side
+        # behaviour it asserts (session handling under writers) only exists in
+        # the SDK.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: .venv/bin/python -m pytest -q python/parallel_test -m "not complex and not slow" --tb=short
       - name: Stop the engine and show its log
         if: always()
         run: |
@@ -935,20 +953,68 @@ jobs:
           # sanitizer build (rustc rejects sanitizers for proc macros).
           RUSTFLAGS="-Zsanitizer=address" cargo test --target x86_64-unknown-linux-gnu \
             -p storage --lib
-      - name: Ignored tests (perf probes, long replay loops)
+      - name: Ignored tests (every ignored case, reported)
         # These mirror the reference's DISABLED_/SLOW_ gtests, which
-        # slow_tests.yml runs nightly, plus the cases the unit lane drops for
-        # its wall time: the ColBERT-SaR training ports and the `rabitq::tests::diag_*`
-        # diagnostics. They are reported rather than gated for
-        # now: at least `new_catalog_index_internal_ut::disabled_slow_test_populate_index`
-        # fails on the port (fulltext_tail is None where the case expects
-        # (0, 16384)), and that predates the current work. Flip this to a gate
-        # once the set is triaged.
+        # slow_tests.yml runs nightly, plus the cases the unit lane drops for its
+        # wall time: the ColBERT-SaR training ports and the `rabitq::tests::diag_*`
+        # diagnostics. Each `#[ignore]` carries a category prefix, and the test's
+        # own body names the reference case it mirrors:
+        #
+        #   slow:         reference `DISABLED_SLOW_*`; a gate (next step)
+        #   bench:        timing/throughput probe, host dependent
+        #   diagnostic:   prints metrics, asserts nothing
+        #   external:     needs MinIO (`INFINITY_MINIO_*`)
+        #   golden:       needs the reference binary's output
+        #   known-defect: a located behaviour difference, see GAPS.md
+        #
+        # This step runs the lot and only reports: a `bench:` number on a shared
+        # runner pans out differently every night, so it cannot gate.
         continue-on-error: true
         working-directory: rust_engine
         env:
           UV_PYTHON: "3.13"
-        run: cargo test --workspace -- --ignored
+        run: cargo test --workspace --no-fail-fast -- --ignored
+      - name: Slow reference cases (the gated half of --ignored)
+        # The `slow:` set alone, and this one gates. Everything else is skipped
+        # by name - `--skip` matches the test name, not the `#[ignore]` reason,
+        # so the categories above are spelled out here. Every `#[ignore]` carries
+        # one of those categories (`slow`/`bench`/`diagnostic`/`external`/
+        # `golden`/`stress`), so this list is exactly "everything but slow".
+        #
+        # Two names beyond the non-slow categories are skipped while their
+        # difference is open (both predate this lane and fail on main):
+        # `dump_index_task_row_cnt_exceed_memory_quota` and
+        # `a_large_corpus_is_byte_identical_to_the_reference`.
+        working-directory: rust_engine
+        env:
+          UV_PYTHON: "3.13"
+        run: |
+          skip=(
+            # bench:
+            probe_same_table_insert_concurrency probe_bulk_delete_journal_scan
+            hnsw_production_scale tensor_maxsim_throughput
+            flush_dump_wall_time_probe a_checkpoint_scaling_probe
+            dot_throughput position_lut_throughput maxsim_throughput
+            spann_bench_128d spann_vs_hnsw_at_equal_latency
+            # diagnostic:
+            diag_estimator_accuracy diag_ranking_quality diag_extra_bits
+            flat_rabitq hnsw_rabitq hnsw_lsg_rabitq
+            compress_hnsw_to_rabitq compress_lsg_to_rabitq
+            spann_out_of_core_keeps_the_resident_set_small
+            spann_query_profile_1536d
+            # external:
+            minio_upload_meta_to_s3 minio_client_roundtrip
+            minio_upload_object minio_download_object
+            # golden:
+            a_large_corpus_is_byte_identical_to_the_reference
+            # stress:
+            ignored_stress_concurrent_seal_and_optimize
+            # open slow cases
+            dump_index_task_row_cnt_exceed_memory_quota
+          )
+          args=()
+          for name in "${skip[@]}"; do args+=("--skip" "$name"); done
+          cargo test --workspace --no-fail-fast -- --ignored "${args[@]}"
       - name: Build the server
         run: (cd rust_engine && cargo build --release -p cli)
       - name: Gate E (performance)

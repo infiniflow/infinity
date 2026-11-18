@@ -273,6 +273,13 @@ impl Engine {
     }
 
     pub fn open_with_options(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
+        // The engine's runtime, created before any engine work. Every fan-out
+        // below (a rebuild's tables, a segment's term batches, an HNSW build's
+        // buckets) spawns on the runtime installed here, and `index::parallel`
+        // has no pool of its own: a fan-out that ran first would silently
+        // collapse to the calling thread. Opening the engine is the point where
+        // that stops being possible.
+        let _ = crate::scheduler::scheduler();
         let dir: PathBuf = dir.as_ref().to_path_buf();
         // `Config::SnapshotDir()`: snapshots live next to the data root unless
         // the caller names a directory (the CLI always does).
@@ -614,6 +621,14 @@ impl Engine {
         if quota == 0 {
             return;
         }
+        // An `IMPORT` in flight owns its indexes until it commits: the
+        // reference's `NewTxn::Import` never reaches the tracer (`PopulateIndex`
+        // is the only thing that dumps, once per index per segment, at the
+        // end). Firing the waterlines from the staging loop split the chunks at
+        // batch boundaries - see `TableEntry::importing`.
+        if table.is_some_and(|table| self.import_in_flight(table)) {
+            return;
+        }
         // No time gate. The reference's `MemIndexTracer::IncreaseMemoryUsage`
         // compares on **every** increase (`cur_index_memory_ >
         // index_memory_limit_ + proposed_dump_size_`, `memindex_tracer.cppm:103`)
@@ -683,6 +698,9 @@ impl Engine {
         if quota == 0 {
             return;
         }
+        if self.import_in_flight(table) {
+            return;
+        }
         self.refresh_memindex_charge(table);
         if self.seal_pressure() == Pressure::Normal {
             return;
@@ -695,6 +713,21 @@ impl Engine {
         // still names the table: the breach is that table's charge, and picking
         // the victim across the engine would leave it undrained.
         self.dump_under_pressure(Some(table)).await;
+    }
+
+    /// Whether an `IMPORT` is currently staging rows into `table`.
+    ///
+    /// While it is, the append path's dump triggers (the row capacity and the
+    /// memory quota) stay off: the reference's `NewTxn::Import` never reaches
+    /// them, and letting them fire cut an index's chunks at whatever batch
+    /// boundary the reader had reached. `populate_import_indexes` writes the
+    /// chunks once, inside the transaction, as `PopulateIndex` does.
+    pub(crate) fn import_in_flight(&self, table: &str) -> bool {
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&self.table_key(table))
+            .is_some_and(|entry| entry.import_in_flight())
     }
 
     /// Queues the background drain. The caller has already established that a
@@ -1359,6 +1392,38 @@ impl Engine {
         catalog
     }
 
+    /// The table's live column ids, in schema order.
+    ///
+    /// The buffer is keyed by column id, so a reader that walks it positionally
+    /// needs the id order the table has **now** - that is what turns its cells
+    /// into the `Vec<Value>` a plan indexes by position.
+    pub(crate) fn table_schema_ids(&self, table: &str) -> Result<Vec<u64>> {
+        Ok(self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
+            .ids)
+    }
+
+    /// The default of each column of `ids`, as a value the buffer can fill a
+    /// row with: a column the row predates takes this.
+    pub(crate) fn fill_values(&self, table: &str, ids: &[u64]) -> Vec<Value> {
+        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(table) else {
+            return vec![Value::Null; ids.len()];
+        };
+        ids.iter()
+            .map(|id| {
+                meta.ids
+                    .iter()
+                    .position(|want| want == id)
+                    .and_then(|at| meta.defaults.get(at).cloned().flatten())
+                    .map(|text| Value::from_literal(&default_literal(&text)))
+                    .unwrap_or(Value::Null)
+            })
+            .collect()
+    }
+
     pub(crate) fn table_schema(&self, table: &str) -> Result<Vec<String>> {
         Ok(self
             .storage
@@ -1454,10 +1519,12 @@ impl Engine {
 
     /// Stamps one append record with the commit ts that appended it.
     ///
-    /// `settle_append_ts` (the "last `count` records" form) is only right while
-    /// no other statement is appending; a commit says exactly which record it
-    /// created (`BlockVersion::Append(commit_ts, rows)` sits on the append the
-    /// transaction made, not on whatever landed last).
+    /// The record is named by the index [`Engine::note_append`] returned, which
+    /// `reserve_rows_at` hands back to every writer that appends. A commit says
+    /// exactly which record it created (`BlockVersion::Append(commit_ts, rows)`
+    /// sits on the append the transaction made, not on whatever landed last),
+    /// and no other definition can be right: a positional "the last n records"
+    /// form cannot tell a row count from a record count.
     pub(crate) fn settle_append_at(&self, table: &str, index: usize, ts: u64) {
         if index == usize::MAX {
             return;
@@ -1581,25 +1648,6 @@ impl Engine {
             }
         }
         rows
-    }
-
-    /// Stamps the newest append with the commit timestamp its transaction got.
-    ///
-    /// The row ids are reserved while the transaction is still being staged
-    /// (`reserve_rows`), so the entry exists - with no timestamp yet - by the
-    /// time the commit hands one out. A rolled-back transaction leaves the zero
-    /// in place, and the mirror's fallback then treats the batch as one create.
-    pub(crate) fn settle_append_ts(&self, table: &str, count: usize, ts: u64) {
-        let n = self.append_totals(table).len();
-        if count == 0 || n == 0 {
-            return;
-        }
-        let mut log = self.append_ts(table);
-        log.resize(n.saturating_sub(count), 0);
-        log.resize(n, ts);
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        tables.entry(tkey).or_default().append_ts = Some(log);
     }
 
     /// The imported extent of `segment`, when it still holds exactly the rows a
@@ -1823,6 +1871,15 @@ impl Engine {
         copy: bool,
         ts: Option<u64>,
     ) -> Result<RowRange> {
+        if n > Self::MAX_APPEND_ROWS {
+            // `TableCache::PrepareAppendNolock` refuses this outright
+            // (`default_values.cppm:49`, 65536). It also bounds a single
+            // allocation to at most two ranges below.
+            return Err(Error::Invalid(format!(
+                "attempt to append {n} rows, the limit is {}",
+                Self::MAX_APPEND_ROWS
+            )));
+        }
         let key = self.table_key(table);
         // The segment floor is read **before** the entry is locked:
         // `next_segment_id` walks the block layout and the catalog, and both
@@ -1885,14 +1942,70 @@ impl Engine {
             seg = (seg + 1).max(floor);
             off = 0;
         }
+        // **Split at the segment boundary.** A segment's offset is a `u32` and
+        // only `SEGMENT_ROW_CAPACITY` (8,388,608) of its values are slots, so an
+        // append that runs past the last slot would hand out ids no block can
+        // hold - `block_of` would name a block past the segment's 1024, and the
+        // reference's `PrepareAppendNolock` never does that: it fills the
+        // current segment and puts the rest at offset 0 of the next one.
         let base = ((seg as usize) << 32) | off as usize;
-        off = off.saturating_add(n as u32);
-        entry.row_counter = Some((seg, off, copy));
-        entry
-            .segments
-            .entry(seg)
-            .and_modify(|s| s.rows = s.rows.max(off))
-            .or_insert(SegmentEntry { id: seg, rows: off });
+        let room = Self::SEGMENT_ROW_CAPACITY.saturating_sub(off as usize);
+        let mut ranges = [(base, 0usize), (0, 0usize)];
+        let mut range_count = 0usize;
+        let mut left = n;
+        let mut at_seg = seg;
+        let mut at_off = off as usize;
+        while left > 0 {
+            let take = left.min(Self::SEGMENT_ROW_CAPACITY - at_off);
+            let range_base = ((at_seg as usize) << 32) | at_off;
+            if range_count < ranges.len() {
+                ranges[range_count] = (range_base, take);
+                range_count += 1;
+            }
+            entry
+                .segments
+                .entry(at_seg)
+                .and_modify(|s| s.rows = s.rows.max((at_off + take) as u32))
+                .or_insert(SegmentEntry {
+                    id: at_seg,
+                    rows: (at_off + take) as u32,
+                });
+            at_off += take;
+            left -= take;
+            if left > 0 {
+                // The next segment: the catalog's next id, never a retired one.
+                at_seg = (at_seg + 1).max(floor);
+                at_off = 0;
+                debug_assert!(
+                    range_count < ranges.len(),
+                    "one append cannot span three segments"
+                );
+            }
+        }
+        if n == 0 {
+            ranges[0] = (base, 0);
+            range_count = 1;
+            // A **claim** on a segment, not an append: `begin_import` reserves
+            // zero rows to take a segment of its own before its first batch. The
+            // row above (`row_counter = (seg, 0)`) is not enough to tell a second
+            // claimer apart - `opens_segment` tests `off > 0` or "the segment is
+            // already listed", and both are false for a segment nobody has
+            // listed yet - so two imports beginning before either writes would
+            // both get segment 0 and hand out the same ids. Listing the segment
+            // is the claim; it creates no append record.
+            if new_segment {
+                entry
+                    .segments
+                    .entry(at_seg)
+                    .and_modify(|s| s.rows = s.rows.max(at_off as u32))
+                    .or_insert(SegmentEntry {
+                        id: at_seg,
+                        rows: at_off as u32,
+                    });
+            }
+        }
+        let _ = room;
+        entry.row_counter = Some((at_seg, at_off as u32, copy));
         if n > 0 {
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
@@ -1900,7 +2013,12 @@ impl Engine {
         drop(tables);
         // One `create` per append in the mirror's `version` file.
         let append = self.note_append(table, n, copy, ts);
-        Ok(RowRange { base, append })
+        Ok(RowRange {
+            base,
+            append,
+            ranges,
+            range_count,
+        })
     }
 
     /// The import's first batch: opens a segment of the statement's own and
@@ -1977,6 +2095,10 @@ impl Engine {
             RowRange {
                 base,
                 append: usize::MAX,
+                // The import caller already splits its batch at
+                // `SEGMENT_CAPACITY - offset` (`import.rs`), so one range.
+                ranges: [(base, n), (0, 0)],
+                range_count: 1,
             },
             ImportCursor {
                 segment: cursor.segment,
@@ -2168,6 +2290,24 @@ impl Engine {
         table: &str,
         rows: &[(usize, T)],
     ) -> Result<()> {
+        self.publish_encoded_rows_with(table, rows, |_, _| Ok(()))
+    }
+
+    /// [`Self::publish_encoded_rows`], handing each parsed batch to `also`.
+    ///
+    /// The caller that also maintains the decoded-row cache passes a closure
+    /// here: it gets the `Vec<Value>` this parse produced instead of parsing the
+    /// same text a second time (`append_row_cache` used to).
+    pub(crate) fn publish_encoded_rows_with<T, F>(
+        &self,
+        table: &str,
+        rows: &[(usize, T)],
+        mut also: F,
+    ) -> Result<()>
+    where
+        T: AsRef<[u8]>,
+        F: FnMut(&str, &[(usize, Vec<Value>)]) -> Result<()>,
+    {
         if rows.is_empty() {
             return Ok(());
         }
@@ -2191,11 +2331,13 @@ impl Engine {
                 }
             }
             if published.len() >= CHUNK {
+                also(table, &published)?;
                 self.refresh_block_mirror_extra(table, &published)?;
                 published.clear();
             }
         }
         if !published.is_empty() {
+            also(table, &published)?;
             self.refresh_block_mirror_extra(table, &published)?;
         }
         Ok(())
@@ -2306,7 +2448,7 @@ impl Engine {
         &self,
         op: TxnOp,
         stage: impl FnOnce() -> Result<(T, E)>,
-        effects: impl FnOnce(E) -> Fut,
+        effects: impl FnOnce(E, u64) -> Fut,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
     ) -> Result<T>
     where
@@ -2342,7 +2484,10 @@ impl Engine {
         // The commit stays invisible until its data is in place; the publish
         // runs even when the effects fail, or the commit barrier would wait for
         // a transaction that already owns a timestamp.
-        let effect_result = effects(plan).await;
+        // The effects see the commit ts: an effect that has to say "this is
+        // safe to drop once a checkpoint has passed me" needs a finite value,
+        // and `u64::MAX` is one no checkpoint ever reaches.
+        let effect_result = effects(plan, commit_ts).await;
         self.txn.finish_bottom(ts);
         effect_result?;
         Ok(out)
@@ -4557,7 +4702,14 @@ impl Engine {
             {
                 Self::with_text_dir_gate(shared, || {
                     crate::engine::state::seal_text_index_gated(shared);
-                    self.record_sealed_text_chunks(table, column);
+                    // `built_ts` is the merge's commit ts, and the chunks this
+                    // seal writes belong to that transaction
+                    // (`PopulateIndex(…, kCompact)`): recording them under
+                    // `current_ts()` (the previous commit) made the merged
+                    // segment's chunk claim a ts the reference never uses.
+                    crate::engine::with_chunk_ts(built_ts, || {
+                        self.record_sealed_text_chunks(table, column);
+                    });
                 });
             }
             {
@@ -5421,6 +5573,17 @@ impl Engine {
             .map(|m| m.id.to_string())
             .unwrap_or_default();
         let mut catalog_chunks: Vec<(u64, std::path::PathBuf, u64, u64)> = Vec::new();
+        // A segment a compaction deprecated is **not** coverage: its rows were
+        // renumbered into the merged segment, so counting its chunks made the
+        // merged segment's rows look sealed and the rebuild left the tail empty
+        // - the merged segment then got no chunk at all.
+        let dropped: std::collections::HashSet<u32> = self
+            .storage
+            .catalog
+            .dropped_segments(&db_id, &table_id)
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
         if let Ok(layers) = catalog::layout::read_index_chunks(
             self.storage.catalog.store().as_ref(),
             &db_id,
@@ -5441,6 +5604,9 @@ impl Engine {
                 else {
                     continue;
                 };
+                if dropped.contains(&segment) {
+                    continue;
+                }
                 catalog_chunks.push((u64::from(segment), path, info.base_row_id, info.row_count));
             }
         }
@@ -5452,19 +5618,15 @@ impl Engine {
         // table, because `is_complete` asks whether this index saw it, not how
         // many postings it holds.
         //
-        // A span counts every slot it holds, deleted ones included, so the sum
-        // only proves coverage when the table has no holes; the live row count
-        // is the yardstick, and the slot count says whether it can be trusted.
-        // Both halves matter: comparing spans with the *blocks'* row count read
-        // "25 of 25 covered" on a table whose last ten rows were still in the
-        // WAL (`test_mem_bmp` kept five `4`s where the index covers seven), and
-        // comparing them with the live count alone would let rows deleted from
-        // inside a span stand in for live rows nobody indexed.
-        let covered_rows: u64 = covered
-            .values()
-            .flat_map(|spans| spans.iter())
-            .map(|(begin, end)| end - begin)
-            .sum();
+        // The count is of the ids the chunks hold, deleted ones included, so the
+        // sum only proves coverage when the table has no holes; the live row
+        // count is the yardstick, and the slot count says whether it can be
+        // trusted. Both halves matter: comparing against the *blocks'* row count
+        // read "25 of 25 covered" on a table whose last ten rows were still in
+        // the WAL (`test_mem_bmp` kept five `4`s where the index covers seven),
+        // and comparing against the live count alone would let rows deleted
+        // inside the covered set stand in for live rows nobody indexed.
+        let covered_rows: u64 = covered.values().map(|ids| ids.len() as u64).sum();
         let live_rows = reserved as u64;
         let slot_rows: u64 = self
             .segment_row_counts(table)
@@ -5496,7 +5658,7 @@ impl Engine {
             let offset = seq as u64 & 0xffff_ffff;
             if covered
                 .get(&segment)
-                .is_some_and(|spans| spans.iter().any(|(a, b)| offset >= *a && offset < *b))
+                .is_some_and(|ids| ids.contains(&offset))
             {
                 continue;
             }
@@ -5797,6 +5959,16 @@ impl Engine {
     /// True unless `result_cache` is explicitly `off`.
     /// Rows a single imported segment can hold (`1024 * 8192`).
     pub const SEGMENT_ROW_CAPACITY: usize = 1024 * 8192;
+
+    /// `MAX_BLOCK_CAPACITY` (`default_values.cppm:49`): the largest single
+    /// append the allocator accepts.
+    ///
+    /// The reference refuses anything larger (`TableCache::PrepareAppendNolock`:
+    /// `if (row_count > MAX_BLOCK_CAPACITY or row_count == 0) UnrecoverableError`),
+    /// which is also what keeps one statement's row range inside a segment under
+    /// any realistic segment offset - but not unconditionally, so the split
+    /// below is still needed.
+    pub const MAX_APPEND_ROWS: usize = 65536;
 
     /// Rows committed per block while streaming a `COPY … FROM`.
     pub(crate) const COPY_BATCH_ROWS: usize = 8192;

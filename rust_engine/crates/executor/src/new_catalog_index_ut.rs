@@ -224,8 +224,8 @@ fn create_index_and_drop_table() {
 /// first committed create wins; the second create of the same name fails and
 /// the index stays.
 #[test]
-#[ignore = "C++ DISABLED_SLOW_create_index_create_index"]
-fn disabled_slow_create_index_create_index() {
+#[ignore = "slow: C++ TestTxnIndex.DISABLED_SLOW_create_index_create_index"]
+fn create_index_create_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     setup(&e, "db1", "col1 INT, col2 VARCHAR");

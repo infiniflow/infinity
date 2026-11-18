@@ -1008,7 +1008,7 @@ mod tests {
     /// cargo test --release -p executor --lib dot_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn dot_throughput() {
         let dim = 128usize;
         let a = values(dim, 7);

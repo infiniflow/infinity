@@ -59,7 +59,7 @@ fn count_block_dirs(root: &Path, out: &mut usize) {
 }
 
 #[test]
-#[ignore = "C++ DISABLED_MINIO_test1 (needs MinIO)"]
+#[ignore = "external: C++ DISABLED_MINIO_test1 needs MinIO, set INFINITY_MINIO_*"]
 fn minio_upload_meta_to_s3() {
     let Some(config) = minio_config() else {
         return;

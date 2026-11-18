@@ -619,8 +619,8 @@ fn replay_compact_interrupt() {
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:468`
 /// (`TestTxnReplayCompact.DISABLED_SLOW_test_compact_with_index`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_compact_with_index"]
-fn disabled_slow_test_compact_with_index() {
+#[ignore = "slow: C++ TestTxnReplayCompact.DISABLED_SLOW_test_compact_with_index"]
+fn replay_compact_with_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);

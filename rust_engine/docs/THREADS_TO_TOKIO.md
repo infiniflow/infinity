@@ -37,7 +37,9 @@
 | 表 10 cli `malloc_trim` | 运行时 task + `spawn_blocking(trim_allocator)` |
 | 表 7 `wal-writer` | **保留**（§1.4：净收益 ≤ 0） |
 
-剩余常驻：`1 × 核数`（`task-scheduler`）`+ 1`（`wal-writer`），另加 `fan-out` 兜底 runtime（仅在没有 runtime 的调用方创建）。行号分配器仍占一个 blocking 额度（§1.2）。
+剩余常驻：`1 × 核数`（`task-scheduler`）`+ 1`（`wal-writer`）。行号分配器仍占一个 blocking 额度（§1.2）。
+
+`index/src/parallel.rs` 的扇出只用两处 runtime：调用线程已进入的那个，或 `Engine::open` 时安装的 `scheduler()`。crate 自己不建池，所以「进程里只有一个 tokio runtime」是 `Engine::open` 保证的，而不依赖 install 先于第一次扇出的时序；引擎之外的调用方（example、bench）自备 runtime 并在其中调用。
 
 ## 1 逐项方案
 
@@ -320,7 +322,7 @@ runtime.block_on(server.serve());
 - `std::process::exit(0)` 从三处上移到 cli 一处
 - **测试也要改**：`server/src/lib.rs:7795/7862/7886`、`http.rs:3535` 等 4 处 `std::thread::spawn(move || server.run())`，`run` 消失后要改成自建 runtime 或 `serve`
 
-**收益**：`3 × 核数` → `1 × 核数`，常驻线程减少 `2 × 核数`。（`fan-out` 兜底 runtime 仍在，它不在这三套里。）**风险**：
+**收益**：`3 × 核数` → `1 × 核数`，常驻线程减少 `2 × 核数`（`fan-out` 兜底 runtime 当时还在，后来删掉了，见 §0）。**风险**：
 
 1. 三处 8 MiB 栈必须保留（注释记录了 `dispatch_arm` 的 1500 行 match 会栈溢出）；
 2. 三个 front end 共用一组 worker，语句本身已经 `.await` 掉 engine 的等待点，CPU 部分在 `spawn_blocking`，理论上不互堵——但这条要实测；
@@ -523,7 +525,7 @@ park/unpark 往返。对一个每次查询要取几十次的表注册表，后�
 |---|---|
 | `wal-writer` | 见 1.4：独占文件句柄 + 换文件原子性；改法净收益 0 或负 |
 | `scheduler` runtime 本身 | 这是 engine 的 runtime，本来就是 tokio |
-| `fan-out` 兜底 runtime | 只在没有 runtime 的调用方（bench / example / 独立单测）用到 |
+| ~~`fan-out` 兜底 runtime~~ | **已删除**。扇出用调用方的 runtime，或 `Engine::open` 安装的 `scheduler()`；引擎之外（bench / example）由调用方自备 runtime |
 | `BottomExecutor`（storage） | 生产不走它（`bottom_queues` + blocking 池），只在自身单测 `start(4)` |
 
 ## 3 顺序与验收

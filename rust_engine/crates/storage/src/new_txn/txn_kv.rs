@@ -693,7 +693,7 @@ mod tests {
     /// busy`, a write to a key changed after the snapshot conflicts, rejected
     /// writes are skipped at commit, and rollback discards.
     #[test]
-    #[ignore = "SLOW: the reference disables this test"]
+    #[ignore = "slow: C++ TestTxnKVStoreTest.DISABLED_SLOW_kv_store1"]
     fn kv_store1_multi_version_transactions() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("rocksdb_transaction_example");

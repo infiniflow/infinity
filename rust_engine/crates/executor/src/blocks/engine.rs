@@ -41,36 +41,6 @@ fn ids_at(timeline: &[(u64, Vec<u64>)], ts: u64, current: &[u64]) -> Vec<u64> {
     }
 }
 
-/// Rewrites one replayed row onto the table's current columns.
-///
-/// The frame's cells follow `frame_ids` - the column ids that were live when
-/// the row was written - while the append buffer (and every block) is
-/// positional against the current schema. Matching by id is what makes a row
-/// survive a schema change: a cell whose column was dropped is discarded, and
-/// a column the row predates takes the default it was added with. Counting
-/// positions instead put a dropped column's value into its neighbour.
-fn reorder_row_text(
-    text: &str,
-    frame_ids: &[u64],
-    current_ids: &[u64],
-    defaults: &[Option<String>],
-) -> String {
-    if frame_ids == current_ids {
-        return text.to_string();
-    }
-    let cells: Vec<&str> = text.split('\t').collect();
-    let mut out: Vec<String> = Vec::with_capacity(current_ids.len());
-    for (position, id) in current_ids.iter().enumerate() {
-        match frame_ids.iter().position(|frame| frame == id) {
-            Some(at) => out.push(cells.get(at).copied().unwrap_or_default().to_string()),
-            None => out.push(default_cell_text(
-                defaults.get(position).cloned().flatten().as_deref(),
-            )),
-        }
-    }
-    out.join("\t")
-}
-
 /// One row's cells, either owned or borrowed from the write's row set.
 ///
 /// The mirror copies nothing it does not have to: a bulk `COPY` publishes its
@@ -195,14 +165,6 @@ fn is_id_ordered(rows: &[(usize, Vec<Value>)]) -> bool {
 }
 
 /// The stored text form of a column default: the same value `AddColumnsData`
-/// writes into the block, so the buffered row and the block agree.
-fn default_cell_text(default: Option<&str>) -> String {
-    match default {
-        Some(text) => mirror_cell_text(&Value::from_literal(&default_literal(text))),
-        None => mirror_cell_text(&Value::Null),
-    }
-}
-
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
@@ -347,14 +309,10 @@ impl Engine {
 
     /// [`Self::write_blocks_bounded`] for an async caller: it awaits the
     /// table's bottom gate instead of blocking on it.
-    pub async fn write_blocks_bounded_async(
-        &self,
-        table: &str,
-        checkpoint_ts: u64,
-    ) -> Result<usize> {
+    pub async fn write_blocks_bounded_async(&self, table: &str, bound_ts: u64) -> Result<usize> {
         let gate = self.bottom_gate(table);
         let _turn = gate.lock().await;
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// [`Self::write_blocks`] with the checkpoint's upper bound spelled out.
@@ -363,23 +321,26 @@ impl Engine {
     /// finished at its `begin_ts` (`NewTxn::Checkpoint` -> `GetRowCnt1` ->
     /// `BlockVersion::GetRowCount(begin_ts)`), so a row id handed out by a
     /// transaction still in flight stays out of the files.
-    pub fn write_blocks_bounded(&self, table: &str, checkpoint_ts: u64) -> Result<usize> {
+    pub fn write_blocks_bounded(&self, table: &str, bound_ts: u64) -> Result<usize> {
         // The reference's checkpoint flushes only the blocks whose data changed
         // since the last one (NewTxn::CheckpointTable writes a block when
         // block_lock->checkpoint_ts_ < min(checkpoint_ts, max_ts)), and a commit
         // writes only the blocks it appended to. So a bounded write is partial
         // too: the touched set is the blocks holding rows or deletes it carries.
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// [`Self::write_blocks_bounded`] for a caller that **already holds** the
     /// table's bottom gate (a checkpoint's per-table step).
-    pub(crate) fn write_blocks_bounded_locked(
-        &self,
-        table: &str,
-        checkpoint_ts: u64,
-    ) -> Result<usize> {
-        self.write_blocks_mode(table, &[], false, checkpoint_ts)
+    ///
+    /// **The caller must hold that gate for as long as this runs.** It is what
+    /// makes `bound_ts` complete: a commit that names its own ts as the bound
+    /// (compaction, an import tail) is only safe because no later append can
+    /// reach the buffer while the gate is held - see
+    /// `docs/ALTER_CHECKPOINT_RACE.md` §5.13. Shortening the guard's scope to
+    /// before the write turns `bound_ts` into a real hole.
+    pub(crate) fn write_blocks_bounded_locked(&self, table: &str, bound_ts: u64) -> Result<usize> {
+        self.write_blocks_mode(table, &[], false, bound_ts)
     }
 
     /// Writes only the blocks this commit's rows and deletes land in.
@@ -417,9 +378,9 @@ impl Engine {
         table: &str,
         extra: &[(usize, Vec<Value>)],
         full: bool,
-        checkpoint_ts: u64,
+        bound_ts: u64,
     ) -> Result<usize> {
-        self.write_blocks_mode_with(table, extra, full, checkpoint_ts, true)
+        self.write_blocks_mode_with(table, extra, full, bound_ts, true)
     }
 
     /// [`Self::write_blocks_mode`] with control over the file sync.
@@ -428,12 +389,27 @@ impl Engine {
     /// blocks in memory and its `IMPORT_V2` frame carries only the extent, so
     /// the checkpoint is what puts them on disk. Every other caller - a
     /// checkpoint, a compaction, a column rewrite - passes `true`.
+    /// The visibility bound of this write: only rows and deletes stamped at or
+    /// before it are written.
+    ///
+    /// A **checkpoint** passes `self.checkpoint_ts()` (`current_ts()`), the
+    /// newest commit that has finished - the rows of a transaction still in
+    /// flight must stay out of the files.
+    ///
+    /// A **non-checkpoint** caller (a commit writing its own blocks:
+    /// `write_blocks_commit`, `write_blocks_import`, `compact`) passes its own
+    /// commit ts. When the value handed here happens to equal the caller's own
+    /// commit ts, that is exactly the signal that this is not a checkpoint
+    /// transaction: there are no foreign rows to bound out, only the caller's
+    /// own, because it holds the table's `bottom_gate` across the write (see
+    /// `docs/ALTER_CHECKPOINT_RACE.md` §5.13). `u64::MAX` is the explicit
+    /// "no bound" spelling of the same case.
     pub(crate) fn write_blocks_mode_with(
         &self,
         table: &str,
         extra: &[(usize, Vec<Value>)],
         full: bool,
-        checkpoint_ts: u64,
+        bound_ts: u64,
         sync_files: bool,
     ) -> Result<usize> {
         // The block writer runs under the **table's bottom gate**: the reference
@@ -461,17 +437,29 @@ impl Engine {
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        // The checkpoint writes the schema **as of its bound** (`NewTxn::Checkpoint`
-        // reads `GetColumnDefs` at its begin ts): a column a transaction
-        // committed after that bound has no cells in these rows and no place in
-        // their files. The sweep below still uses the live schema, so the
-        // `{id}.col` of such a column stays where the ALTER put it.
-        let snapshot_ids = self
-            .storage
-            .catalog
-            .schema_ids_at(&table, checkpoint_ts)
-            .unwrap_or_else(|_| meta.ids.clone());
-        let encode_meta = meta.at_ids(&snapshot_ids);
+        // The schema **as of the bound** (`NewTxn::Checkpoint` reads
+        // `GetColumnDefs` at its begin ts), with each column's type, layout and
+        // default taken from the record that was live then - **not** from
+        // `meta`.
+        //
+        // `meta` is the *current* table. A column dropped since the bound is
+        // gone from it, so `meta.at_ids(snapshot_ids)` would silently skip that
+        // id (`TableMeta::at_ids` continues on an id it cannot find) and encode
+        // the row one cell short; a column added since the bound would bring
+        // its type and default along. Both are the same defect seen from
+        // opposite sides, and `schema_at` is the one place that resolves the
+        // whole column - id, order, type, default - on one timestamp.
+        //
+        // `bound_ts == u64::MAX` means "no bound" (a commit writing its own
+        // blocks, see `write_blocks_commit`): the live table is the answer.
+        let encode_meta = if bound_ts == u64::MAX {
+            meta.clone()
+        } else {
+            self.storage
+                .catalog
+                .schema_at(&table, bound_ts)?
+                .unwrap_or_else(|| meta.clone())
+        };
         let types: Vec<i32> = encode_meta
             .types
             .iter()
@@ -527,7 +515,7 @@ impl Engine {
                 let ts = delete_ts.get(k).copied().unwrap_or(0);
                 (*id as usize, if ts == 0 { DELETED_MIRROR_TS } else { ts })
             })
-            .filter(|(_, ts)| checkpoint_ts == u64::MAX || *ts <= checkpoint_ts)
+            .filter(|(_, ts)| bound_ts == u64::MAX || *ts <= bound_ts)
             .collect();
         let db_id = self.database_id_of(&table);
         let root = self.blocks_root();
@@ -592,12 +580,33 @@ impl Engine {
         // Taken under the lock: a checkpoint that queued behind this one must
         // not see a stale snapshot of the append buffer, or its own rows would
         // be dropped from the files by the write that lands last.
-        let buffered = {
+        // Rows, not the columnar buffer: this write is positional (it encodes
+        // against `encode_meta`), so it needs one row per id. The buffer is
+        // columnar on disk-facing paths only (see `PendingRows`).
+        // Read positionally against `encode_meta`, which is the schema this
+        // write encodes: a cell the buffer holds for a column this bound does
+        // not have is dropped here, and a column the bound has but the buffer
+        // does not yields `null` (the row predates it).
+        let encode_defaults: Vec<Value> = encode_meta
+            .defaults
+            .iter()
+            .map(|d| {
+                d.as_deref()
+                    .map(|text| Value::from_literal(&default_literal(text)))
+                    .unwrap_or(Value::Null)
+            })
+            .collect();
+        let buffered: Vec<(usize, Vec<Value>)> = {
             let tables = self.tables.lock().unwrap();
-            tables
-                .get(&tkey)
-                .map(|e| e.pending_rows.clone())
-                .unwrap_or_default()
+            match tables.get(&tkey) {
+                Some(e) => (0..e.pending_rows.len())
+                    .filter_map(|k| {
+                        let row = e.pending_rows.row(k, &encode_meta.ids, &encode_defaults)?;
+                        Some((e.pending_rows.row_id(k), row))
+                    })
+                    .collect(),
+                None => Vec::new(),
+            }
         };
         let mut merged: Vec<(usize, Vec<Value>)> = extra.to_vec();
         if !buffered.is_empty() {
@@ -622,15 +631,18 @@ impl Engine {
         let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
         // The reference decides per block, by ts: a block is flushed when
-        // `record_ts < min(checkpoint_ts, block_max_ts)` where `record_ts` is
+        // `record_ts < min(bound_ts, block_max_ts)` where `record_ts` is
         // the ts at which the block was last written and `block_max_ts` the
         // newest change it holds (NewTxn::CheckpointTable).
         let touched: std::collections::HashSet<(u32, u16)> = if partial {
             let mut newest: std::collections::HashMap<(u32, u16), u64> = Default::default();
             for (seq, _) in &merged {
                 let key = block_of(*seq);
-                let offset = (*seq & 0xffff_ffff) as u64;
-                let ts = append_ts_of(offset, &totals, &append_ts).unwrap_or(u64::MAX);
+                // `append_ts_of` takes the full row id and does the
+                // segment-to-ordinal conversion itself: the append log is
+                // table-wide, the id's low half is segment-local.
+                let ts =
+                    append_ts_of(*seq as u64, &counts, &totals, &append_ts).unwrap_or(u64::MAX);
                 let slot = newest.entry(key).or_insert(ts);
                 *slot = (*slot).max(ts);
             }
@@ -658,7 +670,7 @@ impl Engine {
                     .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
                     // No record means the block was never written: it has to be.
                     .unwrap_or(0);
-                if record < checkpoint_ts.min(ts) {
+                if record < bound_ts.min(ts) {
                     set.insert(key);
                 }
             }
@@ -690,14 +702,14 @@ impl Engine {
         // segment was left with rows and no file.
         let known_segments: Vec<u32> = counts.iter().map(|(segment, _)| *segment).collect();
         // `NewTxn::Checkpoint` writes the rows of the transactions that had
-        // finished by `checkpoint_ts`: a block holds the rows whose append was
+        // finished by `bound_ts`: a block holds the rows whose append was
         // stamped at or before it (`GetRowCnt1` -> `GetRowCount(begin_ts)`).
         // The allocator's per-segment count also covers ids handed out to a
         // transaction that has not committed yet, and those rows are in no
         // block, so the extent is clipped here. Because ids are allocated in
         // commit-ts order, the committed records are a prefix of the row ids.
-        if checkpoint_ts != u64::MAX {
-            let committed = self.committed_rows(&table, checkpoint_ts);
+        if bound_ts != u64::MAX {
+            let committed = self.committed_rows(&table, bound_ts);
             let mut seen = 0usize;
             let mut clipped: Vec<(u32, u64)> = Vec::with_capacity(counts.len());
             for (segment_id, rows) in counts {
@@ -869,7 +881,7 @@ impl Engine {
                 if !contiguous || chunk.len() > end - start || chunk.is_empty() {
                     return Err(Error::Invalid(format!(
                         "table '{table}': block {segment_id}.{block_index} holds {} of the {} rows \
-                         committed at ts {checkpoint_ts} (ids {}..{}, window {first_id}..{})",
+                         committed at ts {bound_ts} (ids {}..{}, window {first_id}..{})",
                         chunk.len(),
                         end - start,
                         chunk.first().map(|(seq, _)| *seq).unwrap_or(0),
@@ -928,16 +940,22 @@ impl Engine {
                 let block_dir =
                     storage::definition::format::block_dir(db_id, meta.id, segment_id, id.block_id);
                 // A rewrite replaces the block's contents; a file the schema no
-                // longer has (`ALTER TABLE … DROP COLUMN` leaves `1.col`
-                // behind) must not survive next to it, or the reference reads
-                // a column the catalog does not know.
+                // longer has must not survive next to it, or the reference
+                // reads a column the catalog does not know.
+                //
+                // **`keep` is built from `encode_meta`, not from `meta`**, and
+                // this is load-bearing: the sweep below *deletes* every file
+                // this list does not name, and it runs **before** the write.
+                // A column the bound still had but the live table no longer
+                // does (a DROP after the bound) is written by this pass and
+                // must survive; naming only the live columns would delete the
+                // file this write just produced, silently turning "write the
+                // pre-DROP schema" into "write nothing for that column".
                 let mut keep: Vec<String> =
                     vec![storage::definition::format::VERSION_FILE.to_string()];
-                // The live schema, not the snapshot: a column added after the
-                // bound has a file here that this write does not produce.
-                for (i, id) in meta.ids.iter().enumerate() {
+                for (i, id) in encode_meta.ids.iter().enumerate() {
                     keep.push(storage::definition::format::column_file(*id));
-                    if meta
+                    if encode_meta
                         .types
                         .get(i)
                         .and_then(|t| column_type_of(t))
@@ -969,10 +987,14 @@ impl Engine {
                 // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
                 // kVarBuffer type) and aborts the whole read when it is missing,
                 // even though the file is empty for a column whose data is inline.
+                // `types` is `encode_meta`'s, so the id must be too: pairing
+                // the bound's types with the live `meta.ids` is the reverse of
+                // the defect above (`meta.ids[i]` can name another column, or
+                // not exist once a DROP made `meta` shorter).
                 for (i, ty) in types.iter().enumerate() {
                     if is_var_buffer_type(*ty) {
                         let path = root.join(&block_dir).join(
-                            storage::definition::format::column_outline_file(meta.ids[i]),
+                            storage::definition::format::column_outline_file(encode_meta.ids[i]),
                         );
                         if !path.exists() {
                             let _ = storage::definition::format::write_synced(&path, b"");
@@ -1129,6 +1151,15 @@ impl Engine {
         // would drop a row whose window was short; clearing the whole buffer
         // would drop the rows a concurrent commit added meanwhile.
         entry.retain_buffered(|(seq, _)| !written_ids.contains(seq));
+        // This write covered every row at or before its bound, so a column
+        // retired at or before that bound will never be needed again: every
+        // later checkpoint has a bound at least as large (`bound_ts` is
+        // monotonic) and so will not select it. Dropping the cells here is what
+        // keeps a table that keeps adding and dropping columns from growing.
+        if bound_ts != u64::MAX {
+            entry.pending_rows.forget_retired_before(bound_ts);
+            entry.pending_bytes = entry.pending_rows.bytes();
+        }
         // The mark retires only when nothing is left to write and no commit
         // landed while this one ran.
         let covered = entry.mirror_epoch == epoch && entry.pending_rows.is_empty();
@@ -1362,6 +1393,34 @@ impl Engine {
             .iter()
             .map(|(seq, row)| (*seq, coerce_row(row, &coercions)))
             .collect();
+        // The buffer is keyed by column id, so each row's cells have to be
+        // attributed to the schema **it was written under** - not to the table's
+        // current one. The row id decides: `append_ts_of` gives the commit that
+        // produced it, and `schema_at` gives the column order at that ts.
+        //
+        // Resolving the live schema once and reusing it for the whole batch is
+        // the common case (every row of one commit shares it); a row with no
+        // stamp (a replay rebuilt one) falls back to the live schema, which is
+        // what wrote it.
+        let totals = self.append_totals(&table);
+        let stamps = self.append_ts(&table);
+        let live = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let segments = self.segment_row_counts(&table);
+        let ts_of =
+            |seq: usize| -> Option<u64> { append_ts_of(seq as u64, &segments, &totals, &stamps) };
+        let resolve = |ts: u64| -> Option<(Vec<u64>, Vec<Option<String>>)> {
+            match self.storage.catalog.schema_at(&table, ts) {
+                Ok(Some(m)) => Some((m.ids, m.defaults)),
+                // A bound that resolves to nothing (or a catalog error) uses the
+                // live schema: the batch was written by the commit that is
+                // committing now, whose schema is the live one.
+                _ => Some((live.ids.clone(), live.defaults.clone())),
+            }
+        };
         // spann's mem index: the row goes here, **not** into the tree
         // (`docs/SPANN_DESIGN.md` §9.2). One vector copy per row, and the next
         // dump builds the tree that covers these rows and clears the list.
@@ -1398,7 +1457,9 @@ impl Engine {
                     }
                 }
             }
-            entry.buffer_rows(rows);
+            entry.buffer_rows(rows, ts_of, resolve, || {
+                (live.ids.clone(), live.defaults.clone())
+            });
             entry.mirror_dirty = true;
             entry.mirror_epoch += 1;
         }
@@ -1419,9 +1480,9 @@ impl Engine {
     /// block writer writes - and two tables share nothing, so they run side by
     /// side. The global steps (the checkpoint ts, the index-cache reload, the
     /// catalog layout, the final `store.flush`) stay in the caller.
-    pub async fn flush_blocks(&self, checkpoint_ts: u64) -> Result<()> {
+    pub async fn flush_blocks(&self, bound_ts: u64) -> Result<()> {
         let tables = self.storage.catalog.list_tables()?;
-        self.flush_tables(&tables, checkpoint_ts, checkpoint_workers())
+        self.flush_tables(&tables, bound_ts, checkpoint_workers())
             .await
     }
 
@@ -1433,13 +1494,13 @@ impl Engine {
     pub(crate) async fn flush_tables(
         &self,
         tables: &[catalog::TableMeta],
-        checkpoint_ts: u64,
+        bound_ts: u64,
         workers: usize,
     ) -> Result<()> {
         let workers = workers.min(tables.len()).max(1);
         if workers <= 1 {
             for meta in tables {
-                self.flush_table(meta, checkpoint_ts).await?;
+                self.flush_table(meta, bound_ts).await?;
             }
             return Ok(());
         }
@@ -1456,12 +1517,12 @@ impl Engine {
             let metas: Vec<catalog::TableMeta> = tables.to_vec();
             return crate::fanout::for_each_async(metas, workers, move |meta| {
                 let engine = engine.clone();
-                async move { engine.flush_table(&meta, checkpoint_ts).await }
+                async move { engine.flush_table(&meta, bound_ts).await }
             })
             .await;
         }
         for meta in tables {
-            self.flush_table(meta, checkpoint_ts).await?;
+            self.flush_table(meta, bound_ts).await?;
         }
         Ok(())
     }
@@ -1478,17 +1539,15 @@ impl Engine {
     /// touch the in-memory registries only after each write came back. No
     /// `std::sync::Mutex` is held across an await, and no blocking pool thread
     /// ever runs more than one file write.
-    async fn flush_table(&self, meta: &catalog::TableMeta, checkpoint_ts: u64) -> Result<()> {
+    async fn flush_table(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<()> {
         let key = self.table_key(&meta.name);
         let gate = self.bottom_gate(&key);
         let _turn = gate.lock().await;
         let _held = crate::engine::statements::HeldBottom::enter(&key);
         if meta.types.iter().all(|t| column_type_of(t).is_some()) {
             let table = meta.name.clone();
-            self.flush_leaf(move |engine| {
-                engine.write_blocks_bounded_locked(&table, checkpoint_ts)
-            })
-            .await?;
+            self.flush_leaf(move |engine| engine.write_blocks_bounded_locked(&table, bound_ts))
+                .await?;
         }
         // **No index work here.** `NewTxn::CheckpointTable`
         // (`new_txn_data_impl.cpp:1438`) walks the table's blocks and flushes
@@ -1536,6 +1595,24 @@ impl Engine {
     /// last checkpoint must touch the records it already published; the next
     /// mirror preserves the value from [`dump_ts_key`].
     pub(crate) fn stamp_chunk_ts(&self, table: &str, index: &str, ts: u64) -> Result<()> {
+        self.stamp_chunk_ts_of(table, index, ts, |_, _, _| true)
+    }
+
+    /// [`Self::stamp_chunk_ts`] for a subset of the index's chunks.
+    ///
+    /// `keep(segment, chunk_id, current_value)` decides which id records are
+    /// rewritten. An import uses it to stamp **only** the chunks it just
+    /// wrote: the records of the earlier imports already name their own
+    /// transactions, and rewriting those too shifted every one of them to the
+    /// newest ts (they are per-import `AddChunkIndexID1` values, not one
+    /// family-wide stamp).
+    pub(crate) fn stamp_chunk_ts_of(
+        &self,
+        table: &str,
+        index: &str,
+        ts: u64,
+        keep: impl Fn(u32, u64, &[u8]) -> bool,
+    ) -> Result<()> {
         let table = self.qualified_table(table);
         let db_id = self.database_id_of(&table);
         let table_id = self
@@ -1548,14 +1625,21 @@ impl Engine {
         let store = self.storage.catalog.store();
         let prefix = format!("idx_chunk|{db_id}|{table_id}|{index_id}|");
         let value = ts.to_string().into_bytes();
-        for (key, _) in store.scan_prefix(prefix.as_bytes())? {
+        for (key, current) in store.scan_prefix(prefix.as_bytes())? {
             let text = String::from_utf8_lossy(&key).to_string();
             // Only the id records (numeric suffix); `…|chunk_info` and
             // `…|next_chunk_id` are owned by the mirror.
-            let Some(suffix) = text.rsplit('|').next() else {
+            // `idx_chunk|{db}|{tbl}|{index}|{segment}|{chunk}`; `…|chunk_info`
+            // and `…|next_chunk_id` have a non-numeric last field and are left
+            // to the mirror.
+            let mut parts = text[prefix.len()..].split('|');
+            let (Some(segment), Some(id), None) = (parts.next(), parts.next(), parts.next()) else {
                 continue;
             };
-            if suffix.parse::<u64>().is_ok() {
+            let (Ok(segment), Ok(id)) = (segment.parse::<u32>(), id.parse::<u64>()) else {
+                continue;
+            };
+            if keep(segment, id, &current) {
                 store.put(&key, &value)?;
             }
         }
@@ -1696,6 +1780,39 @@ impl Engine {
         // replacement has a record, so `cleanup_index_chunks` can reclaim the bytes of
         // the superseded snapshot without a reader ever losing the one it has open.
         let mut spann_superseded: Vec<(String, u32, Vec<u32>, u64)> = Vec::new();
+        // The BMP images every seal since the last publish produced, taken
+        // **once**: `SparseIndex::pending` is drained by the first segment the
+        // loop reaches, so a per-segment take left every later segment with an
+        // empty list and it fell back to the block-by-block rebuild.
+        //
+        // Only the indexes **this call** publishes: a compaction publishes one
+        // index per call, so draining every index's list here left the merged
+        // segment's segment with nothing to write on the second call and it fell
+        // back to the block-by-block rebuild.
+        let bmp_pending: std::collections::HashMap<u64, Vec<PendingSparseChunk>> = {
+            let mut by_index: std::collections::HashMap<u64, Vec<PendingSparseChunk>> =
+                Default::default();
+            let tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get(&self.table_key(table)) {
+                for im in indexes {
+                    if !im.index_type.eq_ignore_ascii_case("BMP") {
+                        continue;
+                    }
+                    if only.is_some_and(|(name, _)| name != im.name) {
+                        continue;
+                    }
+                    let Some(shared) = entry.sparse.get(&im.id) else {
+                        continue;
+                    };
+                    let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
+                    if guard.pending.is_empty() {
+                        continue;
+                    }
+                    by_index.insert(im.id, std::mem::take(&mut guard.pending));
+                }
+            }
+            by_index
+        };
         for im in indexes {
             if im.table != table && im.table != self.qualified_table(table) {
                 continue;
@@ -1732,11 +1849,6 @@ impl Engine {
                     self.column_types(table).ok()?.get(ci).cloned()
                 })
                 .unwrap_or_default();
-            let sparse = if im.index_type.eq_ignore_ascii_case("BMP") {
-                Some(self.sparse_rows_by_block(table, &im.column, crate::index_block_size(im)))
-            } else {
-                None
-            };
             // The chunk record names the transaction whose dump sealed it
             // (`SegmentIndexMeta::AddChunkIndexID1`); the port's last `DumpIndex`
             // for this index is that transaction.
@@ -1786,10 +1898,6 @@ impl Engine {
                     Some((_, ts)) => ts,
                     None => dump_ts.max(self.import_ts(table, *segment).unwrap_or(0)),
                 };
-                // A segment that still holds exactly what one `COPY` wrote gets
-                // the import's chunk layout (one per capacity for full-text, one
-                // for the whole segment for secondary and sparse).
-                let imported = self.imported_extent(table, *segment, *seg_rows).is_some();
                 // A plain `CREATE INDEX` leaves the type empty, which is the
                 // secondary default everywhere else (`is_secondary_kind`).
                 let chunks = if crate::is_secondary_kind(&im.index_type) {
@@ -1818,7 +1926,6 @@ impl Engine {
                     // dump, so merging has to happen here. The id a record already
                     // named for a block is kept (`PopulateBMPIndexInner` and
                     // `DumpMemIndex` only *take* ids from `GetAndSetNextChunkID`).
-                    let empty = Default::default();
                     let set = SegmentSet {
                         db_id: db_id.to_string(),
                         table_id: table_id.to_string(),
@@ -1826,23 +1933,88 @@ impl Engine {
                     };
                     let mut next_id =
                         self.next_index_chunk_id(&set, &index_id.to_string(), *segment);
-                    publish_bmp_chunks(
-                        &seg_dir,
-                        sparse
-                            .as_ref()
-                            .and_then(|m| m.get(segment))
-                            .cloned()
-                            .unwrap_or(empty),
-                        &crate::blocks::chunk::BmpChunkShape {
-                            width: crate::sparse_idx_width(&declared),
-                            term_bound: crate::sparse_declared_bound(&declared).unwrap_or(0),
-                            block_size: crate::index_block_size(im),
-                            segment: *segment,
-                            single_chunk: imported,
-                        },
-                        &existing_chunks,
-                        &mut next_id,
-                    )
+                    // The bytes the seal just encoded, one image per dump: the
+                    // reference's chunk **is** that image
+                    // (`BMPHandler::SaveToPtr`), so nothing is rebuilt from the
+                    // rows here.
+                    let pending: &[PendingSparseChunk] = bmp_pending
+                        .get(&(index_id as u64))
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]);
+                    // A seal is the **only** source of a BMP chunk: its bytes
+                    // are `BMPHandler::SaveToPtr`'s image, which is what the
+                    // reference's chunk holds. So nothing to publish means
+                    // nothing to write, whoever asked - a checkpoint (which
+                    // never touches an index) or a reopen's rebuild (the chunks
+                    // on disk already cover every row, so it seals nothing).
+                    //
+                    // The rows-derived form below is the one exception: a segment
+                    // with **no** chunk at all, an index that has never been
+                    // dumped. Deriving chunks over an existing family rewrote each
+                    // recorded id with the block partition instead of the BMP's
+                    // own document offsets, and a query lost the postings the
+                    // wider chunk held (`test_mem_bmp`: seven `4`s became five;
+                    // a reopen of a 35-row table wrote five 7-row chunks over the
+                    // three the dumps had produced).
+                    let has_chunk_files = std::fs::read_dir(&seg_dir).is_ok_and(|entries| {
+                        entries.flatten().any(|e| {
+                            let name = e.file_name().to_string_lossy().to_string();
+                            name.starts_with("chunk_") && name.ends_with(".idx")
+                        })
+                    });
+                    if pending.is_empty() && (has_chunk_files || !existing_chunks.is_empty()) {
+                        continue;
+                    }
+                    if pending.is_empty() {
+                        // A **checkpoint** mirrors the index without sealing it
+                        // (`NewTxn::CheckpointTable` never touches an index), so
+                        // there is no fresh image and the chunks are derived
+                        // from the rows.
+                        let by_segment = self
+                            .sparse_rows_by_block(table, &im.column, crate::index_block_size(im))
+                            .remove(segment)
+                            .unwrap_or_default();
+                        publish_bmp_chunks_from_rows(
+                            &seg_dir,
+                            by_segment,
+                            *segment,
+                            crate::sparse_declared_bound(&declared).unwrap_or(0),
+                            crate::sparse_idx_width(&declared),
+                            crate::index_block_size(im),
+                            &existing_chunks,
+                            &mut next_id,
+                        )
+                    } else {
+                        let (chunks, failed) = publish_bmp_chunks(
+                            &seg_dir,
+                            pending,
+                            *segment,
+                            &existing_chunks,
+                            &mut next_id,
+                        );
+                        if !failed.is_empty() {
+                            // Put the images nothing could write back at the
+                            // **front** of the index's queue, so the next seal
+                            // publication tries again: the queue they came from
+                            // was drained, and a chunk with no record is lost
+                            // rows once the process restarts.
+                            let key = self.table_key(table);
+                            if let Some(shared) = self
+                                .tables
+                                .lock()
+                                .unwrap()
+                                .get(&key)
+                                .and_then(|e| e.sparse.get(&(index_id as u64)))
+                                .cloned()
+                            {
+                                let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
+                                let mut requeued = failed;
+                                requeued.append(&mut guard.pending);
+                                guard.pending = requeued;
+                            }
+                        }
+                        chunks
+                    }
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                     // Written in place by the seal; its files are named after
                     // the chunk's base name, not `chunk_N.idx`. The ids come
@@ -2135,13 +2307,6 @@ impl Engine {
         Ok(())
     }
 
-    /// A sparse column's documents, grouped by segment and then by physical
-    /// block, in the BMP encoder's form: `(row id within the segment,
-    /// [(term, value)])`.
-    ///
-    /// The segment is part of the key: every segment restarts its block ids at
-    /// zero, and the reference keeps one BMP index per segment
-    /// (`idx_{id}/seg_{s}/chunk_{block}.idx`).
     pub(crate) fn sparse_rows_by_block(
         &self,
         table: &str,
@@ -2390,7 +2555,6 @@ impl Engine {
                     .unwrap_or_default()
             });
             let frame_ids = ids_at(timeline, append.commit_ts, &current_ids);
-            let defaults = self.table_defaults(&table).unwrap_or_default();
             let types = meta.types.clone();
             // A row the block files already hold is not re-appended: the frame
             // may describe a commit that reached the blocks before the crash
@@ -2402,30 +2566,107 @@ impl Engine {
                     .map(|(seq, _)| seq)
                     .collect()
             });
-            let mut batch = Vec::with_capacity(append.rows.len());
+            // The cells are attributed to the ids the frame was written with,
+            // **not** reordered onto the current schema: a cell whose column
+            // was dropped since still belongs to that column, and a checkpoint
+            // bounded before the DROP still has to write it
+            // (`docs/ALTER_CHECKPOINT_RACE.md` §5). Reordering here discarded
+            // it, which is what made a pre-DROP row read a value from the
+            // wrong column once the buffer became columnar.
+            // The frame's schema is resolved **once**: `schema_at` reads the
+            // table, scans its column records and applies the drop markers, so
+            // asking per row * per column turned a 65,536-row append into
+            // 655,360 catalog reconstructions during recovery.
+            let frame_schema = self
+                .storage
+                .catalog
+                .schema_at(&table, append.commit_ts)
+                .ok()
+                .flatten();
+            let frame_types: std::collections::HashMap<u64, String> = frame_schema
+                .as_ref()
+                .map(|m| m.ids.iter().copied().zip(m.types.iter().cloned()).collect())
+                .unwrap_or_default();
+            let live_types: std::collections::HashMap<u64, String> = current_ids
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(at, id)| (id, types.get(at).cloned().unwrap_or_default()))
+                .collect();
+            let mut attributed: Vec<(usize, std::collections::BTreeMap<u64, Value>)> =
+                Vec::with_capacity(append.rows.len());
             for (seq, text) in &append.rows {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
-                // The row is placed on the ids its frame was written with;
-                // `None` means a snapshot restore hides them, and the text is
-                // already in the schema the restore left behind.
-                let text = reorder_row_text(text, &frame_ids, &current_ids, &defaults);
-                // A row whose text form the row parser cannot rebuild is not
-                // buffered: the append buffer is the only place a row the block
-                // files do not hold can live, and the port keeps no row journal
-                // to hold its text instead.
-                if let Ok(row) = self.parse_stored_row(&table, &defaults, &types, text.as_bytes()) {
-                    batch.push((*seq as usize, row));
+                let cells: Vec<&str> = text.split('\t').collect();
+                let mut placed: std::collections::BTreeMap<u64, Value> = Default::default();
+                for (at, id) in frame_ids.iter().enumerate() {
+                    let Some(cell) = cells.get(at) else { break };
+                    // The type is the frame's own column's: the live `types` no
+                    // longer describes a column dropped since, and using the
+                    // live one would decode the cell with the wrong decoder.
+                    let frame_type = frame_types
+                        .get(id)
+                        .cloned()
+                        .or_else(|| live_types.get(id).cloned());
+                    let declared = frame_type.unwrap_or_default();
+                    if let Ok(value) = self.decode_cell(&table, &[declared], 0, cell) {
+                        placed.insert(*id, value);
+                    }
                 }
+                attributed.push((*seq as usize, placed));
             }
             // One `create` per append transaction, stamped with its commit ts.
-            self.note_append(&table, batch.len(), false, None);
-            self.settle_append_ts(&table, 1, append.commit_ts);
+            let record = self.note_append(&table, attributed.len(), false, None);
+            self.settle_append_at(&table, record, append.commit_ts);
+            // Straight into the columnar buffer, with the attribution the frame
+            // gave: the live schema only supplies the defaults a row's own
+            // schema could not.
+            let live_defaults = self.table_defaults(&table).unwrap_or_default();
+            let live_ids = current_ids.clone();
+            // spann's mem list is fed from the rows too (`refresh_block_mirror_extra`
+            // does it on the live path), so a replayed row has to land there or
+            // the next query cannot see it: the tree only covers what the last
+            // dump built.
+            // The column's position in `live_ids` comes from the live schema by
+            // name: the frame's cells are already attributed by id, and
+            // `attributed` is keyed by id too.
+            let live_names = self.table_schema(&table).unwrap_or_default();
+            let spann_columns: Vec<(u64, u64)> = self
+                .storage
+                .catalog
+                .indexes_of_table(&table)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
+                .filter_map(|im| {
+                    let position = live_names.iter().position(|c| *c == im.column)?;
+                    Some((im.id, *live_ids.get(position)?))
+                })
+                .collect();
+            {
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(self.table_key(&table)).or_default();
+                for (index_id, column_id) in &spann_columns {
+                    let mem = entry.spann_mem.entry(*index_id).or_default();
+                    for (seq, cells) in &attributed {
+                        let Some(value) = cells.get(column_id) else {
+                            continue;
+                        };
+                        let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
+                        if !vector.is_empty() {
+                            mem.push((*seq as u64, vector));
+                        }
+                    }
+                }
+                entry.buffer_attributed_rows(attributed, &live_ids, &live_defaults);
+                entry.mirror_dirty = true;
+                entry.mirror_epoch += 1;
+            }
             if !rows.contains_key(&table) {
                 order.push(table.clone());
             }
-            rows.entry(table).or_default().extend(batch);
         }
         for delete in &deletes {
             let table = self.qualified_table(&delete.table);
@@ -2768,39 +3009,35 @@ impl Engine {
     /// the reference's block **buffer** gains the column instead. Append the
     /// default cell to each buffered row, so the mirror writes it with the
     /// block.
-    pub(crate) fn patch_buffered_add_columns(&self, table: &str, first: usize, defaults: &[Value]) {
+    pub(crate) fn patch_buffered_add_columns(&self, table: &str, ids: &[u64], defaults: &[Value]) {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get_mut(&key) else {
             return;
         };
-        for (_, cells) in entry.pending_rows.iter_mut() {
-            cells.truncate(first);
-            cells.extend(defaults.iter().cloned());
+        // Keyed by id, so this is one vector per new column rather than a
+        // positional rewrite of every row: the buffer's other columns are not
+        // touched at all.
+        for (id, default) in ids.iter().zip(defaults) {
+            entry.pending_rows.add_column(*id, default.clone());
         }
-        // The cells changed shape, so the running byte total is stale: an added
-        // column with a large default would otherwise be uncharged, and the
-        // buffer could cross the quota before anything counted it. DDL is off
-        // the write path, so the extra pass is affordable.
-        entry.retain_buffered(|_| true);
+        entry.pending_bytes = entry.pending_rows.bytes();
     }
 
-    /// The buffer half of `DropColumnsData`: a buffered row loses the cell the
-    /// schema no longer has (`position` is where the column was).
-    pub(crate) fn patch_buffered_drop_column(&self, table: &str, position: usize) {
+    /// The buffer half of `DropColumnsData`: the column is **retired by id**.
+    ///
+    /// Its cells stay until a checkpoint bounded at or after `retired_at` has
+    /// run (`PendingRows::forget_retired_before`): a bound before the DROP
+    /// still has to write that column, and this buffer is the only copy of the
+    /// rows that never reached a block. Removing the cells here is what used to
+    /// shift every later column one slot left.
+    pub(crate) fn patch_buffered_drop_column(&self, table: &str, id: u64, retired_at: u64) {
         let key = self.table_key(table);
         let mut tables = self.tables.lock().unwrap();
         let Some(entry) = tables.get_mut(&key) else {
             return;
         };
-        for (_, cells) in entry.pending_rows.iter_mut() {
-            if position < cells.len() {
-                cells.remove(position);
-            }
-        }
-        // The dropped column's bytes are still in the running total, which would
-        // make the quota think the buffer is bigger than it is and drain early.
-        entry.retain_buffered(|_| true);
+        entry.pending_rows.retire(id, retired_at);
     }
 
     /// `Cleanup` for an `ALTER TABLE … DROP COLUMN`: removes the block column
@@ -2916,7 +3153,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&key)
-            .map(|entry| entry.buffered_row(seq).is_some())
+            .map(|entry| entry.pending_rows.index_of(seq).is_some())
             .unwrap_or(false)
     }
 
@@ -3930,11 +4167,22 @@ impl Engine {
     /// (the reference's `BufferObject` for the blocks they land in).
     pub(crate) fn pending_rows_of(&self, table: &str) -> Vec<(usize, Vec<Value>)> {
         let key = self.table_key(table);
+        // A reader is positional against the table's **live** schema: that is
+        // the `Vec<Value>` every caller of this method destructures by index.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let fill = self.fill_values(table, &order);
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .map(|e| e.pending_rows.clone())
+            .map(|e| {
+                (0..e.pending_rows.len())
+                    .filter_map(|k| {
+                        let row = e.pending_rows.row(k, &order, &fill)?;
+                        Some((e.pending_rows.row_id(k), row))
+                    })
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -3959,11 +4207,17 @@ impl Engine {
         if entry.pending_rows.is_empty() {
             return Default::default();
         }
+        // The caller indexes the row by **position** against the live schema,
+        // so the cells are laid out in that order here - not the buffer's own.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let fill = self.fill_values(table, &order);
         ids.iter()
             .filter_map(|seq| {
+                let k = entry.pending_rows.index_of(*seq)?;
                 entry
-                    .buffered_row(*seq)
-                    .map(|values| (*seq, values.clone()))
+                    .pending_rows
+                    .row(k, &order, &fill)
+                    .map(|values| (*seq, values))
             })
             .collect()
     }
@@ -3973,11 +4227,34 @@ impl Engine {
     /// this is one lookup plus the row's own clone.
     pub(crate) fn pending_row(&self, table: &str, seq: usize) -> Option<Vec<Value>> {
         let key = self.table_key(table);
+        // The row is rendered in the **live** schema, which is what every reader
+        // of this accessor encodes against: a column dropped since stays in the
+        // buffer but must not take a slot, or the retired value lands in the
+        // surviving column's position.
+        let (order, fill) = self
+            .storage
+            .catalog
+            .get_table_by_name(table)
+            .ok()
+            .flatten()
+            .map(|meta| {
+                let fill = meta
+                    .defaults
+                    .iter()
+                    .map(|d| {
+                        d.as_deref()
+                            .map(|text| Value::from_literal(&default_literal(text)))
+                            .unwrap_or(Value::Null)
+                    })
+                    .collect::<Vec<_>>();
+                (meta.ids, fill)
+            })
+            .unwrap_or_default();
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.buffered_row(seq).cloned())
+            .and_then(|e| e.buffered_row(seq, &order, &fill))
     }
 
     /// The stored text of one buffered row, for the paths that read a table the
@@ -4038,18 +4315,27 @@ impl Engine {
         // whole row first (`pending_rows_of`) copied the columns this read does
         // not want - a 20,000-row point filter copied 20,000 varchar strings to
         // throw them away.
+        // The caller indexes the row by **position**, so materialise it in the
+        // live schema's column order.
+        let order = self.table_schema_ids(&table).unwrap_or_default();
+        let fill = self.fill_values(&table, &order);
         let tables = self.tables.lock().unwrap();
         let entry = tables.get(&key)?;
         let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(entry.pending_rows.len());
-        for (seq, values) in &entry.pending_rows {
-            if dead.contains(&(*seq as u64)) {
+        for k in 0..entry.pending_rows.len() {
+            let seq = entry.pending_rows.row_id(k);
+            if dead.contains(&(seq as u64)) {
                 continue;
             }
             if let Some(view) = &view {
-                if !view.covers(*seq, read_ts) {
+                if !view.covers(seq, read_ts) {
                     continue;
                 }
             }
+            let Some(values) = entry.pending_rows.row(k, &order, &fill) else {
+                continue;
+            };
+            let values = &values;
             let cells: Vec<Value> = values
                 .iter()
                 .enumerate()
@@ -4058,7 +4344,7 @@ impl Engine {
                     _ => v.clone(),
                 })
                 .collect();
-            out.push((*seq, cells));
+            out.push((seq, cells));
         }
         drop(tables);
         out.sort_by_key(|(seq, _)| *seq);
@@ -4263,6 +4549,8 @@ impl Engine {
         // scan (20k buffered rows made every query 20 ms slower).
         let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
         let view = self.append_view(&table, read_ts);
+        let order = self.table_schema_ids(&table).unwrap_or_default();
+        let fill = self.fill_values(&table, &order);
         let buffered_empty = {
             let tables = self.tables.lock().unwrap();
             tables
@@ -4273,7 +4561,17 @@ impl Engine {
         if !buffered_empty {
             let tables = self.tables.lock().unwrap();
             let entry = tables.get(&self.table_key(&table));
-            for (seq, values) in entry.map(|e| e.pending_rows.as_slice()).unwrap_or(&[]) {
+            let rows: Vec<(usize, Vec<Value>)> = entry
+                .map(|e| {
+                    (0..e.pending_rows.len())
+                        .filter_map(|k| {
+                            let row = e.pending_rows.row(k, &order, &fill)?;
+                            Some((e.pending_rows.row_id(k), row))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for (seq, values) in &rows {
                 let seq = *seq;
                 if dead.contains(&(seq as u64)) {
                     continue;
@@ -4370,11 +4668,19 @@ impl Engine {
                 Some(entry) if !entry.pending_rows.is_empty() => {
                     let requested: std::collections::HashSet<usize> =
                         rows.iter().map(|seq| *seq as usize).collect();
-                    entry
-                        .pending_rows
-                        .iter()
-                        .filter(|(seq, _)| requested.contains(seq))
-                        .cloned()
+                    (0..entry.pending_rows.len())
+                        .filter_map(|k| {
+                            let seq = entry.pending_rows.row_id(k);
+                            requested.contains(&seq).then(|| {
+                                (
+                                    seq,
+                                    entry
+                                        .pending_rows
+                                        .row_or_null(k, &meta.ids)
+                                        .unwrap_or_default(),
+                                )
+                            })
+                        })
                         .collect()
                 }
                 _ => Default::default(),
@@ -5059,12 +5365,19 @@ impl Engine {
         let Some(entry) = tables.get(&key) else {
             return;
         };
-        for (seq, values) in &entry.pending_rows {
-            if segment.is_some_and(|only| (*seq as u64 >> 32) as u32 != only) {
+        // The buffer is columnar, so the column is picked by position through
+        // the live schema first, then its cells are walked in row order.
+        let order = self.table_schema_ids(table).unwrap_or_default();
+        let Some(id) = order.get(column).copied() else {
+            return;
+        };
+        for k in 0..entry.pending_rows.len() {
+            let seq = entry.pending_rows.row_id(k);
+            if segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
                 continue;
             }
-            if let Some(value) = values.get(column) {
-                sink(*seq, &mirror_cell_text(value));
+            if let Some(value) = entry.pending_rows.cell(k, id) {
+                sink(seq, &mirror_cell_text(value));
             }
         }
     }
@@ -5297,7 +5610,13 @@ impl Engine {
                 return Ok((0, Vec::new()));
             }
             let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
-            Some(encode_hnsw_chunk_from(mem.index(), &labels))
+            // `HnswIndexInMem::begin_row_id_`: the chunk's record names the
+            // memory index's *first* row, not the segment's base - an
+            // incremental dump of one segment starts where the previous
+            // chunk ended (`GetChunkIndexMetaInfo`).
+            let first = mem.rows().first().copied().unwrap_or(0);
+            let (count, chunk) = encode_hnsw_chunk_from(mem.index(), &labels);
+            Some((chunk, first, count))
         } else {
             None
         };
@@ -5339,18 +5658,47 @@ impl Engine {
             if !new_chunk && !force_append && !chunks.is_empty() {
                 continue;
             }
+            // An **incremental** dump only writes the segments whose memory
+            // form holds rows the recorded chunks do not cover. The reference's
+            // `DumpMemIndex` dumps a segment's `MemIndex`, which holds exactly
+            // the rows appended since that segment's last dump, so a segment
+            // already covered contributes nothing. Without this a multi-segment
+            // table re-chunked its earlier segments on every import
+            // (`write_hnsw_chunk` rebuilds per segment once the buffered graph
+            // spans more than one) - three segments took six chunks instead of
+            // three, and a query then merged two generations of one segment.
+            if new_chunk && !force_append {
+                let covered: u64 = catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .find(|(seg, _)| seg == segment)
+                .and_then(|(_, list)| list.into_iter().map(|(_, info)| info.row_count).max())
+                .unwrap_or(0);
+                if covered >= *rows {
+                    continue;
+                }
+            }
+            // `(chunk bytes, its first row id, vector count)`. The row id is
+            // the chunk's own, so a second chunk of one segment starts where
+            // the first ended.
             let built = match &from_memory {
-                Some((count, chunk)) => Some((*count, chunk.clone())),
+                Some((chunk, first, count)) => Some((chunk.clone(), *first, *count)),
                 None => {
                     if *rows == 0 {
                         None
                     } else {
                         self.hnsw_chunk(&table, &column, &options, Some(*segment))
                             .ok()
+                            .map(|(count, chunk)| (chunk, u64::from(*segment) << 32, count))
                     }
                 }
             };
-            let Some((count, chunk)) = built else {
+            let Some((chunk, base_row_id, count)) = built else {
                 continue;
             };
             // `GetAndSetNextChunkID`: take the id and raise the counter in one
@@ -5376,11 +5724,14 @@ impl Engine {
             // directory, so the dump publishes the chunk it just wrote.
             self.record_chunk(
                 &set,
-                index_id as u64,
-                chunk_id,
-                *segment,
-                count as u64,
-                chunk.len() as u64,
+                crate::engine::RecordedChunk {
+                    index_id: index_id as u64,
+                    chunk_id,
+                    segment: *segment,
+                    base_row_id,
+                    row_count: count as u64,
+                    index_size: chunk.len() as u64,
+                },
             );
             written += count;
             // The chunks this one supersedes: the reference's
@@ -6525,14 +6876,25 @@ impl Engine {
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
     /// `column`'s vectors: a deterministic k-means partitions them into
     /// `centroid_count` parts (task #70).
-    pub(crate) fn ivf_chunk(
+    /// The IVF chunk of one segment from in-segment offset `from` on.
+    ///
+    /// `PopulateIvfIndexInner` builds from the segment's blocks, but the
+    /// **incremental** dump the quota and the append path perform covers only
+    /// the rows written since the previous dump of that segment
+    /// (`IVFIndexInMem::GetChunkIndexMetaInfo` reports `begin_row_id_` and
+    /// `input_row_count_`). The offsets stay segment-relative
+    /// (`RowID(segment, offset)`), so starting at `from` is what makes the
+    /// second chunk's `base_row_id` follow the first's.
+    pub(crate) fn ivf_chunk_from(
         &self,
         table: &str,
         column: &str,
         options: &IvfOptions,
         segment: Option<u32>,
+        from: u32,
     ) -> Result<(usize, Vec<u8>)> {
-        let vectors = self.column_vectors(table, column, segment)?;
+        let mut vectors = self.column_vectors(table, column, segment)?;
+        vectors.retain(|(label, _)| *label >= from);
         if vectors.is_empty() {
             return Err(Error::Invalid(format!(
                 "no vectors to index in '{table}.{column}'"
@@ -6776,9 +7138,26 @@ impl Engine {
         }))
     }
 
-    /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
-    /// `…/idx_{id}/seg_0/chunk_0.idx`, returning how many vectors were written.
+    /// `PopulateIvfIndexInner`: writes one chunk per segment covering the
+    /// segment's **whole** vector set.
+    ///
+    /// This is the shape a compaction and an import use - `PopulateIndex` is
+    /// handed a `SegmentMeta` and builds from its blocks, so the chunk's
+    /// `base_row_id` is `RowID(segment, 0)` and its row count the segment's.
+    /// A `DumpIndex` is the other shape: it dumps the segment's **memory
+    /// index** and therefore only the rows written since the previous dump
+    /// ([`Self::write_ivf_tail`]).
     pub fn write_ivf_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_ivf_chunks(table, index_name, false)
+    }
+
+    /// `DumpMemIndex` -> `DumpSegmentMemIndex`'s IVF case: one chunk covering
+    /// the rows the segment's memory index buffered.
+    pub fn write_ivf_tail(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_ivf_chunks(table, index_name, true)
+    }
+
+    fn write_ivf_chunks(&self, table: &str, index_name: &str, tail: bool) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -6807,19 +7186,20 @@ impl Engine {
             if rows == 0 {
                 continue;
             }
-            // A checkpoint mirrors an index whose chunks already cover the
-            // segment: the chunk is the whole segment's vectors, so rewriting it
-            // under a fresh id would append a duplicate to the chunk list every
-            // tick. "A chunk exists" is not the same as "the segment is
-            // covered" - an insert after the first dump leaves vectors the
-            // existing chunk does not hold, and `seal_index_tail` clears
-            // `ivf_mem` right after this returns, so skipping the dump lost
-            // them.
-            // Each IVF dump writes the segment's **whole** vector set, so the
-            // chunks are successive snapshots of it and their row counts must
-            // not be summed (100 rows, then 200, sums to 300). The newest
-            // snapshot is the coverage.
-            let covered: u64 = catalog::layout::read_index_chunks(
+            // `DumpMemIndex` dumps the segment's **memory index**, which holds
+            // only the rows appended since that segment's last dump
+            // (`IVFIndexInMem::GetChunkIndexMetaInfo` reports
+            // `begin_row_id_`/`input_row_count_`, and `AppendMemIndex` starts a
+            // new one at the first row no chunk covers). Writing the whole
+            // segment again made a 130-row table's second dump a 100-row chunk
+            // where the reference's was the 30 rewritten/appended rows, so the
+            // chunks no longer tiled the segment.
+            // `PopulateIndex(…, kCreateIndex)` is what the reference's
+            // `CREATE INDEX` runs, so its chunk exists before any dump. The port
+            // defers that work to the first dump, so a segment with **no**
+            // chunk yet is still populated as a whole - and its record then
+            // replaces (there is nothing to extend).
+            let recorded: u64 = catalog::layout::read_index_chunks(
                 self.storage.catalog.store().as_ref(),
                 &db_id.to_string(),
                 &meta.id.to_string(),
@@ -6828,12 +7208,23 @@ impl Engine {
             .unwrap_or_default()
             .into_iter()
             .find(|(id, _)| *id == segment)
-            .and_then(|(_, chunks)| chunks.into_iter().map(|(_, info)| info.row_count).max())
+            .map(|(_, chunks)| chunks.iter().map(|(_, info)| info.row_count).sum())
             .unwrap_or(0);
-            if covered >= rows {
-                continue;
-            }
-            let (count, chunk) = self.ivf_chunk(&table, &column, &options, Some(segment))?;
+            let populate_whole = !tail || recorded == 0;
+            let from = if populate_whole {
+                0
+            } else {
+                let (first, rows) = self.ivf_memory_tail(&table, index_id as u64, segment);
+                if rows == 0 {
+                    // `DumpMemIndex` returns "empty mem index" before a chunk
+                    // is allocated, and so leaves no record either.
+                    continue;
+                }
+                first
+            };
+            let (count, chunk) =
+                self.ivf_chunk_from(&table, &column, &options, Some(segment), from)?;
+            let base_offset = from;
             let dir = self.blocks_root().join(format!(
                 "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                 meta.id
@@ -6853,27 +7244,88 @@ impl Engine {
             })?;
             // `AddNewChunkIndex1`: the reader enumerates this record, not the
             // directory.
+            // `index_size` is 0 in the record: `PopulateIvfIndexInner` passes
+            // `0 /*index_size*/` to `AddNewChunkIndex1`, and the reader treats
+            // zero as "use the file's own size".
+            // `base_row_id` is the chunk's **first row**, not the segment's
+            // base: a segment dumped twice has two chunks and the second
+            // starts where the first ended (`ChunkIndexMetaInfo::base_row_id_`
+            // is the memory index's `begin_row_id_`).
             let record = catalog::layout::IndexChunk {
                 chunk_id,
                 base_name: String::new(),
-                base_row_id: u64::from(segment) << 32,
+                base_row_id: (u64::from(segment) << 32) | u64::from(base_offset),
                 row_count: count as u64,
                 term_count: 0,
-                index_size: chunk.len() as u64,
-                commit_ts: self.txn.current_ts().max(1),
+                index_size: 0,
+                commit_ts: crate::engine::chunk_commit_ts(self),
             };
-            let index = catalog::layout::IndexSegment {
-                index_id: index_id as u64,
-                segment_id: segment,
-                chunks: vec![record.clone()],
-            };
-            let _ = self
-                .storage
-                .catalog
-                .append_index_chunk(&set, &index, &record);
+            if !populate_whole {
+                // A dump's chunk **extends** the segment's coverage, so it is
+                // appended like any other (`AddNewChunkIndex1`); replacing the
+                // list would drop the earlier chunk's rows.
+                self.record_chunk(
+                    &set,
+                    crate::engine::RecordedChunk {
+                        index_id: index_id as u64,
+                        chunk_id,
+                        segment,
+                        base_row_id: record.base_row_id,
+                        row_count: record.row_count,
+                        index_size: 0,
+                    },
+                );
+            } else {
+                // `PopulateIvfIndexInner`: one record per segment
+                // (`AddNewChunkIndex1` after `RemoveChunkIDs`). The chunk covers
+                // the segment's whole vector set, so a second record would
+                // describe the same rows twice.
+                let _ = self.storage.catalog.replace_segment_chunks(
+                    &set,
+                    index_id as u64,
+                    segment,
+                    std::slice::from_ref(&record),
+                );
+            }
             written += count;
         }
         Ok(written)
+    }
+
+    /// The rows one segment's IVF **memory index** holds: `(first in-segment
+    /// offset, how many)`.
+    ///
+    /// `IVFIndexInMem` is created at `AppendMemIndex`'s `base_row_id` and grows
+    /// by the rows each append feeds it, so a dump covers exactly the rows
+    /// written since the segment's previous dump
+    /// (`IVFIndexInMem::GetChunkIndexMetaInfo` -> `ChunkIndexMetaInfo{begin_row_id_,
+    /// input_row_count_}`). The chunk's offsets are segment-relative, so the
+    /// first entry of `ivf_mem` is the tail's `begin_row_id`.
+    ///
+    /// A dump with no buffered rows contributes nothing: `DumpMemIndex` returns
+    /// "empty mem index" before the chunk is allocated.
+    fn ivf_memory_tail(&self, table: &str, index_id: u64, segment: u32) -> (u32, usize) {
+        let key = self.table_key(table);
+        let tail = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.ivf_mem.get(&index_id))
+            .map(|rows| rows.iter().map(|(seq, _)| *seq).collect::<Vec<_>>())
+            .unwrap_or_default();
+        // Only this segment's rows: the memory map is per index, and a row of
+        // another segment is another chunk's job.
+        let mut offsets: Vec<u32> = tail
+            .iter()
+            .filter(|seq| (**seq >> 32) as u32 == segment)
+            .map(|seq| (*seq & 0xffff_ffff) as u32)
+            .collect();
+        if offsets.is_empty() {
+            return (0, 0);
+        }
+        offsets.sort_unstable();
+        (offsets[0], offsets.len())
     }
 
     /// Reads back a mirror written by [`Self::write_ivf_index`], returning
@@ -7331,11 +7783,14 @@ impl Engine {
         // the next successful optimize.
         self.record_chunk(
             &set,
-            index_id,
-            next,
-            0,
-            merged.doc_num() as u64,
-            bytes.len() as u64,
+            crate::engine::RecordedChunk {
+                index_id,
+                chunk_id: next,
+                segment: 0,
+                base_row_id: 0,
+                row_count: merged.doc_num() as u64,
+                index_size: bytes.len() as u64,
+            },
         );
         Ok(Some(ChunkRewrite {
             segment: 0,
@@ -7385,11 +7840,14 @@ impl Engine {
             // is what the chunk covers; `count` here is the token total.
             self.record_chunk(
                 &set,
-                index_id,
-                chunk_id,
-                0,
-                docs_len as u64,
-                bytes.len() as u64,
+                crate::engine::RecordedChunk {
+                    index_id,
+                    chunk_id,
+                    segment: 0,
+                    base_row_id: 0,
+                    row_count: docs_len as u64,
+                    index_size: bytes.len() as u64,
+                },
             );
             // `SegmentIndexMeta::SavePlaidGlobalCentroids`: the trained
             // centroids and their quantizer live in a sidecar next to the
@@ -7468,11 +7926,14 @@ impl Engine {
         // The record's `row_cnt_` is the document count, not the token total.
         self.record_chunk(
             &set,
-            index_id,
-            next,
-            0,
-            fresh.len() as u64,
-            bytes.len() as u64,
+            crate::engine::RecordedChunk {
+                index_id,
+                chunk_id: next,
+                segment: 0,
+                base_row_id: 0,
+                row_count: fresh.len() as u64,
+                index_size: bytes.len() as u64,
+            },
         );
         Ok(indexed as usize + total)
     }
@@ -7551,13 +8012,13 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 /// whole declared type twice per value - 16.7 M `String`s on an 8 M-row,
 /// two-column `COPY`.
 #[derive(Clone, Copy)]
-enum Coercion {
+pub(crate) enum Coercion {
     None,
     Narrow(fn(i64) -> i64),
     RoundHalf { bf16: bool },
 }
 
-fn coercion_of(ty: &str) -> Coercion {
+pub(crate) fn coercion_of(ty: &str) -> Coercion {
     let upper = ty.trim().to_ascii_uppercase();
     let head = upper
         .split('(')
@@ -7584,7 +8045,7 @@ fn coercion_of(ty: &str) -> Coercion {
     }
 }
 
-fn coerce_row(row: &[Value], coercions: &[Coercion]) -> Vec<Value> {
+pub(crate) fn coerce_row(row: &[Value], coercions: &[Coercion]) -> Vec<Value> {
     // A row whose columns all pass through is handed over as it is: this runs
     // for every row of every `COPY`, and the clone is the only cost.
     if coercions.iter().all(|c| matches!(c, Coercion::None)) {

@@ -950,7 +950,9 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
                     None => Value::Null,
                 })
                 .collect();
-            engine.patch_buffered_add_columns(&full, first, &added);
+            // Keyed by the ids the replayed DDL created, not by position.
+            let added_ids: Vec<u64> = meta.ids.iter().copied().skip(first).collect();
+            engine.patch_buffered_add_columns(&full, &added_ids, &added);
             Vec::new()
         }
         _ => {

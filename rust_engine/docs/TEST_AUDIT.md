@@ -2,19 +2,23 @@
 
 > **子目标 S4 · 用例级覆盖不漏**｜纲领见 [`PORTING.md`](PORTING.md) §5
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 16, `not ported` 8, `ported` 940。
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1020** 个，状态分布（逐行重算）：`excluded` 48, `exempt` 16, `not ported` 8, `ported` 948。
 
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
 - `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及**只测第三方 API 本身**的夹具——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 自己的 `TransactionDB` 环境、后台线程池。它们要覆盖的**行为**由 native 等价实现兜住，并在 `ported` 行给出映射：事务型 KV → `storage` 的 `txn_kv`（`kv_store0`..`kv_store5`、`wal`、`txn_conflict_same_key_snapshot_isolation` 全部通过，`kv_store1` 按参考的 `DISABLED_SLOW_` 标 `#[ignore]`；`kv_store6` 在 `executor` 的 `kv_ut`），线程池 → `bg_task`。
-- 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
+- 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例在 Rust 用 `#[ignore]` 表达，用例名本身不带 `disabled_` 前缀（名字描述被测行为，运行与否由 `--ignored` 在运行期决定，和 pytest 的 `-m slow` 同义）。`#[ignore]` 的理由串以分类前缀开头：`slow:`（参考的 `DISABLED_SLOW_`，含用例全名映射）、`bench:`（计时/吞吐探针，无断言或断言与机器相关）、`external:`（需要 MinIO 等外部服务）、`diagnostic:`（只打印指标）、`golden:`（需要参考二进制产物）、`stress:`（并发压力轮次）、`known-defect:`（已定位未修的行为差异）。理由串只是给人读的：libtest 的过滤参数只匹配**用例名**，`cargo test -- --ignored slow:` 不会按理由筛（它会把 `slow:` 当作名字片段）。所以要看某个分类跑什么，用 `cargo test -- --ignored --list` 列出全部被忽略的用例，再看各自的 `#[ignore]` 理由；CI 的 `slow:` 门禁正是把非 `slow:` 的用例名逐个 `--skip` 掉（`.github/workflows/rust_engine.yml` 的 skip 列表就是这份分类的镜像）。
 
 另有一类 `not ported`（7 行，存储缓冲层：`BufferObj`/`BufferHandle`/`BufferManager` 已整体去掉，块改为 mmap 直接映射），它们不是缺口，是 §3.1 的设计变更；类层面若有 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
 **最近一次核对（2026-10-28）**：脚本逐行读本表，取映射列里的 Rust 用例名，在 `rust_engine/crates` 下检查
 `fn <name>` 是否存在——940 个 `ported` 行全部命中，没有失效映射；再把每行的 `#[ignore]` 与 C++ 用例的
 `DISABLED_` 前缀对比，唯一不同的一组是 `s3_client_minio_ut` / `virtual_store_ut` 的 5 个用例（参考需要
-MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 显式打开）。事务层（§2.1）的对应关系：
+MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 显式打开）。
+
+**2026-11-16 复核**：重跑上面的脚本，`ported` 行仍全部命中；`src/unit_test` 现有 1029 个用例、本表原有 1012 行，
+差额是 `bmw_long_query_ut.cpp` 的 7 个 `DISABLED_SLOW_LongQuery*` 与 `query_match_ut.cpp` 的 `bmw_heap_differential`
+（`#3535` 引入，晚于本表成文），已补在第 1013–1020 行。事务层（§2.1）的对应关系：
 `storage/txn/conflict_check_ut` 1/1、`new_catalog/new_txn_mgr_ut` 2/2（2 个 `DISABLED_SLOW_`）、
 `storage/txn/{table,database,system}_snapshot_ut` 14/14、`new_catalog/cleanup_rollback_txn` 1/1、
 `new_request/conflict_request_ut` 10/10。
@@ -216,7 +220,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
 | 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | ported | `executor` `global_resource_usage::reference_suite::usage_test` |
 | 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `executor` `request_ut::infinity_facade_create_database_table_insert_select` |
-| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `executor` `engine::tests_ut::tests::disabled_slow_chaos_test`（`#[ignore]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
+| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | ported | `executor` `engine::tests_ut::tests::chaos_test`（`#[ignore = "slow: …"]`，`INFINITY_CHAOS_SECONDS` 可缩短） |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `parser` `parser::tests::float_serialize_test_precision` |
 | 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | ported | `expression` `json::tests::float_serialize_test_json` |
 | 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | ported | `expression` `json::tests::float_serialize_test_json_hex_float` |
@@ -574,9 +578,9 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 551 | `src/unit_test/storage/invertedindex/fst/fst_ut.cpp` | `FstTest` | `Iterate` | ported | `storage` `invertedindex::format::tests::fst_iterate_with_bounds` |
 | 552 | `src/unit_test/storage/invertedindex/fst/registry_ut.cpp` | `RegistryTest` | `InsertAndFind` | ported | `storage` `fst_registry::tests::insert_and_find` |
 | 553 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `Chunk` | ported | `executor` `engine::tests_ut::tests::memory_indexer_builds_the_reference_postings` |
-| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | ported | `executor` `engine::tests_ut::tests::disabled_slow_memory`（`#[ignore]`） |
+| 554 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_Memory` | ported | `executor` `engine::tests_ut::tests::memory_indexer_memory`（`#[ignore = "slow: …"]`） |
 | 555 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `SpillLoadTest` | ported | `executor` `invertedindex::search::memory_indexer_ut::spill_load_test` |
-| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | ported | `executor` `engine::tests_ut::tests::disabled_slow_seek_position`（`#[ignore]`） |
+| 556 | `src/unit_test/storage/invertedindex/memory_indexer_ut.cpp` | `MemoryIndexerTest` | `DISABLED_SLOW_SeekPosition` | ported | `executor` `engine::tests_ut::tests::seek_position`（`#[ignore = "slow: …"]`） |
 | 557 | `src/unit_test/storage/invertedindex/posting_merger_ut.cpp` | `PostingMergerTest` | `Basic` | ported | `executor` `posting_merger_ut::basic` |
 | 558 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `test1` | ported | `storage` `posting_writer_ut::test1` |
 | 559 | `src/unit_test/storage/invertedindex/posting_writer_ut.cpp` | `PostingWriterTest` | `tf_after_skip_to_across_segments` | ported | `executor` `posting_writer_ut::tf_after_skip_to_across_segments` |
@@ -647,8 +651,8 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 624 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask_ut.cpp` | `HnswAlgBitmaskTest` | `test1` | ported | `index` `vector::reference_suite::filtered_search_honours_the_bitmask` |
 | 625 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `test_memory` | ported | `index` `hnsw_handler::reference_suite::test_memory` |
 | 626 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `test_compress` | ported | `index` `hnsw_handler::reference_suite::test_compress` |
-| 627 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_SLOW_test_load` | ported | `index` `vector::reference_suite::disabled_slow_test_load`（`#[ignore]`） |
-| 628 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_RANDOME_test_parallel` | ported | `index` `vector::reference_suite::disabled_random_test_parallel`（`#[ignore]`） |
+| 627 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_SLOW_test_load` | ported | `index` `vector::reference_suite::hnsw_save_load_search`（`#[ignore = "slow: …"]`） |
+| 628 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_handler_ut.cpp` | `HnswHandlerTest` | `DISABLED_RANDOME_test_parallel` | ported | `index` `vector::reference_suite::hnsw_concurrent_read_write`（`#[ignore = "slow: …"]`） |
 | 629 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_sparse_ut.cpp` | `HnswSparseTest` | `test1` | ported | `index` `vector::reference_suite::sparse_ip_hnsw_roundtrip` |
 | 630 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_1` | ported | `index` `vector::reference_suite::plain_l2_self_recall` |
 | 631 | `src/unit_test/storage/knnindex/knn_hnsw/test_hnsw_ut.cpp` | `HnswAlgTest` | `test_plain_2` | ported | `index` `vector::reference_suite::plain_cos_self_recall` |
@@ -664,13 +668,13 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 641 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test_avg` | ported | `index` `lsg::tests::avg_is_at_least_the_exhaustive_topk_mean` |
 | 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported | `executor` `engine::tests_ut::tests::lsg_hnsw_keeps_self_query_recall` |
 | 643 | `src/unit_test/storage/knnindex/knn_hnsw/test_lvq_ut.cpp` | `HnswLVQTest` | `test1` | ported | `index` `lvq::tests::reconstruction_error_is_below_two_percent` |
-| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | ported | `index` `quantizer_perf::disabled_slow_flat_lvq` (`#[ignore]`: C++ DISABLED_SLOW_flat_lvq) |
-| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | ported | `index` `quantizer_perf::disabled_slow_flat_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_flat_rabitq) |
-| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | ported | `index` `quantizer_perf::disabled_slow_hnsw_lvq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_lvq) |
-| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | ported | `index` `quantizer_perf::disabled_slow_hnsw_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_rabitq) |
-| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | ported | `index` `quantizer_perf::disabled_slow_hnsw_lsg_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_hnsw_lsg_rabitq) |
-| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | ported | `index` `quantizer_perf::disabled_slow_compress_hnsw_to_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_compress_hnsw_to_rabitq) |
-| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | ported | `index` `quantizer_perf::disabled_slow_compress_lsg_to_rabitq` (`#[ignore]`: C++ DISABLED_SLOW_compress_lsg_to_rabitq) |
+| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | ported | `index` `quantizer_perf::flat_lvq` (`#[ignore = "slow: …"]`) |
+| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | ported | `index` `quantizer_perf::flat_rabitq` (`#[ignore = "diagnostic: …"]`：参考只打印 recall、断言被注释，端口按同样口径只报告) |
+| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | ported | `index` `quantizer_perf::hnsw_lvq` (`#[ignore = "slow: …"]`) |
+| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | ported | `index` `quantizer_perf::hnsw_rabitq` (`#[ignore = "diagnostic: …"]`，同上) |
+| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | ported | `index` `quantizer_perf::hnsw_lsg_rabitq` (`#[ignore = "diagnostic: …"]`，同上) |
+| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | ported | `index` `quantizer_perf::compress_hnsw_to_rabitq` (`#[ignore = "diagnostic: …"]`：Plain 段仍断言 0.9，RaBitQ 段只报告) |
+| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | ported | `index` `quantizer_perf::compress_lsg_to_rabitq` (`#[ignore = "diagnostic: …"]`，同上) |
 | 651 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_simple` | ported | `index` `rabitq::tests::centroid_is_the_rotated_mean` |
 | 652 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_compress` | ported | `index` `rabitq::tests::test_compress` |
 | 653 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_distance` | ported | `index` `rabitq::tests::l2_estimator_keeps_the_true_neighbour` |
@@ -719,7 +723,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `executor` `catalog_ut::append_add_column_fills_old_rows_with_null` |
 | 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `executor` `catalog_ut::append_uses_the_renamed_table` |
 | 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | ported | `executor` `append_delete_ut::append_append_keeps_one_visible_block` |
-| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_append_append_concurrent` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | ported | `executor` `engine::tests_ut::tests::append_append_concurrent` (`#[ignore = "slow: …"]`) |
 | 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `executor` `catalog_ut::append_around_secondary_index_lifecycle` |
 | 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `executor` `catalog_ut::append_around_secondary_index_lifecycle` |
 | 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `executor` `catalog_ut::append_then_compact_preserves_rows` |
@@ -763,7 +767,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 740 | src/unit_test/storage/new_catalog/column_ut.cpp | `drop_column_and_add_column` | ported | `executor` `new_catalog_column_ut::drop_column_and_add_column` |
 | 741 | src/unit_test/storage/new_catalog/column_ut.cpp | `drop_column_and_drop_column` | ported | `executor` `new_catalog_column_ut::drop_column_and_drop_column` |
 | 742 | `src/unit_test/storage/new_catalog/compact_internal_ut.cpp` | `TestTxnCompactInternal` | `test_compact` | ported | `executor` `compact_replay_ut::internal_compact_skips_deleted_offsets` |
-| 743 | src/unit_test/storage/new_catalog/compact_internal_ut.cpp | `test_compact_with_index` | ported | `executor` `compact_replay_ut::disabled_slow_test_compact_with_index` |
+| 743 | src/unit_test/storage/new_catalog/compact_internal_ut.cpp | `test_compact_with_index` | ported | `executor` `compact_replay_ut::replay_compact_with_index` (`#[ignore = "slow: …"]`) |
 | 744 | src/unit_test/storage/new_catalog/compact_ut.cpp | `compact_with_index_commit` | ported | `executor` `compact_replay_ut::compact_with_index_commit` |
 | 745 | src/unit_test/storage/new_catalog/compact_ut.cpp | `compact_with_index_rollback` | ported | `executor` `compact_replay_ut::compact_with_index_rollback` |
 | 746 | `src/unit_test/storage/new_catalog/compact_ut.cpp` | `TestTxnCompact` | `compact_and_drop_db` | ported | `executor` `compact_replay_ut::compact_then_drop_database` |
@@ -822,12 +826,12 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 799 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_rename` | ported | `executor` `update_import_ut::import_then_rename` |
 | 800 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_create_index` | ported | `executor` `update_import_ut::import_then_create_index` |
 | 801 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_drop_index` | ported | `executor` `update_import_ut::import_then_drop_index` |
-| 802 | src/unit_test/storage/new_catalog/import_ut.cpp | `DISABLED_SLOW_test_import_and_compact` | ported | `executor` `update_import_ut::disabled_slow_test_import_and_compact` |
+| 802 | src/unit_test/storage/new_catalog/import_ut.cpp | `DISABLED_SLOW_test_import_and_compact` | ported | `executor` `update_import_ut::import_and_compact` (`#[ignore = "slow: …"]`) |
 | 803 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_optimize_index` | ported | `executor` `update_import_ut::import_then_optimize_index` |
 | 804 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `test_index0` | ported | `executor` `new_catalog_index_internal_ut::test_index0` |
 | 805 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `test_index` | ported | `executor` `new_catalog_index_internal_ut::test_index` |
 | 806 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `test_populate_index0` | ported | `executor` `new_catalog_index_internal_ut::test_populate_index0` |
-| 807 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `DISABLED_SLOW_test_populate_index` | ported | `executor` `new_catalog_index_internal_ut::disabled_slow_test_populate_index` |
+| 807 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `DISABLED_SLOW_test_populate_index` | ported | `executor` `new_catalog_index_internal_ut::populate_index` (`#[ignore = "slow: …"]`) |
 | 808 | src/unit_test/storage/new_catalog/index_internal_ut.cpp | `test_json_index` | ported | `executor` `new_catalog_index_internal_ut::test_json_index` |
 | 809 | src/unit_test/storage/new_catalog/index_ut.cpp | `index_test1` | ported | `executor` `new_catalog_index_ut::index_test1` |
 | 810 | src/unit_test/storage/new_catalog/index_ut.cpp | `index_test2` | ported | `executor` `new_catalog_index_ut::index_test2` |
@@ -835,7 +839,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 812 | src/unit_test/storage/new_catalog/index_ut.cpp | `dropindex_wrong_conflicttype` | ported | `executor` `new_catalog_index_ut::dropindex_wrong_conflicttype` |
 | 813 | src/unit_test/storage/new_catalog/index_ut.cpp | `create_index_and_drop_db` | ported | `executor` `new_catalog_index_ut::create_index_and_drop_db` |
 | 814 | src/unit_test/storage/new_catalog/index_ut.cpp | `create_index_and_drop_table` | ported | `executor` `new_catalog_index_ut::create_index_and_drop_table` |
-| 815 | src/unit_test/storage/new_catalog/index_ut.cpp | `DISABLED_SLOW_create_index_create_index` | ported | `executor` `new_catalog_index_ut::disabled_slow_create_index_create_index` |
+| 815 | src/unit_test/storage/new_catalog/index_ut.cpp | `DISABLED_SLOW_create_index_create_index` | ported | `executor` `new_catalog_index_ut::create_index_create_index` (`#[ignore = "slow: …"]`) |
 | 816 | src/unit_test/storage/new_catalog/index_ut.cpp | `create_index_add_column` | ported | `executor` `new_catalog_index_ut::create_index_add_column` |
 | 817 | src/unit_test/storage/new_catalog/index_ut.cpp | `create_index_drop_column` | ported | `executor` `new_catalog_index_ut::create_index_drop_column` |
 | 818 | src/unit_test/storage/new_catalog/index_ut.cpp | `create_index_rename_table` | ported | `executor` `new_catalog_index_ut::create_index_rename_table` |
@@ -863,9 +867,9 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 840 | src/unit_test/storage/new_catalog/meta_cache_ut.cpp | `test_erase` | ported | `executor` `meta_cache_ut::test_erase` |
 | 841 | src/unit_test/storage/new_catalog/new_catalog_ut.cpp | `test_block_lock` | ported | `executor` `new_catalog_meta_ut::test_block_lock` |
 | 842 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_ts` | ported | `executor` `replay_misc_ut::txn_manager_timestamps` |
-| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_parallel_ts` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | ported | `executor` `engine::tests_ut::tests::parallel_ts` (`#[ignore = "slow: …"]`) |
 | 844 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_check_txns` | ported | `executor` `replay_misc_ut::txn_manager_check_txns` |
-| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `executor` `engine::tests_ut::tests::disabled_slow_test_parallel_insert_table` (`#[ignore]`: C++ DISABLED_SLOW_) |
+| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | ported | `executor` `engine::tests_ut::tests::parallel_insert_table` (`#[ignore = "slow: …"]`) |
 | 846 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db` | ported | `executor` `replay_txn_ut::replay_create_db` |
 | 847 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db2` | ported | `executor` `replay_txn_ut::replay_create_db2` |
 | 848 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_table` | ported | `executor` `replay_txn_ut::replay_create_table` |
@@ -888,12 +892,12 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 865 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_db` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_database` |
 | 866 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_table` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_table` |
 | 867 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_index` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_index` |
-| 868 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_optimize_index` | ported | `executor` `optimize_replay_ut::disabled_slow_optimize_index_and_optimize_index` |
-| 869 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_dump_index` | ported | `executor` `optimize_replay_ut::disabled_slow_optimize_index_and_dump_index` |
+| 868 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_optimize_index` | ported | `executor` `optimize_replay_ut::optimize_index_and_optimize_index` (`#[ignore = "slow: …"]`) |
+| 869 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_dump_index` | ported | `executor` `optimize_replay_ut::optimize_index_and_dump_index` (`#[ignore = "slow: …"]`) |
 | 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_add_column` |
 | 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_column` |
 | 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | ported | `executor` `optimize_replay_ut::optimize_index_then_rename_table` |
-| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::disabled_slow_optimize_index_and_optimize_index` |
+| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::optimize_index_and_compact_table` (`#[ignore = "slow: …"]`) |
 | 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | ported | `executor` `replay_txn_ut::replay_alter_add_column` |
 | 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | ported | `executor` `replay_txn_ut::replay_alter_drop_column` |
 | 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | ported | `executor` `replay_txn_ut::replay_alter_rename` |
@@ -904,20 +908,20 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 881 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_rollback` | ported | `executor` `compact_replay_ut::replay_compact_rollback` |
 | 882 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_replay_compact_flush_gap` | ported | `executor` `compact_replay_ut::replay_compact_flush_gap` |
 | 883 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_interrupt` | ported | `executor` `compact_replay_ut::replay_compact_interrupt` |
-| 884 | src/unit_test/storage/new_catalog/replay_compact_ut.cpp | `DISABLED_SLOW_test_compact_with_index` | ported | `executor` `compact_replay_ut::disabled_slow_test_compact_with_index` |
+| 884 | src/unit_test/storage/new_catalog/replay_compact_ut.cpp | `DISABLED_SLOW_test_compact_with_index` | ported | `executor` `compact_replay_ut::replay_compact_with_index` (`#[ignore = "slow: …"]`) |
 | 885 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact1_rollback` | ported | `executor` `compact_replay_ut::replay_compact1_rollback` |
 | 886 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import0` | ported | `executor` `replay_misc_ut::replay_import0` |
 | 887 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import_with_index` | ported | `executor` `replay_misc_ut::replay_import_with_index` |
-| 888 | src/unit_test/storage/new_catalog/replay_index_ut.cpp | `DISABLED_SLOW_test_replay_append_with_index` | ported | `executor` `replay_misc_ut::disabled_slow_test_replay_append_with_index` |
-| 889 | src/unit_test/storage/new_catalog/replay_index_ut.cpp | `DISABLED_SLOW_test_populate_index` | ported | `executor` `replay_misc_ut::disabled_slow_test_populate_index` |
+| 888 | src/unit_test/storage/new_catalog/replay_index_ut.cpp | `DISABLED_SLOW_test_replay_append_with_index` | ported | `executor` `replay_misc_ut::replay_append_with_index` (`#[ignore = "slow: …"]`) |
+| 889 | src/unit_test/storage/new_catalog/replay_index_ut.cpp | `DISABLED_SLOW_test_populate_index` | ported | `executor` `replay_misc_ut::replay_populate_index` (`#[ignore = "slow: …"]`) |
 | 890 | src/unit_test/storage/new_catalog/replay_index_ut.cpp | `drop_index` | ported | `executor` `replay_misc_ut::replay_index_drop_index` |
 | 891 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `test_json_index_replay` | ported | `executor` `replay_misc_ut::replay_json_index` |
-| 892 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_commit` | ported | `executor` `optimize_replay_ut::disabled_slow_test_optimize_commit` |
-| 893 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_rollback` | ported | `executor` `optimize_replay_ut::disabled_slow_test_optimize_rollback` |
-| 894 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_interrupt` | ported | `executor` `optimize_replay_ut::disabled_slow_test_optimize_interrupt` |
-| 895 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | ported | `executor` `optimize_replay_ut::disabled_slow_test_repaly_restore_table_snapshot` |
-| 896 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | ported | `executor` `optimize_replay_ut::disabled_slow_test_repaly_restore_database_snapshot` |
-| 897 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | ported | `executor` `optimize_replay_ut::disabled_slow_test_repaly_restore_system_snapshot` |
+| 892 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_commit` | ported | `executor` `optimize_replay_ut::replay_optimize_commit` (`#[ignore = "slow: …"]`) |
+| 893 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_rollback` | ported | `executor` `optimize_replay_ut::replay_optimize_rollback` (`#[ignore = "slow: …"]`) |
+| 894 | src/unit_test/storage/new_catalog/replay_optimize_ut.cpp | `DISABLED_SLOW_test_optimize_interrupt` | ported | `executor` `optimize_replay_ut::replay_optimize_interrupt` (`#[ignore = "slow: …"]`) |
+| 895 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | ported | `executor` `optimize_replay_ut::replay_restore_table_snapshot` (`#[ignore = "slow: …"]`) |
+| 896 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | ported | `executor` `optimize_replay_ut::replay_restore_database_snapshot` (`#[ignore = "slow: …"]`) |
+| 897 | src/unit_test/storage/new_catalog/replay_restore_ut.cpp | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | ported | `executor` `optimize_replay_ut::replay_restore_system_snapshot` (`#[ignore = "slow: …"]`) |
 | 898 | src/unit_test/storage/new_catalog/table_cache_ut.cpp | `test_table_cache` | ported | `executor` `new_catalog_meta_ut::test_table_cache` |
 | 899 | src/unit_test/storage/new_catalog/table_meta_ut.cpp | `table_meta` | ported | `executor` `new_catalog_meta_ut::table_meta` |
 | 900 | src/unit_test/storage/new_catalog/table_ut.cpp | `table_test1` | ported | `executor` `new_catalog_table_ut::table_test1` |
@@ -1033,3 +1037,11 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 1010 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test_size` | exempt | 只测 CRoaring API 本身；端口链接 `roaring` crate，与参考共用同一实现，字节一致性由 `storage` `wal::block::tests::the_null_bitmap_matches_the_reference_block` 与 `secondary_lowcard::tests::write_adv_framing_matches_cpp` 覆盖 |
 | 1011 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test1` | exempt | 同上：只测 CRoaring 的 32/64 位基数 API |
 | 1012 | `src/unit_test/third_party/test_croaring_ut.cpp` | `CRoaringTest` | `test2` | exempt | 同上：只测 CRoaring 的集合代数与序列化 API |
+| 1013 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryFullScanParity` | ported | `executor` `bmw_long_query_ut::long_query_full_scan_parity` (`#[ignore = "slow: …"]`) |
+| 1014 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryTopKAndPruningEffectiveness` | ported | `executor` `bmw_long_query_ut::long_query_top_k_and_pruning_effectiveness` (`#[ignore = "slow: …"]`) |
+| 1015 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryDenseVocabulary` | ported | `executor` `bmw_long_query_ut::long_query_dense_vocabulary` (`#[ignore = "slow: …"]`) |
+| 1016 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryAtScale` | ported | `executor` `bmw_long_query_ut::long_query_at_scale` (`#[ignore = "slow: …"]`，`INFINITY_BMW_IT_SCALE=1` 才跑) |
+| 1017 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryPerfComparison` | ported | `executor` `bmw_long_query_ut::long_query_perf_comparison` (`#[ignore = "slow: …"]`，`INFINITY_BMW_IT_PERF=1` 才跑) |
+| 1018 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryStability` | ported | `executor` `bmw_long_query_ut::long_query_stability` (`#[ignore = "slow: …"]`) |
+| 1019 | `src/unit_test/storage/invertedindex/search/bmw_long_query_ut.cpp` | `BmwLongQueryTest` | `DISABLED_SLOW_LongQueryRandomizedDifferential` | ported | `executor` `bmw_long_query_ut::long_query_randomized_differential` (`#[ignore = "slow: …"]`，`INFINITY_BMW_IT_RANDOM=1` 才跑) |
+| 1020 | `src/unit_test/storage/invertedindex/search/query_match_ut.cpp` | `QueryMatchTest` | `bmw_heap_differential` | ported | `executor` `bmw_long_query_ut::bmw_heap_differential` (`#[ignore = "slow: …"]`) |

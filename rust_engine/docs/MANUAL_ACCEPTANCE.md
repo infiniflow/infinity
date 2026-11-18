@@ -197,9 +197,14 @@ mkdir -p .scratch/manual/{ft,ft33,knn,bytes,bin}
 | `build` | 参考版（builder 镜像，amd64/arm64）+ 重写版 | 产出 `bin-<engine>-<arch>` 制品，手工可直接用 |
 | `restart` | Gate C 重启用例（`-m "not slow"`） | 手工补 33M 的长时间导入和内存 |
 | `soak` | 夜间 kill -9：8,388,609 行、随机打断 COPY × 5、索引 point lookup 无缺口、重启耗时门限（`rust_engine/scripts/soak_kill9.sh`，**不** continue-on-error） | 33M 互读与长时间导入仍是手工；`slow` 里那条 `test_insert.py --loop 3` 是小表且 continue-on-error |
-| `sdk` | 未改的 Python SDK 打两个引擎（nightly/手动） | 不涉及大数据索引 |
+| `sdk` | 未改的 Python SDK 打两个引擎（PR 跑 `not complex and not slow`；nightly/手动另跑 `slow` 与 `python/parallel_test`） | 不涉及大数据索引 |
 | `cross_engine` | `test_cross_engine_compat` + `test_cross_engine_bytes_*` | 手工跑同一套 + 8.39M HUGE + 33M 互读 |
-| `slow` | miri / ASan / ignored / parallel / kill -9 循环；重导入 5.toml | 5.toml 仍是 `continue-on-error`，是手工 FT-2 的直接动因 |
+| `slow` | miri / ASan / `--ignored`（报告 + 门禁两档）/ kill -9 循环；重导入 5.toml | 5.toml 仍是 `continue-on-error`，是手工 FT-2 的直接动因 |
+
+`--ignored` 的两档：`Ignored tests` 跑全部 `#[ignore]` 用例但只报告（`bench:`/`diagnostic:` 的数字依赖机器）；
+`Slow reference cases` 按测试名跳过非 `slow:` 类别后**门禁**，即参考 `DISABLED_SLOW_*` 的 37 个移植用例
+（`bmw_long_query_ut` 的 8 个在其中）不通过就是行为差异。`#[ignore]` 的理由串是分类依据，写法见
+[`TEST_AUDIT.md`](TEST_AUDIT.md) 开头。
 
 `.github/workflows/tests.yml` 的 `reldeb_amd64_benchmark` 是参考版自己的 SIFT 黄金基线：
 `knn_import_benchmark` + `knn_query_benchmark`，1 线程和 8 线程。`tools/perf_sift.py` 把同一组语句

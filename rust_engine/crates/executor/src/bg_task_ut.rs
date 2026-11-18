@@ -297,7 +297,7 @@ fn submit_after_stop_is_rejected() {
 /// dumps both blocks as a single 16384-row chunk. The next append proposes
 /// another dump, which starts at row 16384.
 #[test]
-#[ignore = "SLOW: the reference disables this test"]
+#[ignore = "slow: C++ DumpMemIndexTaskTest2.DISABLED_SLOW_row_cnt_exceed_memory_quota"]
 fn dump_index_task_row_cnt_exceed_memory_quota() {
     let dir = tempdir().unwrap();
     let engine = Arc::new(Engine::open(dir.path()).unwrap());
@@ -337,7 +337,7 @@ fn dump_index_task_row_cnt_exceed_memory_quota() {
 /// `mem_index_capacity = 8192`: each append reaches the row bound and is
 /// dumped at the end of its batch, so the second chunk starts at row 8192.
 #[test]
-#[ignore = "SLOW: the reference disables this test"]
+#[ignore = "slow: C++ DumpMemIndexTaskTest.DISABLED_SLOW_row_cnt_exceed_memindex_capacity"]
 fn dump_index_task_row_cnt_exceed_memindex_capacity() {
     let dir = tempdir().unwrap();
     let engine = Engine::open(dir.path()).unwrap();

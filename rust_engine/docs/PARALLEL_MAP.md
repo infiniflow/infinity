@@ -131,7 +131,7 @@
 | DDL 串行 | DDL 事务按 commit 序执行，同一时刻只做一次布局重写 | catalog 的 DDL 锁 | `ddl_lock` 只串行 `catalog.capture`；列变更的提交阶段由冲突矩阵定序，其余 DDL 仍整段持有（见 §3.1） | `aligned` | `test/sql/ddl`、`concurrent_column_changes_leave_no_side_effect_behind` |
 | WAL / checkpoint | 写 WAL 与整表 checkpoint 互斥 | `WalManager` 的 flush/checkpoint 串行 | `flush_lock` | `aligned` | `test_cross_engine_bytes_40_wal.py` |
 | 批量写 vs 后台 dump | dump 事务与 append 争用段，靠重试而不是全局锁 | `DumpIndexProcessor::DoDump` 的重试 | 写批次持该表的闸；`DumpMemIndexTask` 按 key 顺序取全部表的闸，从而看到完整批次（顺序取锁不会互相死锁） | `aligned` | `dump_mem_index_ut` |
-| 列变更 vs checkpoint | 参考的 checkpoint 是一次事务（`CHECKPOINT_V2`），块按它自己的 ts 写，之后的 DDL 与它无关 | `NewTxn::Checkpoint` 走 txn manager | `flush` 在开始处取定 T，块/schema/行/删除都按 T 裁：schema 用 `Catalog::schema_ids_at(T)` 钉住（见 §3.1） | `aligned` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`、`test_alter.py` |
+| 列变更 vs checkpoint | 参考的 checkpoint 是一次事务（`CHECKPOINT_V2`），块按它自己的 ts 写，之后的 DDL 与它无关 | `NewTxn::Checkpoint` 走 txn manager | `flush` 在开始处取定 T，块/schema/行/删除都按 T 裁：schema 用 `Catalog::schema_ids_at(T)` 钉住（见 §3.1）。**缺口**：编码列取自 T、行宽取自 append buffer，两者可不同源；收口方向是把 buffer 改成按列 id 组织，并用完整的 `schema_at(T)` 驱动输出（[`ALTER_CHECKPOINT_RACE.md`](ALTER_CHECKPOINT_RACE.md) §5） | `partial` | `a_checkpoint_through_a_column_change_keeps_the_block_readable`（`known-defect`）、`test_alter.py` |
 | 块文件单写者 | 每块 `BlockLock` + 列式追加，不存在两个「整块重写」 | `new_txn_data_impl.cpp:930-958` | 块写跑在同一张表的 **bottom gate** 下（`write_blocks_mode`/`add_column_files` 取 `bottom_gate(table)`，已在 bottom 里的调用方靠 `HeldBottom` 跳过）；同表串行、跨表并行（见 §3.1） | `aligned`（参考到块、端口到表） | 同上 |
 
 ### 3.1 事务之外的排除，与 checkpoint 的切面
@@ -153,7 +153,7 @@ checkpoint 的切面由它自己的 ts 决定，不需要与 DDL 互斥：`flush
 
 块里缺少本次写入的列时，写路径先按默认值补文件（`ensure_block_columns`，只写缺失文件、不覆盖已有值），读路径把「块存在但解不出来」当错误而不是空块——否则整块重写会把块里的行丢掉。
 
-验证：`replay_of_the_test_alter_complex_sequence_around_a_checkpoint`（把 checkpoint 依次放在每一步之后）、`concurrent_column_changes_leave_no_side_effect_behind`、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。`a_checkpoint_through_a_column_change_keeps_the_block_readable` 是同一竞态的 50 轮压测（checkpoint 在另一线程），当前 `#[ignore]`：慢机上仍能复现一条 replay 侧的列-时刻错配，原因与观测写在该用例的注释里。
+验证：`replay_of_the_test_alter_complex_sequence_around_a_checkpoint`（把 checkpoint 依次放在每一步之后）、`concurrent_column_changes_leave_no_side_effect_behind`、`test_alter.py` 的重启用例、`test_cross_engine_bytes_40_wal.py`。`a_checkpoint_through_a_column_change_keeps_the_block_readable` 是同一竞态的 50 轮压测（checkpoint 在另一线程），当前 `#[ignore]`：仍能复现块内列错位（累计 44 轮 5 次失败，约 11%），根因与收口方向见 [`ALTER_CHECKPOINT_RACE.md`](ALTER_CHECKPOINT_RACE.md)。
 
 ## 4 分片、尺寸与回退
 
