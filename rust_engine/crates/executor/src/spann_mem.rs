@@ -375,35 +375,6 @@ impl SpannStats {
     }
 }
 
-/// Memory a `CREATE INDEX` may spend on the whole-table tree.
-///
-/// The build itself is out-of-core ([`crate::Engine::spann_build`]: a mapped
-/// scratch file plus one code per member, [`build_bytes_per_row`]), so what this
-/// bounds is the tree the builder hands to the [`SpannHandle::Memory`], not the
-/// column.
-/// `encode = none` is the exception - it keeps the raw members - and that is why
-/// the estimate is per row rather than a constant.
-///
-/// Past this budget the index is created without a tree: the catalog record
-/// exists, the checkpoint publishes one tree per segment (the v2 dump), and a
-/// query that arrives before it answers by exact scan (§9.7).
-pub(crate) const MEMORY_TREE_MAX_BYTES: usize = 512 * 1024 * 1024;
-
-/// The heap a whole-table build costs per row, for [`MEMORY_TREE_MAX_BYTES`].
-///
-/// A leaf keeps one `Member` per row: its id, the 16 bytes of correction
-/// factors (norm, raw norm, popcount, dot) and a `dims / 8`-byte rabitq code
-/// behind a `Vec` header - 224 B at 1536d, which matches the 208 B the format
-/// documentation quotes for the code itself. `encode = none` keeps the raw
-/// vector beside the code instead.
-pub(crate) fn build_bytes_per_row(opts: &Options, dims: usize) -> usize {
-    let per_row = match opts.encode {
-        Encode::None => dims * std::mem::size_of::<f32>(),
-        Encode::Rabitq => dims / 8,
-    };
-    per_row + 8 + 16 + 32
-}
-
 /// The SQL-layer default search width: Cockroach's `vector_search_beam_size`,
 /// whose global default is 32. The index's own `Options::base_beam` stays 8 for
 /// direct callers; the statement path is the one that pays for recall, because
