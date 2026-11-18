@@ -47,9 +47,7 @@ use index::spann::{
 };
 use index::vector::{l2_sq, Metric};
 
-pub mod kv_store;
 mod writer;
-pub use kv_store::RocksSpannStore;
 pub use writer::{write, write_to};
 
 /// The chunk's signature: the name, a NUL pad (the field is eight bytes wide so

@@ -2116,28 +2116,7 @@ impl Engine {
                         commit_ts: chunk_ts,
                     }]
                 } else if im.index_type.eq_ignore_ascii_case("SPANN") {
-                    // The incremental tree writes no chunk: its partitions are
-                    // RocksDB rows, so the checkpoint's only job is to apply the
-                    // tail. Returning early here is also what removes the
-                    // segment-wide rebuild from `flush()`.
-                    let incremental = {
-                        let tables = self.tables.lock().unwrap();
-                        tables
-                            .get(&self.table_key(table))
-                            .and_then(|entry| entry.spann.get(&(index_id as u64)))
-                            .map(|handle| {
-                                matches!(
-                                    handle.as_ref(),
-                                    crate::spann_mem::SpannHandle::Incremental(_)
-                                )
-                            })
-                            .unwrap_or(false)
-                    };
-                    if incremental {
-                        let _ = self.flush_spann_tail(table, index_id as u64);
-                        continue;
-                    }
-                    // Incremental dump (`docs/SPANN_DESIGN.md` §9.4): a sealed
+                    // A sealed
                     // segment is immutable, so a live chunk that already covers
                     // this segment's live rows **and was built with the catalog's
                     // options** is still the answer, and rebuilding it would only
@@ -2316,13 +2295,38 @@ impl Engine {
         for (index_name, segment, superseded, ts) in spann_superseded {
             let _ = self.deprecate_chunks(table, &index_name, segment, &superseded, ts);
         }
-        // The published chunks cover the rows the mem index was holding.
+        // The published chunks cover the rows the mem index was holding, and they
+        // are the segment's tree now: the heap copy is exactly what a dump exists
+        // to retire, so the handle is swapped for the mapped form here rather than
+        // on the next query (`docs/SPANN_DESIGN.md` §6.4 - a checkpoint is where
+        // the memory form hands over to the file form, as it is for HNSW).
         if !spann_ready.is_empty() {
             let key = self.table_key(table);
-            if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-                for id in spann_ready {
-                    entry.spann_mem.remove(&id);
+            let mut ready = spann_ready;
+            ready.sort_unstable();
+            ready.dedup();
+            {
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    for id in &ready {
+                        entry.spann_mem.remove(id);
+                    }
                 }
+            }
+            for id in ready {
+                if self.spann_lazy_load(table, id).is_some() {
+                    continue;
+                }
+                // Nothing to map (every record of this pass failed to land): a
+                // heap tree that no longer covers its segment would answer a
+                // stale top-k, so it goes and the coverage check falls back to
+                // the exact scan.
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    entry.spann.remove(&id);
+                }
+                drop(tables);
+                self.refresh_memindex_charge(table);
             }
         }
         Ok(())
@@ -5363,14 +5367,6 @@ impl Engine {
         out
     }
 
-    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
-    /// time**.
-    ///
-    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
-    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
-    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
-    /// builder needs. Handing each cell to the caller lets it parse and drop the
-    /// text per block, so a build's peak is the vectors plus one block's text.
     /// Hands the buffered cells of `column` for the rows of `segment` (every
     /// segment when `None`) to `sink`, one cell at a time.
     ///
@@ -5408,24 +5404,21 @@ impl Engine {
         }
     }
 
+    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
+    /// time**, over the segments in `segments` (every visible segment when
+    /// `None`).
+    ///
+    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
+    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
+    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
+    /// builder needs. Handing each cell to the caller lets it parse and drop the
+    /// text per block, so a build's peak is the vectors plus one block's text.
+    ///
+    /// The segment set is what compaction needs: the merge marks the source
+    /// segments dropped at its own ts, and a reader below that ts (the
+    /// compaction's own bottom half) still sees their blocks. Walking them would
+    /// put rows the merge just retired into the rebuilt tree.
     pub(crate) fn for_each_block_cell(
-        &self,
-        table: &str,
-        column: usize,
-        segment: Option<u32>,
-        f: impl FnMut(usize, &str),
-    ) {
-        let segments: Option<std::collections::HashSet<u32>> =
-            segment.map(|segment| std::collections::HashSet::from([segment]));
-        self.for_each_block_cell_in(table, column, segments.as_ref(), f);
-    }
-
-    /// [`Self::for_each_block_cell`] over a **set** of segments. Compaction
-    /// needs this: the merge marks the source segments dropped at its own ts,
-    /// and a reader below that ts (the compaction's own bottom half) still
-    /// sees their blocks. Walking them would put rows the merge just retired
-    /// into the rebuilt tree.
-    pub(crate) fn for_each_block_cell_in(
         &self,
         table: &str,
         column: usize,
@@ -5466,90 +5459,6 @@ impl Engine {
         // first (`pending_rows_of`) copied every buffered row's whole embedding to
         // keep one column of one segment.
         self.for_each_buffered_cell(&table, column, segments, f);
-    }
-
-    /// One row's vector, by row id, for a split's re-clustering.
-    ///
-    /// A split touches at most `max_partition_size` rows, so the `O(blocks)`
-    /// walk over `visible_block_ids` is bounded by the partition, not the
-    /// table. This is the only place the incremental path needs a raw vector:
-    /// inserts encode from the value they were handed, and deletes find their
-    /// leaf through the row→partition row.
-    pub(crate) fn spann_row_vector(
-        &self,
-        table: &str,
-        column: usize,
-        row: u64,
-    ) -> Option<Vec<f32>> {
-        let table = self.qualified_table(table);
-        let meta = self
-            .storage
-            .catalog
-            .get_table_by_name(&table)
-            .ok()
-            .flatten()?;
-        let types: Vec<i32> = meta
-            .types
-            .iter()
-            .map(|t| column_type_of(t))
-            .collect::<Option<Vec<_>>>()?;
-        let root = self.blocks_root();
-        let segment = (row >> 32) as u32;
-        let offset = (row as u32) as usize;
-        let block_no = (offset / DEFAULT_BLOCK_CAPACITY) as u16;
-        let slot = offset % DEFAULT_BLOCK_CAPACITY;
-        for id in self.visible_block_ids(&table) {
-            if id.segment_id != segment || id.block_id != block_no {
-                continue;
-            }
-            let Ok(block) = self.block_map(&table, &root, id) else {
-                continue;
-            };
-            let version = block.version();
-            if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
-                continue;
-            }
-            // **One** slot, not the block: `decode_rows_of_values`'s
-            // `rows_wanted` path decodes the cell this row needs. Decoding the
-            // block instead rendered every row of the column to text (8192 x
-            // 1536 values), which is what made a split's fetch - and the
-            // restart backfill's - take seconds per row.
-            let wanted_rows: std::collections::HashSet<usize> =
-                [row as usize].into_iter().collect();
-            let Some(rows) = Self::decode_rows_of_values(
-                &meta.ids,
-                &meta.types,
-                &types,
-                id,
-                version,
-                block.as_ref(),
-                Some(&[column]),
-                None,
-                Some(&wanted_rows),
-            ) else {
-                continue;
-            };
-            let Some((_, values)) = rows.first() else {
-                continue;
-            };
-            if let Some(value) = values.get(column) {
-                let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
-                if !vector.is_empty() {
-                    return Some(vector);
-                }
-            }
-        }
-        let mut found = None;
-        let only = std::collections::HashSet::from([segment]);
-        self.for_each_buffered_cell(&table, column, Some(&only), |seq, text| {
-            if seq as u64 == row && found.is_none() {
-                let vector = crate::engine::state::parse_vec_f32(text);
-                if !vector.is_empty() {
-                    found = Some(vector);
-                }
-            }
-        });
-        found
     }
 
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).

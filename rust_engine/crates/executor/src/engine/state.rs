@@ -5031,11 +5031,11 @@ pub(crate) struct TableEntry {
     pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// spann trees per index id (`docs/SPANN_DESIGN.md`).
     ///
-    /// v1 keeps them in memory: `CREATE INDEX … USING SPANN` builds the tree
-    /// and answers queries from it directly. The chunk format is implemented and
-    /// tested in `storage::knn_index::spann`; wiring the dump/load path (§9.4)
-    /// is the remaining step, after which this map holds what the loader
-    /// produced instead.
+    /// `CREATE INDEX … USING SPANN` builds one and installs it as
+    /// [`crate::spann_mem::SpannHandle::Memory`]; the first checkpoint that
+    /// covers the segment publishes `chunk_{n}.idx` and swaps the handle for the
+    /// mapped form (§6.4, §9.4), so after a dump - and after a restart - this
+    /// map holds what the loader produced.
     pub(crate) spann: HashMap<u64, Arc<crate::spann_mem::SpannHandle>>,
     /// spann **mem index** per index id: the rows inserted since the last
     /// dump, kept as `(row id, vector)`.

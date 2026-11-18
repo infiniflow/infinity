@@ -19,10 +19,7 @@
 //! as the radius pruning bound (§8.3).
 
 pub mod build;
-pub mod incremental;
 pub mod kmeans;
-pub mod kv;
-pub mod mut_store;
 pub mod partition;
 pub mod quantize;
 pub mod search;
@@ -30,9 +27,6 @@ pub mod source;
 pub mod store;
 
 pub use build::{build_tree, BuiltTree};
-pub use incremental::{IncrementalIndex, MaintainReport, TreeStats};
-pub use kv::{MetaValue, PartitionState};
-pub use mut_store::{KvOp, MemKvStore, SpannMutStore};
 pub use partition::{Member, Partition};
 pub use quantize::{Code, QueryCode, Rotation};
 pub use search::{Beam, SearchSet};

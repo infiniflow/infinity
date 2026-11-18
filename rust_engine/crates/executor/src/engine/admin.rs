@@ -796,7 +796,7 @@ impl Engine {
                     // A spann tree is keyed by row id, and the merge renumbers
                     // every row: the handle is not "a few stale entries" but a
                     // wrong answer. Drop it here; the rebuild right after the
-                    // commit (`rebuild_spann_kv`) refills the tree from the
+                    // commit (`rebuild_spann_in`) refills the tree from the
                     // merged rows.
                     entry.spann.clear();
                     entry.spann_mem.clear();
@@ -936,7 +936,7 @@ impl Engine {
             .filter(|segment| !sources.contains(segment))
             .chain(std::iter::once(next_seg))
             .collect();
-        self.rebuild_spann_kv_in(table, Some(&live_segments))?;
+        self.rebuild_spann_in(table, Some(&live_segments))?;
         if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
             let (segments, live_rows) = {
                 let tables = self.tables.lock().unwrap();

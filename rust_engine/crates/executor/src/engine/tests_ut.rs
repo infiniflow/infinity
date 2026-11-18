@@ -14138,13 +14138,11 @@ mod tests {
                     .unwrap_or_default(),
             )
         };
-        // A merge renumbers every row, and the incremental tree is keyed by row
-        // id (`vec|…|m|<partition>|<row>` plus the `r|` mapping), so the
+        // The merge renumbers every row, and a tree is keyed by row id
+        // (`segment << 32 | offset`, which is what a chunk's slots hold), so the
         // compaction clears it rather than republishing a tree that names dead
-        // ids. Queries fall back to the exact scan until the index is rebuilt.
-        // The merge renumbers every row, and the compaction rebuilds the tree
-        // over the merged rows inside its bottom half: one handle, every row,
-        // all ids in the new segment.
+        // ids. It rebuilds over the merged rows inside its bottom half instead:
+        // one handle, every row, all ids in the new segment.
         assert!(handles <= 1, "at most one handle may survive a compaction");
         assert!(
             ids.iter()
@@ -14893,8 +14891,6 @@ mod tests {
     /// against the segment's live rows, so a delete (which lowers it) or a
     /// compaction (which renames the segment) still rebuilds.
     #[test]
-    #[ignore = "v2 chunk semantics: CREATE INDEX now writes the incremental tree, which has no chunk \
-                to reuse; the writer/reader contract is covered by `storage::knn_index::spann`"]
     fn a_checkpoint_reuses_an_unchanged_spann_chunk() {
         let n = 120usize;
         let vector = |i: usize| -> String {
@@ -15069,221 +15065,6 @@ mod tests {
     /// `SHOW INDEX` carries the §16.4 telemetry, and the numbers are what the
     /// queries actually did - including `nprobe` being the IVF spelling of the
     /// search width (§15 promised it and the probe ignored it for spann).
-    /// The incremental tree under a real row count: no chunk, no rebuild on
-    /// write, no cost change on delete, no rebuild on restart.
-    ///
-    /// Sized by `INFINITY_SPANN_SCALE_ROWS` / `_DIM` / `_CENTERS`; the defaults
-    /// are what a debug run finishes in well under a minute, the numbers that
-    /// matter are printed so a larger run can be compared against them. A run
-    /// that does not fit in RAM uses `_BULK=1` (the literal/COPY path),
-    /// `_FLUSH_ROWS` (a checkpoint every N rows) and `_INDEX_FIRST_ROWS` (build
-    /// the index early, then ingest through the incremental write path).
-    #[test]
-    #[ignore = "scale test: INFINITY_SPANN_SCALE_ROWS / _DIM / _CENTERS size it; run manually"]
-    fn spann_incremental_scale() {
-        let env_usize = |name: &str, default: usize| -> usize {
-            std::env::var(name)
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(default)
-        };
-        let total = env_usize("INFINITY_SPANN_SCALE_ROWS", 20_000);
-        let dim = env_usize("INFINITY_SPANN_SCALE_DIM", 128);
-        let centers = env_usize("INFINITY_SPANN_SCALE_CENTERS", 512);
-        let unit = |a: u64, b: u64| -> f32 {
-            let mut x = a
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
-            x ^= x >> 33;
-            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
-            x ^= x >> 29;
-            (x % 100_000) as f32 / 100_000.0
-        };
-        let value = |i: usize, d: usize| -> f32 {
-            let centre = (i % centers) as u64;
-            unit(centre, d as u64) * 20.0
-                + (unit(centre ^ 0x5DEE_CE66, (d as u64) * 31 + i as u64) - 0.5) * 0.6
-        };
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim).map(|d| format!("{:.3}", value(i, d))).collect();
-            format!("[{}]", body.join(","))
-        };
-
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
-            "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
-        ))
-        .unwrap();
-        // How the rows go in, and how often a checkpoint runs. The SQL path is
-        // what every other test exercises (parse, plan, execute); the literal
-        // path is the SDK/COPY shape and is what makes a few million rows at
-        // 1536d finish in bounded time - one batch of text exists at a time
-        // instead of the whole column.
-        let bulk = std::env::var("INFINITY_SPANN_SCALE_BULK").as_deref() == Ok("1");
-        // A checkpoint every N rows: the memory tail and the append buffer only
-        // leave memory at a checkpoint, so without one a 2M x 1536d run holds
-        // 12 GiB of vectors plus their text.
-        let flush_rows = env_usize("INFINITY_SPANN_SCALE_FLUSH_ROWS", 0);
-        // Create the index **before** the bulk of the rows: that is the
-        // incremental write path (one partition per write, drained by a
-        // checkpoint) rather than one whole-table build at the end.
-        let index_first = env_usize("INFINITY_SPANN_SCALE_INDEX_FIRST_ROWS", 0);
-        let create_index = || {
-            e.execute_blocking(
-                "CREATE INDEX big_i ON big (v) USING SPANN WITH \
-                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
-            )
-            .unwrap();
-        };
-        let chunk = 500usize;
-        let mut peak_rss = crate::engine::state::process_rss_bytes();
-        let mut created_at = 0usize;
-        let mut written = 0usize;
-        let started = std::time::Instant::now();
-        while written < total {
-            let end = (written + chunk).min(total);
-            if bulk {
-                let rows: Vec<Vec<Literal>> = (written..end)
-                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
-                    .collect();
-                e.insert_literals("default_db.big", None, rows).unwrap();
-            } else {
-                let mut sql = String::from("INSERT INTO big VALUES ");
-                for (at, i) in (written..end).enumerate() {
-                    if at > 0 {
-                        sql.push(',');
-                    }
-                    sql.push_str(&format!("({i}, {})", vector(i)));
-                }
-                sql.push(';');
-                e.execute_blocking(&sql).unwrap();
-            }
-            written = end;
-            if index_first > 0 && created_at == 0 && written >= index_first {
-                create_index();
-                created_at = written;
-                eprintln!("index created at {written} rows, {:?}", started.elapsed());
-            }
-            if flush_rows > 0 && written % flush_rows < chunk {
-                crate::scheduler::block_on(e.flush()).unwrap();
-                eprintln!(
-                    "flushed at {written} rows, {:?}, RSS {} MiB",
-                    started.elapsed(),
-                    crate::engine::state::process_rss_bytes() / (1024 * 1024)
-                );
-            }
-            peak_rss = peak_rss.max(crate::engine::state::process_rss_bytes());
-        }
-        let import = started.elapsed();
-        eprintln!(
-            "load: {total} rows in {import:?}, peak RSS {} MiB",
-            peak_rss / (1024 * 1024)
-        );
-
-        let built = std::time::Instant::now();
-        if created_at == 0 {
-            create_index();
-        }
-        let build = built.elapsed();
-
-        let info = e.show_index_info("big", "big_i").expect("index info");
-        let text = info.other_parameters.as_str();
-        eprintln!(
-            "incremental scale: {total} rows × {dim}d | import {:?} | build {:?} | {text}",
-            import, build
-        );
-        assert!(
-            text.contains("spann_chunks = 0"),
-            "the incremental tree must not publish a chunk: {text}"
-        );
-        assert!(
-            text.contains(&format!("spann_rows = {total},")),
-            "every row must be in the tree: {text}"
-        );
-        assert!(
-            !text.contains("spann_partitions = 1,"),
-            "the tree must have split: {text}"
-        );
-
-        // A delete removes one member row and one mapping row; the query path
-        // must not change shape because of it.
-        let query_of = |id: usize| {
-            format!(
-                "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10) USING INDEX (big_i);",
-                vector(id)
-            )
-        };
-        let timed = |engine: &Engine, sql: &str| -> (std::time::Duration, Vec<Vec<String>>) {
-            let start = std::time::Instant::now();
-            let mut out = Vec::new();
-            for _ in 0..20 {
-                out = rows(engine, sql);
-            }
-            (start.elapsed() / 20, out)
-        };
-        let before_sql = query_of(7);
-        let (before, hits) = timed(&e, &before_sql);
-        assert_eq!(
-            hits.first().map(|r| r[0].clone()),
-            Some("7".to_string()),
-            "a self query must find itself: {hits:?}"
-        );
-        let after_query = e.show_index_info("big", "big_i").expect("index info");
-        assert!(
-            !after_query
-                .other_parameters
-                .contains("spann_candidates_per_query = 0.0"),
-            "the query did not use the tree: {}",
-            after_query.other_parameters
-        );
-        e.execute_blocking("DELETE FROM big WHERE id = 7;").unwrap();
-        // The deleted row is gone, so time the same *shape* of query against a
-        // row that is still there.
-        let query = query_of(8);
-        let (after, hits) = timed(&e, &query);
-        assert!(
-            !hits.iter().any(|row| row[0] == "7"),
-            "a deleted row must not come back: {hits:?}"
-        );
-        eprintln!("query avg before delete {before:?}, after delete {after:?}");
-        assert!(
-            after < before * 3,
-            "a single delete changed the query cost: {before:?} -> {after:?}"
-        );
-        let info = e.show_index_info("big", "big_i").expect("index info");
-        assert!(
-            info.other_parameters
-                .contains(&format!("spann_rows = {}", total - 1)),
-            "the delete must leave the tree: {}",
-            info.other_parameters
-        );
-
-        // Restart: one metadata row per partition, no chunk, no rebuild.
-        drop(e);
-        let reopened = Engine::open(dir.path()).unwrap();
-        let live_start = std::time::Instant::now();
-        let _ = reopened.live_row_count("big");
-        eprintln!("live_row_count after reopen: {:?}", live_start.elapsed());
-        let restart = std::time::Instant::now();
-        let hits = rows(&reopened, &query);
-        eprintln!("first query after reopen: {:?}", restart.elapsed());
-        assert_eq!(
-            hits.first().map(|r| r[0].clone()),
-            Some("8".to_string()),
-            "the reopened tree must answer the surviving row: {hits:?}"
-        );
-        let info = reopened
-            .show_index_info("big", "big_i")
-            .expect("index info");
-        assert!(
-            info.other_parameters
-                .contains(&format!("spann_rows = {}", total - 1)),
-            "the tree survived the restart: {}",
-            info.other_parameters
-        );
-    }
-
     #[test]
     fn spann_telemetry_reports_the_query_shape() {
         let vector = |i: usize| -> String {
@@ -15347,10 +15128,12 @@ mod tests {
             "spann_rows = 64",
             "spann_mem_rows = 0",
             "spann_mem_bytes = 0",
-            "spann_file_backed = ",
-            // The incremental tree writes no chunk; its partitions are
-            // RocksDB rows, so there is nothing for `LiveChunkFiles` to list.
-            "spann_chunks = 0",
+            // The checkpoint published the segment's tree, so the handle is the
+            // mapped chunk rather than the heap tree `CREATE INDEX` installed.
+            "spann_file_backed = true",
+            // One chunk per segment, the only live snapshot `LiveChunkFiles`
+            // lists after a dump.
+            "spann_chunks = 1",
             "spann_max_open_chunks = 6",
             "spann_degraded = tree",
             "spann_compaction_backlog = 0",
@@ -15368,8 +15151,6 @@ mod tests {
     /// `cleanup_index_chunks` reclaims its bytes - the reader-safe path, so a reader
     /// that already mapped the old chunk keeps it until it lets go.
     #[test]
-    #[ignore = "v2 chunk semantics: the incremental tree publishes no chunk, so there is no \
-                snapshot to supersede"]
     fn a_second_spann_dump_supersedes_the_previous_snapshot() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
@@ -15507,8 +15288,6 @@ mod tests {
     /// §17.5: the catalog still lists a chunk whose file is gone. The loader must
     /// skip it and the query must fall back - not fail, and not answer short.
     #[test]
-    #[ignore = "v2 chunk semantics: the incremental tree has no chunk file to lose; its rows are \
-                RocksDB records and survive independently of `idx_{id}/seg_*/`"]
     fn a_spann_chunk_file_that_vanished_falls_back_to_the_exact_scan() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
@@ -15574,11 +15353,10 @@ mod tests {
             .get(&reopened.table_key("default_db.cv"))
             .map(|entry| entry.spann.len())
             .unwrap_or(0);
-        // The incremental tree's partitions are RocksDB rows, so a chunk file
-        // is no longer the only copy: the reopen still loads a tree, and the
-        // answer above did not need the exact scan. The v2 fallback this test
-        // used to exercise is covered by `a_file_handle_merges_every_segment_chunk`.
-        assert_eq!(trees, 1, "the tree now survives a missing chunk");
+        // The chunk file is the only copy of the tree, so the reopen has
+        // nothing to map: the answer above came from the exact scan, not from a
+        // loader that found a second source.
+        assert_eq!(trees, 0, "a lost chunk leaves no tree to load");
     }
 
     /// Large-scale validation with a **small resident set** (§16.4).
@@ -16823,10 +16601,7 @@ mod tests {
                     crate::spann_mem::SpannHandle::File(chunks) => {
                         (chunks.len(), handle.len(), handle.shape().0)
                     }
-                    crate::spann_mem::SpannHandle::Memory(_)
-                    | crate::spann_mem::SpannHandle::Incremental(_) => {
-                        (0, handle.len(), handle.shape().0)
-                    }
+                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
                 },
                 None => (0, 0, 0),
             }
@@ -17114,10 +16889,7 @@ mod tests {
                     crate::spann_mem::SpannHandle::File(chunks) => {
                         (chunks.len(), handle.len(), handle.shape().0)
                     }
-                    crate::spann_mem::SpannHandle::Memory(_)
-                    | crate::spann_mem::SpannHandle::Incremental(_) => {
-                        (0, handle.len(), handle.shape().0)
-                    }
+                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
                 },
                 None => (0, 0, 0),
             }
@@ -17346,14 +17118,15 @@ mod tests {
     /// A query answers while rows are being inserted, and once the writer is
     /// done, the tree covers what it wrote.
     ///
-    /// This is the property the incremental tree exists for: the search reads
-    /// partitions through the store while the writer appends to the memory tail
-    /// and drains it, and a split only ever moves rows between partitions inside
-    /// one store batch - so a reader sees each row exactly once, never a
-    /// half-applied batch, and the two never deadlock on the engine's `tables`
-    /// lock. C-SPANN has the same contract: the fixup worker moves rows, the
-    /// search reads the tree, and neither takes a lock the other holds
-    /// (`cspann/fixup_worker.go`, `cspann/search.go`).
+    /// This is the split of work between writer and reader: the writer appends
+    /// to the **mem index** and the checkpoint folds that list into the
+    /// segment's tree, while the search reads the published chunk - so a reader
+    /// sees each row exactly once (from the chunk, the mem list, or the exact
+    /// scan for the rows neither covers), never a half-applied batch, and the
+    /// two never deadlock on the engine's `tables` lock. C-SPANN has the same
+    /// contract: the fixup worker moves rows, the search reads the tree, and
+    /// neither takes a lock the other holds (`cspann/fixup_worker.go`,
+    /// `cspann/search.go`).
     #[test]
     fn a_query_answers_while_rows_are_being_inserted() {
         let dir = tempdir().unwrap();
@@ -17399,8 +17172,9 @@ mod tests {
         .unwrap();
 
         // One writer, three readers. The writer inserts a batch and checkpoints
-        // after each one, so the readers race the tail, the checkpoint and the
-        // splits it causes (`max_partition_size = 32` splits constantly here).
+        // after each one, so the readers race the mem list, the chunk the
+        // checkpoint publishes to replace it, and the handle swap between the
+        // two (`max_partition_size = 32` makes every dump a full rebuild here).
         let total = 500 + batches * per_batch;
         std::thread::scope(|scope| {
             scope.spawn(|| {

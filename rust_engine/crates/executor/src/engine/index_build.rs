@@ -689,20 +689,19 @@ impl Engine {
         Ok(())
     }
 
-    /// Loads the newest spann chunk of `index` (`docs/SPANN_DESIGN.md` §6).
+    /// Loads the newest spann chunk of every live segment of `index`.
     ///
-    /// A rebuild-mode chunk is a whole-table snapshot, so the highest
-    /// `chunk_*.idx` id under `idx_{id}/seg_*/` **is** the index and the older
-    /// ones are superseded. The catalog's chunk list is not consulted: it is
-    /// keyed per segment, and the snapshot covers every segment anyway.
+    /// A chunk is **one segment's tree** and a checkpoint publishes a new one
+    /// per segment, so the highest `chunk_*.idx` id the catalog lists for a
+    /// segment is that segment's index and the older ids are superseded. This
+    /// is the same rule the HNSW loader applies, and the same one
+    /// `publish_index_chunks` maintains; nothing here reads a directory.
     pub(crate) fn load_spann_index(
         &self,
         table: &str,
         index: &str,
         options: &[(String, String)],
     ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
-        use index::spann::SpannMutStore as _;
-
         let table = self.qualified_table(table);
         let opts = crate::spann_mem::options_from(options).ok()?;
         let meta = self
@@ -712,47 +711,34 @@ impl Engine {
             .ok()?
             .into_iter()
             .find(|im| im.name == index && im.index_type.eq_ignore_ascii_case("SPANN"))?;
-        let dims = self.spann_dims_of(&table, &meta.column);
-        if dims == 0 {
+        if self.spann_dims_of(&table, &meta.column) == 0 {
             return None;
         }
-        // The incremental form: partitions are RocksDB rows, so a restart
-        // reads one metadata row and nothing else. No chunk, no CRC over a
-        // whole tree, no rebuild.
-        let store = storage::knn_index::spann::RocksSpannStore::new(
-            self.storage.catalog.store().clone(),
-            meta.id,
-            dims,
-        );
-        if store
-            .get_meta(index::spann::ROOT_KEY)
-            .ok()
-            .flatten()
-            .is_some()
-        {
-            let incremental = index::spann::IncrementalIndex::open(store, opts).ok()?;
-            return Some(std::sync::Arc::new(
-                crate::spann_mem::SpannHandle::Incremental(std::sync::Arc::new(incremental)),
-            ));
+        // `segment -> newest chunk`, from the catalog's chunk list.
+        let mut newest: std::collections::BTreeMap<u32, (u64, std::path::PathBuf)> =
+            Default::default();
+        for (segment, chunk_id, path) in self.catalog_index_files(&table, meta.id) {
+            let entry = newest.entry(segment).or_insert((chunk_id, path.clone()));
+            if chunk_id > entry.0 {
+                *entry = (chunk_id, path);
+            }
         }
-        // Migration: a directory written before the incremental form has v2
-        // chunks and no KV rows. A chunk is derived data (`rebuild` mode), so
-        // rebuilding from the table is equivalent and cheaper than decoding
-        // it. This runs at most once per index; afterwards the KV rows are
-        // the tree and the chunk is never read again.
-        let dir = self.hnsw_dir(&table, index)?;
-        let has_chunks = self
-            .segment_row_counts(&table)
-            .into_iter()
-            .any(|(segment, _)| {
-                !self
-                    .live_chunk_files(&table, index, segment, &dir)
-                    .is_empty()
-            });
-        if !has_chunks {
+        let mut chunks = Vec::new();
+        for (_, (_, path)) in newest {
+            match storage::knn_index::spann::FileIndex::open(&path, &opts) {
+                Ok(chunk) => chunks.push(std::sync::Arc::new(chunk)),
+                // A chunk whose header disagrees with the catalog is derived
+                // data: skip it, and the next checkpoint republishes the
+                // segment. A query on the gap falls back to the exact scan.
+                Err(_) => continue,
+            }
+        }
+        if chunks.is_empty() {
             return None;
         }
-        self.rebuild_one_spann_kv(&table, &meta, None)
+        Some(std::sync::Arc::new(crate::spann_mem::SpannHandle::File(
+            chunks,
+        )))
     }
 
     /// Lazily loads a spann index the first time a query needs it.
@@ -881,8 +867,8 @@ impl Engine {
                     }
                 }
             } else if im.index_type.eq_ignore_ascii_case("SPANN") {
-                // Rebuild-mode chunks are whole-table snapshots, so the newest
-                // chunk is the whole index; a stale one is superseded by id
+                // One chunk per segment, newest per segment is that segment's
+                // tree; a superseded id is already out of the catalog's list
                 // (`docs/SPANN_DESIGN.md` §9.4).
                 if let Some(tree) = self.load_spann_index(&im.table, &im.name, &im.options) {
                     let tkey = self.table_key(&im.table);
@@ -4440,64 +4426,6 @@ impl Engine {
         }
     }
 
-    /// Applies the spann memory tail to the incremental tree.
-    ///
-    /// This is the whole write path for the incremental form: one batch of
-    /// member rows plus one batch of row→partition rows, then at most a
-    /// handful of fixups. Nothing here reads a segment, rebuilds a tree or
-    /// allocates a vector buffer proportional to the table.
-    pub(crate) fn flush_spann_tail(&self, table: &str, index_id: u64) -> common::Result<()> {
-        let tkey = self.table_key(table);
-        let handle = {
-            let tables = self.tables.lock().unwrap();
-            tables
-                .get(&tkey)
-                .and_then(|entry| entry.spann.get(&index_id))
-                .cloned()
-        };
-        let Some(handle) = handle else {
-            return Ok(());
-        };
-        let crate::spann_mem::SpannHandle::Incremental(index) = handle.as_ref() else {
-            return Ok(());
-        };
-        let column = self.spann_column_of(table, index_id)?;
-        let fetch = |row: u64| self.spann_row_vector(table, column, row);
-        let rows = {
-            let mut tables = self.tables.lock().unwrap();
-            tables
-                .get_mut(&tkey)
-                .map(|entry| entry.spann_mem.remove(&index_id).unwrap_or_default())
-                .unwrap_or_default()
-        };
-        if !rows.is_empty() {
-            let batch: Vec<(u64, &[f32])> =
-                rows.iter().map(|(seq, v)| (*seq, v.as_slice())).collect();
-            let result = index
-                .insert(&batch, &fetch)
-                // 16 fixups per flush: a split is the one operation that reads raw
-                // vectors, and a commit must not wait for a whole tree's worth.
-                .and_then(|()| index.maintain(&fetch, 16).map(|_| ()));
-            if let Err(err) = result {
-                // The tail is the authoritative copy until the batch lands; put it
-                // back so the next flush retries instead of losing a committed row.
-                let mut tables = self.tables.lock().unwrap();
-                if let Some(entry) = tables.get_mut(&tkey) {
-                    entry.spann_mem.entry(index_id).or_default().extend(rows);
-                }
-                return Err(common::Error::Invalid(err.to_string()));
-            }
-        }
-        // A restart replays commits into the block files and the append
-        // buffer, not into the memory tail: those rows are live but the tree
-        // never saw them. This runs **after** the tail, so the rows this flush
-        // just wrote are never "missing" - backfilling first made every flush
-        // re-read them from the blocks, which is what made an index-first load
-        // spend minutes per 5000 rows.
-        self.backfill_spann_kv(table, column, index);
-        Ok(())
-    }
-
     /// The declared dimension of `column`, or `0` when it is not a vector.
     fn spann_dims_of(&self, table: &str, column: &str) -> usize {
         self.table_schema(table)
@@ -4512,24 +4440,22 @@ impl Engine {
             .unwrap_or(0)
     }
 
-    /// Drops an incremental tree's rows. Compaction renumbers every row, and
-    /// the tree is keyed by row id, so there is nothing to preserve: the next
-    /// `CREATE INDEX` rebuilds it over the merged segment.
-    /// Builds one index's incremental tree and installs the handle.
+    /// Builds one index's tree over the table's live rows and installs it.
     ///
-    /// This is the single entry point used by `CREATE INDEX`, compaction and
-    /// the v2-chunk migration: all three want "the tree over the table's live
-    /// rows, in RocksDB". The build is the out-of-core one, so the peak is the
-    /// tree (208 B/row), not the column.
-    fn rebuild_one_spann_kv(
+    /// The single entry point used by `CREATE INDEX`, compaction and a restart
+    /// that finds no chunk: all three want "the tree over the live rows". The
+    /// build is the out-of-core one, so the peak is the tree (208 B/row), not
+    /// the column. The tree is **in memory** - the next checkpoint publishes it
+    /// as the segment's `chunk_{n}.idx` and swaps this handle for the file
+    /// form, exactly like a HNSW memory segment.
+    fn rebuild_one_spann(
         &self,
         table: &str,
         im: &catalog::IndexMeta,
         segments: Option<&std::collections::HashSet<u32>>,
     ) -> Option<std::sync::Arc<crate::spann_mem::SpannHandle>> {
         let table = self.qualified_table(table);
-        let dims = self.spann_dims_of(&table, &im.column);
-        if dims == 0 {
+        if self.spann_dims_of(&table, &im.column) == 0 {
             return None;
         }
         let options = crate::spann_mem::options_from(&im.options).ok()?;
@@ -4537,41 +4463,22 @@ impl Engine {
         // Live segments only. In compaction, the source segments are dropped
         // at `compact_ts`, but the compaction's own bottom half still reads
         // below it and would see their blocks.
-        let built = self.spann_build_in(
-            &table,
-            column,
-            options.clone(),
-            &self.dir.join("tmp"),
-            segments,
-        )?;
-        let store = storage::knn_index::spann::RocksSpannStore::new(
-            self.storage.catalog.store().clone(),
-            im.id,
-            dims,
-        );
-        if store.clear().is_err() {
-            return None;
-        }
-        if crate::spann_mem::import_spann_tree(&store, &built).is_err() {
-            return None;
-        }
-        let index = index::spann::IncrementalIndex::open(store, options).ok()?;
-        Some(std::sync::Arc::new(
-            crate::spann_mem::SpannHandle::Incremental(std::sync::Arc::new(index)),
-        ))
+        let built =
+            self.spann_build_in(&table, column, options, &self.dir.join("tmp"), segments)?;
+        Some(std::sync::Arc::new(crate::spann_mem::SpannHandle::Memory(
+            std::sync::Arc::new(built),
+        )))
     }
 
-    /// Rebuilds every SPANN index of `table` over its current live rows.
-    ///
-    /// Compaction calls this after the merge renumbered every row; the
-    /// migration path calls it when it finds a directory that only has v2
-    /// chunks.
     /// Rebuilds every SPANN index of `table` over the given segments (all live
-    /// ones when `segments` is `None`). Compaction
-    /// passes the surviving segments: the sources are dropped at
-    /// `compact_ts`, but the bottom half that calls this still reads below it
-    /// and would otherwise fold their rows in again.
-    pub(crate) fn rebuild_spann_kv_in(
+    /// ones when `segments` is `None`).
+    ///
+    /// Compaction calls this after the merge renumbered every row, and passes
+    /// the surviving segments: the sources are dropped at `compact_ts`, but the
+    /// bottom half that calls this still reads below it and would otherwise fold
+    /// their rows in again. The rebuilt tree stays in memory; the checkpoint
+    /// that follows publishes each segment's chunk.
+    pub(crate) fn rebuild_spann_in(
         &self,
         table: &str,
         segments: Option<&std::collections::HashSet<u32>>,
@@ -4595,7 +4502,7 @@ impl Engine {
             .iter()
             .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
         {
-            if let Some(handle) = self.rebuild_one_spann_kv(&qualified, im, Some(segments)) {
+            if let Some(handle) = self.rebuild_one_spann(&qualified, im, Some(segments)) {
                 self.tables
                     .lock()
                     .unwrap()
@@ -4606,55 +4513,6 @@ impl Engine {
             }
         }
         Ok(())
-    }
-
-    /// Inserts every live row the tree does not hold yet.
-    ///
-    /// A restart replays commits into the block files and the append buffer,
-    /// not into the memory tail, so without this the rows written after the
-    /// last checkpoint would stay outside the tree until the next `CREATE
-    /// INDEX`. The `row_count` comparison makes the common case one integer
-    /// read; the walk only runs when the tree is actually behind.
-    fn backfill_spann_kv(
-        &self,
-        table: &str,
-        column: usize,
-        index: &index::spann::IncrementalIndex<storage::knn_index::spann::RocksSpannStore>,
-    ) {
-        use index::spann::SpannMutStore as _;
-
-        let live = self.live_row_count(table).unwrap_or(0) + self.buffered_row_count(table);
-        if index.row_count() >= live {
-            return;
-        }
-        let store = index.store();
-        // Phase 1: the missing rows **with** their vectors. The callback is
-        // where the row's text already is, so parsing here costs one cell; this
-        // used to collect ids only and then call `spann_row_vector` per row,
-        // which re-decoded and re-rendered the row's whole block (8192 x 1536
-        // values of text) for every missing row. Inserting inside the callback
-        // would deadlock - a split's fetch re-enters `visible_block_ids` /
-        // `for_each_buffered_cell`, and the buffered half holds `tables` while
-        // it calls back - so the walk only collects.
-        let mut missing: Vec<(u64, Vec<f32>)> = Vec::new();
-        self.for_each_block_cell(table, column, None, |seq, text| {
-            let row = seq as u64;
-            if store.row_partition(row).ok().flatten().is_none() {
-                let vector = crate::engine::state::parse_vec_f32(text);
-                if !vector.is_empty() {
-                    missing.push((row, vector));
-                }
-            }
-        });
-        // Phase 2: insert outside any engine lock, one batch at a time.
-        let fetch = |row: u64| self.spann_row_vector(table, column, row);
-        for chunk in missing.chunks(1024) {
-            let refs: Vec<(u64, &[f32])> = chunk
-                .iter()
-                .map(|(id, vector)| (*id, vector.as_slice()))
-                .collect();
-            let _ = index.insert(&refs, &fetch);
-        }
     }
 
     fn spann_column_of(&self, table: &str, index_id: u64) -> common::Result<usize> {
@@ -4696,7 +4554,7 @@ impl Engine {
         let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
             return;
         };
-        let mut victims: Vec<(String, String, u64, bool)> = Vec::new();
+        let mut victims: Vec<(String, String)> = Vec::new();
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("SPANN") {
                 continue;
@@ -4707,39 +4565,16 @@ impl Engine {
             let Ok(opts) = crate::spann_mem::options_from(&im.options) else {
                 continue;
             };
-            let incremental = {
-                let tables = self.tables.lock().unwrap();
-                tables
-                    .get(&tkey)
-                    .and_then(|entry| entry.spann.get(&im.id))
-                    .map(|handle| {
-                        matches!(
-                            handle.as_ref(),
-                            crate::spann_mem::SpannHandle::Incremental(_)
-                        )
-                    })
-                    .unwrap_or(false)
-            };
-            // The incremental flush appends ≤ `8 × max_partition_size` rows to
-            // existing leaves, so it can run far more often than the rebuild
-            // path, where one dump costs a whole segment.
-            let threshold = if incremental {
-                (opts.max_partition_size.saturating_mul(8)).max(1)
-            } else {
-                crate::spann_mem::mem_dump_threshold(&opts)
-            };
-            if rows >= threshold {
-                victims.push((im.table.clone(), im.name.clone(), im.id, incremental));
+            // One dump costs a whole segment's tree, so the tail waits for the
+            // same `mem_index_capacity` bound the other indexes use.
+            if rows >= crate::spann_mem::mem_dump_threshold(&opts) {
+                victims.push((im.table.clone(), im.name.clone()));
             }
         }
-        for (table, index, id, incremental) in victims {
-            if incremental {
-                // A failed flush leaves the rows in the mem index: they are
-                // still visible (the query merges the list), so the statement
-                // that triggered it has nothing to undo.
-                let _ = self.flush_spann_tail(&table, id);
-                continue;
-            }
+        for (table, index) in victims {
+            // A failed dump leaves the rows in the mem index: they are still
+            // visible (the query merges the tail), so the statement that
+            // triggered it has nothing to undo.
             if self.dump_index_transaction(&table, &index).await.is_ok() {
                 storage::trim_allocator();
             }
