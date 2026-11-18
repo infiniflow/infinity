@@ -409,8 +409,34 @@ impl Engine {
                 rows.retain(|(seq, _)| !gone.contains(seq));
             }
         }
+        // The incremental tree owns its rows, so a delete must remove the
+        // member row as well as the tail's copy: leaving it behind would make
+        // the leaf drift from the table without any count to detect it (the
+        // old `all_covered` check).
+        let incremental: Vec<(u64, Arc<crate::spann_mem::SpannHandle>)> = entry
+            .spann
+            .iter()
+            .filter(|(_, handle)| {
+                matches!(
+                    handle.as_ref(),
+                    crate::spann_mem::SpannHandle::Incremental(_)
+                )
+            })
+            .map(|(index_id, handle)| (*index_id, handle.clone()))
+            .collect();
         entry.mirror_dirty = true;
         entry.mirror_epoch += 1;
+        drop(tables);
+        if !incremental.is_empty() {
+            let rows: Vec<u64> = ids.iter().map(|s| *s as u64).collect();
+            for (_, handle) in incremental {
+                if let crate::spann_mem::SpannHandle::Incremental(index) = handle.as_ref() {
+                    // A failure leaves the row in `deleted_ids`, so the query
+                    // filter still hides it; the next delete retries.
+                    let _ = index.delete_batch(&rows);
+                }
+            }
+        }
         first
     }
 

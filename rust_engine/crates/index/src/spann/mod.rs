@@ -19,7 +19,10 @@
 //! as the radius pruning bound (§8.3).
 
 pub mod build;
+pub mod incremental;
 pub mod kmeans;
+pub mod kv;
+pub mod mut_store;
 pub mod partition;
 pub mod quantize;
 pub mod search;
@@ -27,6 +30,9 @@ pub mod source;
 pub mod store;
 
 pub use build::{build_tree, BuiltTree};
+pub use incremental::{IncrementalIndex, MaintainReport, TreeStats};
+pub use kv::{MetaValue, PartitionState};
+pub use mut_store::{KvOp, MemKvStore, SpannMutStore};
 pub use partition::{Member, Partition};
 pub use quantize::{Code, QueryCode, Rotation};
 pub use search::{Beam, SearchSet};
@@ -195,6 +201,10 @@ pub enum SpannError {
     InvalidOption(&'static str, String),
     /// A chunk could not be parsed; the message names the failing section.
     Corrupt(String),
+    /// The backing store (RocksDB, a file, a test double) rejected an
+    /// operation. Kept as an opaque string so `crates/index` stays free of
+    /// the storage crate's error type.
+    Storage(String),
 }
 
 impl Display for SpannError {
@@ -206,6 +216,7 @@ impl Display for SpannError {
             }
             SpannError::InvalidOption(name, why) => write!(f, "spann: invalid {name}: {why}"),
             SpannError::Corrupt(what) => write!(f, "spann: corrupt chunk: {what}"),
+            SpannError::Storage(what) => write!(f, "spann: store: {what}"),
         }
     }
 }

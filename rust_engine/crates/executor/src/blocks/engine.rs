@@ -1944,6 +1944,27 @@ impl Engine {
                         commit_ts: chunk_ts,
                     }]
                 } else if im.index_type.eq_ignore_ascii_case("SPANN") {
+                    // The incremental tree writes no chunk: its partitions are
+                    // RocksDB rows, so the checkpoint's only job is to apply the
+                    // tail. Returning early here is also what removes the
+                    // segment-wide rebuild from `flush()`.
+                    let incremental = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.spann.get(&(index_id as u64)))
+                            .map(|handle| {
+                                matches!(
+                                    handle.as_ref(),
+                                    crate::spann_mem::SpannHandle::Incremental(_)
+                                )
+                            })
+                            .unwrap_or(false)
+                    };
+                    if incremental {
+                        let _ = self.flush_spann_tail(table, index_id as u64);
+                        continue;
+                    }
                     // Incremental dump (`docs/SPANN_DESIGN.md` §9.4): a sealed
                     // segment is immutable, so a live chunk that already covers
                     // this segment's live rows **and was built with the catalog's
@@ -5053,7 +5074,7 @@ impl Engine {
         &self,
         table: &str,
         column: usize,
-        segment: Option<u32>,
+        segments: Option<&std::collections::HashSet<u32>>,
         mut sink: impl FnMut(usize, &str),
     ) {
         let key = self.table_key(table);
@@ -5062,7 +5083,7 @@ impl Engine {
             return;
         };
         for (seq, values) in &entry.pending_rows {
-            if segment.is_some_and(|only| (*seq as u64 >> 32) as u32 != only) {
+            if segments.is_some_and(|only| !only.contains(&((*seq as u64 >> 32) as u32))) {
                 continue;
             }
             if let Some(value) = values.get(column) {
@@ -5076,6 +5097,23 @@ impl Engine {
         table: &str,
         column: usize,
         segment: Option<u32>,
+        f: impl FnMut(usize, &str),
+    ) {
+        let segments: Option<std::collections::HashSet<u32>> =
+            segment.map(|segment| std::collections::HashSet::from([segment]));
+        self.for_each_block_cell_in(table, column, segments.as_ref(), f);
+    }
+
+    /// [`Self::for_each_block_cell`] over a **set** of segments. Compaction
+    /// needs this: the merge marks the source segments dropped at its own ts,
+    /// and a reader below that ts (the compaction's own bottom half) still
+    /// sees their blocks. Walking them would put rows the merge just retired
+    /// into the rebuilt tree.
+    pub(crate) fn for_each_block_cell_in(
+        &self,
+        table: &str,
+        column: usize,
+        segments: Option<&std::collections::HashSet<u32>>,
         mut f: impl FnMut(usize, &str),
     ) {
         let table = self.qualified_table(table);
@@ -5093,7 +5131,7 @@ impl Engine {
         let root = self.blocks_root();
         let wanted = [column];
         for id in self.visible_block_ids(&table) {
-            if segment.is_some_and(|s| id.segment_id != s) {
+            if segments.is_some_and(|set| !set.contains(&id.segment_id)) {
                 continue;
             }
             if let Some(cells) =
@@ -5111,7 +5149,69 @@ impl Engine {
         // Read them under the buffer's own lock, one cell at a time: cloning it
         // first (`pending_rows_of`) copied every buffered row's whole embedding to
         // keep one column of one segment.
-        self.for_each_buffered_cell(&table, column, segment, f);
+        self.for_each_buffered_cell(&table, column, segments, f);
+    }
+
+    /// One row's vector, by row id, for a split's re-clustering.
+    ///
+    /// A split touches at most `max_partition_size` rows, so the `O(blocks)`
+    /// walk over `visible_block_ids` is bounded by the partition, not the
+    /// table. This is the only place the incremental path needs a raw vector:
+    /// inserts encode from the value they were handed, and deletes find their
+    /// leaf through the row→partition row.
+    pub(crate) fn spann_row_vector(
+        &self,
+        table: &str,
+        column: usize,
+        row: u64,
+    ) -> Option<Vec<f32>> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(&table)
+            .ok()
+            .flatten()?;
+        let types: Vec<i32> = meta
+            .types
+            .iter()
+            .map(|t| column_type_of(t))
+            .collect::<Option<Vec<_>>>()?;
+        let root = self.blocks_root();
+        let segment = (row >> 32) as u32;
+        let block_no = ((row as u32) / DEFAULT_BLOCK_CAPACITY as u32) as u16;
+        for id in self.visible_block_ids(&table) {
+            if id.segment_id != segment || id.block_id != block_no {
+                continue;
+            }
+            let Some(cells) =
+                self.decode_block_cells(&table, &root, &meta, &types, id, Some(&[column]))
+            else {
+                continue;
+            };
+            for (seq, values) in cells {
+                if seq as u64 != row {
+                    continue;
+                }
+                if let Some(text) = values.get(column) {
+                    let vector = crate::engine::state::parse_vec_f32(text);
+                    if !vector.is_empty() {
+                        return Some(vector);
+                    }
+                }
+            }
+        }
+        let mut found = None;
+        let only = std::collections::HashSet::from([segment]);
+        self.for_each_buffered_cell(&table, column, Some(&only), |seq, text| {
+            if seq as u64 == row && found.is_none() {
+                let vector = crate::engine::state::parse_vec_f32(text);
+                if !vector.is_empty() {
+                    found = Some(vector);
+                }
+            }
+        });
+        found
     }
 
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).

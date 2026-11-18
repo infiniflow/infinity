@@ -8,8 +8,9 @@
 use std::sync::Arc;
 
 use common::{Error, Result};
-use index::spann::{Encode, Options, SpannIndex};
+use index::spann::{Encode, IncrementalIndex, Options, SpannIndex};
 use index::vector::Metric;
+use storage::knn_index::spann::RocksSpannStore;
 
 /// The `WITH (…)` keys `CREATE INDEX … USING SPANN` accepts.
 pub(crate) const OPTION_KEYS: &[&str] = &[
@@ -27,6 +28,76 @@ pub(crate) const OPTION_KEYS: &[&str] = &[
 ];
 
 /// Translates the DDL options into the builder's knobs.
+/// Copies a freshly built `SpannIndex` into the RocksDB store, so the builder's
+/// tree is the one the incremental path maintains from then on. `CREATE INDEX`
+/// pays one build; every write after it touches a single partition.
+pub(crate) fn import_spann_tree(
+    store: &RocksSpannStore,
+    tree: &SpannIndex,
+) -> std::result::Result<(), index::spann::SpannError> {
+    use index::spann::{KvOp, MetaValue, PartitionState, SpannMutStore, SpannStore, ROOT_KEY};
+
+    let partitions = tree.store().partitions();
+    // A branch names its children as member ids; the metadata wants the
+    // inverse edge, and the builder does not store it.
+    let mut parents: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+    for partition in partitions {
+        for child in &partition.children {
+            parents.insert(*child, partition.key);
+        }
+    }
+    let mut counter = 1u32;
+    let mut ops = Vec::with_capacity(4096);
+    for partition in partitions {
+        counter = counter.max(partition.key + 1);
+        ops.push(KvOp::PutMeta {
+            key: partition.key,
+            meta: MetaValue {
+                level: partition.level,
+                state: PartitionState::Ready,
+                parent: if partition.key == ROOT_KEY {
+                    ROOT_KEY
+                } else {
+                    parents.get(&partition.key).copied().unwrap_or(ROOT_KEY)
+                },
+                radius: partition.radius,
+                centroid: partition.centroid.clone(),
+                target1: 0,
+                target2: 0,
+                source: 0,
+            },
+        });
+        for member in &partition.members {
+            ops.push(KvOp::PutMember {
+                partition: partition.key,
+                member: member.clone(),
+            });
+            // A leaf is "no children", not "level 1": a split by row count
+            // leaves shallow branches whose level is above the deepest one
+            // (`mixed_depth`), and their members are rows, not child keys.
+            if partition.children.is_empty() {
+                ops.push(KvOp::PutRowMap {
+                    row: member.id,
+                    partition: partition.key,
+                });
+            }
+        }
+        if ops.len() >= 4096 {
+            store.commit(&ops)?;
+            ops.clear();
+        }
+    }
+    ops.push(KvOp::SetCounter(counter as u64));
+    // The counter `open` reads instead of walking every member row (the walk
+    // is what made the first query after a restart cost seconds).
+    ops.push(KvOp::SetStat {
+        name: "rows".to_string(),
+        value: tree.len() as u64,
+    });
+    store.commit(&ops)?;
+    Ok(())
+}
+
 pub(crate) fn options_from(opts: &[(String, String)]) -> Result<Options> {
     let mut out = Options::default();
     for (key, value) in opts {
@@ -125,13 +196,23 @@ pub(crate) fn mem_dump_threshold(opts: &Options) -> usize {
 /// test that runs the same queries through both — so the rest of the engine only
 /// ever sees this enum.
 pub(crate) enum SpannHandle {
-    /// Built in this process and not yet published to a chunk.
+    /// Built in this process and not yet published to a chunk. The incremental
+    /// form replaced it as the production tree (`CREATE INDEX` now imports the
+    /// build into RocksDB); it is kept for the unit tests that pin the search
+    /// contract against a `MemStore`.
+    #[allow(dead_code)]
     Memory(Arc<SpannIndex>),
     /// Served straight out of `chunk_{n}.idx`, **one chunk per segment**: the
     /// slot bytes are page cache, which is what makes 50M rows fit in 8 GB
     /// (§19.3), and per-segment chunks let a checkpoint republish only the
     /// segment it touched (§9.4).
+    #[allow(dead_code)]
     File(Vec<Arc<storage::knn_index::spann::FileIndex>>),
+    /// The incremental tree: one partition per RocksDB row, mutated in place
+    /// (`index::spann::incremental`). This is the production form; the two
+    /// above are the `index_delta_mode = rebuild` legacy and the direct
+    /// in-memory build.
+    Incremental(Arc<IncrementalIndex<RocksSpannStore>>),
 }
 
 /// Orders a union of per-chunk answers the way the metric ranks, so truncating
@@ -148,6 +229,7 @@ impl SpannHandle {
         match self {
             SpannHandle::Memory(index) => index.len(),
             SpannHandle::File(chunks) => chunks.iter().map(|c| c.len()).sum(),
+            SpannHandle::Incremental(index) => index.row_count(),
         }
     }
 
@@ -155,12 +237,14 @@ impl SpannHandle {
         match self {
             SpannHandle::Memory(index) => index.dim(),
             SpannHandle::File(chunks) => chunks.first().map(|c| c.dims()).unwrap_or(0),
+            SpannHandle::Incremental(index) => index.dims(),
         }
     }
 
     pub(crate) fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
         match self {
             SpannHandle::Memory(index) => index.search(q, k, beam),
+            SpannHandle::Incremental(index) => index.search(q, k, beam).unwrap_or_default(),
             SpannHandle::File(chunks) => {
                 // One tree per segment (§3 I6) and the trees share nothing, so a
                 // query is N independent descents (§8.1). A single segment keeps
@@ -203,6 +287,7 @@ impl SpannHandle {
                 ids.sort_unstable();
                 ids
             }
+            SpannHandle::Incremental(index) => index.row_ids().unwrap_or_default(),
         }
     }
 
@@ -237,6 +322,9 @@ impl SpannHandle {
         for attempt in 0..3 {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
+                SpannHandle::Incremental(index) => index
+                    .search_filtered(q, k, Some(width), &ids)
+                    .unwrap_or_default(),
                 SpannHandle::File(chunks) => {
                     let per_chunk: Vec<Vec<(u64, f32)>> = if chunks.len() > 1
                         && !crate::fanout::on_a_runtime_worker()
@@ -288,6 +376,10 @@ impl SpannHandle {
                 chunks.iter().map(|c| c.partitions()).sum(),
                 chunks.iter().map(|c| c.height()).max().unwrap_or(0),
             ),
+            SpannHandle::Incremental(index) => index
+                .stats()
+                .map(|stats| (stats.partitions, stats.height))
+                .unwrap_or((0, 0)),
         }
     }
 
@@ -298,12 +390,14 @@ impl SpannHandle {
     pub(crate) fn mem_usage(&self) -> usize {
         match self {
             SpannHandle::Memory(index) => index.mem_usage(),
-            SpannHandle::File(_) => 0,
+            // The incremental tree lives in RocksDB (block cache + SSTs), so
+            // it owns no heap the watermark can charge.
+            SpannHandle::File(_) | SpannHandle::Incremental(_) => 0,
         }
     }
 
     pub(crate) fn is_file_backed(&self) -> bool {
-        matches!(self, SpannHandle::File(_))
+        matches!(self, SpannHandle::File(_) | SpannHandle::Incremental(_))
     }
 }
 
@@ -588,7 +682,22 @@ impl crate::Engine {
         dir: &std::path::Path,
         segment: Option<u32>,
     ) -> Option<index::spann::SpannIndex> {
-        let (ids, dim, path) = self.spann_scratch(table, column, segment, dir).ok()??;
+        let segments = segment.map(|segment| std::collections::HashSet::from([segment]));
+        self.spann_build_in(table, column, opts, dir, segments.as_ref())
+    }
+
+    /// [`Self::spann_build`] over a **set** of segments (compaction rebuilds
+    /// from the merged segment only: the source segments are dropped at the
+    /// compaction's ts, which the bottom half is still below).
+    pub(crate) fn spann_build_in(
+        &self,
+        table: &str,
+        column: usize,
+        opts: index::spann::Options,
+        dir: &std::path::Path,
+        segments: Option<&std::collections::HashSet<u32>>,
+    ) -> Option<index::spann::SpannIndex> {
+        let (ids, dim, path) = self.spann_scratch(table, column, segments, dir).ok()??;
         let built = storage::knn_index::spann::build_from_scratch(&path, ids, dim, opts).ok();
         let _ = std::fs::remove_file(&path);
         built
@@ -626,7 +735,7 @@ impl crate::Engine {
         &self,
         table: &str,
         column: usize,
-        segment: Option<u32>,
+        segments: Option<&std::collections::HashSet<u32>>,
         dir: &std::path::Path,
     ) -> Result<Option<(Vec<u64>, usize, std::path::PathBuf)>> {
         use std::io::Write;
@@ -649,8 +758,16 @@ impl crate::Engine {
         let mut ragged: Option<(usize, usize)> = None;
         let mut failure: Option<std::io::Error> = None;
         let mut bytes: Vec<u8> = Vec::new();
-        self.for_each_block_cell(table, column, segment, |seq, text| {
+        // A row can be in a block *and* in the append buffer: a commit
+        // publishes the block, the in-memory copy is cleared by the next
+        // checkpoint. Compaction's bottom half hits exactly that window, and a
+        // duplicate would put the same row id in two leaves.
+        let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        self.for_each_block_cell_in(table, column, segments, |seq, text| {
             if ragged.is_some() || failure.is_some() {
+                return;
+            }
+            if !seen.insert(seq as u64) {
                 return;
             }
             let vector = crate::engine::state::parse_vec_f32(text);

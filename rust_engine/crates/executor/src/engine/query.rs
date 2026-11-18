@@ -2265,14 +2265,36 @@ impl Engine {
                         if rows >= options.min_rows
                             && resident <= crate::spann_mem::MEMORY_TREE_MAX_BYTES
                         {
-                            let Some(built) =
-                                self.spann_build(table, col, options, &self.dir.join("tmp"), None)
-                            else {
+                            let Some(built) = self.spann_build(
+                                table,
+                                col,
+                                options.clone(),
+                                &self.dir.join("tmp"),
+                                None,
+                            ) else {
                                 return Err(Error::Invalid(format!(
                                     "no vectors to index in '{table}.{column}'"
                                 )));
                             };
-                            let tree = std::sync::Arc::new(built);
+                            // The build is a one-off, then the tree moves to
+                            // RocksDB and every later write touches one
+                            // partition (`index::spann::incremental`). Keeping
+                            // the builder's tree resident was the memory that
+                            // grew with the table, and re-running it was the
+                            // rebuild on every dump.
+                            let store = storage::knn_index::spann::RocksSpannStore::new(
+                                self.storage.catalog.store().clone(),
+                                index_id as u64,
+                                dims,
+                            );
+                            if let Err(err) = store.clear() {
+                                return Err(Error::Invalid(err.to_string()));
+                            }
+                            if let Err(err) = crate::spann_mem::import_spann_tree(&store, &built) {
+                                return Err(Error::Invalid(err.to_string()));
+                            }
+                            let incremental = index::spann::IncrementalIndex::open(store, options)
+                                .map_err(|err| Error::Invalid(err.to_string()))?;
                             let key = self.table_key(table);
                             self.tables
                                 .lock()
@@ -2282,14 +2304,12 @@ impl Engine {
                                 .spann
                                 .insert(
                                     index_id,
-                                    std::sync::Arc::new(crate::spann_mem::SpannHandle::Memory(
-                                        tree,
-                                    )),
+                                    std::sync::Arc::new(
+                                        crate::spann_mem::SpannHandle::Incremental(
+                                            std::sync::Arc::new(incremental),
+                                        ),
+                                    ),
                                 );
-                            // The tree is heap (centroids + codes, and the member
-                            // vectors in `encode = none`): fold it into the
-                            // watermark charge so `seal_pressure` sees it.
-                            self.refresh_memindex_charge(table);
                         }
                     }
                 }

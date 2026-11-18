@@ -652,14 +652,11 @@ impl Engine {
                     entry.vector.clear();
                     entry.ivf.clear();
                     entry.ivf_mem.clear();
-                    // A spann tree is built per segment over `segment << 32 | offset`
-                    // (`docs/SPANN_DESIGN.md` §3 I6, §9.8): once the merge renumbers
-                    // the rows, every id in it names a different row, so the handle
-                    // is not "a few stale entries" but a wrong answer. Drop both the
-                    // trees and the mem index; the next checkpoint rebuilds the
-                    // merged segment's chunk (`publish_spann_chunks`), and until then
-                    // `knn_candidates` falls back to the exact scan instead of
-                    // serving the retired ids.
+                    // A spann tree is keyed by row id, and the merge renumbers
+                    // every row: the handle is not "a few stale entries" but a
+                    // wrong answer. Drop it here; the rebuild right after the
+                    // commit (`rebuild_spann_kv`) refills the tree from the
+                    // merged rows.
                     entry.spann.clear();
                     entry.spann_mem.clear();
                     entry.block_index = None;
@@ -785,6 +782,20 @@ impl Engine {
         // The merge renumbered every row, so every index posting now points at
         // a dead row id. Rebuild the declared indexes from the merged rows.
         self.rebuild_indexes()?;
+        // The spann tree is row-id keyed, so the merge invalidated it above.
+        // Rebuild it from the merged rows now, inside the compaction's bottom
+        // half: the commit stays unpublished until it is done, so no query can
+        // observe the table between "tree dropped" and "tree rebuilt". The
+        // segment set excludes the sources explicitly - they are only dropped
+        // at `compact_ts`, and this half still reads below it.
+        let live_segments: std::collections::HashSet<u32> = self
+            .segment_row_counts(table)
+            .into_iter()
+            .map(|(segment, _)| segment)
+            .filter(|segment| !sources.contains(segment))
+            .chain(std::iter::once(next_seg))
+            .collect();
+        self.rebuild_spann_kv_in(table, Some(&live_segments))?;
         if crate::engine::text_index::ft_trace_enabled(&self.table_key(table)) {
             let (segments, live_rows) = {
                 let tables = self.tables.lock().unwrap();
