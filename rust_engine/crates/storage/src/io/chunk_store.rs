@@ -64,6 +64,32 @@ pub trait ChunkStore: Send + Sync + std::fmt::Debug {
         self.write(path, bytes)
     }
 
+    /// [`Self::write`] / [`Self::write_dedicated`] for bytes **produced while
+    /// they are written**, returning how many there were.
+    ///
+    /// The rest of this trait takes the whole value, which is right for a block
+    /// and wrong for a spann chunk: one segment's tree is tens of MB, and
+    /// `knn_index::spann::writer::write_to` streams it so the peak is a buffer,
+    /// not the chunk. `dedicated` means what [`Self::write_dedicated`] means.
+    ///
+    /// The default buffers, so a backend that cannot stream still publishes.
+    fn write_streaming(
+        &self,
+        path: &Path,
+        dedicated: bool,
+        produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> std::io::Result<u64> {
+        let mut buf: Vec<u8> = Vec::new();
+        produce(&mut buf)?;
+        let len = buf.len() as u64;
+        if dedicated {
+            self.write_dedicated(path, &buf)?;
+        } else {
+            self.write(path, &buf)?;
+        }
+        Ok(len)
+    }
+
     /// Reads the whole value at `path`.
     fn read(&self, path: &Path) -> std::io::Result<Vec<u8>>;
 
@@ -150,6 +176,17 @@ impl ChunkStore for LocalChunkStore {
     fn is_local(&self) -> bool {
         true
     }
+
+    /// Off a persistence profile the streamed bytes *are* the file, so they go
+    /// straight to the temp+rename publisher instead of being buffered first.
+    fn write_streaming(
+        &self,
+        path: &Path,
+        _dedicated: bool,
+        produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> std::io::Result<u64> {
+        crate::format::write_synced_stream(path, produce)
+    }
 }
 
 /// The persistence backend: every chunk file is also published as an object.
@@ -215,6 +252,32 @@ impl PersistentChunkStore {
         ))
     }
 
+    /// A spool file inside the object workspace.
+    ///
+    /// `persist_keyed` **renames** its input into place (a dedicated object) or
+    /// appends and unlinks it (a composed part), so the source must live on the
+    /// object's filesystem - a rename across filesystems fails with `EXDEV`.
+    /// The name carries the target's own name so a leftover spool is
+    /// identifiable, and a counter so two writers of one path never share one.
+    fn spool_path(&self, path: &Path) -> std::io::Result<std::path::PathBuf> {
+        let spool = self.manager.workspace().join(".spool");
+        std::fs::create_dir_all(&spool)?;
+        let seq = SPOOL_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(spool.join(format!(
+            "{}-{seq}.pmtmp",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        )))
+    }
+
+    /// Records `key` as having no bytes, as `persist` does for a zero-length
+    /// file: the reference stores `ObjAddr::KeyEmpty` rather than an object.
+    fn forget(&self, key: &str) -> std::io::Result<()> {
+        if let Ok(result) = self.manager.cleanup_key(key) {
+            let _ = self.manager.apply_write_result(&result);
+        }
+        Ok(())
+    }
+
     /// Publishes `bytes` into an object, alone or as a part of the current one.
     fn publish(&self, path: &Path, bytes: &[u8], try_compose: bool) -> std::io::Result<()> {
         let Some(key) = self.key(path) else {
@@ -226,23 +289,9 @@ impl PersistentChunkStore {
             // An empty file never owns bytes, so it has no object: the
             // reference records `ObjAddr::KeyEmpty` instead of writing one.
             // Dropping the old record keeps a stale object from being read.
-            if let Ok(result) = self.manager.cleanup_key(&key) {
-                let _ = self.manager.apply_write_result(&result);
-            }
-            return Ok(());
+            return self.forget(&key);
         }
-        // The spool lives **inside the object workspace**: `persist_keyed`
-        // renames it into place, and a rename across filesystems fails with
-        // `EXDEV`. The name carries the file's own name so a leftover spool is
-        // identifiable, and a counter so concurrent writes of one path (a
-        // rewrite racing a checkpoint) never share a spool file.
-        let spool = self.manager.workspace().join(".spool");
-        std::fs::create_dir_all(&spool)?;
-        let seq = SPOOL_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let tmp = spool.join(format!(
-            "{}-{seq}.pmtmp",
-            path.file_name().unwrap_or_default().to_string_lossy()
-        ));
+        let tmp = self.spool_path(path)?;
         crate::format::write_synced_direct(&tmp, bytes)?;
         let result = self
             .manager
@@ -273,6 +322,40 @@ impl ChunkStore for PersistentChunkStore {
         let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::format::write_synced_direct(path, bytes)?;
         self.publish(path, bytes, false)
+    }
+
+    /// The streamed form writes the bytes **once**: into the local cache (the
+    /// file `list` enumerates and a restart re-maps), then copies that file into
+    /// a spool for `persist_keyed`, which consumes what it is given. One pass
+    /// over the producer, one file copy - and never the chunk in memory, which
+    /// is what `write_to` streams for.
+    fn write_streaming(
+        &self,
+        path: &Path,
+        dedicated: bool,
+        produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> std::io::Result<u64> {
+        let lock = self.path_lock(path);
+        let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let len = crate::format::write_synced_stream(path, produce)?;
+        let Some(key) = self.key(path) else {
+            // Outside the engine root: nothing to key the object by, so the
+            // local file is all there is - the buffered path does the same.
+            return Ok(len);
+        };
+        if len == 0 {
+            return self.forget(&key).map(|()| 0);
+        }
+        let tmp = self.spool_path(path)?;
+        std::fs::copy(path, &tmp)?;
+        let result = self
+            .manager
+            .persist_keyed(&key, &tmp, !dedicated)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        self.manager
+            .apply_write_result(&result)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        Ok(len)
     }
 
     fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
@@ -425,6 +508,17 @@ impl ChunkStore for RoutingStore {
         self.pick(path).write_dedicated(path, bytes)
     }
 
+    fn write_streaming(
+        &self,
+        path: &Path,
+        dedicated: bool,
+        produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> std::io::Result<u64> {
+        // Forwarded, not inherited: the default buffers, and buffering a chunk
+        // behind a router is exactly what the streaming form avoids.
+        self.pick(path).write_streaming(path, dedicated, produce)
+    }
+
     fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
         self.pick(path).read(path)
     }
@@ -483,6 +577,15 @@ pub fn read_file(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
 /// [`ChunkStore::write`] for a caller holding anything path-like.
 pub fn write_file(path: impl AsRef<Path>, bytes: &[u8]) -> std::io::Result<()> {
     chunk_store().write(path.as_ref(), bytes)
+}
+
+/// [`ChunkStore::write_streaming`] for a caller holding anything path-like.
+pub fn write_streaming_file(
+    path: impl AsRef<Path>,
+    dedicated: bool,
+    produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+) -> std::io::Result<u64> {
+    chunk_store().write_streaming(path.as_ref(), dedicated, produce)
 }
 
 /// [`ChunkStore::open`] for a caller holding anything path-like.
@@ -623,6 +726,88 @@ mod tests {
         assert_eq!(store.read(&path).unwrap(), b"dictionary bytes");
         let mapped = store.open(&path).unwrap();
         assert_eq!(&mapped[..], b"dictionary bytes");
+    }
+
+    /// The streamed form publishes exactly like the buffered one: one object of
+    /// its own, readable after the cache is gone, byte for byte.
+    ///
+    /// This is the path a spann chunk takes (`writer::write_to`): the producer
+    /// streams because the chunk is tens of MB, and the object has to come out
+    /// the same anyway.
+    #[test]
+    fn a_streamed_write_is_published_and_readable_without_its_local_copy() {
+        let _guard = LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        let store = PersistentChunkStore::new(manager(root), root);
+        let path = root.join("data/db_1/tbl_2/idx_3/seg_0/chunk_0.idx");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let bytes: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
+        let len = store
+            .write_streaming(&path, true, &mut |sink| {
+                sink.write_all(&bytes[..2048])?;
+                sink.write_all(&bytes[2048..])
+            })
+            .unwrap();
+        assert_eq!(len as usize, bytes.len());
+        // The cache holds it, and the object is a dedicated one (offset 0).
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        let addr = store
+            .manager
+            .lookup_key("db_1/tbl_2/idx_3/seg_0/chunk_0.idx")
+            .expect("streamed write must publish an object");
+        assert_eq!(addr.part_offset, 0);
+        assert_eq!(addr.part_size, bytes.len());
+
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(store.read(&path).unwrap(), bytes);
+    }
+
+    /// A spann chunk written by `writer::write_to` is an object: the mapped
+    /// reader answers from it after the cache is gone.
+    ///
+    /// The chunk writer used to `File::create` straight into the cache, so on a
+    /// persistence profile the file a catalog record names was never published
+    /// and a wiped cache lost the index.
+    #[test]
+    fn a_spann_chunk_written_through_the_store_survives_a_wiped_cache() {
+        let _guard = LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        install_chunk_store(Arc::new(PersistentChunkStore::new(manager(root), root)));
+        let rows: Vec<(u64, Vec<f32>)> = (0..120u64)
+            .map(|i| {
+                (
+                    i,
+                    (0..8)
+                        .map(|d| ((i * 7 + d * 3) % 23) as f32 - 11.0)
+                        .collect(),
+                )
+            })
+            .collect();
+        let opts = index::spann::Options {
+            max_partition_size: 32,
+            ..Default::default()
+        };
+        let index = index::spann::SpannIndex::build(rows, opts.clone()).unwrap();
+        let path = root.join("data/db_1/tbl_2/idx_3/seg_0/chunk_0.idx");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let len = crate::knn_index::spann::write_to(&index, &path, 0).unwrap();
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), len);
+        assert!(
+            chunk_store().read(&path).is_ok(),
+            "the chunk must be published as an object"
+        );
+
+        // Wipe the cache exactly as a fresh container would.
+        std::fs::remove_file(&path).unwrap();
+        let reopened = crate::knn_index::spann::FileIndex::open(&path, &opts).unwrap();
+        assert_eq!(reopened.len(), index.len());
+        let header = crate::knn_index::spann::read_header(&path).unwrap();
+        assert_eq!(header.segment, 0);
+        // The shared slot is process-wide; put the local backend back so this
+        // test cannot redirect another one's writes.
+        install_chunk_store(Arc::new(LocalChunkStore));
     }
 
     /// A file below `data/` uses the reference's key (`RemovePrefix`), so a

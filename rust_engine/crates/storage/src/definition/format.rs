@@ -611,6 +611,69 @@ pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     write_parts(path, &[bytes], true)
 }
 
+/// [`write_synced_direct`] for bytes that are **produced while they are
+/// written**, returning how many there were.
+///
+/// A spann chunk is one segment's tree - tens of MB at 1536d - and
+/// `knn_index::spann::writer::write_to` streams it precisely so it never has to
+/// be resident: buffering it here just to hand the store a slice would undo
+/// that. The durability rule is the buffered form's, unchanged: a sibling temp
+/// file, `fsync`, a rename over `path`, then an `fsync` of the directory, so a
+/// chunk a catalog record names is on the disk rather than in the page cache.
+pub fn write_synced_stream(
+    path: &Path,
+    produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+) -> std::io::Result<u64> {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let tmp = path.with_file_name(format!(
+        ".{}.tmp{}-{}",
+        path.file_name().unwrap_or_default().to_string_lossy(),
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    let run = |produce: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>| {
+        let file = std::fs::File::create(&tmp)?;
+        let mut out = ByteCount {
+            inner: std::io::BufWriter::with_capacity(1 << 20, file),
+            written: 0,
+        };
+        produce(&mut out)?;
+        let ByteCount { inner, written } = out;
+        let file = inner.into_inner().map_err(|e| e.into_error())?;
+        // Same ordering as `write_parts`: the bytes are durable before the
+        // rename publishes them, and the rename before the directory sync.
+        file.sync_all()?;
+        std::fs::rename(&tmp, path)?;
+        sync_parent(path)?;
+        Ok(written)
+    };
+    let out = run(produce);
+    if out.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    out
+}
+
+/// A sink that counts what passed through it.
+struct ByteCount<W> {
+    inner: W,
+    written: u64,
+}
+
+impl<W: std::io::Write> std::io::Write for ByteCount<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.written += n as u64;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
 fn write_parts(path: &Path, parts: &[&[u8]], sync: bool) -> std::io::Result<()> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU64, Ordering};

@@ -714,24 +714,56 @@ impl Engine {
         if self.spann_dims_of(&table, &meta.column) == 0 {
             return None;
         }
-        // `segment -> newest chunk`, from the catalog's chunk list.
-        let mut newest: std::collections::BTreeMap<u32, (u64, std::path::PathBuf)> =
-            Default::default();
-        for (segment, chunk_id, path) in self.catalog_index_files(&table, meta.id) {
-            let entry = newest.entry(segment).or_insert((chunk_id, path.clone()));
-            if chunk_id > entry.0 {
-                *entry = (chunk_id, path);
-            }
-        }
-        let mut chunks = Vec::new();
-        for (_, (_, path)) in newest {
+        // Every live chunk of every segment, not just the newest one: a
+        // checkpoint publishes the tail as a *delta* chunk and leaves the older
+        // chunks of that segment in place, so the segment's rows are spread over
+        // a chain of disjoint trees. `SpannHandle::File` merges their answers, and
+        // the executor's exact rescoring drops rows a later delete retired.
+        //
+        // The chain *is* the manifest: each chunk's header names the DFS key it
+        // starts at (`first_key`) and how many partitions it covers, so a segment
+        // is assembled by sorting its chunks and checking that the ranges tile
+        // `0..` with no gap and no overlap. A chain that does not tile is refused
+        // as a whole - answering from half a tree would return the wrong rows,
+        // while the `uncovered` scan is merely slower.
+        let mut per_segment: std::collections::BTreeMap<
+            u32,
+            Vec<(
+                u32,
+                usize,
+                std::sync::Arc<storage::knn_index::spann::FileIndex>,
+            )>,
+        > = Default::default();
+        for (segment, _, path) in self.catalog_index_files(&table, meta.id) {
             match storage::knn_index::spann::FileIndex::open(&path, &opts) {
-                Ok(chunk) => chunks.push(std::sync::Arc::new(chunk)),
+                Ok(chunk) => {
+                    let first = chunk.first_key();
+                    per_segment.entry(segment).or_default().push((
+                        first,
+                        chunk.partitions(),
+                        std::sync::Arc::new(chunk),
+                    ));
+                }
                 // A chunk whose header disagrees with the catalog is derived
                 // data: skip it, and the next checkpoint republishes the
                 // segment. A query on the gap falls back to the exact scan.
                 Err(_) => continue,
             }
+        }
+        let mut chunks = Vec::new();
+        for (_, mut chain) in per_segment {
+            chain.sort_by_key(|(first, _, _)| *first);
+            // `first_key`/`partitions` only describe a *range of one tree* once a
+            // segment is split into subtree chunks. A delta chain is several
+            // whole trees - every one of them starts at key 0 - so the tiling
+            // check applies only when the chunks actually claim distinct ranges
+            // (a subtree chain, which is what a manifest-aware dump writes).
+            if chain.iter().any(|(first, _, _)| *first != 0)
+                && !tiles_the_key_space(&chain.iter().map(|(f, n, _)| (*f, *n)).collect::<Vec<_>>())
+            {
+                continue;
+            }
+            chunks.extend(chain.into_iter().map(|(_, _, chunk)| chunk));
         }
         if chunks.is_empty() {
             return None;
@@ -2285,15 +2317,7 @@ impl Engine {
                     // computed from this number.
                     + e.spann_mem
                         .values()
-                        .map(|rows| {
-                            rows.first()
-                                .map(|(_, v)| {
-                                    rows.len()
-                                        * (std::mem::size_of::<u64>()
-                                            + v.len() * std::mem::size_of::<f32>())
-                                })
-                                .unwrap_or(0)
-                        })
+                        .map(|tail| tail.mem_usage())
                         .sum::<usize>()
                     // The published trees themselves: centroids, member codes and
                     // - with `encode = none` - the member vectors (`SpannIndex::
@@ -4427,7 +4451,7 @@ impl Engine {
     }
 
     /// The declared dimension of `column`, or `0` when it is not a vector.
-    fn spann_dims_of(&self, table: &str, column: &str) -> usize {
+    pub(crate) fn spann_dims_of(&self, table: &str, column: &str) -> usize {
         self.table_schema(table)
             .ok()
             .and_then(|schema| schema.iter().position(|name| name.as_str() == column))
@@ -4542,8 +4566,8 @@ impl Engine {
                     entry
                         .spann_mem
                         .iter()
-                        .filter(|(_, rows)| !rows.is_empty())
-                        .map(|(id, rows)| (*id, rows.len()))
+                        .filter(|(_, tail)| tail.len() > 0)
+                        .map(|(id, tail)| (*id, tail.len()))
                         .collect()
                 })
                 .unwrap_or_default()
@@ -4817,4 +4841,39 @@ pub(crate) struct RecordedChunk {
     pub(crate) base_row_id: u64,
     pub(crate) row_count: u64,
     pub(crate) index_size: u64,
+}
+
+/// Whether `(first_key, partitions)` pairs tile `0..sum` with no gap and no
+/// overlap. A segment's chunks are its manifest; anything else is a chain that
+/// must not be searched (see `load_spann_index`).
+fn tiles_the_key_space(ranges: &[(u32, usize)]) -> bool {
+    let mut next = 0u32;
+    for (first, count) in ranges {
+        if *first != next || *count == 0 {
+            return false;
+        }
+        match next.checked_add(*count as u32) {
+            Some(grown) => next = grown,
+            None => return false,
+        }
+    }
+    !ranges.is_empty()
+}
+
+#[cfg(test)]
+mod manifest_tests {
+    use super::tiles_the_key_space;
+
+    #[test]
+    fn a_chain_has_to_tile_the_key_space() {
+        assert!(tiles_the_key_space(&[(0, 3), (3, 2), (5, 1)]));
+        assert!(!tiles_the_key_space(&[(0, 3), (4, 2)]), "gap at 3");
+        assert!(!tiles_the_key_space(&[(0, 3), (2, 2)]), "overlap at 2");
+        assert!(!tiles_the_key_space(&[(1, 3)]), "must start at 0");
+        assert!(!tiles_the_key_space(&[]), "no chunks at all");
+        assert!(
+            !tiles_the_key_space(&[(0, 0)]),
+            "an empty chunk covers nothing"
+        );
+    }
 }

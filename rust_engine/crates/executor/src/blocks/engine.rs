@@ -1421,10 +1421,11 @@ impl Engine {
                 _ => Some((live.ids.clone(), live.defaults.clone())),
             }
         };
-        // spann's mem index: the row goes here, **not** into the tree
-        // (`docs/SPANN_DESIGN.md` §9.2). One vector copy per row, and the next
-        // dump builds the tree that covers these rows and clears the list.
-        let spann_columns: Vec<(u64, usize)> = self
+        // spann's tail: the row goes **into the tree** (`docs/SPANN_DESIGN.md`
+        // §0.0.3) - one descent plus a code, 208 B at 1536d, and the query
+        // descends the same tree. The dump publishes a chunk over the segment and
+        // empties the tail; it does not have to build the tree from scratch.
+        let spann_columns: Vec<(u64, usize, usize, index::spann::Options)> = self
             .storage
             .catalog
             .indexes_of_table(&table)
@@ -1437,23 +1438,30 @@ impl Engine {
                     .ok()?
                     .iter()
                     .position(|c| c == &im.column)?;
-                Some((im.id, position))
+                let dims = self.spann_dims_of(&table, &im.column);
+                let opts = crate::spann_mem::options_from(&im.options).ok()?;
+                Some((im.id, position, dims, opts))
             })
             .collect();
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             // Before `buffer_rows`, which consumes `rows`.
-            for (index_id, column) in &spann_columns {
-                let mem = entry.spann_mem.entry(*index_id).or_default();
-                mem.reserve(rows.len());
+            for (index_id, column, dims, opts) in &spann_columns {
+                if *dims == 0 {
+                    continue;
+                }
+                let tail = entry.spann_mem.entry(*index_id).or_insert_with(|| {
+                    crate::spann_mem::SpannTail::new(*dims, opts.clone())
+                        .expect("a tail over a validated dimension")
+                });
                 for (seq, row) in &rows {
                     let Some(value) = row.get(*column) else {
                         continue;
                     };
                     let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
                     if !vector.is_empty() {
-                        mem.push((*seq as u64, vector));
+                        let _ = tail.insert(*seq as u64, &vector);
                     }
                 }
             }
@@ -2141,12 +2149,22 @@ impl Engine {
                         tables
                             .get(&self.table_key(table))
                             .and_then(|entry| entry.spann_mem.get(&(index_id as u64)))
-                            .is_some_and(|rows| {
-                                rows.iter().any(|(seq, _)| (*seq >> 32) as u32 == *segment)
-                            })
+                            .is_some_and(|tail| tail.has_segment(*segment))
                     };
                     let opts = crate::spann_mem::options_from(&im.options).ok();
-                    let reusable = !pending_in_segment
+                    // The rows written since the last dump. When there are any,
+                    // this checkpoint publishes *them* as a delta chunk instead of
+                    // rebuilding the segment's tree.
+                    let tail = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.spann_mem.get(&(index_id as u64)))
+                            .cloned()
+                    };
+                    let pending_rows = tail.as_ref().map(|tail| tail.len()).unwrap_or(0);
+                    let reusable = pending_rows == 0
+                        && !pending_in_segment
                         && opts.is_some_and(|opts| {
                             match self
                                 .live_chunk_files(table, &im.name, *segment, &seg_dir)
@@ -2194,25 +2212,70 @@ impl Engine {
                         .into_iter()
                         .map(|(id, _)| id as u32)
                         .collect();
-                    // One chunk per segment, streamed: the tree that has to be
-                    // resident is this segment's, not the table's.
-                    let Some(index_size) =
-                        self.spann_chunk(table, &im.column, &im.options, *segment, &path)
-                    else {
-                        continue;
+                    // A segment that already has a chunk publishes only its
+                    // tail: the rows written since the last dump are already a
+                    // tree (they were inserted into one), so the checkpoint is
+                    // `take → serialise` - proportional to the new rows - instead
+                    // of a k-means over the whole segment. A segment with no chunk
+                    // yet (`CREATE INDEX`, or the first checkpoint) still needs
+                    // the full build.
+                    // A chain of at most eight delta chunks per segment: one
+                    // more tree to probe per checkpoint is the price of a
+                    // checkpoint proportional to the new rows instead of to the
+                    // segment. At the cap the segment is rebuilt once, which is
+                    // also what retires the chain.
+                    const MAX_SEGMENT_CHUNKS: usize = 8;
+                    let rebuild = superseded.is_empty()
+                        || pending_rows == 0
+                        || superseded.len() >= MAX_SEGMENT_CHUNKS;
+                    let (row_count, index_size) = if rebuild {
+                        let Some(size) =
+                            self.spann_chunk(table, &im.column, &im.options, *segment, &path)
+                        else {
+                            continue;
+                        };
+                        (*seg_rows, size)
+                    } else {
+                        let Some(tree) = tail.as_ref().and_then(|tail| tail.take()) else {
+                            continue;
+                        };
+                        let Some(published) = tree.into_spann() else {
+                            continue;
+                        };
+                        let rows = published.len() as u64;
+                        let Ok(size) =
+                            storage::knn_index::spann::write_to(&published, &path, *segment)
+                        else {
+                            // The rows stay in the column, so the coverage check
+                            // answers them through `uncovered` until the next
+                            // checkpoint. Losing the tree is not losing the rows.
+                            continue;
+                        };
+                        (rows, size)
                     };
+                    // A delta leaves the older chunks of the segment live, so the
+                    // chain keeps every row; only a rebuild supersedes them.
+                    let superseded = if rebuild { superseded } else { Vec::new() };
                     // The new chunk is published below and is the one that has to
                     // survive; everything the segment listed before it is dead. The
                     // markers are written *after* the new record lands, so a crash in
                     // between leaves the old snapshot live rather than leaving the
                     // segment with none.
-                    spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
-                    spann_ready.push(index_id as u64);
+                    if !superseded.is_empty() {
+                        spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
+                    }
+                    // A rebuild puts the whole segment into one chunk, so the tail
+                    // is redundant and is dropped. A delta already emptied it
+                    // (`take`), and clearing it here would throw away the rows
+                    // inserted while the chunk was being written.
+                    if rebuild {
+                        spann_ready.push(index_id as u64);
+                    }
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),
                         base_row_id: u64::from(*segment) << 32,
-                        row_count: *seg_rows,
+                        row_count,
                         term_count: 0,
                         index_size,
                         commit_ts: chunk_ts,
@@ -2658,7 +2721,7 @@ impl Engine {
             // name: the frame's cells are already attributed by id, and
             // `attributed` is keyed by id too.
             let live_names = self.table_schema(&table).unwrap_or_default();
-            let spann_columns: Vec<(u64, u64)> = self
+            let spann_columns: Vec<(u64, u64, usize, index::spann::Options)> = self
                 .storage
                 .catalog
                 .indexes_of_table(&table)
@@ -2667,21 +2730,29 @@ impl Engine {
                 .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
                 .filter_map(|im| {
                     let position = live_names.iter().position(|c| *c == im.column)?;
-                    Some((im.id, *live_ids.get(position)?))
+                    let dims = self.spann_dims_of(&table, &im.column);
+                    let opts = crate::spann_mem::options_from(&im.options).ok()?;
+                    Some((im.id, *live_ids.get(position)?, dims, opts))
                 })
                 .collect();
             {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(self.table_key(&table)).or_default();
-                for (index_id, column_id) in &spann_columns {
-                    let mem = entry.spann_mem.entry(*index_id).or_default();
+                for (index_id, column_id, dims, opts) in &spann_columns {
+                    if *dims == 0 {
+                        continue;
+                    }
+                    let tail = entry.spann_mem.entry(*index_id).or_insert_with(|| {
+                        crate::spann_mem::SpannTail::new(*dims, opts.clone())
+                            .expect("a tail over a validated dimension")
+                    });
                     for (seq, cells) in &attributed {
                         let Some(value) = cells.get(column_id) else {
                             continue;
                         };
                         let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
                         if !vector.is_empty() {
-                            mem.push((*seq as u64, vector));
+                            let _ = tail.insert(*seq as u64, &vector);
                         }
                     }
                 }

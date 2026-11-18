@@ -5037,39 +5037,27 @@ pub(crate) struct TableEntry {
     /// mapped form (§6.4, §9.4), so after a dump - and after a restart - this
     /// map holds what the loader produced.
     pub(crate) spann: HashMap<u64, Arc<crate::spann_mem::SpannHandle>>,
-    /// spann **mem index** per index id: the rows inserted since the last
-    /// dump, kept as `(row id, vector)`.
+    /// spann **tail** per index id: the rows inserted since the last dump, held
+    /// as a live tree (`docs/SPANN_DESIGN.md` §0.0.3).
     ///
-    /// An insert does not touch the tree (`docs/SPANN_DESIGN.md` §9.2): the row
-    /// lands here in O(1), queries merge this list with the published chunks, and
-    /// the next dump builds a tree that covers those rows and clears the list.
-    /// Encoding a row into the tree at insert time was the rejection: a leaf's
-    /// members are only 1-bit codes, so a split would need the original vectors
-    /// back from storage anyway.
+    /// An insert descends the tree and appends a code (208 B at 1536d); a query
+    /// descends the same tree, so a pending row is found the way a published row
+    /// is, instead of being re-scored by every KNN query. The tree splits and
+    /// merges its own partitions in place, so nothing here is `O(segment)`.
     ///
-    /// Two rules keep it bounded and honest:
+    /// The bounds and the lifetime are the ones the flat candidate list had:
     ///
-    /// * a row deleted (or `UPDATE`d, which is delete + insert) is dropped here by
-    ///   `note_deleted_ids` - it is no longer live, so it must not be a candidate
-    ///   and must not count as covered;
     /// * `max_partition_size × 64` rows trigger a dump
-    ///   (`Engine::dump_spann_over_capacity`), because every row in this list is
-    ///   re-scored exactly by **every** KNN query on the table.
-    ///
-    /// It is a memory-only structure, and what a restart leaves behind depends on
-    /// where the rows were:
-    ///
-    /// * rows that only reached the WAL are replayed into the append buffer, and
-    ///   the same hook that fills this map at insert time
-    ///   (`refresh_block_mirror_extra`) fills it again - the list is rebuilt for
-    ///   them, so they are candidates immediately;
-    /// * rows that are already in a block file are not re-buffered, so nothing
-    ///   re-registers them: they are simply not covered by the loaded chunk and
-    ///   `knn_candidates` answers them through `uncovered` - an exact scan of
-    ///   exactly those row ids - until the next dump folds them into the tree.
-    ///
-    /// Either way a restart costs work proportional to the gap, never a hole.
-    pub(crate) spann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
+    ///   (`Engine::dump_spann_over_capacity`), which keeps the per-query tail
+    ///   walk bounded and lets the tail answer exactly below that size;
+    /// * a deleted row is tombstoned (`SpannTail::forget`); the next dump rebuilds
+    ///   the segment from the column, so the tombstone only has to survive until
+    ///   then;
+    /// * it is memory-only. Rows the WAL replays are fed back through the same
+    ///   hook (`refresh_block_mirror_extra`); rows already in a block file are not
+    ///   covered by the loaded chunk and `knn_candidates` answers them through
+    ///   `uncovered` - an exact scan of exactly those ids - until the next dump.
+    pub(crate) spann_mem: HashMap<u64, Arc<crate::spann_mem::SpannTail>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,

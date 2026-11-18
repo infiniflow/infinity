@@ -155,12 +155,21 @@ impl Partition {
     /// centroid distance for ip/cosine (a heuristic: radii live in L2 space, so
     /// they cannot bound an inner product).
     pub fn lower_bound(&self, q: &[f32], metric: Metric) -> f32 {
-        let d = l2_sq(q, &self.centroid).max(0.0).sqrt();
+        let d = self.centroid_distance(q, metric);
         if metric.is_l2() {
             (d - self.radius).max(0.0)
         } else {
             d
         }
+    }
+
+    /// Distance from the query to this partition's centroid. This is the
+    /// best-first walk's ranking key: a partition holds the rows of its own
+    /// Voronoi cell, so the centroid distance ranks cells far more tightly than
+    /// `lower_bound`, which flattens to 0 for every partition whose radius
+    /// exceeds its centroid distance.
+    pub fn centroid_distance(&self, q: &[f32], _metric: Metric) -> f32 {
+        l2_sq(q, &self.centroid).max(0.0).sqrt()
     }
 
     /// Scores every member into `out`.

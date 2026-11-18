@@ -426,8 +426,8 @@ impl Engine {
         // insert, so both halves go through this hook.
         if !entry.spann_mem.is_empty() {
             let gone: std::collections::HashSet<u64> = ids.iter().map(|s| *s as u64).collect();
-            for rows in entry.spann_mem.values_mut() {
-                rows.retain(|(seq, _)| !gone.contains(seq));
+            for tail in entry.spann_mem.values() {
+                tail.forget(&gone);
             }
         }
         entry.mirror_dirty = true;

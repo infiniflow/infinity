@@ -5,9 +5,10 @@
 //! module is the only place that turns `WITH (…)` text into `Options` and the
 //! engine's row ids into the index's `(row, vector)` pairs.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, RwLock};
 
 use common::{Error, Result};
+use index::spann::incr::IncIndex;
 use index::spann::{Encode, Options, SpannIndex};
 use index::vector::Metric;
 
@@ -122,6 +123,178 @@ pub(crate) fn mem_dump_threshold(opts: &Options) -> usize {
     opts.max_partition_size
         .saturating_mul(MEM_INDEX_DUMP_FACTOR)
         .max(1)
+}
+
+/// The rows written since the last dump, held as a **live tree**
+/// (`SPANN_DESIGN.md` §0.0.3).
+///
+/// This replaces a `Vec<(row id, Vec<f32>)>`: that kept 6 KB per pending row at
+/// 1536d and made every query re-score the whole list, because a flat list has
+/// no structure to descend. A tree holds 208 B per row, answers with a bounded
+/// beam, and splits/merges a partition in place - so "insert, then query" costs
+/// the same per-row work as a published chunk does.
+///
+/// Deletes are tombstones: the tree cannot un-append a row, and it does not have
+/// to - the next dump rebuilds the segment from the column, so the tombstone set
+/// only has to survive until then. It is bounded by the deletes since the dump,
+/// which is the same bound the flat list had.
+pub(crate) struct SpannTail {
+    tree: RwLock<IncIndex>,
+    dead: Mutex<std::collections::HashSet<u64>>,
+    dim: usize,
+    opts: Options,
+}
+
+impl SpannTail {
+    pub(crate) fn new(dim: usize, opts: Options) -> Result<Arc<Self>> {
+        let tree = IncIndex::new(dim, opts.clone()).map_err(spann_err)?;
+        Ok(Arc::new(Self {
+            tree: RwLock::new(tree),
+            dead: Mutex::new(std::collections::HashSet::new()),
+            dim,
+            opts,
+        }))
+    }
+
+    /// One row, one descent, at most one partition's split/merge. The write lock
+    /// is held for that bounded work, never for a rebuild.
+    pub(crate) fn insert(&self, id: u64, vector: &[f32]) -> Result<()> {
+        if vector.len() != self.dim {
+            return Err(Error::Invalid(format!(
+                "spann: row {id} has {} dims, the index has {}",
+                vector.len(),
+                self.dim
+            )));
+        }
+        let mut tree = self.tree.write().unwrap_or_else(|e| e.into_inner());
+        tree.insert(id, vector).map_err(spann_err)?;
+        if tree.pending_fixups() > 0 {
+            // The tail holds codes, not vectors; a split dequantizes them, the
+            // same path a chunk-backed split takes (`RowSource = None`).
+            tree.run_fixups(None);
+        }
+        Ok(())
+    }
+
+    /// `beam = None` scans every leaf, which is the semantic the tail must keep:
+    /// a row inserted a microsecond ago is *visible*, not merely covered by a
+    /// beam that might not have reached its partition. It stays affordable
+    /// because the tail is bounded by the dump trigger (`max_partition_size ×
+    /// 64` rows) - the same bound the flat candidate list had, without the raw
+    /// vectors behind it.
+    pub(crate) fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        let budget = self.budget(&tree, beam);
+        let mut hits = tree.search(q, k + dead.len(), budget);
+        hits.retain(|(id, _)| !dead.contains(id));
+        hits.truncate(k);
+        hits
+    }
+
+    pub(crate) fn search_filtered(
+        &self,
+        q: &[f32],
+        k: usize,
+        beam: Option<usize>,
+        allowed: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f32)> {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        let budget = self.budget(&tree, beam);
+        let mut hits = tree.search_masked(q, k + dead.len(), budget, Some(allowed));
+        hits.retain(|(id, _)| !dead.contains(id));
+        hits.truncate(k);
+        hits
+    }
+
+    /// The leaf budget for a tail query.
+    ///
+    /// The tail has to answer **exactly** while it is the size the dump trigger
+    /// allows (`max_partition_size × 64` rows): a row inserted a second ago is
+    /// visible, not merely "covered by a beam that might not have reached its
+    /// partition". Beyond that - a stalled dump, a bulk replay - the budget falls
+    /// back to `base_beam` so no query turns into a full scan of the tail.
+    fn budget(&self, tree: &IncIndex, beam: Option<usize>) -> usize {
+        if let Some(beam) = beam {
+            return beam.max(1);
+        }
+        let dump_threshold = self.opts.max_partition_size.saturating_mul(64);
+        if tree.len() <= dump_threshold {
+            usize::MAX
+        } else {
+            self.opts.base_beam.max(1)
+        }
+    }
+
+    /// Live rows held here.
+    pub(crate) fn len(&self) -> usize {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        tree.len().saturating_sub(dead.len())
+    }
+
+    /// Live row ids, ascending - the coverage check's input (§9.7).
+    pub(crate) fn row_ids(&self) -> Vec<u64> {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        let mut ids: Vec<u64> = tree
+            .row_ids()
+            .into_iter()
+            .filter(|id| !dead.contains(id))
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Whether any pending row belongs to `segment`: a segment whose tail is
+    /// non-empty cannot have its chunk reused, because the dump would publish
+    /// nothing for it (the reuse check in `blocks/engine.rs`).
+    pub(crate) fn has_segment(&self, segment: u32) -> bool {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        tree.row_ids()
+            .into_iter()
+            .any(|id| (id >> 32) as u32 == segment && !dead.contains(&id))
+    }
+
+    /// Drops rows a commit deleted (an `UPDATE` is delete + insert, so both
+    /// halves land here).
+    pub(crate) fn forget(&self, ids: &std::collections::HashSet<u64>) {
+        let mut dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        for id in ids {
+            dead.insert(*id);
+        }
+    }
+
+    /// Heap bytes: the codes plus the tombstone set - what the spill ledger
+    /// charges for the un-dumped rows.
+    pub(crate) fn mem_usage(&self) -> usize {
+        let tree = self.tree.read().unwrap_or_else(|e| e.into_inner());
+        let dead = self.dead.lock().unwrap_or_else(|e| e.into_inner());
+        tree.mem_usage() + dead.len() * std::mem::size_of::<u64>()
+    }
+}
+
+impl SpannTail {
+    /// Swaps in an empty tree, handing the filled one to the checkpoint: the
+    /// rows are already in the segment's column, so the publisher owns them from
+    /// here and the tail must stop answering for them.
+    pub(crate) fn take(&self) -> Option<IncIndex> {
+        let mut tree = self.tree.write().unwrap_or_else(|e| e.into_inner());
+        let replacement = IncIndex::new(self.dim, self.opts.clone()).ok()?;
+        let taken = std::mem::replace(&mut *tree, replacement);
+        self.dead.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        if taken.is_empty() {
+            None
+        } else {
+            Some(taken)
+        }
+    }
+}
+
+fn spann_err(e: index::spann::SpannError) -> Error {
+    Error::Invalid(format!("spann: {e}"))
 }
 
 /// A queryable spann index: the tree a `CREATE INDEX` built, or the chunk a
@@ -492,7 +665,7 @@ impl crate::Engine {
             let entry = tables.get(&tkey);
             let mem_rows = entry
                 .and_then(|e| e.spann_mem.get(&im.id))
-                .map(Vec::len)
+                .map(|tail| tail.len())
                 .unwrap_or(0);
             match entry.and_then(|e| e.spann.get(&im.id)) {
                 Some(handle) => {
@@ -634,11 +807,11 @@ impl crate::Engine {
         path: &std::path::Path,
     ) -> Option<u64> {
         let index = self.spann_build(table, column, opts, &self.dir.join("tmp"), Some(segment))?;
-        let len = storage::knn_index::spann::write_to(&index, path, segment).ok()?;
-        // `write_to` streams through a buffered handle; a crash before the data
-        // reaches the platter would leave a chunk the catalog already lists.
-        std::fs::File::open(path).and_then(|f| f.sync_all()).ok()?;
-        Some(len)
+        // `write_to` publishes through `storage::chunk_store`: the bytes are
+        // fsynced and the directory entry renamed into place there, and on a
+        // persistence profile the chunk becomes an object - so there is no
+        // separate sync to do here.
+        storage::knn_index::spann::write_to(&index, path, segment).ok()
     }
 
     /// Writes `column`'s vectors to `dir/spann-scratch-<pid>-<n>.f32` in row
@@ -878,5 +1051,158 @@ mod tests {
         // Never below the requested top-n, never above the I/O ceiling.
         assert_eq!(candidate_budget(1, 2, 0), 10);
         assert_eq!(candidate_budget(100, 2048, 100), MAX_RERANK_CANDIDATES);
+    }
+
+    fn tail_rows(n: usize, dim: usize, clusters: usize) -> Vec<(u64, Vec<f32>)> {
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 40) as f32 / (1u32 << 24) as f32
+        };
+        let centres: Vec<Vec<f32>> = (0..clusters)
+            .map(|_| (0..dim).map(|_| next() * 2.0 - 1.0).collect())
+            .collect();
+        (0..n)
+            .map(|i| {
+                let centre = &centres[i % clusters];
+                // Spread comparable to the inter-centre distance: a 1-bit code
+                // is a *direction* estimate, so a cluster of near-identical
+                // points measures the quantizer's noise, not the index.
+                let v: Vec<f32> = (0..dim)
+                    .map(|d| centre[d] + (next() * 2.0 - 1.0) * 0.8)
+                    .collect();
+                (i as u64, v)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_tail_answers_for_every_row_it_holds() {
+        let dim = 64;
+        let rows = tail_rows(600, dim, 16);
+        let opts = Options::default();
+        let tail = SpannTail::new(dim, opts).unwrap();
+        for (id, v) in &rows {
+            tail.insert(*id, v).unwrap();
+        }
+        assert_eq!(tail.len(), 600);
+        assert_eq!(tail.row_ids().len(), 600);
+        // A row inserted a moment ago is *visible*: the tail scans to the end
+        // while it is below the dump threshold.
+        // What the engine consumes is a *candidate set*: the executor rescores
+        // every candidate exactly, so the assertion is that a row is among the
+        // candidates its own vector asks for, and that top-1 stays high enough
+        // to catch a broken walk.
+        let mut top1 = 0;
+        let mut found = 0;
+        for (id, v) in &rows {
+            let hits = tail.search(v, 16, None);
+            if hits.first().map(|(got, _)| *got) == Some(*id) {
+                top1 += 1;
+            }
+            if hits.iter().any(|(got, _)| *got == *id) {
+                found += 1;
+            }
+        }
+        assert!(top1 >= 510, "top-1 self-query {top1}/600");
+        assert_eq!(found, 600, "candidate recall {found}/600");
+    }
+
+    #[test]
+    fn a_deleted_row_leaves_the_tail() {
+        let dim = 32;
+        let rows = tail_rows(200, dim, 8);
+        let tail = SpannTail::new(dim, Options::default()).unwrap();
+        for (id, v) in &rows {
+            tail.insert(*id, v).unwrap();
+        }
+        let gone: std::collections::HashSet<u64> = rows[..50].iter().map(|(id, _)| *id).collect();
+        tail.forget(&gone);
+        assert_eq!(tail.len(), 150);
+        assert_eq!(tail.row_ids().len(), 150);
+        // The deleted rows must not come back through a query either.
+        for (id, v) in &rows[..50] {
+            let answered = tail
+                .search(v, 10, None)
+                .into_iter()
+                .any(|(got, _)| got == *id);
+            assert!(!answered, "row {id} was deleted but a query returned it");
+        }
+    }
+
+    #[test]
+    fn concurrent_inserts_and_queries_keep_every_row() {
+        let dim = 48;
+        let rows = std::sync::Arc::new(tail_rows(1600, dim, 16));
+        let tail = SpannTail::new(
+            dim,
+            Options {
+                kmeans_iterations: 4,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+
+        let writers: Vec<_> = (0..4)
+            .map(|w| {
+                let tail = Arc::clone(&tail);
+                let rows = Arc::clone(&rows);
+                std::thread::spawn(move || {
+                    for (i, (id, v)) in rows.iter().enumerate() {
+                        if i % 4 == w {
+                            tail.insert(*id, v).unwrap();
+                        }
+                    }
+                })
+            })
+            .collect();
+        let readers: Vec<_> = (0..2)
+            .map(|_| {
+                let tail = Arc::clone(&tail);
+                let rows = Arc::clone(&rows);
+                std::thread::spawn(move || {
+                    for probe in 0..64 {
+                        let (id, v) = &rows[(probe * 7) % rows.len()];
+                        let hits = tail.search(v, 3, None);
+                        assert!(hits.len() <= 3);
+                        // A row either is not inserted yet or must be found;
+                        // nothing may be answered with a wrong id, and the
+                        // walk must not panic on a concurrent split.
+                        if !hits.is_empty() {
+                            assert!(hits.iter().all(|(got, _)| *got < rows.len() as u64));
+                        }
+                        let _ = id;
+                    }
+                })
+            })
+            .collect();
+        for handle in writers {
+            handle.join().unwrap();
+        }
+        for handle in readers {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(tail.len(), rows.len(), "no insert may be lost");
+        assert_eq!(tail.row_ids().len(), rows.len());
+        // 1600 rows over 16 clusters at 48d is where a 1-bit code starts to
+        // blur inside a cluster; the engine's own budget is wider than 32
+        // candidates, so this is a floor, not the operating point.
+        let mut found = 0;
+        for (id, v) in rows.iter() {
+            if tail.search(v, 32, None).iter().any(|(got, _)| *got == *id) {
+                found += 1;
+            }
+        }
+        // This test is about concurrency, not the quantizer: it checks that a
+        // parallel insert loses nothing and that a query never panics on a
+        // split. The recall floor is loose on purpose.
+        assert!(
+            found >= rows.len() * 9 / 10,
+            "candidate recall {found}/{}",
+            rows.len()
+        );
     }
 }

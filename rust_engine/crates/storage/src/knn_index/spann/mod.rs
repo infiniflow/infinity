@@ -10,7 +10,7 @@
 //! Layout (all integers little-endian):
 //!
 //! ```text
-//! 0    160      header (v2)
+//! 0    160      header
 //! 40   ..       section table: 6 × { offset u64, len u64 }
 //! 160  ..       Section A  partition metadata, 32 B per partition
 //!      ..       Section B  centroids, dims × f32 per partition
@@ -34,21 +34,19 @@
 //!
 //! `row_off` is `u32` because **the chunk is one segment's tree** (§3 I6): the
 //! segment lives in the header and the engine-wide id is reconstructed as
-//! `segment << 32 | row_off`. A v1 chunk stored the engine-wide id here, which
-//! cost 4 bytes per row and went stale the moment a compaction renumbered the
-//! segment - those files are refused (`VERSION`), because a chunk is derived
-//! data and the fix is to rebuild it.
+//! `segment << 32 | row_off`. Storing the engine-wide id here would cost four
+//! bytes per row and go stale the moment a compaction renumbered the segment.
 
 use index::spann::{
     partition::{metric_score, Member, Partition},
     quantize::{self, Code, Rotation},
-    search::{self, Beam, SearchSet},
+    search::{self, SearchSet},
     Encode, Options, PartitionKey, SpannError, SpannIndex, ROOT_KEY,
 };
 use index::vector::{l2_sq, Metric};
 
 mod writer;
-pub use writer::{write, write_to};
+pub use writer::{write, write_keys, write_range, write_to};
 
 /// The chunk's signature: the name, a NUL pad (the field is eight bytes wide so
 /// the offsets that follow are the ones `docs/SPANN_FORMAT.md` tabulates) and the
@@ -56,20 +54,16 @@ pub use writer::{write, write_to};
 /// than guessed at - the pre-rename `CSPANN\0\1` files included.
 pub const MAGIC: [u8; 8] = *b"SPANN\x00\x00\x01";
 const TRAILER_MAGIC: [u8; 8] = *b"SPEND\x00\x00\x01";
-/// Bytes of a chunk header.
-///
-/// v2 grew it from 128 to 160: the fixed fields gained `segment_id`, and the
-/// section table moved to 40 so the id sits inside the 8-byte alignment
-/// `SPANN_FORMAT.md` tabulates.
+/// Bytes of a chunk header: the fixed fields, the segment id, and the section
+/// table at 40 so the id sits on the 8-byte alignment `SPANN_FORMAT.md`
+/// tabulates.
 pub const HEADER_LEN: usize = 160;
 /// The only version this build writes and reads.
 ///
-/// v1 stored the engine-wide `segment << 32 | offset` in every slot (8 bytes).
-/// v2 stores the segment's own offset (4 bytes) and puts the segment in the
-/// header, so a chunk that says `1` is refused rather than misread: a spann
-/// chunk is derived data (`index_delta_mode = rebuild`), so the answer is to
-/// rebuild it, not to guess at its ids.
-pub const VERSION: u16 = 2;
+/// A chunk from another version is refused rather than misread: a spann chunk is
+/// derived data (`index_delta_mode = rebuild`), so the answer is to rebuild it,
+/// not to guess at its layout.
+pub const VERSION: u16 = 1;
 /// Where the section table starts inside the header: `magic(8) ver(2)
 /// header_len(2) dims(4) metric(1) encode(1) rot_algo(1) pad(1) seed(8)
 /// partitions(4) segment(4) pad(4)`, then 6 × `{offset u64, len u64}`.
@@ -119,6 +113,13 @@ pub struct ChunkHeader {
     /// segment's **own** offsets; `segment << 32 | offset` is what the engine
     /// sees (`docs/SPANN_DESIGN.md` §6.2).
     pub segment: u32,
+    /// The DFS key of this chunk's first partition: 0 for a chunk that holds the
+    /// whole tree, `lo` for a subtree chunk covering `[lo, lo + partitions)`.
+    ///
+    /// Keys inside a chunk stay **local** (0..partitions), so the reader is
+    /// unchanged; the base is what lets a segment map a global key onto
+    /// `(chunk, local)` once a manifest hands out ranges.
+    pub first_key: u32,
 }
 
 impl ChunkHeader {
@@ -126,6 +127,18 @@ impl ChunkHeader {
     pub fn row_base(&self) -> u64 {
         u64::from(self.segment) << 32
     }
+}
+
+/// One partition of a chunk's directory, as [`FileIndex::tree_meta`] reports it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TreeMeta {
+    /// DFS key, local to the chunk.
+    pub key: PartitionKey,
+    pub level: u32,
+    pub members: usize,
+    pub radius: f32,
+    pub children: Vec<u32>,
+    pub centroid: Vec<f32>,
 }
 
 /// Per-partition metadata (§6.1 section A).
@@ -280,6 +293,14 @@ impl Layout {
             return Err(SpannError::Corrupt("no partitions".to_string()));
         }
         let segment = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
+        let first_key = u32::from_le_bytes(bytes[136..140].try_into().unwrap());
+        if (first_key as usize).checked_add(partitions).is_none()
+            || first_key as usize + partitions > u32::MAX as usize
+        {
+            return Err(SpannError::Corrupt(format!(
+                "subtree base {first_key} + {partitions} partitions overflows the key space"
+            )));
+        }
 
         // Section table, then bounds and CRCs.
         let tail = bytes.len() - TRAILER_LEN;
@@ -330,6 +351,7 @@ impl Layout {
                 seed,
                 partitions,
                 segment,
+                first_key,
             },
             sections,
         })
@@ -368,11 +390,50 @@ impl<'a> Chunk<'a> {
         &self.bytes[offset..offset + len]
     }
 
-    pub fn meta(&self, key: PartitionKey) -> Option<PartitionMeta> {
-        if key as usize >= self.header.partitions {
+    /// The section-A slot a key lives in.
+    ///
+    /// Keys are **looked up**, not assumed to be slots: today's chunks write
+    /// DFS positions, so the fast path hits, but a chunk whose keys are stable
+    /// identifiers (`parent << 6 | slot`) sorts section A by key and resolves
+    /// with a binary search. That lookup is what lets a split insert a child
+    /// without renumbering every partition after it - the obstacle that makes a
+    /// positional key model rewrite the whole tree for one dirty partition.
+    fn slot_of(&self, key: PartitionKey) -> Option<usize> {
+        let section = self.section(Section::Meta);
+        let count = self.header.partitions;
+        let read = |slot: usize| -> PartitionKey {
+            let at = slot * META_ENTRY;
+            u32::from_le_bytes(section[at..at + 4].try_into().unwrap())
+        };
+        if (key as usize) < count && read(key as usize) == key {
+            return Some(key as usize);
+        }
+        let mut lo = 0usize;
+        let mut hi = count;
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            match read(mid).cmp(&key) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return Some(mid),
+            }
+        }
+        None
+    }
+
+    /// The key stored in section A at `slot`: the inverse of [`Self::slot_of`],
+    /// for walking the directory positionally.
+    pub fn key_at(&self, slot: usize) -> Option<PartitionKey> {
+        if slot >= self.header.partitions {
             return None;
         }
-        let at = key as usize * META_ENTRY;
+        let at = slot * META_ENTRY;
+        let section = self.section(Section::Meta);
+        Some(u32::from_le_bytes(section[at..at + 4].try_into().unwrap()))
+    }
+
+    pub fn meta(&self, key: PartitionKey) -> Option<PartitionMeta> {
+        let at = self.slot_of(key)? * META_ENTRY;
         let section = self.section(Section::Meta);
         let word = |at: usize| u32::from_le_bytes(section[at..at + 4].try_into().unwrap());
         Some(PartitionMeta {
@@ -597,12 +658,15 @@ impl Default for Crc32c {
 /// built with the catalog's options must not pay that: this reads `HEADER_LEN`
 /// bytes.
 pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, SpannError> {
-    use std::io::Read;
-    let mut file =
-        std::fs::File::open(path).map_err(|e| SpannError::Corrupt(format!("open chunk: {e}")))?;
-    let mut head = [0u8; HEADER_LEN];
-    file.read_exact(&mut head)
-        .map_err(|e| SpannError::Corrupt(format!("read header: {e}")))?;
+    // Mapped through the chunk store, so a cache that has been wiped still
+    // answers from the object; only the header page is touched, not the
+    // sections, which is the whole point of not calling `Layout::open`.
+    let map = crate::buffer::mapped::MappedFile::open(path)
+        .map_err(|e| SpannError::Corrupt(format!("open chunk: {e}")))?;
+    let bytes: &[u8] = &map;
+    let head = bytes
+        .get(..HEADER_LEN)
+        .ok_or_else(|| SpannError::Corrupt("chunk shorter than its header".to_string()))?;
     if head[0..8] != MAGIC {
         return Err(SpannError::Corrupt("bad magic".to_string()));
     }
@@ -632,6 +696,7 @@ pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, Spa
         seed: u64::from_le_bytes(head[20..28].try_into().unwrap()),
         partitions: u32::from_le_bytes(head[28..32].try_into().unwrap()) as usize,
         segment: u32::from_le_bytes(head[32..36].try_into().unwrap()),
+        first_key: u32::from_le_bytes(head[136..140].try_into().unwrap()),
     })
 }
 
@@ -720,7 +785,10 @@ pub struct FileIndex {
 
 impl FileIndex {
     pub fn open(path: impl AsRef<std::path::Path>, opts: &Options) -> Result<Self, SpannError> {
-        let map = crate::mapped::MappedFile::open_path(path)
+        // `MappedFile::open` is the store-aware facade: with a persistence
+        // profile and no local copy it maps the object that holds the chunk
+        // (`MappedFile::open_range`), instead of failing on a missing cache.
+        let map = crate::mapped::MappedFile::open(path)
             .map_err(|e| SpannError::Corrupt(format!("map: {e}")))?;
         let layout = Layout::open(&map)?;
         if layout.header.metric != opts.metric
@@ -749,6 +817,40 @@ impl FileIndex {
     /// A view over the mapping; the layout was verified at open, so this is free.
     fn chunk(&self) -> Chunk<'_> {
         Chunk::from_layout(&self.map, self.layout.clone())
+    }
+
+    /// The chunk's partition directory, in DFS order: what an incremental dump
+    /// needs in order to insert a row into this tree without re-reading the
+    /// slots of every partition (`SPANN_DESIGN.md` §0.0.3's read-modify-write
+    /// path).
+    ///
+    /// `members` is the count, not the rows: a caller that wants the rows asks
+    /// for one partition at a time (`slots`), which is the unit the dump rewrites.
+    pub fn tree_meta(&self) -> Vec<TreeMeta> {
+        let chunk = self.chunk();
+        (0..self.partitions())
+            .filter_map(|slot| {
+                // Slots, not keys: a re-keyed chunk's keys are identifiers, so the
+                // directory has to be walked positionally and the key read out of
+                // section A.
+                let key = chunk.key_at(slot)?;
+                let meta = chunk.meta(key)?;
+                Some(TreeMeta {
+                    key,
+                    level: meta.level,
+                    members: meta.count as usize,
+                    radius: meta.radius,
+                    children: chunk.children(key),
+                    centroid: chunk.centroid(key)?,
+                })
+            })
+            .collect()
+    }
+
+    /// The DFS key this chunk's first partition sits at: 0 for a whole-tree
+    /// chunk, `lo` for a subtree chunk (`writer::write_range`).
+    pub fn first_key(&self) -> u32 {
+        self.layout.header.first_key
     }
 
     pub fn dims(&self) -> usize {
@@ -817,95 +919,96 @@ impl FileIndex {
         }
         let chunk = self.chunk();
         let metric = self.layout.header.metric;
-        let width = beam.unwrap_or(self.beam).max(1);
-
-        let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, ROOT_KEY)];
-        // See the heap path: a leaf above the bottom level is scanned, not
-        // descended through (`crates/index/src/spann/mod.rs`, `search_masked`).
-        let mut shallow: Vec<(f32, PartitionKey)> = Vec::new();
-        let mut level = chunk.height();
-        // Same descent as the heap path: it ends when nothing is left to descend
-        // into, because a branch can be shallower than the tree's height.
-        loop {
-            // Same narrowing as the heap path (`search::level_width`).
-            let mut next = Beam::new(search::level_width(width, level.saturating_sub(1)));
-            let mut descended = false;
-            for (bound, key) in &current {
-                if chunk.meta(*key).is_some_and(|m| m.level <= 1) {
-                    shallow.push((*bound, *key));
-                    continue;
-                }
-                descended = true;
-                for child in chunk.children(*key) {
-                    let Some(centroid) = chunk.centroid(child) else {
-                        continue;
-                    };
-                    let radius = chunk.meta(child).map(|m| m.radius).unwrap_or(0.0);
-                    let distance = l2_sq(q, &centroid).max(0.0).sqrt();
-                    let lower = if metric.is_l2() {
-                        (distance - radius).max(0.0)
-                    } else {
-                        distance
-                    };
-                    next.push(lower, child);
-                }
-            }
-            if !descended {
-                break;
-            }
-            current = next.into_items();
-            if current.is_empty() {
-                break;
-            }
-            level = level.saturating_sub(1).max(2);
-        }
-        current.extend(shallow);
-        // The leaf scan's early stop reads `current` in bound order.
-        current.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-        if current.is_empty() {
-            return Vec::new();
-        }
+        // `beam` is the leaf-scan budget, matching the heap path
+        // (`search::Candidate`): a tree grown by 2-way splits is ~log2(rows/CAP)
+        // levels deep, so a per-level width dilutes by 2^height by the time it
+        // reaches the leaves.
+        let budget = beam.unwrap_or(self.beam).max(1);
 
         let mut set = SearchSet::with_default_capacity(k);
-        for (bound, key) in &current {
-            let Some(slots) = chunk.slots(*key) else {
-                continue;
-            };
-            let Some(centroid) = chunk.centroid(*key) else {
-                continue;
-            };
-            // Early stop: the beam is sorted by bound, and the bounds here are
-            // distances while the L2 scores are squared (`search::l2_can_beat`).
+        let mut queue: std::collections::BinaryHeap<search::Candidate> =
+            std::collections::BinaryHeap::new();
+        // The chunk's root is its smallest key: a whole-tree chunk that is
+        // `ROOT_KEY`, a subtree chunk the root of the subtree it holds.
+        queue.push(search::Candidate {
+            bound: 0.0,
+            lower: 0.0,
+            key: self.first_key() as u64,
+        });
+        let mut scanned = 0usize;
+        while let Some(node) = queue.pop() {
+            // Skip, never break: the queue is ordered by centroid distance, so a
+            // later node may still have a smaller radius-adjusted bound.
             if metric.is_l2() {
                 if let Some(kth) = set.kth_upper() {
-                    if !search::l2_can_beat(*bound, kth) {
-                        break;
-                    }
-                }
-            }
-            let rot_centroid = self.rotation.apply(&centroid);
-            let query = quantize::make_query(&self.rotation, &rot_centroid, q);
-            for i in 0..slots.len() {
-                let (Some(row), Some((norm, raw_norm, sum, error, bits))) =
-                    (slots.row_id(i), slots.parts(i))
-                else {
-                    continue;
-                };
-                if let Some(allowed) = allowed {
-                    if !allowed.contains(&row) {
+                    if !search::l2_can_beat(node.lower, kth) {
                         continue;
                     }
                 }
-                // Scored from the raw columns: no per-member allocation, which is
-                // what made the first mapped version 3.4× slower than heap.
-                let squared =
-                    quantize::distance_estimate_parts(&query, norm, sum, error, bits, dims);
-                let err = quantize::error_bound_parts(&query, norm, error);
-                let (score, bound) = metric_score(metric, squared, err, query.raw_norm, raw_norm);
-                set.add(score, bound, row);
+            }
+            let key = node.key as PartitionKey;
+            let Some(meta) = chunk.meta(key) else {
+                continue;
+            };
+            if meta.level <= 1 {
+                if scanned >= budget {
+                    break;
+                }
+                scanned += 1;
+                self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
+                continue;
+            }
+            for child in chunk.children(key) {
+                let Some(centroid) = chunk.centroid(child) else {
+                    continue;
+                };
+                let radius = chunk.meta(child).map(|m| m.radius).unwrap_or(0.0);
+                let distance = l2_sq(q, &centroid).max(0.0).sqrt();
+                queue.push(search::Candidate {
+                    bound: distance,
+                    lower: search::radius_lower(distance, radius, metric),
+                    key: child as u64,
+                });
             }
         }
         set.into_sorted()
+    }
+
+    /// Scores every slot of one leaf into `set`.
+    #[allow(clippy::too_many_arguments)]
+    fn scan_leaf(
+        &self,
+        chunk: &Chunk<'_>,
+        key: PartitionKey,
+        q: &[f32],
+        metric: Metric,
+        dims: usize,
+        allowed: Option<&std::collections::HashSet<u64>>,
+        set: &mut SearchSet,
+    ) {
+        let (Some(slots), Some(centroid)) = (chunk.slots(key), chunk.centroid(key)) else {
+            return;
+        };
+        let rot_centroid = self.rotation.apply(&centroid);
+        let query = quantize::make_query(&self.rotation, &rot_centroid, q);
+        for i in 0..slots.len() {
+            let (Some(row), Some((norm, raw_norm, sum, error, bits))) =
+                (slots.row_id(i), slots.parts(i))
+            else {
+                continue;
+            };
+            if let Some(allowed) = allowed {
+                if !allowed.contains(&row) {
+                    continue;
+                }
+            }
+            // Scored from the raw columns: no per-member allocation, which is
+            // what made the first mapped version 3.4× slower than heap.
+            let squared = quantize::distance_estimate_parts(&query, norm, sum, error, bits, dims);
+            let err = quantize::error_bound_parts(&query, norm, error);
+            let (score, bound) = metric_score(metric, squared, err, query.raw_norm, raw_norm);
+            set.add(score, bound, row);
+        }
     }
 }
 
@@ -930,6 +1033,106 @@ mod tests {
             max_partition_size: 32,
             min_partition_size: 8,
             ..Options::default()
+        }
+    }
+
+    #[test]
+    fn a_range_chunk_renumbers_its_keys_and_names_its_base() {
+        let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
+        let n = index.partitions().len();
+        let dir = std::env::temp_dir().join(format!("spann_range_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let header_of = |bytes: &[u8], name: &str| {
+            let path = dir.join(name);
+            std::fs::write(&path, bytes).unwrap();
+            read_header(&path).unwrap()
+        };
+
+        // A whole range is byte-identical to the whole tree: renumbering by 0 and
+        // a base of 0 must be a no-op.
+        let whole = write_range(&index, 0, 0, n).unwrap();
+        assert_eq!(
+            whole,
+            write(&index, 0).unwrap(),
+            "range 0..n must be identical"
+        );
+        assert_eq!(header_of(&whole, "whole.idx").first_key, 0);
+
+        // A leaf is a closed subtree of one partition: its keys renumber to 0 and
+        // the header names where it sits in the segment's key space.
+        let leaf = (0..n)
+            .find(|at| index.partitions()[*at].children.is_empty())
+            .expect("a tree has a leaf");
+        let single = write_range(&index, 0, leaf, leaf + 1).unwrap();
+        let header = header_of(&single, "leaf.idx");
+        assert_eq!(header.partitions, 1);
+        assert_eq!(header.first_key, leaf as u32);
+        // ... and it opens as a one-partition tree of its own.
+        let opened = FileIndex::open(dir.join("leaf.idx"), &opts()).expect("open leaf chunk");
+        assert_eq!(opened.partitions(), 1);
+        assert_eq!(opened.len(), index.partitions()[leaf].members.len());
+    }
+
+    #[test]
+    fn tree_meta_round_trips_the_directory() {
+        let index = SpannIndex::build(rows(150, 8), opts()).unwrap();
+        let dir = std::env::temp_dir().join(format!("spann_meta_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("meta.idx");
+        write_to(&index, &path, 0).unwrap();
+        let opened = FileIndex::open(&path, &opts()).unwrap();
+
+        let meta = opened.tree_meta();
+        assert_eq!(meta.len(), index.partitions().len());
+        for (at, part) in index.partitions().iter().enumerate() {
+            let got = &meta[at];
+            assert_eq!(got.key, part.key);
+            assert_eq!(got.level, part.level);
+            assert_eq!(got.members, part.members.len());
+            assert_eq!(got.radius.to_bits(), part.radius.to_bits());
+            assert_eq!(got.children, part.children);
+            assert_eq!(got.centroid.len(), part.centroid.len());
+            for (a, b) in got.centroid.iter().zip(&part.centroid) {
+                assert_eq!(a.to_bits(), b.to_bits());
+            }
+        }
+    }
+
+    #[test]
+    fn a_keyed_chunk_keeps_its_keys_and_needs_no_renumbering() {
+        let index = SpannIndex::build(rows(120, 8), opts()).unwrap();
+        let all: Vec<PartitionKey> = index.partitions().iter().map(|part| part.key).collect();
+        // Every key, dense: byte-identical to the whole-tree write.
+        assert_eq!(
+            write_keys(&index, 0, &all).unwrap(),
+            write(&index, 0).unwrap()
+        );
+
+        // A single leaf, keyed by its own key: section A still names that key,
+        // the header names it as the base, and it opens on its own.
+        let leaf = (0..all.len())
+            .find(|at| index.partitions()[*at].children.is_empty())
+            .expect("a leaf");
+        let key = all[leaf];
+        let dir = std::env::temp_dir().join(format!("spann_keys_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("leaf.idx");
+        let bytes = write_keys(&index, 0, &[key]).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        let chunk = FileIndex::open(&path, &opts()).unwrap();
+        assert_eq!(chunk.partitions(), 1);
+        assert_eq!(
+            chunk.first_key(),
+            key,
+            "the key is kept, not renumbered to 0"
+        );
+        // The reader resolves it by key, not by position.
+        assert_eq!(chunk.tree_meta()[0].key, key);
+
+        // A set that cuts a child edge is refused.
+        let parent = (0..all.len()).find(|at| !index.partitions()[*at].children.is_empty());
+        if let Some(parent) = parent {
+            assert!(write_keys(&index, 0, &[all[parent]]).is_err());
         }
     }
 
@@ -973,6 +1176,9 @@ mod tests {
         assert_eq!(chunk.header().encode, Encode::Rabitq);
         assert_eq!(chunk.header().seed, index.opts().seed);
         assert_eq!(chunk.header().partitions, index.partitions().len());
+        // A whole-tree chunk starts at key 0; a subtree chunk names its base so
+        // the segment can map a global key onto `(chunk, local)`.
+        assert_eq!(chunk.header().first_key, 0);
         assert_eq!(chunk.height(), index.height());
         assert_eq!(chunk.row_ids().len(), 300);
 
@@ -1066,13 +1272,13 @@ mod tests {
                 let index = SpannIndex::build(data.clone(), options.clone()).unwrap();
                 let bytes = write(&index, 0);
                 if encode == Encode::None {
-                    // The v1 chunk stores rabitq codes only, so a `none` index has
+                    // A chunk stores rabitq codes only, so a `none` index has
                     // no mapped counterpart - and writing one must be refused
                     // rather than silently re-encoded (the build path keeps
                     // working, which is what the `encode = none` tests cover).
                     assert!(
                         bytes.is_err(),
-                        "a `none` index must not be serialised into a v1 chunk"
+                        "a `none` index must not be serialised into a chunk"
                     );
                     continue;
                 }
@@ -1132,6 +1338,98 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The incremental tree publishes through the same chunk format: what the
+    /// live index answered and what a restart reads back are the same rows.
+    #[test]
+    fn an_incremental_tree_round_trips_through_a_chunk() {
+        use index::spann::incr::IncIndex;
+        use index::spann::source::{row_source, Memory};
+
+        // 128d, not the 8d the format tests use: a 1-bit code cannot rank rows
+        // at 8 dimensions (the estimate noise is the inter-row distance), and
+        // this test is about the publish/read-back path, not the quantizer.
+        let dim = 128;
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (state >> 40) as f32 / (1u64 << 24) as f32
+        };
+        let rows: Vec<(u64, Vec<f32>)> = (0..200u64)
+            .map(|i| {
+                let v: Vec<f32> = (0..dim).map(|_| next() + next() - 1.0).collect();
+                (i, v)
+            })
+            .collect();
+
+        let options = opts();
+        let source = Memory::new(rows.clone());
+        let lookup = row_source(&source);
+        let mut inc = IncIndex::new(dim, options.clone()).unwrap();
+        for (id, v) in &rows {
+            inc.insert(*id, v).unwrap();
+            if inc.pending_fixups() > 0 {
+                inc.run_fixups(Some(&lookup));
+            }
+        }
+        inc.run_fixups(Some(&lookup));
+        assert!(inc.splits() > 0, "the fixture has to split");
+
+        let published = inc.to_spann().expect("a built index publishes");
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_0.idx");
+        write_to(&published, &path, 0).unwrap();
+        let file = FileIndex::open(&path, &options).unwrap();
+
+        // Every row survives the fixups. A merge that picks an interior node as
+        // its target appends to that node's `members`/`pending`, where no
+        // descent, scan or publish ever looks, so this is the assertion that
+        // catches a row going missing without any counter moving.
+        let mut want = inc.row_ids();
+        want.sort_unstable();
+        want.dedup();
+        assert_eq!(
+            want,
+            (0..rows.len() as u64).collect::<Vec<_>>(),
+            "the incremental tree keeps every row it was given"
+        );
+        assert_eq!(published.len(), inc.len(), "publishing keeps every row");
+        assert_eq!(file.len(), inc.len());
+        let mut got = file.row_ids();
+        got.sort_unstable();
+        assert_eq!(got, want, "the chunk covers the same rows");
+
+        // The heap tree and its chunk agree (same descent, same scores).
+        for q in rows.iter().take(10) {
+            let heap: Vec<u64> = published
+                .search(&q.1, 5, Some(64))
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            let reopened: Vec<u64> = file
+                .search(&q.1, 5, Some(64))
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(heap, reopened, "row {}", q.0);
+        }
+
+        // And every row still finds itself through the restart.
+        let mut hit = 0usize;
+        for (id, v) in &rows {
+            let got = file.search(v, 1, Some(64)).first().map(|(g, _)| *g);
+            if got != Some(*id) {
+                let live = inc.search(v, 1, 64).first().map(|(g, _)| *g);
+                eprintln!("miss id {id}: chunk got {got:?}, live got {live:?}");
+            }
+            if got == Some(*id) {
+                hit += 1;
+            }
+        }
+        assert_eq!(hit, rows.len(), "self-query after a restart: {hit}/200");
     }
 
     #[test]

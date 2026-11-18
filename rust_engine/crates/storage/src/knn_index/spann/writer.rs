@@ -15,7 +15,7 @@
 use std::io::Write;
 
 use index::spann::quantize::code_bytes;
-use index::spann::{Encode, SpannIndex};
+use index::spann::{Encode, Partition, PartitionKey, SpannIndex};
 use index::vector::Metric;
 
 use super::{
@@ -38,22 +38,81 @@ pub fn write(index: &SpannIndex, segment: u32) -> Result<Vec<u8>, SpannError> {
     Ok(out)
 }
 
+/// The chunk for the half-open partition range `[lo, hi)` of `index`.
+///
+/// A subtree chunk is the unit a manifest hands out: its keys are renumbered to
+/// `0..(hi - lo)`, `header.first_key` names `lo`, and every child edge must stay
+/// inside the range - a subtree is closed under children by construction, so an
+/// edge that leaves it is a caller bug, not something to paper over.
+pub fn write_range(
+    index: &SpannIndex,
+    segment: u32,
+    lo: usize,
+    hi: usize,
+) -> Result<Vec<u8>, SpannError> {
+    let all = index.partitions();
+    if lo >= hi || hi > all.len() {
+        return Err(SpannError::InvalidOption(
+            "range",
+            format!("partition range {lo}..{hi} of {}", all.len()),
+        ));
+    }
+    let keys: Vec<PartitionKey> = all[lo..hi].iter().map(|part| part.key).collect();
+    write_keys(index, segment, &keys)
+}
+
+/// The chunk for an explicit set of partition keys.
+///
+/// This is the form an incremental dump needs: the keys of a re-keyed tree are
+/// **stable identifiers**, not positions, so the dirty set is a set (a leaf plus
+/// its ancestors), not a numeric range. Section A is written sorted by key and
+/// rows are read back through it (`FileIndex::slot_of`), so a chunk can hold any
+/// closed set of partitions - children included - without renumbering anything.
+pub fn write_keys(
+    index: &SpannIndex,
+    segment: u32,
+    keys: &[PartitionKey],
+) -> Result<Vec<u8>, SpannError> {
+    let mut out: Vec<u8> = Vec::new();
+    sections_keys(index, segment, keys, &mut out)?;
+    Ok(out)
+}
+
 /// The chunk for `index`, streamed into `path`; returns its length in bytes.
+///
+/// The stream goes through [`crate::chunk_store`], i.e. through the
+/// `PersistenceManager` on a persistence profile: a chunk a catalog record
+/// names must be an object, not just a file in the cache. `dedicated` is the
+/// reference's `try_compose = false` - a chunk is one object of its own, so a
+/// reader maps the chunk rather than a part of a shared object.
 pub fn write_to(
     index: &SpannIndex,
     path: impl AsRef<std::path::Path>,
     segment: u32,
 ) -> Result<u64, SpannError> {
-    let file = std::fs::File::create(path)
-        .map_err(|e| SpannError::Corrupt(format!("create chunk: {e}")))?;
-    let mut out = std::io::BufWriter::with_capacity(1 << 20, file);
-    sections(index, segment, &mut out)?;
-    let file = out
-        .into_inner()
-        .map_err(|e| SpannError::Corrupt(format!("flush chunk: {e}")))?;
-    file.metadata()
-        .map(|m| m.len())
-        .map_err(|e| SpannError::Corrupt(format!("stat chunk: {e}")))
+    let mut failure: Option<SpannError> = None;
+    let mut produce = |sink: &mut dyn std::io::Write| -> std::io::Result<()> {
+        // `&mut dyn Write` is itself `Write` (and sized), which is what the
+        // section builder is generic over: re-borrowing costs nothing and keeps
+        // every helper in this file off a `?Sized` bound.
+        let mut out = sink;
+        match sections(index, segment, &mut out) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // The section builder is fallible (`encode = none`, an id from
+                // another segment); hand its error back rather than wrapping it
+                // as an IO failure the caller cannot read.
+                failure = Some(e);
+                Err(std::io::Error::other("chunk section failed"))
+            }
+        }
+    };
+    let len = crate::chunk_store::write_streaming_file(path, true, &mut produce)
+        .map_err(|e| SpannError::Corrupt(format!("write chunk: {e}")))?;
+    if let Some(e) = failure {
+        return Err(e);
+    }
+    Ok(len)
 }
 
 fn put<W: Write>(
@@ -101,17 +160,57 @@ fn segment_offset(id: u64, segment: u32) -> Result<u32, SpannError> {
 }
 
 fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(), SpannError> {
+    let keys: Vec<PartitionKey> = index.partitions().iter().map(|part| part.key).collect();
+    sections_keys(index, segment, &keys, out)
+}
+
+fn sections_keys<W: Write>(
+    index: &SpannIndex,
+    segment: u32,
+    keys: &[PartitionKey],
+    out: &mut W,
+) -> Result<(), SpannError> {
     let opts = index.opts();
     if opts.encode != Encode::Rabitq {
         // Section E is reserved; the format only ships the production encoding.
         return Err(SpannError::InvalidOption(
             "encode",
-            "chunk format v2 only stores rabitq codes".to_string(),
+            "a chunk stores rabitq codes only".to_string(),
         ));
     }
     let dims = index.dim();
-    let parts = index.partitions();
-    let row_ids = index.row_ids();
+    let all = index.partitions();
+    if keys.is_empty() {
+        return Err(SpannError::InvalidOption(
+            "keys",
+            "a chunk needs at least one partition".to_string(),
+        ));
+    }
+    // Sorted, because section A's key column is what the reader binary searches.
+    let mut sorted: Vec<PartitionKey> = keys.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let mut parts: Vec<&Partition> = Vec::with_capacity(sorted.len());
+    for key in &sorted {
+        let at = all
+            .binary_search_by_key(key, |part| part.key)
+            .map_err(|_| {
+                SpannError::InvalidOption("keys", format!("no partition with key {key}"))
+            })?;
+        parts.push(&all[at]);
+    }
+    let member_keys: std::collections::HashSet<PartitionKey> = sorted.iter().copied().collect();
+    let whole = parts.len() == all.len();
+    let row_ids: Vec<u64> = if whole {
+        index.row_ids()
+    } else {
+        let mut ids: Vec<u64> = parts
+            .iter()
+            .flat_map(|part| part.members.iter().map(|member| member.id))
+            .collect();
+        ids.sort_unstable();
+        ids
+    };
     let code_bytes = code_bytes(dims);
     // One slot is row_off + norm + raw_norm + sum + error + code (§6.2).
     let slot_bytes = 4 + 4 * 4 + code_bytes;
@@ -122,7 +221,7 @@ fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(
     let mut page_offsets = Vec::with_capacity(parts.len());
     let mut page_data = Vec::with_capacity(parts.len());
     let mut running = 0usize;
-    for part in parts {
+    for part in &parts {
         page_offsets.push(running);
         let data = part.members.len() * slot_bytes;
         page_data.push(data);
@@ -177,6 +276,11 @@ fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(
     header[20..28].copy_from_slice(&opts.seed.to_le_bytes());
     header[28..32].copy_from_slice(&(parts.len() as u32).to_le_bytes());
     header[32..36].copy_from_slice(&segment.to_le_bytes());
+    // Bytes 136..160 are reserved; 136..140 name the **subtree base**: the DFS
+    // key of this chunk's first partition. A whole-tree chunk writes 0 (its keys
+    // are 0..partitions), and a subtree chunk written by a manifest-aware dump
+    // names its base so the segment can resolve `global key -> (chunk, local)`.
+    header[136..140].copy_from_slice(&sorted[0].to_le_bytes());
     for (i, (offset, len)) in table.iter().enumerate() {
         let at = SECTION_TABLE_AT + i * 16;
         header[at..at + 8].copy_from_slice(&offset.to_le_bytes());
@@ -215,7 +319,7 @@ fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(
     pad_to(out, &mut pos, table[Section::Centroids as usize].0 as usize)?;
     // B: centroids.
     let mut crc = Crc32c::new();
-    for part in parts {
+    for part in &parts {
         buf.clear();
         buf.reserve(part.centroid.len() * 4);
         for x in &part.centroid {
@@ -228,10 +332,18 @@ fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(
     pad_to(out, &mut pos, table[Section::Children as usize].0 as usize)?;
     // C: child keys.
     let mut crc = Crc32c::new();
-    for part in parts {
+    for part in &parts {
         buf.clear();
         buf.reserve(part.children.len() * 4);
         for child in &part.children {
+            // A chunk is closed under children: an edge to a partition outside
+            // the set would make the reader resolve a key the chunk does not hold.
+            if !member_keys.contains(child) {
+                return Err(SpannError::InvalidOption(
+                    "keys",
+                    format!("child key {child} is not in the chunk's key set"),
+                ));
+            }
             buf.extend_from_slice(&child.to_le_bytes());
         }
         put(out, &mut crc, &mut pos, &buf)?;
