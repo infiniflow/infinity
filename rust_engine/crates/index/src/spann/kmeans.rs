@@ -58,9 +58,43 @@ fn d2(p: &[f32], c: &[f32]) -> f32 {
     l2_sq(p, c)
 }
 
-/// Balanced 2-means (`BalancedKMeans(k=2)`): k-means++ seeding, Lloyd
-/// iterations, then a **balance** pass that moves the points farthest from
-/// their own centroid until the two clusters differ by at most one.
+/// Points the centroid estimate runs on.
+///
+/// Lloyd over the **whole** node re-reads it once per iteration, and the build
+/// runs one node per tree level: at 2M × 1536d that is 12 GiB × 8 iterations ×
+/// 14 levels of vector traffic, which is what made `CREATE INDEX` take an hour
+/// (the arithmetic was never the cost - the distance kernel is already SIMD).
+/// A bounded, deterministic slice estimates the centroids just as well, and the
+/// node itself is then visited **exactly once**, by the assignment below. This
+/// is the split C-SPANN makes structurally: it never runs k-means over more than
+/// one partition (`cspann/kmeans.go`, `MaxPartitionSize`).
+const SAMPLE_POINTS: usize = 4096;
+
+/// How many slices a pass is cut into when it runs in parallel. Fixed rather
+/// than derived from the core count: the slices are combined in index order, so
+/// the result is the serial one on a 4-core and a 10-core machine alike, which
+/// is what keeps two builds of the same rows byte-identical.
+const CHUNKS: usize = 16;
+
+/// Nodes below this run their pass on the calling thread: a fork costs more
+/// than the pass.
+const PARALLEL_MIN_POINTS: usize = 1 << 16;
+
+/// One point's assignment, plus the distance it paid for it.
+///
+/// The distance is kept because the balance pass needs exactly this value for
+/// the cluster it moves points out of, and recomputing it was a second full
+/// pass over the node's vectors.
+#[derive(Clone, Copy, Default)]
+struct Cell {
+    second: bool,
+    dist: f32,
+}
+
+/// Balanced 2-means (`BalancedKMeans(k=2)`): k-means++ seeding and Lloyd
+/// iterations on a bounded sample, then one full assignment pass, then a
+/// **balance** pass that moves the points farthest from their own centroid until
+/// the two clusters differ by at most one.
 ///
 /// The balance pass is what makes the tree's depth predictable: an unbalanced
 /// split repeats until `max_partition_size` is met, and one heavy child turns
@@ -79,6 +113,11 @@ pub fn balanced_kmeans_2(points: &[&[f32]], dim: usize, iterations: usize, seed:
         };
     }
 
+    let sample: Vec<&[f32]> = sample_indices(points.len())
+        .into_iter()
+        .map(|i| points[i])
+        .collect();
+
     // k-means++: the first centre is drawn uniformly, the second with
     // probability proportional to `d²`. The seed goes through a multiplication
     // so adjacent seeds (`k ^ key`) do not collapse onto the same stream.
@@ -86,60 +125,114 @@ pub fn balanced_kmeans_2(points: &[&[f32]], dim: usize, iterations: usize, seed:
         .wrapping_mul(0x9E37_79B9_7F4A_7C15)
         .wrapping_add(0x2545_F491_4F6C_DD1D)
         | 1);
-    let first = ((rng.next() as usize) * points.len()) % points.len();
-    let c0 = points[first].to_vec();
-    let weights: Vec<f32> = points.iter().map(|p| d2(p, &c0)).collect();
+    let first = ((rng.next() as usize) * sample.len()) % sample.len();
+    let c0 = sample[first].to_vec();
+    let weights: Vec<f32> = sample.iter().map(|p| d2(p, &c0)).collect();
     let total: f32 = weights.iter().sum();
-    let mut c1 = points[(first + 1) % points.len()].to_vec();
+    let mut c1 = sample[(first + 1) % sample.len()].to_vec();
     if total > 0.0 {
         let target = rng.next() * total;
         let mut acc = 0.0f32;
         for (i, w) in weights.iter().enumerate() {
             acc += *w;
             if acc >= target {
-                c1 = points[i].to_vec();
+                c1 = sample[i].to_vec();
                 break;
             }
         }
         if l2_sq(&c0, &c1) == 0.0 {
             // Degenerate data (all points identical): any split is as good.
-            c1 = points[points.len() - 1].to_vec();
+            c1 = sample[sample.len() - 1].to_vec();
         }
     }
 
     let mut centroids = [c0, c1];
-    let mut second = vec![false; points.len()];
+    let mut cells = vec![Cell::default(); sample.len()];
     for _ in 0..iterations.max(1) {
-        assign(points, &centroids, &mut second);
-        let (a, b) = groups(points, &second);
+        assign(&sample, &centroids, &mut cells);
+        let (a, b) = groups(&sample, &cells);
         if a.is_empty() || b.is_empty() {
             break;
         }
         centroids = [mean(&a, dim), mean(&b, dim)];
     }
 
-    assign(points, &centroids, &mut second);
-    rebalance(points, dim, &mut centroids, &mut second);
-    Split { centroids, second }
-}
-
-fn assign(points: &[&[f32]], centroids: &[Vec<f32>; 2], second: &mut [bool]) {
-    for (i, p) in points.iter().enumerate() {
-        second[i] = d2(p, &centroids[1]) < d2(p, &centroids[0]);
+    // The node is visited once: assignment, then the balance pass works off the
+    // distances it produced.
+    let mut cells = vec![Cell::default(); points.len()];
+    assign(points, &centroids, &mut cells);
+    rebalance(points, dim, &mut centroids, &mut cells);
+    Split {
+        centroids,
+        second: cells.into_iter().map(|cell| cell.second).collect(),
     }
 }
 
-fn groups<'a>(points: &[&'a [f32]], second: &[bool]) -> (Vec<&'a [f32]>, Vec<&'a [f32]>) {
+/// `min(n, SAMPLE_POINTS)` evenly spaced indices - deterministic, and spread
+/// over the node instead of its head.
+fn sample_indices(n: usize) -> Vec<usize> {
+    if n <= SAMPLE_POINTS {
+        return (0..n).collect();
+    }
+    let stride = (n / SAMPLE_POINTS).max(1);
+    (0..SAMPLE_POINTS).map(|i| i * stride).collect()
+}
+
+/// Assigns every point, in parallel slices for a large node.
+///
+/// The shape is kentro's `assign_clusters` (`kentro/src/lib.rs`, `par_iter` over
+/// the rows) without its `ndarray` copy: the points are already borrowed
+/// slices, so a slice here is a range of indices and nothing is duplicated.
+fn assign(points: &[&[f32]], centroids: &[Vec<f32>; 2], cells: &mut [Cell]) {
+    let n = points.len().min(cells.len());
+    let run = |offset: usize, part: &mut [Cell]| {
+        for (k, cell) in part.iter_mut().enumerate() {
+            let p = points[offset + k];
+            let d0 = d2(p, &centroids[0]);
+            let d1 = d2(p, &centroids[1]);
+            cell.second = d1 < d0;
+            cell.dist = if cell.second { d1 } else { d0 };
+        }
+    };
+    if n < PARALLEL_MIN_POINTS {
+        run(0, &mut cells[..n]);
+        return;
+    }
+    let per = n.div_ceil(CHUNKS).max(1);
+    std::thread::scope(|scope| {
+        for (chunk, part) in cells[..n].chunks_mut(per).enumerate() {
+            let run = &run;
+            scope.spawn(move || run(chunk * per, part));
+        }
+    });
+}
+
+fn groups<'a>(points: &[&'a [f32]], cells: &[Cell]) -> (Vec<&'a [f32]>, Vec<&'a [f32]>) {
     let mut a = Vec::new();
     let mut b = Vec::new();
-    for (p, s) in points.iter().zip(second) {
-        if *s {
+    for (p, cell) in points.iter().zip(cells) {
+        if cell.second {
             b.push(*p);
         } else {
             a.push(*p);
         }
     }
     (a, b)
+}
+
+/// Up to `SAMPLE_POINTS` members of one side, in index order.
+fn sample_of<'a>(points: &[&'a [f32]], cells: &[Cell], second: bool) -> Vec<&'a [f32]> {
+    let members: Vec<usize> = cells
+        .iter()
+        .enumerate()
+        .filter(|(_, cell)| cell.second == second)
+        .map(|(i, _)| i)
+        .collect();
+    if members.len() <= SAMPLE_POINTS {
+        return members.into_iter().map(|i| points[i]).collect();
+    }
+    let stride = (members.len() / SAMPLE_POINTS).max(1);
+    members.iter().step_by(stride).map(|i| points[*i]).collect()
 }
 
 /// Moves the farthest point of the larger cluster to the other one until the
@@ -150,18 +243,19 @@ fn groups<'a>(points: &[&'a [f32]], second: &[bool]) -> (Vec<&'a [f32]>, Vec<&'a
 /// being moved**, the distance of every point to it is fixed, so the m-th move
 /// takes the m-th farthest point of the cluster it started from. One sort is the
 /// same set of moves in the same order, for `O(n log n)` - at 20k × 128d the
-/// rescans were the dominant cost of the whole build.
-fn rebalance(points: &[&[f32]], dim: usize, centroids: &mut [Vec<f32>; 2], second: &mut [bool]) {
-    let na = second.iter().filter(|s| !**s).count();
-    let nb = second.len() - na;
-    let (from_second, from_centroid) = if na > nb { (false, 0) } else { (true, 1) };
+/// rescans were the dominant cost of the whole build. The distances come from
+/// `assign`, so this pass never touches the vectors.
+fn rebalance(points: &[&[f32]], dim: usize, centroids: &mut [Vec<f32>; 2], cells: &mut [Cell]) {
+    let na = cells.iter().filter(|cell| !cell.second).count();
+    let nb = cells.len() - na;
+    let (from_second, _from_centroid) = if na > nb { (false, 0) } else { (true, 1) };
     let moves = na.abs_diff(nb) / 2;
     if moves > 0 {
-        let mut order: Vec<(f32, usize)> = points
+        let mut order: Vec<(f32, usize)> = cells
             .iter()
             .enumerate()
-            .filter(|(i, _)| second[*i] == from_second)
-            .map(|(i, p)| (d2(p, &centroids[from_centroid]), i))
+            .filter(|(_, cell)| cell.second == from_second)
+            .map(|(i, cell)| (cell.dist, i))
             // A NaN distance is never "the farthest" in the reference's
             // `d > worst` comparison, so it never moves.
             .filter(|(d, _)| !d.is_nan())
@@ -169,10 +263,14 @@ fn rebalance(points: &[&[f32]], dim: usize, centroids: &mut [Vec<f32>; 2], secon
         // Farthest first; ties keep the reference's lowest-index-first order.
         order.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
         for (_, idx) in order.into_iter().take(moves) {
-            second[idx] = !from_second;
+            cells[idx].second = !from_second;
         }
     }
-    let (a, b) = groups(points, second);
+    // Centroids from a bounded sample of each side, for the same reason the
+    // estimate uses one: recomputing them over the whole node was the third
+    // full pass over its vectors.
+    let a = sample_of(points, cells, false);
+    let b = sample_of(points, cells, true);
     *centroids = [mean(&a, dim), mean(&b, dim)];
 }
 
@@ -263,7 +361,14 @@ mod tests {
             let Some((idx, _)) = worst else { break };
             second[idx] = !from_second;
         }
-        let (a, b) = groups(points, second);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for (p, s) in points.iter().zip(second) {
+            if *s {
+                b.push(*p);
+            } else {
+                a.push(*p);
+            }
+        }
         *centroids = [mean(&a, dim), mean(&b, dim)];
     }
 
@@ -297,10 +402,22 @@ mod tests {
                 if n > 3 {
                     old_second[n - 2] = true;
                 }
-                let mut new_second = old_second.clone();
+                let new_second_start = old_second.clone();
                 let (mut old_c, mut new_c) = ([c0.clone(), c1.clone()], [c0, c1]);
                 rebalance_old(&refs, dim, &mut old_c, &mut old_second);
-                rebalance(&refs, dim, &mut new_c, &mut new_second);
+                // The new form takes the distances `assign` paid for, so build
+                // the cells from the same mask and centroids the old one starts
+                // from.
+                let mut cells: Vec<Cell> = new_second_start
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| Cell {
+                        second: *s,
+                        dist: d2(refs[i], &new_c[if *s { 1 } else { 0 }]),
+                    })
+                    .collect();
+                rebalance(&refs, dim, &mut new_c, &mut cells);
+                let new_second: Vec<bool> = cells.iter().map(|c| c.second).collect();
                 assert_eq!(old_second, new_second, "trial {trial}: mask differs");
                 assert_eq!(old_c, new_c, "trial {trial}: centroids differ");
             }

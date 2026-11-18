@@ -16204,6 +16204,60 @@ mod tests {
             eprintln!("  tree.search beam {beam:>4}: {t:?}");
         }
 
+        // Where the *statement's* milliseconds go: the same probe through
+        // `knn_candidates`, at the narrowest width, with and without the
+        // coverage count. Anything neither explains is the SQL layer.
+        {
+            let qv = vector_f32(probe_row(0));
+            let mut opts = crate::knn_scan::KnnScanOptions::default();
+            opts.nprobe = Some(1);
+            let scan = |live: Option<usize>| {
+                e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
+                    table: "big",
+                    index_id: Some(index_id),
+                    query: &qv,
+                    rows: &[],
+                    live_rows: None,
+                    live_count: live,
+                    cache: None,
+                    topn: 10,
+                    metric: "l2",
+                    options: &opts,
+                    allowed: None,
+                    beam: Some(1),
+                })
+            };
+            let started = std::time::Instant::now();
+            let probe = scan(Some(rows_total)).expect("probe");
+            eprintln!(
+                "  knn_candidates nprobe 1, count known: {:?} | {} candidates, {} uncovered",
+                started.elapsed(),
+                probe.candidates.len(),
+                probe.uncovered.len()
+            );
+            let started = std::time::Instant::now();
+            let _ = scan(None);
+            eprintln!(
+                "  knn_candidates nprobe 1, count unknown: {:?}",
+                started.elapsed()
+            );
+            // The three numbers `all_covered` compares: when they disagree the
+            // query pays `row_ids()` on every call.
+            let entry = e
+                .tables
+                .lock()
+                .unwrap()
+                .get(&e.table_key("default_db.big"))
+                .map(|entry| (entry.live_rows, entry.spann_mem.len()));
+            eprintln!(
+                "  counts: tree {} | table row_count {:?} | published live_rows {:?} | mem {:?}",
+                tree.len(),
+                e.row_count("big"),
+                entry.as_ref().and_then(|(live, _)| *live),
+                entry.map(|(_, mem)| mem),
+            );
+        }
+
         // What one rerank candidate costs, on its own: the row arrives as text,
         // so the rescoring pays a parse before it can measure a distance.
         let text = vector_text(0);
@@ -17285,5 +17339,103 @@ mod tests {
             }
             println!("{width:>5} | {} | {}", lines[0], lines[1]);
         }
+    }
+
+    /// A query answers while rows are being inserted, and once the writer is
+    /// done, the tree covers what it wrote.
+    ///
+    /// This is the property the incremental tree exists for: the search reads
+    /// partitions through the store while the writer appends to the memory tail
+    /// and drains it, and a split only ever moves rows between partitions inside
+    /// one store batch - so a reader sees each row exactly once, never a
+    /// half-applied batch, and the two never deadlock on the engine's `tables`
+    /// lock. C-SPANN has the same contract: the fixup worker moves rows, the
+    /// search reads the tree, and neither takes a lock the other holds
+    /// (`cspann/fixup_worker.go`, `cspann/search.go`).
+    #[test]
+    fn a_query_answers_while_rows_are_being_inserted() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE live (id INT, v EMBEDDING(FLOAT,16));")
+            .unwrap();
+        let dim = 16usize;
+        // A hash, not a modular pattern: the latter repeats every 97 rows, so
+        // the last row's nearest neighbour was not itself.
+        let unit = |a: u64, b: u64| -> f32 {
+            let mut x = a
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
+            x ^= x >> 33;
+            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
+            x ^= x >> 29;
+            (x % 100_000) as f32 / 100_000.0
+        };
+        let text = move |i: usize| -> String {
+            let cells: Vec<String> = (0..dim)
+                .map(|d| format!("{:.3}", unit(i as u64, d as u64)))
+                .collect();
+            format!("[{}]", cells.join(","))
+        };
+        let insert = |from: usize, to: usize| {
+            let mut sql = String::from("INSERT INTO live VALUES ");
+            for i in from..to {
+                if i > from {
+                    sql.push(',');
+                }
+                sql.push_str(&format!("({i}, {})", text(i)));
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+        };
+        let batches = 12usize;
+        let per_batch = 100usize;
+        insert(0, 500);
+        e.execute_blocking(
+            "CREATE INDEX live_i ON live (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=8);",
+        )
+        .unwrap();
+
+        // One writer, three readers. The writer inserts a batch and checkpoints
+        // after each one, so the readers race the tail, the checkpoint and the
+        // splits it causes (`max_partition_size = 32` splits constantly here).
+        let total = 500 + batches * per_batch;
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                for batch in 0..batches {
+                    insert(500 + batch * per_batch, 500 + (batch + 1) * per_batch);
+                    crate::scheduler::block_on(e.flush()).unwrap();
+                }
+            });
+            for _ in 0..3 {
+                let text = &text;
+                scope.spawn(|| {
+                    for _ in 0..30 {
+                        let sql = format!(
+                            "SELECT id FROM live SEARCH MATCH VECTOR \
+                             (v, {}, 'float', 'l2', 5);",
+                            text(7)
+                        );
+                        let got = rows(&e, &sql);
+                        assert_eq!(got.len(), 5, "a concurrent query answered short");
+                        for row in &got {
+                            let id: usize = row[0].parse().unwrap();
+                            assert!(id < total, "a concurrent query invented row {id}");
+                        }
+                    }
+                });
+            }
+        });
+
+        // Everything the writer committed is in the tree, so the last row it
+        // wrote is its own nearest neighbour.
+        let sql = format!(
+            "SELECT id FROM live SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+            text(total - 1)
+        );
+        assert_eq!(
+            rows(&e, &sql).first().map(|row| row[0].clone()),
+            Some((total - 1).to_string())
+        );
     }
 }

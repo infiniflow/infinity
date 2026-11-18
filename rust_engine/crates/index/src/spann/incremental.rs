@@ -21,7 +21,9 @@
 //! existing member. Drift is corrected by the split, which is the operation
 //! that recomputes centroids anyway.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::vector::{l2_sq, Metric};
 
@@ -37,6 +39,14 @@ use super::{Encode, Options, PartitionKey, SpannError, ROOT_KEY};
 /// do not (a delete finds its leaf through the row mapping).
 pub type FetchVector<'a> = &'a dyn Fn(u64) -> Option<Vec<f32>>;
 
+/// Leaves scored on one thread below this; above it the probe is sliced across
+/// threads.
+const PROBE_PARALLEL_MIN_LEAVES: usize = 64;
+
+/// Slices a probe is cut into. Fixed, and merged in order, so the returned pool
+/// does not depend on the core count.
+const PROBE_CHUNKS: usize = 8;
+
 /// The tree and its store.
 pub struct IncrementalIndex<S: SpannMutStore> {
     store: S,
@@ -45,7 +55,28 @@ pub struct IncrementalIndex<S: SpannMutStore> {
     /// Live rows, maintained by `insert`/`delete` so the executor's coverage
     /// check does not have to walk every partition on each query (the walk is
     /// `O(partitions)`, and `all_covered` runs per k-NN).
-    rows: std::sync::atomic::AtomicUsize,
+    rows: AtomicUsize,
+    /// A branch's children, as the descent needs them: `(key, radius, centroid)`
+    /// per child.
+    ///
+    /// `find_leaf` runs **once per row**, and reading the root's children from
+    /// the store per row was 64 metadata rows of `dims × 4` bytes - 384 KB at
+    /// 1536d, per row. Branches are one per `max_partition_size / 2` rows and
+    /// change only on split/merge, which is where this is invalidated.
+    branches: RwLock<HashMap<PartitionKey, Arc<Branch>>>,
+    /// Leaves a write touched since the last [`IncrementalIndex::maintain`], so
+    /// the fixup pass starts where the writes happened instead of walking every
+    /// partition of the tree.
+    dirty: Mutex<Vec<PartitionKey>>,
+    /// Where `maintain`'s background sweep resumes: the reference's fixup
+    /// worker visits partitions in a rolling order rather than rescanning the
+    /// whole tree per batch (`fixup_worker.go`, `pacer.go`).
+    sweep: AtomicU32,
+}
+
+/// One branch's children, resolved once.
+struct Branch {
+    children: Vec<(PartitionKey, f32, Vec<f32>)>,
 }
 
 /// What one [`IncrementalIndex::maintain`] pass did, for `SHOW INDEX` and the
@@ -78,7 +109,10 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
             store,
             opts,
             rotation,
-            rows: std::sync::atomic::AtomicUsize::new(0),
+            rows: AtomicUsize::new(0),
+            branches: RwLock::new(HashMap::new()),
+            dirty: Mutex::new(Vec::new()),
+            sweep: AtomicU32::new(0),
         };
         if index.store.get_meta(ROOT_KEY)?.is_none() {
             let mut root = MetaValue::new(1, ROOT_KEY, vec![0.0; dims]);
@@ -219,39 +253,82 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
         current.extend(shallow);
         current.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
 
+        // The leaves are independent reads and the scoring is per-member, so the
+        // probe runs in slices. At 2M rows the default width is 512 leaves of
+        // 128 members each, and one thread scored them at ~0.2 ms per leaf -
+        // which was the whole 1.1 s a query cost. A slice prunes against its own
+        // k-th best rather than the merged one, so it can only examine more, never
+        // score fewer.
+        let leaves: Vec<(f32, PartitionKey)> = current
+            .into_iter()
+            .filter(
+                |(_, key)| matches!(self.store.get_meta(*key), Ok(Some(meta)) if meta.is_leaf()),
+            )
+            .collect();
+        let score = |range: std::ops::Range<usize>| -> Result<SearchSet, SpannError> {
+            let mut set = SearchSet::with_default_capacity(k);
+            for (bound, key) in &leaves[range] {
+                let Some(meta) = self.store.get_meta(*key)? else {
+                    continue;
+                };
+                if self.opts.metric.is_l2() {
+                    if let Some(kth) = set.kth_upper() {
+                        if !search::l2_can_beat(*bound, kth) {
+                            break;
+                        }
+                    }
+                }
+                let rot_centroid = self.rotation.apply(&meta.centroid);
+                let query = quantize::make_query(&self.rotation, &rot_centroid, q);
+                for member in self.store.get_members(*key)? {
+                    if let Some(allowed) = allowed {
+                        if !allowed.contains(&member.id) {
+                            continue;
+                        }
+                    }
+                    let squared = quantize::distance_estimate(&query, &member.code, self.dims());
+                    let err = quantize::error_bound(&query, &member.code);
+                    let (score, score_err) = metric_score(
+                        self.opts.metric,
+                        squared,
+                        err,
+                        query.raw_norm,
+                        member.code.raw_norm,
+                    );
+                    set.add(score, score_err, member.id);
+                }
+            }
+            Ok(set)
+        };
+        let parts = if leaves.len() < PROBE_PARALLEL_MIN_LEAVES {
+            vec![score(0..leaves.len())]
+        } else {
+            let per = leaves.len().div_ceil(PROBE_CHUNKS).max(1);
+            std::thread::scope(|scope| {
+                let handles: Vec<_> = (0..leaves.len())
+                    .step_by(per)
+                    .map(|from| {
+                        let to = (from + per).min(leaves.len());
+                        let score = &score;
+                        scope.spawn(move || score(from..to))
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|handle| match handle.join() {
+                        Ok(result) => result,
+                        Err(payload) => std::panic::resume_unwind(payload),
+                    })
+                    .collect::<Vec<_>>()
+            })
+        };
+        // Merged in slice order, so the pool is the same on every run. The
+        // scores are final here (each carries its own error correction), so the
+        // merge only orders them.
         let mut set = SearchSet::with_default_capacity(k);
-        for (bound, key) in &current {
-            let Some(meta) = self.store.get_meta(*key)? else {
-                continue;
-            };
-            if !meta.is_leaf() {
-                continue;
-            }
-            if self.opts.metric.is_l2() {
-                if let Some(kth) = set.kth_upper() {
-                    if !search::l2_can_beat(*bound, kth) {
-                        break;
-                    }
-                }
-            }
-            let rot_centroid = self.rotation.apply(&meta.centroid);
-            let query = quantize::make_query(&self.rotation, &rot_centroid, q);
-            for member in self.store.get_members(*key)? {
-                if let Some(allowed) = allowed {
-                    if !allowed.contains(&member.id) {
-                        continue;
-                    }
-                }
-                let squared = quantize::distance_estimate(&query, &member.code, self.dims());
-                let err = quantize::error_bound(&query, &member.code);
-                let (score, score_err) = metric_score(
-                    self.opts.metric,
-                    squared,
-                    err,
-                    query.raw_norm,
-                    member.code.raw_norm,
-                );
-                set.add(score, score_err, member.id);
+        for part in parts {
+            for (id, score) in part?.into_sorted() {
+                set.add(score, 0.0, id);
             }
         }
         Ok(set.into_sorted())
@@ -268,10 +345,13 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
             return Ok(());
         }
         let dims = self.dims();
-        let mut groups: BTreeMap<PartitionKey, Vec<Member>> = BTreeMap::new();
-        let mut ops = Vec::with_capacity(rows.len() * 2);
+        // Descend first, then read each leaf's metadata **once**: a leaf's
+        // centroid is `dims × 4` bytes (6 KB at 1536d) and a batch of 500 rows
+        // lands in a handful of leaves, so the old per-row read was the batch's
+        // largest fixed cost.
+        let mut targets: BTreeMap<PartitionKey, Vec<usize>> = BTreeMap::new();
         let mut added = 0usize;
-        for (row, vector) in rows {
+        for (at, (row, vector)) in rows.iter().enumerate() {
             if vector.len() != dims {
                 return Err(SpannError::DimensionMismatch {
                     expected: dims,
@@ -282,23 +362,31 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
                 added += 1;
             }
             let leaf = self.find_leaf(vector)?;
-            let Some(meta) = self.store.get_meta(leaf)? else {
+            targets.entry(leaf).or_default().push(at);
+        }
+        let mut groups: BTreeMap<PartitionKey, Vec<Member>> = BTreeMap::new();
+        let mut ops = Vec::with_capacity(rows.len() * 2 + 1);
+        for (leaf, at) in &targets {
+            let Some(meta) = self.store.get_meta(*leaf)? else {
                 continue;
             };
             // The old row keeps its mapping only until this batch overwrites
             // it; an UPDATE's insert half lands on the same key.
             let rot_centroid = self.rotation.apply(&meta.centroid);
-            let code = quantize::encode(&self.rotation, &rot_centroid, vector);
-            let member = Member { id: *row, code };
-            groups.entry(leaf).or_default().push(member.clone());
-            ops.push(KvOp::PutMember {
-                partition: leaf,
-                member,
-            });
-            ops.push(KvOp::PutRowMap {
-                row: *row,
-                partition: leaf,
-            });
+            for at in at {
+                let (row, vector) = rows[*at];
+                let code = quantize::encode(&self.rotation, &rot_centroid, vector);
+                let member = Member { id: row, code };
+                ops.push(KvOp::PutMember {
+                    partition: *leaf,
+                    member: member.clone(),
+                });
+                ops.push(KvOp::PutRowMap {
+                    row,
+                    partition: *leaf,
+                });
+                groups.entry(*leaf).or_default().push(member);
+            }
         }
         let next_rows = self.rows.load(std::sync::atomic::Ordering::Relaxed) + added;
         ops.push(KvOp::SetStat {
@@ -308,6 +396,8 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
         self.store.commit(&ops)?;
         self.rows
             .store(next_rows, std::sync::atomic::Ordering::Relaxed);
+        // The fixup pass starts at the leaves this batch wrote.
+        self.mark_dirty(groups.keys().copied());
 
         // A split repeats: one leaf can take more than one batch (a `COPY`
         // lands 600 rows in the root before the first split runs), so the loop
@@ -413,7 +503,35 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
         keys.sort_unstable();
         // Overflowing leaves a split creates must be revisited in the same
         // pass: a 600-row root splits into 300/300, which each still overflow.
-        let mut queue: Vec<PartitionKey> = keys;
+        //
+        // Where the pass *starts* is what made a flush cost `O(tree)` before: it
+        // examined every partition of the tree on every batch, so an index with
+        // 32k partitions paid 64k metadata reads to write 500 rows. Now it starts
+        // at the leaves the batch wrote and continues from a rolling cursor, so
+        // the whole tree is still swept - just over many batches, which is what
+        // the reference's pacer does (`pacer.go`).
+        let dirty: Vec<PartitionKey> = {
+            let mut dirty = self.dirty.lock().unwrap();
+            std::mem::take(&mut *dirty)
+        };
+        let start = if keys.is_empty() {
+            0
+        } else {
+            self.sweep.load(Ordering::Relaxed) as usize % keys.len()
+        };
+        let window = budget.saturating_mul(4).max(1);
+        let mut queue: Vec<PartitionKey> = dirty;
+        if !keys.is_empty() {
+            queue.extend(
+                keys.iter()
+                    .cycle()
+                    .skip(start)
+                    .take(window.min(keys.len()))
+                    .copied(),
+            );
+            let next = (start + window) % keys.len();
+            self.sweep.store(next as u32, Ordering::Relaxed);
+        }
         let mut spent = 0usize;
         while let Some(key) = queue.pop() {
             if spent >= budget {
@@ -499,27 +617,21 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
     // ------------------------------------------------------------- internals
 
     /// Greedy descent to the leaf a new vector belongs in.
+    ///
+    /// A branch's children come from [`Self::branch`], which caches them: the
+    /// descent runs once per row, and re-reading the path from the store per row
+    /// was the whole cost of an incremental insert at 1536d.
     fn find_leaf(&self, vector: &[f32]) -> Result<PartitionKey, SpannError> {
         let mut key = ROOT_KEY;
         loop {
-            let Some(meta) = self.store.get_meta(key)? else {
+            let Some(branch) = self.branch(key)? else {
+                // A leaf, a missing partition, or a branch with no children: the
+                // row belongs here.
                 return Ok(key);
             };
-            if meta.is_leaf() {
-                return Ok(key);
-            }
-            let children = self.store.member_ids(key)?;
-            if children.is_empty() {
-                return Ok(key);
-            }
-            let keys: Vec<PartitionKey> = children.iter().map(|c| *c as PartitionKey).collect();
-            let metas = self.store.get_metas(&keys)?;
             let mut best: Option<(f32, PartitionKey)> = None;
-            for (child, child_meta) in keys.iter().zip(metas.iter()) {
-                let Some(child_meta) = child_meta else {
-                    continue;
-                };
-                let bound = meta_lower_bound(child_meta, vector, self.opts.metric);
+            for (child, radius, centroid) in &branch.children {
+                let bound = lower_bound(centroid, *radius, vector, self.opts.metric);
                 if best.map(|(b, _)| bound < b).unwrap_or(true) {
                     best = Some((bound, *child));
                 }
@@ -527,6 +639,63 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
             match best {
                 Some((_, next)) => key = next,
                 None => return Ok(key),
+            }
+        }
+    }
+
+    /// The children of `key`, cached.
+    ///
+    /// `None` means "not a branch": a leaf, a partition that is gone, or one
+    /// whose children are all gone. Every caller treats those the same way -
+    /// the descent stops, the search treats the key as a leaf.
+    fn branch(&self, key: PartitionKey) -> Result<Option<Arc<Branch>>, SpannError> {
+        if let Some(hit) = self.branches.read().unwrap().get(&key) {
+            return Ok(Some(Arc::clone(hit)));
+        }
+        let Some(meta) = self.store.get_meta(key)? else {
+            return Ok(None);
+        };
+        if meta.is_leaf() {
+            return Ok(None);
+        }
+        let children = self.store.member_ids(key)?;
+        if children.is_empty() {
+            return Ok(None);
+        }
+        let keys: Vec<PartitionKey> = children.iter().map(|c| *c as PartitionKey).collect();
+        let metas = self.store.get_metas(&keys)?;
+        let entries: Vec<(PartitionKey, f32, Vec<f32>)> = keys
+            .iter()
+            .zip(metas.iter())
+            .filter_map(|(child, meta)| {
+                meta.as_ref()
+                    .map(|meta| (*child, meta.radius, meta.centroid.clone()))
+            })
+            .collect();
+        let branch = Arc::new(Branch { children: entries });
+        self.branches
+            .write()
+            .unwrap()
+            .insert(key, Arc::clone(&branch));
+        Ok(Some(branch))
+    }
+
+    /// Drops cached branches. Called wherever a child's metadata changes: a
+    /// split rewrites the parent's member rows, a merge deletes them, and a new
+    /// level adds children the cache has never seen.
+    fn forget_branches(&self, keys: impl IntoIterator<Item = PartitionKey>) {
+        let mut cache = self.branches.write().unwrap();
+        for key in keys {
+            cache.remove(&key);
+        }
+    }
+
+    /// Records the leaves a write touched, for the next [`Self::maintain`].
+    fn mark_dirty(&self, keys: impl IntoIterator<Item = PartitionKey>) {
+        let mut dirty = self.dirty.lock().unwrap();
+        for key in keys {
+            if !dirty.contains(&key) {
+                dirty.push(key);
             }
         }
     }
@@ -679,6 +848,13 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
         }
         ops.push(KvOp::SetCounter(counter + 2));
         self.store.commit(&ops)?;
+        // The branch above the split child just gained rows: its cached
+        // children are stale.
+        self.forget_branches([if leaf == ROOT_KEY {
+            ROOT_KEY
+        } else {
+            meta.parent
+        }]);
         Ok(Some((left_key, right_key)))
     }
 
@@ -823,6 +999,7 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
         self.push_child_row(&mut ops, parent, &parent_meta.centroid, new_key, &centroid);
         ops.push(KvOp::SetCounter(counter + 1));
         self.store.commit(&ops)?;
+        self.forget_branches([parent]);
         Ok(Some((new_key, parent)))
     }
 
@@ -838,14 +1015,21 @@ impl<S: SpannMutStore> IncrementalIndex<S> {
                 child: u64::from(leaf),
             });
         }
-        self.store.commit(&ops)
+        self.store.commit(&ops)?;
+        self.forget_branches([meta.parent]);
+        Ok(())
     }
 }
 
 fn meta_lower_bound(meta: &MetaValue, q: &[f32], metric: Metric) -> f32 {
-    let distance = l2_sq(q, &meta.centroid).max(0.0).sqrt();
+    lower_bound(&meta.centroid, meta.radius, q, metric)
+}
+
+/// Lower bound on the distance from `q` to anything inside a partition.
+fn lower_bound(centroid: &[f32], radius: f32, q: &[f32], metric: Metric) -> f32 {
+    let distance = l2_sq(q, centroid).max(0.0).sqrt();
     if metric.is_l2() {
-        (distance - meta.radius).max(0.0)
+        (distance - radius).max(0.0)
     } else {
         distance
     }

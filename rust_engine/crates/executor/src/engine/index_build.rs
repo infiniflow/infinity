@@ -4463,11 +4463,6 @@ impl Engine {
         };
         let column = self.spann_column_of(table, index_id)?;
         let fetch = |row: u64| self.spann_row_vector(table, column, row);
-        // A restart replays commits into the block files and the append
-        // buffer, not into the memory tail: those rows are live but the tree
-        // never saw them. This runs even when the tail is empty, which is
-        // exactly the restart case.
-        self.backfill_spann_kv(table, column, index);
         let rows = {
             let mut tables = self.tables.lock().unwrap();
             tables
@@ -4475,24 +4470,31 @@ impl Engine {
                 .map(|entry| entry.spann_mem.remove(&index_id).unwrap_or_default())
                 .unwrap_or_default()
         };
-        if rows.is_empty() {
-            return Ok(());
-        }
-        let batch: Vec<(u64, &[f32])> = rows.iter().map(|(seq, v)| (*seq, v.as_slice())).collect();
-        let result = index
-            .insert(&batch, &fetch)
-            // 16 fixups per flush: a split is the one operation that reads raw
-            // vectors, and a commit must not wait for a whole tree's worth.
-            .and_then(|()| index.maintain(&fetch, 16).map(|_| ()));
-        if let Err(err) = result {
-            // The tail is the authoritative copy until the batch lands; put it
-            // back so the next flush retries instead of losing a committed row.
-            let mut tables = self.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&tkey) {
-                entry.spann_mem.entry(index_id).or_default().extend(rows);
+        if !rows.is_empty() {
+            let batch: Vec<(u64, &[f32])> =
+                rows.iter().map(|(seq, v)| (*seq, v.as_slice())).collect();
+            let result = index
+                .insert(&batch, &fetch)
+                // 16 fixups per flush: a split is the one operation that reads raw
+                // vectors, and a commit must not wait for a whole tree's worth.
+                .and_then(|()| index.maintain(&fetch, 16).map(|_| ()));
+            if let Err(err) = result {
+                // The tail is the authoritative copy until the batch lands; put it
+                // back so the next flush retries instead of losing a committed row.
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&tkey) {
+                    entry.spann_mem.entry(index_id).or_default().extend(rows);
+                }
+                return Err(common::Error::Invalid(err.to_string()));
             }
-            return Err(common::Error::Invalid(err.to_string()));
         }
+        // A restart replays commits into the block files and the append
+        // buffer, not into the memory tail: those rows are live but the tree
+        // never saw them. This runs **after** the tail, so the rows this flush
+        // just wrote are never "missing" - backfilling first made every flush
+        // re-read them from the blocks, which is what made an index-first load
+        // spend minutes per 5000 rows.
+        self.backfill_spann_kv(table, column, index);
         Ok(())
     }
 
@@ -4626,32 +4628,28 @@ impl Engine {
             return;
         }
         let store = index.store();
-        // Phase 1: collect the missing row ids only. Deriving the vector inside
-        // the callback deadlocks: `for_each_block_cell`'s buffered half holds
-        // `tables` while it calls back, and a split's fetch re-enters
-        // `visible_block_ids` / `for_each_buffered_cell`, which take the same
-        // non-reentrant lock.
-        let mut missing: Vec<u64> = Vec::new();
-        self.for_each_block_cell(table, column, None, |seq, _text| {
+        // Phase 1: the missing rows **with** their vectors. The callback is
+        // where the row's text already is, so parsing here costs one cell; this
+        // used to collect ids only and then call `spann_row_vector` per row,
+        // which re-decoded and re-rendered the row's whole block (8192 x 1536
+        // values of text) for every missing row. Inserting inside the callback
+        // would deadlock - a split's fetch re-enters `visible_block_ids` /
+        // `for_each_buffered_cell`, and the buffered half holds `tables` while
+        // it calls back - so the walk only collects.
+        let mut missing: Vec<(u64, Vec<f32>)> = Vec::new();
+        self.for_each_block_cell(table, column, None, |seq, text| {
             let row = seq as u64;
             if store.row_partition(row).ok().flatten().is_none() {
-                missing.push(row);
+                let vector = crate::engine::state::parse_vec_f32(text);
+                if !vector.is_empty() {
+                    missing.push((row, vector));
+                }
             }
         });
-        // Phase 2: vectors outside any engine lock, one batch at a time.
+        // Phase 2: insert outside any engine lock, one batch at a time.
         let fetch = |row: u64| self.spann_row_vector(table, column, row);
         for chunk in missing.chunks(1024) {
-            let batch: Vec<(u64, Vec<f32>)> = chunk
-                .iter()
-                .filter_map(|row| {
-                    self.spann_row_vector(table, column, *row)
-                        .map(|v| (*row, v))
-                })
-                .collect();
-            if batch.is_empty() {
-                continue;
-            }
-            let refs: Vec<(u64, &[f32])> = batch
+            let refs: Vec<(u64, &[f32])> = chunk
                 .iter()
                 .map(|(id, vector)| (*id, vector.as_slice()))
                 .collect();

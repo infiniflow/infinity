@@ -10258,6 +10258,13 @@ impl Engine {
                 cache_warm
                     .as_ref()
                     .and_then(|c| c.read().ok().map(|g| g.live.len()))
+                    // A cache that exists but holds no row is **unknown**, not
+                    // "the table is empty": taking its `0` as the count made
+                    // `all_covered` false for every indexed query on a table
+                    // with rows, and the coverage fallback then walked every
+                    // row->partition mapping - 138 ms of a 112 ms query at 200k
+                    // rows x 1536d, and 1.1 s of it at 2M.
+                    .filter(|live| *live > 0)
                     .or_else(|| {
                         self.tables
                             .lock()

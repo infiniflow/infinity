@@ -5495,25 +5495,47 @@ impl Engine {
             .collect::<Option<Vec<_>>>()?;
         let root = self.blocks_root();
         let segment = (row >> 32) as u32;
-        let block_no = ((row as u32) / DEFAULT_BLOCK_CAPACITY as u32) as u16;
+        let offset = (row as u32) as usize;
+        let block_no = (offset / DEFAULT_BLOCK_CAPACITY) as u16;
+        let slot = offset % DEFAULT_BLOCK_CAPACITY;
         for id in self.visible_block_ids(&table) {
             if id.segment_id != segment || id.block_id != block_no {
                 continue;
             }
-            let Some(cells) =
-                self.decode_block_cells(&table, &root, &meta, &types, id, Some(&[column]))
-            else {
+            let Ok(block) = self.block_map(&table, &root, id) else {
                 continue;
             };
-            for (seq, values) in cells {
-                if seq as u64 != row {
-                    continue;
-                }
-                if let Some(text) = values.get(column) {
-                    let vector = crate::engine::state::parse_vec_f32(text);
-                    if !vector.is_empty() {
-                        return Some(vector);
-                    }
+            let version = block.version();
+            if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+                continue;
+            }
+            // **One** slot, not the block: `decode_rows_of_values`'s
+            // `rows_wanted` path decodes the cell this row needs. Decoding the
+            // block instead rendered every row of the column to text (8192 x
+            // 1536 values), which is what made a split's fetch - and the
+            // restart backfill's - take seconds per row.
+            let wanted_rows: std::collections::HashSet<usize> =
+                [row as usize].into_iter().collect();
+            let Some(rows) = Self::decode_rows_of_values(
+                &meta.ids,
+                &meta.types,
+                &types,
+                id,
+                version,
+                block.as_ref(),
+                Some(&[column]),
+                None,
+                Some(&wanted_rows),
+            ) else {
+                continue;
+            };
+            let Some((_, values)) = rows.first() else {
+                continue;
+            };
+            if let Some(value) = values.get(column) {
+                let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
+                if !vector.is_empty() {
+                    return Some(vector);
                 }
             }
         }
