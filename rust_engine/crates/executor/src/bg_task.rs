@@ -187,6 +187,21 @@ impl BGTaskProcessor {
         // thread join: the worker is a runtime task and joining it from a
         // non-async caller would need a `block_on` of its own.
         self.jobs.lock().unwrap().take();
+        // A task submitted **before** `start` is queued in `queue` (`submit` is
+        // legal from `new`), and only the worker ever consumes that channel.
+        // Without a worker it would sit there with its `outstanding` count
+        // raised and `drain` below would wait forever - which is exactly what
+        // `Drop` does for a processor nobody started. Dropping the receiver
+        // discards those tasks, so their counts go with them.
+        if self.handles.lock().unwrap().is_empty() {
+            if let Some(queue) = self.queue.lock().unwrap().take() {
+                let queued = queue.len();
+                drop(queue);
+                if queued > 0 {
+                    self.shared.outstanding.fetch_sub(queued, Ordering::SeqCst);
+                }
+            }
+        }
         let handles: Vec<tokio::task::JoinHandle<()>> =
             std::mem::take(&mut *self.handles.lock().unwrap());
         drop(handles);
@@ -250,5 +265,21 @@ mod tests {
 
         processor.stop();
         assert_eq!(processor.running_task_count(), 0);
+    }
+
+    /// A task submitted before `start` is queued, so a pool that is dropped
+    /// without ever starting must not wait for a worker that does not exist:
+    /// without dropping that queue, `stop`'s `drain` parks on a task nothing can
+    /// consume.
+    #[test]
+    fn drop_before_start_does_not_hang() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let processor = BGTaskProcessor::new(1);
+        assert!(processor.submit(Box::new(Increment(Arc::clone(&counter)))));
+        assert_eq!(processor.running_task_count(), 1);
+        processor.stop();
+        assert_eq!(processor.running_task_count(), 0);
+        // The task never ran: it was cancelled with the queue.
+        assert_eq!(counter.load(Ordering::SeqCst), 0);
     }
 }

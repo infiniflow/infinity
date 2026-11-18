@@ -7,7 +7,7 @@
 - `ported`：Rust 有同等场景的用例，映射列给出 `crate 模块::测试名`。少数以 native 组件等价替代 C++ 第三方（例如 RocksDB 事务 KV → `txn_kv`、后台线程池 → `bg_task`），映射列直接指向替代实现，不声称字节级一致。
 - `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point`/`Line`/`Box`/`Path`/`Polygon`/`Circle`）相关用例——这些类型不移植。
 - `exempt`：SIMD/第三方夹具、整段或整块位于 `#if 0` 的用例（C++ 构建中不存在），以及**只测第三方 API 本身**的夹具——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 自己的 `TransactionDB` 环境、后台线程池。它们要覆盖的**行为**由 native 等价实现兜住，并在 `ported` 行给出映射：事务型 KV → `storage` 的 `txn_kv`（`kv_store0`..`kv_store5`、`wal`、`txn_conflict_same_key_snapshot_isolation` 全部通过，`kv_store1` 按参考的 `DISABLED_SLOW_` 标 `#[ignore]`；`kv_store6` 在 `executor` 的 `kv_ut`），线程池 → `bg_task`。
-- 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例在 Rust 用 `#[ignore]` 表达，用例名本身不带 `disabled_` 前缀（名字描述被测行为，运行与否由 `--ignored` 在运行期决定，和 pytest 的 `-m slow` 同义）。`#[ignore]` 的理由串以分类前缀开头，可用 `cargo test -- --ignored --list` 或 `--ignored <前缀>` 筛：`slow:`（参考的 `DISABLED_SLOW_`，含用例全名映射）、`bench:`（计时/吞吐探针，无断言或断言与机器相关）、`external:`（需要 MinIO 等外部服务）、`diagnostic:`（只打印指标）、`golden:`（需要参考二进制产物）、`known-defect:`（已定位未修的行为差异）。
+- 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例在 Rust 用 `#[ignore]` 表达，用例名本身不带 `disabled_` 前缀（名字描述被测行为，运行与否由 `--ignored` 在运行期决定，和 pytest 的 `-m slow` 同义）。`#[ignore]` 的理由串以分类前缀开头：`slow:`（参考的 `DISABLED_SLOW_`，含用例全名映射）、`bench:`（计时/吞吐探针，无断言或断言与机器相关）、`external:`（需要 MinIO 等外部服务）、`diagnostic:`（只打印指标）、`golden:`（需要参考二进制产物）、`stress:`（并发压力轮次）、`known-defect:`（已定位未修的行为差异）。理由串只是给人读的：libtest 的过滤参数只匹配**用例名**，`cargo test -- --ignored slow:` 不会按理由筛（它会把 `slow:` 当作名字片段）。所以要看某个分类跑什么，用 `cargo test -- --ignored --list` 列出全部被忽略的用例，再看各自的 `#[ignore]` 理由；CI 的 `slow:` 门禁正是把非 `slow:` 的用例名逐个 `--skip` 掉（`.github/workflows/rust_engine.yml` 的 skip 列表就是这份分类的镜像）。
 
 另有一类 `not ported`（7 行，存储缓冲层：`BufferObj`/`BufferHandle`/`BufferManager` 已整体去掉，块改为 mmap 直接映射），它们不是缺口，是 §3.1 的设计变更；类层面若有 `partial` 在 [`CLASS_MAP.md`](CLASS_MAP.md) §2。
 
@@ -897,7 +897,7 @@ MinIO 服务才跑，端口标 `#[ignore]`，门禁 60 用 `INFINITY_MINIO_URL` 
 | 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_add_column` |
 | 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | ported | `executor` `optimize_replay_ut::optimize_index_then_drop_column` |
 | 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | ported | `executor` `optimize_replay_ut::optimize_index_then_rename_table` |
-| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::optimize_index_and_optimize_index` (`#[ignore = "slow: …"]`) |
+| 873 | src/unit_test/storage/new_catalog/optimize_index_ut.cpp | `DISABLED_SLOW_optimize_index_and_compact_table` | ported | `executor` `optimize_replay_ut::optimize_index_and_compact_table` (`#[ignore = "slow: …"]`) |
 | 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | ported | `executor` `replay_txn_ut::replay_alter_add_column` |
 | 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | ported | `executor` `replay_txn_ut::replay_alter_drop_column` |
 | 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | ported | `executor` `replay_txn_ut::replay_alter_rename` |

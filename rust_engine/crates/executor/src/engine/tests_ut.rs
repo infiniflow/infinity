@@ -10376,6 +10376,88 @@ mod tests {
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
+    /// A retired column's cells are given back once a checkpoint has passed the
+    /// `DROP`. The retirement is stamped with the commit ts of the statement
+    /// that dropped the column; if it were `u64::MAX`, no checkpoint bound would
+    /// ever reach it and every later insert would keep writing a default cell
+    /// for a column nobody can read.
+    #[test]
+    fn a_dropped_column_leaves_the_append_buffer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE dc2 (a INT, b VARCHAR, c INT);")
+            .unwrap();
+        e.execute_blocking("INSERT INTO dc2 VALUES (1, 'x', 2);")
+            .unwrap();
+        let id_b = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.dc2")
+            .unwrap()
+            .unwrap()
+            .ids[1];
+        e.execute_blocking("ALTER TABLE dc2 DROP COLUMN (b);")
+            .unwrap();
+        let buffered = || {
+            e.tables
+                .lock()
+                .unwrap()
+                .values()
+                .map(|t| t.pending_rows.column_count())
+                .max()
+                .unwrap_or(0)
+        };
+        assert_eq!(
+            buffered(),
+            3,
+            "the cells stay until a checkpoint covers them"
+        );
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(
+            buffered(),
+            2,
+            "a checkpoint past the DROP releases the column"
+        );
+        assert!(
+            !e.tables
+                .lock()
+                .unwrap()
+                .values()
+                .any(|t| t.pending_rows.all_ids().contains(&id_b)),
+            "the retired id is gone from the buffer"
+        );
+    }
+
+    /// A multi-batch `INSERT` that fails in a later batch must not have
+    /// committed the earlier ones: `insert_in_batches` splits one statement into
+    /// several transactions, so the whole request is validated before the first
+    /// one runs.
+    #[test]
+    fn a_bad_row_in_a_later_batch_commits_nothing() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE mb (a INT NOT NULL);")
+            .unwrap();
+        let rows_n = Engine::MAX_APPEND_ROWS + 10;
+        let rows: Vec<String> = (0..rows_n)
+            .map(|i| {
+                if i == rows_n - 1 {
+                    "null".to_string()
+                } else {
+                    i.to_string()
+                }
+            })
+            .map(|v| format!("({v})"))
+            .collect();
+        let sql = format!("INSERT INTO mb VALUES {};", rows.join(","));
+        assert!(e.execute_blocking(&sql).is_err(), "the bad row fails");
+        assert_eq!(
+            e.row_count("mb").unwrap(),
+            0,
+            "no batch was committed before the failure"
+        );
+    }
+
     /// Port of the reference's `ConflictCheckTest.conflict_check_delete`: three
     /// transactions delete the same row, the first commit wins and the other
     /// two get `kTxnConflict`; overlapping sets behave the same way.
@@ -14838,7 +14920,7 @@ mod tests {
     ///
     /// `cargo test --release -p executor spann_out_of_core --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "diagnostic: prints the resident set, asserts nothing host independent"]
     fn spann_out_of_core_keeps_the_resident_set_small() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
@@ -15251,7 +15333,7 @@ mod tests {
     ///
     /// `cargo test --release -p executor spann_query_profile --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "diagnostic: prints the query profile, asserts nothing"]
     fn spann_query_profile_1536d() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
@@ -15502,7 +15584,7 @@ mod tests {
     ///
     /// `cargo test -p executor spann_bench --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "bench: throughput probe, host dependent"]
     fn spann_bench_128d() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
@@ -15761,7 +15843,7 @@ mod tests {
     ///
     /// `cargo test -p executor --release spann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
     #[test]
-    #[ignore]
+    #[ignore = "bench: latency comparison, host dependent"]
     fn spann_vs_hnsw_at_equal_latency() {
         const N: usize = 20_000;
         const DIMS: usize = 128;

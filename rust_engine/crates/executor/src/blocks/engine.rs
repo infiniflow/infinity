@@ -638,8 +638,11 @@ impl Engine {
             let mut newest: std::collections::HashMap<(u32, u16), u64> = Default::default();
             for (seq, _) in &merged {
                 let key = block_of(*seq);
-                let offset = (*seq & 0xffff_ffff) as u64;
-                let ts = append_ts_of(offset, &totals, &append_ts).unwrap_or(u64::MAX);
+                // `append_ts_of` takes the full row id and does the
+                // segment-to-ordinal conversion itself: the append log is
+                // table-wide, the id's low half is segment-local.
+                let ts =
+                    append_ts_of(*seq as u64, &counts, &totals, &append_ts).unwrap_or(u64::MAX);
                 let slot = newest.entry(key).or_insert(ts);
                 *slot = (*slot).max(ts);
             }
@@ -1406,9 +1409,9 @@ impl Engine {
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let ts_of = |seq: usize| -> Option<u64> {
-            append_ts_of((seq & 0xffff_ffff) as u64, &totals, &stamps)
-        };
+        let segments = self.segment_row_counts(&table);
+        let ts_of =
+            |seq: usize| -> Option<u64> { append_ts_of(seq as u64, &segments, &totals, &stamps) };
         let resolve = |ts: u64| -> Option<(Vec<u64>, Vec<Option<String>>)> {
             match self.storage.catalog.schema_at(&table, ts) {
                 Ok(Some(m)) => Some((m.ids, m.defaults)),
@@ -1982,13 +1985,35 @@ impl Engine {
                             &mut next_id,
                         )
                     } else {
-                        publish_bmp_chunks(
+                        let (chunks, failed) = publish_bmp_chunks(
                             &seg_dir,
                             pending,
                             *segment,
                             &existing_chunks,
                             &mut next_id,
-                        )
+                        );
+                        if !failed.is_empty() {
+                            // Put the images nothing could write back at the
+                            // **front** of the index's queue, so the next seal
+                            // publication tries again: the queue they came from
+                            // was drained, and a chunk with no record is lost
+                            // rows once the process restarts.
+                            let key = self.table_key(table);
+                            if let Some(shared) = self
+                                .tables
+                                .lock()
+                                .unwrap()
+                                .get(&key)
+                                .and_then(|e| e.sparse.get(&(index_id as u64)))
+                                .cloned()
+                            {
+                                let mut guard = shared.write().unwrap_or_else(|p| p.into_inner());
+                                let mut requeued = failed;
+                                requeued.append(&mut guard.pending);
+                                guard.pending = requeued;
+                            }
+                        }
+                        chunks
                     }
                 } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
                     // Written in place by the seal; its files are named after
@@ -2548,6 +2573,26 @@ impl Engine {
             // (`docs/ALTER_CHECKPOINT_RACE.md` §5). Reordering here discarded
             // it, which is what made a pre-DROP row read a value from the
             // wrong column once the buffer became columnar.
+            // The frame's schema is resolved **once**: `schema_at` reads the
+            // table, scans its column records and applies the drop markers, so
+            // asking per row * per column turned a 65,536-row append into
+            // 655,360 catalog reconstructions during recovery.
+            let frame_schema = self
+                .storage
+                .catalog
+                .schema_at(&table, append.commit_ts)
+                .ok()
+                .flatten();
+            let frame_types: std::collections::HashMap<u64, String> = frame_schema
+                .as_ref()
+                .map(|m| m.ids.iter().copied().zip(m.types.iter().cloned()).collect())
+                .unwrap_or_default();
+            let live_types: std::collections::HashMap<u64, String> = current_ids
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(at, id)| (id, types.get(at).cloned().unwrap_or_default()))
+                .collect();
             let mut attributed: Vec<(usize, std::collections::BTreeMap<u64, Value>)> =
                 Vec::with_capacity(append.rows.len());
             for (seq, text) in &append.rows {
@@ -2561,27 +2606,11 @@ impl Engine {
                     // The type is the frame's own column's: the live `types` no
                     // longer describes a column dropped since, and using the
                     // live one would decode the cell with the wrong decoder.
-                    let frame_type = self
-                        .storage
-                        .catalog
-                        .schema_at(&table, append.commit_ts)
-                        .ok()
-                        .flatten()
-                        .and_then(|m| {
-                            let pos = m.ids.iter().position(|want| want == id)?;
-                            m.types.get(pos).cloned()
-                        });
-                    let declared = frame_type.unwrap_or_else(|| {
-                        types
-                            .get(
-                                current_ids
-                                    .iter()
-                                    .position(|want| want == id)
-                                    .unwrap_or(usize::MAX),
-                            )
-                            .cloned()
-                            .unwrap_or_default()
-                    });
+                    let frame_type = frame_types
+                        .get(id)
+                        .cloned()
+                        .or_else(|| live_types.get(id).cloned());
+                    let declared = frame_type.unwrap_or_default();
                     if let Ok(value) = self.decode_cell(&table, &[declared], 0, cell) {
                         placed.insert(*id, value);
                     }
@@ -3124,7 +3153,7 @@ impl Engine {
             .lock()
             .unwrap()
             .get(&key)
-            .map(|entry| entry.buffered_row(seq).is_some())
+            .map(|entry| entry.pending_rows.index_of(seq).is_some())
             .unwrap_or(false)
     }
 
@@ -4198,11 +4227,34 @@ impl Engine {
     /// this is one lookup plus the row's own clone.
     pub(crate) fn pending_row(&self, table: &str, seq: usize) -> Option<Vec<Value>> {
         let key = self.table_key(table);
+        // The row is rendered in the **live** schema, which is what every reader
+        // of this accessor encodes against: a column dropped since stays in the
+        // buffer but must not take a slot, or the retired value lands in the
+        // surviving column's position.
+        let (order, fill) = self
+            .storage
+            .catalog
+            .get_table_by_name(table)
+            .ok()
+            .flatten()
+            .map(|meta| {
+                let fill = meta
+                    .defaults
+                    .iter()
+                    .map(|d| {
+                        d.as_deref()
+                            .map(|text| Value::from_literal(&default_literal(text)))
+                            .unwrap_or(Value::Null)
+                    })
+                    .collect::<Vec<_>>();
+                (meta.ids, fill)
+            })
+            .unwrap_or_default();
         self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .and_then(|e| e.buffered_row(seq))
+            .and_then(|e| e.buffered_row(seq, &order, &fill))
     }
 
     /// The stored text of one buffered row, for the paths that read a table the
@@ -7960,13 +8012,13 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 /// whole declared type twice per value - 16.7 M `String`s on an 8 M-row,
 /// two-column `COPY`.
 #[derive(Clone, Copy)]
-enum Coercion {
+pub(crate) enum Coercion {
     None,
     Narrow(fn(i64) -> i64),
     RoundHalf { bf16: bool },
 }
 
-fn coercion_of(ty: &str) -> Coercion {
+pub(crate) fn coercion_of(ty: &str) -> Coercion {
     let upper = ty.trim().to_ascii_uppercase();
     let head = upper
         .split('(')
@@ -7993,7 +8045,7 @@ fn coercion_of(ty: &str) -> Coercion {
     }
 }
 
-fn coerce_row(row: &[Value], coercions: &[Coercion]) -> Vec<Value> {
+pub(crate) fn coerce_row(row: &[Value], coercions: &[Coercion]) -> Vec<Value> {
     // A row whose columns all pass through is handed over as it is: this runs
     // for every row of every `COPY`, and the clone is the only cost.
     if coercions.iter().all(|c| matches!(c, Coercion::None)) {

@@ -1985,6 +1985,24 @@ impl Engine {
         if n == 0 {
             ranges[0] = (base, 0);
             range_count = 1;
+            // A **claim** on a segment, not an append: `begin_import` reserves
+            // zero rows to take a segment of its own before its first batch. The
+            // row above (`row_counter = (seg, 0)`) is not enough to tell a second
+            // claimer apart - `opens_segment` tests `off > 0` or "the segment is
+            // already listed", and both are false for a segment nobody has
+            // listed yet - so two imports beginning before either writes would
+            // both get segment 0 and hand out the same ids. Listing the segment
+            // is the claim; it creates no append record.
+            if new_segment {
+                entry
+                    .segments
+                    .entry(at_seg)
+                    .and_modify(|s| s.rows = s.rows.max(at_off as u32))
+                    .or_insert(SegmentEntry {
+                        id: at_seg,
+                        rows: at_off as u32,
+                    });
+            }
         }
         let _ = room;
         entry.row_counter = Some((at_seg, at_off as u32, copy));
@@ -2430,7 +2448,7 @@ impl Engine {
         &self,
         op: TxnOp,
         stage: impl FnOnce() -> Result<(T, E)>,
-        effects: impl FnOnce(E) -> Fut,
+        effects: impl FnOnce(E, u64) -> Fut,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
     ) -> Result<T>
     where
@@ -2466,7 +2484,10 @@ impl Engine {
         // The commit stays invisible until its data is in place; the publish
         // runs even when the effects fail, or the commit barrier would wait for
         // a transaction that already owns a timestamp.
-        let effect_result = effects(plan).await;
+        // The effects see the commit ts: an effect that has to say "this is
+        // safe to drop once a checkpoint has passed me" needs a finite value,
+        // and `u64::MAX` is one no checkpoint ever reaches.
+        let effect_result = effects(plan, commit_ts).await;
         self.txn.finish_bottom(ts);
         effect_result?;
         Ok(out)
@@ -5597,19 +5618,15 @@ impl Engine {
         // table, because `is_complete` asks whether this index saw it, not how
         // many postings it holds.
         //
-        // A span counts every slot it holds, deleted ones included, so the sum
-        // only proves coverage when the table has no holes; the live row count
-        // is the yardstick, and the slot count says whether it can be trusted.
-        // Both halves matter: comparing spans with the *blocks'* row count read
-        // "25 of 25 covered" on a table whose last ten rows were still in the
-        // WAL (`test_mem_bmp` kept five `4`s where the index covers seven), and
-        // comparing them with the live count alone would let rows deleted from
-        // inside a span stand in for live rows nobody indexed.
-        let covered_rows: u64 = covered
-            .values()
-            .flat_map(|spans| spans.iter())
-            .map(|(begin, end)| end - begin)
-            .sum();
+        // The count is of the ids the chunks hold, deleted ones included, so the
+        // sum only proves coverage when the table has no holes; the live row
+        // count is the yardstick, and the slot count says whether it can be
+        // trusted. Both halves matter: comparing against the *blocks'* row count
+        // read "25 of 25 covered" on a table whose last ten rows were still in
+        // the WAL (`test_mem_bmp` kept five `4`s where the index covers seven),
+        // and comparing against the live count alone would let rows deleted
+        // inside the covered set stand in for live rows nobody indexed.
+        let covered_rows: u64 = covered.values().map(|ids| ids.len() as u64).sum();
         let live_rows = reserved as u64;
         let slot_rows: u64 = self
             .segment_row_counts(table)
@@ -5641,7 +5658,7 @@ impl Engine {
             let offset = seq as u64 & 0xffff_ffff;
             if covered
                 .get(&segment)
-                .is_some_and(|spans| spans.iter().any(|(a, b)| offset >= *a && offset < *b))
+                .is_some_and(|ids| ids.contains(&offset))
             {
                 continue;
             }

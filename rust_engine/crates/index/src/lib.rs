@@ -466,6 +466,50 @@ impl SecondaryIndex {
     }
 }
 
+impl SecondaryIndex {
+    /// Drops `row_id` from every key's posting list, in both maps.
+    ///
+    /// Not a search-path operation: it exists for the write paths that must
+    /// undo rows they staged but never committed (a `COPY` that fails past its
+    /// first batch). Keys left with no row ids are removed, so a key that only
+    /// the undone rows mentioned stops matching.
+    pub fn remove_row(&self, row_id: RowID) {
+        fn prune(map: &Map, row_id: RowID) -> (Map, usize, usize) {
+            let mut out: Map = Map::new();
+            let mut removed = 0usize;
+            let mut bytes = 0usize;
+            for (key, ids) in map {
+                let before = ids.len();
+                let kept: Vec<RowID> = ids.iter().copied().filter(|id| *id != row_id).collect();
+                removed += before - kept.len();
+                if kept.is_empty() {
+                    continue;
+                }
+                bytes += key.len() + 16 + 24 + kept.len() * std::mem::size_of::<RowID>();
+                out.insert(key.clone(), kept);
+            }
+            (out, removed, bytes)
+        }
+        {
+            let mut pending = self.pending.lock().unwrap();
+            let (next, removed, _) = prune(&pending, row_id);
+            *pending = next;
+            self.rows.fetch_sub(removed, AtomicOrdering::Relaxed);
+        }
+        let mut published = self.published.write().unwrap();
+        let (next, removed, bytes) = prune(&published, row_id);
+        if removed > 0 {
+            let keys = next.len();
+            *published = Arc::new(next);
+            self.rows.fetch_sub(removed, AtomicOrdering::Relaxed);
+            self.published_keys.store(keys, AtomicOrdering::Relaxed);
+            // `bytes` is approximate by design: recomputing it exactly here
+            // means walking the pending map too, which the quota does not need.
+            let _ = bytes;
+        }
+    }
+}
+
 impl Index for SecondaryIndex {
     fn insert(&self, key: &[u8], row_id: RowID) {
         let mut pending = self.pending.lock().unwrap();

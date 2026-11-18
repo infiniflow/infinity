@@ -547,6 +547,27 @@ impl Engine {
         columns: Option<&[String]>,
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
+        // The same split [`Self::insert_literals`] uses: one allocation is at
+        // most `MAX_APPEND_ROWS` rows (`TableCache::PrepareAppendNolock`
+        // refuses more), so a larger request is several commits. A retry stays
+        // inside the batch it was made for: re-running a batch that already
+        // committed would duplicate its rows.
+        if rows.len() > Self::MAX_APPEND_ROWS {
+            let mut inserted = 0usize;
+            let mut left = rows;
+            while !left.is_empty() {
+                let take = left.len().min(Self::MAX_APPEND_ROWS);
+                let batch: Vec<Vec<Literal>> = left.drain(..take).collect();
+                // The recursive call is already within the limit, so it runs
+                // one `insert_literals_inner` per attempt.
+                let result = Box::pin(self.insert_literals_retrying(table, columns, batch)).await?;
+                match result {
+                    QueryResult::Inserted { count } => inserted += count,
+                    other => return Ok(other),
+                }
+            }
+            return Ok(QueryResult::Inserted { count: inserted });
+        }
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
             match self
@@ -607,6 +628,13 @@ impl Engine {
                 .insert_literals_inner(table, columns, rows, new_segment)
                 .await;
         }
+        // Validate the **whole** request before the first batch commits. The
+        // batches below are separate transactions, so a row that is invalid
+        // (a `NULL` in a NOT NULL column, a vector of the wrong dimension) in a
+        // later batch would otherwise fail after the earlier ones were durable -
+        // and a caller that retried the statement would duplicate them. The
+        // reference has no such window: its whole `INSERT` is one DataBlock.
+        self.validate_insert_rows(table, columns, &rows)?;
         let mut inserted = 0usize;
         let mut left = rows;
         while !left.is_empty() {
@@ -621,6 +649,57 @@ impl Engine {
             }
         }
         Ok(QueryResult::Inserted { count: inserted })
+    }
+
+    /// The checks [`Self::insert_literals_inner`] performs before it commits,
+    /// without committing anything.
+    ///
+    /// It exists for the batched entry points, which split one request into
+    /// several transactions ([`Self::insert_in_batches`]): validating only as
+    /// each batch runs lets a later batch fail after earlier ones committed. The
+    /// rules are the reference's insert checks - a known column list, a value
+    /// that fits its column, no `NULL` in a NOT NULL column - so running them
+    /// twice costs a pass over the rows and changes no outcome.
+    fn validate_insert_rows(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: &[Vec<Literal>],
+    ) -> Result<()> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        if let Some(cols) = columns {
+            for c in cols {
+                if !meta.columns.iter().any(|s| s == c) {
+                    return Err(Error::Invalid(format!(
+                        "syntax: column '{c}' does not exist in table '{table}'"
+                    )));
+                }
+            }
+        }
+        let aligned = align_insert_rows(&meta.columns, &meta.defaults, columns, rows);
+        for (at, row) in aligned.iter().enumerate() {
+            for (i, nn) in meta.not_nulls.iter().enumerate() {
+                if *nn && matches!(row.get(i), Some(Literal::Null) | None) {
+                    return Err(Error::Invalid(format!(
+                        "null value in NOT NULL column '{}'",
+                        meta.columns.get(i).cloned().unwrap_or_default()
+                    )));
+                }
+            }
+            for (i, cell) in row.iter().enumerate() {
+                if let Some(t) = meta.types.get(i) {
+                    validate_insert_value(t, cell.to_slt_string().trim()).map_err(|e| match e {
+                        Error::Invalid(m) => Error::Invalid(format!("row {}: {m}", at + 1)),
+                        other => other,
+                    })?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// `NewTxn::Import`: like [`Self::insert_literals`], but the batch always
@@ -1188,9 +1267,9 @@ impl Engine {
         rows: &[Vec<Value>],
         txn: Txn,
         prepare: F,
-    ) -> Result<usize>
+    ) -> Result<RowRange>
     where
-        F: FnOnce(&mut Txn, usize) -> Result<()>,
+        F: FnOnce(&mut Txn, RowRange) -> Result<()>,
     {
         self.result_cache.lock().unwrap().clear();
         self.plan_cache.clear();
@@ -1225,11 +1304,10 @@ impl Engine {
                 let range = self.reserve_rows_at(table, count, false, ts)?;
                 *allocated.lock().unwrap() = range;
                 *record.lock().unwrap() = (count > 0).then_some(range.append);
-                prepare(txn, range.base)
+                prepare(txn, range)
             })
             .await?;
         let range = *allocated.lock().unwrap();
-        let base = range.base;
         let _visible = BottomGuard::new(&self.txn, ts);
         // One copy of the rewritten rows: the block buffer takes them as
         // `Value`s, and the caller keeps its slice for the index hooks.
@@ -1245,7 +1323,7 @@ impl Engine {
         let record = *record.lock().unwrap();
         self.delete_bottom(table, deletes, record, extra, ts)
             .await?;
-        Ok(base)
+        Ok(range)
     }
 
     /// Whether committing `batch` would leave the catalog exactly as it is.
@@ -1811,6 +1889,65 @@ impl Engine {
             .into_iter()
             .map(|im| (im.id, im.column))
             .collect()
+    }
+
+    /// Undoes the index hooks for rows a write staged but never committed.
+    ///
+    /// An `IMPORT` feeds every hook batch by batch (`insert_secondary_keys`,
+    /// `update_text_indexes_batch`, the sparse/multi-vector hooks, the vector
+    /// caches) while it reads its file, and only commits at the end. A file
+    /// that turns invalid past its first batch therefore leaves entries for rows
+    /// no block will ever hold - and the chunk a later dump writes would make
+    /// them durable. This removes them again.
+    ///
+    /// A secondary tail is the one structure that needs a real removal
+    /// (`SecondaryIndex::remove_row`): the other kinds' tails are keyed by row
+    /// id, and the text index drops a document by its row id too.
+    pub(crate) fn rollback_index_rows(&self, table: &str, seqs: &[usize]) {
+        if seqs.is_empty() {
+            return;
+        }
+        let tkey = self.table_key(table);
+        let dead: std::collections::HashSet<u64> = seqs.iter().map(|s| *s as u64).collect();
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        for index in entry.secondary.indexes.values() {
+            for seq in seqs {
+                index.remove_row(*seq as u64);
+            }
+        }
+        for sparse in entry.sparse.values_mut() {
+            let mut guard = sparse.write().unwrap_or_else(|p| p.into_inner());
+            for seq in seqs {
+                guard.remove(*seq as u64);
+            }
+        }
+        for mv in entry.mv.values_mut() {
+            let mut guard = mv.write().unwrap_or_else(|p| p.into_inner());
+            for seq in seqs {
+                guard.remove(*seq as u64);
+            }
+        }
+        for text in entry.text.values() {
+            let mut guard = text.write().unwrap_or_else(|p| p.into_inner());
+            for seq in seqs {
+                guard.mem.delete(*seq as u64);
+            }
+        }
+        // HNSW and IVF have no per-row removal (a graph and a clamped set), so
+        // their tails are **dropped** instead: the next dump rebuilds them from
+        // the blocks, which hold only committed rows. Dropping is cheap - the
+        // handle is rebuilt on the next write - and it is the only answer that
+        // cannot leave an uncommitted row in the graph.
+        if !entry.hnsw_mem.is_empty() {
+            entry.hnsw_mem.clear();
+            entry.hnsw_topup = true;
+        }
+        for rows in entry.ivf_mem.values_mut() {
+            rows.retain(|(seq, _)| !dead.contains(seq));
+        }
     }
 
     pub(crate) fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {

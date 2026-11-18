@@ -406,6 +406,17 @@ impl BmpReader {
         self.doc_ids.first().copied().unwrap_or(0)
     }
 
+    /// Every document id the chunk holds, ascending.
+    ///
+    /// A BMP image stores one entry per row that **has postings**, so its
+    /// document ids are not a contiguous span: a `NULL` sparse cell between two
+    /// stored rows leaves a hole (`first_doc`/`doc_count` would claim the span
+    /// covers it). Coverage has to be judged on these ids, not on
+    /// `[first_doc, first_doc + doc_count)`.
+    pub fn doc_ids(&self) -> &[u32] {
+        &self.doc_ids
+    }
+
     /// `BMPAlgBase::SearchKnn`: `beta` term selection, threshold from the k-th
     /// posting score, block bounds, exact block scoring, and `alpha` early stop.
     pub fn search(

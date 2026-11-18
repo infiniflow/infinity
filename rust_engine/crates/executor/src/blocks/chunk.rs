@@ -133,13 +133,19 @@ pub(crate) fn publish_bmp_chunks(
     segment: u32,
     existing: &std::collections::HashMap<u64, u32>,
     next_id: &mut u32,
-) -> Vec<IndexChunk> {
+) -> (Vec<IndexChunk>, Vec<crate::engine::PendingSparseChunk>) {
     let mut chunks = Vec::new();
+    let mut failed: Vec<(u64, Vec<u8>, u32, usize)> = Vec::new();
     for (chunk_segment, bytes, first_doc, doc_count) in pending {
-        if std::fs::create_dir_all(seg_dir).is_err() {
-            break;
-        }
         if *chunk_segment != u64::from(segment) {
+            continue;
+        }
+        if std::fs::create_dir_all(seg_dir).is_err() {
+            // Keep the image: the caller's queue was drained before this ran,
+            // and a chunk it never wrote has no record - the documents would be
+            // gone at the next restart. It is returned to the caller so the next
+            // publication can try again.
+            failed.push((*chunk_segment, bytes.clone(), *first_doc, *doc_count));
             continue;
         }
         let base_row_id = (u64::from(segment) << 32) | u64::from(*first_doc);
@@ -153,6 +159,7 @@ pub(crate) fn publish_bmp_chunks(
         };
         let path = seg_dir.join(format!("chunk_{chunk_id}.idx"));
         if storage::definition::format::write_synced(&path, bytes).is_err() {
+            failed.push((*chunk_segment, bytes.clone(), *first_doc, *doc_count));
             continue;
         }
         chunks.push(IndexChunk {
@@ -165,7 +172,7 @@ pub(crate) fn publish_bmp_chunks(
             commit_ts: 0,
         });
     }
-    chunks
+    (chunks, failed)
 }
 
 /// The full-text chunks on disk, one per block, named `ft_{base_row_id:016x}`.

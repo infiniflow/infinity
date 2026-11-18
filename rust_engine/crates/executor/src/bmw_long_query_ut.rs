@@ -370,7 +370,10 @@ fn long_query_top_k_and_pruning_effectiveness() {
                 "topn={topn}: doc {doc} scored {score}, reference {expected}"
             );
         }
-        // (2) the descending score sequence equals the reference's top-k
+        // (2) the descending score sequence equals the reference's top-k,
+        // **document ids included**: two rows with the same score are separated
+        // by the smaller id, so a score-only check passes on a result whose
+        // tie-break went the other way.
         for (rank, (doc, score)) in bmw.docs.iter().enumerate() {
             let (expected_doc, expected_score) = reference_sorted[rank];
             let tolerance = 1e-4 * expected_score.abs().max(1.0);
@@ -378,6 +381,11 @@ fn long_query_top_k_and_pruning_effectiveness() {
                 (expected_score - score).abs() <= tolerance,
                 "topn={topn} rank {rank}: got doc {doc} score {score}, \
                  expected doc {expected_doc} score {expected_score}"
+            );
+            assert_eq!(
+                *doc, expected_doc,
+                "topn={topn} rank {rank}: got doc {doc}, expected doc {expected_doc} \
+                 at the same score {score}"
             );
         }
         // (3) determinism
@@ -996,6 +1004,13 @@ fn long_query_randomized_differential() {
             let dead = HashSet::new();
             let mut iterator =
                 BlockMaxWandIterator::new(fields, 10, &dead, 0.0, min_should, WandMode::Bm25);
+            // `Next(target)` is **forward-only**: both paths return the current
+            // document when it is already at or past `target`
+            // (`next_naive`/`next` both open with `current >= target`). Drawing
+            // a target behind the cursor is therefore legal and lands on the
+            // cached row, so the expectation is "the first hit at or after
+            // max(target, current)", not "the first hit at or after target".
+            let mut cursor = 0u64;
             for _ in 0..8 {
                 let pick = (next() % reference.docs.len() as u64) as usize;
                 let target = reference.docs[pick].0;
@@ -1004,14 +1019,15 @@ fn long_query_randomized_differential() {
                     "round {round}: Next({target}) ran off the end"
                 );
                 let (doc, score) = iterator.current().unwrap();
-                let at = reference.docs.partition_point(|(row, _)| *row < target);
+                let from = target.max(cursor);
+                let at = reference.docs.partition_point(|(row, _)| *row < from);
                 assert!(
                     at < reference.docs.len(),
                     "round {round}: target {target} past the last hit"
                 );
                 assert_eq!(
                     doc, reference.docs[at].0,
-                    "round {round}: Next({target}) landed on {doc}"
+                    "round {round}: Next({target}) from {cursor} landed on {doc}"
                 );
                 let expected = reference.docs[at].1;
                 let tolerance = 1e-4 * expected.abs().max(1.0);
@@ -1019,6 +1035,7 @@ fn long_query_randomized_differential() {
                     (expected - score).abs() <= tolerance,
                     "round {round}: jump score {score} vs {expected}"
                 );
+                cursor = doc;
             }
         }
     }

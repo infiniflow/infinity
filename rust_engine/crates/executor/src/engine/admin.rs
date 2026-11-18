@@ -522,6 +522,16 @@ impl Engine {
         // mirror with an empty block).
         let gate = self.batch_gate(table);
         let _batch = gate.lock().await;
+        // The table's **bottom** gate is taken here and held for the whole
+        // pass, not just across the commit. Two steps below read and write the
+        // segments this compaction is about to retire - the pre-write of the
+        // buffered rows (`write_blocks_bounded_locked`, which requires its caller
+        // to hold this gate) and the source-row read - and an append that
+        // published rows into a source segment between them would be retired
+        // without ever being copied. `EngineTxn` commits take this gate but not
+        // `batch_gate`, so the batch gate alone does not exclude them.
+        let compact_gate = self.bottom_gate(table);
+        let compact_turn = compact_gate.lock().await;
         self.invalidate_row_cache(table);
         // Compaction moves rows between segments without changing how many are
         // live, so the counter survives even though the mirror's row-id
@@ -606,12 +616,11 @@ impl Engine {
         // gone.
         let turn = self.txn.reserve_commit_ts();
         let compact_ts = turn.ts();
-        // The table's bottom gate is taken **here**, before the commit, and
-        // held across it: the callback below is a synchronous `FnOnce`
-        // running on a runtime worker that already holds the commit turn
-        // and `commit_lock`, so it can neither `.await` nor take the gate.
-        let compact_gate = self.bottom_gate(table);
-        let compact_turn = compact_gate.lock().await;
+        // `compact_turn` (taken at the top of this pass) is still held, which is
+        // what makes the commit and the pre-write above one step with respect to
+        // every other writer of this table. The callback below is a synchronous
+        // `FnOnce` on a runtime worker that already holds the commit turn and
+        // `commit_lock`, so it can neither `.await` nor take the gate.
         self.txn
             .commit_at_deferred_with(t, compact_ts, |_txn| {
                 // Drop every source position that no compacted row reuses. The

@@ -496,6 +496,11 @@ impl Engine {
                 .secondary
                 .declared_types
                 .insert(index_id, type_upper.clone());
+            // The tail starts empty: a build re-reads every row the chunks are
+            // about to cover, so keeping what was there would double those
+            // entries. A row committed *while* the build runs lands in the new
+            // tail through the write hook (it is registered before the scan for
+            // exactly that reason).
             entry
                 .secondary
                 .indexes
@@ -1125,6 +1130,16 @@ impl Engine {
     pub async fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
         let table = self.qualified_table(table);
+        // An `IMPORT` in flight owns its index tails until it commits: its rows
+        // are staged, not committed, and a chunk that sealed them would be a
+        // record for rows the table may never have (a failure past this point
+        // only clears the marker). The quota's `propose_dump` already declines
+        // to queue one, but a task queued **before** the import began reaches
+        // this function directly (`dump_under_pressure` -> here), so the check
+        // has to hold at execution time.
+        if self.import_in_flight(&table) {
+            return Ok(());
+        }
         // The reference skips a dump when the memory index has nothing new
         // ("skipped dumping MemIndex … since it doesn't exist"). Three states
         // count as "something new": a non-empty memory tail; a chunk file the

@@ -523,9 +523,46 @@ impl<'a> BlockMaxWandIterator<'a> {
 
     /// `Next(target)` without the top-k wrapper: the caller sees every candidate
     /// the pruned path stops on, which is what a `topn=0` scan does.
+    ///
+    /// `min_should` is applied here too. `offer` is the top-k wrapper's
+    /// eligibility check, and the full-scan path never reaches it, so without
+    /// this a `topn=0` scan of `"a b"` with `min_should=2` returned a document
+    /// matching only `a` - and a test that compares the pruned scan against the
+    /// naive one would agree while both violated `minimum_should_match`.
     #[cfg(test)]
     pub(crate) fn step(&mut self, target: Option<u64>) -> bool {
-        self.next(target)
+        let mut target = target;
+        loop {
+            if !self.next(target) {
+                return false;
+            }
+            let Some(doc) = self.doc_id else {
+                return false;
+            };
+            let eligible =
+                self.matched_units() >= self.min_should.max(1) && !self.dead.contains(&doc);
+            if eligible {
+                return true;
+            }
+            // Rejected: resume immediately after this document.
+            target = Some(doc + 1);
+        }
+    }
+
+    /// How many query units the current candidate matched, in [`Self::offer`]'s
+    /// definition: distinct terms for BM25, `(field, term)` pairs for boolean.
+    #[cfg(test)]
+    fn matched_units(&self) -> usize {
+        match self.mode {
+            WandMode::Bm25 => {
+                let mut seen = HashSet::new();
+                for &i in &self.prefix {
+                    seen.insert(self.cursors[i].term);
+                }
+                seen.len()
+            }
+            WandMode::Boolean => self.prefix.len(),
+        }
     }
 
     /// The document and exact score `step` stopped on.

@@ -1427,15 +1427,21 @@ impl Engine {
                         }
                         Ok(((), drop_id))
                     },
-                    |id| async move {
+                    |id, commit_ts| async move {
                         // A buffered row has no block file to leave alone. The
                         // column is **retired by id**, not removed: its cells
                         // stay until a checkpoint bounded at or after this
                         // commit has written them, because a bound before the
                         // DROP still has to write that column and the buffer is
                         // the only copy of its unreached rows.
+                        //
+                        // The retirement is stamped with the DROP's own commit
+                        // ts, which is finite: `u64::MAX` was a value no
+                        // checkpoint bound ever reaches, so the cells stayed for
+                        // the life of the process and every later insert kept
+                        // writing a default for them.
                         if let Some(id) = id {
-                            self.patch_buffered_drop_column(table, id, u64::MAX);
+                            self.patch_buffered_drop_column(table, id, commit_ts);
                         }
                         Ok(())
                     },
@@ -1529,7 +1535,7 @@ impl Engine {
                         )?;
                         Ok(((), ac_blocks))
                     },
-                    |blocks| async move {
+                    |blocks, _commit_ts| async move {
                         // Rows still in the append buffer have no block file
                         // yet (`AddColumnsData` walks the segments and would
                         // skip them): the reference's block *buffer* gains the
@@ -2758,20 +2764,23 @@ impl Engine {
                     let block = typed_append_block(&literals, &types);
                     let table_name = table.to_string();
                     let table_ident = self.table_ident(table)?;
-                    let row_count = literals.len();
-                    let base = self
-                        .commit_rewritten_rows(table, &to_del, &new_rows, t, move |txn, base| {
+                    let allocation = self
+                        .commit_rewritten_rows(table, &to_del, &new_rows, t, move |txn, range| {
                             if let Some((_, table_id, _)) = table_ident {
                                 // A row the WAL encoder cannot express keeps
                                 // its `DeleteV2` only: the new cells reach the
                                 // block buffer, and no row record is kept.
                                 if let Some(block) = block {
+                                    // Both ranges: a rewrite that crosses a
+                                    // segment seam gets the next segment's ids
+                                    // for its tail, and the frame says so
+                                    // (`WalCmdAppendV2::row_ranges_`).
                                     txn.set_typed_commands(vec![
                                         self.delete_command(&table_name, &table_id, &delete_ids),
                                         self.append_command(
                                             &table_name,
                                             &table_id,
-                                            &[(base, row_count)],
+                                            range.ranges(),
                                             block,
                                         ),
                                     ]);
@@ -2796,10 +2805,11 @@ impl Engine {
                             let mut row_texts: Vec<(usize, Vec<String>)> =
                                 Vec::with_capacity(new_rows.len());
                             for (k, nr) in new_rows.iter().enumerate() {
-                                self.update_indexes_on_insert_text(table, base + k, nr, &schema)?;
+                                let seq = allocation.seq_at(k);
+                                self.update_indexes_on_insert_text(table, seq, nr, &schema)?;
                                 let texts: Vec<String> =
                                     nr.iter().map(|v| v.to_slt_string()).collect();
-                                row_texts.push((base + k, texts));
+                                row_texts.push((seq, texts));
                             }
                             let batch: Vec<(usize, &[String])> = row_texts
                                 .iter()

@@ -2084,11 +2084,20 @@ impl Catalog {
     }
 
     /// Writes the two system tags a C++-written directory always carries
-    /// (`NewCatalog::Init`): the catalog version and the database counter. Both
-    /// only when absent - a directory that already has them keeps its values.
+    /// (`NewCatalog::Init`): the catalog version and the database counter.
+    ///
+    /// The version is **upgraded** in place when it differs, not only written
+    /// when absent: the reference compares it with its own build version at
+    /// startup and runs its JSON-index conversion for anything older
+    /// (`Storage::ConvertJsonIndexFormat`), which aborts on a port-written
+    /// catalog. A directory this build opened must therefore carry its version
+    /// even when the open runs no DDL and no checkpoint - leaving an older value
+    /// behind would make the reference fail to start on it. The database
+    /// counter, unlike the version, is only initialised when absent: it is
+    /// real state, not a format stamp.
     pub fn init_key_space(&self) -> Result<()> {
         use storage::catalog_format::{CATALOG_VERSION, META_VERSION, NEXT_DATABASE_ID};
-        if self.store.get(META_VERSION.as_bytes())?.is_none() {
+        if self.store.get(META_VERSION.as_bytes())?.as_deref() != Some(CATALOG_VERSION.as_bytes()) {
             self.store
                 .put(META_VERSION.as_bytes(), CATALOG_VERSION.as_bytes())?;
         }

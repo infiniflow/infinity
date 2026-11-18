@@ -154,8 +154,9 @@ IMPORT 的块与 `create` 边界只在提交之后落（失败不留幽灵行）
 写 `AddNewChunkIndex1` 记录并 `Dump` 出一块（`buffer_obj->Save()`），所以 DDL 一提交磁盘上就有 chunk。
 
 端口只对 secondary / BMP / IVF / 多值这样做：`query.rs` 的 `CreateIndex` 分支建完索引后调
-`publish_index_chunks`，而 HNSW 的图与全文的倒排段只留在内存索引里，第一次 `DumpIndex`
-（显式 dump 或 checkpoint 的首次 dump）才落 chunk。实测（`new_catalog_index_internal_ut::populate_index`，
+`publish_index_chunks`，而 HNSW 的图与全文的倒排段只留在内存索引里，要等第一次 `DumpIndex`
+（显式 dump 或配额触发的 dump）才落 chunk。checkpoint 本身从不封存索引（§1.1），所以它不会
+补上这一块：一个只做 checkpoint 的表，这两种索引在建索引后到第一次 dump 之前没有 chunk。实测（`new_catalog_index_internal_ut::populate_index`，
 两段各 8192 行 + 建索引 + 后插一块 8192 行）：
 
 | kind | 参考 `check_index` | 端口 |

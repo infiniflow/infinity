@@ -973,11 +973,13 @@ jobs:
         working-directory: rust_engine
         env:
           UV_PYTHON: "3.13"
-        run: cargo test --workspace -- --ignored
+        run: cargo test --workspace --no-fail-fast -- --ignored
       - name: Slow reference cases (the gated half of --ignored)
         # The `slow:` set alone, and this one gates. Everything else is skipped
         # by name - `--skip` matches the test name, not the `#[ignore]` reason,
-        # so the categories above are spelled out here.
+        # so the categories above are spelled out here. Every `#[ignore]` carries
+        # one of those categories (`slow`/`bench`/`diagnostic`/`external`/
+        # `golden`/`stress`), so this list is exactly "everything but slow".
         #
         # Two names beyond the non-slow categories are skipped while their
         # difference is open (both predate this lane and fail on main):
@@ -993,21 +995,26 @@ jobs:
             hnsw_production_scale tensor_maxsim_throughput
             flush_dump_wall_time_probe a_checkpoint_scaling_probe
             dot_throughput position_lut_throughput maxsim_throughput
+            spann_bench_128d spann_vs_hnsw_at_equal_latency
             # diagnostic:
             diag_estimator_accuracy diag_ranking_quality diag_extra_bits
             flat_rabitq hnsw_rabitq hnsw_lsg_rabitq
             compress_hnsw_to_rabitq compress_lsg_to_rabitq
+            spann_out_of_core_keeps_the_resident_set_small
+            spann_query_profile_1536d
             # external:
             minio_upload_meta_to_s3 minio_client_roundtrip
             minio_upload_object minio_download_object
             # golden:
             a_large_corpus_is_byte_identical_to_the_reference
+            # stress:
+            ignored_stress_concurrent_seal_and_optimize
             # open slow cases
             dump_index_task_row_cnt_exceed_memory_quota
           )
           args=()
           for name in "${skip[@]}"; do args+=("--skip" "$name"); done
-          cargo test --workspace -- --ignored "${args[@]}"
+          cargo test --workspace --no-fail-fast -- --ignored "${args[@]}"
       - name: Build the server
         run: (cd rust_engine && cargo build --release -p cli)
       - name: Gate E (performance)

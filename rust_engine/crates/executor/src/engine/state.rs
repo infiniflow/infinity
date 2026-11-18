@@ -4313,21 +4313,34 @@ impl SparseIndex {
     /// (`test_mem_bmp`: a self-query answered `[4, 4, 2, 2, 1, ...]` instead of
     /// the seven `4`s the index covers). `covered` is what the loaded chunks
     /// cover, per `ROW_ID` segment, as `[begin, end)` in segment offsets.
+    ///
+    /// Coverage is the **document ids the image holds**, not the span
+    /// `[base_row_id, base_row_id + row_count)`: a BMP stores an entry only for
+    /// a row with postings, so a `NULL` sparse cell between two stored rows
+    /// leaves a hole inside that span. Recording the span made the rebuild's gap
+    /// check re-index the row after such a hole, and the row then appeared twice
+    /// in the results (once from the chunk, once from the seal the rebuild
+    /// wrote).
     pub(crate) fn load_sealed(
         &mut self,
         chunks: &[(u64, std::path::PathBuf, u64, u64)],
-    ) -> std::collections::HashMap<u64, Vec<(u64, u64)>> {
-        let mut covered: std::collections::HashMap<u64, Vec<(u64, u64)>> = Default::default();
+    ) -> std::collections::HashMap<u64, std::collections::BTreeSet<u64>> {
+        let mut covered: std::collections::HashMap<u64, std::collections::BTreeSet<u64>> =
+            Default::default();
         for (segment, path, base_row_id, row_count) in chunks {
             let Ok(reader) = storage::bmp::BmpReader::open(path, self.width) else {
                 continue;
             };
+            let ids = covered.entry(*segment).or_default();
+            ids.extend(reader.doc_ids().iter().map(|id| u64::from(*id)));
+            // A chunk whose image reports no document still covers the first
+            // row its record names: the record is the minimum the reference
+            // publishes, and treating it as empty would re-index that row.
+            let first = base_row_id & 0xffff_ffff;
             self.sealed.push((*segment, Arc::new(reader)));
-            let begin = base_row_id & 0xffff_ffff;
-            covered
-                .entry(*segment)
-                .or_default()
-                .push((begin, begin + row_count));
+            if ids.is_empty() && *row_count > 0 {
+                ids.insert(first);
+            }
         }
         covered
     }
@@ -4835,18 +4848,28 @@ impl TableEntry {
         self.pending_bytes + self.pending_rows.column_count() * std::mem::size_of::<Vec<Value>>()
     }
 
-    /// The buffered row `seq`, if the commit that appended it is still above
-    /// the last checkpoint.
+    /// The buffered row `seq` in the **caller's** column order.
     ///
     /// The buffer is columnar, so this **materialises** the row: the cells live
     /// in one vector per column and there is no contiguous row to borrow. A
     /// caller that needs a few cells should go through
     /// [`TableEntry::buffered_row_cell`] instead.
-    pub(crate) fn buffered_row(&self, seq: usize) -> Option<Vec<Value>> {
-        let order: Vec<u64> = self.pending_rows.all_ids();
+    ///
+    /// `order` is the schema the reader uses positionally, `fill` its per-column
+    /// defaults. It must not be the buffer's own `all_ids()`: a retired column
+    /// stays in the buffer (a checkpoint bounded before the `DROP` still has to
+    /// write it), and rendering a row in that order gave `[10, 20, 30]` for a
+    /// row that is `[10, 30]` in the live schema - the retired `20` occupied the
+    /// surviving column's position.
+    pub(crate) fn buffered_row(
+        &self,
+        seq: usize,
+        order: &[u64],
+        fill: &[Value],
+    ) -> Option<Vec<Value>> {
         self.pending_rows
             .index_of(seq)
-            .and_then(|k| self.pending_rows.row_or_null(k, &order))
+            .and_then(|k| self.pending_rows.row(k, order, fill))
     }
 }
 
@@ -5258,11 +5281,17 @@ impl PendingRows {
             wanted.extend(cells.keys().copied());
         }
         // A column that appears for the first time is back-filled for the rows
-        // already buffered; a column already here keeps its cells.
+        // already buffered; a column already here keeps its cells. The
+        // back-fill is **charged**: those cells are in the buffer, and a batch
+        // of old-schema rows followed by one new-schema row otherwise adds a
+        // default per old row without reporting it, so `unsealed_bytes`
+        // under-states what the buffer holds.
         let have = self.len();
         for id in &wanted {
             if !self.columns.contains_key(id) {
-                self.columns.insert(*id, vec![default_of(*id); have]);
+                let fill = default_of(*id);
+                self.bytes += value_bytes(&fill) * have;
+                self.columns.insert(*id, vec![fill; have]);
             }
         }
         let cols: Vec<u64> = self.columns.keys().copied().collect();
@@ -5277,13 +5306,16 @@ impl PendingRows {
             }
             for id in &cols {
                 let value = cells.get(id).cloned().unwrap_or_else(|| default_of(*id));
+                // Every stored cell counts, the default filled in for a column
+                // the row does not mention included: it is a cell the buffer
+                // now holds.
+                self.bytes += value_bytes(&value);
                 if at_tail {
                     self.columns.get_mut(id).unwrap().push(value);
                 } else {
                     self.columns.get_mut(id).unwrap().insert(k, value);
                 }
             }
-            self.bytes += cells.values().map(value_bytes).sum::<usize>();
         }
         debug_assert!(
             self.columns.values().all(|c| c.len() == self.len()),
@@ -5316,7 +5348,9 @@ impl PendingRows {
         let have = self.len();
         for id in &wanted {
             if !self.columns.contains_key(id) {
-                self.columns.insert(*id, vec![default_of(*id); have]);
+                let fill = default_of(*id);
+                self.bytes += value_bytes(&fill) * have;
+                self.columns.insert(*id, vec![fill; have]);
             }
         }
         let cols: Vec<u64> = self.columns.keys().copied().collect();
@@ -5331,13 +5365,13 @@ impl PendingRows {
             }
             for id in &cols {
                 let value = cells.get(id).cloned().unwrap_or_else(|| default_of(*id));
+                self.bytes += value_bytes(&value);
                 if at_tail {
                     self.columns.get_mut(id).unwrap().push(value);
                 } else {
                     self.columns.get_mut(id).unwrap().insert(k, value);
                 }
             }
-            self.bytes += cells.values().map(value_bytes).sum::<usize>();
         }
         debug_assert!(
             self.columns.values().all(|c| c.len() == self.len()),
@@ -5976,15 +6010,29 @@ impl PendingRestore<'_> {
     pub fn rollback(self) {}
 }
 
-/// One append staged by an [`EngineTxn`]: the table, its first row id, the
+/// One append staged by an [`EngineTxn`]: the table, the allocation, the
 /// append-log record the reservation created (settled with the commit ts), the
 /// encoded rows and the literal rows.
+///
+/// The **allocation** is kept, not just its base: an append that runs past the
+/// segment's last slot is two ranges (`reserve_rows_inline` splits it, because
+/// an in-segment offset is a `u32`), and the rows after the seam carry the next
+/// segment's id, not `base + k`. The WAL frame names both ranges and the bottom
+/// half addresses each row through `seq_at`, so the buffer, the WAL and the
+/// index entries agree across the seam.
 pub(crate) struct StagedAppend {
     pub(crate) table: String,
-    pub(crate) base: usize,
+    pub(crate) range: RowRange,
     pub(crate) record: usize,
     pub(crate) encoded: Vec<String>,
     pub(crate) rows: Vec<Vec<Literal>>,
+}
+
+impl StagedAppend {
+    /// The row id of the `k`-th row of this append.
+    pub(crate) fn seq_at(&self, k: usize) -> usize {
+        self.range.seq_at(k)
+    }
 }
 
 /// The catalog state a staged `DumpMemIndex` transaction validated against.
@@ -6124,9 +6172,9 @@ pub(crate) async fn run_bottom(
             // once per row.
             let mut texts: Vec<(usize, Vec<String>)> = Vec::with_capacity(append.rows.len());
             for (k, row) in append.rows.iter().enumerate() {
-                engine.update_indexes_on_insert(table, append.base + k, row, &schema)?;
+                engine.update_indexes_on_insert(table, append.seq_at(k), row, &schema)?;
                 texts.push((
-                    append.base + k,
+                    append.seq_at(k),
                     row.iter().map(|v| v.to_slt_string()).collect(),
                 ));
             }
@@ -6146,15 +6194,25 @@ pub(crate) async fn run_bottom(
         engine.bump_writes(table);
         engine.note_live_rows(table, append.rows.len() as isize);
         // The frame's rows are already decoded (`buffer_attributed_rows` took
-        // them), so the cache takes them as they are - no second parse.
+        // them), so the cache takes them as they are - no second parse. They are
+        // narrowed to the column's storage width first: `Literal::Int(300)` in
+        // a TINYINT column is stored as 44 by the block encoder, and a cache
+        // that kept 300 answered a latest-state read differently from the file.
+        let coercions: Vec<crate::blocks::engine::Coercion> = engine
+            .column_types(table)
+            .unwrap_or_default()
+            .iter()
+            .map(|ty| crate::blocks::engine::coercion_of(ty))
+            .collect();
         let replay_rows: Vec<(usize, Vec<Value>)> = append
             .rows
             .iter()
             .enumerate()
             .map(|(k, row)| {
+                let values: Vec<Value> = row.iter().map(Value::from_literal).collect();
                 (
-                    append.base + k,
-                    row.iter().map(Value::from_literal).collect::<Vec<_>>(),
+                    append.seq_at(k),
+                    crate::blocks::engine::coerce_row(&values, &coercions),
                 )
             })
             .collect();
@@ -6185,9 +6243,9 @@ pub(crate) async fn run_bottom(
                 // commit has already published it, and the block is the only
                 // place its values can come from.
                 match engine.parse_stored_row(table, &defaults, &stored_types, text.as_bytes()) {
-                    Ok(row) => published.push((append.base + k, row)),
+                    Ok(row) => published.push((append.seq_at(k), row)),
                     Err(_) => published.push((
-                        append.base + k,
+                        append.seq_at(k),
                         text.split('\t')
                             .map(|c| Value::Str(c.to_string()))
                             .collect(),
@@ -6361,7 +6419,6 @@ impl<'a> EngineTxn<'a> {
             }
         }
         let range = self.engine.reserve_rows(&table, rows.len(), false)?;
-        let base = range.base;
         let types = self.engine.column_types(&table)?;
         let mut encoded = Vec::with_capacity(rows.len());
         for row in rows.iter() {
@@ -6381,7 +6438,7 @@ impl<'a> EngineTxn<'a> {
                 txn.set_typed_commands(vec![self.engine.append_command(
                     &table,
                     &table_id,
-                    &[(base, rows.len())],
+                    range.ranges(),
                     block,
                 )]);
             }
@@ -6393,10 +6450,11 @@ impl<'a> EngineTxn<'a> {
                 table: table.to_string(),
             });
         }
+        let record = range.append;
         self.appends.push(StagedAppend {
             table: table.to_string(),
-            base,
-            record: range.append,
+            range,
+            record,
             encoded,
             rows,
         });
