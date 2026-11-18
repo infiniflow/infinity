@@ -1938,13 +1938,28 @@ impl Engine {
                         .get(&(index_id as u64))
                         .map(Vec::as_slice)
                         .unwrap_or(&[]);
-                    if pending.is_empty() && only.is_none() {
-                        // A **checkpoint** does not touch an index
-                        // (`NewTxn::CheckpointTable`), so it publishes nothing
-                        // new here: the records a dump wrote are the chunk list.
-                        // Deriving chunks block by block instead appended a
-                        // second family beside them (60 rows became four 16-row
-                        // chunks next to the dump's one).
+                    // A seal is the **only** source of a BMP chunk: its bytes
+                    // are `BMPHandler::SaveToPtr`'s image, which is what the
+                    // reference's chunk holds. So nothing to publish means
+                    // nothing to write, whoever asked - a checkpoint (which
+                    // never touches an index) or a reopen's rebuild (the chunks
+                    // on disk already cover every row, so it seals nothing).
+                    //
+                    // The rows-derived form below is the one exception: a segment
+                    // with **no** chunk at all, an index that has never been
+                    // dumped. Deriving chunks over an existing family rewrote each
+                    // recorded id with the block partition instead of the BMP's
+                    // own document offsets, and a query lost the postings the
+                    // wider chunk held (`test_mem_bmp`: seven `4`s became five;
+                    // a reopen of a 35-row table wrote five 7-row chunks over the
+                    // three the dumps had produced).
+                    let has_chunk_files = std::fs::read_dir(&seg_dir).is_ok_and(|entries| {
+                        entries.flatten().any(|e| {
+                            let name = e.file_name().to_string_lossy().to_string();
+                            name.starts_with("chunk_") && name.ends_with(".idx")
+                        })
+                    });
+                    if pending.is_empty() && (has_chunk_files || !existing_chunks.is_empty()) {
                         continue;
                     }
                     if pending.is_empty() {

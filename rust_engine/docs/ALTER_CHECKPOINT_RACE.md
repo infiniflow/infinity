@@ -793,3 +793,18 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 而两者只在"一条记录一行"时相等。删掉它之后 append ts 只有一个写入点
 （`settle_append_at` + `note_append` 返回的下标），`catalog|blk|` 的 ts 由 `version` 首个
 `create` 反推这条链也不再需要区别对待。
+
+### 6.9 重启后 BMP chunk 被按行重写
+
+`test_mem_bmp`（`python/restart_test/test_memidx.py`）在重启后答出 5 个 `4` 而不是 7 个。
+两个进程之间的 chunk 文件名不变，但**字节变小了**（2508 → 2120），即重启把已记录的 chunk
+按行重建覆盖了。
+
+根因在 `publish_index_chunks` 的 BMP 分支：它原来只在 `only.is_none()`（checkpoint）时才跳过，
+而重启后的重建既不 seal（chunk 已覆盖全部行），调用方也可能是显式 dump，于是走了"按 block
+从行重建"的兜底 —— 那个分块（block 边界）与 BMP 自己的文档偏移不同，用同一个 chunk id 写回，
+比原图窄，最后几条 posting 就丢了。
+
+修法：判据改成"**有没有东西可发布**"，而不是"谁在调用"。`pending` 为空且段目录里已有
+`chunk_*.idx`（或目录里没有 chunk 但 catalog 已记录）时不发布。按行重建只保留给"这个段
+从来没有 chunk"的情形。改完 `test_mem_bmp` 连跑 4 次全过，重启套件 46 passed。
