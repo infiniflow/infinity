@@ -669,7 +669,7 @@ mod tests {
     /// reference body is commented out; this pins the same initialisation and
     /// a real put/get/delete round trip when MinIO is configured.
     #[test]
-    #[ignore = "C++ S3ClientMinioTest relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    #[ignore = "external: C++ S3ClientMinioTest needs MinIO, set INFINITY_MINIO_*"]
     fn minio_client_roundtrip() {
         let Some(config) = env_config() else {
             return;
@@ -688,7 +688,7 @@ mod tests {
 
     /// C++: `virtual_store_ut.cpp:283` (`VirtualStoreTest.minio_upload`).
     #[test]
-    #[ignore = "C++ VirtualStoreTest.minio_upload relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    #[ignore = "external: C++ VirtualStoreTest.minio_upload needs MinIO, set INFINITY_MINIO_*"]
     fn minio_upload_object() {
         let Some(config) = env_config() else {
             return;
@@ -708,7 +708,7 @@ mod tests {
 
     /// C++: `virtual_store_ut.cpp:320` (`VirtualStoreTest.minio_download`).
     #[test]
-    #[ignore = "C++ VirtualStoreTest.minio_download relies on MinIO; set INFINITY_MINIO_* and run with --ignored"]
+    #[ignore = "external: C++ VirtualStoreTest.minio_download needs MinIO, set INFINITY_MINIO_*"]
     fn minio_download_object() {
         let Some(config) = env_config() else {
             return;

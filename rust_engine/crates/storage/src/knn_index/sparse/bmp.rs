@@ -316,7 +316,21 @@ impl BmpReader {
         let map = crate::chunk_store::chunk_store()
             .open(path)
             .map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))?;
-        let mut cur = Cursor { buf: &map, at: 0 };
+        Self::from_bytes(&map, width)
+    }
+
+    /// The same parse, over bytes the caller already holds.
+    ///
+    /// `C++ BMPHandler::LoadFromPtr(const char *, size_t)`: a BMP index is a
+    /// self-describing byte image, so it can be read straight out of the buffer
+    /// that holds it - the reference's `Dump` writes into a `BufferObj` and a
+    /// query reads it back from that same memory, with no file in between.
+    ///
+    /// The parse produces owned tables (`ivt`, `blocks`, `doc_ids`), so the
+    /// returned reader does not borrow `bytes`: a caller may drop them.
+    pub fn from_bytes(bytes: &[u8], width: IdxWidth) -> Result<Self, FormatError> {
+        let map = bytes;
+        let mut cur = Cursor { buf: map, at: 0 };
         let term_num = cur.u64_aligned()? as usize;
         let kths = cur.i32s_aligned(term_num)?;
         let kth_scores = cur.f32s_aligned(term_num)?;
@@ -337,7 +351,7 @@ impl BmpReader {
         let mut blocks: Vec<BlockTerms> = Vec::with_capacity(block_num);
         for &offset in offsets.iter().take(block_num) {
             let mut bc = Cursor {
-                buf: &map,
+                buf: map,
                 at: data_start + offset as usize,
             };
             let terms = bc.u64_aligned()? as usize;
@@ -381,6 +395,26 @@ impl BmpReader {
 
     pub fn doc_count(&self) -> usize {
         self.doc_ids.len()
+    }
+
+    /// The **first** document id the chunk holds.
+    ///
+    /// `ChunkIndexMetaInfo::base_row_id_` is this value, not the segment's base:
+    /// a segment dumped twice has two chunks and the second starts where the
+    /// first ended (`BMPIndexInMem::GetChunkIndexMetaInfo`).
+    pub fn first_doc(&self) -> u32 {
+        self.doc_ids.first().copied().unwrap_or(0)
+    }
+
+    /// Every document id the chunk holds, ascending.
+    ///
+    /// A BMP image stores one entry per row that **has postings**, so its
+    /// document ids are not a contiguous span: a `NULL` sparse cell between two
+    /// stored rows leaves a hole (`first_doc`/`doc_count` would claim the span
+    /// covers it). Coverage has to be judged on these ids, not on
+    /// `[first_doc, first_doc + doc_count)`.
+    pub fn doc_ids(&self) -> &[u32] {
+        &self.doc_ids
     }
 
     /// `BMPAlgBase::SearchKnn`: `beta` term selection, threshold from the k-th

@@ -362,10 +362,19 @@ impl Engine {
     /// with rows the fetch cannot resolve. This is the reference's
     /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
     /// `ToWalEntry`, `kCompact`).
-    fn populate_compacted_indexes(&self, table: &str, merged_segment: u32, sources: &[u32]) {
+    fn populate_compacted_indexes(
+        &self,
+        table: &str,
+        merged_segment: u32,
+        sources: &[u32],
+        compact_ts: u64,
+    ) {
         #[cfg(test)]
         crate::engine::statements::run_compaction_window_hook(table, "records");
-        self.populate_secondary_indexes(table);
+        // Every record this pass writes carries the compaction's ts
+        // (`PopulateIndex(…, kCompact)` runs inside the transaction, so
+        // `current_ts()` - still the previous commit here - is not it).
+        crate::engine::with_chunk_ts(compact_ts, || self.populate_secondary_indexes(table));
         let qualified = self.qualified_table(table);
         let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
             return;
@@ -392,10 +401,115 @@ impl Engine {
             // that is torn in two (`Engine::with_text_dir_gate`).
             Self::with_text_dir_gate(&shared, || {
                 crate::engine::state::seal_text_index_gated(&shared);
-                self.record_sealed_text_chunks(&qualified, &im.column);
                 self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
             });
+            // The record is written **separately** and with the compaction's
+            // ts: `record_sealed_text_chunks_of_at` takes an explicit value
+            // because `current_ts()` is still the previous commit while the
+            // compaction transaction is open (`AddChunkIndexID1` under
+            // `kStarted` stores what the commit resolves).
+            self.record_sealed_text_chunks_at(&qualified, &im.column, Some(compact_ts));
+            // `reindex_compacted_text` already sealed and recorded the merged
+            // chunk, under `current_ts()`; a record that exists keeps the ts it
+            // was written with, so the merged segment's id is restamped here.
+            let _ = self.stamp_chunk_ts_of(&qualified, &im.name, compact_ts, |segment, _, _| {
+                segment == merged_segment
+            });
         }
+        // The **other** kinds: `PopulateIndex(…, kCompact)` calls the same
+        // per-kind builders the import does, so the merged segment gets a chunk
+        // from HNSW, IVF, BMP and the multi-vector indexes too
+        // (`new_txn_data_impl.cpp:808`). Without them a query over the merged
+        // segment fell back to the exact scan for every kind but full-text and
+        // secondary - and the segment's directory had no chunk to publish.
+        self.populate_merged_segment_indexes(&qualified, merged_segment, &indexes, compact_ts);
+    }
+
+    /// `PopulateIndex` for the kinds that rebuild a whole segment from its
+    /// blocks: HNSW, IVF, BMP and the multi-vector family.
+    ///
+    /// `PopulateIndex(…, kCompact)` runs these inside the compaction
+    /// transaction (`new_txn_data_impl.cpp:808`), so the merged segment's chunk
+    /// carries the compaction's ts. The port's compaction renumbers every row,
+    /// so the memory forms of these indexes were dropped with the old layout
+    /// (`entry.hnsw_mem.clear()` and friends) - the merged chunk can only come
+    /// from a rebuild, which is what each builder does.
+    fn populate_merged_segment_indexes(
+        &self,
+        table: &str,
+        merged_segment: u32,
+        indexes: &[catalog::IndexMeta],
+        compact_ts: u64,
+    ) {
+        crate::engine::with_chunk_ts(compact_ts, || {
+            for im in indexes {
+                if crate::is_secondary_kind(&im.index_type)
+                    || im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                    || im.index_type.eq_ignore_ascii_case("SPANN")
+                {
+                    continue;
+                }
+                if im.index_type.eq_ignore_ascii_case("BMP") {
+                    // Rebuild the index over the merged rows and seal it: the
+                    // seal encodes the image the chunk has to be
+                    // (`BMPHandler::SaveToPtr`), and `publish_index_chunks`
+                    // writes exactly that.
+                    let width = self
+                        .table_schema(table)
+                        .ok()
+                        .and_then(|s| s.iter().position(|c| c == &im.column))
+                        .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                        .map(|ty| crate::sparse_idx_width(&ty));
+                    if let Some(width) = width {
+                        let _ = self.sparse_index_by_id(table, &im.column, im.id, width);
+                    }
+                    self.seal_sparse_index(table, im.id);
+                } else if im.index_type.eq_ignore_ascii_case("HNSW") {
+                    let _ = self.build_hnsw_index_of(table, &im.column, Some(im.id));
+                    let _ = self.dump_hnsw_index(table, &im.name);
+                    self.release_hnsw_memory(table, im.id);
+                } else if im.index_type.eq_ignore_ascii_case("IVF") {
+                    let _ = self.write_ivf_index(table, &im.name);
+                    let key = self.table_key(table);
+                    let mut tables = self.tables.lock().unwrap();
+                    if let Some(rows) = tables.get_mut(&key).and_then(|e| e.ivf_mem.get_mut(&im.id))
+                    {
+                        rows.clear();
+                    }
+                } else if im.index_type.eq_ignore_ascii_case("PLAID")
+                    || im.index_type.eq_ignore_ascii_case("SMVE")
+                    || im.index_type.eq_ignore_ascii_case("EMVB")
+                {
+                    self.seal_multivector_index(table, im.id);
+                    if im.index_type.eq_ignore_ascii_case("PLAID") {
+                        let _ = self.write_plaid_index(table, &im.name);
+                    }
+                }
+            }
+            // The catalog records: `AddChunkIndexID1` inside the compaction
+            // transaction. A BMP chunk is written by the mirror (its `.bmp`
+            // spill is merged into one `chunk_N.idx` per segment), so this is
+            // where its file and record appear together.
+            if let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(table) {
+                for im in indexes {
+                    if crate::is_secondary_kind(&im.index_type)
+                        || im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                        || im.index_type.eq_ignore_ascii_case("SPANN")
+                    {
+                        continue;
+                    }
+                    let _ = self.publish_index_chunks(
+                        table,
+                        meta.id,
+                        Some((im.name.as_str(), compact_ts)),
+                    );
+                }
+            }
+        });
+        let _ = merged_segment;
+        // The chunk files are new: reload the readers so the merged segment is
+        // served from them instead of the exact scan.
+        self.reload_vector_indexes();
     }
 
     /// Rebuilds the spann trees of the segments this compaction renumbered
@@ -515,6 +629,16 @@ impl Engine {
         // mirror with an empty block).
         let gate = self.batch_gate(table);
         let _batch = gate.lock().await;
+        // The table's **bottom** gate is taken here and held for the whole
+        // pass, not just across the commit. Two steps below read and write the
+        // segments this compaction is about to retire - the pre-write of the
+        // buffered rows (`write_blocks_bounded_locked`, which requires its caller
+        // to hold this gate) and the source-row read - and an append that
+        // published rows into a source segment between them would be retired
+        // without ever being copied. `EngineTxn` commits take this gate but not
+        // `batch_gate`, so the batch gate alone does not exclude them.
+        let compact_gate = self.bottom_gate(table);
+        let compact_turn = compact_gate.lock().await;
         self.invalidate_row_cache(table);
         // Compaction moves rows between segments without changing how many are
         // live, so the counter survives even though the mirror's row-id
@@ -524,6 +648,24 @@ impl Engine {
         let sources: std::collections::HashSet<u32> = sources.iter().copied().collect();
         let mut source_ids: Vec<u32> = sources.iter().copied().collect();
         source_ids.sort_unstable();
+        // This pass moves rows by reading the **block files**. A segment the
+        // append buffer still holds rows for has not got all of its rows there
+        // yet, so those rows are written first - the reference reads rows out of
+        // its blocks too, and it can always do so because `AppendInBlock` puts
+        // them there during the commit. Skipping such a segment instead would
+        // mean "a compaction right after an insert does nothing", which is what
+        // `compact_all_segments`'s callers rely on it not doing.
+        if source_ids.iter().any(|s| {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&self.table_key(table)).is_some_and(|e| {
+                (0..e.pending_rows.len()).any(|k| (e.pending_rows.row_id(k) >> 32) as u32 == *s)
+            })
+        }) {
+            // No bound: every buffered row of this table is already committed
+            // (a checkpoint's bound only decides which rows the *files* claim),
+            // so this writes them all.
+            let _ = self.write_blocks_bounded_locked(table, u64::MAX);
+        }
         // The layout the row ids were allocated in, before anything moves:
         // `next_seg` counts from every segment, and the append log is rebased
         // against it.
@@ -581,12 +723,11 @@ impl Engine {
         // gone.
         let turn = self.txn.reserve_commit_ts();
         let compact_ts = turn.ts();
-        // The table's bottom gate is taken **here**, before the commit, and
-        // held across it: the callback below is a synchronous `FnOnce`
-        // running on a runtime worker that already holds the commit turn
-        // and `commit_lock`, so it can neither `.await` nor take the gate.
-        let compact_gate = self.bottom_gate(table);
-        let compact_turn = compact_gate.lock().await;
+        // `compact_turn` (taken at the top of this pass) is still held, which is
+        // what makes the commit and the pre-write above one step with respect to
+        // every other writer of this table. The callback below is a synchronous
+        // `FnOnce` on a runtime worker that already holds the commit turn and
+        // `commit_lock`, so it can neither `.await` nor take the gate.
         self.txn
             .commit_at_deferred_with(t, compact_ts, |_txn| {
                 // Drop every source position that no compacted row reuses. The
@@ -816,7 +957,7 @@ impl Engine {
         // The port reloads only the chunks the catalog lists, so the merged
         // segment's rows would otherwise stay in a memory tail and the old
         // chunks (whose row ids the merge retired) would keep answering.
-        self.populate_compacted_indexes(table, next_seg, &source_ids);
+        self.populate_compacted_indexes(table, next_seg, &source_ids, compact_ts);
         // The trees of the merged segments were dropped with the commit (their
         // row ids are gone, §9.8). Rebuild them here instead of waiting for the
         // next checkpoint: the segment is fresh, so its chunk no longer matches
@@ -1104,7 +1245,11 @@ impl Engine {
         // the files. The frame's payload is what the store flush covers, which
         // is this same bound plus anything that committed while the mirror ran
         // (see the frame at the end of this function).
-        let checkpoint_ts = self.checkpoint_ts();
+        //
+        // Named `bound_ts` at the block writer: it is the **visibility bound**
+        // of the mirror, not this transaction's own ts (which a checkpoint does
+        // not have - it writes rows other transactions committed).
+        let bound_ts = self.checkpoint_ts();
         // The checkpoint **does not** dump the memory indexes: C++
         // `NewTxn::CheckpointTable` only flushes blocks, and a memory index
         // keeps its rows until a `DumpMemIndex` transaction seals them. The
@@ -1117,7 +1262,7 @@ impl Engine {
         // this function.
         // The C++ block mirror is the storage of record; a table it cannot
         // write (a column with no block layout) keeps its rows buffered only.
-        let mirror = self.flush_blocks(checkpoint_ts).await;
+        let mirror = self.flush_blocks(bound_ts).await;
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {
@@ -1130,7 +1275,7 @@ impl Engine {
         // blocks are final — is the natural place to refresh it. There is no
         // memory tail to seal, which is why it does not wait for a
         // `DumpMemIndex`.
-        self.publish_spann_chunks(checkpoint_ts);
+        self.publish_spann_chunks(bound_ts);
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Bound the page cache the way the reference's buffer manager does:

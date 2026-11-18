@@ -623,7 +623,7 @@ mod tests {
     /// cargo test --release -p index --lib position_lut_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn position_lut_throughput() {
         let (nbits, dim) = (4u32, 128u32);
         let mut q = PlaidQuantizer::new(nbits, dim).unwrap();

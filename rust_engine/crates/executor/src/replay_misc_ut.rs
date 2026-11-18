@@ -125,8 +125,8 @@ fn replay_append_with_index0() {
 /// C++ `src/unit_test/storage/new_catalog/replay_index_ut.cpp:87`
 /// (`TestTxnReplayIndex.DISABLED_SLOW_test_replay_append_with_index`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_replay_append_with_index"]
-fn disabled_slow_test_replay_append_with_index() {
+#[ignore = "slow: C++ TestTxnReplayIndex.DISABLED_SLOW_test_replay_append_with_index"]
+fn replay_append_with_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);
@@ -145,8 +145,8 @@ fn disabled_slow_test_replay_append_with_index() {
 /// C++ `src/unit_test/storage/new_catalog/replay_index_ut.cpp:466`
 /// (`TestTxnReplayIndex.DISABLED_SLOW_test_populate_index`).
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_populate_index"]
-fn disabled_slow_test_populate_index() {
+#[ignore = "slow: C++ TestTxnReplayIndex.DISABLED_SLOW_test_populate_index"]
+fn replay_populate_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     create_table(&e);

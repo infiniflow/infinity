@@ -64,6 +64,7 @@ pub(crate) mod text_index;
 pub(crate) mod text_query;
 pub(crate) mod types;
 
+pub(crate) use index_build::{chunk_commit_ts, with_chunk_ts, RecordedChunk};
 pub(crate) use maintain::{Pressure, SealCandidate, SealScheduler, Watermarks, SEAL_STARVE_TICKS};
 pub(crate) use recall::RecallMonitor;
 

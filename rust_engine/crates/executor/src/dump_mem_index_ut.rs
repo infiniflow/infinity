@@ -348,7 +348,7 @@ fn dump_and_delete() {
 /// Repeated dump/append rounds: each dump seals the tail and the next append
 /// starts at the following row id.
 #[test]
-#[ignore = "SLOW: the reference repeats the dump/append round many times"]
+#[ignore = "slow: the reference repeats the dump/append round many times"]
 fn dump_and_dump() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
@@ -679,7 +679,7 @@ fn dump_and_import() {
 /// C++: `dump_mem_index_ut.cpp:6260`
 /// (`DISABLED_SLOW_test_dump_index_and_optimize_index`).
 #[test]
-#[ignore = "SLOW: reference is DISABLED_SLOW_"]
+#[ignore = "slow: C++ TestTxnDumpMemIndex.DISABLED_SLOW_dump_and_dump"]
 fn dump_index_and_optimize_index() {
     fn prepare(e: &Engine) {
         e.execute_blocking("CREATE DATABASE db1;").unwrap();

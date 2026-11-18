@@ -1476,6 +1476,107 @@ pub fn column_timeline(
     Ok(out)
 }
 
+/// One table's columns as of a timestamp: the schema a transaction whose
+/// `begin_ts` is `ts` would read.
+///
+/// `ids` alone is not enough to write a block: the writer needs the column's
+/// declared type, its layout and its default, and a `DROP COLUMN` retires the
+/// `tbl|col|` record from the *live* set without deleting it. Rebuilding the
+/// `TableMeta` from the record that was live at `ts` is what
+/// [`table_meta_of`] already does for "now" - this pins the same reconstruction
+/// to a timestamp.
+///
+/// The window rules are `column_timeline`'s (this is that function with the
+/// `ColumnDefValue` kept instead of only the id):
+///
+/// - a record lives from its create ts (the key carries it);
+/// - its `drop|tbl_col|…` marker - whose *value* is the DROP's commit ts -
+///   ends it at that ts, **inclusive**: a transaction whose `begin_ts` equals
+///   the drop ts already sees the column as gone (`begin_ts = current_ts + 1`
+///   and `current_ts` only advances past a finished commit), which is the same
+///   `<=` the `AppendView` predicate uses;
+/// - a name created again later is a new record with a new id; only the newest
+///   incarnation at or before `ts` is live.
+///
+/// A ts that predates every record yields an empty schema, not "the current
+/// one": an empty answer means "this table did not exist yet".
+pub fn schema_at(
+    store: &dyn MetaStore,
+    db_id: u64,
+    table_id: u64,
+    ts: u64,
+) -> Result<Vec<ColumnDefValue>> {
+    let db = db_id.to_string();
+    let table = table_id.to_string();
+    let prefix = key::table_column_prefix(&db, &table);
+    // `(record value, create ts)` per incarnation.
+    let mut records: Vec<(ColumnDefValue, u64)> = Vec::new();
+    for (k, v) in store.scan_prefix(prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let create_ts = key
+            .rsplit('|')
+            .next()
+            .and_then(|t| t.parse::<u64>().ok())
+            .unwrap_or(0);
+        if create_ts > ts {
+            continue;
+        }
+        let Some(col) = value_format::column_def_from_bytes(&v) else {
+            continue;
+        };
+        records.push((col, create_ts));
+    }
+    let drop_prefix = format!("drop|tbl_col|{db}/{table}/");
+    // `(name, create ts) -> drop ts`, only for the wins that ended a record.
+    let mut drops: Vec<(String, u64, u64)> = Vec::new();
+    for (k, v) in store.scan_prefix(drop_prefix.as_bytes())? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        let Some(tail) = key.strip_prefix(&drop_prefix) else {
+            continue;
+        };
+        let Some((name, create)) = tail.rsplit_once('/') else {
+            continue;
+        };
+        let (Ok(create_ts), Ok(drop_ts)) = (
+            create.parse::<u64>(),
+            String::from_utf8_lossy(&v).parse::<u64>(),
+        ) else {
+            continue;
+        };
+        if drop_ts == crate::DDL_TS_SENTINEL {
+            continue;
+        }
+        drops.push((name.to_string(), create_ts, drop_ts));
+    }
+    // The newest incarnation of each name wins; the others are superseded.
+    let newest: std::collections::HashMap<String, u64> = records
+        .iter()
+        .map(|(col, create_ts)| (col.column_name.clone(), *create_ts))
+        .fold(std::collections::HashMap::new(), |mut acc, (name, ts)| {
+            acc.entry(name)
+                .and_modify(|seen| *seen = (*seen).max(ts))
+                .or_insert(ts);
+            acc
+        });
+    let mut live: Vec<ColumnDefValue> = Vec::new();
+    for (col, create_ts) in records {
+        let name = col.column_name.clone();
+        if newest.get(&name).is_some_and(|seen| *seen > create_ts) {
+            continue;
+        }
+        // Dropped at or before `ts`: not live any more.
+        if drops
+            .iter()
+            .any(|(other, c, d)| *other == name && *c == create_ts && *d <= ts)
+        {
+            continue;
+        }
+        live.push(col);
+    }
+    live.sort_by_key(|c| c.column_id);
+    Ok(live)
+}
+
 /// One table, resolved **by name**: its newest `catalog|tbl|` record and that
 /// record's columns.
 ///

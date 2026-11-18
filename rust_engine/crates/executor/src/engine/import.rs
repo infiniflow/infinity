@@ -167,6 +167,31 @@ impl Drop for StagedRows {
 }
 
 impl Engine {
+    /// Marks `table` as having an `IMPORT` in flight until the guard drops.
+    ///
+    /// The reference's `NewTxn::Import` builds every index's chunk **once**, at
+    /// the end of the transaction (`PopulateIndex`), so nothing in the staging
+    /// loop may dump. The port feeds the same per-batch index hooks an `INSERT`
+    /// does, and those hooks carry the append path's triggers (the row capacity
+    /// and the memory quota's waterlines); this flag turns them off for the
+    /// table being imported into.
+    fn stage_import(&self, table: &str) -> ImportStaging<'_> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key.clone())
+            .or_default()
+            .importing += 1;
+        ImportStaging {
+            engine: self,
+            key,
+            table: self.qualified_table(table),
+            staged: Vec::new(),
+            committed: false,
+        }
+    }
+
     /// Loads a CSV file into `table` (`COPY t FROM …`). The path may be absolute
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
@@ -302,6 +327,12 @@ impl Engine {
         let mut pending_header = opts
             .iter()
             .any(|(k, v)| k == "HEADER" && v.eq_ignore_ascii_case("true"));
+        // `NewTxn::Import`: the reference stages the whole statement into one
+        // transaction and only populates the indexes at its end, so nothing
+        // dumps from the staging loop. Marking the table for the duration keeps
+        // the append path's capacity/quota triggers off - see
+        // `TableEntry::importing`.
+        let mut staging = self.stage_import(table);
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -435,6 +466,7 @@ impl Engine {
                     };
                     let needs_texts = self.has_text_or_vector_indexes(table);
                     let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(take);
+                    staging.note((0..take).map(|k| base + k));
                     for (k, row) in batch[start..start + take].iter().enumerate() {
                         self.insert_secondary_keys(&secondary_targets, base + k, row)?;
                         if needs_texts {
@@ -481,6 +513,7 @@ impl Engine {
             // of the time), which made a stale vector cache look fresh and let
             // an index that covers part of the table pass the coverage gate.
             self.note_live_rows(table, staged as isize);
+            staging.committed();
         } else {
             drop(t);
         }
@@ -621,6 +654,9 @@ impl Engine {
         self.note_import_ts(table, (base >> 32) as u32, _ts);
         self.publish_rows(table, base, &rows)?;
         let schema = self.table_schema(table).unwrap_or_default();
+        // `NewTxn::Import`: the indexes are populated once, at the end of the
+        // transaction, not by the append path's triggers (see `stage_import`).
+        let _staging = self.stage_import(table);
         let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(rows.len());
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row, &schema)?;
@@ -635,8 +671,11 @@ impl Engine {
         for (seq, texts) in &texts_by_row {
             self.update_vector_caches(table, *seq, texts);
         }
-        self.dump_hnsw_over_capacity(table);
-        self.dump_secondary_over_capacity(table).await;
+        let segment = (base >> 32) as u32;
+        drop(_staging);
+        crate::engine::state::with_read_ts_override(u64::MAX, || {
+            self.populate_import_indexes(table, &[segment], _ts);
+        });
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -699,6 +738,13 @@ impl Engine {
         if self.has_block_layout(table) {
             self.write_blocks_commit(table, ts)?;
         }
+        // `PopulateIndex(…, kImport)`: the chunks are written inside the import
+        // transaction, with its ts, before the rows are visible. The read is
+        // unbounded so the builders see the rows this commit just wrote
+        // (`with_read_ts_override`).
+        crate::engine::state::with_read_ts_override(u64::MAX, || {
+            self.populate_import_indexes(table, &[segment], ts);
+        });
         drop(_held);
         drop(_turn);
         drop(_visible);
@@ -1136,4 +1182,47 @@ fn sparse_value_type(type_text: &str) -> &str {
         .and_then(|rest| rest.split(',').next())
         .unwrap_or("")
         .trim()
+}
+
+/// [`Engine::stage_import`]'s guard: clears the table's import marker on drop,
+/// including an early return from the staging loop.
+///
+/// It also **undoes the index hooks** of a statement that failed: the staging
+/// loop feeds every index batch by batch while it reads the file and only
+/// commits at the end (`NewTxn::Import` is one transaction), so a cell that
+/// turns invalid past the first batch would otherwise leave postings for rows
+/// no block holds - and the next dump would write them into a chunk. The rows
+/// are recorded as they are staged ([`ImportStaging::note`]) and removed here
+/// unless the statement committed.
+struct ImportStaging<'a> {
+    engine: &'a Engine,
+    key: String,
+    table: String,
+    /// Rows the staging loop handed to the index hooks.
+    staged: Vec<usize>,
+    /// Set once the import has committed: its rows are real then.
+    committed: bool,
+}
+
+impl ImportStaging<'_> {
+    /// Records rows this staging loop has just indexed.
+    fn note(&mut self, seqs: impl IntoIterator<Item = usize>) {
+        self.staged.extend(seqs);
+    }
+
+    /// The statement committed; its index entries must stay.
+    fn committed(&mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for ImportStaging<'_> {
+    fn drop(&mut self) {
+        if !self.committed && !self.staged.is_empty() {
+            self.engine.rollback_index_rows(&self.table, &self.staged);
+        }
+        if let Some(entry) = self.engine.tables.lock().unwrap().get_mut(&self.key) {
+            entry.importing = entry.importing.saturating_sub(1);
+        }
+    }
 }

@@ -593,7 +593,7 @@ mod tests {
     /// errors are unreachable (as in the reference, where `enable_{}` is
     /// false).
     #[test]
-    fn disabled_profiler_ignores_phase_transitions() {
+    fn default_profiler_ignores_phase_transitions() {
         let mut profiler = QueryProfiler::new();
         assert!(profiler.stop_phase(QueryPhase::Parser).is_ok());
         assert!(profiler.start_phase(QueryPhase::Parser).is_ok());

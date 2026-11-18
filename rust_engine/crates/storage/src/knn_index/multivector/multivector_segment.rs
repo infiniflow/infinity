@@ -193,7 +193,7 @@ mod tests {
     /// cargo test --release -p storage --lib maxsim_throughput -- --ignored --nocapture
     /// ```
     #[test]
-    #[ignore = "timing"]
+    #[ignore = "bench: timing"]
     fn maxsim_throughput() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("seg_bench.mvec");

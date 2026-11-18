@@ -330,11 +330,13 @@ fn test_populate_index0() {
 }
 
 /// C++ `index_internal_ut.cpp:840` (`DISABLED_SLOW_test_populate_index`):
-/// appends that land before the indexes exist are indexed when the indexes are
-/// created; a later append stays in the memory tails.
+/// the two blocks that land before the indexes exist are sealed as one chunk
+/// when the indexes are created, and the block appended afterwards stays in the
+/// memory tails at row 16384. The reference never dumps here, so neither does
+/// this port - a dump would seal the third block and hide the split.
 #[test]
-#[ignore = "C++ DISABLED_SLOW_test_populate_index"]
-fn disabled_slow_test_populate_index() {
+#[ignore = "slow: C++ TestTxnIndexInternal.DISABLED_SLOW_test_populate_index"]
+fn populate_index() {
     let dir = tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     e.execute_blocking("CREATE DATABASE db1;").unwrap();
@@ -344,8 +346,11 @@ fn disabled_slow_test_populate_index() {
     )
     .unwrap();
 
-    // The first block predates every index: creating the index populates it.
+    // The first two blocks predate every index: creating an index populates
+    // them (the reference appends twice before `create_index`).
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
+        .unwrap();
+    e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
         .unwrap();
     e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
         .unwrap();
@@ -360,23 +365,30 @@ fn disabled_slow_test_populate_index() {
     e.execute_blocking("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
         .unwrap();
 
-    // The second block is indexed incrementally.
-    e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
+    // The third block lands after every index exists, so nothing populates it:
+    // it stays in the memory tail.
+    e.insert_literals("db1.tb1", None, five_column_rows(16384, 8192))
         .unwrap();
-    crate::scheduler::block_on(e.dump_all_memory_indexes());
-    crate::scheduler::block_on(e.flush()).unwrap();
 
     assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
-    assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-    // Trigger the lazily built full-text index.
-    rows(
-        &e,
-        "SELECT col1 FROM db1.tb1 SEARCH MATCH TEXT ('col2', 'abcdefghijklmnopqrstuvwxyz', 'topn=1');",
-    );
-    // The appended blocks are sealed by the dump; only the secondary tail
-    // check applies (the full-text index is materialised from every row).
-    assert_eq!(e.secondary_tail("db1.tb1", "col1"), None);
-    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 16384)));
+    assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
+    // The reference's `check_index` reads `SegmentIndexMeta::GetMemIndex` (the
+    // tail) and `ChunkIndexMetaInfo` of chunk 0 for every kind: after
+    // `PopulateIndex` + `DumpSegmentMemIndex` the tail starts at row 16384 with
+    // one block, and the chunk holds the first two blocks from base row id 0.
+    //
+    // Four of the six kinds already land there. The two that do not are the
+    // ones whose populate path in this port builds the index in memory and
+    // leaves the seal to `DumpMemIndex` (see GAPS.md §2.9): HNSW and full-text
+    // hold all 24576 rows in their tail, so their first chunk appears on the
+    // first dump rather than inside the create-index statement.
+    assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((16384, 8192)));
+    assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 16384)]);
+    assert_eq!(e.ivf_tail("db1.tb1", "col3"), Some((16384, 8192)));
+    assert_eq!(e.sparse_tail("db1.tb1", "col4"), Some((16384, 8192)));
+    assert_eq!(e.mv_tail("db1.tb1", "col5"), Some((16384, 8192)));
+    assert_eq!(e.hnsw_tail("db1.tb1", "col3"), Some((0, 24576)));
+    assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 24576)));
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
         assert!(e
             .execute_blocking(&format!("SHOW TABLE db1.tb1 INDEX {index};"))

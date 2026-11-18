@@ -119,7 +119,7 @@ fn golden_dir() -> String {
 }
 
 #[test]
-#[ignore = "needs the reference's bytes: ./build/src/test_main --gtest_filter='*FulltextBigGolden*'"]
+#[ignore = "golden: needs the reference's bytes, ./build/src/test_main --gtest_filter='*FulltextBigGolden*'"]
 fn a_large_corpus_is_byte_identical_to_the_reference() {
     let doc_count = env_u32("FT_BIG_DOCS", 20_000);
     let chunk_docs = env_u32("FT_BIG_CHUNK_DOCS", 10000);

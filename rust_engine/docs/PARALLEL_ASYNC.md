@@ -319,19 +319,19 @@ P3/P4 的并行单位是**表**（checkpoint 扫表、启动重建索引、批�
 | posting 编码 | 纯内存编码，产出 `Vec<u8>` | **纯 CPU** |
 | HNSW `build_range` | 纯图构建 | **纯 CPU** |
 
-**原语**（`index/src/parallel.rs`）：每个项一个 **tokio task**，并发上限是 `tokio::sync::Semaphore` 的许可数（= 调用方给的 `workers`），项体本身用 `tokio::task::spawn_blocking` 执行。没有自建线程池、没有 work-stealing 运行时、没有第二个调度器与请求 runtime 抢核；一次扇出嵌进另一次扇出只是各取各的许可，不会互相饿死。
+**原语**（`index/src/parallel.rs`）：每个项一个 **tokio task**，并发上限是 `tokio::sync::Semaphore` 的许可数（= 调用方给的 `workers`），项体本身用 `tokio::task::spawn_blocking` 执行。没有自建线程池、没有 work-stealing 运行时、没有第二个调度器与请求 runtime 抢核，crate 自己也不建 runtime；一次扇出嵌进另一次扇出只是各取各的许可，不会互相饿死。
 
 - `for_each_blocking(items, workers, f)` / `map_blocking(items, workers, f)`：`f` 是**一个阻塞单元**——要么纯 CPU 叶子（块解码、posting 编码、一个 bucket 的建图），要么一次阻塞调用（一张表的 checkpoint）。它跑在 blocking 池上，**只有它**跑在 blocking 池上。
 - 任务在提交顺序上 join，所以结果**按输入顺序**收回，与哪个项先完成无关。
 - 首个错误记为最终返回值，但**每个项都会跑完**：一次失败的 checkpoint 不能让后面的表没有镜像（否则它留下的半成品文件会被下一次 flush 当作完整镜像）。
-- 没有可用 runtime 时（独立单测、example）串行执行，语义相同（每项都跑、首个错误返回）。
-- 线程上没有已进入的 runtime 时（checkpoint 触发线程、同步 `Engine::execute_blocking`、CLI），使用 `scheduler()` 安装的 runtime 句柄；`current_thread` runtime 上不并发（单线程就是等待线程，spawn 会死锁），直接串行。
+- 线程上没有已进入的 runtime 时（checkpoint 触发线程、同步 `Engine::execute_blocking`、blocking 池里的 body），用 `Engine::open` 时安装的 `scheduler()` 句柄；`current_thread` runtime 上不并发（单线程就是等待线程，spawn 会死锁），直接串行。
+- 这两个来源都没有时（crate 的单测、引擎之外没有自备 runtime 的调用方）在调用线程上串行执行，语义相同（每项都跑、首个错误返回）。**crate 自己不建 runtime**：引擎之外要并行，调用方自带一个并在其中调用（`examples/hnsw_*_bench.rs` 就是这么做的）。
 
 **为什么不用共享 work-stealing 池**：一个在 `fsync` 里阻塞的 worker 会被池当成“正在干活”的线程，而另一个纯解码的项却在等空闲 worker，两边都慢；把一个混合工作体整体丢进池里，等于把“等待”和“计算”混在同一个并发额度里。现在的形状是调用方先把工作**拆到一个阻塞单元**，再交给扇出——混合负载不会被整体搬到别的线程。
 
 **边界**：`spawn_blocking` 只包细粒度纯 CPU 热点函数或单次阻塞调用，不包混合负载；并行本身一律用 tokio task + Semaphore。`workers == 1` 时串行，不做任何派发。
 
-**错误传播**：单测 `a_failure_is_reported_after_every_item_ran` / `map_keeps_input_order` / `the_bound_is_the_callers` / `a_runtime_runs_the_items_on_tasks`（`index/src/parallel.rs`）与 `parallel_block_decode_matches_the_serial_scan`、`a_checkpoint_uses_the_worker_count_it_was_given`（executor）固定这些语义。
+**错误传播**：单测 `a_failure_is_reported_after_every_item_ran` / `map_keeps_input_order` / `the_bound_is_the_callers` / `a_runtime_runs_the_items_on_tasks` / `without_a_runtime_the_items_run_on_the_calling_thread`（`index/src/parallel.rs`）、`a_fan_out_with_no_caller_runtime_uses_the_engines_workers`（`executor/src/fanout.rs`）与 `parallel_block_decode_matches_the_serial_scan`、`a_checkpoint_uses_the_worker_count_it_was_given`（executor）固定这些语义。
 
 ### 6.7 全局分配器：一处声明，全仓生效
 
