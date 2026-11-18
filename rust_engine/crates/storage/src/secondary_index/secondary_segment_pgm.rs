@@ -2095,6 +2095,22 @@ impl SecondarySegmentReader {
         u32::from_le_bytes(self.map[at..at + 4].try_into().unwrap())
     }
 
+    /// Every segment offset the chunk holds, ascending and de-duplicated.
+    ///
+    /// Coverage has to be judged on these, not on `[base, base + row_count)`:
+    /// `row_count` is the number of distinct offsets, so a segment whose
+    /// offsets have holes (a delete or an `UPDATE` leaves one, and `IMPORT`
+    /// plus `INSERT` into one segment leaves many) puts rows outside that span
+    /// even though they are in the chunk. Treating the span as the coverage
+    /// re-indexed those rows, and the next dump wrote the duplicate into a
+    /// chunk.
+    pub fn offsets(&self) -> Vec<u32> {
+        let mut out: Vec<u32> = (0..self.row_count).map(|i| self.offset(i)).collect();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     /// Every `(key, offsets)` pair the chunk holds, in key order.
     ///
     /// A dump that merges a segment's chunks needs the whole content, not one

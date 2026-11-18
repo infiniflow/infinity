@@ -9887,6 +9887,44 @@ mod tests {
         assert_eq!(rows(&e, q), vec![vec!["5".to_string()]]);
     }
 
+    /// A secondary chunk covers the offsets it **holds**, not
+    /// `[base_row_id, base_row_id + row_count)`: deleting rows leaves holes in a
+    /// segment, and a row past the first hole is still in the chunk. Judging
+    /// coverage by the span re-indexed those rows, so a reopen answered a row
+    /// twice and the next dump persisted the duplicate.
+    #[test]
+    fn a_reopened_secondary_index_does_not_reindex_the_rows_it_already_holds() {
+        let dir = tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute_blocking("CREATE TABLE sc (id INT, v INT);")
+                .unwrap();
+            e.execute_blocking("CREATE INDEX sc_v ON sc (v) USING SECONDARY;")
+                .unwrap();
+            let rows: Vec<String> = (0..40).map(|i| format!("({i}, {})", i * 10)).collect();
+            e.execute_blocking(&format!("INSERT INTO sc VALUES {};", rows.join(",")))
+                .unwrap();
+            // Holes inside the segment: every other row of the first half goes.
+            e.execute_blocking("DELETE FROM sc WHERE id % 2 = 0 AND id < 20;")
+                .unwrap();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            crate::scheduler::block_on(e.dump_all_memory_indexes());
+        }
+        let e = Engine::open(dir.path()).unwrap();
+        // Every surviving row is found exactly once.
+        for i in (1..20).step_by(2) {
+            let query = format!("SELECT id FROM sc WHERE v = {};", i * 10);
+            let found = rows(&e, &query);
+            assert_eq!(
+                found,
+                vec![vec![i.to_string()]],
+                "value {} answered {found:?}",
+                i * 10
+            );
+        }
+        assert_eq!(e.row_count("sc").unwrap(), 30);
+    }
+
     /// `storage_type = scalar_quantization` writes the C++ SQ chunk layout and
     /// searches it (residual codes + `dot_v_e`), instead of silently mirroring
     /// the index as plain storage.

@@ -404,6 +404,20 @@ impl LowCardReader {
         out
     }
 
+    /// Every segment offset the chunk holds, ascending and de-duplicated.
+    ///
+    /// Same contract as the high-cardinality reader's: coverage is the ids a
+    /// chunk actually holds, not `[base, base + row_count)`.
+    pub fn offsets(&self) -> Vec<u32> {
+        let mut out: Vec<u32> = Vec::new();
+        for i in 0..self.count {
+            out.extend(self.bitmap_at(i));
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     /// Decodes the posting list of key `i`.
     ///
     /// Walk to it: every earlier entry carries an `i32` size prefix.

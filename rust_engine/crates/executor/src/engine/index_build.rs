@@ -144,7 +144,14 @@ impl Engine {
         let mut disk = Vec::new();
         let mut low = Vec::new();
         let mut chunk_meta = Vec::new();
-        let mut covered: std::collections::BTreeMap<u32, Vec<(u64, u64)>> = Default::default();
+        // Coverage is the **offsets a chunk holds**, not the span
+        // `[base_row_id, base_row_id + row_count)`. `row_count` counts distinct
+        // offsets, so a segment whose offsets have holes (a delete, an `UPDATE`,
+        // or `IMPORT` plus `INSERT` into one segment) puts rows outside that
+        // span even though the chunk holds them; treating the span as coverage
+        // re-indexed those rows and the next dump persisted the duplicate.
+        let mut covered: std::collections::BTreeMap<u32, std::collections::BTreeSet<u32>> =
+            Default::default();
         for (segment, entries) in chunks {
             for (chunk_id, info) in entries {
                 let path = dir.join(format!("seg_{segment}/chunk_{chunk_id}.idx"));
@@ -152,6 +159,7 @@ impl Engine {
                     let Ok(reader) = storage::secondary_lowcard::LowCardReader::open(&path) else {
                         continue;
                     };
+                    covered.entry(segment).or_default().extend(reader.offsets());
                     low.push((u64::from(segment) << 32, Arc::new(reader)));
                 } else {
                     let Ok(reader) =
@@ -161,13 +169,9 @@ impl Engine {
                     else {
                         continue;
                     };
+                    covered.entry(segment).or_default().extend(reader.offsets());
                     disk.push((u64::from(segment) << 32, Arc::new(reader)));
                 }
-                let base = info.base_row_id & 0xffff_ffff;
-                covered
-                    .entry(segment)
-                    .or_default()
-                    .push((base, base + info.row_count));
                 chunk_meta.push((info.base_row_id, info.row_count as usize));
             }
         }
@@ -209,16 +213,17 @@ impl Engine {
     /// Feeds the rows **no chunk covers** into one secondary index's memory
     /// tail, in the same key form the per-row insert hook uses.
     ///
-    /// Membership is judged per row: a row is a gap when its `(segment,
-    /// offset)` falls in no span `covered` lists. That is stricter (and more
-    /// correct) than intersecting with a row count, which would miss a row that
-    /// exists only in the append buffer.
+    /// Membership is judged per row: a row is a gap when the chunks of its
+    /// segment do not hold its offset. That is exact where a span is not - a
+    /// segment's offsets can have holes inside `[base, base + row_count)` - and
+    /// it still keeps a row that exists only in the append buffer, which a row
+    /// count would miss.
     fn index_secondary_gap(
         &self,
         table: &str,
         index_id: u64,
         ci: usize,
-        covered: &std::collections::BTreeMap<u32, Vec<(u64, u64)>>,
+        covered: &std::collections::BTreeMap<u32, std::collections::BTreeSet<u32>>,
     ) {
         let tkey = self.table_key(table);
         let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
@@ -229,7 +234,7 @@ impl Engine {
             let offset = seq as u64 & 0xffff_ffff;
             let in_chunk = covered
                 .get(&segment)
-                .is_some_and(|spans| spans.iter().any(|(a, b)| offset >= *a && offset < *b));
+                .is_some_and(|offsets| offsets.contains(&(offset as u32)));
             if in_chunk {
                 continue;
             }
