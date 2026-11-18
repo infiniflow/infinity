@@ -304,6 +304,24 @@ impl Engine {
             let Some(ci) = schema.iter().position(|c| c == &meta.column) else {
                 continue;
             };
+            // A full-text index is built here **whether or not** its chunks
+            // already cover every row. `NewTxn::RecoverMemIndex` creates the
+            // segment's memory index at startup for every index it walks, and
+            // that object is what a later `AppendIndex` appends to: without it
+            // the write path finds no cached index, `update_text_indexes_batch`
+            // silently indexes nothing, and the next `DumpIndex` sees an empty
+            // tail and writes no chunk - so the rows written after the restart
+            // never reach a chunk (measured: 210 rows in the table, the only
+            // chunk still the 100 rows the first process dumped).
+            //
+            // `text_index_for` maps the sealed chunks and re-indexes only from
+            // the first row they do not cover, so this costs the gap and not
+            // the table.
+            if kind.eq_ignore_ascii_case("FULLTEXT") {
+                let tokenizer = self.index_tokenizer(&table, &meta.column);
+                let _ = self.text_index_for(&table, &meta.column, tokenizer);
+                continue;
+            }
             let chunks = catalog::layout::read_index_chunks(
                 self.storage.catalog.store().as_ref(),
                 &self.database_id_of(&table).to_string(),
@@ -378,11 +396,6 @@ impl Engine {
                         .or_default()
                         .extend(recovered);
                 }
-            } else if kind.eq_ignore_ascii_case("FULLTEXT") {
-                // Maps the chunks already on disk and indexes from the first row
-                // they do not cover (TextIndex::load_sealed).
-                let tokenizer = self.index_tokenizer(&table, &meta.column);
-                let _ = self.text_index_for(&table, &meta.column, tokenizer);
             }
         }
         Ok(())
@@ -1431,7 +1444,9 @@ impl Engine {
                 self.release_hnsw_memory(&table, meta.id);
             }
         } else if meta.index_type.eq_ignore_ascii_case("IVF") {
-            let _ = self.write_ivf_index(&table, &meta.name);
+            // A `DumpIndex` seals the segment's memory tail, not a fresh
+            // whole-segment snapshot (`DumpMemIndex` -> `DumpSegmentMemIndex`).
+            let _ = self.write_ivf_tail(&table, &meta.name);
             let key = self.table_key(&table);
             let mut tables = self.tables.lock().unwrap();
             if let Some(rows) = tables

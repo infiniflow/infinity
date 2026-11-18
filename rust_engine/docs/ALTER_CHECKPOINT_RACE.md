@@ -759,9 +759,9 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 | `bytes_30_segments` | **8/8 通过** |
 | `bytes_40_wal` | 通过 |
 | `bytes_45_ddl` | 通过 |
-| `bytes_50_mutations` | 4/8（与改动前的基线**同一组**失败） |
+| `bytes_50_mutations` | **8/8 通过**（§6.7 的三处修复） |
 
-合计 34 passed / 4 failed / 1 skipped。
+合计 38 passed / 1 skipped（`bytes_60`/`70` 需要 MinIO 与 multivector 夹具，不在这一轮）。
 
 计划书关注的两处都核对过：
 
@@ -770,21 +770,26 @@ append 的 bottom 也要拿同一把 gate（`dml.rs:801` 的 `gate.lock()`，那
 - 跨段切分让 `row_ranges` 有两项；单段内的多块 UPDATE 仍是**每块一个** `WalCmdAppendV2`
   （`append_command` 按 range 发出），`bytes_40_wal` 逐帧一致。
 
-### 6.7 仍然失败的一处：重启后的 create ts
+### 6.7 `bytes_50_mutations`：三处口径差异
 
-`bytes_50_mutations` 的 4 个用例（`test_the_bytes_after_deletes_updates_and_a_restart` 等）
-在两个引擎的目录上逐字节比对 `seg_0/blk_0/version` 时不一致：参考的首个 `create` 是 18
-（第一次 INSERT 的提交 ts），端口是 34/36（第二个进程的提交 ts）。这与本计划书的改动无关
-——把工作区回退到改动前的提交，同一组用例同样失败。
+这一组最初 4/8 通过，四个用例各自暴露一条与 checkpoint 无关、但同样破坏字节一致性的口径：
 
-链路已经定位到两处：
+| 现象 | 根因 | 修法 |
+|---|---|---|
+| `seg_0/blk_0/version` 的每个 `create` 都是最新 ts（`[(30,100),(30,200),(30,210)]`，参考是 `[(14,100),(26,200),(30,210)]`） | `settle_append_ts(&table, count, ts)` 从**末尾数 count 条记录**，而 `delete_bottom` / `commit_with_deletes` 传的是**行数**。一次 `UPDATE` 只有一条 append 记录，传 10 行让 `log.resize(n-10, 0)` 把该记录之前的全部清零，上一进程写的 create ts 全丢 | 删掉这个函数。`note_append` 返回记录下标，`reserve_rows_at` 已经把它交回给调用方，所以一律用 `settle_append_at(index, ts)`。`commit_with_deletes` 的 `appended` 参数恒为 0（纯 `DELETE` 不追加），一并删除 |
+| 重启后第二次 `DumpIndex` 写不出全文本 chunk（参考 6 个文件，端口 3 个） | `recover_mem_index` 只在该索引**存在行缺口**时构建全文本缓存。chunk 已覆盖全部行时缓存根本不存在，`update_text_indexes_batch` 找不到索引就静默不索引，dump 于是看到空尾巴 | 把 FULLTEXT 分支提到 `gap.is_empty()` 之前：`NewTxn::RecoverMemIndex` 对每个走到的索引都建内存索引，与缺口无关。`text_index_for` 自己会从 chunk 的覆盖末尾续建，所以没有缺口时它只花常数代价 |
+| IVF chunk 不铺满 segment：`[(0,200),(0,260)]`（参考 `[(0,200),(200,60)]`） | `write_ivf_index` 每次重写**整个 segment** 的向量快照。参考有两种形态：`PopulateIvfIndexInner`（compaction/import，整段）与 `DumpSegmentMemIndex`（`DumpIndex`，只有上次 dump 之后写入的行）。端口只实现了前者 | 拆成 `write_ivf_index`（整段，`base_row_id = RowID(segment, 0)`，仍然 replace 记录）与 `write_ivf_tail`（读 `ivf_mem` 得到 `(首行段内偏移, 行数)`，从该偏移构建并 append 记录；无缓冲行则不 dump，对应 `EmptyMemIndex`）。段上还没有任何 chunk 时 tail 仍按整段处理：参考的 `CREATE INDEX` 自己跑 `PopulateIndex`，端口把这一步推迟到首次 dump，而 `bytes_30_segments` 的 compaction 用例正是靠它先有 chunk。`publish_chunk_files` 的 IVF 回退也从"只取最新一个快照"改为按 `chunk_N.idx` 头部 `row_count` 逐块累加，并据此推出 `base_row_id` |
 
-1. `settle_append_ts(&table, count, ts)` 的参数是**记录数**，而 `delete_bottom` 收到的是
-   `AppendRecords`（行数）。一次 `UPDATE` 只产生一条 append 记录，传 10 行使
-   `log.resize(n - 10, 0)` 把本次之前的记录一并清零，上一进程的 create ts 就丢了。
-2. 只把调用点改成 `1` 还不够：`catalog|blk` / `catalog|seg` 的 ts 由 `version` 的首个
-   `create` 反推（`block_ts = batches.first()`），改完之后 `bytes_10_encoding` 出现
-   `3130 vs 3132`。两者必须一起改——`version` 保留每个 append 的真实 ts，而
-   `catalog|blk|` 沿用块创建时的值。
+三处修完 `bytes_50_mutations` 8/8 通过，全部门禁 38 passed。
 
-这条链牵动 `apply_replayed_rows`、`journals_from_blocks` 与 checkpoint 的块重写，尚未收敛。
+单测侧也修了同一处口径：`sparse_index_is_built_at_write_time` 原先断言"第二次 dump 只把
+行数长在同一个 chunk 里"，但参考的 `BMPIndexInMem::GetChunkIndexMetaInfo` 报的是该内存索引
+自己的 `begin_row_id_` 与行数，所以每次 dump 各写一个 chunk（实测参考目录里就是这个脚本
+产生 `chunk_0.idx` + `chunk_1.idx`）。断言改为 2。
+
+### 6.8 已收敛的一处
+
+`settle_append_ts` 的"末尾 count 条"语义是这组缺陷的公共根：它把**行数**当**记录数**，
+而两者只在"一条记录一行"时相等。删掉它之后 append ts 只有一个写入点
+（`settle_append_at` + `note_append` 返回的下标），`catalog|blk|` 的 ts 由 `version` 首个
+`create` 反推这条链也不再需要区别对待。

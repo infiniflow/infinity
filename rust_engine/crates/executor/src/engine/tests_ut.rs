@@ -7116,12 +7116,14 @@ mod tests {
             ]
         );
 
-        // A dump transaction seals the tail again and the ranking holds. The
-        // chunk is the segment's (`DumpMemIndex` takes one chunk id per
-        // segment), so the row count grows inside it rather than adding a
-        // second file.
+        // A dump transaction seals the tail and the ranking holds. Each dump
+        // appends **its own** chunk: `BMPIndexInMem::GetChunkIndexMetaInfo`
+        // reports the memory index's `begin_row_id_` and its own row count, so
+        // the first dump's chunk keeps the two rows it sealed and the second
+        // holds the row added afterwards (measured on the reference: two
+        // `chunk_N.idx` for this script).
         crate::scheduler::block_on(e.dump_all_memory_indexes());
-        assert_eq!(count("idx"), 1);
+        assert_eq!(count("idx"), 2);
         assert_eq!(
             rows(&e, q),
             vec![
@@ -10400,30 +10402,30 @@ mod tests {
         let t1 = stale_delete(&e);
         let t2 = stale_delete(&e);
         let t3 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t1)).unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t1)).unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t2)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t2)),
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], 0, &[], t3)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t3)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], 0, &[], t4)).unwrap();
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], &[], t4)).unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let a = stale_delete(&e);
         let b = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], 0, &[], a))
+        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], &[], a))
             .unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], 0, &[], b)),
+            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], &[], b)),
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);

@@ -1519,10 +1519,12 @@ impl Engine {
 
     /// Stamps one append record with the commit ts that appended it.
     ///
-    /// `settle_append_ts` (the "last `count` records" form) is only right while
-    /// no other statement is appending; a commit says exactly which record it
-    /// created (`BlockVersion::Append(commit_ts, rows)` sits on the append the
-    /// transaction made, not on whatever landed last).
+    /// The record is named by the index [`Engine::note_append`] returned, which
+    /// `reserve_rows_at` hands back to every writer that appends. A commit says
+    /// exactly which record it created (`BlockVersion::Append(commit_ts, rows)`
+    /// sits on the append the transaction made, not on whatever landed last),
+    /// and no other definition can be right: a positional "the last n records"
+    /// form cannot tell a row count from a record count.
     pub(crate) fn settle_append_at(&self, table: &str, index: usize, ts: u64) {
         if index == usize::MAX {
             return;
@@ -1646,28 +1648,6 @@ impl Engine {
             }
         }
         rows
-    }
-
-    /// Stamps the newest append with the commit timestamp its transaction got.
-    ///
-    /// The row ids are reserved while the transaction is still being staged
-    /// (`reserve_rows`), so the entry exists - with no timestamp yet - by the
-    /// time the commit hands one out. A rolled-back transaction leaves the zero
-    /// in place, and the mirror's fallback then treats the batch as one create.
-    pub(crate) fn settle_append_ts(&self, table: &str, count: usize, ts: u64) {
-        let n = self.append_totals(table).len();
-        if count == 0 || n == 0 {
-            return;
-        }
-        let mut log = self.append_ts(table);
-        // `resize` **down** to `n - count` zeroes the records before this
-        // statement's own, which is deliberate: the journal is not a history -
-        // a record whose ts is zero is one the next settle rewrites.
-        log.resize(n.saturating_sub(count), 0);
-        log.resize(n, ts);
-        let tkey = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        tables.entry(tkey).or_default().append_ts = Some(log);
     }
 
     /// The imported extent of `segment`, when it still holds exactly the rows a

@@ -272,28 +272,38 @@ pub(crate) fn publish_chunk_files(
         }
     }
     if !hnsw {
-        // One chunk per segment, but under **its own** id: a literal 0 would
-        // append a second record next to the one `write_ivf_index` published.
+        // One chunk per dump, under **its own** id: a literal 0 would append a
+        // second record next to the one `write_ivf_index` published.
         //
-        // **Newest**, not smallest: an IVF chunk is a snapshot of the whole
-        // segment (`PopulateIvfIndexInner` builds from every block), so a
-        // segment dumped twice holds two generations of the same rows. Listing
-        // both made the reader sum two overlapping 100-row spans and report a
-        // 200-row segment with a gap at 100; the newest snapshot is the
-        // coverage, which is the same rule `write_ivf_index`'s `covered` check
-        // applies.
-        let Some(id) = ids.into_iter().max() else {
-            return Vec::new();
-        };
-        return vec![IndexChunk {
-            chunk_id: id,
-            base_name: String::new(),
-            base_row_id: u64::from(segment) << 32,
-            row_count: rows,
-            term_count: 0,
-            index_size: 0,
-            commit_ts: 0,
-        }];
+        // The chunks **tile** the segment: a dump covers the rows its memory
+        // index buffered since the previous dump (`IVFIndexInMem`'s
+        // `begin_row_id_`/`input_row_count_`), so chunk *k* starts where chunk
+        // *k-1* ended. Their row counts come from the chunk header
+        // (`[row_count][embedding_count][dimension][centroid_count]`); the
+        // `rows` argument is only the fallback for a directory whose header
+        // cannot be read.
+        ids.sort_unstable();
+        let mut chunks = Vec::new();
+        let mut base_row_id = 0u64;
+        for id in ids {
+            let row_count = storage::chunk_store::chunk_store()
+                .read(&seg_dir.join(format!("chunk_{id}.idx")))
+                .ok()
+                .filter(|bytes| bytes.len() >= 8)
+                .map(|bytes| u64::from(u32::from_le_bytes(bytes[0..4].try_into().unwrap())))
+                .unwrap_or(rows);
+            chunks.push(IndexChunk {
+                chunk_id: id,
+                base_name: String::new(),
+                base_row_id: (u64::from(segment) << 32) | base_row_id,
+                row_count,
+                term_count: 0,
+                index_size: 0,
+                commit_ts: 0,
+            });
+            base_row_id += row_count;
+        }
+        return chunks;
     }
     ids.sort_unstable();
     let mut chunks = Vec::new();

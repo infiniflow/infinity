@@ -1088,11 +1088,12 @@ impl Engine {
         }
     }
 
+    /// A pure `DELETE`: it appends nothing, so the block's `version` gets the
+    /// delete timestamps and no `create` of its own.
     pub(crate) async fn commit_with_deletes(
         &self,
         table: &str,
         deletes: &[usize],
-        appended: usize,
         extra: &[(usize, Vec<Value>)],
         mut txn: Txn,
     ) -> Result<u64> {
@@ -1120,8 +1121,11 @@ impl Engine {
         let ts = self.txn.commit_deferred(txn).await?;
         let _visible = BottomGuard::new(&self.txn, ts);
         // `CommitBottomDelete` on the table's worker: the block's `version`
-        // records the delete ts (and an UPDATE's rewritten rows' append ts).
-        self.delete_bottom(table, deletes, Some(appended), extra.to_vec(), ts)
+        // records the delete ts. A `DELETE` stages no append - passing a count
+        // here settled record 0 (`Some(0)` means "the last zero records", i.e.
+        // "keep the log"), and `settle_append_at(0, …)` overwrote the first
+        // `create` a previous process had written with this delete's ts.
+        self.delete_bottom(table, deletes, None, extra.to_vec(), ts)
             .await?;
         Ok(ts)
     }
@@ -1152,11 +1156,15 @@ impl Engine {
             // written. `column_type_of` covers every type the DDL accepts, so
             // `has_block_layout` is true for every table that exists.
             // An UPDATE stages its rewritten rows as an append in the same
-            // transaction (`reserve_rows` already logged the create), so the
-            // block's `version` has to record this ts for them as well
-            // (`BlockVersion::Append`).
-            if let Some(count) = appended {
-                engine.settle_append_ts(&bottom_table, count, ts);
+            // transaction (`reserve_rows_at` logged the create), so the block's
+            // `version` has to record this ts for it as well
+            // (`BlockVersion::Append`). The record is named, not counted: an
+            // `UPDATE` of n rows is **one** record, and settling "the last n"
+            // re-sized the log from n - zeroing the creates a previous process
+            // had written (`[(30,100),(30,200),(30,210)]` instead of the
+            // reference's `[(14,100),(26,200),(30,210)]`).
+            if let Some(record) = appended {
+                engine.settle_append_at(&bottom_table, record, ts);
             }
             // `BlockVersion::Delete(row_id, commit_ts)`: the slot carries the
             // deleting transaction's commit timestamp, and the block rewrite
@@ -1208,11 +1216,15 @@ impl Engine {
         let ts = turn.ts();
         let count = rows.len();
         let allocated = std::sync::Mutex::new(RowRange::single(0));
+        // The append record `reserve_rows_at` created, so the bottom half
+        // stamps **that** one; `None` when the statement rewrote no rows.
+        let record = std::sync::Mutex::new(None);
         let ts = self
             .txn
             .commit_at_deferred_with(txn, ts, |txn| {
                 let range = self.reserve_rows_at(table, count, false, ts)?;
                 *allocated.lock().unwrap() = range;
+                *record.lock().unwrap() = (count > 0).then_some(range.append);
                 prepare(txn, range.base)
             })
             .await?;
@@ -1229,7 +1241,9 @@ impl Engine {
         // The staged append record settles with its commit ts here, which is what
         // `committed_rows` reads; without it a checkpoint would not see the
         // rewritten rows (`reserve_rows_at` no longer stamps it).
-        self.delete_bottom(table, deletes, Some(count), extra, ts)
+        // Read out of the mutex before the await: the guard is not `Send`.
+        let record = *record.lock().unwrap();
+        self.delete_bottom(table, deletes, record, extra, ts)
             .await?;
         Ok(base)
     }

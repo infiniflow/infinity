@@ -2626,7 +2626,7 @@ impl Engine {
                 }
                 if !to_del.is_empty() {
                     let t = self.txn.begin();
-                    self.commit_with_deletes(table, &to_del, 0, &[], t).await?;
+                    self.commit_with_deletes(table, &to_del, &[], t).await?;
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),

@@ -6979,12 +6979,16 @@ pub(crate) struct ImportCursor {
     pub(crate) batches: Vec<usize>,
 }
 
-/// How many of the **last** append records a bottom half has to stamp with its
-/// commit ts (`None` when the transaction staged no appends of its own).
+/// The append record a bottom half has to stamp with its commit ts, as the
+/// index [`Engine::note_append`] returned (`None` when the transaction staged
+/// no append of its own).
 ///
-/// It was an enum with a `None` variant until every producer that appends now
-/// stamps its own record - an unstamped record is a row `committed_rows` does
-/// not see, which is exactly the bug that variant caused.
+/// An **index**, not a count: `reserve_rows_at` hands the record back and the
+/// callers that append several batches keep one index each. Counting records
+/// from the end cannot work - `settle_append_ts` re-sizes the log from that
+/// count, and a caller that passes a row count (an `UPDATE` of 10 rows is one
+/// record) zeroes every earlier record and loses the create timestamps a
+/// previous process wrote.
 pub(crate) type AppendRecords = Option<usize>;
 
 /// Renames the projection's output columns with the select-list aliases.

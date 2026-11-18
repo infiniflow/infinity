@@ -2574,8 +2574,8 @@ impl Engine {
                 attributed.push((*seq as usize, placed));
             }
             // One `create` per append transaction, stamped with its commit ts.
-            self.note_append(&table, attributed.len(), false, None);
-            self.settle_append_ts(&table, 1, append.commit_ts);
+            let record = self.note_append(&table, attributed.len(), false, None);
+            self.settle_append_at(&table, record, append.commit_ts);
             // Straight into the columnar buffer, with the attribution the frame
             // gave: the live schema only supplies the defaults a row's own
             // schema could not.
@@ -7071,9 +7071,26 @@ impl Engine {
         }))
     }
 
-    /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
-    /// `…/idx_{id}/seg_0/chunk_0.idx`, returning how many vectors were written.
+    /// `PopulateIvfIndexInner`: writes one chunk per segment covering the
+    /// segment's **whole** vector set.
+    ///
+    /// This is the shape a compaction and an import use - `PopulateIndex` is
+    /// handed a `SegmentMeta` and builds from its blocks, so the chunk's
+    /// `base_row_id` is `RowID(segment, 0)` and its row count the segment's.
+    /// A `DumpIndex` is the other shape: it dumps the segment's **memory
+    /// index** and therefore only the rows written since the previous dump
+    /// ([`Self::write_ivf_tail`]).
     pub fn write_ivf_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_ivf_chunks(table, index_name, false)
+    }
+
+    /// `DumpMemIndex` -> `DumpSegmentMemIndex`'s IVF case: one chunk covering
+    /// the rows the segment's memory index buffered.
+    pub fn write_ivf_tail(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_ivf_chunks(table, index_name, true)
+    }
+
+    fn write_ivf_chunks(&self, table: &str, index_name: &str, tail: bool) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
             .storage
@@ -7102,19 +7119,20 @@ impl Engine {
             if rows == 0 {
                 continue;
             }
-            // A checkpoint mirrors an index whose chunks already cover the
-            // segment: the chunk is the whole segment's vectors, so rewriting it
-            // under a fresh id would append a duplicate to the chunk list every
-            // tick. "A chunk exists" is not the same as "the segment is
-            // covered" - an insert after the first dump leaves vectors the
-            // existing chunk does not hold, and `seal_index_tail` clears
-            // `ivf_mem` right after this returns, so skipping the dump lost
-            // them.
-            // Each IVF dump writes the segment's **whole** vector set, so the
-            // chunks are successive snapshots of it and their row counts must
-            // not be summed (100 rows, then 200, sums to 300). The newest
-            // snapshot is the coverage.
-            let covered: u64 = catalog::layout::read_index_chunks(
+            // `DumpMemIndex` dumps the segment's **memory index**, which holds
+            // only the rows appended since that segment's last dump
+            // (`IVFIndexInMem::GetChunkIndexMetaInfo` reports
+            // `begin_row_id_`/`input_row_count_`, and `AppendMemIndex` starts a
+            // new one at the first row no chunk covers). Writing the whole
+            // segment again made a 130-row table's second dump a 100-row chunk
+            // where the reference's was the 30 rewritten/appended rows, so the
+            // chunks no longer tiled the segment.
+            // `PopulateIndex(…, kCreateIndex)` is what the reference's
+            // `CREATE INDEX` runs, so its chunk exists before any dump. The port
+            // defers that work to the first dump, so a segment with **no**
+            // chunk yet is still populated as a whole - and its record then
+            // replaces (there is nothing to extend).
+            let recorded: u64 = catalog::layout::read_index_chunks(
                 self.storage.catalog.store().as_ref(),
                 &db_id.to_string(),
                 &meta.id.to_string(),
@@ -7123,18 +7141,23 @@ impl Engine {
             .unwrap_or_default()
             .into_iter()
             .find(|(id, _)| *id == segment)
-            .and_then(|(_, chunks)| chunks.into_iter().map(|(_, info)| info.row_count).max())
+            .map(|(_, chunks)| chunks.iter().map(|(_, info)| info.row_count).sum())
             .unwrap_or(0);
-            if covered >= rows {
-                continue;
-            }
-            // A dump writes the segment's **whole** vector set
-            // (`PopulateIvfIndexInner` builds from the segment's blocks and
-            // records `base_row_id = RowID(segment, 0)`), so the new chunk
-            // supersedes the previous snapshot rather than extending it.
+            let populate_whole = !tail || recorded == 0;
+            let from = if populate_whole {
+                0
+            } else {
+                let (first, rows) = self.ivf_memory_tail(&table, index_id as u64, segment);
+                if rows == 0 {
+                    // `DumpMemIndex` returns "empty mem index" before a chunk
+                    // is allocated, and so leaves no record either.
+                    continue;
+                }
+                first
+            };
             let (count, chunk) =
-                self.ivf_chunk_from(&table, &column, &options, Some(segment), 0)?;
-            let base_offset = 0u32;
+                self.ivf_chunk_from(&table, &column, &options, Some(segment), from)?;
+            let base_offset = from;
             let dir = self.blocks_root().join(format!(
                 "db_{db_id}/tbl_{}/idx_{index_id}/seg_{segment}",
                 meta.id
@@ -7170,20 +7193,72 @@ impl Engine {
                 index_size: 0,
                 commit_ts: crate::engine::chunk_commit_ts(self),
             };
-            // **Replace**: one record per segment (`AddNewChunkIndex1` after a
-            // `RemoveChunkIDs`, which is what `PopulateIvfIndexInner` does for a
-            // re-dump). The chunk covers the segment's whole vector set, so a
-            // second record would describe the same rows twice; the reference
-            // holds exactly one per (index, segment).
-            let _ = self.storage.catalog.replace_segment_chunks(
-                &set,
-                index_id as u64,
-                segment,
-                std::slice::from_ref(&record),
-            );
+            if !populate_whole {
+                // A dump's chunk **extends** the segment's coverage, so it is
+                // appended like any other (`AddNewChunkIndex1`); replacing the
+                // list would drop the earlier chunk's rows.
+                self.record_chunk(
+                    &set,
+                    crate::engine::RecordedChunk {
+                        index_id: index_id as u64,
+                        chunk_id,
+                        segment,
+                        base_row_id: record.base_row_id,
+                        row_count: record.row_count,
+                        index_size: 0,
+                    },
+                );
+            } else {
+                // `PopulateIvfIndexInner`: one record per segment
+                // (`AddNewChunkIndex1` after `RemoveChunkIDs`). The chunk covers
+                // the segment's whole vector set, so a second record would
+                // describe the same rows twice.
+                let _ = self.storage.catalog.replace_segment_chunks(
+                    &set,
+                    index_id as u64,
+                    segment,
+                    std::slice::from_ref(&record),
+                );
+            }
             written += count;
         }
         Ok(written)
+    }
+
+    /// The rows one segment's IVF **memory index** holds: `(first in-segment
+    /// offset, how many)`.
+    ///
+    /// `IVFIndexInMem` is created at `AppendMemIndex`'s `base_row_id` and grows
+    /// by the rows each append feeds it, so a dump covers exactly the rows
+    /// written since the segment's previous dump
+    /// (`IVFIndexInMem::GetChunkIndexMetaInfo` -> `ChunkIndexMetaInfo{begin_row_id_,
+    /// input_row_count_}`). The chunk's offsets are segment-relative, so the
+    /// first entry of `ivf_mem` is the tail's `begin_row_id`.
+    ///
+    /// A dump with no buffered rows contributes nothing: `DumpMemIndex` returns
+    /// "empty mem index" before the chunk is allocated.
+    fn ivf_memory_tail(&self, table: &str, index_id: u64, segment: u32) -> (u32, usize) {
+        let key = self.table_key(table);
+        let tail = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.ivf_mem.get(&index_id))
+            .map(|rows| rows.iter().map(|(seq, _)| *seq).collect::<Vec<_>>())
+            .unwrap_or_default();
+        // Only this segment's rows: the memory map is per index, and a row of
+        // another segment is another chunk's job.
+        let mut offsets: Vec<u32> = tail
+            .iter()
+            .filter(|seq| (**seq >> 32) as u32 == segment)
+            .map(|seq| (*seq & 0xffff_ffff) as u32)
+            .collect();
+        if offsets.is_empty() {
+            return (0, 0);
+        }
+        offsets.sort_unstable();
+        (offsets[0], offsets.len())
     }
 
     /// Reads back a mirror written by [`Self::write_ivf_index`], returning
