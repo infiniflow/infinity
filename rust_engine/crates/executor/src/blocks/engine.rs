@@ -2370,17 +2370,21 @@ impl Engine {
                         else {
                             continue;
                         };
-                        let coverage = chain_after.coverage();
-                        if !coverage.is_complete()
+                        // Directory work only: `len` sums the reachable leaves'
+                        // member counts and `dangling` walks the child edges, so
+                        // this costs partitions, not rows. `coverage()` would also
+                        // read every leaf's slot page to look for a row in two
+                        // leaves - a writer invariant the storage tests pin, and
+                        // O(rows) page misses a checkpoint cannot pay.
+                        let dangling = chain_after.dangling();
+                        if !dangling.is_empty()
                             || chain_after.len() as u64 != covered as u64 + moved
                         {
                             eprintln!(
                                 "spann: delta for segment {segment} refused: {} rows, \
-                                 expected {}, duplicates {:?}, dangling {:?}",
+                                 expected {}, dangling {dangling:?}",
                                 chain_after.len(),
                                 covered as u64 + moved,
-                                coverage.duplicates.len(),
-                                coverage.dangling.len()
                             );
                             continue;
                         }

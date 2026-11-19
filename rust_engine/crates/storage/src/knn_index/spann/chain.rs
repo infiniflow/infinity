@@ -277,6 +277,31 @@ impl ChunkChain {
 
     /// Reachability, duplicate rows and dangling edges - the three ways a delta
     /// can be wrong.
+    /// Child edges that land on no layer - the half of [`Self::coverage`] that
+    /// needs the directory only.
+    ///
+    /// `coverage` also reads every reachable leaf's slot page, because it counts
+    /// rows and looks for duplicates: O(rows) page misses, which a checkpoint
+    /// cannot afford on its own publish path. This is O(partitions) and catches
+    /// the failure a truncated delta produces (an edge into a page no chunk
+    /// holds), which is the one the publisher has to refuse.
+    pub fn dangling(&self) -> Vec<PartitionKey> {
+        let mut out = Vec::new();
+        for (key, _) in &self.owners {
+            let Some(meta) = self.meta(*key) else {
+                continue;
+            };
+            for child in meta.children {
+                if self.owner(child).is_none() {
+                    out.push(child);
+                }
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     pub fn coverage(&self) -> Coverage {
         let mut out = Coverage::default();
         let mut seen: HashMap<u64, PartitionKey> = HashMap::new();
