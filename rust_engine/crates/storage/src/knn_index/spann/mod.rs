@@ -870,6 +870,23 @@ impl FileIndex {
         self.chunk().meta(key)
     }
 
+    /// The segment this chunk was built over (§6.2).
+    pub fn segment(&self) -> u32 {
+        self.layout.header.segment
+    }
+
+    /// The directory's keys, in slot order - four bytes each, no centroids.
+    ///
+    /// This is what a chain needs to build its owner table: which layer names
+    /// which key. [`Self::tree_meta`] answers the same question but copies a
+    /// `dims`-sized centroid per node, which at 1536d and 62k partitions is
+    /// 380 MB per layer, per open - the cost the checkpoint kept paying.
+    pub fn keys(&self) -> Vec<PartitionKey> {
+        (0..self.partitions())
+            .filter_map(|slot| self.chunk().key_at(slot))
+            .collect()
+    }
+
     /// The centroid of `key`, if this chunk holds it.
     pub fn centroid(&self, key: PartitionKey) -> Option<Vec<f32>> {
         self.chunk().centroid(key)

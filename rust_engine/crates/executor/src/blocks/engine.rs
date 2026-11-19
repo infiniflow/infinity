@@ -1784,6 +1784,14 @@ impl Engine {
         // index is the rows that chunk now covers, so it is cleared once the
         // records are appended below.
         let mut spann_ready: Vec<u64> = Vec::new();
+        // `(index id, segment, the chain that now answers for it)`: a delta
+        // installs the chain it built, so neither the next query nor the next
+        // checkpoint has to open the layers again.
+        let mut spann_install: Vec<(
+            u64,
+            u32,
+            std::sync::Arc<storage::knn_index::spann::ChunkChain>,
+        )> = Vec::new();
         // `(index name, segment, chunks it replaces, chunk ts)` - deprecated once the
         // replacement has a record, so `cleanup_index_chunks` can reclaim the bytes of
         // the superseded snapshot without a reader ever losing the one it has open.
@@ -2157,13 +2165,34 @@ impl Engine {
                     let mut live_chunks =
                         self.live_chunk_files(table, &im.name, *segment, &seg_dir);
                     live_chunks.sort_by(|a, b| b.0.cmp(&a.0));
-                    let chain = opts.as_ref().and_then(|opts| {
+                    // The chain that is already answering, if the handle holds one
+                    // for this segment with exactly these chunks. Re-opening from
+                    // the paths maps and validates every layer again - the base
+                    // chunk is the same bytes it validated on the previous
+                    // checkpoint - which is the per-layer cost of a dump.
+                    let current = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.spann.get(&(index_id as u64)))
+                            .and_then(|handle| match handle.as_ref() {
+                                crate::spann_mem::SpannHandle::File(chains) => {
+                                    chains.iter().find(|chain| chain.segment() == *segment).cloned()
+                                }
+                                crate::spann_mem::SpannHandle::Memory(_) => None,
+                            })
+                            .filter(|chain| chain.layers() == live_chunks.len())
+                    };
+                    let chain = current.or_else(|| {
+                        let opts = opts.as_ref()?;
                         let paths: Vec<std::path::PathBuf> =
                             live_chunks.iter().map(|(_, path)| path.clone()).collect();
                         if paths.is_empty() {
                             return None;
                         }
-                        storage::knn_index::spann::ChunkChain::open(&paths, opts).ok()
+                        storage::knn_index::spann::ChunkChain::open(&paths, opts)
+                            .ok()
+                            .map(std::sync::Arc::new)
                     });
                     // Rows the chain covers, from the **directories**: after a
                     // delta the newest chunk holds a few pages, so "the newest
@@ -2224,6 +2253,9 @@ impl Engine {
                     let rebuild = chain.is_none()
                         || pending_rows == 0
                         || live_chunks.len() >= MAX_SEGMENT_CHUNKS;
+                    let mut installed: Option<
+                        std::sync::Arc<storage::knn_index::spann::ChunkChain>,
+                    > = None;
                     let (row_count, index_size) = if rebuild {
                         let Some(size) =
                             self.spann_chunk(table, &im.column, &im.options, *segment, &path)
@@ -2363,13 +2395,13 @@ impl Engine {
                         // are still in the column, so a query scores them
                         // exactly). Recording it would trade a slow query for a
                         // wrong one.
-                        let mut after: Vec<std::path::PathBuf> = vec![path.clone()];
-                        after.extend(live_chunks.iter().map(|(_, path)| path.clone()));
-                        let Ok(chain_after) =
-                            storage::knn_index::spann::ChunkChain::open(&after, &opts)
+                        let Ok(layer) = storage::knn_index::spann::FileIndex::open(&path, &opts)
                         else {
                             continue;
                         };
+                        let chain_after = std::sync::Arc::new(
+                            chain.with_newest(std::sync::Arc::new(layer)),
+                        );
                         // Directory work only: `len` sums the reachable leaves'
                         // member counts and `dangling` walks the child edges, so
                         // this costs partitions, not rows. `coverage()` would also
@@ -2388,6 +2420,7 @@ impl Engine {
                             );
                             continue;
                         }
+                        installed = Some(chain_after);
                         (covered as u64 + moved, size)
                     };
                     // A delta leaves the older chunks of the segment live, so the
@@ -2401,13 +2434,15 @@ impl Engine {
                     if !superseded.is_empty() {
                         spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
                     }
-                    // Both forms change what the segment's chain answers: a
-                    // rebuild replaces it, a delta shadows some of its pages. The
-                    // cached handle is dropped here and lazily reloaded, so the
-                    // next query maps the chain that now includes this chunk -
-                    // leaving the old handle in place would answer without the
-                    // rows this checkpoint just made durable.
-                    spann_ready.push(index_id as u64);
+                    // A rebuild replaces the segment's answer wholesale, so the
+                    // handle is dropped and lazily reloaded. A delta has the chain
+                    // that now includes it in hand - installing that one is what
+                    // keeps the next checkpoint (and the next query) from opening
+                    // the same layers again.
+                    match installed {
+                        Some(chain) => spann_install.push((index_id as u64, *segment, chain)),
+                        None => spann_ready.push(index_id as u64),
+                    }
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),
@@ -2500,6 +2535,32 @@ impl Engine {
         // to retire, so the handle is swapped for the mapped form here rather than
         // on the next query (`docs/SPANN_DESIGN.md` §6.4 - a checkpoint is where
         // the memory form hands over to the file form, as it is for HNSW).
+        if !spann_install.is_empty() {
+            let key = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&key) {
+                for (id, segment, chain) in std::mem::take(&mut spann_install) {
+                    let Some(handle) = entry.spann.get(&id) else {
+                        // Nothing mapped: the next query loads from the catalog,
+                        // which already lists this chunk.
+                        continue;
+                    };
+                    let crate::spann_mem::SpannHandle::File(chains) = handle.as_ref() else {
+                        // A heap tree answers for this index; it cannot answer for
+                        // a chain, so the reload below is the safe hand-over.
+                        continue;
+                    };
+                    let mut chains = chains.clone();
+                    match chains.iter().position(|chain| chain.segment() == segment) {
+                        Some(at) => chains[at] = chain,
+                        None => chains.push(chain),
+                    }
+                    entry
+                        .spann
+                        .insert(id, std::sync::Arc::new(crate::spann_mem::SpannHandle::File(chains)));
+                }
+            }
+        }
         if !spann_ready.is_empty() {
             let key = self.table_key(table);
             let mut ready = spann_ready;

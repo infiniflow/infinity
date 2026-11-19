@@ -126,9 +126,14 @@ impl ChunkChain {
         let mut owners: Vec<(PartitionKey, u32)> = Vec::new();
         let mut seen: HashSet<PartitionKey> = HashSet::new();
         for (layer, chunk) in layers.iter().enumerate() {
-            for meta in chunk.tree_meta() {
-                if seen.insert(meta.key) {
-                    owners.push((meta.key, layer as u32));
+            // Keys, not `tree_meta`: the owner table needs the key set and
+            // nothing else, and `tree_meta` copies a `dims`-sized centroid per
+            // node - at 1536d that is the difference between 4 B and 6 KB per
+            // partition, per layer, per open (a checkpoint opens the chain twice
+            // and reloads it once).
+            for key in chunk.keys() {
+                if seen.insert(key) {
+                    owners.push((key, layer as u32));
                 }
             }
         }
@@ -157,6 +162,53 @@ impl ChunkChain {
     /// Number of chunks in the chain, newest first.
     pub fn layers(&self) -> usize {
         self.layers.len()
+    }
+
+    /// The segment every layer was written for.
+    pub fn segment(&self) -> u32 {
+        self.layers.first().map(|layer| layer.segment()).unwrap_or(0)
+    }
+
+    /// The chain with `layer` as its **newest** chunk.
+    ///
+    /// What a checkpoint needs: it already holds the chain that is answering, so
+    /// the delta must not be assembled by re-opening the older layers from their
+    /// paths - each open maps and validates a file, and the base chunk is the
+    /// same bytes it validated on the previous checkpoint. The owner table is
+    /// rebuilt from the new layer's keys plus the ones it does not name, which
+    /// is four bytes per partition.
+    pub fn with_newest(&self, layer: Arc<FileIndex>) -> Self {
+        let mut owners: Vec<(PartitionKey, u32)> = Vec::with_capacity(
+            self.owners.len() + layer.partitions(),
+        );
+        let mut newest: HashSet<PartitionKey> = HashSet::with_capacity(layer.partitions());
+        for key in layer.keys() {
+            if newest.insert(key) {
+                owners.push((key, 0));
+            }
+        }
+        for (key, old) in &self.owners {
+            if !newest.contains(key) {
+                // The old layers shift down by one.
+                owners.push((*key, old + 1));
+            }
+        }
+        owners.sort_by_key(|(key, _)| *key);
+        let mut layers = Vec::with_capacity(self.layers.len() + 1);
+        layers.push(layer);
+        layers.extend(self.layers.iter().cloned());
+        let root = owners
+            .first()
+            .map(|(key, _)| *key)
+            .filter(|key| *key == ROOT_KEY)
+            .or_else(|| owners.first().map(|(key, _)| *key))
+            .unwrap_or(ROOT_KEY);
+        Self {
+            layers,
+            owners,
+            root,
+            beam: self.beam,
+        }
     }
 
     pub fn root(&self) -> PartitionKey {
