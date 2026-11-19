@@ -2292,7 +2292,7 @@ impl Engine {
                             })
                             .collect();
                         let Ok(mut live) =
-                            index::spann::incr::IncIndex::from_durable(dim, opts, nodes)
+                            index::spann::incr::IncIndex::from_durable(dim, opts.clone(), nodes)
                         else {
                             continue;
                         };
@@ -2329,6 +2329,36 @@ impl Engine {
                             // checkpoint. Losing the tree is not losing the rows.
                             continue;
                         };
+                        // §5.4's last step: the chain that now *includes* this
+                        // layer has to cover the segment - every row once, no
+                        // edge into a page no chunk holds, and exactly the rows
+                        // the directories claim. A chain that fails is not
+                        // recorded, so the old chain keeps answering and the rows
+                        // this chunk would have carried stay `uncovered` (they
+                        // are still in the column, so a query scores them
+                        // exactly). Recording it would trade a slow query for a
+                        // wrong one.
+                        let mut after: Vec<std::path::PathBuf> = vec![path.clone()];
+                        after.extend(live_chunks.iter().map(|(_, path)| path.clone()));
+                        let Ok(chain_after) =
+                            storage::knn_index::spann::ChunkChain::open(&after, &opts)
+                        else {
+                            continue;
+                        };
+                        let coverage = chain_after.coverage();
+                        if !coverage.is_complete()
+                            || chain_after.len() as u64 != covered as u64 + moved
+                        {
+                            eprintln!(
+                                "spann: delta for segment {segment} refused: {} rows, \
+                                 expected {}, duplicates {:?}, dangling {:?}",
+                                chain_after.len(),
+                                covered as u64 + moved,
+                                coverage.duplicates.len(),
+                                coverage.dangling.len()
+                            );
+                            continue;
+                        }
                         (covered as u64 + moved, size)
                     };
                     // A delta leaves the older chunks of the segment live, so the
