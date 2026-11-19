@@ -15202,6 +15202,91 @@ mod tests {
     /// `SHOW INDEX` carries the §16.4 telemetry, and the numbers are what the
     /// queries actually did - including `nprobe` being the IVF spelling of the
     /// search width (§15 promised it and the probe ignored it for spann).
+    /// §11.3 item 4's loop, end to end: the width a query uses comes from the
+    /// index's monitor, so a measured recall below the target is what the
+    /// **next** query searches wider with.
+    ///
+    /// The sampling side (`observe_recall` → `observe`) is not re-run here - it
+    /// needs a hundred real queries to hit one sample, and what it computes is
+    /// the monitor's own unit tests' subject. This pins the half the query path
+    /// owns: `beam_actual` is `max(monitor.beam(), leaf_share)`, and a widening
+    /// the monitor recorded reaches the probe.
+    #[test]
+    fn a_low_sampled_recall_widens_the_next_query() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..8)
+                .map(|d| format!("{}.5", (i * 31 + d * 47) % 1013))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tw (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO tw VALUES ");
+        for i in 0..400 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 400 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX tw_i ON tw (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=16);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.tw", "tw_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+        let query = |i: usize| {
+            format!(
+                "SELECT id FROM tw SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(i)
+            )
+        };
+
+        rows(&e, &query(3));
+        let before = e.spann_stats(index_id).snapshot().beam_actual;
+        assert_eq!(
+            before,
+            crate::spann_mem::DEFAULT_SEARCH_BEAM as f64,
+            "the first query uses the base width"
+        );
+
+        // A measured recall of 0.5 against a 0.95 target: the monitor widens to
+        // 1.5x and asks for a rebuild. Everything else about the monitor is its
+        // own unit tests' business; what matters here is that the width the next
+        // statement probes with is the monitor's.
+        let key = (e.table_key("default_db.tw"), index_id);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        {
+            let mut monitors = e.context.recall.lock().unwrap();
+            let monitor = monitors.get_mut(&key).expect("the query made a monitor");
+            monitor.observe(now, 0.5, 1.0);
+            assert_eq!(monitor.beam(), crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2);
+            assert!(monitor.rebuild_suggested());
+        }
+
+        rows(&e, &query(5));
+        let stats = e.spann_stats(index_id).snapshot();
+        assert_eq!(stats.queries, 2);
+        assert_eq!(
+            stats.beam_actual,
+            (crate::spann_mem::DEFAULT_SEARCH_BEAM as f64 + (crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2) as f64) / 2.0,
+            "the second query probed with the widened width"
+        );
+    }
+
     #[test]
     fn spann_telemetry_reports_the_query_shape() {
         let vector = |i: usize| -> String {
