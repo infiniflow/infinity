@@ -24,7 +24,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use index::spann::search::{self, SearchSet};
-use index::spann::{Member, Options, PartitionKey, ROOT_KEY, SpannError};
+use index::spann::{Member, Options, PartitionKey, SpannError, ROOT_KEY};
 use index::vector::Metric;
 
 use super::{FileIndex, TreeMeta};
@@ -104,10 +104,7 @@ pub struct ChunkChain {
 impl ChunkChain {
     /// Opens the chain. `paths` must be **newest first** - the order the catalog
     /// hands the chunks back in, newest chunk id first.
-    pub fn open(
-        paths: &[std::path::PathBuf],
-        opts: &Options,
-    ) -> Result<Self, SpannError> {
+    pub fn open(paths: &[std::path::PathBuf], opts: &Options) -> Result<Self, SpannError> {
         if paths.is_empty() {
             return Err(SpannError::Corrupt(
                 "a chain needs at least one chunk".to_string(),
@@ -164,9 +161,34 @@ impl ChunkChain {
         self.layers.len()
     }
 
+    /// The bytes this chain holds in the heap: the owner table plus each
+    /// layer's header/rotation. The slot pages are page cache and are not part
+    /// of it (`buffer::mapped::mapped_bytes` reports those).
+    pub fn heap_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.owners.capacity() * std::mem::size_of::<(PartitionKey, u32)>()
+            + self
+                .layers
+                .iter()
+                .map(|layer| layer.heap_bytes())
+                .sum::<usize>()
+    }
+
+    /// Drops the resident pages of every layer, returning the bytes released.
+    ///
+    /// A chain is the only long-lived owner of a segment's chunk mappings, so
+    /// this is the call that brings an idle index's RSS back down without
+    /// closing it: the pages come back from the file on the next query.
+    pub fn release_pages(&self) -> usize {
+        self.layers.iter().map(|layer| layer.release_pages()).sum()
+    }
+
     /// The segment every layer was written for.
     pub fn segment(&self) -> u32 {
-        self.layers.first().map(|layer| layer.segment()).unwrap_or(0)
+        self.layers
+            .first()
+            .map(|layer| layer.segment())
+            .unwrap_or(0)
     }
 
     /// The chain with `layer` as its **newest** chunk.
@@ -178,9 +200,8 @@ impl ChunkChain {
     /// rebuilt from the new layer's keys plus the ones it does not name, which
     /// is four bytes per partition.
     pub fn with_newest(&self, layer: Arc<FileIndex>) -> Self {
-        let mut owners: Vec<(PartitionKey, u32)> = Vec::with_capacity(
-            self.owners.len() + layer.partitions(),
-        );
+        let mut owners: Vec<(PartitionKey, u32)> =
+            Vec::with_capacity(self.owners.len() + layer.partitions());
         let mut newest: HashSet<PartitionKey> = HashSet::with_capacity(layer.partitions());
         for key in layer.keys() {
             if newest.insert(key) {
@@ -235,6 +256,15 @@ impl ChunkChain {
         self.owners.len()
     }
 
+    /// The highest key any layer names. New nodes take keys above it, which is
+    /// why a delta never collides with a published page.
+    pub fn max_key(&self) -> u64 {
+        self.owners
+            .last()
+            .map(|(key, _)| u64::from(*key))
+            .unwrap_or(0)
+    }
+
     fn owner(&self, key: PartitionKey) -> Option<usize> {
         self.owners
             .binary_search_by_key(&key, |(owner, _)| *owner)
@@ -257,17 +287,10 @@ impl ChunkChain {
         self.meta(key).map(|meta| meta.children).unwrap_or_default()
     }
 
-    /// A published leaf's rows, as a live tree's [`index::spann::incr::SlotSource`]
-    /// needs them: `(key) -> members`.
+    /// A published leaf's rows: `(key) -> members`, the page a split reads back.
     pub fn slot_members(&self, key: PartitionKey) -> Option<Vec<Member>> {
         let layer = self.owner(key)?;
         self.layers[layer].slot_members(key)
-    }
-
-    /// `(key) -> members` in the shape `IncIndex::from_durable`'s slot source
-    /// takes.
-    pub fn slot_source(&self) -> impl Fn(u64) -> Option<Vec<Member>> + '_ {
-        move |key| self.slot_members(key as PartitionKey)
     }
 
     /// The merged directory, ascending by key - what a live tree loads.
@@ -483,13 +506,31 @@ impl ChunkChain {
         set.into_sorted()
     }
 }
+impl index::spann::page_tree::PageSource for ChunkChain {
+    fn page(&self, key: u64) -> Option<index::spann::page_tree::PageMeta> {
+        let key = PartitionKey::try_from(key).ok()?;
+        let meta = self.meta(key)?;
+        Some(index::spann::page_tree::PageMeta {
+            key: u64::from(meta.key),
+            level: meta.level,
+            centroid: meta.centroid,
+            radius: meta.radius,
+            children: meta.children.into_iter().map(u64::from).collect(),
+            count: meta.members,
+        })
+    }
+
+    fn slots(&self, key: u64) -> Option<Vec<Member>> {
+        self.slot_members(PartitionKey::try_from(key).ok()?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::super::{write_dirty, write_to};
     use super::*;
-    use index::spann::incr::{DurableNode, IncIndex};
     use index::spann::source::{row_source, Memory};
     use index::spann::{Encode, SpannIndex};
-    use super::super::{write_dirty, write_to};
 
     fn noise(i: usize, d: usize) -> f32 {
         let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
@@ -519,20 +560,6 @@ mod tests {
         }
     }
 
-    fn durable(tree: &FileIndex) -> Vec<DurableNode> {
-        tree.tree_meta()
-            .into_iter()
-            .map(|meta| DurableNode {
-                key: meta.key,
-                level: meta.level,
-                members: meta.members,
-                radius: meta.radius,
-                children: meta.children,
-                centroid: meta.centroid,
-            })
-            .collect()
-    }
-
     /// §5.2-b: rows are assigned into the **published** tree - the leaf a
     /// descent picks, not a fresh tree over the new rows - and §5.3/§5.4: a
     /// checkpoint writes only the pages it touched, and the chain still answers
@@ -548,36 +575,42 @@ mod tests {
         write_to(&base, &base_path, 0).unwrap();
         let opened = FileIndex::open(&base_path, &opts()).unwrap();
 
-        // The live tree: directory in heap, rows still in the chunk.
-        let mut live = IncIndex::from_durable(dim, opts(), durable(&opened)).unwrap();
-        assert_eq!(live.len(), 300, "the directory accounts for every row");
-        assert_eq!(live.pending_rows(), 0);
-        assert!(!live.is_dirty(), "a freshly loaded tree has nothing to write");
+        // The write path's view: pages on demand, the directory never
+        // materialised. The base chunk is the page source.
+        let base_chain = ChunkChain::from_layers(vec![std::sync::Arc::new(opened)], &opts());
+        let mut tree = index::spann::page_tree::PageTree::new(
+            dim,
+            opts(),
+            index::spann::quantize::Rotation::new(dim, opts().seed),
+            &base_chain,
+            u64::from(base_chain.root()),
+            base_chain.max_key() + 1,
+            64 << 20,
+            512 << 20,
+        )
+        .unwrap();
 
-        // The split path reads a published leaf's page, so the sources have to
-        // be wired exactly as the engine wires them.
+        // The split path reads a row's raw vector, so the source has to be
+        // wired exactly as the engine wires it.
         let source = Memory::new(all.clone());
         let lookup = row_source(&source);
-        let slots = |key: u64| opened.slot_members(key as PartitionKey);
         for (id, v) in &all[300..] {
-            live.insert(*id, v).unwrap();
-            if live.pending_fixups() > 0 {
-                live.run_fixups_from(Some(&lookup), Some(&slots));
+            tree.insert(*id, v).unwrap();
+            if *id % 8 == 0 {
+                tree.run_fixups(Some(&lookup), 4);
             }
         }
-        live.run_fixups_from(Some(&lookup), Some(&slots));
-        assert_eq!(live.len(), 400);
-        assert_eq!(live.pending_rows(), 100);
-        assert_eq!(live.published_rows(), 300);
+        tree.run_fixups(Some(&lookup), usize::MAX);
 
-        let dirty = live.dirty_nodes();
-        let dirty_keys: Vec<PartitionKey> = dirty.iter().map(|key| *key as PartitionKey).collect();
-        assert!(!dirty.is_empty(), "the 100 rows touched some leaves");
+        let dirty_keys: Vec<PartitionKey> = tree
+            .dirty_keys()
+            .iter()
+            .map(|key| *key as PartitionKey)
+            .collect();
+        assert!(!dirty_keys.is_empty(), "the 100 rows touched some leaves");
 
-        let delta = live
-            .to_spann_dirty(Some(&slots))
-            .expect("a dirty set publishes with its slot source");
-        assert_eq!(delta.partitions().len(), dirty.len());
+        let delta = tree.to_spann_delta().expect("a dirty set publishes");
+        assert_eq!(delta.partitions().len(), dirty_keys.len());
         let delta_path = dir.path().join("chunk_1.idx");
         let bytes = write_dirty(&delta, 0, &dirty_keys).unwrap();
         std::fs::write(&delta_path, &bytes).unwrap();
@@ -585,7 +618,7 @@ mod tests {
         // Newest first: the delta shadows the pages it rewrote.
         let chain = ChunkChain::open(&[delta_path, base_path.clone()], &opts()).unwrap();
         assert_eq!(chain.layers(), 2);
-        assert_eq!(chain.partitions(), live.parts().len());
+        assert!(chain.partitions() > 0);
 
         let mut ids = chain.row_ids();
         ids.sort_unstable();
@@ -612,7 +645,7 @@ mod tests {
                 "row {id} missing from the chain answer: {hits:?}"
             );
         }
-        assert_eq!(chain.height(), live.height());
+        assert_eq!(chain.height(), tree.height());
     }
 
     /// A delta that rewrites only an interior node keeps its children, and the
@@ -628,21 +661,25 @@ mod tests {
         write_to(&base, &base_path, 0).unwrap();
         let opened = FileIndex::open(&base_path, &opts()).unwrap();
 
-        let live = IncIndex::from_durable(dim, opts(), durable(&opened)).unwrap();
-        let branch = live
-            .parts()
-            .iter()
-            .find(|part| !part.is_leaf())
+        let meta = opened
+            .tree_meta()
+            .into_iter()
+            .find(|meta| !meta.children.is_empty())
             .expect("a 200-row tree has a branch");
-        let delta = live
-            .to_spann_keys(&[branch.key], None)
-            .expect("a branch publishes without rows");
+        let rot = index::spann::quantize::Rotation::new(dim, opts().seed);
+        let branch = index::spann::partition::Partition::from_decoded(
+            meta.key,
+            meta.level,
+            dim,
+            meta.centroid.clone(),
+            meta.radius,
+            rot.apply(&meta.centroid),
+            Vec::new(),
+            meta.children.clone(),
+        );
+        let delta = SpannIndex::from_parts(opts(), dim, rot, vec![branch], meta.level, meta.key);
         let delta_path = dir.path().join("chunk_1.idx");
-        std::fs::write(
-            &delta_path,
-            write_dirty(&delta, 0, &[branch.key as PartitionKey]).unwrap(),
-        )
-        .unwrap();
+        std::fs::write(&delta_path, write_dirty(&delta, 0, &[meta.key]).unwrap()).unwrap();
 
         let chain = ChunkChain::open(&[delta_path, base_path], &opts()).unwrap();
         let mut live_set: HashSet<u64> = (0..200).collect();

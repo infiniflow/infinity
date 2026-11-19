@@ -14667,8 +14667,10 @@ mod tests {
         // 80 rows after the checkpoint, two of them deleted before the dump: one
         // that only the tail holds (130) and one the chunk already published (60).
         insert(&e, 120..200);
-        e.execute_blocking("DELETE FROM cdel WHERE id = 130;").unwrap();
-        e.execute_blocking("DELETE FROM cdel WHERE id = 60;").unwrap();
+        e.execute_blocking("DELETE FROM cdel WHERE id = 130;")
+            .unwrap();
+        e.execute_blocking("DELETE FROM cdel WHERE id = 60;")
+            .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
         assert_eq!(count(&e), "198", "both deletes are visible");
 
@@ -15482,7 +15484,10 @@ mod tests {
             let mut monitors = e.context.recall.lock().unwrap();
             let monitor = monitors.get_mut(&key).expect("the query made a monitor");
             monitor.observe(now, 0.5, 1.0);
-            assert_eq!(monitor.beam(), crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2);
+            assert_eq!(
+                monitor.beam(),
+                crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2
+            );
             assert!(monitor.rebuild_suggested());
         }
 
@@ -15491,7 +15496,9 @@ mod tests {
         assert_eq!(stats.queries, 2);
         assert_eq!(
             stats.beam_actual,
-            (crate::spann_mem::DEFAULT_SEARCH_BEAM as f64 + (crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2) as f64) / 2.0,
+            (crate::spann_mem::DEFAULT_SEARCH_BEAM as f64
+                + (crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2) as f64)
+                / 2.0,
             "the second query probed with the widened width"
         );
     }
@@ -15565,7 +15572,9 @@ mod tests {
             // One chunk per segment, the only live snapshot `LiveChunkFiles`
             // lists after a dump.
             "spann_chunks = 1",
-            "spann_max_open_chunks = 6",
+            // 8: the same number the checkpoint uses as a segment's layer cap,
+            // so the value an operator reads is the one that decides a rebuild.
+            "spann_max_open_chunks = 8",
             "spann_degraded = tree",
             "spann_compaction_backlog = 0",
             "spann_candidates_per_query = ",
@@ -15581,6 +15590,125 @@ mod tests {
     /// superseded chunk leaves the list with a `drop|idx_chunk|` marker, and
     /// `cleanup_index_chunks` reclaims its bytes - the reader-safe path, so a reader
     /// that already mapped the old chunk keeps it until it lets go.
+    /// A chunk written but never recorded - the crash window between the file
+    /// sync and the catalog append - is reclaimed once it is stale. A fresh
+    /// unrecorded file may be a write in progress and has to survive.
+    #[test]
+    fn cleanup_reclaims_a_stale_chunk_no_record_names() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 13 + d * 29) % 907))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tc (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO tc VALUES ");
+        for i in 0..32 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 32 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX tc_i ON tc (v) USING SPANN WITH \
+             (min_rows = 1, max_partition_size = 8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.tc", "tc_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+
+        let seg = e
+            .spann_chunk_dir("tc", "tc_i", 0)
+            .expect("the index has a chunk directory");
+        let stale = seg.join("chunk_9999.idx");
+        std::fs::write(&stale, b"never recorded").unwrap();
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 3600);
+        std::fs::File::options()
+            .write(true)
+            .open(&stale)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let in_flight = seg.join("chunk_9998.idx");
+        std::fs::write(&in_flight, b"being written").unwrap();
+
+        e.cleanup_index_chunks().unwrap();
+        assert!(!stale.exists(), "a stale unrecorded chunk is an orphan");
+        assert!(
+            in_flight.exists(),
+            "a fresh unrecorded file may be a write in progress"
+        );
+        assert_eq!(e.spann_stats(index_id).snapshot().orphans, 1);
+    }
+
+    /// A segment whose published chain is mostly dead rows is rebuilt by the
+    /// checkpoint. A delta appends a page, so without this nothing ever drops
+    /// the rows a `DELETE` marked: they would be scanned and filtered forever.
+    #[test]
+    fn a_mostly_dead_chain_is_rebuilt_by_the_checkpoint() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..4)
+                .map(|d| format!("{}.5", (i * 17 + d * 31) % 911))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE td (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO td VALUES ");
+        for i in 0..40 {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < 40 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX td_i ON td (v) USING SPANN WITH \
+             (min_rows = 1, max_partition_size = 8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.td", "td_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+        let before = e.spann_stats(index_id).snapshot();
+
+        // 24 of 40 rows: 60%, well past the 20% bound.
+        e.execute_blocking("DELETE FROM td WHERE id >= 16;")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let after = e.spann_stats(index_id).snapshot();
+        assert!(
+            after.rebuilds > before.rebuilds,
+            "the dead rows forced a rebuild: {:?} -> {:?}",
+            before.rebuilds,
+            after.rebuilds
+        );
+        assert_eq!(
+            after.dead_rows, 0,
+            "the rebuild dropped the dead rows from the chain"
+        );
+    }
+
     #[test]
     fn a_second_spann_dump_appends_a_delta_chunk() {
         let vector = |i: usize| -> String {
@@ -16430,35 +16558,36 @@ mod tests {
             }
         };
         // Everything the index has on disk: chunk bytes and the segment's chain.
-        let chunks = |e: &Engine| -> (usize, u64) {
-            let mut count = 0usize;
-            let mut bytes = 0u64;
-            let mut stack = vec![e.dir.clone()];
-            while let Some(dir) = stack.pop() {
-                let Ok(entries) = std::fs::read_dir(&dir) else {
-                    continue;
-                };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        stack.push(path);
-                    } else if path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .is_some_and(|name| name.starts_with("chunk_") && name.ends_with(".idx"))
-                    {
-                        count += 1;
-                        bytes += entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+        let chunks =
+            |e: &Engine| -> (usize, u64) {
+                let mut count = 0usize;
+                let mut bytes = 0u64;
+                let mut stack = vec![e.dir.clone()];
+                while let Some(dir) = stack.pop() {
+                    let Ok(entries) = std::fs::read_dir(&dir) else {
+                        continue;
+                    };
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            stack.push(path);
+                        } else if path.file_name().and_then(|name| name.to_str()).is_some_and(
+                            |name| name.starts_with("chunk_") && name.ends_with(".idx"),
+                        ) {
+                            count += 1;
+                            bytes += entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+                        }
                     }
                 }
-            }
-            (count, bytes)
-        };
+                (count, bytes)
+            };
 
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!("CREATE TABLE cp (id INT, v EMBEDDING(FLOAT,{DIM}));"))
-            .unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE cp (id INT, v EMBEDDING(FLOAT,{DIM}));"
+        ))
+        .unwrap();
         insert(&e, 0..rows_total);
         e.execute_blocking(
             "CREATE INDEX cp_i ON cp (v) USING SPANN WITH (min_rows = 1, metric='l2');",
@@ -16466,7 +16595,10 @@ mod tests {
         .unwrap();
 
         println!("dim={DIM} rows={rows_total} append={append}");
-        println!("{:>6} {:>9} {:>8} {:>7} {:>6} {:>10} {:>12}", "round", "kind", "moved", "layers", "chunks", "ms", "ms/row");
+        println!(
+            "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10} {:>12}",
+            "round", "kind", "moved", "layers", "chunks", "ms", "ms/row"
+        );
         let begin = std::time::Instant::now();
         crate::scheduler::block_on(e.flush()).unwrap();
         let ms = begin.elapsed().as_secs_f64() * 1000.0;
@@ -16475,7 +16607,11 @@ mod tests {
             "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10.1} {:>12}",
             "base", "rebuild", rows_total, 1, files, ms, "-"
         );
-        println!("        (chunk bytes {} = {:.1} B/row)", bytes, bytes as f64 / rows_total as f64);
+        println!(
+            "        (chunk bytes {} = {:.1} B/row)",
+            bytes,
+            bytes as f64 / rows_total as f64
+        );
 
         let mut written = rows_total;
         for round in 1..=12 {
@@ -16523,6 +16659,113 @@ mod tests {
     /// `nprobe = 1, rerank_multiplier = 0` is the SQL layer (literal parsing and
     /// dispatch). `tree.search` is the same probe without any of that.
     ///
+    /// `cargo test --release -p executor spann_delta_checkpoint_peak --lib -- --ignored --nocapture`
+    ///
+    /// A delta checkpoint reads the new rows' vectors so it can encode them, and
+    /// `BlockCursor::vectors` hands back **owned** `f32` vectors. Asking for the
+    /// whole segment at once therefore costs `dim x 4` per new row of peak RSS on
+    /// top of the tree, which only keeps the codes (`record_bytes` each). This
+    /// samples RSS from a second thread while the checkpoint runs and bounds the
+    /// growth well below "every vector at once", which is what batching it buys.
+    #[test]
+    #[ignore = "bench: measures peak RSS, host dependent"]
+    fn spann_delta_checkpoint_peak_rss() {
+        let dim = 512usize;
+        let rows_total = 40_000usize;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{:.3}", ((i * 131 + d * 977) % 4093) as f32 / 4093.0))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.set_pending_budget(512 * 1024 * 1024);
+        e.execute_blocking(&format!(
+            "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
+        ))
+        .unwrap();
+
+        // The first half becomes the published chunk: `CREATE INDEX` + `flush`
+        // take the rebuild path, which is not what this measures.
+        let half = rows_total / 2;
+        let insert = |from: usize, to: usize| {
+            let batch = 2_000usize;
+            let mut at = from;
+            while at < to {
+                let end = (at + batch).min(to);
+                let rows: Vec<Vec<Literal>> = (at..end)
+                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
+                    .collect();
+                e.insert_literals("default_db.big", None, rows).unwrap();
+                at = end;
+            }
+        };
+        insert(0, half);
+        e.execute_blocking(
+            "CREATE INDEX big_i ON big (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=32);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        // The second half is the delta: nothing is published yet, so the vectors
+        // of these rows are what the next checkpoint has to read.
+        insert(half, rows_total);
+
+        // `RssAnon` is the heap. Total RSS is not the right figure here: the
+        // checkpoint seals the append buffer and maps the column and the new
+        // chunk, so it legitimately raises RSS by the column's size - page
+        // cache, not allocation.
+        let anon_available = crate::engine::state::process_rss_anon_bytes().is_some();
+        let sample_now = || -> u64 {
+            crate::engine::state::process_rss_anon_bytes()
+                .unwrap_or_else(crate::engine::state::process_rss_bytes)
+        };
+        let base = sample_now();
+        let peak = Arc::new(std::sync::atomic::AtomicU64::new(base));
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let sampler = {
+            let peak = Arc::clone(&peak);
+            let stop = Arc::clone(&stop);
+            std::thread::spawn(move || {
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    peak.fetch_max(
+                        crate::engine::state::process_rss_anon_bytes()
+                            .unwrap_or_else(crate::engine::state::process_rss_bytes),
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+            })
+        };
+        crate::scheduler::block_on(e.flush()).unwrap();
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        sampler.join().unwrap();
+
+        let grew = peak
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .saturating_sub(base);
+        let new_rows = rows_total - half;
+        let all_vectors = (new_rows * dim * 4) as u64;
+        let label = if anon_available { "heap" } else { "rss" };
+        eprintln!(
+            "delta checkpoint peak {label} growth: {grew} B for {new_rows} rows x {dim}d; \
+             every vector at once would be {all_vectors} B"
+        );
+        if anon_available {
+            assert!(
+                grew < all_vectors / 2 + 8 * 1024 * 1024,
+                "the checkpoint held {grew} B of heap for {new_rows} rows; batching \
+                 the vectors should stay under half of {all_vectors} B"
+            );
+        } else {
+            // `ps`'s figure includes the mapped column and chunk pages, so it
+            // cannot separate the vectors from page cache. Report, do not assert.
+            eprintln!("(no RssAnon on this platform: total RSS growth reported, not asserted)");
+        }
+    }
+
     /// `cargo test --release -p executor spann_query_profile --lib -- --ignored --nocapture`
     #[test]
     #[ignore = "diagnostic: prints the query profile, asserts nothing"]

@@ -394,7 +394,10 @@ impl Engine {
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 spann_stats: Mutex::new(std::collections::HashMap::new()),
-                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(6),
+                // 8, not the reference's 6: this is the **same** number the
+                // checkpoint uses as a segment's layer cap, so the value
+                // `SHOW INDEX` prints is the one that decides a rebuild.
+                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(8),
                 pending_budget: std::sync::atomic::AtomicUsize::new(512 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
@@ -10820,6 +10823,29 @@ impl Engine {
     /// attached or it is shutting down.
     pub fn submit_optimize_indexes(&self) -> bool {
         self.submit_task(|engine| Box::new(OptimizeTask { engine }))
+    }
+
+    /// Queues the rebuild of one spann segment. Returns `false` when no
+    /// processor is attached (the checkpoint then rebuilds on its own thread
+    /// instead of leaving the segment stale).
+    pub(crate) fn submit_spann_rebuild(
+        &self,
+        table: &str,
+        table_id: u64,
+        index: &str,
+        ts: u64,
+    ) -> bool {
+        let table = table.to_string();
+        let index = index.to_string();
+        self.submit_task(move |engine| {
+            Box::new(SpannRebuildTask {
+                engine,
+                table,
+                table_id,
+                index,
+                ts,
+            })
+        })
     }
 
     pub(crate) fn submit_task(

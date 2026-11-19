@@ -741,7 +741,7 @@ impl Engine {
         let mut chains = Vec::new();
         for (_, mut layers) in per_segment {
             // Newest chunk id first: a delta shadows the pages it rewrote.
-            layers.sort_by(|a, b| b.0.cmp(&a.0));
+            layers.sort_by_key(|a| std::cmp::Reverse(a.0));
             let layers: Vec<std::sync::Arc<storage::knn_index::spann::FileIndex>> =
                 layers.into_iter().map(|(_, chunk)| chunk).collect();
             chains.push(std::sync::Arc::new(

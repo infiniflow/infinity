@@ -21,6 +21,7 @@
 pub mod build;
 pub mod incr;
 pub mod kmeans;
+pub mod page_tree;
 pub mod partition;
 pub mod quantize;
 pub mod search;
@@ -199,6 +200,15 @@ pub enum SpannError {
     InvalidOption(&'static str, String),
     /// A chunk could not be parsed; the message names the failing section.
     Corrupt(String),
+    /// The chunk is well formed but its format version is not the one this
+    /// build reads. Distinct from [`Self::Corrupt`] because the recovery is
+    /// different: the bytes are fine, the segment simply has to be rebuilt from
+    /// the column, which a checkpoint can schedule (`VERSION` in
+    /// `storage::knn_index::spann`).
+    NeedsRebuild {
+        found: u16,
+        expected: u16,
+    },
     /// The backing store (RocksDB, a file, a test double) rejected an
     /// operation. Kept as an opaque string so `crates/index` stays free of
     /// the storage crate's error type.
@@ -214,6 +224,10 @@ impl Display for SpannError {
             }
             SpannError::InvalidOption(name, why) => write!(f, "spann: invalid {name}: {why}"),
             SpannError::Corrupt(what) => write!(f, "spann: corrupt chunk: {what}"),
+            SpannError::NeedsRebuild { found, expected } => write!(
+                f,
+                "spann: chunk version {found}, this build reads {expected}; rebuild the index"
+            ),
             SpannError::Storage(what) => write!(f, "spann: store: {what}"),
         }
     }

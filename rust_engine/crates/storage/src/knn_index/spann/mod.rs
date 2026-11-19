@@ -48,9 +48,7 @@ use index::vector::{l2_sq, Metric};
 mod chain;
 mod writer;
 pub use chain::{ChainMeta, ChunkChain, Coverage};
-pub use writer::{
-    write, write_dirty, write_dirty_to, write_keys, write_range, write_to,
-};
+pub use writer::{write, write_dirty, write_dirty_to, write_keys, write_range, write_to};
 
 /// The chunk's signature: the name, a NUL pad (the field is eight bytes wide so
 /// the offsets that follow are the ones `docs/SPANN_FORMAT.md` tabulates) and the
@@ -265,9 +263,14 @@ impl Layout {
         }
         let version = u16::from_le_bytes([bytes[8], bytes[9]]);
         if version != VERSION {
-            return Err(SpannError::Corrupt(format!(
-                "unsupported version {version} (this build writes {VERSION}; rebuild the index)"
-            )));
+            // Not corruption: the bytes are a chunk of another format version,
+            // so the segment has to be rebuilt from the column. The caller can
+            // tell the two apart and schedule that rebuild instead of treating
+            // a readable index as damaged.
+            return Err(SpannError::NeedsRebuild {
+                found: version,
+                expected: VERSION,
+            });
         }
         let header_len = u16::from_le_bytes([bytes[10], bytes[11]]) as usize;
         if header_len != HEADER_LEN {
@@ -676,9 +679,10 @@ pub fn read_header(path: impl AsRef<std::path::Path>) -> Result<ChunkHeader, Spa
     }
     let version = u16::from_le_bytes([head[8], head[9]]);
     if version != VERSION {
-        return Err(SpannError::Corrupt(format!(
-            "unsupported version {version} (this build writes {VERSION}; rebuild the index)"
-        )));
+        return Err(SpannError::NeedsRebuild {
+            found: version,
+            expected: VERSION,
+        });
     }
     let dims = u32::from_le_bytes(head[12..16].try_into().unwrap()) as usize;
     let metric = match head[16] {
@@ -818,6 +822,27 @@ impl FileIndex {
         })
     }
 
+    /// Drops the resident pages of this chunk's mapping, returning how many
+    /// bytes were handed back to the kernel.
+    ///
+    /// The chunk is immutable once published, so a dropped page is re-read from
+    /// the file (or the object) on the next access; nothing is lost but time.
+    /// This is what lets a long-lived engine keep every segment's chain addressable
+    /// while its RSS tracks the working set instead of the index size.
+    pub fn release_pages(&self) -> usize {
+        self.map.release_pages()
+    }
+
+    /// The bytes this reader holds in the heap: the header, the section table,
+    /// and the regenerated rotation. The mapped pages are **not** counted - they
+    /// are page cache (`buffer::mapped::mapped_bytes` reports their extent).
+    pub fn heap_bytes(&self) -> usize {
+        // The rotated copy of the chunk is `dims` signs plus the FWHT block
+        // lengths (`index::spann::quantize::Rotation`), i.e. `dims x 4` order -
+        // not a `dims x dims` matrix.
+        std::mem::size_of::<Self>() + self.layout.header.dims * 8
+    }
+
     /// A view over the mapping; the layout was verified at open, so this is free.
     fn chunk(&self) -> Chunk<'_> {
         Chunk::from_layout(&self.map, self.layout.clone())
@@ -938,7 +963,15 @@ impl FileIndex {
         set: &mut SearchSet,
     ) {
         let chunk = self.chunk();
-        self.scan_leaf(&chunk, key, q, self.layout.header.metric, self.dims(), allowed, set);
+        self.scan_leaf(
+            &chunk,
+            key,
+            q,
+            self.layout.header.metric,
+            self.dims(),
+            allowed,
+            set,
+        );
     }
 
     pub fn dims(&self) -> usize {
@@ -1109,6 +1142,65 @@ impl FileIndex {
 mod tests {
     use super::*;
     use index::spann::SpannIndex;
+
+    /// A chunk of another format version is **not** corruption: the bytes are
+    /// readable, the layout is the same, and the repair is a rebuild from the
+    /// column. The errors are distinct so the checkpoint can defer that rebuild
+    /// instead of treating a readable index as damaged.
+    #[test]
+    fn a_chunk_of_another_version_asks_for_a_rebuild() {
+        let index = SpannIndex::build(rows(60, 8), opts()).unwrap();
+        let dir = std::env::temp_dir().join(format!("spann_version_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("old.idx");
+        write_to(&index, &path, 0).unwrap();
+
+        let mut bytes = std::fs::read(&path).unwrap();
+        // The version is the u16 at offset 8 (`Layout::open`).
+        let bumped = (VERSION + 1).to_le_bytes();
+        bytes[8] = bumped[0];
+        bytes[9] = bumped[1];
+        std::fs::write(&path, &bytes).unwrap();
+
+        match read_header(&path) {
+            Err(SpannError::NeedsRebuild { found, expected }) => {
+                assert_eq!(found, VERSION + 1, "the header names the version it found");
+                assert_eq!(expected, VERSION, "and the one this build reads");
+            }
+            _ => panic!("a version bump must ask for a rebuild, not report corruption"),
+        }
+        match Layout::open(&bytes) {
+            Err(SpannError::NeedsRebuild { found, .. }) => assert_eq!(found, VERSION + 1),
+            _ => panic!("the full layout must report the same thing"),
+        }
+    }
+
+    /// Giving an idle chunk's pages back does not close it: the mapping stays
+    /// valid and the next read faults the same immutable bytes back in from the
+    /// file. That is what lets a long-lived engine keep every chain addressable
+    /// while its RSS tracks the working set.
+    #[test]
+    fn releasing_the_pages_keeps_the_chunk_readable() {
+        let index = SpannIndex::build(rows(150, 8), opts()).unwrap();
+        let dir = std::env::temp_dir().join(format!("spann_release_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("release.idx");
+        write_to(&index, &path, 0).unwrap();
+
+        let opened = FileIndex::open(&path, &opts()).unwrap();
+        let before = opened.len();
+        let released = opened.release_pages();
+        assert!(released > 0, "a mapped chunk has pages to give back");
+        assert_eq!(opened.len(), before);
+        // The directory still answers, and every partition keeps its members:
+        // the read goes back to the file, not to a copy that was dropped.
+        let meta = opened.tree_meta();
+        assert_eq!(meta.len(), index.partitions().len());
+        for (at, part) in index.partitions().iter().enumerate() {
+            assert_eq!(meta[at].members, part.members.len());
+            assert_eq!(meta[at].key, part.key);
+        }
+    }
 
     fn rows(n: usize, dim: usize) -> Vec<(u64, Vec<f32>)> {
         (0..n)

@@ -52,8 +52,6 @@ use super::{Encode, Member, Options, PartitionKey, SpannError, SpannIndex};
 /// only producer of extra children, and every child costs one centroid distance
 /// per descent, so the width is capped rather than the depth alone.
 pub const FANOUT: usize = 64;
-/// Upper bound on fixup steps in one drain, so a commit cannot hang.
-const MAX_FIXUP_STEPS: usize = 1 << 14;
 
 /// Rows an import draws to seed the routing levels (§0.0.5). Strided over the
 /// source, so it is one sequential read: 8192 × 6 KB ≈ 48 MB at 1536d, dropped
@@ -92,9 +90,14 @@ pub struct IncPartition {
     /// Mean of the members, raw space. Frozen once the node stops being a
     /// mutable root (invariant I1).
     pub centroid: Vec<f32>,
-    /// `rot.apply(centroid)`; the codes and the query side are both relative
-    /// to this, so it is cached rather than recomputed per insert.
-    pub rot_centroid: Vec<f32>,
+    /// `rot.apply(centroid)`, computed on first use and cached.
+    ///
+    /// It is **derived**: the descent ranks by the raw centroid and only a leaf
+    /// that takes rows or is published ever needs the rotated form. Building it
+    /// for every partition is `dims x 4` bytes per partition of data nothing
+    /// reads - at 1536d and the 62k partitions of an 8M-row segment that is
+    /// 380 MB on top of the raw centroids.
+    rot_centroid: std::sync::OnceLock<Vec<f32>>,
     /// `max ‖x − c‖`, for the radius lower bound (§8.3).
     pub radius: f32,
     /// Child keys, empty for a leaf.
@@ -103,15 +106,6 @@ pub struct IncPartition {
     pub members: Vec<Member>,
     /// Rows inserted since the last fold; same encoding as `members`.
     pub pending: Vec<Member>,
-    /// Rows whose codes are **already on disk** (in the chunk this tree was
-    /// loaded from) and are not held here.
-    ///
-    /// This is what makes a live tree over a published chunk cheap: the
-    /// directory (centroid, radius, children, counts) stays in heap and the
-    /// slot pages stay in the mapping. A split of such a leaf reads its page
-    /// back through [`SlotSource`] and re-encodes the rows into two new leaves,
-    /// at which point its count returns to zero.
-    pub published: usize,
     /// Only the un-split root: it keeps the rows **themselves** and is scanned
     /// exactly, which is what Cockroach's root partition does (the one partition
     /// the store encodes with `UnQuantizer`) and what spfresh's full-precision
@@ -134,27 +128,30 @@ pub struct IncPartition {
 
 impl IncPartition {
     /// An empty leaf whose centroid is `centroid`.
+    /// `rot.apply(centroid)`, cached after the first call.
+    fn rot_centroid(&self, rot: &Rotation) -> &[f32] {
+        self.rot_centroid.get_or_init(|| rot.apply(&self.centroid))
+    }
+
     fn new_leaf(
         key: u64,
         depth: u32,
         parent: Option<u64>,
         centroid: Vec<f32>,
-        rot: &Rotation,
+        _rot: &Rotation,
         dim: usize,
         mutable: bool,
     ) -> Self {
-        let rot_centroid = rot.apply(&centroid);
         Self {
             key,
             depth,
             parent,
             centroid,
-            rot_centroid,
+            rot_centroid: std::sync::OnceLock::new(),
             radius: 0.0,
             children: Vec::new(),
             members: Vec::new(),
             pending: Vec::new(),
-            published: 0,
             mutable,
             raw: mutable.then(|| Vec::with_capacity(dim * 4)),
             raw_ids: Vec::new(),
@@ -169,7 +166,7 @@ impl IncPartition {
     pub fn len(&self) -> usize {
         match self.raw {
             Some(_) => self.raw_ids.len(),
-            None => self.published + self.members.len() + self.pending.len(),
+            None => self.members.len() + self.pending.len(),
         }
     }
 
@@ -225,31 +222,6 @@ impl IncPartition {
 /// inserts, so a split that lands mid-batch still has every row it needs.
 pub type RowSource<'a> = &'a dyn Fn(u64) -> Option<Vec<f32>>;
 
-/// Supplies a **published leaf's slots** by key: the codes and row ids already
-/// stored in the chunk the live tree was loaded from.
-///
-/// The counterpart of [`RowSource`] for a tree that keeps only its directory in
-/// heap. `storage::knn_index::spann::ChunkChain` answers it from the mapped slot
-/// page, so a split reads one page (~27 KB at 128 rows × 212 B), not the tree.
-pub type SlotSource<'a> = &'a dyn Fn(u64) -> Option<Vec<Member>>;
-
-/// One node of a published directory, as [`IncIndex::from_durable`] takes it.
-///
-/// The field names are the chunk's (`Storage`'s `TreeMeta`): a **level** counted
-/// upward from the leaf and a member **count**, because a published leaf's rows
-/// stay in the chunk.
-#[derive(Clone, Debug, PartialEq)]
-pub struct DurableNode {
-    pub key: PartitionKey,
-    /// `1` = leaf, `root.level == height` (§6.1).
-    pub level: u32,
-    /// Rows the node covers (a leaf's slot count).
-    pub members: usize,
-    pub radius: f32,
-    pub children: Vec<PartitionKey>,
-    pub centroid: Vec<f32>,
-}
-
 /// The incremental index.
 ///
 /// `parts` is sorted by [`IncPartition::key`], and keys are allocated in
@@ -303,135 +275,6 @@ impl IncIndex {
         })
     }
 
-    /// A live tree over a **published directory**: the shape the next insert
-    /// descends and the leaves it appends to.
-    ///
-    /// What is *not* read here is the rows: a published leaf's codes stay in the
-    /// chunk and are fetched by key when a split needs them
-    /// (`IncPartition::published`, [`SlotSource`]). So loading a 390k-partition
-    /// tree costs the directory (~40 B per node plus two centroids), not
-    /// 208 B per row.
-    ///
-    /// Keys are kept **as published**, which is what makes the first delta chunk
-    /// addressable next to the base one; new nodes take keys above the highest
-    /// loaded key.
-    pub fn from_durable(
-        dim: usize,
-        opts: Options,
-        mut nodes: Vec<DurableNode>,
-    ) -> Result<Self, SpannError> {
-        let mut index = Self::new(dim, opts)?;
-        if nodes.is_empty() {
-            return Ok(index);
-        }
-        for node in &nodes {
-            if node.centroid.len() != dim {
-                return Err(SpannError::DimensionMismatch {
-                    expected: dim,
-                    actual: node.centroid.len(),
-                });
-            }
-        }
-        nodes.sort_unstable_by_key(|node| node.key);
-        // The shape is read from the **child edges**, not from the `level`
-        // column. A split converts the overflowing leaf into a branch *in place*
-        // (so `ROOT_KEY` never moves), which raises the level of every node above
-        // it - and a delta chunk that rewrote that leaf leaves the root's page,
-        // and its now stale level, in the chunk underneath it. Deriving "the root
-        // is the highest level" then finds two roots. Depth from the root, by
-        // walk, is what the tree actually is.
-        let root_key = ROOT_KEY as PartitionKey;
-        if nodes.iter().all(|node| node.key != root_key) {
-            return Err(SpannError::Corrupt(
-                "a directory without its root".to_string(),
-            ));
-        }
-        let at_of: std::collections::HashMap<PartitionKey, usize> = nodes
-            .iter()
-            .enumerate()
-            .map(|(at, node)| (node.key, at))
-            .collect();
-        // Child → parent, one pass instead of a scan per node. An edge to a key
-        // no node names is left out: that is a dangling edge (a delta chunk
-        // whose parent page it did not rewrite), which `ChunkChain::coverage`
-        // reports and the reader resolves through the older layer.
-        let mut parents: std::collections::HashMap<PartitionKey, PartitionKey> =
-            std::collections::HashMap::new();
-        for node in &nodes {
-            for child in &node.children {
-                if at_of.contains_key(child) {
-                    parents.insert(*child, node.key);
-                }
-            }
-        }
-        // Depth from the root. A node nobody reaches is a page an older layer
-        // still holds but the current parent no longer names (a retired sibling):
-        // it keeps its rows' keys resolvable and starts a descent that never
-        // arrives, so keeping it costs one directory entry.
-        let root_at = at_of[&root_key];
-        let mut depths = vec![u32::MAX; nodes.len()];
-        depths[root_at] = 0;
-        let mut frontier: Vec<PartitionKey> = vec![root_key];
-        while let Some(key) = frontier.pop() {
-            let depth = depths[at_of[&key]];
-            for child in &nodes[at_of[&key]].children {
-                if let Some(at) = at_of.get(child) {
-                    if depths[*at] > depth + 1 {
-                        depths[*at] = depth + 1;
-                        frontier.push(*child);
-                    }
-                }
-            }
-        }
-        let mut rows = 0usize;
-        let mut parts = Vec::with_capacity(nodes.len());
-        for (at, node) in nodes.iter().enumerate() {
-            let reachable = depths[at] != u32::MAX;
-            // An unreachable page sits where its parent put it, one level under
-            // it, so a split that later reaches it starts from the right depth.
-            let depth = if reachable {
-                depths[at]
-            } else {
-                parents
-                    .get(&node.key)
-                    .and_then(|parent| at_of.get(parent))
-                    .map(|parent| depths[*parent].saturating_add(1))
-                    .filter(|depth| *depth != u32::MAX)
-                    .unwrap_or(1)
-            };
-            let parent = parents.get(&node.key).map(|key| u64::from(*key));
-            let mut part = IncPartition::new_leaf(
-                u64::from(node.key),
-                depth,
-                parent,
-                node.centroid.clone(),
-                &index.rot,
-                dim,
-                false,
-            );
-            part.radius = node.radius;
-            part.children = node.children.iter().map(|key| u64::from(*key)).collect();
-            part.published = if node.children.is_empty() {
-                node.members
-            } else {
-                0
-            };
-            // Only a reachable leaf's rows are the tree's: a retired leaf's page
-            // still holds the rows that moved into the leaves that replaced it.
-            if reachable && node.children.is_empty() {
-                rows += part.published;
-            }
-            parts.push(part);
-        }
-        index.next_key = parts
-            .last()
-            .map(|part| part.key + 1)
-            .unwrap_or(ROOT_KEY + 1);
-        index.parts = parts;
-        index.rows = rows;
-        Ok(index)
-    }
-
     /// A key no node uses yet. Always larger than every existing key.
     fn alloc_key(&mut self) -> u64 {
         let key = self.next_key;
@@ -442,13 +285,6 @@ impl IncIndex {
             key
         );
         key
-    }
-
-    /// Keys whose page differs from what is on disk - the publish set (§5.4).
-    pub fn dirty_nodes(&self) -> Vec<u64> {
-        let mut keys: Vec<u64> = self.dirty.iter().copied().collect();
-        keys.sort_unstable();
-        keys
     }
 
     /// Whether anything was written since the tree was created or published.
@@ -463,11 +299,6 @@ impl IncIndex {
             .filter(|part| part.is_leaf())
             .map(|part| part.local_len())
             .sum()
-    }
-
-    /// Rows whose codes are already in a chunk.
-    pub fn published_rows(&self) -> usize {
-        self.parts.iter().map(|part| part.published).sum()
     }
 
     pub fn dim(&self) -> usize {
@@ -506,57 +337,58 @@ impl IncIndex {
         self.parts.iter().map(|p| p.depth + 1).max().unwrap_or(0)
     }
 
-    /// The same tree as a bulk [`SpannIndex`], which is the form the chunk
-    /// writer publishes (`storage::knn_index::spann::write_to`).
+    /// The in-memory tree as a chunk, borrowing it.
     ///
-    /// **Keys are kept**, not renumbered to positions: a published key is the
-    /// node's stable identifier, and a delta chunk is only addressable next to
-    /// the chunk it supersedes if both name the node the same way.
-    ///
-    /// **Levels** are counted bottom-up (`1` = leaf, `root.level == height`,
-    /// §6.1). `depth` cannot stand in for `level`: this tree grows one leaf at a
-    /// time, so a leaf can sit above `MAX_DEPTH`'s complement of the root, and
-    /// the format's reader treats `level <= 1` as "this is a leaf".
-    ///
-    /// `None` when there is nothing to publish, or when a leaf's rows are only
-    /// on disk and no [`SlotSource`] was supplied: silently publishing a short
-    /// partition would lose rows.
+    /// The published tree is not written this way any more - a delta goes
+    /// through `spann::page_tree`, which never materialises the directory - but
+    /// a tail is published whole, and so is a test fixture.
     pub fn to_spann(&self) -> Option<SpannIndex> {
-        let keys: Vec<u64> = self.parts.iter().map(|part| part.key).collect();
-        self.to_spann_keys(&keys, None)
-    }
-
-    /// [`Self::to_spann`] over an explicit key set - the publish path of a
-    /// **dirty set** (§5.4).
-    ///
-    /// Each key becomes one partition of the chunk, with its own children and
-    /// members; an edge to a key outside `keys` is left dangling, which is what
-    /// the chain reader resolves against the older chunks
-    /// (`storage::knn_index::spann::write_dirty`).
-    pub fn to_spann_keys(
-        &self,
-        keys: &[u64],
-        slots: Option<SlotSource<'_>>,
-    ) -> Option<SpannIndex> {
-        if keys.is_empty() || self.parts.is_empty() {
-            return None;
-        }
-        let levels = self.levels();
-        let height = levels.first().copied().unwrap_or(1).max(1);
-        let mut partitions: Vec<Partition> = Vec::with_capacity(keys.len());
-        for key in keys {
-            let at = self.find(*key)?;
-            let part = &self.parts[at];
-            let members = self.members_of(part, slots)?;
+        let levels = Self::levels_for(&self.parts);
+        let height = levels.first().copied().unwrap_or(0);
+        let mut partitions = Vec::with_capacity(self.parts.len());
+        for (at, part) in self.parts.iter().enumerate() {
+            // A cold-start root keeps its rows at full precision (`encode =
+            // none`); `Partition::from_decoded` has no raw column, so such a
+            // leaf is rebuilt from its vectors.
+            if let Some(raw) = part.raw.as_ref() {
+                if part.children.is_empty() {
+                    let owned: Vec<Vec<f32>> = raw
+                        .chunks_exact(self.dim)
+                        .map(|chunk| chunk.to_vec())
+                        .collect();
+                    let items: Vec<(u64, &[f32])> = owned
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| (part.raw_ids.get(i).copied().unwrap_or(0), v.as_slice()))
+                        .collect();
+                    partitions.push(Partition::build(
+                        part.key as PartitionKey,
+                        levels[at],
+                        self.dim,
+                        &items,
+                        &self.rot,
+                        self.opts.encode,
+                    ));
+                    continue;
+                }
+            }
+            let mut members: Vec<Member> = part.members.clone();
+            members.extend(part.pending.iter().cloned());
+            if members.is_empty() && part.children.is_empty() {
+                continue;
+            }
             partitions.push(Partition::from_decoded(
-                *key as PartitionKey,
+                part.key as PartitionKey,
                 levels[at],
                 self.dim,
                 part.centroid.clone(),
                 part.radius,
-                part.rot_centroid.clone(),
+                part.rot_centroid(&self.rot).to_vec(),
                 members,
-                part.children.iter().map(|child| *child as PartitionKey).collect(),
+                part.children
+                    .iter()
+                    .map(|child| *child as PartitionKey)
+                    .collect(),
             ));
         }
         Some(SpannIndex::from_parts(
@@ -565,84 +397,14 @@ impl IncIndex {
             self.rot.clone(),
             partitions,
             height,
-            super::ROOT_KEY,
+            ROOT_KEY as PartitionKey,
         ))
-    }
-
-    /// What changed since the tree was loaded or last published (§5.4).
-    pub fn to_spann_dirty(&self, slots: Option<SlotSource<'_>>) -> Option<SpannIndex> {
-        let keys = self.dirty_nodes();
-        self.to_spann_keys(&keys, slots)
-    }
-
-    /// `1` for a leaf, `1 + max(child level)` above it - the format's numbering.
-    fn levels(&self) -> Vec<u32> {
-        let mut levels = vec![1u32; self.parts.len()];
-        // Keys are allocated before their children's, so a reverse walk visits
-        // every node after the node that owns it.
-        for at in (0..self.parts.len()).rev() {
-            if let Some(owner_key) = self.parts[at].parent {
-                if let Some(owner) = self.find(owner_key) {
-                    levels[owner] = levels[owner].max(levels[at] + 1);
-                }
-            }
-        }
-        levels
-    }
-
-    /// The members a partition's page holds: a leaf's rows (published base +
-    /// local) or a branch's child centroids, encoded against its own centroid.
-    fn members_of(&self, part: &IncPartition, slots: Option<SlotSource<'_>>) -> Option<Vec<Member>> {
-        if let Some(raw) = part.raw.as_ref() {
-            // The un-split root never encoded its rows; do it here, once, so the
-            // chunk carries the same codes a split would have produced.
-            return Some(
-                part.raw_ids
-                    .iter()
-                    .zip(raw.chunks_exact(self.dim))
-                    .map(|(id, vector)| Member {
-                        id: *id,
-                        code: quantize::encode(&self.rot, &part.rot_centroid, vector),
-                    })
-                    .collect(),
-            );
-        }
-        let mut out: Vec<Member> = Vec::with_capacity(part.len());
-        if part.published > 0 {
-            let base = slots?(part.key)?;
-            if base.len() != part.published {
-                // The page this tree was loaded from says a different number of
-                // rows: the caller is publishing against a chain that moved.
-                return None;
-            }
-            out.extend(base);
-        }
-        if part.children.is_empty() {
-            out.extend(part.members.iter().cloned());
-            out.extend(part.pending.iter().cloned());
-        } else {
-            for child in &part.children {
-                let centroid = &self.parts[self.find(*child)?].centroid;
-                out.push(Member {
-                    id: *child,
-                    code: quantize::encode(&self.rot, &part.rot_centroid, centroid),
-                });
-            }
-        }
-        Some(out)
     }
 
     /// [`Self::to_spann`] for a tree nobody needs afterwards: the codes and
     /// centroids are **moved** into the chunk's partitions, so a build peaks at
     /// one copy of the index rather than two.
-    ///
-    /// A tree loaded from a chunk has its base rows on disk rather than here, so
-    /// it cannot be published this way (there is nothing to move); it publishes
-    /// through [`Self::to_spann_dirty`] with its [`SlotSource`] instead.
     pub fn into_spann(self) -> Option<SpannIndex> {
-        if self.parts.iter().any(|part| part.published > 0) {
-            return self.to_spann();
-        }
         let IncIndex {
             opts,
             dim,
@@ -672,6 +434,11 @@ impl IncIndex {
             } = part;
             // Child keys stay the keys they are: a chunk's edges name stable
             // identifiers, and the reader resolves them by key.
+            let rot_centroid = match rot_centroid.into_inner() {
+                Some(rot) => rot,
+                // Never encoded against: the leaf only ever scanned its raw rows.
+                None => rot.apply(&centroid),
+            };
             let members: Vec<Member> = match raw {
                 // The un-split root never encoded its rows; do it once here.
                 Some(raw) => raw_ids
@@ -695,7 +462,10 @@ impl IncIndex {
                 radius,
                 rot_centroid,
                 members,
-                children.iter().map(|child| *child as PartitionKey).collect(),
+                children
+                    .iter()
+                    .map(|child| *child as PartitionKey)
+                    .collect(),
             ));
         }
         Some(SpannIndex::from_parts(
@@ -731,7 +501,8 @@ impl IncIndex {
         let mut bytes = 0;
         for p in &self.parts {
             bytes += p.local_len() * per_member;
-            bytes += p.centroid.len() * 4 + p.rot_centroid.len() * 4;
+            bytes +=
+                p.centroid.len() * 4 + p.rot_centroid.get().map(|rot| rot.len() * 4).unwrap_or(0);
             bytes += p.children.len() * 8;
             bytes += p.raw.as_ref().map(|r| r.len() * 4).unwrap_or(0);
         }
@@ -766,8 +537,15 @@ impl IncIndex {
             });
         }
         if self.parts.is_empty() {
-            let mut part =
-                IncPartition::new_leaf(ROOT_KEY, 0, None, vector.to_vec(), &self.rot, self.dim, true);
+            let mut part = IncPartition::new_leaf(
+                ROOT_KEY,
+                0,
+                None,
+                vector.to_vec(),
+                &self.rot,
+                self.dim,
+                true,
+            );
             part.push_raw(row_id, vector);
             self.parts.push(part);
             self.dirty.insert(ROOT_KEY);
@@ -786,7 +564,7 @@ impl IncIndex {
             part.radius = part.radius.max(l2_sq(vector, &part.centroid).sqrt());
             self.rows += 1;
         } else {
-            let rot_centroid = self.parts[idx].rot_centroid.clone();
+            let rot_centroid = self.parts[idx].rot_centroid(&self.rot).to_vec();
             let code = quantize::encode(&self.rot, &rot_centroid, vector);
             let radius = l2_sq(vector, &self.parts[idx].centroid).sqrt();
             let part = &mut self.parts[idx];
@@ -811,16 +589,23 @@ impl IncIndex {
     /// Not on the insert path, by design - see [`Self::insert`]. The caller runs
     /// this at a batch boundary (commit, flush, or the end of a load).
     pub fn run_fixups(&mut self, source: Option<RowSource<'_>>) {
-        self.run_fixups_from(source, None);
+        let _ = self.run_fixups_budgeted(source, usize::MAX);
     }
 
-    /// [`Self::run_fixups`] for a tree whose leaves are **published**: a split
-    /// has to read the leaf's slot page to get its rows back, and `slots`
-    /// supplies it (`storage::knn_index::spann::ChunkChain`).
-    pub fn run_fixups_from(&mut self, source: Option<RowSource<'_>>, slots: Option<SlotSource<'_>>) {
+    /// [`Self::run_fixups`] that stops after `budget` queued keys and
+    /// returns how many it took.
+    ///
+    /// This is the pacer the write path needs: an insert that crosses a
+    /// partition bound can be made to pay **one** split, not the whole backlog,
+    /// and the rest of the queue is drained by a background pass. Returning
+    /// `budget` (rather than a bool) is what lets the caller tell "the queue is
+    /// empty" from "I ran out of budget" - only the former lets it run the
+    /// underfull sweep, which is a full directory pass.
+    pub fn run_fixups_budgeted(&mut self, source: Option<RowSource<'_>>, budget: usize) -> usize {
         // A split queues nothing new and a merge neither, so one pass per queued
         // key is the whole job; the bound only stops a pathological input from
         // hanging a commit.
+        let cap = budget.max(1);
         let mut steps = 0usize;
         let mut rows_before: usize = self
             .parts
@@ -829,10 +614,13 @@ impl IncIndex {
             .map(|p| p.len())
             .sum();
         while let Some(key) = self.fixups.pop() {
-            steps += 1;
-            if steps > MAX_FIXUP_STEPS {
+            if steps >= cap {
+                // Put it back: the key was not handled and its page is still
+                // over its bound. `queue_fixup` would refuse it otherwise.
+                self.fixups.push(key);
                 break;
             }
+            steps += 1;
             self.queued.remove(&key);
             let Some(idx) = self.find(key) else {
                 // Merged away by an earlier job in this pass.
@@ -840,9 +628,9 @@ impl IncIndex {
             };
             let len = self.parts[idx].len();
             let _ = if len > self.opts.max_partition_size {
-                self.split_or_sideways(idx, source, slots)
+                self.split_or_sideways(idx, source)
             } else if len < self.opts.min_partition_size {
-                self.merge(idx, source, slots)
+                self.merge(idx, source)
             } else {
                 Ok(())
             };
@@ -855,7 +643,10 @@ impl IncIndex {
             debug_assert_eq!(now, rows_before, "fixup on key {key} lost a row");
             rows_before = now;
         }
-        self.merge_underfull(source, slots);
+        if steps < cap {
+            self.merge_underfull(source);
+        }
+        steps
     }
 
     fn queue_fixup(&mut self, key: u64) {
@@ -923,7 +714,8 @@ impl IncIndex {
             .map(|row| l2_sq(row, &centroid).sqrt())
             .fold(0.0f32, f32::max);
         let pos = self.parts.len();
-        let mut part = IncPartition::new_leaf(key, depth, None, centroid, &self.rot, self.dim, false);
+        let mut part =
+            IncPartition::new_leaf(key, depth, None, centroid, &self.rot, self.dim, false);
         part.radius = radius;
         self.parts.push(part);
 
@@ -980,7 +772,6 @@ impl IncIndex {
         &mut self,
         idx: usize,
         source: Option<RowSource<'_>>,
-        slots: Option<SlotSource<'_>>,
     ) -> Result<(), SpannError> {
         let part = &self.parts[idx];
         if !part.is_leaf() || part.len() < 2 {
@@ -991,9 +782,9 @@ impl IncIndex {
             return Ok(());
         }
         if part.depth + 1 < MAX_DEPTH {
-            self.split(idx, source, slots)
+            self.split(idx, source)
         } else {
-            self.split_sideways(idx, source, slots)
+            self.split_sideways(idx, source)
         }
     }
 
@@ -1023,12 +814,7 @@ impl IncIndex {
     /// (RaBitQ codes are centroid-relative), so unlike spfresh - which
     /// concatenates postings verbatim - a merge *can* degrade a code; adjacency
     /// plus the underfull trigger keeps that bounded.
-    fn merge(
-        &mut self,
-        idx: usize,
-        source: Option<RowSource<'_>>,
-        slots: Option<SlotSource<'_>>,
-    ) -> Result<(), SpannError> {
+    fn merge(&mut self, idx: usize, source: Option<RowSource<'_>>) -> Result<(), SpannError> {
         let (key, len, src_centroid, src_radius) = {
             let part = &self.parts[idx];
             (part.key, part.len(), part.centroid.clone(), part.radius)
@@ -1071,7 +857,7 @@ impl IncIndex {
             return Ok(());
         }
 
-        let (vectors, ids) = self.gather_rows(idx, source, slots);
+        let (vectors, ids) = self.gather_rows(idx, source);
         debug_assert_eq!(
             vectors.len(),
             len,
@@ -1110,7 +896,8 @@ impl IncIndex {
         for (i, slot) in plan.iter().enumerate() {
             let at = candidates[*slot].0;
             let vector = &vectors[i];
-            let code = quantize::encode(&self.rot, &self.parts[at].rot_centroid, vector);
+            let rot_centroid = self.parts[at].rot_centroid(&self.rot).to_vec();
+            let code = quantize::encode(&self.rot, &rot_centroid, vector);
             let radius = l2_sq(vector, &self.parts[at].centroid).sqrt();
             let part = &mut self.parts[at];
             part.push_member(ids[i], code);
@@ -1146,7 +933,7 @@ impl IncIndex {
     }
 
     /// Merges every leaf that a delete or a split left under the limit.
-    fn merge_underfull(&mut self, source: Option<RowSource<'_>>, slots: Option<SlotSource<'_>>) {
+    fn merge_underfull(&mut self, source: Option<RowSource<'_>>) {
         let thin: Vec<u64> = self
             .parts
             .iter()
@@ -1155,7 +942,7 @@ impl IncIndex {
             .collect();
         for key in thin {
             if let Some(idx) = self.find(key) {
-                let _ = self.merge(idx, source, slots);
+                let _ = self.merge(idx, source);
             }
         }
     }
@@ -1173,16 +960,11 @@ impl IncIndex {
     /// DRAM is the alternative and costs 6 KB per row at 1536d, which is the
     /// constraint the codes exist to avoid, so the row source is the cheap side
     /// of the trade.
-    fn split(
-        &mut self,
-        idx: usize,
-        source: Option<RowSource<'_>>,
-        slots: Option<SlotSource<'_>>,
-    ) -> Result<(), SpannError> {
+    fn split(&mut self, idx: usize, source: Option<RowSource<'_>>) -> Result<(), SpannError> {
         let part = &self.parts[idx];
         let depth = part.depth;
         let key = part.key;
-        let (vectors, ids) = self.gather_rows(idx, source, slots);
+        let (vectors, ids) = self.gather_rows(idx, source);
         if vectors.len() < 2 {
             return Ok(());
         }
@@ -1246,7 +1028,6 @@ impl IncIndex {
         let parent = &mut self.parts[idx];
         parent.members.clear();
         parent.pending.clear();
-        parent.published = 0;
         parent.raw = None;
         parent.raw_ids.clear();
         parent.mutable = false;
@@ -1277,12 +1058,7 @@ impl IncIndex {
     /// A leaf loaded from a chunk has neither `raw` nor `members`: its codes come
     /// from `slots(key)`, the published page. That is the read half of the
     /// read-modify-write the dirty-leaf dump performs.
-    fn gather_rows(
-        &self,
-        idx: usize,
-        source: Option<RowSource<'_>>,
-        slots: Option<SlotSource<'_>>,
-    ) -> (Vec<Vec<f32>>, Vec<u64>) {
+    fn gather_rows(&self, idx: usize, source: Option<RowSource<'_>>) -> (Vec<Vec<f32>>, Vec<u64>) {
         let part = &self.parts[idx];
         let mut vectors: Vec<Vec<f32>> = Vec::with_capacity(part.len());
         let mut ids: Vec<u64> = Vec::with_capacity(part.len());
@@ -1293,26 +1069,10 @@ impl IncIndex {
             }
             return (vectors, ids);
         }
-        let base: Vec<Member> = if part.published > 0 {
-            match slots.and_then(|page| page(part.key)) {
-                Some(members) if members.len() == part.published => members,
-                // Without the page (or with a page that moved) the leaf cannot be
-                // split honestly: reporting a short row list makes the caller
-                // refuse the split (`vectors.len() < 2`), which leaves the leaf
-                // overfull rather than silently dropping rows.
-                _ => return (Vec::new(), Vec::new()),
-            }
-        } else {
-            Vec::new()
-        };
-        for m in base
-            .iter()
-            .chain(part.members.iter())
-            .chain(part.pending.iter())
-        {
+        for m in part.members.iter().chain(part.pending.iter()) {
             let row = match source.and_then(|fetch| fetch(m.id)) {
                 Some(v) if v.len() == self.dim => v,
-                _ => dequantize_member(&self.rot, &part.rot_centroid, m),
+                _ => dequantize_member(&self.rot, part.rot_centroid(&self.rot), m),
             };
             vectors.push(row);
             ids.push(m.id);
@@ -1344,7 +1104,6 @@ impl IncIndex {
         &mut self,
         idx: usize,
         source: Option<RowSource<'_>>,
-        slots: Option<SlotSource<'_>>,
     ) -> Result<(), SpannError> {
         let (key, depth) = {
             let part = &self.parts[idx];
@@ -1360,7 +1119,7 @@ impl IncIndex {
             return Ok(());
         }
 
-        let (vectors, ids) = self.gather_rows(idx, source, slots);
+        let (vectors, ids) = self.gather_rows(idx, source);
         if vectors.len() < 2 {
             return Ok(());
         }
@@ -1418,7 +1177,7 @@ impl IncIndex {
         let mut radius = 0.0f32;
         for (id, v) in items {
             radius = radius.max(l2_sq(v, &part.centroid).sqrt());
-            let code = quantize::encode(&self.rot, &part.rot_centroid, v);
+            let code = quantize::encode(&self.rot, part.rot_centroid(&self.rot), v);
             part.push_member(*id, code);
         }
         part.fold_pending();
@@ -1563,7 +1322,7 @@ impl IncIndex {
             }
             return;
         }
-        let qc = quantize::make_query(&self.rot, &part.rot_centroid, query);
+        let qc = quantize::make_query(&self.rot, part.rot_centroid(&self.rot), query);
         for member in part.members.iter().chain(part.pending.iter()) {
             if let Some(allowed) = allowed {
                 if !allowed.contains(&member.id) {
@@ -1691,7 +1450,7 @@ impl Rng {
 /// Empty clusters are repaired by stealing a point from the largest cluster, so
 /// a split never yields an empty leaf (which would split again on the very next
 /// insert, forever).
-fn kmeans_k(
+pub(crate) fn kmeans_k(
     points: &[&[f32]],
     dim: usize,
     k: usize,
@@ -1846,92 +1605,6 @@ pub fn member_bytes(encode: Encode, dim: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// A delta chunk that converted a leaf into a branch does **not** rewrite
-    /// the root's page - the root's children did not change, only its level did -
-    /// so the chain it is read through has a stale `level` on the root and the
-    /// new branch carrying the same number. Deriving "the tree has one root, the
-    /// highest level" then finds two; the shape has to come from the child edges.
-    ///
-    /// This is the exact state the eight-checkpoint test reached: keys 1..3 are
-    /// leaves of the root, key 4 was a leaf and is now a branch over 5 and 6, and
-    /// the root's page says level 2 just like key 4.
-    #[test]
-    fn a_directory_whose_root_level_is_stale_still_loads() {
-        let dim = 8;
-        let opts = || Options {
-            max_partition_size: 16,
-            min_partition_size: 4,
-            ..Options::default()
-        };
-        let nodes: Vec<DurableNode> = [
-            (0u32, 2u32, vec![1u32, 2, 3, 4], vec![0.0f32; 8]),
-            (1, 1, vec![], vec![1.0; 8]),
-            (2, 1, vec![], vec![2.0; 8]),
-            (3, 1, vec![], vec![3.0; 8]),
-            (4, 2, vec![5u32, 6], vec![4.0; 8]),
-            (5, 1, vec![], vec![5.0; 8]),
-            (6, 1, vec![], vec![6.0; 8]),
-        ]
-        .into_iter()
-        .map(|(key, level, children, centroid)| DurableNode {
-            key,
-            level,
-            members: if children.is_empty() { 10 } else { children.len() },
-            radius: 1.0,
-            children,
-            centroid,
-        })
-        .collect();
-
-        let live = IncIndex::from_durable(dim, opts(), nodes).expect("one root, read from the edges");
-        assert_eq!(live.len(), 50, "five reachable leaves of ten rows");
-        assert_eq!(live.parts().len(), 7);
-        let root = live.find(u64::from(ROOT_KEY as u32)).expect("key 0");
-        assert_eq!(live.parts()[root].depth, 0);
-        let branch = live.find(4).expect("the converted leaf");
-        assert_eq!(
-            live.parts()[branch].depth, 1,
-            "the branch sits where its parent put it"
-        );
-        for key in [5u64, 6] {
-            let at = live.find(key).expect("a new leaf");
-            assert_eq!(live.parts()[at].depth, 2);
-        }
-    }
-
-    /// A page an older layer still names but the current parent no longer does -
-    /// a leaf a merge retired - is kept (its key must stay resolvable) and does
-    /// not become a root.
-    #[test]
-    fn a_retired_page_is_kept_and_is_not_a_root() {
-        let dim = 4;
-        let nodes: Vec<DurableNode> = [
-            (0u32, 2u32, vec![1u32, 2], vec![0.0f32; 4]),
-            (1, 1, vec![], vec![1.0; 4]),
-            (2, 1, vec![], vec![2.0; 4]),
-            // Key 3 was retired: no parent lists it any more.
-            (3, 1, vec![], vec![3.0; 4]),
-        ]
-        .into_iter()
-        .map(|(key, level, children, centroid)| DurableNode {
-            key,
-            level,
-            members: 3,
-            radius: 1.0,
-            children,
-            centroid,
-        })
-        .collect();
-
-        let live = IncIndex::from_durable(dim, Options::default(), nodes).expect("loads");
-        assert!(live.find(3).is_some(), "the retired page stays resolvable");
-        assert_eq!(
-            live.len(),
-            6,
-            "only the reachable leaves' rows are the tree's"
-        );
-    }
 
     /// Two clusters at ±2 with **signed** per-dimension jitter.
     ///
@@ -2091,6 +1764,60 @@ mod tests {
         }
     }
 
+    /// A paced drain handles one queued key per call and hands the rest back.
+    ///
+    /// That is what keeps an insert from paying a whole backlog of splits: the
+    /// write path calls this with a small budget and a background pass finishes
+    /// the queue. The tree must stay **exact** in between - a row that is in a
+    /// leaf before a pass is in some leaf after it.
+    #[test]
+    fn a_budgeted_fixup_pass_takes_one_key_and_loses_nothing() {
+        let opts = Options {
+            max_partition_size: 8,
+            min_partition_size: 2,
+            ..opts()
+        };
+        let dim = 14usize;
+        let mut index = IncIndex::new(dim, opts).unwrap();
+        let row = |id: u64| -> Vec<f32> {
+            (0..dim)
+                .map(|i| (((id * 7 + i as u64) % 13) as f32) - 6.0)
+                .collect()
+        };
+        // The un-split root absorbs rows without queuing anything (`insert`
+        // appends to it), so the tree has to be split first for the queue to
+        // have more than one key in it.
+        for id in 0..64u64 {
+            index.insert(id, &row(id)).unwrap();
+        }
+        index.run_fixups(None);
+        assert!(index.parts().len() > 1, "the root split into leaves");
+        for id in 64..400u64 {
+            index.insert(id, &row(id)).unwrap();
+        }
+        let rows = index.len();
+        assert_eq!(rows, 400);
+        assert!(
+            index.pending_fixups() > 1,
+            "several leaves were over their bound: {}",
+            index.pending_fixups()
+        );
+        let mut passes = 0usize;
+        loop {
+            let steps = index.run_fixups_budgeted(None, 1);
+            if steps == 0 {
+                break;
+            }
+            assert_eq!(steps, 1, "a budget of one key took more than one");
+            passes += 1;
+            assert_eq!(index.len(), rows, "a paced pass lost a row");
+            assert!(passes < 10_000, "the queue never drained");
+        }
+        assert!(passes > 1, "the backlog was handled in a single pass");
+        assert_eq!(index.pending_fixups(), 0);
+        assert_eq!(index.len(), rows);
+    }
+
     /// Builds an index with a row source, so a split re-encodes the rows and
     /// not their 1-bit reconstructions.
     fn build_with(
@@ -2215,15 +1942,17 @@ mod tests {
             idx.splits() > 0,
             "the fixture has to split to be interesting"
         );
-        let spann = idx.to_spann().expect("a built index publishes");
-        assert_eq!(spann.len(), idx.len());
-        assert_eq!(spann.partitions().len(), idx.parts().len());
+        let (len, partitions, height, rows) =
+            (idx.len(), idx.parts().len(), idx.height(), idx.row_ids());
+        let spann = idx.into_spann().expect("a built index publishes");
+        assert_eq!(spann.len(), len);
+        assert_eq!(spann.partitions().len(), partitions);
         // The format's height is the root's level, which is not the deepest
         // node's depth: a leaf this tree never split can sit above the bottom.
-        assert!(spann.height() <= idx.height());
+        assert!(spann.height() <= height);
         let mut ids = spann.row_ids();
         ids.sort_unstable();
-        assert_eq!(ids, idx.row_ids(), "the same rows, no duplicates");
+        assert_eq!(ids, rows, "the same rows, no duplicates");
 
         // Keys are the DFS ordinals the format addresses, and a level counts up
         // from the leaf (the chunk's convention, not the incremental `depth`).
@@ -2421,7 +2150,7 @@ mod tests {
         {
             let bottom = parts.last_mut().unwrap();
             for (id, v) in pts.iter().take(8) {
-                let code = quantize::encode(&rot, &bottom.rot_centroid, v);
+                let code = quantize::encode(&rot, bottom.rot_centroid(&rot), v);
                 bottom.push_member(*id, code);
             }
             bottom.fold_pending();
@@ -2742,8 +2471,7 @@ mod tests {
     fn tree_of_leaves(dim: usize, opts: Options, leaves: &[Vec<(u64, Vec<f32>)>]) -> IncIndex {
         let mut idx = IncIndex::new(dim, opts).unwrap();
         let rot = idx.rot.clone();
-        let mut root =
-            IncPartition::new_leaf(ROOT_KEY, 0, None, vec![0.0; dim], &rot, dim, false);
+        let mut root = IncPartition::new_leaf(ROOT_KEY, 0, None, vec![0.0; dim], &rot, dim, false);
         let mut total = 0usize;
         for rows in leaves {
             let key = idx.alloc_key();
@@ -2759,7 +2487,7 @@ mod tests {
             let mut leaf =
                 IncPartition::new_leaf(key, 1, Some(ROOT_KEY), centroid.clone(), &rot, dim, false);
             for (id, v) in rows {
-                let code = quantize::encode(&rot, &leaf.rot_centroid, v);
+                let code = quantize::encode(&rot, leaf.rot_centroid(&rot), v);
                 leaf.push_member(*id, code);
                 leaf.radius = leaf.radius.max(l2_sq(v, &centroid).sqrt());
             }
@@ -2907,7 +2635,7 @@ mod tests {
         let rows_before = idx.row_ids().len();
         let parent_children = idx.parts[0].children.len();
 
-        idx.merge(at, Some(&source), None).unwrap();
+        idx.merge(at, Some(&source)).unwrap();
 
         assert_eq!(idx.merges(), 1, "the merge has to happen");
         assert_eq!(idx.parts[0].children.len(), parent_children - 1);
@@ -2935,7 +2663,7 @@ mod tests {
         let at = idx.find(leaf_key(0)).unwrap();
         let before = idx.row_ids().len();
 
-        idx.merge(at, None, None).unwrap();
+        idx.merge(at, None).unwrap();
 
         assert_eq!(idx.merges(), 0, "a full sibling must not be filled further");
         assert_eq!(idx.row_ids().len(), before);
@@ -2952,7 +2680,7 @@ mod tests {
         let mut idx = tree_of_leaves(dim, opts(), &[src, dst]);
         let at = idx.find(leaf_key(0)).unwrap();
 
-        idx.merge(at, None, None).unwrap();
+        idx.merge(at, None).unwrap();
 
         assert_eq!(idx.merges(), 0, "the I9c radius gate has to refuse this");
         assert!(idx.find(leaf_key(0)).is_some());
@@ -2973,7 +2701,7 @@ mod tests {
         let mut idx = tree_of_leaves(dim, opts(), &[src, left, right]);
         let at = idx.find(leaf_key(0)).unwrap();
 
-        idx.merge(at, None, None).unwrap();
+        idx.merge(at, None).unwrap();
 
         assert_eq!(idx.merges(), 1);
         let left_at = idx.find(leaf_key(1)).unwrap();

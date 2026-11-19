@@ -1119,6 +1119,17 @@ impl Engine {
                 })
                 .collect();
             let segments = self.segment_row_counts(&im.table);
+            // Rows a published chain holds but the column deleted: a delta
+            // cannot drop them, so a segment past the bound needs a rebuild -
+            // the same bound the checkpoint uses, so the two agree on when the
+            // tombstone garbage has to go.
+            let dead_by_segment: std::collections::HashMap<u32, u64> = {
+                let mut by: std::collections::HashMap<u32, u64> = Default::default();
+                for id in self.deleted_set(&im.table).iter() {
+                    *by.entry((*id >> 32) as u32).or_insert(0) += 1;
+                }
+                by
+            };
             let mut needs_dump = false;
             let mut over_cap = false;
             for (segment, rows) in &segments {
@@ -1135,7 +1146,11 @@ impl Engine {
                     .max()
                     .and_then(|id| recorded.get(&(*segment, id)).copied())
                     .unwrap_or(0);
-                if covered != *rows {
+                let dead = dead_by_segment.get(segment).copied().unwrap_or(0);
+                let dead_share = *rows > 0
+                    && dead.saturating_mul(100)
+                        >= rows.saturating_mul(Self::SPANN_DEAD_REBUILD_PERCENT);
+                if covered != *rows || dead_share {
                     needs_dump = true;
                 }
             }
@@ -1143,12 +1158,37 @@ impl Engine {
                 continue;
             }
             if needs_dump {
+                // Forced: the deprecation loop below drops every layer but the
+                // newest, which is only correct when the newest one is a full
+                // snapshot. A delta here would leave the chain short of rows.
                 // Failure is not fatal to the pass: the index keeps answering
                 // from its previous chunk and the uncovered rows are scored
                 // exactly (§9.7).
-                let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+                let _ = self.publish_index_chunks_forced(
+                    &im.table,
+                    meta.id,
+                    Some((im.name.as_str(), ts)),
+                );
             }
-            for (segment, _) in &segments {
+            // The counts as they are **after** the publication above: the chunk
+            // it wrote is in the catalog now, and the snapshot test below has to
+            // see it - the table read before the publication cannot.
+            let published_rows: std::collections::HashMap<(u32, u64), u64> =
+                catalog::layout::read_index_chunks(
+                    self.storage.catalog.store().as_ref(),
+                    &db_id.to_string(),
+                    &meta.id.to_string(),
+                    &index_id.to_string(),
+                )
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(|(segment, chunks)| {
+                    chunks
+                        .into_iter()
+                        .map(move |(id, info)| ((segment, id), info.row_count))
+                })
+                .collect();
+            for (segment, rows) in &segments {
                 let Some(dir) = self.spann_chunk_dir(&im.table, &im.name, *segment) else {
                     continue;
                 };
@@ -1156,6 +1196,18 @@ impl Engine {
                 let Some(newest) = live.iter().map(|(id, _)| *id).max() else {
                     continue;
                 };
+                // Only a newest layer that is a **full snapshot** can stand
+                // alone: dropping the older layers of a chain whose newest
+                // layer is a delta would delete the rows only they hold. The
+                // record's row count is the test (`published_index_chunks`
+                // writes a snapshot's count as the segment's row count).
+                let newest_rows = published_rows
+                    .get(&(*segment, newest))
+                    .copied()
+                    .unwrap_or(0);
+                if newest_rows != *rows {
+                    continue;
+                }
                 let old: Vec<u32> = live
                     .iter()
                     .filter(|(id, _)| *id != newest)

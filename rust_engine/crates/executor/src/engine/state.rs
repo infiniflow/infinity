@@ -5889,6 +5889,32 @@ pub(crate) fn process_rss_bytes() -> u64 {
     pages * 4096
 }
 
+/// Anonymous (heap) resident bytes on Linux, `None` where the split is not
+/// exposed.
+///
+/// `process_rss_bytes` counts the mapped chunk and column pages too, and those
+/// are page cache: a checkpoint that maps a column legitimately raises RSS by
+/// the column's size. This is the number a heap question has to be asked
+/// against, and the one `/proc/self/status` calls `RssAnon`.
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("RssAnon:") {
+            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
+            return Some(kb * 1024);
+        }
+    }
+    None
+}
+
+/// [`process_rss_anon_bytes`] where the kernel does not split RSS: the caller
+/// falls back to reporting only, since `ps`'s figure includes file pages.
+#[cfg(all(test, not(target_os = "linux")))]
+pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
+    None
+}
+
 /// Resident set size in bytes on the platforms without `/proc`: `ps -o rss=`
 /// reads the same figure from libproc (macOS) / the BSDs' kernel interface and
 /// prints it in KiB. Nothing overflows on the way back to bytes - an RSS is a
@@ -9918,6 +9944,38 @@ impl BgTask for OptimizeTask {
                 if let Err(error) = engine.optimize_indexes_async().await {
                     eprintln!("background optimize failed: {error}");
                 }
+            }
+        })
+    }
+}
+
+impl BgTask for SpannRebuildTask {
+    fn name(&self) -> &str {
+        "SpannRebuildTask"
+    }
+
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            let Some(engine) = self.engine.upgrade() else {
+                return;
+            };
+            let table = self.table;
+            let index = self.index;
+            let table_id = self.table_id;
+            let ts = self.ts;
+            // The rebuild streams a whole segment's column: it belongs on the
+            // blocking pool, where it cannot hold a query's worker for minutes.
+            let joined = tokio::task::spawn_blocking(move || {
+                engine.publish_index_chunks_forced(&table, table_id, Some((&index, ts)))
+            })
+            .await;
+            match joined {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => eprintln!("background spann rebuild failed: {error}"),
+                // A panic here must not take the engine down: the old chain is
+                // still installed and still correct (the new chunk was never
+                // recorded), so the segment simply rebuilds again next time.
+                Err(error) => eprintln!("background spann rebuild panicked: {error}"),
             }
         })
     }
