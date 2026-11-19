@@ -2577,6 +2577,15 @@ impl Engine {
         self.context
             .hnsw_budget
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        // Apply it to what is already mapped: opening the catalog maps every
+        // block's `version`, so a budget set after `open()` would otherwise
+        // only take effect when a *new* block is mapped - and those mappings
+        // are hits forever after.
+        self.context
+            .block_maps
+            .lock()
+            .unwrap()
+            .trim_to(bytes.max(1));
     }
 
     /// Sets the process RSS ceiling (`0` = unset).

@@ -561,6 +561,156 @@ mod tests {
         assert_eq!(out, vec![vec!["2".to_string()]]);
     }
 
+    /// **Experiment, not a gate**: what one reclaim pass costs the query that
+    /// runs right after it.
+    ///
+    /// Dropping the block *mapping* is cheap (the pages stay in the page cache,
+    /// so the next access only re-faults them), but the tick also advises the
+    /// pages themselves away - `madvise(DONTNEED)` throws them out, so the next
+    /// access reads from the file. That is the price of the memory the pass
+    /// returns, and it is why a ceiling should not sit exactly on the working
+    /// set: the pass would then run every second and every query would pay it.
+    ///
+    /// Run with `cargo test --release -p executor --lib experiment_a_reclaim_pass -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "measurement, run with --ignored --nocapture"]
+    fn experiment_a_reclaim_pass_costs_the_next_query() {
+        let dim = 128usize;
+        let rows = 20_000usize;
+        let dir = tempfile::tempdir().unwrap();
+        let e = super::super::Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE rq (id INT, v EMBEDDING(FLOAT,{dim}));"
+        ))
+        .unwrap();
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 7 + d * 13) % 991))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let mut sql = String::from("INSERT INTO rq VALUES ");
+        for i in 0..rows {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < rows {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let q = format!(
+            "SELECT id FROM rq SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+            vector(rows / 2)
+        );
+        let time = |e: &super::super::Engine| -> f64 {
+            let t0 = std::time::Instant::now();
+            e.execute_blocking(&q).unwrap();
+            t0.elapsed().as_secs_f64() * 1000.0
+        };
+
+        // Warm: every block mapped, every page resident.
+        let mut warm = Vec::new();
+        for _ in 0..8 {
+            warm.push(time(&e));
+        }
+        warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        println!(
+            "warm:            p50 {:.3} ms, mapped {} MB",
+            warm[warm.len() / 2],
+            e.buffer_used_bytes() / (1024 * 1024)
+        );
+
+        // One pass over the ceiling: pages advised away, mappings dropped.
+        e.set_memory_limit(1);
+        let released = e.memory_tick();
+        println!(
+            "reclaim:         released {} MB, mapped {} MB left",
+            released / (1024 * 1024),
+            e.buffer_used_bytes() / (1024 * 1024)
+        );
+
+        // The first query has to read the blocks back; the rest re-warm.
+        let mut cold = Vec::new();
+        for _ in 0..8 {
+            cold.push(time(&e));
+        }
+        println!("first after:     {:.3} ms", cold[0]);
+        let mut rest = cold[1..].to_vec();
+        rest.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        println!("next seven (p50): {:.3} ms", rest[rest.len() / 2]);
+    }
+
+    /// **Experiment, not a gate**: the shape of the latency when the ceiling
+    /// sits *under* the working set, so the tick reclaims on every pass.
+    ///
+    /// A pass drops the pages a query is about to read; the query reads them
+    /// back, the next pass drops them again. That is a sawtooth, not a one-off
+    /// cost - this run is what sizes the ceiling: fit the working set, or pay
+    /// the re-read once per tick.
+    ///
+    /// Run with `cargo test --release -p executor --lib experiment_a_tick_under -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "measurement, run with --ignored --nocapture"]
+    fn experiment_a_tick_under_a_tight_ceiling_costs_every_cycle() {
+        let dim = 128usize;
+        let rows = 20_000usize;
+        let dir = tempfile::tempdir().unwrap();
+        let e = super::super::Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE rt (id INT, v EMBEDDING(FLOAT,{dim}));"
+        ))
+        .unwrap();
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 7 + d * 13) % 991))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let mut sql = String::from("INSERT INTO rt VALUES ");
+        for i in 0..rows {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < rows {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let q = format!(
+            "SELECT id FROM rt SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+            vector(rows / 2)
+        );
+        // Warm, so the first measured query is not paying for a cold file.
+        for _ in 0..3 {
+            e.execute_blocking(&q).unwrap();
+        }
+        e.set_memory_limit(1);
+        let mut lat = Vec::new();
+        for i in 0..24 {
+            // The tick runs once a second; queries here are a few ms, so every
+            // eighth query stands in for "one query fell in the tick's window".
+            if i % 8 == 0 {
+                e.memory_tick();
+            }
+            let t0 = std::time::Instant::now();
+            e.execute_blocking(&q).unwrap();
+            lat.push(t0.elapsed().as_secs_f64() * 1000.0);
+        }
+        let mut sorted = lat.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        println!(
+            "tick every 8th: p50 {:.3} ms, p95 {:.3} ms, max {:.3} ms",
+            sorted[sorted.len() / 2],
+            sorted[(sorted.len() as f64 * 0.95) as usize],
+            sorted[sorted.len() - 1]
+        );
+        println!(
+            "  first three: {:.3} / {:.3} / {:.3} ms (query right after each pass)",
+            lat[0], lat[8], lat[16]
+        );
+    }
+
     /// The watermarks come from the ceiling, and a kernel `memory.high` wins over
     /// the percentage - it is the number the kernel itself throttles at.
     #[test]

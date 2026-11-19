@@ -5686,6 +5686,18 @@ impl BlockMapCache {
         before - self.bytes
     }
 
+    /// Evicts down to a (new) budget, returning what the cache gave up.
+    ///
+    /// A budget that shrinks has to be applied at once: the blocks mapped while
+    /// the engine opened its catalog are hits from then on, and a hit never
+    /// inserts, so waiting for the next miss would leave the old, larger
+    /// footprint resident indefinitely.
+    pub(crate) fn trim_to(&mut self, budget: usize) -> usize {
+        let before = self.bytes;
+        self.shrink_to(budget);
+        before - self.bytes
+    }
+
     /// Drops entries until the cache covers at most `budget` bytes.
     fn shrink_to(&mut self, budget: usize) {
         while self.bytes > budget {

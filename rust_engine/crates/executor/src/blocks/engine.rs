@@ -3960,11 +3960,25 @@ impl Engine {
         root: &Path,
         id: BlockId,
     ) -> std::io::Result<Arc<MappedBlock>> {
-        if let Some(block) = self.context.block_maps.lock().unwrap().get(&id) {
-            self.context
-                .block_map_hits
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            return Ok(block);
+        // One load per call, whether the block is cached or not: the budget can
+        // be lowered after mappings were made (a config applied to a running
+        // engine maps the catalog's blocks during open), and a hit never
+        // inserts, so insert-time enforcement alone would leave an over-budget
+        // cache resident for the life of the process.
+        let budget = self
+            .context
+            .buffer_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .max(1);
+        {
+            let mut maps = self.context.block_maps.lock().unwrap();
+            if let Some(block) = maps.get(&id) {
+                self.context
+                    .block_map_hits
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                maps.trim_to(budget);
+                return Ok(block);
+            }
         }
         self.context
             .block_map_misses
@@ -3983,11 +3997,6 @@ impl Engine {
         // keep the first mapping, so a block has exactly one in the process.
         // The insert also enforces the buffer budget - a block beyond it evicts
         // the least recently used mappings rather than staying mapped forever.
-        let budget = self
-            .context
-            .buffer_budget
-            .load(std::sync::atomic::Ordering::Relaxed)
-            .max(1);
         Ok(self
             .context
             .block_maps

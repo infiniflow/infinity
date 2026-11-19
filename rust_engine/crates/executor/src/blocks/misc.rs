@@ -733,6 +733,30 @@ mod tests {
         assert_eq!(cache.bytes(), 0);
     }
 
+    /// A budget that **shrinks** applies to what is already mapped. Opening a
+    /// directory maps every block's `version`, and those entries are cache hits
+    /// from then on - a hit never inserts, so enforcement at insert time alone
+    /// would keep the old footprint for the life of the process.
+    #[test]
+    fn lowering_the_budget_evicts_what_is_already_mapped() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bml (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO bml VALUES (1);").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let root = e.blocks_root();
+        let id = e.visible_block_ids("default_db.bml")[0];
+        let _ = e.block_map("default_db.bml", &root, id).unwrap();
+        assert_eq!(e.buffer_objects().len(), 1);
+
+        // No insert follows: only the hit path can react.
+        e.set_buffer_budget(1);
+        assert!(
+            e.buffer_objects().is_empty(),
+            "a lowered budget is applied without waiting for a miss"
+        );
+    }
+
     /// A budget smaller than any block keeps the shared map empty, and the
     /// reader still gets a live mapping for the call that asked for it - the
     /// budget bounds what the process *keeps*, not what one statement may read.
