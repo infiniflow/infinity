@@ -20,6 +20,8 @@ use memmap2::Mmap;
 static MAPPINGS: AtomicUsize = AtomicUsize::new(0);
 /// Bytes covered by the live mappings.
 static MAPPED_BYTES: AtomicUsize = AtomicUsize::new(0);
+/// Bytes whose resident pages have been dropped by [`MappedFile::release_pages`].
+static PAGES_RELEASED: AtomicUsize = AtomicUsize::new(0);
 
 /// One read-only mapping of a file.
 ///
@@ -135,6 +137,39 @@ impl MappedFile {
         }
     }
 
+    /// Asks the kernel to drop the resident pages of this mapping.
+    ///
+    /// A mapped index chunk's slot pages are clean file-backed pages: dropping
+    /// them costs a later re-read from the object/file and nothing else, which
+    /// is the only way back to a small RSS without closing the index. Returns
+    /// the bytes whose pages were dropped (0 for the empty mapping).
+    ///
+    /// Correct while readers hold the mapping: `MADV_DONTNEED` on a read-only
+    /// file mapping only discards cache; the next access faults the page back
+    /// in from the file, which is immutable once published.
+    #[allow(unsafe_code)]
+    pub fn release_pages(&self) -> usize {
+        let Some(map) = &self.map else {
+            return 0;
+        };
+        #[cfg(unix)]
+        {
+            // SAFETY: every mapping this process makes is read-only over an
+            // immutable file (a publisher renames a new file over the old one,
+            // never truncating or writing in place), so `MADV_DONTNEED` drops
+            // clean pages and the next access faults the same bytes back in.
+            // No borrow of the mapped slice is created here, and a concurrent
+            // reader outside this call sees unchanged contents - the mapping is
+            // never written through.
+            if unsafe { map.unchecked_advise(memmap2::UncheckedAdvice::DontNeed) }.is_err() {
+                return 0;
+            }
+        }
+        let len = self.range.len();
+        PAGES_RELEASED.fetch_add(len, Ordering::Relaxed);
+        len
+    }
+
     /// The file this mapping covers, while it is alive.
     pub fn len(&self) -> usize {
         self.range.len()
@@ -191,4 +226,9 @@ pub fn mapping_count() -> usize {
 /// How many bytes the live mappings cover.
 pub fn mapped_bytes() -> usize {
     MAPPED_BYTES.load(Ordering::Relaxed)
+}
+
+/// How many mapped bytes have had their resident pages dropped.
+pub fn pages_released_bytes() -> usize {
+    PAGES_RELEASED.load(Ordering::Relaxed)
 }

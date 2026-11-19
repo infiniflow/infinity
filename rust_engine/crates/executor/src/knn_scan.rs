@@ -183,6 +183,24 @@ fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
 }
 
 impl Engine {
+    /// The beam a statement runs with when it does not name one (M4's pacer in its
+    /// static form): a fraction of the tree's leaves, clamped.
+    ///
+    /// Measured on 1536d clustered data: 1452 leaves holds recall 1.000 at a width
+    /// of 32, and 2856 leaves needs 64 - `leaves / 45` reproduces both. The cap
+    /// stops a large index from turning one query into a scan of a sizeable slice of
+    /// the table, and a statement's own beam always wins.
+    fn search_width(explicit: Option<usize>, partitions: usize) -> usize {
+        /// Past this the query is better served by a wider rerank pool than by more
+        /// partitions.
+        const MAX_SEARCH_BEAM: usize = 256;
+        if let Some(beam) = explicit {
+            return beam.max(1);
+        }
+        let leaves = (partitions / 2).max(1);
+        (leaves / 45).clamp(crate::spann_mem::DEFAULT_SEARCH_BEAM, MAX_SEARCH_BEAM)
+    }
+
     /// The live rows `covered` does not name.
     ///
     /// The ids come from the block versions - the same walk `count(*)` does -
@@ -276,12 +294,14 @@ impl Engine {
             //
             // `nprobe` is the IVF spelling of the same knob and the SDK sends it
             // to every index type, so it is honoured as the width when the
-            // statement did not name `beam` (§15 promised that and the port
-            // ignored it).
-            let width = q
-                .beam
-                .or(q.options.nprobe.filter(|n| *n > 0))
-                .unwrap_or(crate::spann_mem::DEFAULT_SEARCH_BEAM);
+            // A statement may name a beam (`beam` or `nprobe`); otherwise the
+            // width follows the tree's size (`search_width`), not a constant. A
+            // constant is what made recall fall off as the table grew: the
+            // budget is a *fraction* of the leaves, so it has to grow with them.
+            let width = Self::search_width(
+                q.beam.or(q.options.nprobe.filter(|n| *n > 0)),
+                index.shape().0,
+            );
             let multiplier = q
                 .options
                 .rerank_multiplier
@@ -309,16 +329,29 @@ impl Engine {
             // WAL replay re-buffers, so rows that were already in a block file
             // fall into `uncovered` below - an exact scan of exactly those rows,
             // which is correct and costs the gap, not the table.
-            let mem: Vec<usize> = {
+            // The tail: rows written since the last dump, held as a live tree.
+            // They are queried the same way a chunk is - a bounded descent, not
+            // a re-score of every pending row (`docs/SPANN_DESIGN.md` §0.0.3).
+            let tail = {
                 let tables = self.tables.lock().unwrap();
                 tables
                     .get(&tkey)
                     .and_then(|e| e.spann_mem.get(&index_id))
-                    .map(|rows| rows.iter().map(|(seq, _)| *seq as usize).collect())
-                    .unwrap_or_default()
+                    .cloned()
             };
-            candidates.extend(mem.iter().copied());
-            if all_covered(q, index.len() + mem.len()) {
+            if let Some(tail) = &tail {
+                let tail_hits = match q.allowed {
+                    Some(allowed) => {
+                        let ids: std::collections::HashSet<u64> =
+                            allowed.iter().map(|id| *id as u64).collect();
+                        tail.search_filtered(q.query, budget, None, &ids)
+                    }
+                    None => tail.search(q.query, budget, None),
+                };
+                candidates.extend(tail_hits.into_iter().map(|(id, _)| id as usize));
+            }
+            let mem_len = tail.as_ref().map(|t| t.len()).unwrap_or(0);
+            if all_covered(q, index.len() + mem_len) {
                 return Some(KnnProbe {
                     candidates,
                     uncovered: Vec::new(),
@@ -328,7 +361,9 @@ impl Engine {
             // rest are scored by the exact scan.
             let mut covered: HashSet<usize> =
                 index.row_ids().into_iter().map(|id| id as usize).collect();
-            covered.extend(mem);
+            if let Some(tail) = &tail {
+                covered.extend(tail.row_ids().into_iter().map(|id| id as usize));
+            }
             let uncovered = self.uncovered_rows(q, &covered);
             return Some(KnnProbe {
                 candidates,
@@ -910,5 +945,25 @@ mod tests {
         };
         let out = scan("l2", Some(0.5)).finish(state);
         assert_eq!(out.scored, vec![(1, 0.9, 0.1), (4, 0.9, 0.1)]);
+    }
+}
+
+#[cfg(test)]
+mod beam_tests {
+    use super::Engine;
+
+    #[test]
+    fn the_beam_follows_the_tree_and_never_undercuts_a_statement() {
+        // A small tree keeps the floor.
+        assert_eq!(Engine::search_width(None, 12), 32);
+        // 1452 leaves (2904 partitions) held recall 1.000 at 32.
+        assert_eq!(Engine::search_width(None, 2904), 32);
+        // 2856 leaves needed 64.
+        assert!(Engine::search_width(None, 5712) >= 63);
+        // A huge tree is capped rather than scanning a slice of the table.
+        assert_eq!(Engine::search_width(None, 4_000_000), 256);
+        // A statement's own beam always wins, and never becomes zero.
+        assert_eq!(Engine::search_width(Some(8), 4_000_000), 8);
+        assert_eq!(Engine::search_width(Some(0), 100), 1);
     }
 }

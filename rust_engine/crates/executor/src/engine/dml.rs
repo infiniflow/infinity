@@ -426,12 +426,13 @@ impl Engine {
         // insert, so both halves go through this hook.
         if !entry.spann_mem.is_empty() {
             let gone: std::collections::HashSet<u64> = ids.iter().map(|s| *s as u64).collect();
-            for rows in entry.spann_mem.values_mut() {
-                rows.retain(|(seq, _)| !gone.contains(seq));
+            for tail in entry.spann_mem.values() {
+                tail.forget(&gone);
             }
         }
         entry.mirror_dirty = true;
         entry.mirror_epoch += 1;
+        drop(tables);
         first
     }
 
@@ -1891,6 +1892,30 @@ impl Engine {
             .collect()
     }
 
+    /// The table's full-text columns, from the catalog.
+    ///
+    /// [`Self::index_column_map`] carries every index kind, so it cannot say
+    /// which columns a *text* index belongs to - a column with only a secondary
+    /// index has no text postings to write. A column that carries two full-text
+    /// indexes (a sparse-gram one and a regular one) is listed once.
+    fn fulltext_columns(&self, table: &str) -> Vec<String> {
+        let mut columns: Vec<String> = Vec::new();
+        for meta in self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default()
+        {
+            if meta.id > 0
+                && meta.index_type.eq_ignore_ascii_case("FULLTEXT")
+                && !columns.contains(&meta.column)
+            {
+                columns.push(meta.column);
+            }
+        }
+        columns
+    }
+
     /// Undoes the index hooks for rows a write staged but never committed.
     ///
     /// An `IMPORT` feeds every hook batch by batch (`insert_secondary_keys`,
@@ -2178,7 +2203,7 @@ impl Engine {
         }
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, SharedTextIndex)> = self
+        let mut indexes: Vec<(String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
@@ -2190,6 +2215,30 @@ impl Engine {
                     .collect()
             })
             .unwrap_or_default();
+        // A writer must not depend on a reader having built the index. The
+        // reference's write path only needs the column's mem indexer, which it
+        // creates itself; here the documents go into the **cached** index, so a
+        // column whose index is not cached yet - a build still in flight, a cache
+        // a compaction dropped, a table entry that has not loaded it - was
+        // skipped in silence and its postings existed nowhere. A rebuild recovers
+        // them only from the blocks, and a `COPY` writes those when its statement
+        // commits, so the rows of the import that hit the window are exactly the
+        // ones a following build cannot see. Build the index here instead: the
+        // read is the one the first query would have done, at most once per
+        // column, and only while the cache has no entry for it.
+        if indexes.len() < by_id.len() {
+            for column in self.fulltext_columns(table) {
+                if schema.iter().all(|c| c != &column)
+                    || indexes.iter().any(|(cached, _)| cached == &column)
+                {
+                    continue;
+                }
+                let tokenizer = self.index_tokenizer(table, &column);
+                if let Ok(shared) = self.text_index_for(table, &column, tokenizer) {
+                    indexes.push((column, shared));
+                }
+            }
+        }
         for (column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
@@ -2348,7 +2397,7 @@ impl Engine {
         table: &str,
         mut t: Txn,
         segments: &[u32],
-        encoded_rows: &[(usize, String)],
+        staged_rows: &crate::engine::import::StagedRows,
         batches: &[usize],
     ) -> Result<u64> {
         let mut cmds = Vec::new();
@@ -2384,7 +2433,6 @@ impl Engine {
         // blocks that never got written and that slice's rows were gone.
         let segments_owned: Vec<u32> = segments.to_vec();
         let batches_owned: Vec<usize> = batches.to_vec();
-        let encoded_owned: Vec<(usize, String)> = encoded_rows.to_vec();
         let table_owned = table.to_string();
         // The append records are created here (the WAL frame names them) but
         // **stamped after the rows are published**. The reference keeps a
@@ -2431,10 +2479,14 @@ impl Engine {
             let gate = self.bottom_gate(table);
             let _turn = gate.lock().await;
             let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
-            self.publish_encoded_rows(table, &encoded_owned)?;
-            // The buffer holds the values now; the stored text of the whole
-            // file (hundreds of MB) has no reader left.
-            drop(encoded_owned);
+            // The rows are replayed from the staged set a batch at a time (the
+            // text may be on disk), but the block write still happens once, for
+            // the whole statement: the block's `created` boundaries come from
+            // the append journal, which carries every batch of this transaction,
+            // so a write that saw only one batch would size a block from rows it
+            // was never handed ("block 0.0 holds 8191 of the 8192 rows committed
+            // at ts 10").
+            self.publish_staged_rows(table, staged_rows, &batches_owned, |_batch| Ok(()))?;
             // The rows are readable now, so the records may carry this
             // transaction's ts (`BlockVersion::Append(commit_ts, …)`).
             for record in &records_owned {
@@ -2525,6 +2577,51 @@ impl Engine {
         self.context
             .hnsw_budget
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets the process RSS ceiling (`0` = unset).
+    ///
+    /// The port has no BufferManager, so sealed blocks are page cache the kernel
+    /// evicts under pressure - but a container's `memory_limit` kills before the
+    /// kernel gets the chance. When the cleanup pass sees the process above this,
+    /// it hands mapped pages back (`madvise`/`fadvise`) whether or not the index
+    /// that owns them went idle.
+    pub fn set_memory_limit(&self, bytes: u64) {
+        self.context
+            .memory_limit
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Builds the **first** chunk of a spann segment on the background task
+    /// instead of the checkpoint.
+    ///
+    /// Off by default: a synchronous build makes the index readable as soon as
+    /// the statement returns. An asynchronous one returns immediately, keeps
+    /// answering from the memory tree (or the exact scan), and publishes the
+    /// chain when `SpannRebuildTask` finishes (its progress is
+    /// `spann_build_progress` in `SHOW INDEX`). A checkpoint's delta stays
+    /// inline either way - it is the new rows, not a rebuild.
+    pub fn set_spann_async_build(&self, async_build: bool) {
+        self.context
+            .spann_async_build
+            .store(async_build, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets the two byte budgets a delta checkpoint's `PageTree` runs under:
+    /// cached clean pages, and the dirty pages that are the delta itself.
+    ///
+    /// The dirty budget is the one with a visible consequence: an insert that
+    /// would spend past it is refused (`PageTreeError::Full`), the rows go back
+    /// to the tail, and the **next** checkpoint publishes them. The defaults
+    /// (64 MiB / 512 MiB) are sized for a real segment; a test that wants the
+    /// refusal picks a few kilobytes.
+    pub fn set_spann_page_budgets(&self, page_bytes: usize, dirty_bytes: usize) {
+        self.context
+            .spann_page_budget
+            .store(page_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .spann_dirty_budget
+            .store(dirty_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped

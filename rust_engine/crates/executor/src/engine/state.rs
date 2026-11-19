@@ -5031,45 +5031,33 @@ pub(crate) struct TableEntry {
     pub(crate) ivf_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
     /// spann trees per index id (`docs/SPANN_DESIGN.md`).
     ///
-    /// v1 keeps them in memory: `CREATE INDEX … USING SPANN` builds the tree
-    /// and answers queries from it directly. The chunk format is implemented and
-    /// tested in `storage::knn_index::spann`; wiring the dump/load path (§9.4)
-    /// is the remaining step, after which this map holds what the loader
-    /// produced instead.
+    /// `CREATE INDEX … USING SPANN` builds one and installs it as
+    /// [`crate::spann_mem::SpannHandle::Memory`]; the first checkpoint that
+    /// covers the segment publishes `chunk_{n}.idx` and swaps the handle for the
+    /// mapped form (§6.4, §9.4), so after a dump - and after a restart - this
+    /// map holds what the loader produced.
     pub(crate) spann: HashMap<u64, Arc<crate::spann_mem::SpannHandle>>,
-    /// spann **mem index** per index id: the rows inserted since the last
-    /// dump, kept as `(row id, vector)`.
+    /// spann **tail** per index id: the rows inserted since the last dump, held
+    /// as a live tree (`docs/SPANN_DESIGN.md` §0.0.3).
     ///
-    /// An insert does not touch the tree (`docs/SPANN_DESIGN.md` §9.2): the row
-    /// lands here in O(1), queries merge this list with the published chunks, and
-    /// the next dump builds a tree that covers those rows and clears the list.
-    /// Encoding a row into the tree at insert time was the rejection: a leaf's
-    /// members are only 1-bit codes, so a split would need the original vectors
-    /// back from storage anyway.
+    /// An insert descends the tree and appends a code (208 B at 1536d); a query
+    /// descends the same tree, so a pending row is found the way a published row
+    /// is, instead of being re-scored by every KNN query. The tree splits and
+    /// merges its own partitions in place, so nothing here is `O(segment)`.
     ///
-    /// Two rules keep it bounded and honest:
+    /// The bounds and the lifetime are the ones the flat candidate list had:
     ///
-    /// * a row deleted (or `UPDATE`d, which is delete + insert) is dropped here by
-    ///   `note_deleted_ids` - it is no longer live, so it must not be a candidate
-    ///   and must not count as covered;
     /// * `max_partition_size × 64` rows trigger a dump
-    ///   (`Engine::dump_spann_over_capacity`), because every row in this list is
-    ///   re-scored exactly by **every** KNN query on the table.
-    ///
-    /// It is a memory-only structure, and what a restart leaves behind depends on
-    /// where the rows were:
-    ///
-    /// * rows that only reached the WAL are replayed into the append buffer, and
-    ///   the same hook that fills this map at insert time
-    ///   (`refresh_block_mirror_extra`) fills it again - the list is rebuilt for
-    ///   them, so they are candidates immediately;
-    /// * rows that are already in a block file are not re-buffered, so nothing
-    ///   re-registers them: they are simply not covered by the loaded chunk and
-    ///   `knn_candidates` answers them through `uncovered` - an exact scan of
-    ///   exactly those row ids - until the next dump folds them into the tree.
-    ///
-    /// Either way a restart costs work proportional to the gap, never a hole.
-    pub(crate) spann_mem: HashMap<u64, Vec<(u64, Vec<f32>)>>,
+    ///   (`Engine::dump_spann_over_capacity`), which keeps the per-query tail
+    ///   walk bounded and lets the tail answer exactly below that size;
+    /// * a deleted row is tombstoned (`SpannTail::forget`); the next dump rebuilds
+    ///   the segment from the column, so the tombstone only has to survive until
+    ///   then;
+    /// * it is memory-only. Rows the WAL replays are fed back through the same
+    ///   hook (`refresh_block_mirror_extra`); rows already in a block file are not
+    ///   covered by the loaded chunk and `knn_candidates` answers them through
+    ///   `uncovered` - an exact scan of exactly those ids - until the next dump.
+    pub(crate) spann_mem: HashMap<u64, Arc<crate::spann_mem::SpannTail>>,
     /// Block map of the C++-format mirror (C++ `BlockIndex`): block ids, row
     /// ranges and the decoded-block LRU shared with `Context::buffer`.
     pub(crate) block_index: Option<Arc<Mutex<storage::block_index::BlockIndex>>>,
@@ -5637,6 +5625,25 @@ pub(crate) struct Context {
     /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
     /// trigger (the reference only dumps when a quota is configured).
     pub(crate) memindex_quota: std::sync::atomic::AtomicU64,
+    /// Process RSS ceiling (`0` = unset). The cleanup pass reads it and, when
+    /// the process is over it, gives the mapped pages back instead of waiting
+    /// for an index to go idle - the difference between a slow query and an OOM
+    /// kill under a container limit.
+    pub(crate) memory_limit: std::sync::atomic::AtomicU64,
+    /// Build the **first** chunk of a spann segment on the background task
+    /// instead of inside the checkpoint that needs it. Off by default: a
+    /// synchronous build makes the index readable on the next statement, an
+    /// asynchronous one leaves the segment on its memory tree (or the exact
+    /// scan) until the task publishes the chain. A `CREATE INDEX` that already
+    /// has rows still builds inline - it is the statement's own work.
+    pub(crate) spann_async_build: std::sync::atomic::AtomicBool,
+    /// Bytes the `PageTree` of a delta checkpoint may cache (clean pages).
+    pub(crate) spann_page_budget: std::sync::atomic::AtomicUsize,
+    /// Bytes of **dirty** pages a delta checkpoint may hold. A dirty page cannot
+    /// be evicted - its bytes are the output - so this is what bounds the delta;
+    /// when it is spent the remaining rows go back to the tail and the next
+    /// checkpoint publishes them.
+    pub(crate) spann_dirty_budget: std::sync::atomic::AtomicUsize,
     /// Bytes every in-memory index form holds right now, kept by delta.
     ///
     /// The quota check used to walk every table and lock every index, so a
@@ -5791,6 +5798,13 @@ pub struct Engine {
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
     pub(crate) self_weak: Mutex<std::sync::Weak<Engine>>,
+    /// Spann rebuilds queued or running: `(table_id, index name)`.
+    ///
+    /// A rebuild is minutes on a large segment, and the checkpoint that found
+    /// no chain keeps finding none until the task publishes one - without this
+    /// set every checkpoint in that window queues the same build again, and two
+    /// of them writing the segment's directory would race for the chunk id.
+    pub(crate) spann_builds_inflight: Mutex<std::collections::HashSet<(u64, String)>>,
     /// One gate per table, held for a whole write batch.
     ///
     /// The reference's `DumpMemIndex` transaction retries while an append holds
@@ -5899,6 +5913,32 @@ pub(crate) fn process_rss_bytes() -> u64 {
         .unwrap_or(0);
     // 4 KiB is the page size of every Linux target this engine builds for.
     pages * 4096
+}
+
+/// Anonymous (heap) resident bytes on Linux, `None` where the split is not
+/// exposed.
+///
+/// `process_rss_bytes` counts the mapped chunk and column pages too, and those
+/// are page cache: a checkpoint that maps a column legitimately raises RSS by
+/// the column's size. This is the number a heap question has to be asked
+/// against, and the one `/proc/self/status` calls `RssAnon`.
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("RssAnon:") {
+            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
+            return Some(kb * 1024);
+        }
+    }
+    None
+}
+
+/// [`process_rss_anon_bytes`] where the kernel does not split RSS: the caller
+/// falls back to reporting only, since `ps`'s figure includes file pages.
+#[cfg(all(test, not(target_os = "linux")))]
+pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
+    None
 }
 
 /// Resident set size in bytes on the platforms without `/proc`: `ps -o rss=`
@@ -6885,6 +6925,53 @@ pub(crate) fn optimize_text_index_unlocked(
     Ok(index.apply_merge(&plan, merged))
 }
 
+/// [`optimize_text_index_unlocked`] for a full-text index that is **not** in the
+/// engine's cache: maps the chunk list the catalog holds into a detached
+/// [`TextIndex`], merges it, and returns what it holds afterwards.
+///
+/// The reference never consults a memory index here - `OptimizeFtIndex` walks
+/// `SegmentIndexMeta`'s chunk ids (`new_txn_index_impl.cpp:2193-2245`) - so an
+/// index whose column has not been queried since the process started (or since
+/// a compaction dropped its cache entry) is merged like any other. The caller
+/// publishes the returned chunk list and drops the detached index, so an
+/// optimize tick costs the mapping, not a resident index per column.
+///
+/// The return value is the merge count and, per surviving chunk,
+/// `(segment, base_name, base_row_id, row_count, term_count)`.
+pub(crate) fn merge_text_index_from_catalog(
+    dir: &str,
+    chunks: &[crate::engine::text_index::CatalogChunk],
+    deleted: &std::collections::HashSet<u64>,
+) -> crate::Result<(usize, Vec<crate::engine::text_index::HeldTextChunk>)> {
+    let mut index = TextIndex::new(dir.to_string(), TextTokenizer::default());
+    // Nothing is re-indexed: `load_sealed_scoped` maps the chunks the catalog
+    // names, exactly what the query path's build does before it scans the tail.
+    if index.load_sealed_scoped(chunks) == 0 {
+        return Ok((0, Vec::new()));
+    }
+    let shared: SharedTextIndex = Arc::new(std::sync::RwLock::new(index));
+    let done = optimize_text_index_unlocked(&shared, deleted)?;
+    let held = {
+        let index = shared.read().unwrap_or_else(|poison| poison.into_inner());
+        index
+            .reader
+            .segments
+            .iter()
+            .map(|segment| {
+                let base_row_id = segment.reader.base_row_id();
+                (
+                    (base_row_id >> 32) as u32,
+                    segment.reader.base_name().to_string(),
+                    base_row_id,
+                    u64::from(segment.docs),
+                    segment.total_len,
+                )
+            })
+            .collect()
+    };
+    Ok((done, held))
+}
+
 pub(crate) fn index_delete_row(index: &mut TextIndex, seq: u64) {
     index.mem.delete(seq);
     // A row whose text already went to a sealed segment keeps its old postings
@@ -7750,6 +7837,40 @@ pub(crate) struct RowFulltextProvider<'a> {
 }
 
 impl RowFulltextProvider<'_> {
+    /// The dictionary terms `term` is looked up as.
+    ///
+    /// C++ runs the *analyzer* over the `filter_fulltext` text before the query
+    /// tree is built (`SearchDriver::ParseSingleWithFields` with
+    /// `GetColumn2Analyzer`, `filter_expression_push_down_indexscanfilter_impl.
+    /// cpp:980-994`), so the tree holds analyzed terms. Looking the literal up
+    /// instead searched the raw word: a `standard` column stores `families` and
+    /// its stem `famili`, a query for `family` matched only the document that
+    /// spelled it that way, while `MATCH TEXT` (which does analyze) matched
+    /// both. The analyzer emits a word *and* its stem at one offset, so every
+    /// emitted form is searched and the caller's boolean tree decides the rest.
+    pub(crate) fn query_terms(&self, term: &str) -> Vec<String> {
+        let needle = term.to_lowercase();
+        // A sparse-gram index is a literal-run test over the text, not a term
+        // lookup: its analyzer emits grams, which would never match `needle`.
+        if self.substring {
+            return vec![needle];
+        }
+        let Some((_, tokenizer)) = self.index else {
+            return vec![needle];
+        };
+        let mut terms: Vec<String> = crate::tokenize_index_positions(&needle, tokenizer)
+            .into_iter()
+            .map(|(term, _)| term)
+            .filter(|term| !term.is_empty())
+            .collect();
+        terms.sort_unstable();
+        terms.dedup();
+        if terms.is_empty() {
+            terms.push(needle);
+        }
+        terms
+    }
+
     /// C++ `ColumnIndexReader::Lookup(term, false)`: the row ids whose documents
     /// contain `term`, with stale copies of re-indexed rows removed.
     pub(crate) fn index_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
@@ -7768,6 +7889,20 @@ impl RowFulltextProvider<'_> {
                 .unwrap_or_default(),
         )
     }
+
+    /// [`Self::index_postings`] over every form the analyzer emitted, or `None`
+    /// when this column has no inverted index to answer the filter.
+    fn analyzed_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
+        let mut out: Option<std::collections::HashSet<usize>> = None;
+        for analyzed in self.query_terms(term) {
+            // `index_postings` returns `None` when the index's tokenizer is not
+            // the one the filter asked for; that is a property of the column, so
+            // one probe is enough.
+            let hits = self.index_postings(&analyzed)?;
+            out.get_or_insert_with(Default::default).extend(hits);
+        }
+        out
+    }
 }
 
 impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
@@ -7776,7 +7911,7 @@ impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
         // The term index answers from the postings; a sparse-gram index
         // (seeded by `RegexIndexRewrite`, or named with `col@index`) is a
         // literal-run test over the text.
-        let postings = self.index_postings(&needle);
+        let postings = self.analyzed_postings(&needle);
         let mut out = Vec::new();
         for (i, row) in self.rows.iter().enumerate() {
             let hit = if let (Some(postings), Some(ids)) = (&postings, self.row_ids) {
@@ -9837,6 +9972,60 @@ impl BgTask for OptimizeTask {
                 }
             }
         })
+    }
+}
+
+impl BgTask for SpannRebuildTask {
+    fn name(&self) -> &str {
+        "SpannRebuildTask"
+    }
+
+    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async move {
+            let Some(engine) = self.engine.upgrade() else {
+                return;
+            };
+            let table = self.table;
+            let index = self.index;
+            let table_id = self.table_id;
+            let ts = self.ts;
+            // The rebuild streams a whole segment's column: it belongs on the
+            // blocking pool, where it cannot hold a query's worker for minutes.
+            // The rebuild owns the segment for as long as it runs: the set is
+            // what keeps the next checkpoint from queueing the same build, so
+            // it is cleared however this task ends.
+            let guard = InflightRebuild {
+                engine: engine.clone(),
+                key: (table_id, index.clone()),
+            };
+            let joined = tokio::task::spawn_blocking(move || {
+                engine.publish_index_chunks_forced(&table, table_id, Some((&index, ts)))
+            })
+            .await;
+            drop(guard);
+            match joined {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => eprintln!("background spann rebuild failed: {error}"),
+                // A panic here must not take the engine down: the old chain is
+                // still installed and still correct (the new chunk was never
+                // recorded), so the segment simply rebuilds again next time.
+                Err(error) => eprintln!("background spann rebuild panicked: {error}"),
+            }
+        })
+    }
+}
+
+/// Clears a segment's `spann_builds_inflight` entry when the rebuild ends.
+struct InflightRebuild {
+    engine: std::sync::Arc<Engine>,
+    key: (u64, String),
+}
+
+impl Drop for InflightRebuild {
+    fn drop(&mut self) {
+        if let Ok(mut inflight) = self.engine.spann_builds_inflight.lock() {
+            inflight.remove(&self.key);
+        }
     }
 }
 

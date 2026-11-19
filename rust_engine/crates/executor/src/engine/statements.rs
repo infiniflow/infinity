@@ -117,6 +117,11 @@ pub(crate) enum TextPublish {
     /// what this statement sees, but a statement above the merge would resolve
     /// the ids it left behind. Answer this one from it, cache nothing.
     ReadTooOld,
+    /// The cache already holds more documents than the build read: the build
+    /// started before documents reached the index (an import appends to the
+    /// cached index itself) and publishing it would drop them from every later
+    /// statement. Keep the cache, answer this one from it.
+    Superseded,
 }
 
 /// Marks one table's bottom as running on this thread for as long as it lives.
@@ -389,7 +394,14 @@ impl Engine {
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 spann_stats: Mutex::new(std::collections::HashMap::new()),
-                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(6),
+                // 8, not the reference's 6: this is the **same** number the
+                // checkpoint uses as a segment's layer cap, so the value
+                // `SHOW INDEX` prints is the one that decides a rebuild.
+                max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(8),
+                memory_limit: std::sync::atomic::AtomicU64::new(0),
+                spann_async_build: std::sync::atomic::AtomicBool::new(false),
+                spann_page_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_PAGE_BUDGET),
+                spann_dirty_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_DIRTY_BUDGET),
                 pending_budget: std::sync::atomic::AtomicUsize::new(512 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
@@ -419,6 +431,7 @@ impl Engine {
             ddl_lock: tokio::sync::Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
+            spann_builds_inflight: Mutex::new(std::collections::HashSet::new()),
             batch_locks: Mutex::new(HashMap::new()),
             bottom_gates: Mutex::new(HashMap::new()),
             bottom_queues: Mutex::new(BottomQueues::default()),
@@ -2343,6 +2356,59 @@ impl Engine {
         Ok(())
     }
 
+    /// [`Self::publish_encoded_rows`] over a `COPY`'s staged rows.
+    ///
+    /// The rows may be spilled to disk ([`crate::engine::import::StagedRows`]),
+    /// so they are replayed instead of borrowed. `after_batch` runs at every
+    /// import batch boundary: the caller settles that batch's append record and
+    /// writes the block it landed in, which empties the append buffer again -
+    /// otherwise the buffer holds the whole statement's rows, and the peak is
+    /// the segment (a 500k-row segment of 1536d embeddings is ~6 GiB of cells).
+    pub(crate) fn publish_staged_rows(
+        &self,
+        table: &str,
+        rows: &crate::engine::import::StagedRows,
+        batches: &[usize],
+        mut after_batch: impl FnMut(usize) -> Result<()>,
+    ) -> Result<()> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
+        let take = batches.first().copied().unwrap_or(0);
+        // One batch's cells, shared between the row walk and the batch
+        // boundary: the batch that just filled it is handed to the buffer and
+        // the vector is emptied, so the peak is a batch and not the statement.
+        let published: std::cell::RefCell<Vec<(usize, Vec<Value>)>> =
+            std::cell::RefCell::new(Vec::with_capacity(take));
+        rows.replay_batches(
+            batches,
+            |seq, text| {
+                let values = match self.parse_stored_row(table, &defaults, &types, text.as_bytes())
+                {
+                    Ok(values) => values,
+                    // Never drop a row because its text form would not parse:
+                    // the cells are simply that text, which is what the writer
+                    // stores.
+                    Err(_) => text
+                        .split('\t')
+                        .map(|c| Value::Str(c.to_string()))
+                        .collect(),
+                };
+                published.borrow_mut().push((seq, values));
+                Ok(())
+            },
+            |batch| {
+                let batch_rows = std::mem::take(&mut *published.borrow_mut());
+                if !batch_rows.is_empty() {
+                    self.refresh_block_mirror_extra(table, &batch_rows)?;
+                }
+                after_batch(batch)
+            },
+        )
+    }
+
     /// The `(db_id, table_id, table_key)` of a table from its catalog key.
     pub(crate) fn table_ident(&self, table: &str) -> Result<Option<(String, String, String)>> {
         let bare = table.rsplit('.').next().unwrap_or(table);
@@ -4131,34 +4197,68 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
+        Ok(self.text_index_with_tokenizer(table, column, tokenizer)?.0)
+    }
+
+    /// [`Self::text_index_for`] **and** the tokeniser the returned index's
+    /// postings were written with.
+    ///
+    /// The two have to travel together: two `FULLTEXT` indexes on one column may
+    /// declare different analyzers, so the caller's `tokenizer` (the column's own
+    /// choice, `column_analyzer_name`) is not necessarily the record's. A query
+    /// path that pairs the index with the other one cannot look a term up -
+    /// `RowFulltextProvider` compares the pair and must give up on a mismatch -
+    /// and `filter_fulltext` then keeps every row instead of narrowing. The
+    /// caller passes the tokeniser only as the fallback for a record that names
+    /// none.
+    pub(crate) fn text_index_with_tokenizer(
+        &self,
+        table: &str,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<(SharedTextIndex, TextTokenizer)> {
         let (index_id, index_name) = self.fulltext_record(table, column).ok_or_else(|| {
             Error::Invalid(format!(
                 "fulltext index does not exist for column '{column}'"
             ))
         })?;
-        // The tokeniser belongs to the **record**, not the column: two
-        // `FULLTEXT` indexes on one column may declare different analyzers, and
-        // `column_analyzer_name` picks one for the whole column (in *name*
-        // order) while this resolves the index by id. Using the column's choice
-        // for the record it did not select tokenises the query with one
-        // analyzer and the postings with another.
         let tokenizer = self
             .index_tokenizer_of(table, &index_name)
             .unwrap_or(tokenizer);
-        self.text_index_for_id(table, index_id, column, tokenizer)
+        let index = self.text_index_for_id(table, index_id, column, tokenizer.clone())?;
+        Ok((index, tokenizer))
     }
 
-    /// The `(id, name)` of the full-text record a plain `MATCH TEXT` resolves
-    /// to on `column`.
+    /// The `(id, name)` of the full-text record a plain `MATCH TEXT` or
+    /// `filter_fulltext` resolves to on `column`.
+    ///
+    /// A sparse-gram record is the one `regex()` narrows with (`index=`), not the
+    /// one a term search reads, so a column carrying both is answered by the
+    /// regular analyzer - the same preference `column_analyzer_name` applies to
+    /// the column's tokeniser (`filter_regex_multi_index.slt`).
     fn fulltext_record(&self, table: &str, column: &str) -> Option<(u64, String)> {
-        self.storage
+        let records: Vec<(u64, String)> = self
+            .storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
             .ok()?
             .into_iter()
-            .find(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
+            .filter(|im| im.column == column && im.index_type.eq_ignore_ascii_case("FULLTEXT"))
             .filter(|im| im.id > 0)
             .map(|im| (im.id, im.name))
+            .collect();
+        records
+            .iter()
+            .find(|(_, name)| {
+                !matches!(
+                    self.analyzer_of_index(table, name)
+                        .as_deref()
+                        .and_then(|name| analyzer::parse_analyzer_name(name).ok()),
+                    Some(analyzer::AnalyzerName::SparseGram { .. })
+                )
+            })
+            .or_else(|| records.first())
+            .cloned()
     }
 
     /// The tokeniser one full-text record was created with.
@@ -4393,9 +4493,31 @@ impl Engine {
                 None => (None, None),
             }
         };
+        // A zero counter means one of two things, and only one of them makes an
+        // empty index complete: the table really is empty, or a reader published
+        // `cache_row_set`'s count from a snapshot it took while the rows were
+        // still staged in an import (`COPY` writes its blocks when the statement
+        // commits, not per batch). In the second case `complete >= reserved` is
+        // true for *any* index - an empty one built on the empty table included -
+        // and that index is then served to every query until the process
+        // restarts, which is the reported "one table returns no full-text rows,
+        // `COUNT(*)` is right". Confirm the zero against the blocks (one
+        // `version` read on a table that is genuinely empty) and repair the
+        // counter with what they say.
         let reserved = match reserved {
-            Some(n) => n,
-            None => self.row_count(table).unwrap_or(0),
+            Some(n) if n > 0 => n,
+            _ => {
+                let published = self.row_count(table).unwrap_or(0);
+                if published > 0 {
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey.clone())
+                        .or_default()
+                        .live_rows = Some(published);
+                }
+                published
+            }
         };
         let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
         if let Some(idx) = cached {
@@ -4539,6 +4661,20 @@ impl Engine {
             // rebuild could keep one `MATCH` running for the whole gate timeout
             // (`TestParallelFulltextIndexReadWrite`, 15 s window, 427 s case).
             TextPublish::ReadTooOld | TextPublish::Renumbered => Ok(shared),
+            // The cache covers documents this build never read (it started
+            // before they arrived). Answering from the build would be wrong for
+            // **this** statement too, and caching it would be wrong for every
+            // later one, so the statement continues on the cached index - the
+            // one the writers have been feeding.
+            TextPublish::Superseded => {
+                let cached = {
+                    let tables = self.tables.lock().unwrap();
+                    tables
+                        .get(&tkey)
+                        .and_then(|entry| entry.text.get(&index_id).cloned())
+                };
+                Ok(cached.unwrap_or(shared))
+            }
         }
     }
 
@@ -4559,6 +4695,27 @@ impl Engine {
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .covered_row_segments();
+        let built_docs = index.read().unwrap_or_else(|e| e.into_inner()).total_docs();
+        // The count the cache holds right now, taken **between** two short
+        // `tables` guards: the index lock may not be taken under `tables` (a
+        // reader holds the index while it fetches rows, and that fetch needs
+        // `tables`), so the handle is cloned out and measured after the guard
+        // is gone.
+        let (cached_before, cached_docs) = {
+            let cached = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(tkey)
+                    .and_then(|entry| entry.text.get(&index_id).cloned())
+            };
+            let docs = cached.as_ref().map(|cached| {
+                cached
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .total_docs()
+            });
+            (cached, docs)
+        };
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
@@ -4592,6 +4749,35 @@ impl Engine {
         // a ts above the merge, would resolve the ids it left behind.
         if read_ts < entry.text_min_ts {
             return TextPublish::ReadTooOld;
+        }
+        // **The cache is monotonic in coverage.** A build that started before the
+        // documents arrived - the index created on the empty table, its build
+        // still in flight when the import began appending to that very cache, or
+        // a rebuild that overlapped the import - holds fewer documents than the
+        // cache does now. Replacing the cache with it drops the rows the writer
+        // already indexed: they are in the blocks, but nothing in the query path
+        // rebuilds on its own while the coverage counter says the index is
+        // complete, so every `MATCH` answers nothing until the process restarts
+        // (the reported "one table of three returns no full-text rows after a
+        // concurrent import, `COUNT(*)` is right"). Answer this statement from
+        // the richer cache and publish nothing.
+        let superseded = match (&cached_before, entry.text.get(&index_id)) {
+            (Some(before), Some(now)) => {
+                // The count was read outside this guard (see above); only trust
+                // it while the object it describes is still the cached one.
+                Arc::ptr_eq(before, now) && cached_docs.is_some_and(|docs| docs > built_docs)
+            }
+            _ => false,
+        };
+        if superseded {
+            if ft_trace_enabled(tkey) {
+                eprintln!(
+                    "[FT] {tkey}.{index_id} publish refused: build has {built_docs} doc(s), the \
+                     cache has {}",
+                    cached_docs.unwrap_or(0)
+                );
+            }
+            return TextPublish::Superseded;
         }
         entry.text.insert(index_id, index);
         entry.text_built.insert(index_id, (epoch, read_ts));
@@ -4802,7 +4988,11 @@ impl Engine {
     /// it is also the authoritative list for a directory the port wrote.
     /// `idx_{index_id}` for a full-text index - the root the seals write under
     /// and the catalog's `idx_chunk` records name.
-    fn fulltext_index_root_of(&self, table: &str, index_id: u64) -> Option<std::path::PathBuf> {
+    pub(crate) fn fulltext_index_root_of(
+        &self,
+        table: &str,
+        index_id: u64,
+    ) -> Option<std::path::PathBuf> {
         let qualified = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&qualified).ok()??;
         Some(self.blocks_root().join(format!(
@@ -4855,6 +5045,7 @@ impl Engine {
                     dir: dir.clone(),
                     base_name: info.base_name,
                     base_row_id: info.base_row_id,
+                    row_count: info.row_count,
                 });
             }
         }
@@ -10075,6 +10266,13 @@ impl Engine {
                 cache_warm
                     .as_ref()
                     .and_then(|c| c.read().ok().map(|g| g.live.len()))
+                    // A cache that exists but holds no row is **unknown**, not
+                    // "the table is empty": taking its `0` as the count made
+                    // `all_covered` false for every indexed query on a table
+                    // with rows, and the coverage fallback then walked every
+                    // row->partition mapping - 138 ms of a 112 ms query at 200k
+                    // rows x 1536d, and 1.1 s of it at 2M.
+                    .filter(|live| *live > 0)
                     .or_else(|| {
                         self.tables
                             .lock()
@@ -10630,6 +10828,44 @@ impl Engine {
     /// attached or it is shutting down.
     pub fn submit_optimize_indexes(&self) -> bool {
         self.submit_task(|engine| Box::new(OptimizeTask { engine }))
+    }
+
+    /// Queues the rebuild of one spann segment. Returns `false` when no
+    /// processor is attached (the checkpoint then rebuilds on its own thread
+    /// instead of leaving the segment stale).
+    ///
+    /// Returns `true` for a build that is already queued or running: the caller
+    /// wanted the segment out of its hands, and it is.
+    pub(crate) fn submit_spann_rebuild(
+        &self,
+        table: &str,
+        table_id: u64,
+        index: &str,
+        ts: u64,
+    ) -> bool {
+        let key = (table_id, index.to_string());
+        {
+            let mut inflight = self.spann_builds_inflight.lock().unwrap();
+            if !inflight.insert(key.clone()) {
+                return true;
+            }
+        }
+        let table = table.to_string();
+        let index = index.to_string();
+        let queued = self.submit_task(move |engine| {
+            Box::new(SpannRebuildTask {
+                engine,
+                table,
+                table_id,
+                index,
+                ts,
+            })
+        });
+        if !queued {
+            // Shutting down: the caller must not read this as "handed off".
+            self.spann_builds_inflight.lock().unwrap().remove(&key);
+        }
+        queued
     }
 
     pub(crate) fn submit_task(

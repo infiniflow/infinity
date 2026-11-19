@@ -2244,56 +2244,35 @@ impl Engine {
                     }
                 }
                 // spann is materialised by `CREATE INDEX` (`docs/SPANN_DESIGN.md`
-                // D3/D4) and held in memory. The tree covers exactly the rows
-                // present when it was built; rows written afterwards leave the
-                // index *uncovered*, and `knn_candidates` then answers with the
-                // exact scan (§9.7) instead of a short top-k.
-                if effective_type.eq_ignore_ascii_case("SPANN") && has_rows {
-                    if let Some(index_id) = created_index_id {
-                        let schema = self.table_schema(table)?;
-                        let Some(col) = schema.iter().position(|c| c == column) else {
-                            return Err(Error::Invalid(format!("unknown column '{column}'")));
-                        };
-                        // Out-of-core build: scratch file + mapping, so the
-                        // column is never resident as text or as one flat `f32`
-                        // buffer (see `Engine::spann_build`).
-                        let options = crate::spann_mem::options_from(opts)?;
-                        // §18's open question resolved as *degrade*: below
-                        // `min_rows` (1024 by default) the index is created but
-                        // no tree is built. A k-means over a few hundred rows
-                        // costs more than the one-pass exact scan it would
-                        // accelerate, and the catalog entry still makes the
-                        // column's intent explicit (`SHOW INDEX` reports
-                        // `spann_degraded = flat`). A later dump over a table that
-                        // has grown builds the tree.
-                        let rows = self.row_count(table)? + self.buffered_row_count(table);
-                        if rows >= options.min_rows {
-                            let Some(built) =
-                                self.spann_build(table, col, options, &self.dir.join("tmp"), None)
-                            else {
-                                return Err(Error::Invalid(format!(
-                                    "no vectors to index in '{table}.{column}'"
-                                )));
-                            };
-                            let tree = std::sync::Arc::new(built);
-                            let key = self.table_key(table);
-                            self.tables
-                                .lock()
-                                .unwrap()
-                                .entry(key)
-                                .or_default()
-                                .spann
-                                .insert(
-                                    index_id,
-                                    std::sync::Arc::new(crate::spann_mem::SpannHandle::Memory(
-                                        tree,
-                                    )),
-                                );
-                            // The tree is heap (centroids + codes, and the member
-                            // vectors in `encode = none`): fold it into the
-                            // watermark charge so `seal_pressure` sees it.
-                            self.refresh_memindex_charge(table);
-                        }
+                // D3/D4), but **not** by building a tree here: a chunk holds one
+                // segment's tree, so the publish below is the only build (§6.4).
+                // The rows are already in the column's blocks; publishing walks
+                // each segment's blocks once, quantizes as it goes and streams
+                // `chunk_{n}.idx` out. Building the whole table's tree first cost
+                // O(table) heap and O(table) work for a tree the publish replaced
+                // before any query could use it (2M x 1536d: 16 min and 496 MB
+                // thrown away, plus a 12.3 GB scratch of the whole column).
+                // Rows written afterwards go to the mem index and are candidates
+                // for every query (§9.2); rows the chunks do not cover yet are
+                // answered by the exact scan (§9.7).
+                if effective_type.eq_ignore_ascii_case("SPANN")
+                    && has_rows
+                    && created_index_id.is_some()
+                {
+                    // §18's open question resolved as *degrade*: below
+                    // `min_rows` (1024 by default) no tree is built. A k-means
+                    // over a few hundred rows costs more than the one-pass
+                    // exact scan it would accelerate, and the catalog entry
+                    // still makes the column's intent explicit (`SHOW INDEX`
+                    // reports `spann_degraded = flat`). A later dump over a
+                    // table that has grown builds it.
+                    let options = crate::spann_mem::options_from(opts)?;
+                    let rows = self.row_count(table)? + self.buffered_row_count(table);
+                    if rows >= options.min_rows {
+                        // A failed publish leaves the rows uncovered: queries
+                        // fall back to the exact scan, so the statement that
+                        // created the index has nothing to undo.
+                        let _ = self.dump_index_transaction(table, name).await;
                     }
                 }
                 // A multi-vector index is materialised when it is created, so

@@ -1432,7 +1432,19 @@ pub(crate) struct CatalogChunk {
     pub(crate) dir: String,
     pub(crate) base_name: String,
     pub(crate) base_row_id: u64,
+    /// The span the record covers (`ChunkIndexMetaInfo::row_cnt_`): a merged
+    /// chunk's name repeats it, and it is what tells a reader which plain chunks
+    /// a merged one has replaced.
+    pub(crate) row_count: u64,
 }
+
+/// One chunk a merge left behind, in the shape the catalog records it:
+/// `(segment, base_name, base_row_id, row_count, term_count)`.
+///
+/// A merge of an index that is not in the cache happens on a detached
+/// [`TextIndex`], so what survives has to be described well enough to republish
+/// without it - the pairs `ChunkIndexMetaInfo` carries.
+pub(crate) type HeldTextChunk = (u32, String, u64, u64, u64);
 
 /// The per-column reader over the sealed segments.
 ///
@@ -1607,10 +1619,20 @@ impl TextIndex {
                     .strip_prefix("ft_")
                     .and_then(|hex| hex.split('_').next())
                     .and_then(|hex| u64::from_str_radix(hex, 16).ok())?;
+                // A merged chunk (`ft_{base:016x}_{rows:x}`) repeats its span in
+                // the name; a plain one does not carry a count at all, and only
+                // the merged form's is read (the loader uses it to retire the
+                // plain chunks a merge replaced).
+                let row_count = base
+                    .strip_prefix("ft_")
+                    .and_then(|rest| rest.split_once('_'))
+                    .and_then(|(_, rows)| u64::from_str_radix(rows, 16).ok())
+                    .unwrap_or(0);
                 Some(CatalogChunk {
                     dir: dir.to_string(),
                     base_name: base.to_string(),
                     base_row_id,
+                    row_count,
                 })
             })
             .collect();
@@ -1659,8 +1681,37 @@ impl TextIndex {
         // starts at row 0, which would overlap every chunk already loaded. So
         // one broken chunk retires the whole set: the caller rebuilds from
         // scratch, and `Cleanup` removes what is on disk.
+        // A merge publishes the merged chunk and unlinks its sources in two
+        // steps, so a crash in between leaves `ft_{base:016x}_{rows:x}` recorded
+        // next to the plain chunks it replaced (`apply_merge`). Mapping both
+        // copies puts every row of the range in the index twice, and
+        // `total_docs` stops being the number of rows the index can answer for.
+        // The merged chunk is the newer one, so a plain chunk whose base falls
+        // inside a merged chunk's span is dropped - the resolution `apply_merge`
+        // notes here (the reference never meets the state: its merge rewrites
+        // chunk *ids* rather than files).
+        let merged_spans: Vec<(u64, u64)> = catalog
+            .iter()
+            .filter(|chunk| {
+                storage::definition::format::is_merged_fulltext_base_name(&chunk.base_name)
+            })
+            .map(|chunk| (chunk.base_row_id, chunk.base_row_id + chunk.row_count))
+            .collect();
         let mut broken = false;
         for chunk in catalog {
+            if merged_spans.iter().any(|(start, end)| {
+                chunk.base_row_id >= *start
+                    && chunk.base_row_id < *end
+                    && !storage::definition::format::is_merged_fulltext_base_name(&chunk.base_name)
+            }) {
+                if ft_trace_enabled(&self.dir) {
+                    eprintln!(
+                        "[FT] {} drops chunk {} (rows {}..{}): a merged chunk covers it",
+                        self.dir, chunk.base_name, chunk.base_row_id, chunk.row_count
+                    );
+                }
+                continue;
+            }
             // A chunk's `chunk_info` names its first row id, and that is what
             // turns a posting's dense ordinal back into a row id.
             let base_row_id = chunk.base_row_id;
@@ -2240,7 +2291,16 @@ impl TextIndex {
                         // files: leaving them beside the intact sources would
                         // make the next `load_sealed` count every row in the
                         // range twice.
-                        remove_run_files(dir, &run.dst);
+                        //
+                        // The output lives in the **segment's** directory
+                        // (`segment_chunk_dir`), not in the column's root: the
+                        // cleanup has to name the same directory the merge wrote
+                        // to. Pointing it at the root left the half-published
+                        // chunk on disk, where the checkpoint's directory scan
+                        // (`publish_fulltext_chunks`) recorded it beside its
+                        // still-recorded sources and every row of the range was
+                        // counted twice.
+                        remove_run_files(&run_dir, &run.dst);
                         None
                     }
                 }
@@ -2336,6 +2396,20 @@ impl TextIndex {
             }
         }
         self.reader.segments = out;
+        // A source the merge retired leaves the publish queue too. Its files are
+        // gone, and `record_sealed_text_chunks` turns a queued name into a
+        // catalog record without looking at the disk: the record would name a
+        // chunk `load_sealed_scoped` cannot open, which retires the **whole**
+        // set and rebuilds the column from the blocks. The merged chunk is
+        // published by `republish_text_chunks`, not through this queue.
+        let live: std::collections::HashSet<&str> = self
+            .reader
+            .segments
+            .iter()
+            .map(|segment| segment.reader.base_name())
+            .collect();
+        self.unrecorded
+            .retain(|chunk| live.contains(chunk.base_name.as_str()));
         applied
     }
 

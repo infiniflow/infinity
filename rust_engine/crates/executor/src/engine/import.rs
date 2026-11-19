@@ -4,6 +4,168 @@
 
 use super::*;
 
+/// Stored text an import keeps in memory before it spills to disk.
+///
+/// The import commits once, so its rows cannot reach the block writer early;
+/// holding every row's stored text until then made the peak the *statement*
+/// (11 KiB per row at 1536d - 5.8 GiB for one 500k-row segment, measured on
+/// `spann_scale_1536d`). Past this much text the rows go to a scratch file and
+/// are replayed a batch at a time, so the import's memory is a batch whatever
+/// the file's size.
+const IMPORT_SPILL_BYTES: usize = 64 * 1024 * 1024;
+
+/// The rows one `COPY` stages for the block writer, spilled past
+/// [`IMPORT_SPILL_BYTES`].
+pub(crate) struct StagedRows {
+    /// Rows kept in memory (the whole set while it stays under the threshold).
+    memory: Vec<(usize, String)>,
+    /// The scratch file once the threshold is crossed: path and writer.
+    spill: Option<(std::path::PathBuf, std::io::BufWriter<std::fs::File>)>,
+    /// Rows staged so far, in both modes.
+    count: usize,
+    /// Bytes of stored text held so far, in both modes.
+    bytes: usize,
+}
+
+impl StagedRows {
+    fn new() -> Self {
+        Self {
+            memory: Vec::new(),
+            spill: None,
+            count: 0,
+            bytes: 0,
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Stages one row's stored text, moving the set to disk when it grows past
+    /// the threshold. `dir` is where the scratch file lives.
+    fn push(&mut self, seq: usize, text: String, dir: &std::path::Path) -> Result<()> {
+        self.count += 1;
+        self.bytes += text.len();
+        if self.spill.is_none() {
+            if self.bytes <= IMPORT_SPILL_BYTES {
+                self.memory.push((seq, text));
+                return Ok(());
+            }
+            std::fs::create_dir_all(dir).map_err(|e| Error::io(dir, e))?;
+            let path = dir.join(format!(
+                "import-spill-{}-{}.rows",
+                std::process::id(),
+                self.count
+            ));
+            let file = std::fs::File::create(&path).map_err(|e| Error::io(&path, e))?;
+            let mut writer = std::io::BufWriter::with_capacity(1 << 20, file);
+            for (seq, text) in self.memory.drain(..) {
+                Self::write_row(&mut writer, &path, seq, &text)?;
+            }
+            self.spill = Some((path, writer));
+            // The row that crossed the threshold goes to the file too, below:
+            // returning here dropped exactly one row per segment, and the block
+            // writer caught it ("block 0.0 holds 8191 of the 8192 rows
+            // committed at ts 10").
+        }
+        let (path, writer) = self.spill.as_mut().unwrap();
+        let path = path.clone();
+        Self::write_row(writer, &path, seq, &text)
+    }
+
+    fn write_row(
+        writer: &mut impl std::io::Write,
+        path: &std::path::Path,
+        seq: usize,
+        text: &str,
+    ) -> Result<()> {
+        let len = u32::try_from(text.len())
+            .map_err(|_| Error::Invalid("import: a row's stored text exceeds 4 GiB".into()))?;
+        writer
+            .write_all(&(seq as u64).to_le_bytes())
+            .and_then(|()| writer.write_all(&len.to_le_bytes()))
+            .and_then(|()| writer.write_all(text.as_bytes()))
+            .map_err(|e| Error::io(path, e))
+    }
+
+    /// Pushes what the writer still holds to the file, so [`Self::replay`] can
+    /// read it back.
+    fn flush(&mut self) -> Result<()> {
+        use std::io::Write;
+        if let Some((path, writer)) = self.spill.as_mut() {
+            let path = path.clone();
+            writer.flush().map_err(|e| Error::io(&path, e))?;
+        }
+        Ok(())
+    }
+
+    /// Hands every staged row to `row`, in staging order, calling `batch_done`
+    /// at each boundary in `batches` (one entry per import batch).
+    ///
+    /// One pass for the whole set: the caller publishes a batch, writes the
+    /// block it landed in, and drops it, so the append buffer never holds more
+    /// than one batch either.
+    pub(crate) fn replay_batches(
+        &self,
+        batches: &[usize],
+        mut row: impl FnMut(usize, &str) -> Result<()>,
+        mut batch_done: impl FnMut(usize) -> Result<()>,
+    ) -> Result<()> {
+        let mut batch = 0usize;
+        let mut left = batches.first().copied().unwrap_or(0);
+        let mut end_batch = |batch: &mut usize, left: &mut usize| -> Result<()> {
+            batch_done(*batch)?;
+            *batch += 1;
+            *left = batches.get(*batch).copied().unwrap_or(0);
+            Ok(())
+        };
+        let Some((path, _)) = self.spill.as_ref() else {
+            for (seq, text) in &self.memory {
+                row(*seq, text.as_str())?;
+                left = left.saturating_sub(1);
+                if left == 0 {
+                    end_batch(&mut batch, &mut left)?;
+                }
+            }
+            return Ok(());
+        };
+        use std::io::Read;
+        let file = std::fs::File::open(path).map_err(|e| Error::io(path.as_path(), e))?;
+        let mut reader = std::io::BufReader::with_capacity(1 << 20, file);
+        let mut buf: Vec<u8> = Vec::new();
+        loop {
+            let mut head = [0u8; 12];
+            match reader.read_exact(&mut head) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                Err(e) => return Err(Error::io(path.as_path(), e)),
+            }
+            let seq = u64::from_le_bytes(head[..8].try_into().unwrap()) as usize;
+            let len = u32::from_le_bytes(head[8..].try_into().unwrap()) as usize;
+            buf.clear();
+            buf.resize(len, 0);
+            reader
+                .read_exact(&mut buf)
+                .map_err(|e| Error::io(path.as_path(), e))?;
+            let text = String::from_utf8_lossy(&buf);
+            row(seq, text.as_ref())?;
+            left = left.saturating_sub(1);
+            if left == 0 {
+                end_batch(&mut batch, &mut left)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for StagedRows {
+    fn drop(&mut self) {
+        if let Some((path, _)) = self.spill.take() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
 impl Engine {
     /// Marks `table` as having an `IMPORT` in flight until the guard drops.
     ///
@@ -155,8 +317,10 @@ impl Engine {
         // segment must keep the boundaries of both.
         let mut batches_all: Vec<usize> = Vec::new();
         // `(row id, stored text)` per row, so the commit can hand the block the
-        // values it publishes without a second pass over the file.
-        let mut encoded_rows: Vec<(usize, String)> = Vec::new();
+        // values it publishes without a second pass over the file. Spilled past
+        // a batch's worth: the whole statement's text does not stay resident.
+        let mut staged_rows = StagedRows::new();
+        let spill_dir = self.dir.join("tmp");
         // `HEADER true` makes the first line a header: the reference validates
         // its column count against the table and then drops it without counting
         // it as a row (`PhysicalImport::NewCSVHeaderHandler`).
@@ -286,7 +450,7 @@ impl Engine {
                         // The rows ride in the transaction only as its `ImportV2`
                         // extent; their values go to the block buffer at commit.
                         let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
-                        encoded_rows.push((base + k, encoded));
+                        staged_rows.push(base + k, encoded, &spill_dir)?;
                     }
                     let segment = (base >> 32) as u32;
                     if !segments.contains(&segment) {
@@ -333,9 +497,12 @@ impl Engine {
             }
         }
         if staged > 0 {
+            // A spilled set has to be on the file before the commit reads it
+            // back; the in-memory one is already complete.
+            staged_rows.flush()?;
             // One `create` boundary per staged batch, across every segment this
             // statement opened.
-            self.commit_import_chunk(table, t, &segments, &encoded_rows, &batches_all)
+            self.commit_import_chunk(table, t, &segments, &staged_rows, &batches_all)
                 .await?;
             // `live_rows` is what the query path's cache freshness and index
             // coverage gates compare against, and it adds a *delta* to a

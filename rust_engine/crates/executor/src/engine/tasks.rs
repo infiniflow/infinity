@@ -39,6 +39,24 @@ pub struct OptimizeTask {
     pub(crate) engine: std::sync::Weak<Engine>,
 }
 
+/// A spann segment the checkpoint declined to rebuild on its own thread.
+///
+/// The checkpoint publishes deltas, which is `O(new rows)`. A rebuild is
+/// `O(rows · log(rows/max) · dims)` - minutes on a large segment - so the two
+/// states that force one (a chain at the layer cap, or a segment whose
+/// published chain is mostly dead rows) are handed here instead: the old chain
+/// keeps answering until the new one is installed, and the checkpoint does not
+/// stall. `publish_index_chunks_forced` is the rebuild, and it runs on the
+/// blocking pool so a query keeps its runtime worker.
+pub struct SpannRebuildTask {
+    pub(crate) engine: std::sync::Weak<Engine>,
+    pub(crate) table: String,
+    pub(crate) table_id: u64,
+    pub(crate) index: String,
+    /// The dump timestamp the new chunk's records carry.
+    pub(crate) ts: u64,
+}
+
 /// The reference's `PeriodicTriggerThread::Run`
 /// (`periodic_trigger_thread_impl.cpp:49-74`): wake every second and fire each
 /// trigger whose interval elapsed.
@@ -101,6 +119,18 @@ pub(crate) async fn trigger_loop(
             {
                 last_cleanup = std::time::Instant::now();
                 engine.submit_cleanup();
+            }
+            // The insert path takes a couple of queued splits per row and
+            // leaves the rest of a bulk load's backlog behind it; this is the
+            // pass that catches up. It is bounded, and a tail with nothing
+            // queued costs one short read, so an idle engine does no work here.
+            // `block_in_place`: the drain takes the tail's write lock, and a
+            // tokio worker must not park on it while other tasks are ready.
+            if engine.has_spann_fixups() {
+                let engine = engine.clone();
+                let _ = tokio::task::block_in_place(move || {
+                    engine.spann_drain_fixups(crate::spann_mem::BACKGROUND_FIXUP_BUDGET)
+                });
             }
         }
         tokio::time::sleep(TICK).await;

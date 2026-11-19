@@ -49,6 +49,72 @@ impl Ord for Entry {
     }
 }
 
+/// One partition waiting to be expanded, ordered so the heap pops the *nearest*
+/// first.
+///
+/// Best-first is what makes recall independent of tree depth: a node at depth 3
+/// competes directly with one at depth 7 on its lower bound, instead of the two
+/// spending separate per-level budgets. With a level-synchronous beam a tree
+/// grown by 2-way splits (one level per ~CAP rows) dilutes the beam to
+/// `beam / 2^height` by the time it reaches the leaves - measured at 0.23 recall
+/// on 100k x 1536d / height 9 with beam 32, against 1.0 once the walk is
+/// best-first. This is Cockroach's `BestFirstSearch` (`cspann/search.go`), and
+/// `beam` here is its `beamSize`: a budget on **leaf partitions scanned**, not a
+/// per-level width.
+#[derive(Clone, Copy, Debug)]
+pub struct Candidate {
+    /// Distance from the query to this partition's **centroid**: the ordering
+    /// key. Every partition holds exactly the rows of its own Voronoi cell, so
+    /// this is the tight, meaningful rank.
+    pub bound: f32,
+    /// `max(0, bound - radius)`: a true lower bound on any row in the subtree,
+    /// used only to *skip* a subtree, never to order or to stop the walk. With
+    /// `bound - radius` as the heap key the rank collapses: a merged or sparse
+    /// partition has a radius larger than its distance, every such node ties at
+    /// 0, and the beam walks them in key order (measured: 0.85 recall at 200k x
+    /// 1536d versus 1.0 once the rank is the centroid distance).
+    pub lower: f32,
+    /// Widened to `u64`: the incremental tree keys partitions by their DFS path,
+    /// the published tree by a `u32` DFS ordinal.
+    pub key: u64,
+}
+
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for Candidate {}
+
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Candidate {
+    /// Reversed on purpose: `BinaryHeap` is a max-heap, and the smallest lower
+    /// bound has to come out first. Ties break on the key so a query is
+    /// reproducible.
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .bound
+            .total_cmp(&self.bound)
+            .then_with(|| other.key.cmp(&self.key))
+    }
+}
+
+/// `max(0, distance - radius)` for L2, else `distance` (§8.3: the radius bounds
+/// a partition's rows only under L2).
+pub fn radius_lower(distance: f32, radius: f32, metric: crate::vector::Metric) -> f32 {
+    if metric.is_l2() {
+        (distance - radius).max(0.0)
+    } else {
+        distance
+    }
+}
+
 /// The top-k set of one query, with the dedupe every multi-chunk merge needs.
 #[derive(Debug)]
 pub struct SearchSet {

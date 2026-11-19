@@ -19,11 +19,14 @@
 //! as the radius pruning bound (§8.3).
 
 pub mod build;
+pub mod incr;
 pub mod kmeans;
+pub mod page_tree;
 pub mod partition;
 pub mod quantize;
 pub mod search;
 pub mod source;
+pub mod spool;
 pub mod store;
 
 pub use build::{build_tree, BuiltTree};
@@ -100,7 +103,9 @@ pub struct Options {
     pub kmeans_iterations: usize,
     /// Persisted in the chunk header; rebuilds the same rotation (§18).
     pub seed: u64,
-    /// Partitions probed per level when the statement does not override it.
+    /// Leaf partitions probed per query when the statement does not override
+    /// it. The walk is best-first, so this is a *total* budget, not a per-level
+    /// width (`search::Candidate`, `cspann`'s `beamSize`).
     pub base_beam: usize,
     /// Root fan-out: `num_centroids` of §11.2. The bisection tree is collapsed
     /// above `log2(root_fanout)` levels into one wide root (`build::collapse_top`).
@@ -195,6 +200,19 @@ pub enum SpannError {
     InvalidOption(&'static str, String),
     /// A chunk could not be parsed; the message names the failing section.
     Corrupt(String),
+    /// The chunk is well formed but its format version is not the one this
+    /// build reads. Distinct from [`Self::Corrupt`] because the recovery is
+    /// different: the bytes are fine, the segment simply has to be rebuilt from
+    /// the column, which a checkpoint can schedule (`VERSION` in
+    /// `storage::knn_index::spann`).
+    NeedsRebuild {
+        found: u16,
+        expected: u16,
+    },
+    /// The backing store (RocksDB, a file, a test double) rejected an
+    /// operation. Kept as an opaque string so `crates/index` stays free of
+    /// the storage crate's error type.
+    Storage(String),
 }
 
 impl Display for SpannError {
@@ -206,6 +224,11 @@ impl Display for SpannError {
             }
             SpannError::InvalidOption(name, why) => write!(f, "spann: invalid {name}: {why}"),
             SpannError::Corrupt(what) => write!(f, "spann: corrupt chunk: {what}"),
+            SpannError::NeedsRebuild { found, expected } => write!(
+                f,
+                "spann: chunk version {found}, this build reads {expected}; rebuild the index"
+            ),
+            SpannError::Storage(what) => write!(f, "spann: store: {what}"),
         }
     }
 }
@@ -400,72 +423,56 @@ impl SpannIndex {
         let Some(root) = self.store.partition(self.store.root()) else {
             return Vec::new();
         };
-        let width = beam.unwrap_or(self.opts.base_beam).max(1);
-        let mut current: Vec<(f32, PartitionKey)> = vec![(0.0, root.key)];
-        // Leaves met above the bottom level. The bisection splits by row count, so
-        // one side of a split can fit in a partition while the other does not and
-        // the tree ends up with branches of different depth; a leaf like that has
-        // no children to descend into and used to empty the beam (or, worse, be
-        // skipped while its siblings answered).
-        let mut shallow: Vec<(f32, PartitionKey)> = Vec::new();
-        let mut level = root.level;
-        // The descent ends when nothing is left to descend into, not when the level
-        // counter reaches 1: with branches of different depth the counter is only
-        // an upper bound, and stopping on it left a partition at level 2 unscanned.
-        loop {
-            // Interior levels narrow: the root of a 1M-row tree holds a handful
-            // of children, so spending the leaf width there only scans
-            // centroids (see `search::level_width`).
-            let mut next = Beam::new(search::level_width(width, level.saturating_sub(1)));
-            let mut descended = false;
-            for (bound, key) in &current {
-                let Some(p) = self.store.partition(*key) else {
-                    continue;
-                };
-                if p.is_leaf() {
-                    shallow.push((*bound, *key));
-                    continue;
-                }
-                descended = true;
-                for child in &p.children {
-                    if let Some(c) = self.store.partition(*child) {
-                        next.push(c.lower_bound(q, self.opts.metric), *child);
-                    }
-                }
-            }
-            if !descended {
-                break;
-            }
-            current = next.into_items();
-            if current.is_empty() {
-                break;
-            }
-            level = level.saturating_sub(1).max(2);
-        }
-        current.extend(shallow);
-        // The leaf scan's early stop reads `current` in bound order.
-        current.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-
+        // `beam` is the leaf-scan budget (`cspann`'s `beamSize`): how many
+        // partitions a query may probe, *not* how wide each level is. A tree that
+        // grows by 2-way splits ends up ~log2(rows/CAP) levels deep - height 9 at
+        // 100k x 1536d - and a per-level width of 32 reaches the leaves with
+        // 32 / 2^height of the space, measured at 0.23 recall. Best-first spends
+        // the same budget on the most promising partitions wherever they sit.
+        let budget = beam.unwrap_or(self.opts.base_beam).max(1);
         let mut set = SearchSet::with_default_capacity(k);
-        // `current` is sorted by lower bound, so the first partition that cannot
-        // beat the incumbent k-th result ends the leaf scan: that is the
-        // descent's early stop, and it is what lets a wide beam stay cheap when
-        // the query is unambiguous.
-        for (bound, key) in &current {
-            let Some(p) = self.store.partition(*key) else {
-                continue;
-            };
-            // Radius pruning needs the metric's distance to be bounded below by
-            // ‖q−c‖ − R, which only holds for L2 (§8.3).
+        let mut queue: std::collections::BinaryHeap<search::Candidate> =
+            std::collections::BinaryHeap::new();
+        queue.push(search::Candidate {
+            bound: 0.0,
+            lower: 0.0,
+            key: root.key as u64,
+        });
+        let mut scanned = 0usize;
+        while let Some(node) = queue.pop() {
+            // Radius pruning skips a subtree whose *every* row is farther than
+            // the incumbent k-th result (§8.3's bound only holds for L2). It
+            // cannot break the walk: the queue is ordered by centroid distance,
+            // and a later node may have a smaller radius-adjusted bound.
             if self.opts.metric.is_l2() {
                 if let Some(kth) = set.kth_upper() {
-                    if !search::l2_can_beat(*bound, kth) {
-                        break;
+                    if !search::l2_can_beat(node.lower, kth) {
+                        continue;
                     }
                 }
             }
-            let query = p.make_query(&self.rotation, q);
-            p.search_into(&query, q, self.opts.metric, &mut set, allowed);
+            let Some(part) = self.store.partition(node.key as PartitionKey) else {
+                continue;
+            };
+            if part.is_leaf() {
+                if scanned >= budget {
+                    break;
+                }
+                let query = part.make_query(&self.rotation, q);
+                part.search_into(&query, q, self.opts.metric, &mut set, allowed);
+                scanned += 1;
+            } else {
+                for child in &part.children {
+                    if let Some(c) = self.store.partition(*child) {
+                        let distance = c.centroid_distance(q, self.opts.metric);
+                        queue.push(search::Candidate {
+                            bound: distance,
+                            lower: search::radius_lower(distance, c.radius, self.opts.metric),
+                            key: *child as u64,
+                        });
+                    }
+                }
+            }
         }
         set.into_sorted()
     }

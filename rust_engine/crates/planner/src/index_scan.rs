@@ -1993,14 +1993,22 @@ fn fulltext_evaluator(expr: &Expr) -> Option<IndexFilterEvaluatorFulltext> {
     };
     let mut evaluator =
         IndexFilterEvaluatorFulltext::new(expr.clone(), parse_fulltext_query(text, options));
+    // The clause count `minimum_should_match` is a share of: the children of the
+    // boolean node the query built (C++ `GetMinimumShouldMatchParameter(option,
+    // leaf_count)`, `index_filter_evaluators_impl.cpp:571`).
+    let clauses = match &evaluator.query_tree {
+        FulltextQuery::Term(_) => 1,
+        FulltextQuery::And(children) | FulltextQuery::Or(children) => children.len(),
+    };
     for part in options.split(';') {
         let (key, value) = part.split_once('=').unwrap_or(("", ""));
         match key.trim().to_ascii_lowercase().as_str() {
+            // A plain number, a percentage, a negative form or `n<spec` are all
+            // valid (the parser has already rejected the out-of-range ones), and
+            // which of them applies depends on the clause count.
             "minimum_should_match" => {
-                evaluator.minimum_should_match = value
-                    .trim()
-                    .parse::<usize>()
-                    .unwrap_or(evaluator.minimum_should_match)
+                evaluator.minimum_should_match =
+                    expression::minimum_should_match(value.trim(), clauses)
             }
             "threshold" => evaluator.score_threshold = value.trim().parse::<f32>().unwrap_or(0.0),
             "similarity" if value.trim().eq_ignore_ascii_case("boolean") => {
@@ -2549,10 +2557,73 @@ impl crate::optimize::OptimizerRule for IndexScanRule {
         let mut plan = built.plan;
         if !built.candidates.is_empty() {
             if let Some(residual) = residual {
-                plan = add_filter_above_scan(plan, residual);
+                // `filter_fulltext` is the one predicate the evaluator answers
+                // *exactly* - `ColumnIndexReader::Lookup` over the analyzed
+                // query, the same postings the reference's
+                // `IndexFilterEvaluatorFulltext` reads - and C++ *replaces* it
+                // with the query tree instead of running it again
+                // (`FilterFulltextExpression` is consumed by the index scan).
+                // Keeping it above the scan made the residual a second, weaker
+                // answer: the expression interpreter's `fulltext_match` compares
+                // raw words, so `filter_fulltext('body', 'family')` threw away
+                // the row the index had just matched through the stem `famili`.
+                // A secondary-index conjunct stays: its ranges only narrow the
+                // candidates, so the row still needs the comparison.
+                let answered_fulltext = built
+                    .candidates
+                    .iter()
+                    .any(|candidate| contains_fulltext(&candidate.index_filter));
+                let residual = if answered_fulltext {
+                    without_fulltext(residual)
+                } else {
+                    Some(residual)
+                };
+                if let Some(residual) = residual {
+                    plan = add_filter_above_scan(plan, residual);
+                }
             }
         }
         Ok(plan)
+    }
+}
+
+/// `true` when `expr` holds a `filter_fulltext` predicate: the index evaluator
+/// answers that part exactly, so the rule may drop it from the residual.
+fn contains_fulltext(expr: &Expr) -> bool {
+    match expr {
+        Expr::FullText(..) => true,
+        Expr::And(a, b) | Expr::Or(a, b) => contains_fulltext(a) || contains_fulltext(b),
+        Expr::Not(a) => contains_fulltext(a),
+        _ => false,
+    }
+}
+
+/// `true` when `expr` is nothing but `filter_fulltext` conjuncts/disjuncts: the
+/// index evaluator answers such a node exactly, so it need not run again above
+/// the scan. A node mixing in a comparison is not exact (a secondary index's
+/// ranges only narrow), and neither is one under `NOT`.
+fn fulltext_only(expr: &Expr) -> bool {
+    match expr {
+        Expr::FullText(..) => true,
+        Expr::And(a, b) | Expr::Or(a, b) => fulltext_only(a) && fulltext_only(b),
+        _ => false,
+    }
+}
+
+/// [`fulltext_only`] nodes removed from an `AND` tree (`None` when nothing is
+/// left).
+fn without_fulltext(expr: Expr) -> Option<Expr> {
+    if fulltext_only(&expr) {
+        return None;
+    }
+    match expr {
+        Expr::And(a, b) => and_exprs(
+            [without_fulltext(*a), without_fulltext(*b)]
+                .into_iter()
+                .flatten()
+                .collect(),
+        ),
+        other => Some(other),
     }
 }
 
@@ -3114,6 +3185,49 @@ mod tests {
         let built = IndexScanBuilder::build(plan, &catalog()).unwrap();
         assert!(built.candidates.is_empty());
         assert!(matches!(built.plan, LogicalPlan::Filter { .. }));
+    }
+
+    /// A `filter_fulltext` conjunct is answered by the evaluator **alone**. C++
+    /// consumes the `FilterFulltextExpression` into the index scan, and keeping
+    /// it above the scan made the expression interpreter's raw-word matcher the
+    /// final answer: the index matched `family` through the stem `famili` and the
+    /// residual then threw the row away. A comparison conjunct stays - a
+    /// secondary index's ranges only narrow candidates.
+    #[test]
+    fn the_index_scan_rule_drops_the_answered_fulltext_predicate() {
+        let scan = || LogicalPlan::Scan {
+            table: "t".into(),
+            columns: vec!["id".into(), "name".into()],
+        };
+        let fulltext = Expr::FullText(1, "family".into(), String::new());
+        // Alone: the plan is the index scan, nothing is left to re-check.
+        let plan = LogicalPlan::Filter {
+            input: Box::new(scan()),
+            predicate: fulltext.clone(),
+        };
+        let mut optimizer = crate::optimize::Optimizer::new();
+        optimizer.add_rule(Box::new(IndexScanRule::new(catalog(), None)));
+        let out = optimizer.optimize(plan).unwrap();
+        assert!(
+            matches!(out, LogicalPlan::IndexScan { .. }),
+            "the fulltext predicate is the index scan's, got {out:?}"
+        );
+        // Conjoined with a comparison: only the comparison stays above it.
+        let compare = cmp(col(0), CmpOp::Ge, Expr::Literal(Value::Int(1)));
+        let plan = LogicalPlan::Filter {
+            input: Box::new(scan()),
+            predicate: Expr::And(Box::new(compare.clone()), Box::new(fulltext)),
+        };
+        let out = optimizer.optimize(plan).unwrap();
+        let LogicalPlan::Filter {
+            input,
+            predicate: residual,
+        } = &out
+        else {
+            panic!("expected the comparison to stay above the scan, got {out:?}");
+        };
+        assert_eq!(residual, &compare);
+        assert!(matches!(input.as_ref(), LogicalPlan::IndexScan { .. }));
     }
 
     /// `IndexScanRule` is the optimizer-rule form of the builder: it rewrites

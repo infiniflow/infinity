@@ -1421,10 +1421,11 @@ impl Engine {
                 _ => Some((live.ids.clone(), live.defaults.clone())),
             }
         };
-        // spann's mem index: the row goes here, **not** into the tree
-        // (`docs/SPANN_DESIGN.md` §9.2). One vector copy per row, and the next
-        // dump builds the tree that covers these rows and clears the list.
-        let spann_columns: Vec<(u64, usize)> = self
+        // spann's tail: the row goes **into the tree** (`docs/SPANN_DESIGN.md`
+        // §0.0.3) - one descent plus a code, 208 B at 1536d, and the query
+        // descends the same tree. The dump publishes a chunk over the segment and
+        // empties the tail; it does not have to build the tree from scratch.
+        let spann_columns: Vec<(u64, usize, usize, index::spann::Options)> = self
             .storage
             .catalog
             .indexes_of_table(&table)
@@ -1437,23 +1438,30 @@ impl Engine {
                     .ok()?
                     .iter()
                     .position(|c| c == &im.column)?;
-                Some((im.id, position))
+                let dims = self.spann_dims_of(&table, &im.column);
+                let opts = crate::spann_mem::options_from(&im.options).ok()?;
+                Some((im.id, position, dims, opts))
             })
             .collect();
         {
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
             // Before `buffer_rows`, which consumes `rows`.
-            for (index_id, column) in &spann_columns {
-                let mem = entry.spann_mem.entry(*index_id).or_default();
-                mem.reserve(rows.len());
+            for (index_id, column, dims, opts) in &spann_columns {
+                if *dims == 0 {
+                    continue;
+                }
+                let tail = entry.spann_mem.entry(*index_id).or_insert_with(|| {
+                    crate::spann_mem::SpannTail::new(*dims, opts.clone())
+                        .expect("a tail over a validated dimension")
+                });
                 for (seq, row) in &rows {
                     let Some(value) = row.get(*column) else {
                         continue;
                     };
                     let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
                     if !vector.is_empty() {
-                        mem.push((*seq as u64, vector));
+                        let _ = tail.insert(*seq as u64, &vector);
                     }
                 }
             }
@@ -1739,17 +1747,80 @@ impl Engine {
     /// seals it: every record it writes carries that transaction's commit ts.
     /// The checkpoint passes `None` and mirrors the whole table with the ts the
     /// last dump recorded.
+    /// Share of a segment's rows that may be dead - published into a chunk,
+    /// then deleted from the column - before the checkpoint asks for a rebuild.
+    ///
+    /// A delta appends a page; it never rewrites a leaf to drop a row, so dead
+    /// rows accumulate until a rebuild. Without a bound they are scanned
+    /// forever: a table that deletes and re-inserts the same volume grows a
+    /// chain of tombstones nothing reclaims.
+    pub(crate) const SPANN_DEAD_REBUILD_PERCENT: u64 = 20;
+
+    /// Clean pages a delta checkpoint may keep for routing.
+    ///
+    /// The pages are one centroid plus child keys each (~6 KB at 1536d), so this
+    /// is roughly 10k partitions - far more than a checkpoint's working set,
+    /// and small enough that it does not scale with the segment.
+    pub(crate) const SPANN_PAGE_BUDGET: usize = 64 << 20;
+
+    /// Pages a delta checkpoint may hold **for writing**. A dirty page cannot be
+    /// evicted, so this is what bounds the delta; when it is spent the remaining
+    /// rows go back to the tail and the next checkpoint publishes them.
+    pub(crate) const SPANN_DIRTY_BUDGET: usize = 512 << 20;
+
+    /// [`Self::SPANN_PAGE_BUDGET`], as the running engine holds it.
+    pub(crate) fn spann_page_budget(&self) -> usize {
+        self.context
+            .spann_page_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// [`Self::SPANN_DIRTY_BUDGET`], as the running engine holds it.
+    pub(crate) fn spann_dirty_budget(&self) -> usize {
+        self.context
+            .spann_dirty_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub(crate) fn publish_index_chunks(
         &self,
         table: &str,
         table_id: u64,
         only: Option<(&str, u64)>,
     ) -> Result<()> {
+        self.publish_index_chunks_inner(table, table_id, only, false)
+    }
+
+    /// [`Self::publish_index_chunks`] that rebuilds each spann segment from the
+    /// column instead of appending a delta.
+    ///
+    /// The optimize pass calls this for the states a delta cannot fix: a chain
+    /// at the layer cap (each further delta is one more tree per query probe)
+    /// and a segment whose published chain still holds rows the column deleted
+    /// (a delta appends; only a rebuild drops). It runs on the background task,
+    /// so the rebuild is not a checkpoint stall - which is why the checkpoint
+    /// defers these two states to it.
+    pub(crate) fn publish_index_chunks_forced(
+        &self,
+        table: &str,
+        table_id: u64,
+        only: Option<(&str, u64)>,
+    ) -> Result<()> {
+        self.publish_index_chunks_inner(table, table_id, only, true)
+    }
+
+    fn publish_index_chunks_inner(
+        &self,
+        table: &str,
+        table_id: u64,
+        only: Option<(&str, u64)>,
+        force_rebuild: bool,
+    ) -> Result<()> {
         let mut indexes = self.storage.catalog.indexes_of_table(table)?;
         if let Some((name, _)) = only {
             indexes.retain(|im| im.name == name);
         }
-        self.publish_index_chunks_of(table, table_id, &indexes, only)
+        self.publish_index_chunks_of(table, table_id, &indexes, only, force_rebuild)
     }
 
     fn publish_index_chunks_of(
@@ -1758,6 +1829,7 @@ impl Engine {
         table_id: u64,
         indexes: &[catalog::IndexMeta],
         only: Option<(&str, u64)>,
+        force_rebuild: bool,
     ) -> Result<()> {
         let db_id = self.database_id_of(table);
         let root = self
@@ -1776,6 +1848,14 @@ impl Engine {
         // index is the rows that chunk now covers, so it is cleared once the
         // records are appended below.
         let mut spann_ready: Vec<u64> = Vec::new();
+        // `(index id, segment, the chain that now answers for it)`: a delta
+        // installs the chain it built, so neither the next query nor the next
+        // checkpoint has to open the layers again.
+        let mut spann_install: Vec<(
+            u64,
+            u32,
+            std::sync::Arc<storage::knn_index::spann::ChunkChain>,
+        )> = Vec::new();
         // `(index name, segment, chunks it replaces, chunk ts)` - deprecated once the
         // replacement has a record, so `cleanup_index_chunks` can reclaim the bytes of
         // the superseded snapshot without a reader ever losing the one it has open.
@@ -1876,17 +1956,6 @@ impl Engine {
                 .iter()
                 .flat_map(|(_, chunks)| chunks)
                 .map(|(id, info)| (info.base_row_id, *id as u32))
-                .collect();
-            // `(segment, chunk id) -> row_count`, for the spann reuse check: a
-            // chunk records how many rows it covers, and a segment that has not
-            // changed since its chunk was written has exactly that many.
-            let recorded_rows: std::collections::HashMap<(u32, u64), u64> = recorded_chunks
-                .iter()
-                .flat_map(|(segment, chunks)| {
-                    chunks
-                        .iter()
-                        .map(move |(id, info)| ((*segment, *id), info.row_count))
-                })
                 .collect();
             for (segment, seg_rows) in &segments {
                 let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
@@ -2116,7 +2185,13 @@ impl Engine {
                         commit_ts: chunk_ts,
                     }]
                 } else if im.index_type.eq_ignore_ascii_case("SPANN") {
-                    // Incremental dump (`docs/SPANN_DESIGN.md` §9.4): a sealed
+                    // An operator cancel is taken at the segment boundary: the
+                    // chunk being written is dropped unrecorded, so the old
+                    // chain keeps answering and the next pass retries.
+                    if self.spann_stats(index_id as u64).take_cancel() {
+                        continue;
+                    }
+                    // A sealed
                     // segment is immutable, so a live chunk that already covers
                     // this segment's live rows **and was built with the catalog's
                     // options** is still the answer, and rebuilding it would only
@@ -2141,35 +2216,92 @@ impl Engine {
                         tables
                             .get(&self.table_key(table))
                             .and_then(|entry| entry.spann_mem.get(&(index_id as u64)))
-                            .is_some_and(|rows| {
-                                rows.iter().any(|(seq, _)| (*seq >> 32) as u32 == *segment)
-                            })
+                            .is_some_and(|tail| tail.has_segment(*segment))
                     };
                     let opts = crate::spann_mem::options_from(&im.options).ok();
-                    let reusable = !pending_in_segment
-                        && opts.is_some_and(|opts| {
-                            match self
-                                .live_chunk_files(table, &im.name, *segment, &seg_dir)
-                                .into_iter()
-                                .max_by_key(|(id, _)| *id)
-                            {
-                                Some((id, path)) => {
-                                    recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
-                                        && storage::knn_index::spann::read_header(&path).is_ok_and(
-                                            |h| {
-                                                h.metric == opts.metric
-                                                    && h.encode == opts.encode
-                                                    && h.seed == opts.seed
-                                            },
-                                        )
-                                }
-                                None => false,
-                            }
-                        });
+                    // The rows written since the last dump. When there are any,
+                    // this checkpoint publishes *them* as a delta chunk instead of
+                    // rebuilding the segment's tree.
+                    let tail = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.spann_mem.get(&(index_id as u64)))
+                            .cloned()
+                    };
+                    let pending_rows = tail.as_ref().map(|tail| tail.len()).unwrap_or(0);
+                    // The segment's chunks, **newest first**: what a delta
+                    // extends, and what the reuse test asks for coverage.
+                    let mut live_chunks =
+                        self.live_chunk_files(table, &im.name, *segment, &seg_dir);
+                    live_chunks.sort_by_key(|a| std::cmp::Reverse(a.0));
+                    // The chain that is already answering, if the handle holds one
+                    // for this segment with exactly these chunks. Re-opening from
+                    // the paths maps and validates every layer again - the base
+                    // chunk is the same bytes it validated on the previous
+                    // checkpoint - which is the per-layer cost of a dump.
+                    let current = {
+                        let tables = self.tables.lock().unwrap();
+                        tables
+                            .get(&self.table_key(table))
+                            .and_then(|entry| entry.spann.get(&(index_id as u64)))
+                            .and_then(|handle| match handle.as_ref() {
+                                crate::spann_mem::SpannHandle::File(chains) => chains
+                                    .iter()
+                                    .find(|chain| chain.segment() == *segment)
+                                    .cloned(),
+                                crate::spann_mem::SpannHandle::Memory(_) => None,
+                            })
+                            .filter(|chain| chain.layers() == live_chunks.len())
+                    };
+                    let chain = current.or_else(|| {
+                        let opts = opts.as_ref()?;
+                        let paths: Vec<std::path::PathBuf> =
+                            live_chunks.iter().map(|(_, path)| path.clone()).collect();
+                        if paths.is_empty() {
+                            return None;
+                        }
+                        storage::knn_index::spann::ChunkChain::open(&paths, opts)
+                            .ok()
+                            .map(std::sync::Arc::new)
+                    });
+                    // Rows the chain covers, from the **directories**: after a
+                    // delta the newest chunk holds a few pages, so "the newest
+                    // chunk's row count" can no longer stand for the segment.
+                    let covered = chain.as_ref().map(|chain| chain.len()).unwrap_or(0);
+                    // The header check still runs against the newest chunk - it is
+                    // the one whose metric/encode/seed the query path will use.
+                    let header_ok = live_chunks.first().is_some_and(|(_, path)| {
+                        opts.as_ref().is_some_and(|opts| {
+                            storage::knn_index::spann::read_header(path).is_ok_and(|h| {
+                                h.metric == opts.metric
+                                    && h.encode == opts.encode
+                                    && h.seed == opts.seed
+                            })
+                        })
+                    });
+                    // `>=`, not `==`: `seg_rows` counts the column's rows, so a
+                    // chain may still hold a row the column no longer does (its
+                    // layer is live until a rebuild), and covering a removed row
+                    // costs a tombstone check, not a wrong answer. A chain that
+                    // covers *fewer* rows than the column holds is a gap, and only
+                    // a rebuild closes it.
+                    // Reuse is a statement about **pages**: the chain covers the
+                    // segment and this build can read it. A deleted row is a
+                    // tombstone the query path filters; reclaiming it is a
+                    // rebuild, and rebuilds are compaction's job - the checkpoint
+                    // does not scan the delete journal to find garbage, or every
+                    // flush would pay `O(deletes)` to decide nothing new.
+                    // A forced pass (compaction) rebuilds regardless of reuse:
+                    // "the pages are current" is not the question it is asking.
+                    let reusable = !force_rebuild
+                        && pending_rows == 0
+                        && !pending_in_segment
+                        && covered as u64 >= *seg_rows
+                        && header_ok;
                     if reusable {
-                        // Nothing to publish: the catalog already lists the chunk
-                        // that covers this segment, and the loader takes the
-                        // newest one per segment.
+                        // Nothing to publish: the catalog already lists the chain
+                        // that covers this segment.
                         continue;
                     }
                     // The tree is rebuilt from the column and the chunk describes
@@ -2189,30 +2321,349 @@ impl Engine {
                     // until `cleanup_index_chunks` runs, and going through
                     // `deprecate_chunks` is what keeps a reader that already mapped
                     // one of them valid: the marker only removes the record.
-                    let superseded: Vec<u32> = self
-                        .live_chunk_files(table, &im.name, *segment, &seg_dir)
-                        .into_iter()
-                        .map(|(id, _)| id as u32)
-                        .collect();
-                    // One chunk per segment, streamed: the tree that has to be
-                    // resident is this segment's, not the table's.
-                    let Some(index_size) =
-                        self.spann_chunk(table, &im.column, &im.options, *segment, &path)
-                    else {
+                    let superseded: Vec<u32> =
+                        live_chunks.iter().map(|(id, _)| *id as u32).collect();
+                    // A segment with no chunk yet (`CREATE INDEX`, or the first
+                    // checkpoint) needs the full build. So does one whose chain is
+                    // at the cap: a further delta is one more tree per query probe,
+                    // and the rebuild is what retires the chain. `pending_rows == 0`
+                    // means nothing is new, so a rebuild at that point is there to
+                    // shrink (a delete lowered the live count) or to fold.
+                    // The layer cap is the operator's `max_open_chunks_per_index`
+                    // - the same knob the optimize pass reads - so the number
+                    // `SHOW INDEX` prints is the number that decides a rebuild.
+                    // A floor of two keeps a delta chain possible at all.
+                    let max_layers = self.max_open_chunks_per_index().max(2);
+                    let over_cap = live_chunks.len() >= max_layers;
+                    // A rebuild is `O(rows · log(rows/max) · dims)` - minutes on
+                    // a large segment - so it does not run inside the checkpoint
+                    // that noticed it: the chain keeps answering, and the
+                    // optimize pass (a background task) does the rebuild off the
+                    // request path. Only a chain that covers **fewer** rows than
+                    // the column holds is rebuilt here: there is no new row to
+                    // publish as a delta, so deferring would leave the gap open.
+                    let gap = (covered as u64) < *seg_rows;
+                    // A chunk this build cannot read (another format version,
+                    // another metric/encode/seed) is the third state that needs a
+                    // full rewrite: `header_ok` was computed above, and it is
+                    // exactly what `NeedsRebuild` reports for a version bump.
+                    let stale = !header_ok;
+                    if !force_rebuild
+                        && chain.is_some()
+                        && !gap
+                        && (over_cap || stale)
+                        && self.submit_spann_rebuild(table, table_id, &im.name, chunk_ts)
+                    {
+                        // Nothing to publish this pass: the old chain answers
+                        // until the background rebuild installs the new one.
                         continue;
+                    }
+                    let rebuild = force_rebuild || chain.is_none() || pending_rows == 0 || over_cap;
+                    let mut installed: Option<
+                        std::sync::Arc<storage::knn_index::spann::ChunkChain>,
+                    > = None;
+                    // An asynchronous build hands the rebuild to the background
+                    // task and returns: the segment stays uncovered, the exact
+                    // scan answers it, and the chain appears when the task
+                    // finishes. Only the **first** build takes this path - a
+                    // checkpoint's delta is cheap and stays inline.
+                    if rebuild
+                        && !force_rebuild
+                        && chain.is_none()
+                        && self
+                            .context
+                            .spann_async_build
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        && self.submit_spann_rebuild(table, table_id, &im.name, chunk_ts)
+                    {
+                        continue;
+                    }
+                    let (row_count, index_size) = if rebuild {
+                        // `spann_build_progress`: 0 is idle, non-zero is "a
+                        // segment is being streamed". The build is a single
+                        // call into the index crate, so this is the granularity
+                        // an operator can act on - and `SHOW INDEX` reporting a
+                        // stuck build is what makes a cancel useful.
+                        let stats = self.spann_stats(index_id as u64);
+                        stats.set_build_progress(1);
+                        let built =
+                            self.spann_chunk(table, &im.column, &im.options, *segment, &path);
+                        stats.set_build_progress(0);
+                        let Some(size) = built else {
+                            continue;
+                        };
+                        (*seg_rows, size)
+                    } else {
+                        // §5.2-b/§5.3/§5.4: the rows written since the last dump
+                        // are assigned into the tree the chain already holds (one
+                        // descent, one leaf page each), leaves that crossed the
+                        // size limit split against their **published** pages, and
+                        // only the pages that changed are written.
+                        let Some((tail_tree, tail_dead)) =
+                            tail.as_ref().and_then(|tail| tail.take_live())
+                        else {
+                            continue;
+                        };
+                        let Some(chain) = chain.as_ref() else {
+                            continue;
+                        };
+                        let Some(opts) = opts.clone() else {
+                            continue;
+                        };
+                        let Some(ci) = self
+                            .table_schema(table)
+                            .ok()
+                            .and_then(|schema| schema.iter().position(|name| name == &im.column))
+                        else {
+                            continue;
+                        };
+                        // The new rows may still be in the append buffer, where
+                        // the mapped column source refuses to answer
+                        // (`spann_vector_source` returns `None` for a buffered
+                        // table). `BlockCursor::vectors` is the read the exact
+                        // rescoring of a query uses: one decode per block the ids
+                        // touch, and the buffer's text parsed for the rows that
+                        // have no block yet.
+                        let Some((dim, element_type)) = self
+                            .column_types(table)
+                            .ok()
+                            .and_then(|types| types.get(ci).cloned())
+                            .and_then(|decl| crate::blocks::embedding_shape(&decl))
+                        else {
+                            continue;
+                        };
+                        // The ids this segment's delta covers: its own rows that
+                        // are not already dead. Another segment's rows stay
+                        // `uncovered` (the tail is one tree for the whole index)
+                        // until their own dump, and a deleted-before-publish row
+                        // is skipped because a delete is a tombstone, not an
+                        // un-append - re-inserting it would undo the delete.
+                        let ids: Vec<u64> = tail_tree
+                            .row_ids()
+                            .into_iter()
+                            .filter(|id| *id >> 32 == u64::from(*segment))
+                            .filter(|id| !tail_dead.contains(id))
+                            .collect();
+                        // The tree is **not** materialised: the pages are read
+                        // through the chain as the descent visits them and
+                        // dropped again under the byte budget, so a checkpoint
+                        // of a few thousand rows into a 62k-partition segment
+                        // allocates its own working set and not the directory.
+                        let mut tree = match index::spann::page_tree::PageTree::new(
+                            dim,
+                            opts.clone(),
+                            index::spann::quantize::Rotation::new(dim, opts.seed),
+                            chain.as_ref(),
+                            u64::from(chain.root()),
+                            chain.max_key() + 1,
+                            self.spann_page_budget(),
+                            self.spann_dirty_budget(),
+                        ) {
+                            Ok(tree) => tree,
+                            Err(_) => continue,
+                        };
+                        let Ok(cursor) = self.block_cursor(table) else {
+                            continue;
+                        };
+                        // `vectors` returns **owned** `f32` vectors, so asking it
+                        // for a whole segment is `dim x 4` per row of peak heap -
+                        // 6 KB at 1536d, six gigabytes at a million rows. Batches
+                        // bound that to one batch, and the fixups read their rows
+                        // back one at a time instead of keeping the segment.
+                        const INSERT_BATCH: usize = 2048;
+                        let cursor = std::cell::RefCell::new(cursor);
+                        let lookup = |id: u64| -> Option<Vec<f32>> {
+                            let mut cursor = cursor.borrow_mut();
+                            cursor
+                                .vectors(ci, dim, element_type, &[id])
+                                .ok()?
+                                .pop()
+                                .map(|(_, vector)| vector)
+                        };
+                        let mut moved = 0u64;
+                        let mut overflow: Option<usize> = None;
+                        'insert: for (at, batch) in ids.chunks(INSERT_BATCH).enumerate() {
+                            let rows = {
+                                let mut cursor = cursor.borrow_mut();
+                                cursor.vectors(ci, dim, element_type, batch).ok()
+                            };
+                            let Some(rows) = rows else { continue };
+                            for (i, (seq, vector)) in rows.into_iter().enumerate() {
+                                match tree.insert(seq as u64, &vector) {
+                                    Ok(()) => moved += 1,
+                                    Err(index::spann::page_tree::PageTreeError::Full) => {
+                                        // The dirty budget is spent: this row and
+                                        // every later one stays unpublished.
+                                        overflow = Some(at * INSERT_BATCH + i);
+                                        break 'insert;
+                                    }
+                                    // A page this build cannot read keeps the row
+                                    // out of the delta; it stays `uncovered` and
+                                    // the exact scan answers it.
+                                    Err(_) => continue,
+                                }
+                            }
+                            tree.run_fixups(Some(&lookup), 8);
+                        }
+                        if overflow.is_some() {
+                            // Hand **every** row back to the tail, not just the
+                            // refused suffix: the tree is dropped without being
+                            // published (a partial delta is not a delta), so the
+                            // rows it did accept would otherwise leave the tail
+                            // without entering a chunk - answerable by the exact
+                            // scan, never published. One at a time, not as a
+                            // batch: this path is rare and must not re-introduce
+                            // the peak it just avoided. The tombstones go back
+                            // too, or a deleted-before-publish row would be
+                            // published by the next pass.
+                            for id in ids.iter().copied() {
+                                if let (Some(tail), Some(vector)) = (tail.as_ref(), lookup(id)) {
+                                    let _ = tail.insert(id, &vector);
+                                }
+                            }
+                            if let Some(tail) = tail.as_ref() {
+                                tail.restore_dead(tail_dead);
+                            }
+                            continue;
+                        }
+                        // Drain the fixups the last batch queued, then take the
+                        // delta. `to_spann_delta` moves the slot columns out, so
+                        // the peak here is one delta and not two.
+                        tree.run_fixups(Some(&lookup), usize::MAX);
+                        if !tree.is_dirty() {
+                            continue;
+                        }
+                        let dirty: Vec<u32> =
+                            tree.dirty_keys().iter().map(|key| *key as u32).collect();
+                        let Some(delta) = tree.to_spann_delta() else {
+                            continue;
+                        };
+                        let Ok(size) = storage::knn_index::spann::write_dirty_to(
+                            &delta, &path, *segment, &dirty,
+                        ) else {
+                            // The rows stay in the column, so the coverage check
+                            // answers them through `uncovered` until the next
+                            // checkpoint. Losing the tree is not losing the rows.
+                            continue;
+                        };
+                        // The window between "the delta chunk is on disk" and "the
+                        // catalog names it" is the one this path has to survive: a
+                        // crash there leaves a file no record lists (cleanup sweeps
+                        // it) and the rows in the column (the next checkpoint
+                        // republishes them). `INFINITY_CRASH_SPANN_DELTA` makes that
+                        // window reachable on purpose; `scripts/soak_kill9.sh` is
+                        // its only caller. `abort` and not `exit`: the point is to
+                        // die the way a `kill -9` does, with no destructors run.
+                        if std::env::var_os("INFINITY_CRASH_SPANN_DELTA").is_some() {
+                            eprintln!(
+                                "spann: injected crash after writing chunk {chunk_id} \
+                                 (segment {segment}) and before its record"
+                            );
+                            std::process::abort();
+                        }
+                        // §5.4's last step: the chain that now *includes* this
+                        // layer has to cover the segment - every row once, no
+                        // edge into a page no chunk holds, and exactly the rows
+                        // the directories claim. A chain that fails is not
+                        // recorded, so the old chain keeps answering and the rows
+                        // this chunk would have carried stay `uncovered` (they
+                        // are still in the column, so a query scores them
+                        // exactly). Recording it would trade a slow query for a
+                        // wrong one.
+                        let Ok(layer) = storage::knn_index::spann::FileIndex::open(&path, &opts)
+                        else {
+                            continue;
+                        };
+                        let chain_after =
+                            std::sync::Arc::new(chain.with_newest(std::sync::Arc::new(layer)));
+                        // Directory work only: `len` sums the reachable leaves'
+                        // member counts and `dangling` walks the child edges, so
+                        // this costs partitions, not rows. `coverage()` would also
+                        // read every leaf's slot page to look for a row in two
+                        // leaves - a writer invariant the storage tests pin, and
+                        // O(rows) page misses a checkpoint cannot pay.
+                        let dangling = chain_after.dangling();
+                        if !dangling.is_empty()
+                            || chain_after.len() as u64 != covered as u64 + moved
+                        {
+                            eprintln!(
+                                "spann: delta for segment {segment} refused: {} rows, \
+                                 expected {}, dangling {dangling:?}",
+                                chain_after.len(),
+                                covered as u64 + moved,
+                            );
+                            self.spann_stats(index_id as u64).record_refused();
+                            continue;
+                        }
+                        installed = Some(chain_after);
+                        (covered as u64 + moved, size)
                     };
+                    // The writer invariant "no row in two leaves" costs one slot
+                    // read per row, which a delta cannot pay (the comment above
+                    // the delta check explains it). A rebuild already streams
+                    // the column, so it is the one place the check is
+                    // affordable - behind a switch, because it doubles the
+                    // rebuild's I/O. A duplicate here is a bug in the split
+                    // path, and a `refused` counter is how it surfaces.
+                    if rebuild && std::env::var_os("INFINITY_SPANN_VERIFY_COVERAGE").is_some() {
+                        if let Some(opts) = opts.as_ref() {
+                            if let Ok(layer) =
+                                storage::knn_index::spann::FileIndex::open(&path, opts)
+                            {
+                                let chain = storage::knn_index::spann::ChunkChain::from_layers(
+                                    vec![std::sync::Arc::new(layer)],
+                                    opts,
+                                );
+                                let report = chain.coverage();
+                                if !report.duplicates.is_empty() {
+                                    eprintln!(
+                                        "spann: segment {segment} rebuilt with {} rows in two \
+                                         leaves: {:?}",
+                                        report.duplicates.len(),
+                                        &report.duplicates[..report.duplicates.len().min(8)]
+                                    );
+                                    self.spann_stats(index_id as u64).record_refused();
+                                }
+                            }
+                        }
+                    }
+                    // `spann_rebuilds` / `spann_deltas`: which path this
+                    // segment took, and how many dead rows it left behind (a
+                    // rebuild reclaims them, a delta does not).
+                    if rebuild {
+                        // A rebuild drops the dead rows, so the gauge goes to
+                        // zero: the tombstones stay in the delete journal until
+                        // the next flush of that journal, but the tree no
+                        // longer holds those rows.
+                        self.spann_stats(index_id as u64).record_rebuild(0);
+                    } else {
+                        self.spann_stats(index_id as u64).record_delta(0);
+                    }
+                    // A delta leaves the older chunks of the segment live, so the
+                    // chain keeps every row; only a rebuild supersedes them.
+                    let superseded = if rebuild { superseded } else { Vec::new() };
                     // The new chunk is published below and is the one that has to
                     // survive; everything the segment listed before it is dead. The
                     // markers are written *after* the new record lands, so a crash in
                     // between leaves the old snapshot live rather than leaving the
                     // segment with none.
-                    spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
-                    spann_ready.push(index_id as u64);
+                    if !superseded.is_empty() {
+                        spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
+                    }
+                    // A rebuild replaces the segment's answer wholesale, so the
+                    // handle is dropped and lazily reloaded. A delta has the chain
+                    // that now includes it in hand - installing that one is what
+                    // keeps the next checkpoint (and the next query) from opening
+                    // the same layers again.
+                    match installed {
+                        Some(chain) => spann_install.push((index_id as u64, *segment, chain)),
+                        None => spann_ready.push(index_id as u64),
+                    }
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),
                         base_row_id: u64::from(*segment) << 32,
-                        row_count: *seg_rows,
+                        row_count,
                         term_count: 0,
                         index_size,
                         commit_ts: chunk_ts,
@@ -2295,13 +2746,65 @@ impl Engine {
         for (index_name, segment, superseded, ts) in spann_superseded {
             let _ = self.deprecate_chunks(table, &index_name, segment, &superseded, ts);
         }
-        // The published chunks cover the rows the mem index was holding.
+        // The published chunks cover the rows the mem index was holding, and they
+        // are the segment's tree now: the heap copy is exactly what a dump exists
+        // to retire, so the handle is swapped for the mapped form here rather than
+        // on the next query (`docs/SPANN_DESIGN.md` §6.4 - a checkpoint is where
+        // the memory form hands over to the file form, as it is for HNSW).
+        if !spann_install.is_empty() {
+            let key = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&key) {
+                for (id, segment, chain) in std::mem::take(&mut spann_install) {
+                    let Some(handle) = entry.spann.get(&id) else {
+                        // Nothing mapped: the next query loads from the catalog,
+                        // which already lists this chunk.
+                        continue;
+                    };
+                    let crate::spann_mem::SpannHandle::File(chains) = handle.as_ref() else {
+                        // A heap tree answers for this index; it cannot answer for
+                        // a chain, so the reload below is the safe hand-over.
+                        continue;
+                    };
+                    let mut chains = chains.clone();
+                    match chains.iter().position(|chain| chain.segment() == segment) {
+                        Some(at) => chains[at] = chain,
+                        None => chains.push(chain),
+                    }
+                    entry.spann.insert(
+                        id,
+                        std::sync::Arc::new(crate::spann_mem::SpannHandle::File(chains)),
+                    );
+                }
+            }
+        }
         if !spann_ready.is_empty() {
             let key = self.table_key(table);
-            if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-                for id in spann_ready {
-                    entry.spann_mem.remove(&id);
+            let mut ready = spann_ready;
+            ready.sort_unstable();
+            ready.dedup();
+            {
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    for id in &ready {
+                        entry.spann_mem.remove(id);
+                    }
                 }
+            }
+            for id in ready {
+                if self.spann_lazy_load(table, id).is_some() {
+                    continue;
+                }
+                // Nothing to map (every record of this pass failed to land): a
+                // heap tree that no longer covers its segment would answer a
+                // stale top-k, so it goes and the coverage check falls back to
+                // the exact scan.
+                let mut tables = self.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&key) {
+                    entry.spann.remove(&id);
+                }
+                drop(tables);
+                self.refresh_memindex_charge(table);
             }
         }
         Ok(())
@@ -2633,7 +3136,7 @@ impl Engine {
             // name: the frame's cells are already attributed by id, and
             // `attributed` is keyed by id too.
             let live_names = self.table_schema(&table).unwrap_or_default();
-            let spann_columns: Vec<(u64, u64)> = self
+            let spann_columns: Vec<(u64, u64, usize, index::spann::Options)> = self
                 .storage
                 .catalog
                 .indexes_of_table(&table)
@@ -2642,21 +3145,29 @@ impl Engine {
                 .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
                 .filter_map(|im| {
                     let position = live_names.iter().position(|c| *c == im.column)?;
-                    Some((im.id, *live_ids.get(position)?))
+                    let dims = self.spann_dims_of(&table, &im.column);
+                    let opts = crate::spann_mem::options_from(&im.options).ok()?;
+                    Some((im.id, *live_ids.get(position)?, dims, opts))
                 })
                 .collect();
             {
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(self.table_key(&table)).or_default();
-                for (index_id, column_id) in &spann_columns {
-                    let mem = entry.spann_mem.entry(*index_id).or_default();
+                for (index_id, column_id, dims, opts) in &spann_columns {
+                    if *dims == 0 {
+                        continue;
+                    }
+                    let tail = entry.spann_mem.entry(*index_id).or_insert_with(|| {
+                        crate::spann_mem::SpannTail::new(*dims, opts.clone())
+                            .expect("a tail over a validated dimension")
+                    });
                     for (seq, cells) in &attributed {
                         let Some(value) = cells.get(column_id) else {
                             continue;
                         };
                         let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
                         if !vector.is_empty() {
-                            mem.push((*seq as u64, vector));
+                            let _ = tail.insert(*seq as u64, &vector);
                         }
                     }
                 }
@@ -3525,14 +4036,6 @@ impl Engine {
             return Default::default();
         };
         let root = self.blocks_root();
-        let Some(types) = meta
-            .types
-            .iter()
-            .map(|t| column_type_of(t))
-            .collect::<Option<Vec<_>>>()
-        else {
-            return Default::default();
-        };
         let mut appends = Vec::new();
         let mut append_ts = Vec::new();
         let mut append_copy = Vec::new();
@@ -3546,9 +4049,17 @@ impl Engine {
                 continue;
             };
             let version = block.version();
-            let Some(rows) = self.decode_block_cells(&table, &root, &meta, &types, id, None) else {
-                continue;
-            };
+            // The `version` alone answers everything here: `created` gives the
+            // append totals, its last record the block's row count, and
+            // `deleted` the tombstones by slot. Decoding the block's cells - the
+            // 1536-d embedding of every row - was 125 s of a fresh process's
+            // first query on a 500k-row table, for a journal that never read a
+            // cell.
+            let rows = version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as u64)
+                .unwrap_or(0);
             let mut seen = 0u64;
             for create in &version.created {
                 let cumulative = create.cumulative_row_count.max(0) as u64;
@@ -3562,10 +4073,12 @@ impl Engine {
                     .entry(id.segment_id)
                     .or_insert(create.create_ts);
             }
-            *segment_rows.entry(id.segment_id).or_default() += rows.len() as u64;
-            for (slot, (seq, _cells)) in rows.iter().enumerate() {
+            *segment_rows.entry(id.segment_id).or_default() += rows;
+            let base = ((id.segment_id as u64) << 32)
+                | (u64::from(id.block_id) * DEFAULT_BLOCK_CAPACITY as u64);
+            for slot in 0..rows as usize {
                 if let Some(ts) = version.deleted.get(slot).copied().filter(|t| *t != 0) {
-                    deletes.push(*seq as u64);
+                    deletes.push(base | slot as u64);
                     delete_ts.push(ts);
                 }
             }
@@ -5340,14 +5853,6 @@ impl Engine {
         out
     }
 
-    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
-    /// time**.
-    ///
-    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
-    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
-    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
-    /// builder needs. Handing each cell to the caller lets it parse and drop the
-    /// text per block, so a build's peak is the vectors plus one block's text.
     /// Hands the buffered cells of `column` for the rows of `segment` (every
     /// segment when `None`) to `sink`, one cell at a time.
     ///
@@ -5357,7 +5862,7 @@ impl Engine {
         &self,
         table: &str,
         column: usize,
-        segment: Option<u32>,
+        segments: Option<&std::collections::HashSet<u32>>,
         mut sink: impl FnMut(usize, &str),
     ) {
         let key = self.table_key(table);
@@ -5373,7 +5878,10 @@ impl Engine {
         };
         for k in 0..entry.pending_rows.len() {
             let seq = entry.pending_rows.row_id(k);
-            if segment.is_some_and(|only| (seq as u64 >> 32) as u32 != only) {
+            // This side narrows by a *set* of segments (a compaction walks
+            // several at once); upstream's single-segment form is the same test
+            // with one element.
+            if segments.is_some_and(|only| !only.contains(&((seq as u64 >> 32) as u32))) {
                 continue;
             }
             if let Some(value) = entry.pending_rows.cell(k, id) {
@@ -5382,11 +5890,25 @@ impl Engine {
         }
     }
 
+    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
+    /// time**, over the segments in `segments` (every visible segment when
+    /// `None`).
+    ///
+    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
+    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
+    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
+    /// builder needs. Handing each cell to the caller lets it parse and drop the
+    /// text per block, so a build's peak is the vectors plus one block's text.
+    ///
+    /// The segment set is what compaction needs: the merge marks the source
+    /// segments dropped at its own ts, and a reader below that ts (the
+    /// compaction's own bottom half) still sees their blocks. Walking them would
+    /// put rows the merge just retired into the rebuilt tree.
     pub(crate) fn for_each_block_cell(
         &self,
         table: &str,
         column: usize,
-        segment: Option<u32>,
+        segments: Option<&std::collections::HashSet<u32>>,
         mut f: impl FnMut(usize, &str),
     ) {
         let table = self.qualified_table(table);
@@ -5404,7 +5926,7 @@ impl Engine {
         let root = self.blocks_root();
         let wanted = [column];
         for id in self.visible_block_ids(&table) {
-            if segment.is_some_and(|s| id.segment_id != s) {
+            if segments.is_some_and(|set| !set.contains(&id.segment_id)) {
                 continue;
             }
             if let Some(cells) =
@@ -5422,7 +5944,7 @@ impl Engine {
         // Read them under the buffer's own lock, one cell at a time: cloning it
         // first (`pending_rows_of`) copied every buffered row's whole embedding to
         // keep one column of one segment.
-        self.for_each_buffered_cell(&table, column, segment, f);
+        self.for_each_buffered_cell(&table, column, segments, f);
     }
 
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
@@ -6170,6 +6692,38 @@ impl Engine {
                         continue;
                     };
                     self.reclaim_deprecated_chunks(&im.table, &im.name, segment, &dir)?;
+                    // The crash window's leftovers: a checkpoint syncs
+                    // `chunk_{n}.idx` before it appends the record that names it,
+                    // so a kill in between leaves a file nothing references.
+                    // Only a **stale** file is swept, never one a write is still
+                    // producing: the grace is longer than any chunk write and a
+                    // live chunk's mtime keeps moving only while it is written,
+                    // so an in-flight layer is never mistaken for an orphan.
+                    const ORPHAN_GRACE_SECS: u64 = 600;
+                    let live: std::collections::HashSet<u64> = self
+                        .live_chunk_files(&im.table, &im.name, segment, &dir)
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect();
+                    let deprecated = self.deprecated_chunk_ids(&im.table, &im.name, segment);
+                    let now = std::time::SystemTime::now();
+                    let mut orphans = 0u64;
+                    for (id, path) in hnsw_chunks(&dir) {
+                        if live.contains(&id) || deprecated.contains(&id) {
+                            continue;
+                        }
+                        let stale = std::fs::metadata(&path)
+                            .and_then(|meta| meta.modified())
+                            .ok()
+                            .and_then(|at| now.duration_since(at).ok())
+                            .is_some_and(|age| age.as_secs() >= ORPHAN_GRACE_SECS);
+                        if stale && storage::chunk_store::remove_file(&path).is_ok() {
+                            orphans += 1;
+                        }
+                    }
+                    if orphans > 0 {
+                        self.spann_stats(im.id).record_orphans(orphans);
+                    }
                 }
                 continue;
             }
@@ -6227,6 +6781,21 @@ impl Engine {
                     }
                 }
             }
+        }
+        // Cleanup is also the moment an idle index gives its pages back: the
+        // slot bytes are page cache, not heap, and an index nothing queried
+        // since the previous pass should not keep them resident.
+        let _ = self.spann_release_pages();
+        // Over the ceiling, give back everything: chunk pages are not the only
+        // resident bytes - the column's block files are, and a container's
+        // `memory_limit` kills the process before the kernel reclaims them.
+        let limit = self
+            .context
+            .memory_limit
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if limit > 0 && crate::engine::state::process_rss_bytes() > limit {
+            let _ = self.spann_release_pages_forced();
+            storage::drop_tree_cache(&self.blocks_root());
         }
         Ok(())
     }
