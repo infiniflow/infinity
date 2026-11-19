@@ -161,6 +161,15 @@ impl BlockVersionFile {
         }
     }
 
+    /// Heap bytes this decoded version holds, so a cache of blocks can charge
+    /// it: `deleted` is one timestamp per block slot - 64 KiB for the
+    /// 8192-slot blocks - and that is real allocator memory per cached block,
+    /// not page cache behind a mapping.
+    pub fn heap_bytes(&self) -> usize {
+        self.deleted.capacity() * std::mem::size_of::<TxnTimeStamp>()
+            + self.created.capacity() * std::mem::size_of::<VersionCreate>()
+    }
+
     /// Serializes exactly as C++ `BlockVersion::SaveToFile` does.
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(2 + self.created.len() * 16 + 2 + self.deleted.len() * 8);

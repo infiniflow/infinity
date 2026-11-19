@@ -13,10 +13,11 @@
 //! Keys are assigned in DFS pre-order, so the root is always `ROOT_KEY == 0`
 //! and a parent's key is smaller than its children's.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::kmeans::balanced_kmeans_2;
+use super::kmeans::balanced_kmeans_2_by;
 use super::partition::Partition;
 use super::quantize::Rotation;
 use super::source::VectorSource;
@@ -166,7 +167,7 @@ impl Builder<'_> {
     /// (`SPANN_DESIGN.md` §4), it just no longer needs a mutable counter.
     fn build_subtree(&self, indices: &mut [usize], key: PartitionKey) -> Subtree {
         if indices.len() <= self.opts.max_partition_size {
-            let members: Vec<(u64, &[f32])> = indices
+            let members: Vec<(u64, Cow<'_, [f32]>)> = indices
                 .iter()
                 .map(|i| (self.src.id(*i), self.src.vector(*i)))
                 .collect();
@@ -178,10 +179,14 @@ impl Builder<'_> {
             };
         }
 
-        // Bisect: `BalancedKMeans(k=2)` over the slice's vectors.
-        let vectors: Vec<&[f32]> = indices.iter().map(|i| self.src.vector(*i)).collect();
-        let split = balanced_kmeans_2(
-            &vectors,
+        // Bisect: `BalancedKMeans(k=2)` over the slice's vectors, read through
+        // their positions. Collecting them first kept every converted row of the
+        // subtree alive - the whole column at the root - for a pass that reads
+        // each row twice; a `FLOAT` source still hands back a borrow, so nothing
+        // is converted at all there.
+        let split = balanced_kmeans_2_by(
+            indices.len(),
+            |at| self.src.vector(indices[at]),
             self.dim,
             self.opts.kmeans_iterations,
             self.opts.seed ^ u64::from(key),

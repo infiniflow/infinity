@@ -30,6 +30,7 @@ pub mod plaid;
 pub mod rabitq;
 pub mod simd;
 pub mod smve;
+pub mod source;
 pub mod spann;
 pub mod sparse;
 pub mod vector;

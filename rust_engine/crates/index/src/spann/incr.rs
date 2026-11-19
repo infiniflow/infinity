@@ -2215,7 +2215,7 @@ mod tests {
     /// * **self-query** - can a row find itself (the ghost-row bug scored 39%);
     /// * **candidate recall** - are the true 10 nearest inside the `k + extra`
     ///   the index returns, which is what the executor's exact rescoring
-    ///   (`TableHeap`/`BlockVectorSource`) needs (design D1: the index ranks,
+    ///   (`TableHeap`/`VectorColumn`) needs (design D1: the index ranks,
     ///   the engine rescores);
     /// * **top-10 recall** - the order the codes alone produce, which is capped
     ///   by 1-bit precision at this dimension and is *not* what the engine ships;

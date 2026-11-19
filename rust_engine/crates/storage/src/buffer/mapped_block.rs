@@ -87,6 +87,13 @@ impl MappedBlock {
         self.bytes
     }
 
+    /// Heap bytes this block holds beyond its mapping: the decoded `version`
+    /// (one timestamp per slot, 64 KiB per 8192-row block). A cache that
+    /// charges only [`Self::bytes`] undercounts every entry by that much.
+    pub fn heap_bytes(&self) -> usize {
+        self.version.heap_bytes()
+    }
+
     /// The block's column payloads as slices of the mapping.
     pub fn columns(&self) -> MappedColumns<'_> {
         MappedColumns { block: self }

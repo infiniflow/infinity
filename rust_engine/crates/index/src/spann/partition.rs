@@ -48,12 +48,14 @@ impl Partition {
     ///
     /// The vectors are borrowed (`&[f32]`) rather than owned: a build over a
     /// mapped scratch file must not copy the column into `Vec<f32>` per member
-    /// (6 KB each at 1536d), and a leaf's codes are all the node keeps.
-    pub fn build(
+    /// (6 KB each at 1536d), and a leaf's codes are all the node keeps. They
+    /// arrive as `AsRef<[f32]>` so a source can hand over its own borrow (`&[f32]`)
+    /// or a `Cow` it widened for this member only.
+    pub fn build<V: AsRef<[f32]>>(
         key: PartitionKey,
         level: u32,
         dim: usize,
-        members: &[(u64, &[f32])],
+        members: &[(u64, V)],
         rot: &Rotation,
         encode: Encode,
     ) -> Self {
@@ -63,6 +65,7 @@ impl Partition {
         let mut codes = Vec::with_capacity(members.len());
         let mut raw = (encode == Encode::None).then(|| Vec::with_capacity(members.len() * dim));
         for (id, v) in members {
+            let v = v.as_ref();
             radius = radius.max(l2_sq(v, &centroid).sqrt());
             let code = quantize::encode(rot, &rot_centroid, v);
             codes.push(Member { id: *id, code });
@@ -226,13 +229,13 @@ pub fn metric_score(metric: Metric, squared: f32, err: f32, q_raw: f32, o_raw: f
     }
 }
 
-fn mean_of(members: &[(u64, &[f32])], dim: usize) -> Vec<f32> {
+fn mean_of<V: AsRef<[f32]>>(members: &[(u64, V)], dim: usize) -> Vec<f32> {
     let mut out = vec![0.0f32; dim];
     if members.is_empty() {
         return out;
     }
     for (_, v) in members {
-        for (o, x) in out.iter_mut().zip(v.iter()) {
+        for (o, x) in out.iter_mut().zip(v.as_ref().iter()) {
             *o += *x;
         }
     }

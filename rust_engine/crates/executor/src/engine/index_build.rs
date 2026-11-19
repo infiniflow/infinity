@@ -4470,8 +4470,7 @@ impl Engine {
         // Live segments only. In compaction, the source segments are dropped
         // at `compact_ts`, but the compaction's own bottom half still reads
         // below it and would see their blocks.
-        let built =
-            self.spann_build_in(&table, column, options, &self.dir.join("tmp"), segments)?;
+        let built = self.spann_build_in(&table, column, options, segments)?;
         Some(std::sync::Arc::new(crate::spann_mem::SpannHandle::Memory(
             std::sync::Arc::new(built),
         )))

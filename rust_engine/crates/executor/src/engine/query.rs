@@ -563,6 +563,10 @@ impl Engine {
             // (`PhysicalFlush::Execute` does the same before its switch).
             if invalidates_result_cache(&qualified) {
                 self.ensure_writable()?;
+                // Backpressure, the same admission the direct insert primitives
+                // apply (`Engine::admit_write`): a statement is refused at the
+                // critical watermark, after one reclaim pass.
+                self.admit_write()?;
             }
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.

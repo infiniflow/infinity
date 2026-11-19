@@ -134,12 +134,18 @@ fn test_big_with_gc_and_cleanup() {
     let (columns, rows) = e.read_blocks("table1").unwrap();
     assert_eq!(columns, vec!["col1".to_string()]);
     assert_eq!(rows.len(), INSERT_N * IMPORT_SIZE);
-    // Reading a block maps it instead of copying it into a budget: every
-    // block of the table is mapped once and shared, whatever the budget says.
-    assert_eq!(
-        e.buffer_objects().len(),
-        INSERT_N,
-        "one mapping per block of the table"
+    // Reading a block maps it instead of copying it, and the shared map is an
+    // LRU over those mappings: a block beyond the budget evicts the least
+    // recently used one, so a table larger than the budget does not leave one
+    // mapping per block in the process (what the reference's GC does here).
+    assert!(
+        e.buffer_used_bytes() <= memory_limit,
+        "{} bytes mapped against a {memory_limit}-byte budget",
+        e.buffer_used_bytes()
+    );
+    assert!(
+        e.buffer_objects().len() < INSERT_N,
+        "a table larger than the budget does not keep every mapping"
     );
     for idx in 0..INSERT_N {
         for row_id in 0..IMPORT_SIZE {

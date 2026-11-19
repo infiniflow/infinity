@@ -61,8 +61,8 @@ pub(crate) mod column;
 pub(crate) mod engine;
 pub(crate) mod index_chunk;
 pub(crate) mod misc;
-pub(crate) mod spann_source;
 pub(crate) mod value_shape;
+pub(crate) mod vector_column;
 
 pub use chunk::encode_fulltext_chunk;
 pub(crate) use chunk::*;

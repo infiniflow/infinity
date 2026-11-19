@@ -64,18 +64,24 @@ pub fn trim_allocator() {
 /// write gigabytes of segment/sidecar files; without this the cache grows
 /// until the OOM killer fires (the reference bounds it with its buffer manager).
 ///
-/// Darwin has no `posix_fadvise` (it exposes `fcntl(F_NOCACHE)`, which cannot
-/// drop pages that are already cached), so the write-back is all that happens
-/// there: the function is best effort on every target.
+/// Linux only: `posix_fadvise(DONTNEED)` is the one call that drops pages a file
+/// already has cached. Darwin exposes only `fcntl(F_NOCACHE)`, which cannot, and
+/// Windows has no equivalent on a closed handle - on those targets the pages of
+/// a **mapped** file are dropped through [`mapped::release_mapped_pages`]
+/// instead, which is where the reclaim path goes anyway.
 #[allow(unsafe_code)]
 pub fn drop_file_cache(path: &std::path::Path) {
-    let Ok(file) = std::fs::File::open(path) else {
-        return;
-    };
-    let _ = file.sync_data();
+    #[cfg(not(target_os = "linux"))]
+    let _ = path;
     #[cfg(target_os = "linux")]
     {
+        let Ok(file) = std::fs::File::open(path) else {
+            return;
+        };
         use std::os::unix::io::AsRawFd;
+        // No flush first: this drops **read** cache, and `DONTNEED` leaves dirty
+        // pages alone anyway - a `sync_data` here only pays a write-out per file
+        // on a path that runs when the process is short of memory.
         // SAFETY: `posix_fadvise` only advises the kernel about this fd's cache.
         unsafe {
             posix_fadvise(file.as_raw_fd(), 0, 0, 4 /* POSIX_FADV_DONTNEED */);
@@ -89,19 +95,37 @@ unsafe extern "C" {
     fn posix_fadvise(fd: i32, offset: i64, len: i64, advice: i32) -> i32;
 }
 
-/// Recursively drops page cache under `root` (best effort).
-pub fn drop_tree_cache(root: &std::path::Path) {
+/// Drops page cache under `root`, visiting at most `budget` files (best effort),
+/// returning how many it visited.
+///
+/// The walk is `read_dir` + `open` per file, so its cost is the tree's, not the
+/// caller's: a budget is what keeps one call from stalling the engine on a
+/// data directory with a million files. Callers either bound it (a cache drop
+/// between checkpoints) or use [`mapped::release_mapped_pages`], which reaches
+/// the same pages through the mapping registry without touching the filesystem -
+/// that is the one to use on a reclaim path.
+pub fn drop_tree_cache(root: &std::path::Path, budget: usize) -> usize {
     let Ok(entries) = std::fs::read_dir(root) else {
-        return;
+        return 0;
     };
+    let mut left = budget;
+    let mut visited = 0usize;
     for entry in entries.flatten() {
+        if left == 0 {
+            break;
+        }
         let path = entry.path();
         if path.is_dir() {
-            drop_tree_cache(&path);
+            let used = drop_tree_cache(&path, left);
+            left -= used;
+            visited += used;
         } else {
             drop_file_cache(&path);
+            left -= 1;
+            visited += 1;
         }
     }
+    visited
 }
 
 pub mod bg_task;
