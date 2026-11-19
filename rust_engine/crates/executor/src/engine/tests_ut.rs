@@ -14521,6 +14521,215 @@ mod tests {
         assert!(loaded, "the query must have loaded the chunk into memory");
     }
 
+    /// The chain has a **cap**: eight chunks per segment, then a rebuild. Without
+    /// it a long-lived segment would add one tree per checkpoint - one more probe
+    /// per query, forever - and the fold is also what retires the layers a delta
+    /// leaves behind.
+    #[test]
+    fn the_chunk_chain_folds_at_its_cap() {
+        let dim = 8;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 13 + d * 41) % 967))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE ccap (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let insert = |e: &Engine, range: std::ops::Range<usize>| {
+            let mut sql = String::from("INSERT INTO ccap VALUES ");
+            for i in range.clone() {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < range.end {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+        };
+        let shape = |e: &Engine| -> (usize, usize) {
+            let key = e.table_key("default_db.ccap");
+            let handle = e
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.values().next().cloned())
+                .expect("the index is loaded");
+            let layers = match handle.as_ref() {
+                crate::spann_mem::SpannHandle::File(chains) => chains
+                    .first()
+                    .map(|chain| chain.layers())
+                    .unwrap_or_default(),
+                crate::spann_mem::SpannHandle::Memory(_) => 0,
+            };
+            (layers, handle.len())
+        };
+
+        insert(&e, 0..40);
+        e.execute_blocking(
+            "CREATE INDEX ccap_i ON ccap (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(shape(&e).0, 1, "the first checkpoint builds one chunk");
+
+        // Six more checkpoints, twenty rows each: one more layer per checkpoint
+        // and never more than the cap.
+        let mut widest = 0usize;
+        for round in 0..8 {
+            let first = 40 + round * 20;
+            insert(&e, first..first + 20);
+            crate::scheduler::block_on(e.flush()).unwrap();
+            let (layers, covered) = shape(&e);
+            assert!(
+                layers <= 8,
+                "round {round}: {layers} layers is past the cap"
+            );
+            assert_eq!(
+                covered,
+                first + 20,
+                "round {round}: the chain covers every row"
+            );
+            widest = widest.max(layers);
+        }
+        assert_eq!(widest, 8, "the chain reached the cap before folding");
+        let (layers, covered) = shape(&e);
+        assert_eq!(layers, 1, "the checkpoint at the cap folded the chain");
+        assert_eq!(covered, 200);
+
+        for i in [0usize, 39, 120, 199] {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM ccap SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            assert_eq!(
+                got.first().map(|r| r[0].clone()),
+                Some(i.to_string()),
+                "row {i} after the fold"
+            );
+        }
+    }
+
+    /// A delete is a tombstone, not an un-append: the row's codes sit in the
+    /// leaf that marked it dead. The delta checkpoint re-inserts a leaf's row
+    /// **ids** into the segment's published tree, so it has to skip the
+    /// tombstones - otherwise a `DELETE` would be undone by the very checkpoint
+    /// that made it durable. A row published earlier is a different case: its
+    /// layer stays live (a delta shadows pages, it does not rewrite the base),
+    /// and the query drops it on the visibility check, which the next rebuild
+    /// compacts away.
+    #[test]
+    fn a_deleted_pending_row_is_not_resurrected_by_its_delta() {
+        let dim = 8;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 19 + d * 31) % 983))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let insert = |e: &Engine, range: std::ops::Range<usize>| {
+            let mut sql = String::from("INSERT INTO cdel VALUES ");
+            for i in range.clone() {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < range.end {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+        };
+        let count = |e: &Engine| -> String {
+            rows(e, "SELECT COUNT(*) FROM cdel;")
+                .first()
+                .map(|r| r[0].clone())
+                .unwrap_or_default()
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cdel (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        insert(&e, 0..120);
+        e.execute_blocking(
+            "CREATE INDEX cdel_i ON cdel (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(count(&e), "120");
+
+        // 80 rows after the checkpoint, two of them deleted before the dump: one
+        // that only the tail holds (130) and one the chunk already published (60).
+        insert(&e, 120..200);
+        e.execute_blocking("DELETE FROM cdel WHERE id = 130;").unwrap();
+        e.execute_blocking("DELETE FROM cdel WHERE id = 60;").unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(count(&e), "198", "both deletes are visible");
+
+        let self_query = |e: &Engine, i: usize| -> Option<String> {
+            rows(
+                e,
+                &format!(
+                    "SELECT id FROM cdel SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            )
+            .first()
+            .map(|r| r[0].clone())
+        };
+        assert_ne!(
+            self_query(&e, 130),
+            Some("130".to_string()),
+            "the delta must not re-publish a row that was deleted before its dump"
+        );
+        assert_ne!(self_query(&e, 60), Some("60".to_string()));
+        for i in [1usize, 119, 199] {
+            assert_eq!(self_query(&e, i), Some(i.to_string()), "row {i} survives");
+        }
+
+        // The segment's row count is the column's - tombstones included - so
+        // skipping 130 leaves the chain one row short of it and the next
+        // checkpoint folds: one tree, and the fold publishes the column it reads.
+        let layers_now = |e: &Engine| -> (usize, usize) {
+            let key = e.table_key("default_db.cdel");
+            let handle = e
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.values().next().cloned())
+                .expect("the index is loaded");
+            let layers = match handle.as_ref() {
+                crate::spann_mem::SpannHandle::File(chains) => chains
+                    .first()
+                    .map(|chain| chain.layers())
+                    .unwrap_or_default(),
+                crate::spann_mem::SpannHandle::Memory(_) => 0,
+            };
+            (layers, handle.len())
+        };
+        assert_eq!(
+            layers_now(&e),
+            (2, 199),
+            "120 published + 79 moved; the deleted pending row is skipped"
+        );
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(count(&e), "198");
+        assert_eq!(layers_now(&e), (1, 200), "the gap folded into one chunk");
+
+        // And it settles there: the chain now covers every row the segment
+        // holds, so an idle checkpoint publishes nothing and does not churn.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(layers_now(&e), (1, 200), "an idle checkpoint is reusable");
+        assert_ne!(self_query(&e, 60), Some("60".to_string()));
+    }
+
     /// §5.2-b/§5.3/§5.4, end to end: rows inserted after a checkpoint are
     /// assigned into **the chunk's own tree** (one descent, one leaf page each),
     /// and the next checkpoint appends only the pages it rewrote instead of

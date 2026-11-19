@@ -277,18 +277,26 @@ impl SpannTail {
 }
 
 impl SpannTail {
-    /// Swaps in an empty tree, handing the filled one to the checkpoint: the
-    /// rows are already in the segment's column, so the publisher owns them from
-    /// here and the tail must stop answering for them.
-    pub(crate) fn take(&self) -> Option<IncIndex> {
+    /// Swaps in an empty tree, handing the filled one **and its tombstones** to
+    /// the checkpoint: the rows are already in the segment's column, so the
+    /// publisher owns them from here and the tail must stop answering for them.
+    ///
+    /// The tombstones travel with the tree because a delete does not un-append a
+    /// row: its codes are still in the leaf the `UPDATE`/`DELETE` marked dead.
+    /// A publisher that re-inserts the tree's row ids into a segment's published
+    /// tree has to skip them, or the delete would be undone by the checkpoint
+    /// that was supposed to make it durable.
+    pub(crate) fn take_live(
+        &self,
+    ) -> Option<(IncIndex, std::collections::HashSet<u64>)> {
         let mut tree = self.tree.write().unwrap_or_else(|e| e.into_inner());
         let replacement = IncIndex::new(self.dim, self.opts.clone()).ok()?;
         let taken = std::mem::replace(&mut *tree, replacement);
-        self.dead.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        let dead = std::mem::take(&mut *self.dead.lock().unwrap_or_else(|e| e.into_inner()));
         if taken.is_empty() {
             None
         } else {
-            Some(taken)
+            Some((taken, dead))
         }
     }
 }

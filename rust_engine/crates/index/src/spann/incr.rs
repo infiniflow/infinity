@@ -333,31 +333,78 @@ impl IncIndex {
             }
         }
         nodes.sort_unstable_by_key(|node| node.key);
-        let height = nodes.iter().map(|node| node.level).max().unwrap_or(1).max(1);
-        let roots = nodes.iter().filter(|node| node.level == height).count();
-        if roots != 1 {
-            return Err(SpannError::Corrupt(format!(
-                "a directory has one root, this one has {roots} at level {height}"
-            )));
+        // The shape is read from the **child edges**, not from the `level`
+        // column. A split converts the overflowing leaf into a branch *in place*
+        // (so `ROOT_KEY` never moves), which raises the level of every node above
+        // it - and a delta chunk that rewrote that leaf leaves the root's page,
+        // and its now stale level, in the chunk underneath it. Deriving "the root
+        // is the highest level" then finds two roots. Depth from the root, by
+        // walk, is what the tree actually is.
+        let root_key = ROOT_KEY as PartitionKey;
+        if nodes.iter().all(|node| node.key != root_key) {
+            return Err(SpannError::Corrupt(
+                "a directory without its root".to_string(),
+            ));
         }
-        // Child → parent, one pass instead of a scan per node.
+        let at_of: std::collections::HashMap<PartitionKey, usize> = nodes
+            .iter()
+            .enumerate()
+            .map(|(at, node)| (node.key, at))
+            .collect();
+        // Child → parent, one pass instead of a scan per node. An edge to a key
+        // no node names is left out: that is a dangling edge (a delta chunk
+        // whose parent page it did not rewrite), which `ChunkChain::coverage`
+        // reports and the reader resolves through the older layer.
         let mut parents: std::collections::HashMap<PartitionKey, PartitionKey> =
             std::collections::HashMap::new();
         for node in &nodes {
             for child in &node.children {
-                parents.insert(*child, node.key);
+                if at_of.contains_key(child) {
+                    parents.insert(*child, node.key);
+                }
+            }
+        }
+        // Depth from the root. A node nobody reaches is a page an older layer
+        // still holds but the current parent no longer names (a retired sibling):
+        // it keeps its rows' keys resolvable and starts a descent that never
+        // arrives, so keeping it costs one directory entry.
+        let root_at = at_of[&root_key];
+        let mut depths = vec![u32::MAX; nodes.len()];
+        depths[root_at] = 0;
+        let mut frontier: Vec<PartitionKey> = vec![root_key];
+        while let Some(key) = frontier.pop() {
+            let depth = depths[at_of[&key]];
+            for child in &nodes[at_of[&key]].children {
+                if let Some(at) = at_of.get(child) {
+                    if depths[*at] > depth + 1 {
+                        depths[*at] = depth + 1;
+                        frontier.push(*child);
+                    }
+                }
             }
         }
         let mut rows = 0usize;
         let mut parts = Vec::with_capacity(nodes.len());
-        for node in nodes {
+        for (at, node) in nodes.iter().enumerate() {
+            let reachable = depths[at] != u32::MAX;
+            // An unreachable page sits where its parent put it, one level under
+            // it, so a split that later reaches it starts from the right depth.
+            let depth = if reachable {
+                depths[at]
+            } else {
+                parents
+                    .get(&node.key)
+                    .and_then(|parent| at_of.get(parent))
+                    .map(|parent| depths[*parent].saturating_add(1))
+                    .filter(|depth| *depth != u32::MAX)
+                    .unwrap_or(1)
+            };
             let parent = parents.get(&node.key).map(|key| u64::from(*key));
-            let depth = height.saturating_sub(node.level);
             let mut part = IncPartition::new_leaf(
                 u64::from(node.key),
                 depth,
                 parent,
-                node.centroid,
+                node.centroid.clone(),
                 &index.rot,
                 dim,
                 false,
@@ -369,7 +416,11 @@ impl IncIndex {
             } else {
                 0
             };
-            rows += part.published;
+            // Only a reachable leaf's rows are the tree's: a retired leaf's page
+            // still holds the rows that moved into the leaves that replaced it.
+            if reachable && node.children.is_empty() {
+                rows += part.published;
+            }
             parts.push(part);
         }
         index.next_key = parts
@@ -1795,6 +1846,92 @@ pub fn member_bytes(encode: Encode, dim: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A delta chunk that converted a leaf into a branch does **not** rewrite
+    /// the root's page - the root's children did not change, only its level did -
+    /// so the chain it is read through has a stale `level` on the root and the
+    /// new branch carrying the same number. Deriving "the tree has one root, the
+    /// highest level" then finds two; the shape has to come from the child edges.
+    ///
+    /// This is the exact state the eight-checkpoint test reached: keys 1..3 are
+    /// leaves of the root, key 4 was a leaf and is now a branch over 5 and 6, and
+    /// the root's page says level 2 just like key 4.
+    #[test]
+    fn a_directory_whose_root_level_is_stale_still_loads() {
+        let dim = 8;
+        let opts = || Options {
+            max_partition_size: 16,
+            min_partition_size: 4,
+            ..Options::default()
+        };
+        let nodes: Vec<DurableNode> = [
+            (0u32, 2u32, vec![1u32, 2, 3, 4], vec![0.0f32; 8]),
+            (1, 1, vec![], vec![1.0; 8]),
+            (2, 1, vec![], vec![2.0; 8]),
+            (3, 1, vec![], vec![3.0; 8]),
+            (4, 2, vec![5u32, 6], vec![4.0; 8]),
+            (5, 1, vec![], vec![5.0; 8]),
+            (6, 1, vec![], vec![6.0; 8]),
+        ]
+        .into_iter()
+        .map(|(key, level, children, centroid)| DurableNode {
+            key,
+            level,
+            members: if children.is_empty() { 10 } else { children.len() },
+            radius: 1.0,
+            children,
+            centroid,
+        })
+        .collect();
+
+        let live = IncIndex::from_durable(dim, opts(), nodes).expect("one root, read from the edges");
+        assert_eq!(live.len(), 50, "five reachable leaves of ten rows");
+        assert_eq!(live.parts().len(), 7);
+        let root = live.find(u64::from(ROOT_KEY as u32)).expect("key 0");
+        assert_eq!(live.parts()[root].depth, 0);
+        let branch = live.find(4).expect("the converted leaf");
+        assert_eq!(
+            live.parts()[branch].depth, 1,
+            "the branch sits where its parent put it"
+        );
+        for key in [5u64, 6] {
+            let at = live.find(key).expect("a new leaf");
+            assert_eq!(live.parts()[at].depth, 2);
+        }
+    }
+
+    /// A page an older layer still names but the current parent no longer does -
+    /// a leaf a merge retired - is kept (its key must stay resolvable) and does
+    /// not become a root.
+    #[test]
+    fn a_retired_page_is_kept_and_is_not_a_root() {
+        let dim = 4;
+        let nodes: Vec<DurableNode> = [
+            (0u32, 2u32, vec![1u32, 2], vec![0.0f32; 4]),
+            (1, 1, vec![], vec![1.0; 4]),
+            (2, 1, vec![], vec![2.0; 4]),
+            // Key 3 was retired: no parent lists it any more.
+            (3, 1, vec![], vec![3.0; 4]),
+        ]
+        .into_iter()
+        .map(|(key, level, children, centroid)| DurableNode {
+            key,
+            level,
+            members: 3,
+            radius: 1.0,
+            children,
+            centroid,
+        })
+        .collect();
+
+        let live = IncIndex::from_durable(dim, Options::default(), nodes).expect("loads");
+        assert!(live.find(3).is_some(), "the retired page stays resolvable");
+        assert_eq!(
+            live.len(),
+            6,
+            "only the reachable leaves' rows are the tree's"
+        );
+    }
 
     /// Two clusters at ±2 with **signed** per-dimension jitter.
     ///

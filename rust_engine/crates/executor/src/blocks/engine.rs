@@ -2180,9 +2180,15 @@ impl Engine {
                             })
                         })
                     });
+                    // `>=`, not `==`: `seg_rows` counts the column's rows, so a
+                    // chain may still hold a row the column no longer does (its
+                    // layer is live until a rebuild), and covering a removed row
+                    // costs a tombstone check, not a wrong answer. A chain that
+                    // covers *fewer* rows than the column holds is a gap, and only
+                    // a rebuild closes it.
                     let reusable = pending_rows == 0
                         && !pending_in_segment
-                        && covered as u64 == *seg_rows
+                        && covered as u64 >= *seg_rows
                         && header_ok;
                     if reusable {
                         // Nothing to publish: the catalog already lists the chain
@@ -2231,7 +2237,9 @@ impl Engine {
                         // descent, one leaf page each), leaves that crossed the
                         // size limit split against their **published** pages, and
                         // only the pages that changed are written.
-                        let Some(tail_tree) = tail.as_ref().and_then(|tail| tail.take()) else {
+                        let Some((tail_tree, tail_dead)) =
+                            tail.as_ref().and_then(|tail| tail.take_live())
+                        else {
                             continue;
                         };
                         let Some(chain) = chain.as_ref() else {
@@ -2291,10 +2299,20 @@ impl Engine {
                                 centroid: meta.centroid,
                             })
                             .collect();
-                        let Ok(mut live) =
-                            index::spann::incr::IncIndex::from_durable(dim, opts.clone(), nodes)
-                        else {
-                            continue;
+                        let mut live = match index::spann::incr::IncIndex::from_durable(
+                            dim,
+                            opts.clone(),
+                            nodes,
+                        ) {
+                            Ok(live) => live,
+                            Err(_) => {
+                                // A directory this engine cannot read is a chunk
+                                // it cannot serve from: keep the old chain (the
+                                // rows stay `uncovered` and the exact scan
+                                // answers them) rather than record a layer the
+                                // loader will refuse.
+                                continue;
+                            }
                         };
                         let mut moved = 0u64;
                         for id in tail_tree.row_ids() {
@@ -2302,6 +2320,13 @@ impl Engine {
                                 // Another segment's row: the tail is one tree for
                                 // the whole index. It stays covered by the
                                 // `uncovered` scan until its own segment's dump.
+                                continue;
+                            }
+                            if tail_dead.contains(&id) {
+                                // Deleted before it was ever published: its codes
+                                // are still in the tail's leaf (a delete is a
+                                // tombstone, not an un-append), so re-inserting
+                                // it here would undo the delete.
                                 continue;
                             }
                             let Some(vector) = lookup(id) else {
