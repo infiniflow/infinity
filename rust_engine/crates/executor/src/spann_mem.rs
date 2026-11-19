@@ -307,12 +307,11 @@ pub(crate) enum SpannHandle {
     /// Built in this process and not yet published to a chunk: what
     /// `CREATE INDEX` installs, and what the first query after it answers from.
     Memory(Arc<SpannIndex>),
-    /// Served straight out of `chunk_{n}.idx`, **one chunk per segment**: the
+    /// Served straight out of `chunk_{n}.idx`, **one chain per segment**: the
     /// slot bytes are page cache, which is what makes 50M rows fit in 8 GB
-    /// (§19.3), and per-segment chunks let a checkpoint republish only the
-    /// segment it touched. This is the form a restart and every checkpoint
-    /// produce, exactly like HNSW's `chunk_{n}.idx`.
-    File(Vec<Arc<storage::knn_index::spann::FileIndex>>),
+    /// (§19.3), and a segment's chunks are a chain whose newest layer wins per
+    /// key (§5.4) - a checkpoint appends the pages it rewrote.
+    File(Vec<Arc<storage::knn_index::spann::ChunkChain>>),
 }
 
 /// Orders a union of per-chunk answers the way the metric ranks, so truncating
@@ -328,40 +327,40 @@ impl SpannHandle {
     pub(crate) fn len(&self) -> usize {
         match self {
             SpannHandle::Memory(index) => index.len(),
-            SpannHandle::File(chunks) => chunks.iter().map(|c| c.len()).sum(),
+            SpannHandle::File(chains) => chains.iter().map(|c| c.len()).sum(),
         }
     }
 
     pub(crate) fn dim(&self) -> usize {
         match self {
             SpannHandle::Memory(index) => index.dim(),
-            SpannHandle::File(chunks) => chunks.first().map(|c| c.dims()).unwrap_or(0),
+            SpannHandle::File(chains) => chains.first().map(|c| c.dims()).unwrap_or(0),
         }
     }
 
     pub(crate) fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
         match self {
             SpannHandle::Memory(index) => index.search(q, k, beam),
-            SpannHandle::File(chunks) => {
+            SpannHandle::File(chains) => {
                 // One tree per segment (§3 I6) and the trees share nothing, so a
                 // query is N independent descents (§8.1). A single segment keeps
                 // the serial loop - a fan-out for one item buys no parallelism.
                 let per_chunk: Vec<Vec<(u64, f32)>> =
-                    if chunks.len() > 1 && !crate::fanout::on_a_runtime_worker() {
-                        let items: Vec<Arc<storage::knn_index::spann::FileIndex>> = chunks.to_vec();
+                    if chains.len() > 1 && !crate::fanout::on_a_runtime_worker() {
+                        let items: Vec<Arc<storage::knn_index::spann::ChunkChain>> = chains.to_vec();
                         let shared_query: Arc<[f32]> = Arc::from(q);
-                        let workers = chunks.len();
-                        match crate::fanout::map_blocking(items, workers, move |chunk| {
-                            Ok(chunk.search(shared_query.as_ref(), k, beam))
+                        let workers = chains.len();
+                        match crate::fanout::map_blocking(items, workers, move |chain| {
+                            Ok(chain.search(shared_query.as_ref(), k, beam))
                         }) {
                             Ok(answers) => answers,
                             // A fan-out that cannot spawn falls back to this
                             // thread: a missing segment is a wrong answer, not a
                             // slow one.
-                            Err(_) => chunks.iter().map(|c| c.search(q, k, beam)).collect(),
+                            Err(_) => chains.iter().map(|c| c.search(q, k, beam)).collect(),
                         }
                     } else {
-                        chunks.iter().map(|c| c.search(q, k, beam)).collect()
+                        chains.iter().map(|c| c.search(q, k, beam)).collect()
                     };
                 // Every segment answers with its own `k`, and the union is what
                 // the caller's exact rescoring sees: truncating per segment
@@ -379,8 +378,8 @@ impl SpannHandle {
     pub(crate) fn row_ids(&self) -> Vec<u64> {
         match self {
             SpannHandle::Memory(index) => index.row_ids(),
-            SpannHandle::File(chunks) => {
-                let mut ids: Vec<u64> = chunks.iter().flat_map(|c| c.row_ids()).collect();
+            SpannHandle::File(chains) => {
+                let mut ids: Vec<u64> = chains.iter().flat_map(|c| c.row_ids()).collect();
                 ids.sort_unstable();
                 ids
             }
@@ -418,16 +417,16 @@ impl SpannHandle {
         for attempt in 0..3 {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
-                SpannHandle::File(chunks) => {
-                    let per_chunk: Vec<Vec<(u64, f32)>> = if chunks.len() > 1
+                SpannHandle::File(chains) => {
+                    let per_chunk: Vec<Vec<(u64, f32)>> = if chains.len() > 1
                         && !crate::fanout::on_a_runtime_worker()
                     {
-                        let items: Vec<Arc<storage::knn_index::spann::FileIndex>> = chunks.to_vec();
+                        let items: Vec<Arc<storage::knn_index::spann::ChunkChain>> = chains.to_vec();
                         let shared_query: Arc<[f32]> = Arc::from(q);
                         let shared_ids = Arc::clone(&ids);
-                        let workers = chunks.len();
-                        match crate::fanout::map_blocking(items, workers, move |chunk| {
-                            Ok(chunk.search_filtered(
+                        let workers = chains.len();
+                        match crate::fanout::map_blocking(items, workers, move |chain| {
+                            Ok(chain.search_filtered(
                                 shared_query.as_ref(),
                                 k,
                                 Some(width),
@@ -435,13 +434,13 @@ impl SpannHandle {
                             ))
                         }) {
                             Ok(answers) => answers,
-                            Err(_) => chunks
+                            Err(_) => chains
                                 .iter()
                                 .map(|c| c.search_filtered(q, k, Some(width), &ids))
                                 .collect(),
                         }
                     } else {
-                        chunks
+                        chains
                             .iter()
                             .map(|c| c.search_filtered(q, k, Some(width), &ids))
                             .collect()
@@ -465,9 +464,9 @@ impl SpannHandle {
     pub(crate) fn shape(&self) -> (usize, u32) {
         match self {
             SpannHandle::Memory(index) => (index.partitions().len(), index.height()),
-            SpannHandle::File(chunks) => (
-                chunks.iter().map(|c| c.partitions()).sum(),
-                chunks.iter().map(|c| c.height()).max().unwrap_or(0),
+            SpannHandle::File(chains) => (
+                chains.iter().map(|c| c.partitions()).sum(),
+                chains.iter().map(|c| c.height()).max().unwrap_or(0),
             ),
         }
     }
@@ -936,10 +935,13 @@ mod tests {
             let path = dir.join(name);
             storage::knn_index::spann::write_to(&index, &path, segment).unwrap();
             let opened = storage::knn_index::spann::FileIndex::open(&path, &options).unwrap();
-            Arc::new(opened)
+            Arc::new(storage::knn_index::spann::ChunkChain::from_layers(
+                vec![Arc::new(opened)],
+                &options,
+            ))
         };
         let handle = SpannHandle::File(vec![chunk("seg0.idx", 0, 1.0), chunk("seg1.idx", 1, -1.0)]);
-        assert_eq!(handle.len(), 80, "coverage is the sum of the chunks");
+        assert_eq!(handle.len(), 80, "coverage is the sum of the chains");
 
         // The origin is between the two clusters, so the six nearest rows are
         // three from each side: a merge that stopped at one chunk would answer

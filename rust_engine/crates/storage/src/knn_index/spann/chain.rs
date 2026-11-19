@@ -233,20 +233,24 @@ impl ChunkChain {
     /// at it, so its rows moved and must not be counted twice.
     pub fn row_ids(&self) -> Vec<u64> {
         let mut ids = Vec::new();
-        self.walk_leaves(|_key, layer, _meta| {
-            if let Some(members) = self.layers[layer].slot_members(_key) {
-                ids.extend(members.into_iter().map(|member| member.id));
+        self.walk_leaves(|key, layer, _meta| {
+            if let Some(rows) = self.layers[layer].slot_row_ids(key) {
+                ids.extend(rows);
             }
         });
         ids
     }
 
+    /// Rows the directory says are covered - no page read, so this is what a
+    /// `SHOW INDEX` or a query's coverage test can afford.
     pub fn len(&self) -> usize {
-        self.row_ids().len()
+        let mut rows = 0;
+        self.walk_leaves(|_key, _layer, meta| rows += meta.members);
+        rows
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.owners.is_empty()
     }
 
     /// Visits every reachable leaf once: `(key, layer, meta)`.
@@ -276,35 +280,23 @@ impl ChunkChain {
     pub fn coverage(&self) -> Coverage {
         let mut out = Coverage::default();
         let mut seen: HashMap<u64, PartitionKey> = HashMap::new();
-        let mut leaves: BTreeSet<PartitionKey> = BTreeSet::new();
         self.walk_leaves(|key, layer, _meta| {
-            leaves.insert(key);
-            let Some(members) = self.layers[layer].slot_members(key) else {
+            let Some(rows) = self.layers[layer].slot_row_ids(key) else {
                 return;
             };
-            for member in members {
+            for id in rows {
                 out.rows += 1;
-                if let Some(other) = seen.insert(member.id, key) {
+                if let Some(other) = seen.insert(id, key) {
                     if other != key {
-                        out.duplicates.push(member.id);
+                        out.duplicates.push(id);
                     }
                 }
             }
         });
         out.duplicates.sort_unstable();
         out.duplicates.dedup();
-        // Every edge, from every reachable node, must land on some layer.
-        let mut touched: BTreeSet<PartitionKey> = BTreeSet::new();
-        for key in &leaves {
-            if let Some(meta) = self.meta(*key) {
-                for child in meta.children {
-                    touched.insert(child);
-                }
-            }
-        }
-        // The walk above only reaches leaves, so the interior edges are checked
-        // here over the directory itself: a key that is someone's child must
-        // exist, and an edge to a missing key is what a truncated delta looks
+        // Every edge, from every node the chain can reach or name, must land on
+        // some layer: an edge to a missing key is what a truncated delta looks
         // like.
         for (key, _) in &self.owners {
             let Some(meta) = self.meta(*key) else {
@@ -329,8 +321,8 @@ impl ChunkChain {
         let mut out = self.coverage();
         let mut held: HashSet<u64> = HashSet::new();
         self.walk_leaves(|key, layer, _meta| {
-            if let Some(members) = self.layers[layer].slot_members(key) {
-                held.extend(members.into_iter().map(|member| member.id));
+            if let Some(rows) = self.layers[layer].slot_row_ids(key) {
+                held.extend(rows);
             }
         });
         out.missing = live.difference(&held).copied().collect();

@@ -1885,17 +1885,6 @@ impl Engine {
                 .flat_map(|(_, chunks)| chunks)
                 .map(|(id, info)| (info.base_row_id, *id as u32))
                 .collect();
-            // `(segment, chunk id) -> row_count`, for the spann reuse check: a
-            // chunk records how many rows it covers, and a segment that has not
-            // changed since its chunk was written has exactly that many.
-            let recorded_rows: std::collections::HashMap<(u32, u64), u64> = recorded_chunks
-                .iter()
-                .flat_map(|(segment, chunks)| {
-                    chunks
-                        .iter()
-                        .map(move |(id, info)| ((*segment, *id), info.row_count))
-                })
-                .collect();
             for (segment, seg_rows) in &segments {
                 let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
                 // A chunk's ts is the commit ts of the transaction whose dump
@@ -2163,31 +2152,41 @@ impl Engine {
                             .cloned()
                     };
                     let pending_rows = tail.as_ref().map(|tail| tail.len()).unwrap_or(0);
+                    // The segment's chunks, **newest first**: what a delta
+                    // extends, and what the reuse test asks for coverage.
+                    let mut live_chunks =
+                        self.live_chunk_files(table, &im.name, *segment, &seg_dir);
+                    live_chunks.sort_by(|a, b| b.0.cmp(&a.0));
+                    let chain = opts.as_ref().and_then(|opts| {
+                        let paths: Vec<std::path::PathBuf> =
+                            live_chunks.iter().map(|(_, path)| path.clone()).collect();
+                        if paths.is_empty() {
+                            return None;
+                        }
+                        storage::knn_index::spann::ChunkChain::open(&paths, opts).ok()
+                    });
+                    // Rows the chain covers, from the **directories**: after a
+                    // delta the newest chunk holds a few pages, so "the newest
+                    // chunk's row count" can no longer stand for the segment.
+                    let covered = chain.as_ref().map(|chain| chain.len()).unwrap_or(0);
+                    // The header check still runs against the newest chunk - it is
+                    // the one whose metric/encode/seed the query path will use.
+                    let header_ok = live_chunks.first().is_some_and(|(_, path)| {
+                        opts.as_ref().is_some_and(|opts| {
+                            storage::knn_index::spann::read_header(path).is_ok_and(|h| {
+                                h.metric == opts.metric
+                                    && h.encode == opts.encode
+                                    && h.seed == opts.seed
+                            })
+                        })
+                    });
                     let reusable = pending_rows == 0
                         && !pending_in_segment
-                        && opts.is_some_and(|opts| {
-                            match self
-                                .live_chunk_files(table, &im.name, *segment, &seg_dir)
-                                .into_iter()
-                                .max_by_key(|(id, _)| *id)
-                            {
-                                Some((id, path)) => {
-                                    recorded_rows.get(&(*segment, id)).copied() == Some(*seg_rows)
-                                        && storage::knn_index::spann::read_header(&path).is_ok_and(
-                                            |h| {
-                                                h.metric == opts.metric
-                                                    && h.encode == opts.encode
-                                                    && h.seed == opts.seed
-                                            },
-                                        )
-                                }
-                                None => false,
-                            }
-                        });
+                        && covered as u64 == *seg_rows
+                        && header_ok;
                     if reusable {
-                        // Nothing to publish: the catalog already lists the chunk
-                        // that covers this segment, and the loader takes the
-                        // newest one per segment.
+                        // Nothing to publish: the catalog already lists the chain
+                        // that covers this segment.
                         continue;
                     }
                     // The tree is rebuilt from the column and the chunk describes
@@ -2207,27 +2206,18 @@ impl Engine {
                     // until `cleanup_index_chunks` runs, and going through
                     // `deprecate_chunks` is what keeps a reader that already mapped
                     // one of them valid: the marker only removes the record.
-                    let superseded: Vec<u32> = self
-                        .live_chunk_files(table, &im.name, *segment, &seg_dir)
-                        .into_iter()
-                        .map(|(id, _)| id as u32)
-                        .collect();
-                    // A segment that already has a chunk publishes only its
-                    // tail: the rows written since the last dump are already a
-                    // tree (they were inserted into one), so the checkpoint is
-                    // `take → serialise` - proportional to the new rows - instead
-                    // of a k-means over the whole segment. A segment with no chunk
-                    // yet (`CREATE INDEX`, or the first checkpoint) still needs
-                    // the full build.
-                    // A chain of at most eight delta chunks per segment: one
-                    // more tree to probe per checkpoint is the price of a
-                    // checkpoint proportional to the new rows instead of to the
-                    // segment. At the cap the segment is rebuilt once, which is
-                    // also what retires the chain.
+                    let superseded: Vec<u32> =
+                        live_chunks.iter().map(|(id, _)| *id as u32).collect();
+                    // A segment with no chunk yet (`CREATE INDEX`, or the first
+                    // checkpoint) needs the full build. So does one whose chain is
+                    // at the cap: a further delta is one more tree per query probe,
+                    // and the rebuild is what retires the chain. `pending_rows == 0`
+                    // means nothing is new, so a rebuild at that point is there to
+                    // shrink (a delete lowered the live count) or to fold.
                     const MAX_SEGMENT_CHUNKS: usize = 8;
-                    let rebuild = superseded.is_empty()
+                    let rebuild = chain.is_none()
                         || pending_rows == 0
-                        || superseded.len() >= MAX_SEGMENT_CHUNKS;
+                        || live_chunks.len() >= MAX_SEGMENT_CHUNKS;
                     let (row_count, index_size) = if rebuild {
                         let Some(size) =
                             self.spann_chunk(table, &im.column, &im.options, *segment, &path)
@@ -2236,22 +2226,110 @@ impl Engine {
                         };
                         (*seg_rows, size)
                     } else {
-                        let Some(tree) = tail.as_ref().and_then(|tail| tail.take()) else {
+                        // §5.2-b/§5.3/§5.4: the rows written since the last dump
+                        // are assigned into the tree the chain already holds (one
+                        // descent, one leaf page each), leaves that crossed the
+                        // size limit split against their **published** pages, and
+                        // only the pages that changed are written.
+                        let Some(tail_tree) = tail.as_ref().and_then(|tail| tail.take()) else {
                             continue;
                         };
-                        let Some(published) = tree.into_spann() else {
+                        let Some(chain) = chain.as_ref() else {
                             continue;
                         };
-                        let rows = published.len() as u64;
-                        let Ok(size) =
-                            storage::knn_index::spann::write_to(&published, &path, *segment)
+                        let Some(opts) = opts.clone() else {
+                            continue;
+                        };
+                        let Some(ci) = self
+                            .table_schema(table)
+                            .ok()
+                            .and_then(|schema| schema.iter().position(|name| name == &im.column))
                         else {
+                            continue;
+                        };
+                        // The new rows may still be in the append buffer, where
+                        // the mapped column source refuses to answer
+                        // (`spann_vector_source` returns `None` for a buffered
+                        // table). `BlockCursor::vectors` is the read the exact
+                        // rescoring of a query uses: one decode per block the ids
+                        // touch, and the buffer's text parsed for the rows that
+                        // have no block yet.
+                        let Some((dim, element_type)) = self
+                            .column_types(table)
+                            .ok()
+                            .and_then(|types| types.get(ci).cloned())
+                            .and_then(|decl| crate::blocks::embedding_shape(&decl))
+                        else {
+                            continue;
+                        };
+                        let ids: Vec<u64> = tail_tree
+                            .row_ids()
+                            .into_iter()
+                            .filter(|id| *id >> 32 == u64::from(*segment))
+                            .collect();
+                        let mut by_id: std::collections::HashMap<u64, Vec<f32>> =
+                            std::collections::HashMap::with_capacity(ids.len());
+                        if let Ok(mut cursor) = self.block_cursor(table) {
+                            if let Ok(rows) = cursor.vectors(ci, dim, element_type, &ids) {
+                                for (seq, vector) in rows {
+                                    by_id.insert(seq as u64, vector);
+                                }
+                            }
+                        }
+                        let lookup = |id: u64| -> Option<Vec<f32>> { by_id.get(&id).cloned() };
+                        let slot_of = |key: u64| chain.slot_members(key as u32);
+                        let slots: &dyn Fn(u64) -> Option<Vec<index::spann::Member>> = &slot_of;
+                        let nodes: Vec<index::spann::incr::DurableNode> = chain
+                            .tree_meta()
+                            .into_iter()
+                            .map(|meta| index::spann::incr::DurableNode {
+                                key: meta.key,
+                                level: meta.level,
+                                members: meta.members,
+                                radius: meta.radius,
+                                children: meta.children,
+                                centroid: meta.centroid,
+                            })
+                            .collect();
+                        let Ok(mut live) =
+                            index::spann::incr::IncIndex::from_durable(dim, opts, nodes)
+                        else {
+                            continue;
+                        };
+                        let mut moved = 0u64;
+                        for id in tail_tree.row_ids() {
+                            if id >> 32 != u64::from(*segment) {
+                                // Another segment's row: the tail is one tree for
+                                // the whole index. It stays covered by the
+                                // `uncovered` scan until its own segment's dump.
+                                continue;
+                            }
+                            let Some(vector) = lookup(id) else {
+                                continue;
+                            };
+                            if live.insert(id, &vector).is_err() {
+                                continue;
+                            }
+                            moved += 1;
+                        }
+                        live.run_fixups_from(Some(&lookup), Some(slots));
+                        let dirty: Vec<u32> =
+                            live.dirty_nodes().iter().map(|key| *key as u32).collect();
+                        if dirty.is_empty() {
+                            continue;
+                        }
+                        let Some(delta) = live.to_spann_dirty(Some(slots)) else {
+                            continue;
+                        };
+                        let Ok(size) = storage::knn_index::spann::write_dirty_to(
+                            &delta, &path, *segment, &dirty,
+                        ) else {
                             // The rows stay in the column, so the coverage check
                             // answers them through `uncovered` until the next
                             // checkpoint. Losing the tree is not losing the rows.
                             continue;
                         };
-                        (rows, size)
+                        (covered as u64 + moved, size)
                     };
                     // A delta leaves the older chunks of the segment live, so the
                     // chain keeps every row; only a rebuild supersedes them.
@@ -2264,13 +2342,13 @@ impl Engine {
                     if !superseded.is_empty() {
                         spann_superseded.push((im.name.clone(), *segment, superseded, chunk_ts));
                     }
-                    // A rebuild puts the whole segment into one chunk, so the tail
-                    // is redundant and is dropped. A delta already emptied it
-                    // (`take`), and clearing it here would throw away the rows
-                    // inserted while the chunk was being written.
-                    if rebuild {
-                        spann_ready.push(index_id as u64);
-                    }
+                    // Both forms change what the segment's chain answers: a
+                    // rebuild replaces it, a delta shadows some of its pages. The
+                    // cached handle is dropped here and lazily reloaded, so the
+                    // next query maps the chain that now includes this chunk -
+                    // leaving the old handle in place would answer without the
+                    // rows this checkpoint just made durable.
+                    spann_ready.push(index_id as u64);
                     vec![IndexChunk {
                         chunk_id,
                         base_name: String::new(),

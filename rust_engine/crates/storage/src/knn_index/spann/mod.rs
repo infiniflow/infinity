@@ -897,6 +897,20 @@ impl FileIndex {
         Some(out)
     }
 
+    /// `key`'s row ids only - the ids column, not the codes.
+    ///
+    /// §6.2 stores row ids and quantized codes in separate columns, so a coverage
+    /// pass over 390k leaves touches the `4 B/row` column and leaves the
+    /// `212 B/row` code pages alone.
+    pub fn slot_row_ids(&self, key: PartitionKey) -> Option<Vec<u64>> {
+        let view = self.chunk().slots(key)?;
+        let mut out = Vec::with_capacity(view.len());
+        for i in 0..view.len() {
+            out.push(view.row_id(i)?);
+        }
+        Some(out)
+    }
+
     /// Scores one leaf's page into `set`, the single-chunk scan the chain reuses
     /// (`ChunkChain::search` walks the chain but scans through the owner layer).
     pub(crate) fn scan_leaf_into(
@@ -930,6 +944,11 @@ impl FileIndex {
     /// asks which rows the tree does *not* hold, so a partly covered table
     /// scores its tail instead of the whole table
     /// (`docs/SPANN_DESIGN.md` §9.7).
+    ///
+    /// Authoritative only for a **standalone** chunk. A delta chunk
+    /// (`writer::write_dirty`) writes the partitions it rewrote and nothing
+    /// else, so its section F is a slice of pages, not the tree's coverage -
+    /// ask [`ChunkChain::row_ids`] instead, which walks the reachable leaves.
     pub fn row_ids(&self) -> Vec<u64> {
         self.chunk().row_ids()
     }

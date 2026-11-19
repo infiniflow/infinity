@@ -14521,6 +14521,111 @@ mod tests {
         assert!(loaded, "the query must have loaded the chunk into memory");
     }
 
+    /// §5.2-b/§5.3/§5.4, end to end: rows inserted after a checkpoint are
+    /// assigned into **the chunk's own tree** (one descent, one leaf page each),
+    /// and the next checkpoint appends only the pages it rewrote instead of
+    /// rebuilding the segment. The segment's index is therefore a chain, and a
+    /// query - before and after a restart - answers every row exactly once.
+    #[test]
+    fn a_checkpoint_appends_dirty_pages_to_the_published_tree() {
+        let dim = 8;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 17 + d * 29) % 991))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let insert = |e: &Engine, range: std::ops::Range<usize>| {
+            let mut sql = String::from("INSERT INTO cd VALUES ");
+            for i in range.clone() {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < range.end {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        insert(&e, 0..120);
+        e.execute_blocking(
+            "CREATE INDEX cd_i ON cd (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        // The first checkpoint has no chunk to extend: it builds the tree.
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        // 80 rows after the checkpoint. The flush below writes the pages those
+        // rows touched, and keeps the chunk they were assigned into.
+        insert(&e, 120..200);
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let key = e.table_key("default_db.cd");
+        let handle = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.spann.values().next().cloned())
+            .expect("the checkpoint reloaded the segment's index");
+        let layers = match handle.as_ref() {
+            crate::spann_mem::SpannHandle::File(chains) => chains
+                .first()
+                .map(|chain| chain.layers())
+                .unwrap_or_default(),
+            crate::spann_mem::SpannHandle::Memory(_) => 0,
+        };
+        assert_eq!(
+            layers, 2,
+            "a delta is one more layer over the chunk it extends, not a rebuild"
+        );
+        assert_eq!(handle.len(), 200, "the chain covers every live row");
+        let ids = handle.row_ids();
+        assert_eq!(ids.len(), 200, "and holds each row exactly once");
+        let unique: std::collections::HashSet<u64> = ids.iter().copied().collect();
+        assert_eq!(unique.len(), 200, "no row is covered twice");
+
+        // A row from either side of the delta is answered by the chain: the base
+        // chunk's pages and the ones the checkpoint rewrote resolve together.
+        for i in [0usize, 60, 119, 120, 199] {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM cd SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            assert_eq!(
+                got.first().map(|r| r[0].clone()),
+                Some(i.to_string()),
+                "row {i} after the delta publish"
+            );
+        }
+
+        // The delta is on disk: a restart rebuilds the chain from the catalog and
+        // still answers for both halves.
+        drop(e);
+        let reopened = Engine::open(dir.path()).unwrap();
+        for i in [7usize, 130] {
+            let got = rows(
+                &reopened,
+                &format!(
+                    "SELECT id FROM cd SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            assert_eq!(
+                got.first().map(|r| r[0].clone()),
+                Some(i.to_string()),
+                "row {i} after a restart over a two-layer chain"
+            );
+        }
+    }
+
     /// An insert must be queryable **before** the next dump.
     ///
     /// The row goes into the index's mem index (O(1) append), and the query
