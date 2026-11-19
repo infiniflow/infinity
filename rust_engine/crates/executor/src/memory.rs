@@ -19,7 +19,11 @@
 //!   killer uses; it includes the page cache, i.e. exactly the bytes the reclaim
 //!   pass can give back. `memory.max` is the ceiling and `memory.high`, when it
 //!   is set, is the kernel's own soft watermark - better than a percentage of
-//!   ours.
+//!   ours. `memory.current` is only read when the cgroup has a limit of its own:
+//!   a container gets one cgroup per container, but a host whose root cgroup is
+//!   unlimited reports the whole machine's page cache there, and a ceiling that
+//!   came from the configuration would then measure the machine instead of the
+//!   process (`Engine::memory_usage`).
 //! * **macOS / Windows**: no cgroup. There is no per-process ceiling to read, so
 //!   the ceiling comes from the configuration alone ([`Ceiling::source`] says
 //!   `None` otherwise) and the usage is the process's resident size. Guessing a
@@ -250,6 +254,21 @@ fn watermarks(ceiling: u64, kernel_high: Option<u64>) -> (u64, u64, u64) {
     (low, high, critical)
 }
 
+/// The figure the governor compares against the ceiling.
+///
+/// The cgroup's charge is the right number only when the cgroup is a container
+/// of its own, which is what `memory.max` says: with a limit, `memory.current`
+/// accounts for this process (and the page cache it grew). Without one, the same
+/// file accounts for the whole host - every process and its page cache - so a
+/// configured ceiling would be compared against the machine. `rss` is a function
+/// because reading it forks on macOS.
+fn usage_feed(cgroup_limited: bool, cgroup: Option<u64>, rss: fn() -> u64) -> u64 {
+    match (cgroup_limited, cgroup) {
+        (true, Some(bytes)) => bytes,
+        _ => rss(),
+    }
+}
+
 impl super::Engine {
     /// The ceiling this engine runs under: the configuration's
     /// `buffer_manager_size` (`memory_limit`) when it is set, the cgroup's
@@ -277,10 +296,24 @@ impl super::Engine {
     }
 
     /// What the process is using, as the platform's own account of it: the
-    /// cgroup's `memory.current` where there is one (page cache included, which
-    /// is what the kernel kills on), the process's resident size otherwise.
+    /// cgroup's `memory.current` when the cgroup has a limit of its own (page
+    /// cache included, which is what the kernel kills on), the process's
+    /// resident size otherwise.
+    ///
+    /// The limit is what makes `memory.current` a figure about *this* process. A
+    /// container is the only tenant of its cgroup, so the number is the
+    /// container's; on a host whose root cgroup is unlimited the same file adds
+    /// up every process and all the page cache of the machine, which is a
+    /// different quantity from the one a configured ceiling asks about - on a CI
+    /// runner that had just generated and copied the fixtures, that is gigabytes
+    /// of someone else's page cache, and a 4 GiB `buffer_manager_size` would
+    /// refuse its first write while the engine itself held a few hundred MiB.
     pub(crate) fn memory_usage(&self) -> u64 {
-        cgroup_usage().unwrap_or_else(crate::engine::state::process_rss_bytes)
+        usage_feed(
+            cgroup_ceiling().is_some(),
+            cgroup_usage(),
+            crate::engine::state::process_rss_bytes,
+        )
     }
 
     /// How full the process is against [`Self::memory_ceiling`], measured at most
@@ -723,5 +756,24 @@ mod tests {
         // can use, so the percentage stands.
         assert_eq!(watermarks(1000, Some(990)).1, 850);
         assert_eq!(watermarks(1000, Some(100)).1, 850);
+    }
+
+    fn a_hundred() -> u64 {
+        100
+    }
+
+    /// The feed follows the ceiling's kind. A cgroup without a limit reports the
+    /// host's page cache (on a CI runner, gigabytes the engine never asked for),
+    /// and measuring a configured ceiling against that refuses every write: the
+    /// suite terminated on its first `CREATE TABLE` because the API rejected the
+    /// table and the case used the nil handle.
+    #[test]
+    fn an_unlimited_cgroup_is_measured_by_the_process_not_by_the_host() {
+        assert_eq!(usage_feed(false, Some(9_000), a_hundred), 100);
+        assert_eq!(usage_feed(false, None, a_hundred), 100);
+        // A container's own charge is the figure the kernel kills on.
+        assert_eq!(usage_feed(true, Some(9_000), a_hundred), 9_000);
+        // A limit without a readable `memory.current` still needs a figure.
+        assert_eq!(usage_feed(true, None, a_hundred), 100);
     }
 }
