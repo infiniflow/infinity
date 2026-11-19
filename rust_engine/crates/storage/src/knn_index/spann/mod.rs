@@ -45,8 +45,12 @@ use index::spann::{
 };
 use index::vector::{l2_sq, Metric};
 
+mod chain;
 mod writer;
-pub use writer::{write, write_keys, write_range, write_to};
+pub use chain::{ChainMeta, ChunkChain, Coverage};
+pub use writer::{
+    write, write_dirty, write_dirty_to, write_keys, write_range, write_to,
+};
 
 /// The chunk's signature: the name, a NUL pad (the field is eight bytes wide so
 /// the offsets that follow are the ones `docs/SPANN_FORMAT.md` tabulates) and the
@@ -851,6 +855,59 @@ impl FileIndex {
     /// chunk, `lo` for a subtree chunk (`writer::write_range`).
     pub fn first_key(&self) -> u32 {
         self.layout.header.first_key
+    }
+
+    /// Whether this chunk's directory names `key`.
+    ///
+    /// What a chain asks before falling back to an older layer: a delta chunk
+    /// holds only the partitions it rewrote, so "not here" is the normal case.
+    pub fn contains_key(&self, key: PartitionKey) -> bool {
+        self.chunk().meta(key).is_some()
+    }
+
+    /// The directory entry for `key`, if this chunk holds it.
+    pub fn meta(&self, key: PartitionKey) -> Option<PartitionMeta> {
+        self.chunk().meta(key)
+    }
+
+    /// The centroid of `key`, if this chunk holds it.
+    pub fn centroid(&self, key: PartitionKey) -> Option<Vec<f32>> {
+        self.chunk().centroid(key)
+    }
+
+    /// `key`'s child list, from this chunk's copy of the node.
+    pub fn children(&self, key: PartitionKey) -> Vec<u32> {
+        self.chunk().children(key)
+    }
+
+    /// `key`'s slot page decoded into members - a **published leaf's rows**,
+    /// which is what a live tree reads back to split it (`SlotSource`).
+    ///
+    /// Decoded on demand (the crate forbids `unsafe`, so the columns are copied
+    /// rather than reinterpreted): one page, ~27 KB at 128 rows × 212 B.
+    pub fn slot_members(&self, key: PartitionKey) -> Option<Vec<index::spann::Member>> {
+        let view = self.chunk().slots(key)?;
+        let mut out = Vec::with_capacity(view.len());
+        for i in 0..view.len() {
+            out.push(index::spann::Member {
+                id: view.row_id(i)?,
+                code: view.code(i)?,
+            });
+        }
+        Some(out)
+    }
+
+    /// Scores one leaf's page into `set`, the single-chunk scan the chain reuses
+    /// (`ChunkChain::search` walks the chain but scans through the owner layer).
+    pub(crate) fn scan_leaf_into(
+        &self,
+        key: PartitionKey,
+        q: &[f32],
+        allowed: Option<&std::collections::HashSet<u64>>,
+        set: &mut SearchSet,
+    ) {
+        let chunk = self.chunk();
+        self.scan_leaf(&chunk, key, q, self.layout.header.metric, self.dims(), allowed, set);
     }
 
     pub fn dims(&self) -> usize {

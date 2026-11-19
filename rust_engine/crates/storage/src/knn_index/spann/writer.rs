@@ -74,8 +74,53 @@ pub fn write_keys(
     keys: &[PartitionKey],
 ) -> Result<Vec<u8>, SpannError> {
     let mut out: Vec<u8> = Vec::new();
-    sections_keys(index, segment, keys, &mut out)?;
+    sections_keys(index, segment, keys, true, &mut out)?;
     Ok(out)
+}
+
+/// The chunk for a **dirty set** (§5.4): the partitions a checkpoint rewrote,
+/// with edges to partitions it did not touch left **dangling**.
+///
+/// A delta chunk is not a tree on its own - a leaf's parent may live in the
+/// chunk that is already published - so it is only readable through
+/// [`super::ChunkChain`], which resolves a key against the newest chunk that
+/// names it. Every other invariant is `write_keys`': keys stay as the tree
+/// allocated them, and the byte layout is the same, so a full-set write through
+/// this entry point is byte-identical to [`write_keys`].
+pub fn write_dirty(
+    index: &SpannIndex,
+    segment: u32,
+    keys: &[PartitionKey],
+) -> Result<Vec<u8>, SpannError> {
+    let mut out: Vec<u8> = Vec::new();
+    sections_keys(index, segment, keys, false, &mut out)?;
+    Ok(out)
+}
+
+/// [`write_dirty`] streamed into `path`; returns its length in bytes.
+pub fn write_dirty_to(
+    index: &SpannIndex,
+    path: impl AsRef<std::path::Path>,
+    segment: u32,
+    keys: &[PartitionKey],
+) -> Result<u64, SpannError> {
+    let mut failure: Option<SpannError> = None;
+    let mut produce = |sink: &mut dyn std::io::Write| -> std::io::Result<()> {
+        let mut out = sink;
+        match sections_keys(index, segment, keys, false, &mut out) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                failure = Some(e);
+                Err(std::io::Error::other("chunk section failed"))
+            }
+        }
+    };
+    let len = crate::chunk_store::write_streaming_file(path, true, &mut produce)
+        .map_err(|e| SpannError::Corrupt(format!("write chunk: {e}")))?;
+    if let Some(e) = failure {
+        return Err(e);
+    }
+    Ok(len)
 }
 
 /// The chunk for `index`, streamed into `path`; returns its length in bytes.
@@ -161,13 +206,17 @@ fn segment_offset(id: u64, segment: u32) -> Result<u32, SpannError> {
 
 fn sections<W: Write>(index: &SpannIndex, segment: u32, out: &mut W) -> Result<(), SpannError> {
     let keys: Vec<PartitionKey> = index.partitions().iter().map(|part| part.key).collect();
-    sections_keys(index, segment, &keys, out)
+    sections_keys(index, segment, &keys, true, out)
 }
 
+/// `closed` is the difference between a standalone chunk and a delta: a chunk
+/// that is read on its own must hold every child it names, while a delta's
+/// untouched children live in the chunk it supersedes.
 fn sections_keys<W: Write>(
     index: &SpannIndex,
     segment: u32,
     keys: &[PartitionKey],
+    closed: bool,
     out: &mut W,
 ) -> Result<(), SpannError> {
     let opts = index.opts();
@@ -336,9 +385,11 @@ fn sections_keys<W: Write>(
         buf.clear();
         buf.reserve(part.children.len() * 4);
         for child in &part.children {
-            // A chunk is closed under children: an edge to a partition outside
-            // the set would make the reader resolve a key the chunk does not hold.
-            if !member_keys.contains(child) {
+            // A standalone chunk is closed under children: an edge to a
+            // partition outside the set would make the reader resolve a key the
+            // chunk does not hold. A delta leaves those edges dangling on
+            // purpose - its chain resolves them.
+            if closed && !member_keys.contains(child) {
                 return Err(SpannError::InvalidOption(
                     "keys",
                     format!("child key {child} is not in the chunk's key set"),
