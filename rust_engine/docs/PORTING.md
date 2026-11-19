@@ -130,6 +130,31 @@ SIMD 侧同样核对过：向量化走 `std::simd`（`storage/src/simd.rs`、`co
 没有 `std::arch` intrinsics；只有 `is_x86_feature_detected!` 做运行期特性分发，那是安全宏。
 这也是 `rust-toolchain.toml` 钉 nightly 的唯一原因。
 
+### 2.9 内存治理
+
+进程内存由一个 governor 统一管（`executor/src/memory.rs`），不让每个组件各管一段：
+
+- **上限**：`[buffer] buffer_manager_size`（`cli` 把它同时交给 `Engine::set_buffer_budget` 与
+  `set_memory_limit`）；没配时取 cgroup 的 `memory.max` × 0.9（v2 从本 cgroup 逐级向上取最紧的一个，
+  v1 读**进程自己** cgroup 的 `memory.limit_in_bytes`，不是挂载根的——根通常是"无限"）。
+  两者都没有（裸机且没配）时不治理，上限交给部署侧的 cgroup / systemd `MemoryMax`。
+- **水位**：低 70% / 高 85% / 临界 95%；cgroup 设了 `memory.high` 且落在 (低, 临界) 内时用内核那个。
+- **回收**（`memory_tick`，1 s tick，**不**前置于 `needs_cleanup`，否则只读实例永远不回收）：
+  分配器（`mi_collect`）→ 全部存活映射的常驻页（`madvise(DONTNEED)`，按注册表游标轮转，
+  避免每秒只回收表头那几项）→ 块映射本身（LRU unmap，唯一能归还地址空间的杠杆）→ 临界时再加
+  SPANN 页记账与纯缓存（result / plan / vector cache）。每步之后重新测量进程水位，
+  不拿"映射长度"这个上界当回收量。
+- **写入背压**：临界水位且回收后仍不下降时，写语句返回 `memory limit exceeded`，读照常
+  （读不新增可回收的堆）。这是最后一档，前面几档都尝试过才会拒绝。
+- **组件预算**（governor 之下的内环，防单点撑爆）：块映射 LRU 与 HNSW 解码 chunk 各受
+  `buffer_budget` 约束（块条目按"映射长度 + 解码 version 的堆"计费）；`memindex_memory_quota`
+  管内存索引尾巴；`pending_budget`（512 MiB）管未封存行；SPANN 有 page / dirty 两个预算；
+  whole-column 的 vector cache 上限是 `buffer_budget` 的四分之一，超过就退回分批流式扫描
+  （查询仍正确，只失去重复查询的缓存）。
+- **可观测**：`SHOW VARIABLE system_memory_usage` = RSS；`buffer_pool_usage` = 块缓存已计费字节 /
+  预算；`SHOW BUFFERS` 一行 = 一个映射。回收趟数与释放字节在
+  `Context::memory_reclaim_passes` / `memory_reclaimed_bytes`。
+
 ## 3 当前状态
 
 ### 3.1 存储形态：catalog 是参考的键空间，行只在块文件与 WAL 里

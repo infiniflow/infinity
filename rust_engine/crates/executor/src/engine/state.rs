@@ -5217,17 +5217,6 @@ impl PendingRows {
         )
     }
 
-    /// One cell, `None` when the row is out of range or has no such column.
-    ///
-    /// A reader that wants one column of many rows (`for_each_buffered_cell`)
-    /// goes through this rather than materialising each row.
-    pub(crate) fn cell(&self, k: usize, id: u64) -> Option<&Value> {
-        if k >= self.len() {
-            return None;
-        }
-        self.columns.get(&id)?.get(k)
-    }
-
     /// [`Self::row`] with `null` for a column this buffer does not hold.
     pub(crate) fn row_or_null(&self, k: usize, order: &[u64]) -> Option<Vec<Value>> {
         self.row(k, order, &[])
@@ -5595,26 +5584,200 @@ pub(crate) fn scalar_only(types: &[String]) -> bool {
     })
 }
 
+/// The process's shared map of sealed blocks, bounded by the buffer budget.
+///
+/// A sealed block's files never change, so one mapping can serve every reader
+/// in the process - but "can be shared" is not "must stay mapped". A table
+/// larger than the budget would otherwise keep one mapping per block for the
+/// life of the process: address space that never shrinks, plus a resident page
+/// for every page ever read. The reference bounds the same structure with its
+/// buffer manager's LRU; here the entry *is* the mapping, so evicting it
+/// unmaps the block and that is what actually gives the memory back. Readers
+/// already holding the `Arc` keep reading their mapping: the file is immutable
+/// and only the cache's reference goes away.
+pub(crate) struct BlockMapCache {
+    entries: std::collections::HashMap<storage::format::BlockId, CachedBlock>,
+    /// Insertion order, the clock hand's track: eviction walks it from the
+    /// front, giving an entry that was used since its last visit a second
+    /// chance (CLOCK). A full sort by timestamp on every eviction would be
+    /// `O(n log n)` per block on a table larger than the budget - the scan this
+    /// cache exists to serve would then be quadratic.
+    order: std::collections::VecDeque<storage::format::BlockId>,
+    /// Sum of the entries' charges (mapped bytes plus the heap the decoded
+    /// `version` costs), kept in step with every insert/remove so a budget check
+    /// is one load, not a walk.
+    bytes: usize,
+}
+
+struct CachedBlock {
+    block: Arc<MappedBlock>,
+    /// Set by [`BlockMapCache::get`]; cleared when the clock hand passes it.
+    referenced: bool,
+    /// What this entry is charged to the budget: [`MappedBlock::bytes`] plus
+    /// [`MappedBlock::heap_bytes`]. The version's `deleted` array alone is
+    /// 64 KiB per block, so charging the mapping's length only would let the
+    /// heap grow to a multiple of the budget.
+    charge: usize,
+}
+
+impl BlockMapCache {
+    pub(crate) fn new() -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            order: std::collections::VecDeque::new(),
+            bytes: 0,
+        }
+    }
+
+    /// The mapping for `id`, marked as used since the clock hand last passed.
+    pub(crate) fn get(&mut self, id: &storage::format::BlockId) -> Option<Arc<MappedBlock>> {
+        let entry = self.entries.get_mut(id)?;
+        entry.referenced = true;
+        Some(entry.block.clone())
+    }
+
+    /// Installs `block` unless another reader got there first (one mapping per
+    /// block), then evicts down to `budget`. Returns the mapping the process
+    /// keeps - which is `block` itself when it was evicted immediately (a
+    /// budget smaller than the block), so the caller always has a valid handle.
+    pub(crate) fn insert(
+        &mut self,
+        id: storage::format::BlockId,
+        block: Arc<MappedBlock>,
+        budget: usize,
+    ) -> Arc<MappedBlock> {
+        if let Some(existing) = self.entries.get_mut(&id) {
+            existing.referenced = true;
+            return existing.block.clone();
+        }
+        let charge = block.bytes() + block.heap_bytes();
+        self.bytes += charge;
+        self.entries.insert(
+            id,
+            CachedBlock {
+                block: block.clone(),
+                referenced: false,
+                charge,
+            },
+        );
+        self.order.push_back(id);
+        self.shrink_to(budget);
+        // A block dropped by name (`drop_block_map` on a rewrite) leaves its id
+        // on the track; compact once the stale entries outnumber the live ones
+        // so the hand never walks a mostly-dead queue.
+        if self.order.len() > 2 * self.entries.len() + 64 {
+            self.order.retain(|id| self.entries.contains_key(id));
+        }
+        match self.entries.get(&id) {
+            Some(entry) => entry.block.clone(),
+            None => block,
+        }
+    }
+
+    /// Evicts entries until `want` bytes have been dropped, returning how many
+    /// the cache no longer holds.
+    pub(crate) fn shrink_by(&mut self, want: usize) -> usize {
+        if want == 0 {
+            return 0;
+        }
+        let before = self.bytes;
+        let target = before.saturating_sub(want);
+        self.shrink_to(target);
+        before - self.bytes
+    }
+
+    /// Drops entries until the cache covers at most `budget` bytes.
+    fn shrink_to(&mut self, budget: usize) {
+        while self.bytes > budget {
+            if !self.evict_one() {
+                // Every entry was given its second chance and re-queued; the
+                // next round evicts the ones the hand now finds unreferenced.
+                if !self.evict_one() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// One turn of the clock hand: pops entries from the front, re-queues the
+    /// ones used since their last turn, and removes the first stale one.
+    fn evict_one(&mut self) -> bool {
+        let turns = self.order.len();
+        for _ in 0..turns {
+            let Some(id) = self.order.pop_front() else {
+                return false;
+            };
+            match self.entries.get_mut(&id) {
+                // A stale order entry: the mapping was dropped by name.
+                None => continue,
+                Some(entry) if entry.referenced => {
+                    entry.referenced = false;
+                    self.order.push_back(id);
+                }
+                Some(_) => {
+                    self.remove(&id);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub(crate) fn remove(&mut self, id: &storage::format::BlockId) -> Option<Arc<MappedBlock>> {
+        let entry = self.entries.remove(id)?;
+        self.bytes -= entry.charge;
+        Some(entry.block)
+    }
+
+    /// Drops every mapping of one table: its block files were rewritten,
+    /// compacted or deleted, so the mappings no longer describe them.
+    pub(crate) fn retain_table(&mut self, table_id: u64) {
+        let stale: Vec<storage::format::BlockId> = self
+            .entries
+            .keys()
+            .filter(|id| id.table_id == table_id)
+            .copied()
+            .collect();
+        for id in stale {
+            self.remove(&id);
+        }
+        // Keep the hand's track from filling with ids that no longer resolve.
+        self.order.retain(|id| self.entries.contains_key(id));
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Bytes the cache is charged for - the mappings plus the heap their
+    /// decoded versions occupy. This is the number `buffer_pool_usage` reports
+    /// against the budget.
+    pub(crate) fn bytes(&self) -> usize {
+        self.bytes
+    }
+
+    pub(crate) fn blocks(&self) -> impl Iterator<Item = &Arc<MappedBlock>> {
+        self.entries.values().map(|entry| &entry.block)
+    }
+}
+
 /// Engine-wide runtime state.
 ///
 /// C++: `InfinityContext` (`src/storage/infinity_context.cppm`) — the shared
 /// configuration, buffer manager and service handles. `Engine` composes it
 /// instead of owning these fields directly.
 pub(crate) struct Context {
-    /// One mapping per sealed block, shared by every reader in the process.
-    ///
-    /// A block file never changes while it is sealed, so the mapping *is* the
-    /// block: the reference reaches the same bytes through a `BufferManager`
-    /// copy, which costs memory and an LRU; here the pages stay in the page
-    /// cache. The entry is dropped when the block's files are rewritten or
-    /// deleted (`Engine::drop_block_maps`).
-    pub(crate) block_maps:
-        Mutex<std::collections::HashMap<storage::format::BlockId, Arc<MappedBlock>>>,
-    /// The budget the index buffers are held to (`memindex_memory_quota` for
-    /// the dump trigger is separate). Built in at 8 GiB: the reference's
-    /// `[buffer] buffer_manager_size` is accepted by the config parser but
-    /// ignored, and sealed blocks are mapped, not buffered, so they do not
-    /// spend it.
+    /// One mapping per sealed block, shared by every reader in the process and
+    /// bounded by [`Self::buffer_budget`]. An entry goes when the block is
+    /// rewritten or deleted (`Engine::drop_block_maps`) or when it is the least
+    /// recently used one under pressure ([`BlockMapCache::shrink_to`]).
+    pub(crate) block_maps: Mutex<BlockMapCache>,
+    /// The budget the block mappings and the decoded HNSW chunks are each held
+    /// to (`memindex_memory_quota` for the dump trigger is separate). Built in
+    /// at 8 GiB; `[buffer] buffer_manager_size` sets it (`Engine::
+    /// set_buffer_budget`). It is the lever a deployment uses to cap the page
+    /// cache the engine itself asks for; the process ceiling in `memory.rs` is
+    /// what covers everything else.
     pub(crate) buffer_budget: std::sync::atomic::AtomicUsize,
     /// Mappings served from the shared map, and mappings opened for a block
     /// it did not hold: `SHOW VARIABLE memory_cache_miss` reports the ratio.
@@ -5630,6 +5793,15 @@ pub(crate) struct Context {
     /// for an index to go idle - the difference between a slow query and an OOM
     /// kill under a container limit.
     pub(crate) memory_limit: std::sync::atomic::AtomicU64,
+    /// When the pressure was last measured, and what it was: the write path asks
+    /// on every statement, and the measurement is a file read on Linux / a `ps`
+    /// fork on macOS.
+    pub(crate) memory_checked_at: std::sync::atomic::AtomicU64,
+    pub(crate) memory_pressure_level: std::sync::atomic::AtomicU8,
+    /// Governor passes that ran, and the bytes they released: the only way to
+    /// tell "the ceiling held" from "the ceiling was never reached".
+    pub(crate) memory_reclaim_passes: std::sync::atomic::AtomicU64,
+    pub(crate) memory_reclaimed_bytes: std::sync::atomic::AtomicU64,
     /// Build the **first** chunk of a spann segment on the background task
     /// instead of inside the checkpoint that needs it. Off by default: a
     /// synchronous build makes the index readable on the next statement, an

@@ -2590,6 +2590,12 @@ impl Engine {
         self.context
             .memory_limit
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        // The measured pressure is reused for half a second, so a ceiling that
+        // just changed has to invalidate it - otherwise lowering the limit leaves
+        // the old verdict in place while writes keep landing.
+        self.context
+            .memory_checked_at
+            .store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Builds the **first** chunk of a spann segment on the background task

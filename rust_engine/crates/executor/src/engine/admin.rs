@@ -1222,19 +1222,16 @@ impl Engine {
         Ok(())
     }
 
-    /// Drops the shared mappings of the spilled index files, so RSS tracks live
+    /// Drops the clean pages of every index mapping, so RSS tracks live
     /// structures rather than the page cache (C++ `BufferManager::Flush` drops
     /// the clean pages it wrote back).
+    ///
+    /// Through the mapping registry rather than the directory: the walk it
+    /// replaced opened every file under `fulltext`/`multivector`/`sparse`/
+    /// `secondary`/`secondary_low` on every checkpoint, and `fadvise` on an
+    /// already-mapped file does not drop the pages the mapping holds.
     pub(crate) fn drop_index_caches(&self) {
-        for sub in [
-            "fulltext",
-            "multivector",
-            "sparse",
-            "secondary",
-            "secondary_low",
-        ] {
-            storage::drop_tree_cache(&self.dir.join(sub));
-        }
+        storage::mapped::release_mapped_pages(usize::MAX);
     }
 
     /// The checkpoint itself, without the mode gate: [`Self::cleanup`] runs it

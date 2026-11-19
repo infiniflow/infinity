@@ -75,7 +75,7 @@ impl RowCells<'_> {
 /// One argument for "which column, how wide, in which element type" instead of
 /// five loose ones.
 #[derive(Clone, Copy)]
-pub(crate) struct VectorColumn<'a> {
+pub(crate) struct EmbeddingColumn<'a> {
     /// The declared types (`IndexMeta`/table meta `types`), in column order.
     pub declared: &'a [String],
     /// The storage types, in column order.
@@ -2419,7 +2419,7 @@ impl Engine {
                         };
                         // The new rows may still be in the append buffer, where
                         // the mapped column source refuses to answer
-                        // (`spann_vector_source` returns `None` for a buffered
+                        // (`vector_column` returns `None` for a buffered
                         // table). `BlockCursor::vectors` is the read the exact
                         // rescoring of a query uses: one decode per block the ids
                         // touch, and the buffer's text parsed for the rows that
@@ -3964,7 +3964,7 @@ impl Engine {
             self.context
                 .block_map_hits
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            return Ok(block.clone());
+            return Ok(block);
         }
         self.context
             .block_map_misses
@@ -3981,8 +3981,19 @@ impl Engine {
         };
         // Another reader may have mapped the block while this one did the I/O:
         // keep the first mapping, so a block has exactly one in the process.
-        let mut maps = self.context.block_maps.lock().unwrap();
-        Ok(maps.entry(id).or_insert(block).clone())
+        // The insert also enforces the buffer budget - a block beyond it evicts
+        // the least recently used mappings rather than staying mapped forever.
+        let budget = self
+            .context
+            .buffer_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .max(1);
+        Ok(self
+            .context
+            .block_maps
+            .lock()
+            .unwrap()
+            .insert(id, block, budget))
     }
 
     /// Drops the mappings of every block of `table_id`: the block files under
@@ -3993,7 +4004,7 @@ impl Engine {
             .block_maps
             .lock()
             .unwrap()
-            .retain(|id, _| id.table_id != table_id);
+            .retain_table(table_id);
     }
 
     /// Drops the mapping of one block, for a rewrite that only touches that
@@ -4600,7 +4611,7 @@ impl Engine {
     /// `decode_rows_of_values` answers `Value::Null` for them as well.
     pub(crate) fn decode_vectors_of_block(
         ids: &[u64],
-        vector: VectorColumn<'_>,
+        vector: EmbeddingColumn<'_>,
         id: BlockId,
         version: &storage::definition::format::BlockVersionFile,
         columns: &dyn BlockColumns,
@@ -5853,100 +5864,6 @@ impl Engine {
         out
     }
 
-    /// Hands the buffered cells of `column` for the rows of `segment` (every
-    /// segment when `None`) to `sink`, one cell at a time.
-    ///
-    /// The sink runs **while the buffer is locked**, so it must not reach back into
-    /// `tables` - a segment build only writes to its scratch file.
-    pub(crate) fn for_each_buffered_cell(
-        &self,
-        table: &str,
-        column: usize,
-        segments: Option<&std::collections::HashSet<u32>>,
-        mut sink: impl FnMut(usize, &str),
-    ) {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let Some(entry) = tables.get(&key) else {
-            return;
-        };
-        // The buffer is columnar, so the column is picked by position through
-        // the live schema first, then its cells are walked in row order.
-        let order = self.table_schema_ids(table).unwrap_or_default();
-        let Some(id) = order.get(column).copied() else {
-            return;
-        };
-        for k in 0..entry.pending_rows.len() {
-            let seq = entry.pending_rows.row_id(k);
-            // This side narrows by a *set* of segments (a compaction walks
-            // several at once); upstream's single-segment form is the same test
-            // with one element.
-            if segments.is_some_and(|only| !only.contains(&((seq as u64 >> 32) as u32))) {
-                continue;
-            }
-            if let Some(value) = entry.pending_rows.cell(k, id) {
-                sink(seq, &mirror_cell_text(value));
-            }
-        }
-    }
-
-    /// Calls `f(seq, cell)` for every stored cell of `column`, **one block at a
-    /// time**, over the segments in `segments` (every visible segment when
-    /// `None`).
-    ///
-    /// [`Self::read_block_column_including_deleted`] keeps the whole column as
-    /// `String`s; for a 1536d `EMBEDDING` that is ~15 KB of decimal text per
-    /// row, i.e. 15 GB of peak RSS at 1M rows *before* the `f32` copy the index
-    /// builder needs. Handing each cell to the caller lets it parse and drop the
-    /// text per block, so a build's peak is the vectors plus one block's text.
-    ///
-    /// The segment set is what compaction needs: the merge marks the source
-    /// segments dropped at its own ts, and a reader below that ts (the
-    /// compaction's own bottom half) still sees their blocks. Walking them would
-    /// put rows the merge just retired into the rebuilt tree.
-    pub(crate) fn for_each_block_cell(
-        &self,
-        table: &str,
-        column: usize,
-        segments: Option<&std::collections::HashSet<u32>>,
-        mut f: impl FnMut(usize, &str),
-    ) {
-        let table = self.qualified_table(table);
-        let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
-            return;
-        };
-        let Some(types) = meta
-            .types
-            .iter()
-            .map(|t| column_type_of(t))
-            .collect::<Option<Vec<_>>>()
-        else {
-            return;
-        };
-        let root = self.blocks_root();
-        let wanted = [column];
-        for id in self.visible_block_ids(&table) {
-            if segments.is_some_and(|set| !set.contains(&id.segment_id)) {
-                continue;
-            }
-            if let Some(cells) =
-                self.decode_block_cells(&table, &root, &meta, &types, id, Some(&wanted))
-            {
-                for (seq, cells) in cells {
-                    if let Some(text) = cells.get(column) {
-                        f(seq, text);
-                    }
-                }
-            }
-        }
-        // Rows that are still in the append buffer have no block yet. Their seq
-        // carries the segment in its high half (`base_row_id = segment << 32`).
-        // Read them under the buffer's own lock, one cell at a time: cloning it
-        // first (`pending_rows_of`) copied every buffered row's whole embedding to
-        // keep one column of one segment.
-        self.for_each_buffered_cell(&table, column, segments, f);
-    }
-
     /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
     ///
     /// The graph is built by the engine's own `HnswIndex` and serialized with the
@@ -6795,7 +6712,12 @@ impl Engine {
             .load(std::sync::atomic::Ordering::Relaxed);
         if limit > 0 && crate::engine::state::process_rss_bytes() > limit {
             let _ = self.spann_release_pages_forced();
-            storage::drop_tree_cache(&self.blocks_root());
+            // Every index reader maps through `MappedFile`, so the registry
+            // reaches the block files, the text segments and the secondary
+            // structures without walking (and opening) the data directory -
+            // which is what this used to do, on every pass, while already over
+            // the limit.
+            storage::mapped::release_mapped_pages(usize::MAX);
         }
         Ok(())
     }

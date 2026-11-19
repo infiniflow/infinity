@@ -378,7 +378,7 @@ impl Engine {
             },
             txn,
             context: Context {
-                block_maps: Mutex::new(std::collections::HashMap::new()),
+                block_maps: Mutex::new(BlockMapCache::new()),
                 buffer_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
                 block_map_hits: std::sync::atomic::AtomicU64::new(0),
                 block_map_misses: std::sync::atomic::AtomicU64::new(0),
@@ -399,6 +399,10 @@ impl Engine {
                 // `SHOW INDEX` prints is the one that decides a rebuild.
                 max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(8),
                 memory_limit: std::sync::atomic::AtomicU64::new(0),
+                memory_checked_at: std::sync::atomic::AtomicU64::new(0),
+                memory_pressure_level: std::sync::atomic::AtomicU8::new(0),
+                memory_reclaim_passes: std::sync::atomic::AtomicU64::new(0),
+                memory_reclaimed_bytes: std::sync::atomic::AtomicU64::new(0),
                 spann_async_build: std::sync::atomic::AtomicBool::new(false),
                 spann_page_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_PAGE_BUDGET),
                 spann_dirty_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_DIRTY_BUDGET),
@@ -3999,6 +4003,16 @@ impl Engine {
             .map(|_| cache.clone())
     }
 
+    /// Builds the whole-column vector cache, unless the column is too large for
+    /// the share it is allowed.
+    ///
+    /// The cache is a heap copy of every vector in the column - 1M x 128 `f32`
+    /// is 512 MB, and a table an order of magnitude bigger would be tens of
+    /// gigabytes held at once, which no reclaim pass can take back mid-scan.
+    /// It is capped at a quarter of the buffer budget; past that this returns an
+    /// error and the caller streams the scan in batches instead (the exact-scan
+    /// path treats a missing cache as "stream", so the query still answers -
+    /// only the repeat-query optimization is lost).
     pub(crate) fn vector_cache_for(
         &self,
         table: &str,
@@ -4014,6 +4028,16 @@ impl Engine {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let cap = self
+            .context
+            .buffer_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .max(1)
+            / 4;
+        // `usize` + `Vec<f32>` header, plus the vectors themselves.
+        let per_row = dims
+            .saturating_mul(std::mem::size_of::<f32>())
+            .saturating_add(64);
         let mut cache = VectorCache {
             dims,
             rows: Vec::new(),
@@ -4025,6 +4049,12 @@ impl Engine {
                 if v.len() == dims {
                     cache.rows.push((seq, v));
                     cache.live.insert(seq);
+                    if cache.rows.len().saturating_mul(per_row) > cap {
+                        return Err(Error::Invalid(format!(
+                            "the vector cache for {table}.{column} would exceed {cap} bytes \
+                             (a quarter of the buffer budget); the scan streams instead"
+                        )));
+                    }
                 }
             }
         }
@@ -6454,18 +6484,12 @@ impl Engine {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Bytes this engine's block mappings cover. Nothing is charged to a buffer
-    /// pool any more, so this is the page-cache footprint the buffer budget
-    /// used to approximate for blocks (the index chunks are mapped too, and
-    /// counted process-wide by `storage::mapped`).
+    /// Bytes the block cache is charged for: the mapped files plus the heap
+    /// their decoded `version`s occupy. The mappings are the page-cache
+    /// footprint the buffer budget used to approximate for blocks (index
+    /// chunks are mapped too, and counted process-wide by `storage::mapped`).
     pub fn buffer_used_bytes(&self) -> usize {
-        self.context
-            .block_maps
-            .lock()
-            .unwrap()
-            .values()
-            .map(|block| block.bytes())
-            .sum()
+        self.context.block_maps.lock().unwrap().bytes()
     }
 
     /// Begins a table restore that is only applied by
@@ -11167,7 +11191,7 @@ impl Engine {
             .block_maps
             .lock()
             .unwrap()
-            .values()
+            .blocks()
             .map(|block| BufferObjectInfo {
                 object_path: block.dir(&root),
                 buffered_status: BufferStatus::Loaded,

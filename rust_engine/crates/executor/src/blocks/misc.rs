@@ -412,7 +412,7 @@ impl<'a> BlockCursor<'a> {
             }
             let Some(rows) = Engine::decode_vectors_of_block(
                 &self.meta.ids,
-                crate::blocks::engine::VectorColumn {
+                crate::blocks::engine::EmbeddingColumn {
                     declared: &self.meta.types,
                     storage: &self.types,
                     col,
@@ -539,6 +539,77 @@ mod tests {
         out
     }
 
+    /// **Experiment, not a gate**: what [`BlockCursor::vectors`] costs against the
+    /// same rows read through [`VectorColumn`], which borrows instead of copying.
+    ///
+    /// `vectors` is what the delta checkpoint calls for every pending row, and it
+    /// returns an owned `Vec<f32>` per row (`INSERT_BATCH` exists to cap the
+    /// peak). `VectorColumn:` [`index::source::VectorSource`] hands out
+    /// `&[f32]` into the mapping. This run is the measurement that decides
+    /// whether the owned form is worth replacing - see the printed per-row cost.
+    #[test]
+    #[ignore = "measurement, run with --ignored --nocapture"]
+    fn experiment_borrowed_vectors_against_owned() {
+        let dim = 256;
+        let rows = 4000usize;
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!(
+            "CREATE TABLE bv (id INT, v EMBEDDING(FLOAT,{dim}));"
+        ))
+        .unwrap();
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 7 + d * 13) % 991))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let mut sql = String::from("INSERT INTO bv VALUES ");
+        for i in 0..rows {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < rows {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+
+        let wanted = 2048usize;
+        let ids: Vec<u64> = (0..wanted as u64).collect();
+
+        let mut cursor = e.block_cursor("bv").unwrap();
+        let started = std::time::Instant::now();
+        let owned = cursor.vectors(1, dim, 6, &ids).unwrap();
+        let owned_time = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let column = e
+            .vector_column("bv", 1, None, crate::blocks::vector_column::Rows::Chunk)
+            .expect("the column reads in place");
+        let open = started.elapsed();
+        let started = std::time::Instant::now();
+        let mut borrowed = 0usize;
+        for id in &ids {
+            let v = column.at(*id).expect("the row is there");
+            borrowed += v.len();
+        }
+        let borrow = started.elapsed();
+
+        assert_eq!(owned.len(), wanted);
+        assert_eq!(borrowed, wanted * dim);
+        eprintln!(
+            "vectors(): {} rows of {dim}d -> {:?} ({} KB copied, {} allocations); \
+             VectorColumn::at(): open {:?} + walk {:?} (0 bytes copied)",
+            owned.len(),
+            owned_time,
+            owned.len() * owned[0].1.len() * 4 / 1024,
+            owned.len(),
+            open,
+            borrow
+        );
+    }
+
     /// A sealed block is mapped **once** and the mapping is shared: a second
     /// reader gets the same `Arc`, no file is reopened, and no column body is
     /// copied into the heap (the scan decodes straight out of the pages).
@@ -590,6 +661,104 @@ mod tests {
         assert_eq!(
             row_strings(&e, "SELECT id, name FROM mb WHERE id = 1;"),
             vec![vec!["1".to_string(), "c".to_string()]]
+        );
+    }
+
+    /// One real sealed block on disk, mapped read-only.
+    fn sealed_block(
+        root: &std::path::Path,
+        id: storage::format::BlockId,
+        rows: usize,
+    ) -> Arc<MappedBlock> {
+        let values: Vec<u8> = (0..rows).flat_map(|v| (v as i32).to_le_bytes()).collect();
+        let valid = vec![true; rows];
+        let body = storage::ColumnBody::build(rows, 4, &values, &valid).unwrap();
+        let columns = vec![storage::BlockColumn {
+            column_id: 0,
+            body,
+            outline: Vec::new(),
+        }];
+        let version =
+            storage::BlockVersionFile::new(&[(1, rows as u32)], storage::DEFAULT_BLOCK_CAPACITY);
+        storage::write_block(root, id, &columns, &version).unwrap();
+        Arc::new(MappedBlock::open(root, id).unwrap())
+    }
+
+    /// The shared block map is a cache, not a registry: a table larger than the
+    /// buffer budget would otherwise keep one mapping per block for the life of
+    /// the process, and that address space (with the resident pages behind it)
+    /// is exactly what a long-running server must not accumulate.
+    ///
+    /// The budget here is one byte short of the three blocks' total: two always
+    /// fit, three never do, so exactly the least recently used mapping goes.
+    #[test]
+    fn the_block_map_evicts_the_least_recently_used_mapping() {
+        use crate::engine::state::BlockMapCache;
+
+        let dir = tempdir().unwrap();
+        let ids: Vec<storage::format::BlockId> = (0..3u16)
+            .map(|block_id| storage::format::BlockId {
+                db_id: 1,
+                table_id: 2,
+                segment_id: 0,
+                block_id,
+            })
+            .collect();
+        let blocks: Vec<Arc<MappedBlock>> = ids
+            .iter()
+            .map(|id| sealed_block(dir.path(), *id, 4))
+            .collect();
+        let charge = |b: &Arc<MappedBlock>| b.bytes() + b.heap_bytes();
+        let budget = blocks.iter().map(charge).sum::<usize>() - 1;
+
+        let mut cache = BlockMapCache::new();
+        cache.insert(ids[0], blocks[0].clone(), budget);
+        cache.insert(ids[1], blocks[1].clone(), budget);
+        // Touch the first, so the second is now the least recently used.
+        assert!(cache.get(&ids[0]).is_some());
+        cache.insert(ids[2], blocks[2].clone(), budget);
+
+        assert_eq!(cache.len(), 2, "the third mapping evicted one entry");
+        assert!(cache.get(&ids[0]).is_some(), "the touched block stays");
+        assert!(cache.get(&ids[2]).is_some(), "the newest block stays");
+        assert!(
+            cache.get(&ids[1]).is_none(),
+            "the least recently used mapping is the one unmapped"
+        );
+        assert_eq!(cache.bytes(), charge(&blocks[0]) + charge(&blocks[2]));
+
+        // A rewrite/compaction drops a whole table's mappings.
+        cache.retain_table(2);
+        assert_eq!(cache.len(), 0);
+        assert_eq!(cache.bytes(), 0);
+    }
+
+    /// A budget smaller than any block keeps the shared map empty, and the
+    /// reader still gets a live mapping for the call that asked for it - the
+    /// budget bounds what the process *keeps*, not what one statement may read.
+    #[test]
+    fn a_tiny_buffer_budget_keeps_the_block_map_empty() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bmb (id INT);").unwrap();
+        e.execute_blocking("INSERT INTO bmb VALUES (1),(2),(3);")
+            .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let root = e.blocks_root();
+        let id = e.visible_block_ids("default_db.bmb")[0];
+        e.set_buffer_budget(1);
+        e.drop_block_maps(id.table_id);
+
+        let block = e.block_map("default_db.bmb", &root, id).unwrap();
+        assert!(block.bytes() > 1);
+        assert!(
+            e.buffer_objects().is_empty(),
+            "a mapping larger than the budget is not retained"
+        );
+        // The rows still read: each block is mapped for the scan and released.
+        assert_eq!(
+            row_strings(&e, "SELECT COUNT(*) FROM bmb;"),
+            vec![vec!["3".to_string()]]
         );
     }
 

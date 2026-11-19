@@ -15527,10 +15527,11 @@ mod tests {
     /// nothing for this one - the tail is a single tree for the whole index, and
     /// this is the seam where a delta could go to the wrong segment.
     ///
-    /// A *second* delta layer on each of two segments is not reachable through
-    /// the allocator today: only the newest segment takes new rows (an `INSERT`
-    /// after a `COPY` opens a fresh segment), so the segment that gains rows and
-    /// the segment that already has a chain are never the same one twice.
+    /// Two segments each carrying a delta layer is not a case to test: a sealed
+    /// segment is immutable, so only the **open** one ever takes new rows, and a
+    /// delta layer is exactly what the open segment's new rows become. The
+    /// allocator is what enforces that (an `INSERT` after a `COPY` opens the next
+    /// segment), not an accident of this test's shape.
     #[test]
     fn two_segments_keep_a_chain_each() {
         let dim = 8;

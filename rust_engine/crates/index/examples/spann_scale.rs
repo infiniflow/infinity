@@ -19,8 +19,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use index::source::{Memory, VectorSource};
 use index::spann::incr::IncIndex;
-use index::spann::source::{row_source, Memory, VectorSource};
+use index::spann::source::row_source;
 use index::spann::{Options, SpannIndex};
 
 fn main() {

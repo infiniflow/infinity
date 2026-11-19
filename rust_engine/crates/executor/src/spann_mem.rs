@@ -1115,15 +1115,12 @@ impl crate::Engine {
     /// Builds a spann tree over `column` **without holding the column in RAM**.
     ///
     /// The vectors are read where they already are: `EMBEDDING(FLOAT, dim)` is
-    /// `ColumnLayout::Fixed(dim * 4)` of inline `f32`, so `blocks::spann_source`
-    /// hands the builder a slice of the block that holds the row - no text
-    /// rendering, no second copy of the column on disk, no mapping of one.
-    ///
-    /// Two cases still go through [`Self::spann_scratch`]: a non-`f32` element
-    /// type (`FLOAT16`/`DOUBLE`/`BIT`, whose body is not an `f32` array) and rows
-    /// still in the append buffer (they have no block body yet). Both are rare
-    /// next to a sealed column of `FLOAT` embeddings, and both need the same
-    /// "one random read per member" contract the builder has.
+    /// `ColumnLayout::Fixed(dim * 4)` of inline `f32`, so
+    /// `blocks::vector_column` hands the builder a slice of the block that holds
+    /// the row - no text rendering, no second copy of the column on disk, no
+    /// mapping of one. A non-`f32` element type (`FLOAT16`/`DOUBLE`/`BIT`, whose
+    /// body is not an `f32` array) is widened one block at a time, and rows still
+    /// in the append buffer are read from the buffer itself.
     ///
     /// Peak heap is therefore the finished tree's codes (208 B/row at 1536d)
     /// plus one block, instead of `text + f32` for the whole table.
@@ -1132,11 +1129,10 @@ impl crate::Engine {
         table: &str,
         column: usize,
         opts: index::spann::Options,
-        dir: &std::path::Path,
         segment: Option<u32>,
     ) -> Option<index::spann::SpannIndex> {
         let segments = segment.map(|segment| std::collections::HashSet::from([segment]));
-        self.spann_build_in(table, column, opts, dir, segments.as_ref())
+        self.spann_build_in(table, column, opts, segments.as_ref())
     }
 
     /// [`Self::spann_build`] over a **set** of segments (compaction rebuilds
@@ -1147,22 +1143,20 @@ impl crate::Engine {
         table: &str,
         column: usize,
         opts: index::spann::Options,
-        dir: &std::path::Path,
         segments: Option<&std::collections::HashSet<u32>>,
     ) -> Option<index::spann::SpannIndex> {
         // The vectors are already in the column: reading them in place - a
-        // borrow of the block's `f32` payload - is the build's whole input, so
-        // no scratch copy of the column is written or mapped (§19.3).
-        if let Some(source) = self.spann_vector_source(table, column, segments) {
-            return index::spann::SpannIndex::build_from_source(&source, opts).ok();
-        }
-        // A non-`f32` element type or rows still in the append buffer: both are
-        // the cases the scratch exists for, and both are rare next to a sealed
-        // column of `FLOAT` embeddings.
-        let (ids, dim, path) = self.spann_scratch(table, column, segments, dir).ok()??;
-        let built = storage::knn_index::spann::build_from_scratch(&path, ids, dim, opts).ok();
-        let _ = std::fs::remove_file(&path);
-        built
+        // borrow of the block's `f32` payload, or one block widened when the
+        // element type is not `f32` - is the build's whole input, so no scratch
+        // copy of the column is written or mapped (§19.3). Rows still in the
+        // append buffer are part of the row set too: a chunk has to cover them.
+        let source = self.vector_column(
+            table,
+            column,
+            segments,
+            crate::blocks::vector_column::Rows::Chunk,
+        )?;
+        index::spann::SpannIndex::build_from_source(&source, opts).ok()
     }
 
     /// Builds `segment`'s tree and **streams** it into `path`, returning the
@@ -1179,95 +1173,12 @@ impl crate::Engine {
         segment: u32,
         path: &std::path::Path,
     ) -> Option<u64> {
-        let index = self.spann_build(table, column, opts, &self.dir.join("tmp"), Some(segment))?;
+        let index = self.spann_build(table, column, opts, Some(segment))?;
         // `write_to` publishes through `storage::chunk_store`: the bytes are
         // fsynced and the directory entry renamed into place there, and on a
         // persistence profile the chunk becomes an object - so there is no
         // separate sync to do here.
         storage::knn_index::spann::write_to(&index, path, segment).ok()
-    }
-
-    /// Writes `column`'s vectors to `dir/spann-scratch-<pid>-<n>.f32` in row
-    /// order, returning `(row ids, dims, path)`; `None` when the table is empty.
-    ///
-    /// Rows whose width disagrees with the first row are an error, not silently
-    /// dropped: the vector column has a declared dimension, so a ragged cell
-    /// means the data is wrong and a short index would hide it.
-    fn spann_scratch(
-        &self,
-        table: &str,
-        column: usize,
-        segments: Option<&std::collections::HashSet<u32>>,
-        dir: &std::path::Path,
-    ) -> Result<Option<(Vec<u64>, usize, std::path::PathBuf)>> {
-        use std::io::Write;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        std::fs::create_dir_all(dir)
-            .map_err(|e| Error::Invalid(format!("spann scratch dir: {e}")))?;
-        let path = dir.join(format!(
-            "spann-scratch-{}-{}.f32",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let mut out = std::io::BufWriter::with_capacity(
-            1 << 20,
-            std::fs::File::create(&path)
-                .map_err(|e| Error::Invalid(format!("spann scratch: {e}")))?,
-        );
-        let mut ids: Vec<u64> = Vec::new();
-        let mut dim = 0usize;
-        let mut ragged: Option<(usize, usize)> = None;
-        let mut failure: Option<std::io::Error> = None;
-        let mut bytes: Vec<u8> = Vec::new();
-        // A row can be in a block *and* in the append buffer: a commit
-        // publishes the block, the in-memory copy is cleared by the next
-        // checkpoint. Compaction's bottom half hits exactly that window, and a
-        // duplicate would put the same row id in two leaves.
-        let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
-        self.for_each_block_cell(table, column, segments, |seq, text| {
-            if ragged.is_some() || failure.is_some() {
-                return;
-            }
-            if !seen.insert(seq as u64) {
-                return;
-            }
-            let vector = crate::engine::state::parse_vec_f32(text);
-            if ids.is_empty() {
-                dim = vector.len();
-            } else if vector.len() != dim {
-                ragged = Some((dim, vector.len()));
-                return;
-            }
-            bytes.clear();
-            bytes.reserve(vector.len() * 4);
-            for x in &vector {
-                bytes.extend_from_slice(&x.to_le_bytes());
-            }
-            if let Err(e) = out.write_all(&bytes) {
-                failure = Some(e);
-                return;
-            }
-            ids.push(seq as u64);
-        });
-        if let Some((want, got)) = ragged {
-            let _ = std::fs::remove_file(&path);
-            return Err(Error::Invalid(format!(
-                "spann build: row of column {column} has {got} dims, expected {want}"
-            )));
-        }
-        if let Some(e) = failure {
-            let _ = std::fs::remove_file(&path);
-            return Err(Error::Invalid(format!("spann scratch write: {e}")));
-        }
-        out.flush()
-            .map_err(|e| Error::Invalid(format!("spann scratch flush: {e}")))?;
-        drop(out);
-        if ids.is_empty() {
-            let _ = std::fs::remove_file(&path);
-            return Ok(None);
-        }
-        Ok(Some((ids, dim, path)))
     }
 }
 
