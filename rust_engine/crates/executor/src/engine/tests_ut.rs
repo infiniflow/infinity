@@ -10947,6 +10947,50 @@ mod tests {
         // hamming counts differing positions.
         let (_, h) = vector_score(&[1.0, 0.0, 1.0], &[1.0, 1.0, 1.0], "hamming");
         assert!((h - 1.0).abs() < 1e-9, "got {h}");
+        // The `f32` form the streamed rerank uses gives the same distance - and
+        // it counts a non-zero position as set, as the text form does.
+        let (_, h) = vector_score_f32(&[2.0, 0.0, 1.0], &[1.0, 0.0, 0.0], "hamming");
+        assert!((h - 1.0).abs() < 1e-9, "got {h}");
+    }
+
+    /// `test_knn_binary_hamming.slt:26`: a `BIT` column whose rows are still in
+    /// the append buffer (no checkpoint between the `INSERT` and the query).
+    ///
+    /// The streamed exact scan decodes vectors out of **block bodies**
+    /// (`BlockCursor::vectors`), and a buffered cell is text: `"[0100…]"`, which
+    /// the numeric reader parses as one number, so every row failed the `dim`
+    /// check and the top-3 came back empty.
+    #[test]
+    fn a_bit_query_scores_rows_that_are_still_buffered() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE bh (c1 INT, c2 EMBEDDING(BIT, 16));")
+            .unwrap();
+        // Row `n` has its last `n` bits set, so the distance to the all-zero
+        // query is `n`.
+        for n in 0..6usize {
+            let bits: Vec<String> = (0..16)
+                .map(|i| if i >= 16 - n { "1" } else { "0" }.to_string())
+                .collect();
+            e.execute_blocking(&format!(
+                "INSERT INTO bh VALUES ({n}, [{}]);",
+                bits.join(",")
+            ))
+            .unwrap();
+        }
+        let got = rows(
+            &e,
+            "SELECT c1, DISTANCE() FROM bh SEARCH MATCH VECTOR(c2, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'bit', 'hamming', 3);",
+        );
+        assert_eq!(
+            got,
+            vec![
+                vec!["0".to_string(), "0.000000".to_string()],
+                vec!["1".to_string(), "1.000000".to_string()],
+                vec!["2".to_string(), "2.000000".to_string()],
+            ],
+            "the buffered bit rows must be scored"
+        );
     }
 
     #[test]
@@ -14411,6 +14455,70 @@ mod tests {
         // the exact scan.
         e.execute_blocking("DROP INDEX cf_i;").unwrap();
         assert_eq!(rows(&e, &query), got);
+    }
+
+    /// A tombstoned candidate costs a live row.
+    ///
+    /// The tree's members are slots (`Rows::Chunk` keeps the slot of a deleted
+    /// row), so a pool sized for `topn` members answers fewer than `topn` live
+    /// rows once most of the segment is deleted - the answer comes up short
+    /// although live rows exist. The pool is widened by the share of members
+    /// that is still live, so the top-k is full.
+    #[test]
+    fn a_tombstoned_pool_still_answers_topn_live_rows() {
+        let n = 2000usize;
+        let vector =
+            |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,{}.0]", i + 1, i + 2, i + 3) };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE tp (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO tp VALUES ");
+        for i in 1..=n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.execute_blocking(
+            "CREATE INDEX tp_i ON tp (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        // Most of the segment deleted, and no checkpoint since: the slots are
+        // still in the tree, the live rows are the last twenty.
+        e.execute_blocking("DELETE FROM tp WHERE id <= 1980;")
+            .unwrap();
+
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM tp SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+                vector(295)
+            ),
+        );
+        assert_eq!(
+            got.len(),
+            10,
+            "a pool of tombstones answered {} live rows: {got:?}",
+            got.len()
+        );
+        // The exact scan is the contract the widening has to keep.
+        e.execute_blocking("DROP INDEX tp_i;").unwrap();
+        let exact = rows(
+            &e,
+            &format!(
+                "SELECT id FROM tp SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
+                vector(295)
+            ),
+        );
+        let mut indexed: Vec<_> = got.into_iter().flatten().collect();
+        let mut exact: Vec<_> = exact.into_iter().flatten().collect();
+        indexed.sort();
+        exact.sort();
+        assert_eq!(indexed, exact, "the widened pool missed a live row");
     }
 
     /// The same contract on IVF: the probe's candidates are filtered by the

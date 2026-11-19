@@ -10,6 +10,8 @@
 //! LCG seeded by `Options::seed`, so two builds of the same rows produce the
 //! same tree (the chunk format relies on it for reproducible tests).
 
+use std::borrow::Cow;
+
 use crate::vector::l2_sq;
 
 /// One split: two centroids and, per point, `true` for the second cluster.
@@ -99,24 +101,59 @@ struct Cell {
 /// The balance pass is what makes the tree's depth predictable: an unbalanced
 /// split repeats until `max_partition_size` is met, and one heavy child turns
 /// the tree into a list.
-pub fn balanced_kmeans_2(points: &[&[f32]], dim: usize, iterations: usize, seed: u64) -> Split {
-    if points.is_empty() {
+pub fn balanced_kmeans_2<V: AsRef<[f32]> + Sync>(
+    points: &[V],
+    dim: usize,
+    iterations: usize,
+    seed: u64,
+) -> Split {
+    balanced_kmeans_2_by(
+        points.len(),
+        |at| Cow::Borrowed(points[at].as_ref()),
+        dim,
+        iterations,
+        seed,
+    )
+}
+
+/// A position-indexed view of the vectors being split: the vector at `at`, as a
+/// borrow when the source can give one and as an owned vector when it has to be
+/// converted.
+type Point<'a> = dyn Fn(usize) -> Cow<'a, [f32]> + Sync + 'a;
+
+/// [`balanced_kmeans_2`] over positions, reading one vector at a time.
+///
+/// This is what keeps a build's memory bounded: a source whose bodies are not
+/// `f32` arrays hands back an owned `Cow` for the position being measured and it
+/// is dropped as soon as the two distances are taken. Collecting the points
+/// first - as the split used to - held every converted row of the subtree, i.e.
+/// the whole column at the root, for a pass that reads each row twice.
+pub fn balanced_kmeans_2_by<'a>(
+    count: usize,
+    point: impl Fn(usize) -> Cow<'a, [f32]> + Sync + 'a,
+    dim: usize,
+    iterations: usize,
+    seed: u64,
+) -> Split {
+    if count == 0 {
         return Split {
             centroids: [vec![0.0f32; dim], vec![0.0f32; dim]],
             second: Vec::new(),
         };
     }
-    if points.len() == 1 {
+    if count == 1 {
+        let only = point(0).to_vec();
         return Split {
-            centroids: [points[0].to_vec(), points[0].to_vec()],
+            centroids: [only.clone(), only],
             second: vec![false],
         };
     }
 
-    let sample: Vec<&[f32]> = sample_indices(points.len())
-        .into_iter()
-        .map(|i| points[i])
-        .collect();
+    // The sample is the only place a converted vector is kept: `SAMPLE_POINTS`
+    // rows instead of the node's, so the root split costs what a leaf's does.
+    let sample: Vec<Cow<'a, [f32]>> = sample_indices(count).into_iter().map(&point).collect();
+    let sample_refs: Vec<&[f32]> = sample.iter().map(|v| v.as_ref()).collect();
+    let sample_point = |at: usize| Cow::Borrowed(sample_refs[at]);
 
     // k-means++: the first centre is drawn uniformly, the second with
     // probability proportional to `d²`. The seed goes through a multiplication
@@ -147,10 +184,10 @@ pub fn balanced_kmeans_2(points: &[&[f32]], dim: usize, iterations: usize, seed:
     }
 
     let mut centroids = [c0, c1];
-    let mut cells = vec![Cell::default(); sample.len()];
+    let mut cells = vec![Cell::default(); sample_refs.len()];
     for _ in 0..iterations.max(1) {
-        assign(&sample, &centroids, &mut cells);
-        let (a, b) = groups(&sample, &cells);
+        assign(&sample_point, sample_refs.len(), &centroids, &mut cells);
+        let (a, b) = groups(&sample_refs, &cells);
         if a.is_empty() || b.is_empty() {
             break;
         }
@@ -159,9 +196,9 @@ pub fn balanced_kmeans_2(points: &[&[f32]], dim: usize, iterations: usize, seed:
 
     // The node is visited once: assignment, then the balance pass works off the
     // distances it produced.
-    let mut cells = vec![Cell::default(); points.len()];
-    assign(points, &centroids, &mut cells);
-    rebalance(points, dim, &mut centroids, &mut cells);
+    let mut cells = vec![Cell::default(); count];
+    assign(&point, count, &centroids, &mut cells);
+    rebalance(&point, dim, &mut centroids, &mut cells);
     Split {
         centroids,
         second: cells.into_iter().map(|cell| cell.second).collect(),
@@ -183,13 +220,13 @@ fn sample_indices(n: usize) -> Vec<usize> {
 /// The shape is kentro's `assign_clusters` (`kentro/src/lib.rs`, `par_iter` over
 /// the rows) without its `ndarray` copy: the points are already borrowed
 /// slices, so a slice here is a range of indices and nothing is duplicated.
-fn assign(points: &[&[f32]], centroids: &[Vec<f32>; 2], cells: &mut [Cell]) {
-    let n = points.len().min(cells.len());
+fn assign(point: &Point<'_>, count: usize, centroids: &[Vec<f32>; 2], cells: &mut [Cell]) {
+    let n = count.min(cells.len());
     let run = |offset: usize, part: &mut [Cell]| {
         for (k, cell) in part.iter_mut().enumerate() {
-            let p = points[offset + k];
-            let d0 = d2(p, &centroids[0]);
-            let d1 = d2(p, &centroids[1]);
+            let p = point(offset + k);
+            let d0 = d2(&p, &centroids[0]);
+            let d1 = d2(&p, &centroids[1]);
             cell.second = d1 < d0;
             cell.dist = if cell.second { d1 } else { d0 };
         }
@@ -221,7 +258,7 @@ fn groups<'a>(points: &[&'a [f32]], cells: &[Cell]) -> (Vec<&'a [f32]>, Vec<&'a 
 }
 
 /// Up to `SAMPLE_POINTS` members of one side, in index order.
-fn sample_of<'a>(points: &[&'a [f32]], cells: &[Cell], second: bool) -> Vec<&'a [f32]> {
+fn sample_of<'a>(point: &Point<'a>, cells: &[Cell], second: bool) -> Vec<Cow<'a, [f32]>> {
     let members: Vec<usize> = cells
         .iter()
         .enumerate()
@@ -229,10 +266,10 @@ fn sample_of<'a>(points: &[&'a [f32]], cells: &[Cell], second: bool) -> Vec<&'a 
         .map(|(i, _)| i)
         .collect();
     if members.len() <= SAMPLE_POINTS {
-        return members.into_iter().map(|i| points[i]).collect();
+        return members.into_iter().map(point).collect();
     }
     let stride = (members.len() / SAMPLE_POINTS).max(1);
-    members.iter().step_by(stride).map(|i| points[*i]).collect()
+    members.iter().step_by(stride).map(|i| point(*i)).collect()
 }
 
 /// Moves the farthest point of the larger cluster to the other one until the
@@ -245,7 +282,7 @@ fn sample_of<'a>(points: &[&'a [f32]], cells: &[Cell], second: bool) -> Vec<&'a 
 /// same set of moves in the same order, for `O(n log n)` - at 20k × 128d the
 /// rescans were the dominant cost of the whole build. The distances come from
 /// `assign`, so this pass never touches the vectors.
-fn rebalance(points: &[&[f32]], dim: usize, centroids: &mut [Vec<f32>; 2], cells: &mut [Cell]) {
+fn rebalance(point: &Point<'_>, dim: usize, centroids: &mut [Vec<f32>; 2], cells: &mut [Cell]) {
     let na = cells.iter().filter(|cell| !cell.second).count();
     let nb = cells.len() - na;
     let (from_second, _from_centroid) = if na > nb { (false, 0) } else { (true, 1) };
@@ -269,9 +306,11 @@ fn rebalance(points: &[&[f32]], dim: usize, centroids: &mut [Vec<f32>; 2], cells
     // Centroids from a bounded sample of each side, for the same reason the
     // estimate uses one: recomputing them over the whole node was the third
     // full pass over its vectors.
-    let a = sample_of(points, cells, false);
-    let b = sample_of(points, cells, true);
-    *centroids = [mean(&a, dim), mean(&b, dim)];
+    let a = sample_of(point, cells, false);
+    let b = sample_of(point, cells, true);
+    let a_refs: Vec<&[f32]> = a.iter().map(|v| v.as_ref()).collect();
+    let b_refs: Vec<&[f32]> = b.iter().map(|v| v.as_ref()).collect();
+    *centroids = [mean(&a_refs, dim), mean(&b_refs, dim)];
 }
 
 #[cfg(test)]
@@ -416,7 +455,7 @@ mod tests {
                         dist: d2(refs[i], &new_c[if *s { 1 } else { 0 }]),
                     })
                     .collect();
-                rebalance(&refs, dim, &mut new_c, &mut cells);
+                rebalance(&|at| Cow::Borrowed(refs[at]), dim, &mut new_c, &mut cells);
                 let new_second: Vec<bool> = cells.iter().map(|c| c.second).collect();
                 assert_eq!(old_second, new_second, "trial {trial}: mask differs");
                 assert_eq!(old_c, new_c, "trial {trial}: centroids differ");

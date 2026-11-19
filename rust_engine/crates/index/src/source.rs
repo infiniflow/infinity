@@ -24,7 +24,14 @@ pub trait VectorSource: Send + Sync {
     fn id(&self, index: usize) -> u64;
 
     /// Vector at position `index`; must be `dims()` long.
-    fn vector(&self, index: usize) -> &[f32];
+    ///
+    /// `Cow`, not `&[f32]`: a column read where it already is borrows (the
+    /// common case - an `f32` embedding body is the array the builder wants),
+    /// while a body that is not `f32` (`FLOAT16`/`BFLOAT16`/`DOUBLE`/`BIT`, or a
+    /// row that starts off-alignment) has to be widened, and a builder that
+    /// keeps a whole leaf's vectors alive would otherwise force the source to
+    /// hold every widened block it ever answered for.
+    fn vector(&self, index: usize) -> std::borrow::Cow<'_, [f32]>;
 
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -86,8 +93,8 @@ impl VectorSource for Memory {
         self.ids[index]
     }
 
-    fn vector(&self, index: usize) -> &[f32] {
-        &self.data[self.offsets[index]..self.offsets[index + 1]]
+    fn vector(&self, index: usize) -> std::borrow::Cow<'_, [f32]> {
+        std::borrow::Cow::Borrowed(&self.data[self.offsets[index]..self.offsets[index + 1]])
     }
 }
 
@@ -100,7 +107,7 @@ mod tests {
         let src = Memory::new(vec![(7u64, vec![1.0, 2.0]), (9, vec![3.0, 4.0])]);
         assert_eq!(src.len(), 2);
         assert_eq!(src.id(0), 7);
-        assert_eq!(src.vector(1), &[3.0, 4.0]);
+        assert_eq!(src.vector(1).as_ref(), &[3.0, 4.0]);
         assert_eq!(src.dims(), 2);
     }
 

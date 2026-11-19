@@ -93,16 +93,46 @@ impl Pressure {
 /// again anyway.
 const CHECK_INTERVAL_MS: u64 = 500;
 
-fn now_millis() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|since| since.as_millis() as u64)
-        .unwrap_or(0)
+/// The message [`Engine::admit_write`] refuses with. One constant, because a
+/// batched insert recognises the refusal by it ([`Engine::is_admission_refusal`]).
+pub(crate) const ADMISSION_REFUSED: &str = "memory limit exceeded";
+
+/// Milliseconds since the first call, monotonic, and never `0`.
+///
+/// Both users are *intervals* - the cgroup refresh and the pressure-sample
+/// throttle - and a wall clock is the wrong instrument for those: an NTP step
+/// back would stall a refresh for the size of the step, a step forward would run
+/// the throttle out in a burst. The `+ 1` keeps `0` meaning "never", which is
+/// what a zeroed counter reads as.
+fn elapsed_millis() -> u64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis() as u64
+        + 1
+}
+
+/// The cgroup's memory ceiling and the cgroup that owns it.
+///
+/// A limit inherited from an ancestor is still the process's limit, but the
+/// charge it is compared against is that ancestor's `memory.current` - a leaf
+/// with 8 GiB under a 4 GiB parent is a 4 GiB process - so the directory travels
+/// with the number.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CgroupLimit {
+    pub bytes: u64,
+    /// The cgroup whose charge is compared with `bytes`.
+    pub dir: std::path::PathBuf,
+    /// cgroup v2 (`memory.current`) or v1 (`memory.usage_in_bytes`).
+    pub v2: bool,
 }
 
 #[cfg(target_os = "linux")]
 mod proc {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+
+    use super::CgroupLimit;
 
     /// A cgroup file holding one number, or `None` when it says `max` / holds
     /// the "unlimited" sentinel (cgroup v1 writes a huge page-aligned value).
@@ -136,67 +166,119 @@ mod proc {
         None
     }
 
-    /// `/sys/fs/cgroup` joined with the process's own cgroup, falling back to the
-    /// mount point when the namespace does not expose the path.
-    fn dir(v2: bool) -> String {
-        let mount = if v2 {
-            "/sys/fs/cgroup".to_string()
-        } else {
-            "/sys/fs/cgroup/memory".to_string()
-        };
-        match cgroup_path(v2) {
-            Some(path) if !path.is_empty() && path != "/" => format!("{mount}{path}"),
-            _ => mount,
-        }
-    }
-
-    /// One cgroup v1 file: the process's own cgroup first, then the mount root.
+    /// Which hierarchy `/sys/fs/cgroup` mounts.
     ///
-    /// v1 puts each controller in its own hierarchy and the limit on the
-    /// process's cgroup inside it (`/proc/self/cgroup` names which), so reading
-    /// `/sys/fs/cgroup/memory/memory.limit_in_bytes` alone reports the **root**
-    /// cgroup - unlimited - and a v1 deployment would silently run ungoverned.
-    fn v1(name: &str) -> Option<u64> {
-        read_number(Path::new(&format!("{}/{name}", dir(false))))
-            .or_else(|| read_number(Path::new(&format!("/sys/fs/cgroup/memory/{name}"))))
+    /// Asked of the hierarchy's own interface - `cgroup.controllers` exists only
+    /// on v2 - and not of a controller file at the mount root. A namespace root
+    /// is a cgroup of its own and need not carry `memory.max` at all (the limit
+    /// sits on an ancestor, or nowhere), and reading that absence as "this must
+    /// be v1" sent the lookup to `/sys/fs/cgroup/memory/...`, which does not
+    /// exist on a v2 host: the process then ran ungoverned even though an
+    /// ancestor had a limit.
+    fn is_v2() -> bool {
+        Path::new("/sys/fs/cgroup/cgroup.controllers").exists()
     }
 
-    pub(super) fn ceiling() -> Option<u64> {
-        if Path::new("/sys/fs/cgroup/memory.max").exists() {
-            // v2: the limit may sit on any ancestor, and the effective one is the
-            // smallest, so walk up from our own cgroup to the mount point.
-            let mut here = dir(true);
-            loop {
-                if let Some(value) = read_number(Path::new(&format!("{here}/memory.max"))) {
-                    return Some(value);
+    /// The mount point of the hierarchy holding the memory controller.
+    fn mount(v2: bool) -> PathBuf {
+        PathBuf::from(if v2 {
+            "/sys/fs/cgroup"
+        } else {
+            "/sys/fs/cgroup/memory"
+        })
+    }
+
+    /// The process's own cgroup directory, then every ancestor up to the mount.
+    ///
+    /// The effective limit is the smallest on that path, so all of them have to
+    /// be read: a leaf may be granted more than its parent allows.
+    fn own_and_ancestors(v2: bool) -> Vec<PathBuf> {
+        let mount = mount(v2);
+        let mut here = match cgroup_path(v2) {
+            Some(path) if !path.is_empty() && path != "/" => {
+                mount.join(path.trim_start_matches('/'))
+            }
+            _ => mount.clone(),
+        };
+        let mut out = vec![here.clone()];
+        while let Some(parent) = here.parent().map(Path::to_path_buf) {
+            if parent == here || !parent.starts_with(&mount) {
+                break;
+            }
+            here = parent;
+            out.push(here.clone());
+        }
+        out
+    }
+
+    /// The finite limit that is under the most pressure, with the cgroup it came
+    /// from.
+    ///
+    /// The smallest number is not the effective one: a leaf at 100% of its own
+    /// limit is what a write would push over, even when the parent that grants it
+    /// is at 10% of a larger one. So every finite limit is compared with the
+    /// charge of **its own** cgroup and the highest share wins - the limit and
+    /// the directory its `memory.current` is read from travel together, which is
+    /// what makes the pairing consistent. An unreadable charge counts as idle.
+    pub(super) fn limit() -> Option<CgroupLimit> {
+        let v2 = is_v2();
+        let (max_file, usage_file) = if v2 {
+            ("memory.max", "memory.current")
+        } else {
+            ("memory.limit_in_bytes", "memory.usage_in_bytes")
+        };
+        let mut best: Option<(CgroupLimit, u64)> = None;
+        for dir in own_and_ancestors(v2) {
+            let Some(bytes) = read_number(&dir.join(max_file)) else {
+                continue;
+            };
+            let usage = read_number(&dir.join(usage_file)).unwrap_or(0);
+            let tighter = match &best {
+                // `usage/bytes > found_usage/found_bytes`, in integers.
+                Some((found, found_usage)) => {
+                    u128::from(usage) * u128::from(found.bytes)
+                        > u128::from(*found_usage) * u128::from(bytes)
                 }
-                let parent = Path::new(&here).parent()?.display().to_string();
-                if !parent.starts_with("/sys/fs/cgroup") || parent == here {
-                    return None;
-                }
-                here = parent;
+                None => true,
+            };
+            if tighter {
+                best = Some((CgroupLimit { bytes, dir, v2 }, usage));
             }
         }
-        v1("memory.limit_in_bytes")
+        best.map(|(limit, _)| limit)
     }
 
+    /// The process's own cgroup's soft limit: v2's `memory.high`, which the
+    /// kernel throttles at instead of killing, or v1's `memory.soft_limit_in_bytes`.
     pub(super) fn high() -> Option<u64> {
-        read_number(Path::new(&format!("{}/memory.high", dir(true))))
-            .or_else(|| v1("memory.soft_limit_in_bytes"))
+        let v2 = is_v2();
+        let own = own_and_ancestors(v2).into_iter().next()?;
+        read_number(&own.join(if v2 {
+            "memory.high"
+        } else {
+            "memory.soft_limit_in_bytes"
+        }))
     }
 
-    pub(super) fn usage() -> Option<u64> {
-        read_number(Path::new(&format!("{}/memory.current", dir(true))))
-            .or_else(|| v1("memory.usage_in_bytes"))
+    /// The charge under `limit`: `memory.current` (v2) / `memory.usage_in_bytes`
+    /// (v1) of the cgroup the limit was taken from.
+    pub(super) fn usage(limit: &CgroupLimit) -> Option<u64> {
+        read_number(&limit.dir.join(if limit.v2 {
+            "memory.current"
+        } else {
+            "memory.usage_in_bytes"
+        }))
     }
 }
 
 #[cfg(not(target_os = "linux"))]
 mod proc {
+    use super::CgroupLimit;
+
     // No cgroup: macOS has no per-process ceiling (jetsam is iOS; a desktop
     // daemon is only ever slowed by swap), and Windows exposes one through a
     // `JobObject`, not a file. The ceiling comes from the configuration there.
-    pub(super) fn ceiling() -> Option<u64> {
+    pub(super) fn limit() -> Option<CgroupLimit> {
         None
     }
 
@@ -204,37 +286,74 @@ mod proc {
         None
     }
 
-    pub(super) fn usage() -> Option<u64> {
+    pub(super) fn usage(_limit: &CgroupLimit) -> Option<u64> {
         None
     }
 }
 
-/// The cgroup's ceiling, discovered once: it cannot change without a new
-/// container, and `memory_pressure` runs on the write path.
+/// How often the ceiling is looked up again.
 ///
-/// `UNKNOWN` is 0 and `NONE` is `u64::MAX`, so the common "there is no cgroup
-/// limit" case costs one atomic load after the first look.
-static CGROUP_CEILING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// The write path cannot re-walk `/proc/self/cgroup` and the hierarchy per
+/// statement, so the answer is cached - but "discovered once" was wrong in both
+/// directions: a process that started without a limit never picked up one an
+/// orchestrator added later, and a limit that was raised kept refusing writes.
+/// One refresh per interval keeps the cached read at a single atomic load while
+/// covering both transitions.
+const CGROUP_REFRESH_MS: u64 = 5_000;
 
-/// The cgroup's memory ceiling, when it has one.
-pub(crate) fn cgroup_ceiling() -> Option<u64> {
-    const NONE: u64 = u64::MAX;
-    let cached = CGROUP_CEILING.load(Ordering::Relaxed);
-    if cached == NONE {
-        return None;
-    }
-    if cached > 0 {
-        return Some(cached);
-    }
-    let found = proc::ceiling();
-    CGROUP_CEILING.store(found.unwrap_or(NONE), Ordering::Relaxed);
-    found
+/// The one view of the cgroup the governor works from.
+///
+/// The limit, the cgroup whose charge it is compared against, and the generation
+/// that names the pair live together so that a reader cannot see one without the
+/// other: a new generation published next to a stale limit is what makes a
+/// verdict look current after it was measured against a ceiling that no longer
+/// exists.
+struct CgroupState {
+    /// Moves whenever `limit` changes; a pressure verdict is stamped with it and
+    /// reused only while it is still current.
+    generation: u64,
+    limit: Option<CgroupLimit>,
+    /// Monotonic stamp of the last discovery, in [`elapsed_millis`] units; `0`
+    /// means the hierarchy has not been looked at yet.
+    discovered_at: u64,
 }
 
-/// The cgroup's own usage figure - the one the kernel charges, page cache
-/// included.
-pub(crate) fn cgroup_usage() -> Option<u64> {
-    proc::usage()
+static CGROUP: std::sync::Mutex<CgroupState> = std::sync::Mutex::new(CgroupState {
+    generation: 0,
+    limit: None,
+    discovered_at: 0,
+});
+
+/// The current snapshot, rediscovered when it is older than
+/// [`CGROUP_REFRESH_MS`].
+///
+/// The walk runs under the same lock a reader takes, so the generation and the
+/// limit it names are published and read as one pair; it is a handful of small
+/// file reads once per interval, and a concurrent reader waits for it instead of
+/// observing a half-updated state.
+fn cgroup_snapshot() -> (u64, Option<CgroupLimit>) {
+    let mut state = match CGROUP.lock() {
+        Ok(state) => state,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let now = elapsed_millis();
+    if state.discovered_at == 0 || now.saturating_sub(state.discovered_at) >= CGROUP_REFRESH_MS {
+        let found = proc::limit();
+        if found != state.limit {
+            // The level `memory_pressure` cached belongs to the ceiling that was
+            // in force when it was measured.
+            state.generation += 1;
+            state.limit = found;
+        }
+        state.discovered_at = now;
+    }
+    (state.generation, state.limit.clone())
+}
+
+/// The charge under `limit` - the number the kernel kills on, page cache
+/// included - read from the cgroup the limit was taken from.
+fn cgroup_usage_at(limit: &CgroupLimit) -> Option<u64> {
+    proc::usage(limit)
 }
 
 /// The cgroup's soft limit (`memory.high`): the kernel throttles at it instead
@@ -256,14 +375,16 @@ fn watermarks(ceiling: u64, kernel_high: Option<u64>) -> (u64, u64, u64) {
 
 /// The figure the governor compares against the ceiling.
 ///
-/// The cgroup's charge is the right number only when the cgroup is a container
-/// of its own, which is what `memory.max` says: with a limit, `memory.current`
-/// accounts for this process (and the page cache it grew). Without one, the same
-/// file accounts for the whole host - every process and its page cache - so a
-/// configured ceiling would be compared against the machine. `rss` is a function
-/// because reading it forks on macOS.
-fn usage_feed(cgroup_limited: bool, cgroup: Option<u64>, rss: fn() -> u64) -> u64 {
-    match (cgroup_limited, cgroup) {
+/// Each ceiling is paired with the charge it is about. A ceiling the
+/// configuration set asks about **this process**, so it is compared with the
+/// resident size; a ceiling the cgroup set asks about the **cgroup**, so it is
+/// compared with that cgroup's `memory.current` - the number the kernel kills
+/// on, page cache included. Reading the cgroup's charge under a configured
+/// ceiling compared the process against the whole host, and on a CI runner that
+/// had just generated the fixtures that was gigabytes of someone else's page
+/// cache. `rss` is a function because reading it forks on macOS.
+fn usage_feed(from_cgroup: bool, cgroup: Option<u64>, rss: fn() -> u64) -> u64 {
+    match (from_cgroup, cgroup) {
         (true, Some(bytes)) => bytes,
         _ => rss(),
     }
@@ -274,6 +395,13 @@ impl super::Engine {
     /// `buffer_manager_size` (`memory_limit`) when it is set, the cgroup's
     /// `memory.max` otherwise. A container that sized neither is not governed.
     pub(crate) fn memory_ceiling(&self) -> Ceiling {
+        let (_, cgroup) = cgroup_snapshot();
+        self.ceiling_from(cgroup.as_ref())
+    }
+
+    /// [`Self::memory_ceiling`] against one snapshot, so the limit and the charge
+    /// it is compared with come from the same discovery.
+    fn ceiling_from(&self, cgroup: Option<&CgroupLimit>) -> Ceiling {
         let configured = self
             .context
             .memory_limit
@@ -284,34 +412,48 @@ impl super::Engine {
                 source: "config",
             };
         }
-        match cgroup_ceiling() {
+        match cgroup {
             // Nine tenths: the kernel kills at the limit, and the last tenth is
             // what a reclaim pass needs to actually get below it.
-            Some(bytes) => Ceiling {
-                bytes: bytes / 10 * 9,
+            Some(limit) => Ceiling {
+                bytes: limit.bytes / 10 * 9,
                 source: "cgroup",
             },
             None => Ceiling::disabled(),
         }
     }
 
-    /// What the process is using, as the platform's own account of it: the
-    /// cgroup's `memory.current` when the cgroup has a limit of its own (page
-    /// cache included, which is what the kernel kills on), the process's
-    /// resident size otherwise.
+    /// What the process is using, as the platform's own account of it, paired
+    /// with the ceiling that is in force: the resident size under a configured
+    /// ceiling, the cgroup's `memory.current` (page cache included, which is what
+    /// the kernel kills on) under a cgroup one.
     ///
-    /// The limit is what makes `memory.current` a figure about *this* process. A
-    /// container is the only tenant of its cgroup, so the number is the
-    /// container's; on a host whose root cgroup is unlimited the same file adds
-    /// up every process and all the page cache of the machine, which is a
-    /// different quantity from the one a configured ceiling asks about - on a CI
-    /// runner that had just generated and copied the fixtures, that is gigabytes
-    /// of someone else's page cache, and a 4 GiB `buffer_manager_size` would
-    /// refuse its first write while the engine itself held a few hundred MiB.
+    /// The pairing is the point. `memory.current` is a figure about the cgroup -
+    /// a container is its only tenant, so it is the container's number; on a host
+    /// whose root cgroup is unlimited the same file adds up every process and the
+    /// machine's page cache, which is not what a `buffer_manager_size` asks
+    /// about. A CI runner that had just generated and copied the fixtures had
+    /// gigabytes of that, and a 4 GiB ceiling refused the engine's first write
+    /// while the engine itself held a few hundred MiB.
     pub(crate) fn memory_usage(&self) -> u64 {
+        let (_, cgroup) = cgroup_snapshot();
+        self.usage_against(cgroup.as_ref())
+    }
+
+    /// The charge paired with the ceiling `cgroup` produces: the cgroup's own
+    /// when that limit is the one in force, the process's resident size when the
+    /// ceiling came from the configuration (a configured ceiling is about this
+    /// process, not about whatever else shares the cgroup).
+    fn usage_against(&self, cgroup: Option<&CgroupLimit>) -> u64 {
+        let from_cgroup = self
+            .context
+            .memory_limit
+            .load(std::sync::atomic::Ordering::Relaxed)
+            == 0
+            && cgroup.is_some();
         usage_feed(
-            cgroup_ceiling().is_some(),
-            cgroup_usage(),
+            from_cgroup,
+            cgroup.and_then(cgroup_usage_at),
             crate::engine::state::process_rss_bytes,
         )
     }
@@ -319,36 +461,52 @@ impl super::Engine {
     /// How full the process is against [`Self::memory_ceiling`], measured at most
     /// once per [`CHECK_INTERVAL_MS`].
     pub(crate) fn memory_pressure(&self) -> Pressure {
-        let now = now_millis();
+        // One snapshot for the whole decision: the limit, the cgroup its charge is
+        // read from, and the generation the verdict is stamped with. The refresh
+        // has to happen before the throttle decides to reuse the level - the
+        // level belongs to the ceiling that was in force when it was measured.
+        let (generation, cgroup) = cgroup_snapshot();
+        let now = elapsed_millis();
         let checked = self
             .context
             .memory_checked_at
             .load(std::sync::atomic::Ordering::Relaxed);
-        if now.saturating_sub(checked) < CHECK_INTERVAL_MS {
+        // `0` is "never measured": a level that was never taken cannot be reused.
+        if checked != 0
+            && self
+                .context
+                .memory_ceiling_generation
+                .load(std::sync::atomic::Ordering::Relaxed)
+                == generation
+            && now.saturating_sub(checked) < CHECK_INTERVAL_MS
+        {
             return Pressure::from_byte(
                 self.context
                     .memory_pressure_level
                     .load(std::sync::atomic::Ordering::Relaxed),
             );
         }
-        let pressure = self.measure_pressure();
+        let pressure = self.measure_pressure(cgroup.as_ref());
         self.context
             .memory_checked_at
             .store(now, std::sync::atomic::Ordering::Relaxed);
         self.context
             .memory_pressure_level
             .store(pressure as u8, std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .memory_ceiling_generation
+            .store(generation, std::sync::atomic::Ordering::Relaxed);
         pressure
     }
 
-    /// [`Self::memory_pressure`] without the throttle.
-    fn measure_pressure(&self) -> Pressure {
-        let ceiling = self.memory_ceiling();
+    /// [`Self::memory_pressure`] without the throttle, against one snapshot.
+    fn measure_pressure(&self, cgroup: Option<&CgroupLimit>) -> Pressure {
+        let ceiling = self.ceiling_from(cgroup);
         if ceiling.bytes == 0 {
             return Pressure::Ok;
         }
         let (_, high, critical) = watermarks(ceiling.bytes, cgroup_high());
-        match self.memory_usage() {
+        match self.usage_against(cgroup) {
             usage if usage >= critical => Pressure::Critical,
             usage if usage >= high => Pressure::High,
             _ => Pressure::Ok,
@@ -386,7 +544,8 @@ impl super::Engine {
         // cache it has not reclaimed yet), so the decision to escalate is the
         // process's own figure - not the sum above. Escalate when the cheap
         // pass did not meet the target, or when the process is still over.
-        let pressure = self.measure_pressure();
+        let (_, cgroup) = cgroup_snapshot();
+        let pressure = self.measure_pressure(cgroup.as_ref());
         if forced || pressure != Pressure::Ok || released < want {
             let over = self.memory_usage().saturating_sub(self.memory_low());
             let remaining = want.saturating_sub(released).max(over);
@@ -419,15 +578,55 @@ impl super::Engine {
         self.context.block_maps.lock().unwrap().shrink_by(want)
     }
 
+    /// Write admission: the last lever, tried after a reclaim pass has failed.
+    ///
+    /// Refusing the write is the only answer that keeps the process alive - the
+    /// alternative is the kernel's, and it takes the whole engine with it. Reads
+    /// keep working: they need no new memory.
+    ///
+    /// Every write entry point calls this before it allocates or commits, not
+    /// only the statement path: the Thrift `Insert` RPC, the REST handler and
+    /// `COPY` insert through the primitives in `dml`, which never pass through
+    /// `execute_statements`.
+    /// Whether `error` is the refusal [`Self::admit_write`] makes, as opposed to
+    /// any other `Error::Invalid` a write can return. A batched insert asks so it
+    /// can tell "nothing was written" from "the batches before this one are
+    /// durable".
+    pub(crate) fn is_admission_refusal(error: &::common::Error) -> bool {
+        matches!(error, ::common::Error::Invalid(message) if message.starts_with(ADMISSION_REFUSED))
+    }
+
+    pub(crate) fn admit_write(&self) -> ::common::Result<()> {
+        if !self.memory_pressure().blocks_writes() {
+            return Ok(());
+        }
+        // One reclaim pass now, so a burst that just needs its page cache
+        // dropped does not turn into a user-visible error.
+        let _ = self.memory_tick();
+        if !self.memory_pressure().blocks_writes() {
+            return Ok(());
+        }
+        let ceiling = self.memory_ceiling();
+        Err(::common::Error::Invalid(format!(
+            "{ADMISSION_REFUSED}: {} bytes in use against a {} ceiling ({}); \
+             the write was refused",
+            self.memory_usage(),
+            ceiling.bytes,
+            ceiling.source
+        )))
+    }
+
     /// One pass of the governor, run on the periodic tick - deliberately **not**
     /// behind `needs_cleanup`: a read-only server can grow its page cache without
     /// a single transaction. Returns the bytes it released.
     pub(crate) fn memory_tick(&self) -> u64 {
-        let ceiling = self.memory_ceiling();
+        // One snapshot: the pass measures and stamps against the same limit.
+        let (generation, cgroup) = cgroup_snapshot();
+        let ceiling = self.ceiling_from(cgroup.as_ref());
         if ceiling.bytes == 0 {
             return 0;
         }
-        let usage = self.memory_usage();
+        let usage = self.usage_against(cgroup.as_ref());
         let (low, high, critical) = watermarks(ceiling.bytes, cgroup_high());
         if usage < high {
             return 0;
@@ -439,13 +638,16 @@ impl super::Engine {
         // Measure again rather than assuming the pass worked: when nothing can
         // be released (a ceiling below the working set) the level is still
         // critical, and the next write must see that.
-        let after = self.measure_pressure();
+        let after = self.measure_pressure(cgroup.as_ref());
         self.context
             .memory_pressure_level
             .store(after as u8, Ordering::Relaxed);
         self.context
             .memory_checked_at
-            .store(now_millis(), Ordering::Relaxed);
+            .store(elapsed_millis(), Ordering::Relaxed);
+        self.context
+            .memory_ceiling_generation
+            .store(generation, Ordering::Relaxed);
         self.context
             .memory_reclaim_passes
             .fetch_add(1, Ordering::Relaxed);

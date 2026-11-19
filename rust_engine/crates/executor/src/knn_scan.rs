@@ -307,6 +307,43 @@ impl Engine {
                 .rerank_multiplier
                 .unwrap_or(crate::spann_mem::DEFAULT_RERANK_MULTIPLIER);
             let budget = crate::spann_mem::candidate_budget(q.topn, width, multiplier);
+            // How many rows the tree names, and how many of the table's rows are
+            // live. The tail is looked up first because it contributes to both.
+            let tail = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.spann_mem.get(&index_id))
+                    .cloned()
+            };
+            let mem_len = tail.as_ref().map(|t| t.len()).unwrap_or(0);
+            let members = index.len().saturating_add(mem_len);
+            let live = q.live_count.or_else(|| q.live_rows.map(<[usize]>::len));
+            // The members are **slots** (`Rows::Chunk` keeps the slot of a
+            // deleted row, `blocks::vector_column`), and a candidate that lands
+            // on a tombstone decodes to nothing at rerank time. With most of the
+            // segment deleted, a beam and a pool sized for `topn` probe too few of
+            // the leaves that still hold a live row: the answer comes up short
+            // although live rows exist. Both are widened by the share of members
+            // that is still live - 1:1 for an undamaged tree - and both are work
+            // rather than rows, so the beam stops at the tree's leaf count and the
+            // pool at the I/O ceiling.
+            let (width, budget) = match live {
+                Some(live) if live > 0 && members > live => {
+                    let widen = |value: usize, ceiling: usize| {
+                        let scaled = ((value as u128) * (members as u128)).div_ceil(live as u128);
+                        (scaled as usize).clamp(value, ceiling.max(value))
+                    };
+                    (
+                        widen(width, index.shape().0),
+                        widen(
+                            budget,
+                            crate::spann_mem::MAX_RERANK_CANDIDATES.saturating_mul(4),
+                        ),
+                    )
+                }
+                _ => (width, budget),
+            };
             let hits = match q.allowed {
                 Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
                 None => index.search(q.query, budget, Some(width)),
@@ -318,10 +355,11 @@ impl Engine {
             self.spann_stats(index_id).record(hits.len(), width, budget);
             let mut candidates: HashSet<usize> =
                 hits.into_iter().map(|(id, _)| id as usize).collect();
-            // The mem index: rows inserted since the last dump. They are
-            // candidates (the exact rescoring decides) and they are covered, so
-            // an insert stays visible without turning the query into a scan of
-            // the whole table (`docs/SPANN_DESIGN.md` §9.2).
+            // The tail (`tail` above): rows inserted since the last dump, held as
+            // a live tree. They are candidates (the exact rescoring decides) and
+            // they are covered, so an insert stays visible without turning the
+            // query into a scan of the whole table (`docs/SPANN_DESIGN.md` §9.2) -
+            // a bounded descent, not a re-score of every pending row (§0.0.3).
             //
             // Every row here is re-scored, which is why the list is bounded
             // (`max_partition_size × 64` triggers a dump) and why a delete prunes
@@ -329,16 +367,6 @@ impl Engine {
             // WAL replay re-buffers, so rows that were already in a block file
             // fall into `uncovered` below - an exact scan of exactly those rows,
             // which is correct and costs the gap, not the table.
-            // The tail: rows written since the last dump, held as a live tree.
-            // They are queried the same way a chunk is - a bounded descent, not
-            // a re-score of every pending row (`docs/SPANN_DESIGN.md` §0.0.3).
-            let tail = {
-                let tables = self.tables.lock().unwrap();
-                tables
-                    .get(&tkey)
-                    .and_then(|e| e.spann_mem.get(&index_id))
-                    .cloned()
-            };
             if let Some(tail) = &tail {
                 let tail_hits = match q.allowed {
                     Some(allowed) => {
@@ -350,15 +378,19 @@ impl Engine {
                 };
                 candidates.extend(tail_hits.into_iter().map(|(id, _)| id as usize));
             }
-            let mem_len = tail.as_ref().map(|t| t.len()).unwrap_or(0);
-            if all_covered(q, index.len() + mem_len) {
+            // The counts agree, so every member is a live row and the tree
+            // covers the table. The shortcut is worth keeping: asking which rows
+            // the tree holds means `row_ids()`, which walks every reachable
+            // leaf's slot page - tens of milliseconds at 200k rows and ~1 s at
+            // 2M - and this is the state of a table nobody deletes from.
+            if all_covered(q, members) {
                 return Some(KnnProbe {
                     candidates,
                     uncovered: Vec::new(),
                 });
             }
-            // The tree's own row list says exactly which rows it holds; the
-            // rest are scored by the exact scan.
+            // The counts disagree: the tree's own row list says exactly which
+            // rows it holds, and the rest are scored by the exact scan.
             let mut covered: HashSet<usize> =
                 index.row_ids().into_iter().map(|id| id as usize).collect();
             if let Some(tail) = &tail {
@@ -799,11 +831,10 @@ impl PhysicalKnnScan<'_> {
         // for O(n) hash lookups instead of O(k), and on a 20k-row table that was
         // most of the query's time.
         if let Some(cands) = &self.vector_candidates {
-            // One sorted walk, not a lookup per candidate: the cache is in id
-            // order (`fetch_rows_with_ids_projected` returns sorted rows and the
-            // update path only replaces values in place), so both sides can be
-            // swept together. 64 binary searches over 20k rows was costing 1.27 ms
-            // of the query - more than the HNSW search itself.
+            // One sorted walk, not a lookup per candidate: the cache is built in
+            // id order (and the update path only replaces values in place), so
+            // both sides can be swept together. 64 binary searches over 20k rows
+            // was costing 1.27 ms of the query - more than the HNSW search.
             let mut wanted: Vec<usize> = cands.iter().copied().collect();
             wanted.sort_unstable();
             let mut at = 0usize;

@@ -11,9 +11,11 @@
 //! vectors, in row order, by row id" and gets them. What a caller chooses is
 //! *which rows* ([`Rows`]); the elements it does not have to choose, because a
 //! body that is not an `f32` array (`FLOAT16`/`BFLOAT16`/`DOUBLE`/`BIT`, or a
-//! `f32` body that starts off-alignment) is materialized one **block** at a
-//! time instead of borrowed. That is the case the scratch file existed for, and
-//! it is bounded: one block, not the column.
+//! `f32` body that starts off-alignment) is widened one **row** at a time
+//! instead of borrowed, and handed back as an owned
+//! [`Cow`](std::borrow::Cow). That is the case the scratch file existed for, and
+//! it is bounded: one vector, not the column - nor one block per block, which is
+//! what keeping a materialized `Vec<f32>` per [`SourceBlock`] amounted to.
 
 use super::*;
 
@@ -58,9 +60,11 @@ struct SourceBlock {
     first: usize,
     /// Row id of slot 0, so a slot is `row id - base`.
     base: u64,
-    /// Set when the cell cannot be borrowed (a body that is not `f32`-aligned,
-    /// or an element type that is not `f32`): the block's vectors, copied once.
-    materialized: Option<Vec<f32>>,
+    /// The element type and the bytes of one slot, kept so a cell that cannot be
+    /// borrowed (not `f32`, or off-alignment) can be widened for the one call
+    /// that asked: no block-wide copy is retained.
+    element: i32,
+    row_bytes: usize,
 }
 
 impl index::source::VectorSource for VectorColumn {
@@ -72,10 +76,10 @@ impl index::source::VectorSource for VectorColumn {
         self.ids[index]
     }
 
-    fn vector(&self, index: usize) -> &[f32] {
+    fn vector(&self, index: usize) -> std::borrow::Cow<'_, [f32]> {
         // The buffer's rows are the tail of `ids`: no block lookup, no body.
         if index >= self.sealed {
-            return &self.buffered[index - self.sealed];
+            return std::borrow::Cow::Borrowed(&self.buffered[index - self.sealed]);
         }
         let at = match self
             .blocks
@@ -88,10 +92,6 @@ impl index::source::VectorSource for VectorColumn {
             Err(at) => at - 1,
         };
         let block = &self.blocks[at];
-        let local = index - block.first;
-        if let Some(flat) = &block.materialized {
-            return &flat[local * self.dim..(local + 1) * self.dim];
-        }
         let (body, _outline) = block
             .mapped
             .as_ref()
@@ -103,8 +103,22 @@ impl index::source::VectorSource for VectorColumn {
             block.layout,
         );
         let slot = (self.ids[index] - block.base) as usize;
-        storage::definition::fixed_f32::fixed_f32_slot(data, slot, self.dim)
-            .expect("alignment was checked when the source was built")
+        if block.element == 6 {
+            if let Some(v) = storage::definition::fixed_f32::fixed_f32_slot(data, slot, self.dim) {
+                return std::borrow::Cow::Borrowed(v);
+            }
+            // A body that starts off-alignment cannot be borrowed as an array of
+            // `f32`: copied for this row, not for the block.
+            return std::borrow::Cow::Owned(
+                storage::definition::fixed_f32::copy_f32_slot(data, slot, self.dim)
+                    .expect("the body length was checked when the source was built")
+                    .to_vec(),
+            );
+        }
+        std::borrow::Cow::Owned(
+            Self::widen_row(data, block.element, self.dim, block.row_bytes, slot)
+                .expect("the body length was checked when the source was built"),
+        )
     }
 }
 
@@ -120,14 +134,52 @@ impl VectorColumn {
     /// A fixup that knows only the id (split a leaf, re-encode a moved row) is
     /// the caller this is for; until that reader lands, only the tests ask.
     #[allow(dead_code)]
-    pub(crate) fn at(&self, row_id: u64) -> Option<&[f32]> {
+    pub(crate) fn at(&self, row_id: u64) -> Option<std::borrow::Cow<'_, [f32]>> {
         if let Ok(index) = self.ids[..self.sealed].binary_search(&row_id) {
             return Some(<Self as index::source::VectorSource>::vector(self, index));
         }
         self.ids[self.sealed..]
             .iter()
             .position(|id| *id == row_id)
-            .map(|at| self.buffered[at].as_slice())
+            .map(|at| std::borrow::Cow::Borrowed(self.buffered[at].as_slice()))
+    }
+
+    /// One row of an element type that is not `f32`, widened for this call. A
+    /// `BIT` body packs `dim` bits per row (`embedding_size`, LSB-first) and
+    /// cannot go through [`storage::definition::format::read_embedding_element`],
+    /// which reads element `0` as a byte.
+    fn widen_row(
+        data: &[u8],
+        element: i32,
+        dim: usize,
+        row_bytes: usize,
+        slot: usize,
+    ) -> Option<Vec<f32>> {
+        if row_bytes == 0 || dim == 0 {
+            return None;
+        }
+        let from = slot.checked_mul(row_bytes)?;
+        let row = data.get(from..from + row_bytes)?;
+        let mut out = Vec::with_capacity(dim);
+        if element == 0 {
+            for j in 0..dim {
+                let bit = (row[j / 8] >> (j % 8)) & 1;
+                out.push(if bit == 1 { 1.0 } else { 0.0 });
+            }
+        } else {
+            let width = storage::definition::format::element_width(element);
+            for j in 0..dim {
+                let at = j * width;
+                // Exactly one element's bytes: the reader narrows the slice to
+                // the element's width and refuses anything longer.
+                let value = storage::definition::format::read_embedding_element(
+                    &row[at..at + width],
+                    element,
+                )?;
+                out.push(value as f32);
+            }
+        }
+        Some(out)
     }
 }
 
@@ -211,32 +263,22 @@ impl Engine {
             let (body, _outline) = mapped.as_ref().column(column_id)?;
             let (data, _nulls) =
                 storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
-            let materialized = if element == 6 {
-                // Alignment is a property of the body, not of the slot (every
-                // slot is a whole number of `f32`s apart), so one probe decides
-                // the block.
-                let probe = (ids[first] - base) as usize;
-                match storage::definition::fixed_f32::fixed_f32_slot(data, probe, dim) {
-                    Some(_) => None,
-                    None => Some(Self::copy_block_vectors(data, &ids[first..], base, dim)?),
-                }
-            } else {
-                Some(Self::widen_block_vectors(
-                    data,
-                    element,
-                    dim,
-                    row_bytes,
-                    &ids[first..],
-                    base,
-                )?)
-            };
+            // A cell is widened on demand now, so this is where a body that does
+            // not hold every slot it contributes is refused: the block-wide copy
+            // used to catch it row by row, at the price of holding the whole
+            // block's vectors for the rest of the build.
+            let last = (ids[ids.len() - 1] - base) as usize;
+            if row_bytes == 0 || data.len() < (last + 1).saturating_mul(row_bytes) {
+                return None;
+            }
             blocks.push(SourceBlock {
                 mapped,
                 column_id,
                 layout,
                 first,
                 base,
-                materialized,
+                element,
+                row_bytes,
             });
         }
         let sealed = ids.len();
@@ -282,63 +324,6 @@ impl Engine {
             blocks,
         })
     }
-
-    /// [`storage::definition::fixed_f32::fixed_f32_slot`]'s fallback for a block whose body
-    /// is not `f32`-aligned: its rows, copied once.
-    fn copy_block_vectors(data: &[u8], rows: &[u64], base: u64, dim: usize) -> Option<Vec<f32>> {
-        let mut flat = Vec::with_capacity(rows.len() * dim);
-        for seq in rows {
-            let slot = (seq - base) as usize;
-            flat.extend_from_slice(&storage::definition::fixed_f32::copy_f32_slot(
-                data, slot, dim,
-            )?);
-        }
-        Some(flat)
-    }
-
-    /// One block of an element type that is not `f32`, widened once. A `BIT`
-    /// body packs `dim` bits per row (`embedding_size`, LSB-first) and cannot go
-    /// through [`storage::definition::format::read_embedding_element`], which
-    /// reads element `0` as a byte.
-    fn widen_block_vectors(
-        data: &[u8],
-        element: i32,
-        dim: usize,
-        row_bytes: usize,
-        rows: &[u64],
-        base: u64,
-    ) -> Option<Vec<f32>> {
-        // A zero-width row would make every slot the same; the layout of an
-        // embedding column is never zero, but a zero `dim` would divide by it.
-        if row_bytes == 0 || dim == 0 {
-            return None;
-        }
-        let width = storage::definition::format::element_width(element);
-        let mut flat = Vec::with_capacity(rows.len() * dim);
-        for seq in rows {
-            let slot = (seq - base) as usize;
-            let from = slot * row_bytes;
-            let row = data.get(from..from + row_bytes)?;
-            if element == 0 {
-                for j in 0..dim {
-                    let bit = (row[j / 8] >> (j % 8)) & 1;
-                    flat.push(if bit == 1 { 1.0 } else { 0.0 });
-                }
-            } else {
-                for j in 0..dim {
-                    let at = j * width;
-                    // Exactly one element's bytes: the reader narrows the slice
-                    // to the element's width and refuses anything longer.
-                    let value = storage::definition::format::read_embedding_element(
-                        &row[at..at + width],
-                        element,
-                    )?;
-                    flat.push(value as f32);
-                }
-            }
-        }
-        Some(flat)
-    }
 }
 
 #[cfg(test)]
@@ -374,7 +359,7 @@ mod tests {
         assert_eq!(source.len(), 8);
         for row in 0..8usize {
             assert_eq!(
-                source.vector(row),
+                source.vector(row).as_ref(),
                 &[
                     row as f32,
                     (row + 1) as f32,
@@ -425,14 +410,17 @@ mod tests {
         assert_eq!(source.len(), 5);
         for row in 0..5usize {
             assert_eq!(
-                source.vector(row),
+                source.vector(row).as_ref(),
                 &[row as f32, 0.0, 0.0, 0.0],
                 "buffered row {row}"
             );
             // Random access answers for the same rows, which is what a fixup
             // that only knows the id asks for.
             let id = source.id(row);
-            assert_eq!(source.at(id), Some(&[row as f32, 0.0, 0.0, 0.0][..]));
+            assert_eq!(
+                source.at(id).as_deref(),
+                Some(&[row as f32, 0.0, 0.0, 0.0][..])
+            );
         }
         assert!(source.at(4_000).is_none(), "a row the column does not hold");
     }
@@ -460,7 +448,7 @@ mod tests {
         assert_eq!(source.len(), 6);
         for row in 0..6usize {
             assert_eq!(
-                source.vector(row),
+                source.vector(row).as_ref(),
                 &[row as f32 + 0.5, 0.0, 0.0, 0.0],
                 "row {row}"
             );

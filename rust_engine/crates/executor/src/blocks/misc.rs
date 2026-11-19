@@ -367,7 +367,22 @@ impl<'a> BlockCursor<'a> {
             for seq in &live {
                 if let Some(values) = pending.remove(seq) {
                     if let Some(Value::Str(text)) = values.get(col) {
-                        let parsed = crate::parse_vec_f32(text);
+                        // A row that is still in the append buffer is text, and a
+                        // `BIT` cell's text is a bit string (`[0100…]`): the
+                        // numeric reader turns that into one number, so the row
+                        // was dropped and a query over a table nobody had
+                        // checkpointed scored nothing (`test_knn_binary_hamming`).
+                        // Read it as bits, the same way the block body is
+                        // decoded (`decode_embedding_f32`).
+                        let parsed: Vec<f32> = if element_type == 0 {
+                            crate::parse_bit_leaves(text)
+                                .into_iter()
+                                .flatten()
+                                .map(|bit| bit as f32)
+                                .collect()
+                        } else {
+                            crate::parse_vec_f32(text)
+                        };
                         if parsed.len() == dim {
                             out.push((*seq, parsed));
                         }

@@ -5810,6 +5810,11 @@ pub(crate) struct Context {
     /// fork on macOS.
     pub(crate) memory_checked_at: std::sync::atomic::AtomicU64,
     pub(crate) memory_pressure_level: std::sync::atomic::AtomicU8,
+    /// The cgroup generation that level was measured under
+    /// (`memory::cgroup_generation`). A limit an orchestrator added or changed
+    /// invalidates it, so the next ask measures again instead of reusing a
+    /// number that belongs to the old ceiling.
+    pub(crate) memory_ceiling_generation: std::sync::atomic::AtomicU64,
     /// Governor passes that ran, and the bytes they released: the only way to
     /// tell "the ceiling held" from "the ceiling was never reached".
     pub(crate) memory_reclaim_passes: std::sync::atomic::AtomicU64,
@@ -10003,6 +10008,18 @@ pub(crate) fn vector_score_f32(q: &[f32], v: &[f32], metric: &str) -> (f64, f64)
                 0.0
             };
             (c, 1.0 - c)
+        }
+        "hamming" => {
+            // The same rule as [`vector_score`]: a position counts when one side
+            // is zero and the other is not. A `BIT` column's widened body is
+            // exactly 0/1, so this cannot rely on `l2_sq` agreeing with it - the
+            // query is whatever the statement wrote (`[0,0,2]` is legal).
+            let d = q
+                .iter()
+                .zip(v)
+                .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
+                .count() as f64;
+            (1.0 / (1.0 + d), d)
         }
         _ => {
             // `l2` reports the squared distance and needs neither the dot product

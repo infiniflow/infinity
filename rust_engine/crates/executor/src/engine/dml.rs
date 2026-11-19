@@ -554,6 +554,7 @@ impl Engine {
         // inside the batch it was made for: re-running a batch that already
         // committed would duplicate its rows.
         if rows.len() > Self::MAX_APPEND_ROWS {
+            let total = rows.len();
             let mut inserted = 0usize;
             let mut left = rows;
             while !left.is_empty() {
@@ -561,7 +562,21 @@ impl Engine {
                 let batch: Vec<Vec<Literal>> = left.drain(..take).collect();
                 // The recursive call is already within the limit, so it runs
                 // one `insert_literals_inner` per attempt.
-                let result = Box::pin(self.insert_literals_retrying(table, columns, batch)).await?;
+                let result =
+                    match Box::pin(self.insert_literals_retrying(table, columns, batch)).await {
+                        Ok(result) => result,
+                        // A refusal after some batches committed has to say so:
+                        // the committed prefix is durable, and a caller that
+                        // resubmitted the whole request would duplicate it.
+                        Err(error) if inserted > 0 && Self::is_admission_refusal(&error) => {
+                            return Err(Error::Invalid(format!(
+                                "{error}; {inserted} of {total} rows are committed - resubmit \
+                                 from row {}",
+                                inserted + 1
+                            )));
+                        }
+                        Err(error) => return Err(error),
+                    };
                 match result {
                     QueryResult::Inserted { count } => inserted += count,
                     other => return Ok(other),
@@ -636,17 +651,30 @@ impl Engine {
         // and a caller that retried the statement would duplicate them. The
         // reference has no such window: its whole `INSERT` is one DataBlock.
         self.validate_insert_rows(table, columns, &rows)?;
+        let total = rows.len();
         let mut inserted = 0usize;
         let mut left = rows;
         while !left.is_empty() {
             let take = left.len().min(Self::MAX_APPEND_ROWS);
             let batch: Vec<Vec<Literal>> = left.drain(..take).collect();
-            match self
+            let result = self
                 .insert_literals_inner(table, columns, batch, new_segment)
-                .await?
-            {
-                QueryResult::Inserted { count } => inserted += count,
-                other => return Ok(other),
+                .await;
+            match result {
+                Ok(QueryResult::Inserted { count }) => inserted += count,
+                Ok(other) => return Ok(other),
+                // The memory governor refuses per batch, so the batches before
+                // this one are durable: a plain refusal here would leave the
+                // caller unable to tell that from "nothing was written", and a
+                // retry of the whole request would duplicate them.
+                Err(error) if inserted > 0 && Self::is_admission_refusal(&error) => {
+                    return Err(Error::Invalid(format!(
+                        "{error}; {inserted} of {total} rows are committed - resubmit \
+                         from row {}",
+                        inserted + 1
+                    )));
+                }
+                Err(error) => return Err(error),
             }
         }
         Ok(QueryResult::Inserted { count: inserted })
@@ -725,6 +753,12 @@ impl Engine {
         // not in the SQL layer, so every caller of this primitive - the SQL
         // `INSERT`, the Thrift RPC, the REST handler, `COPY` - gets the gate.
         self.ensure_writable()?;
+        // And the memory governor's admission, which the statement path applies
+        // at the same point (`execute_statements`): this primitive is reached
+        // directly by the RPC and the REST handler, so a direct insert has to be
+        // refused at the same ceiling - before the row range is allocated and
+        // before the WAL frame is written.
+        self.admit_write()?;
         let meta = self
             .storage
             .catalog

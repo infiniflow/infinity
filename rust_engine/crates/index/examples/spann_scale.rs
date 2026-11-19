@@ -79,7 +79,8 @@ fn run_incr(
     let lookup = row_source(src);
     let mut marks = Vec::new();
     for row in 0..src.len() {
-        tree.insert(src.id(row), src.vector(row)).expect("insert");
+        tree.insert(src.id(row), src.vector(row).as_ref())
+            .expect("insert");
         if tree.pending_fixups() >= 64 {
             tree.run_fixups(Some(&lookup));
         }
@@ -107,7 +108,8 @@ fn run_disk(src: &Memory, opts: &Options, rows: usize, dim: usize, beam: usize) 
     let mut tree = IncIndex::bootstrap(src, dim, opts.clone()).expect("bootstrap");
     let lookup = row_source(src);
     for row in 0..src.len() {
-        tree.insert(src.id(row), src.vector(row)).expect("insert");
+        tree.insert(src.id(row), src.vector(row).as_ref())
+            .expect("insert");
         if tree.pending_fixups() >= 64 {
             tree.run_fixups(Some(&lookup));
         }
@@ -120,7 +122,7 @@ fn run_disk(src: &Memory, opts: &Options, rows: usize, dim: usize, beam: usize) 
     let before = Instant::now();
     let mut hits = 0usize;
     for row in &probes {
-        let got = index.search(src.vector(*row), 1, Some(beam));
+        let got = index.search(src.vector(*row).as_ref(), 1, Some(beam));
         if got.first().map(|(id, _)| *id) == Some(src.id(*row)) {
             hits += 1;
         }
@@ -135,7 +137,7 @@ fn run_disk(src: &Memory, opts: &Options, rows: usize, dim: usize, beam: usize) 
     let before = Instant::now();
     let mut mapped_hits = 0usize;
     for row in &probes {
-        let got = file.search(src.vector(*row), 1, Some(beam));
+        let got = file.search(src.vector(*row).as_ref(), 1, Some(beam));
         if got.first().map(|(id, _)| *id) == Some(src.id(*row)) {
             mapped_hits += 1;
         }
@@ -196,7 +198,7 @@ fn recall(index: &SpannIndex, src: &Memory, beam: usize) -> f32 {
     let mut hits = 0usize;
     for i in 0..probes {
         let row = i * stride;
-        let got = index.search(src.vector(row), 1, Some(beam));
+        let got = index.search(src.vector(row).as_ref(), 1, Some(beam));
         if got.first().map(|(id, _)| *id) == Some(src.id(row)) {
             hits += 1;
         }

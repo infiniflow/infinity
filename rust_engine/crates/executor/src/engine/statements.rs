@@ -401,6 +401,7 @@ impl Engine {
                 memory_limit: std::sync::atomic::AtomicU64::new(0),
                 memory_checked_at: std::sync::atomic::AtomicU64::new(0),
                 memory_pressure_level: std::sync::atomic::AtomicU8::new(0),
+                memory_ceiling_generation: std::sync::atomic::AtomicU64::new(0),
                 memory_reclaim_passes: std::sync::atomic::AtomicU64::new(0),
                 memory_reclaimed_bytes: std::sync::atomic::AtomicU64::new(0),
                 spann_async_build: std::sync::atomic::AtomicBool::new(false),
@@ -4034,30 +4035,68 @@ impl Engine {
             .load(std::sync::atomic::Ordering::Relaxed)
             .max(1)
             / 4;
-        // `usize` + `Vec<f32>` header, plus the vectors themselves.
-        let per_row = dims
-            .saturating_mul(std::mem::size_of::<f32>())
-            .saturating_add(64);
+        // What the cache retains, tracked as it grows: the `f64` payload at the
+        // capacity `push` left behind (`VectorCache::rows` is
+        // `Vec<(usize, Vec<f64>)>` - charging four bytes per element, as this
+        // did, counted half of it), the row's slot in that `Vec`, and its entry
+        // in the live set (a key plus the hash table's slack). Growth of `rows`
+        // is charged when the allocation moves, not per row.
+        const LIVE_SET_ENTRY: usize = 2 * std::mem::size_of::<usize>();
+        let mut charge = 0usize;
+        let mut slots = 0usize;
         let mut cache = VectorCache {
             dims,
             rows: Vec::new(),
             live: Default::default(),
         };
-        for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
-            if let Some(Value::Str(text)) = cells.get(col) {
+        // Bounded batches: the row ids first (the walk the coverage check does
+        // anyway), then one batch of rows at a time. The projected read this
+        // replaces built every row of the column - a full-width `Vec<Value>` per
+        // row - before pushing the first vector, so the peak was the column's
+        // Values *plus* the cache; here it is one batch, and the loop stops at
+        // the cap without decoding the rest.
+        const CACHE_BUILD_BATCH: usize = 4096;
+        let mut ids: Vec<u64> = self
+            .live_row_ids(table)
+            .into_iter()
+            .map(|seq| seq as u64)
+            .collect();
+        ids.sort_unstable();
+        for batch in ids.chunks(CACHE_BUILD_BATCH) {
+            for (seq, cells) in self.fetch_some_rows_with_ids(table, batch)? {
+                let Some(Value::Str(text)) = cells.get(col) else {
+                    continue;
+                };
                 let v = parse_vec_str(text);
-                if v.len() == dims {
-                    cache.rows.push((seq, v));
-                    cache.live.insert(seq);
-                    if cache.rows.len().saturating_mul(per_row) > cap {
-                        return Err(Error::Invalid(format!(
-                            "the vector cache for {table}.{column} would exceed {cap} bytes \
-                             (a quarter of the buffer budget); the scan streams instead"
-                        )));
-                    }
+                if v.len() != dims {
+                    continue;
+                }
+                let payload =
+                    v.capacity() * std::mem::size_of::<f64>() + std::mem::size_of::<Vec<f64>>();
+                cache.rows.push((seq, v));
+                cache.live.insert(seq);
+                charge = charge
+                    .saturating_add(payload)
+                    .saturating_add(LIVE_SET_ENTRY);
+                let grown = cache.rows.capacity();
+                if grown != slots {
+                    charge = charge.saturating_add(
+                        grown.saturating_sub(slots) * std::mem::size_of::<(usize, Vec<f64>)>(),
+                    );
+                    slots = grown;
+                }
+                if charge > cap {
+                    return Err(Error::Invalid(format!(
+                        "the vector cache for {table}.{column} would exceed {cap} bytes \
+                         (a quarter of the buffer budget); the scan streams instead"
+                    )));
                 }
             }
         }
+        // The scan sweeps the candidates against `rows` in one pass, which needs
+        // ascending ids; a batch read groups by block and appends the buffer
+        // last, so the order is restored here.
+        cache.rows.sort_unstable_by_key(|(seq, _)| *seq);
         let built = cache.live.len();
         let shared = Arc::new(std::sync::RwLock::new(cache));
         self.vector_cache
@@ -5938,43 +5977,8 @@ impl Engine {
         Ok(dead)
     }
 
-    /// Live rows with only column `idx` parsed. A vector scan over a wide table
-    /// must not decode every column: the text of all rows is what made
-    /// concurrent KNN queries exhaust memory.
-    pub(crate) fn fetch_rows_with_ids_projected(
-        &self,
-        table: &str,
-        idx: usize,
-    ) -> Result<Vec<(usize, Vec<Value>)>> {
-        // Project one column. The blocks decode it on demand; the journal's
-        // tail (rows above the last checkpoint) is projected the same way, and
-        // the result keeps the shape the callers expect - a full-width row with
-        // NULLs outside the wanted column.
-        let project = |cells: Vec<Value>| -> Vec<Value> {
-            let value = cells.get(idx).cloned().unwrap_or(Value::Null);
-            let mut out = vec![Value::Null; idx + 1];
-            out[idx] = value;
-            out
-        };
-        if !self.mirror_dirty(table) {
-            if let Ok((_, rows)) = self.read_blocks_pruned(table, &[idx], &[]) {
-                return Ok(rows
-                    .into_iter()
-                    .map(|(seq, cells)| {
-                        (seq, project(cells.iter().map(|c| parse_value(c)).collect()))
-                    })
-                    .collect());
-            }
-        }
-        Ok(self
-            .row_set_from(table)?
-            .into_iter()
-            .map(|(seq, cells)| (seq, project(cells)))
-            .collect())
-    }
-
-    /// [`Self::fetch_rows_with_ids_projected`] over several columns: the shape a
-    /// predicate needs, and nothing else.
+    /// Several columns with only `idxs` parsed: the shape a predicate needs, and
+    /// nothing else.
     ///
     /// The block read decodes only `idxs`, and the cells go through
     /// [`Self::decode_cell`] so a text column keeps its text (`parse_value`
@@ -10361,6 +10365,13 @@ impl Engine {
         // The candidate set is known: decode only the rows it kept, or the whole
         // table when no index answered.
         if cache.is_none() {
+            // No index answered and the cache was refused its budget: there is no
+            // candidate list to decode, and materializing the table (a full-width
+            // `Vec<Value>` per row) is exactly the allocation the cap refused. Score
+            // the visible vectors one batch at a time and keep each batch's top-n;
+            // the output rows are fetched afterwards, for the final hits only.
+            // Sparse and tensor scans still take the whole column: their scores are
+            // built from it before ranking (the BMP index and MaxSim read `rows`).
             rows = match &vector_candidates {
                 // The fast path: an unfiltered dense embedding whose declared
                 // shape matches the query. The row is decoded as `f32` out of its
@@ -10447,6 +10458,99 @@ impl Engine {
                     got
                 }
                 Some(_) => Vec::new(),
+                None if !is_sparse && !is_tensor => {
+                    // The in-place `f32` decode the indexed path uses, when the
+                    // query and the column's declared element agree on it; a
+                    // filtered query needs the whole row, so it takes the row
+                    // batches below.
+                    let dense = if has_filter {
+                        None
+                    } else {
+                        crate::blocks::embedding_shape(&column_decl)
+                            .filter(|(dim, _)| *dim == query_f32.len())
+                    };
+                    let mut ids: Vec<u64> = self
+                        .live_row_ids(table)
+                        .into_iter()
+                        .map(|seq| seq as u64)
+                        .collect();
+                    ids.sort_unstable();
+                    let mut cursor = match dense {
+                        Some(_) => Some(self.block_cursor(table)?),
+                        None => None,
+                    };
+                    // Reads only the ranking parameters, so one is enough for the
+                    // per-batch truncation.
+                    let truncate = knn_scan::PhysicalKnnScan {
+                        column_index: col_idx,
+                        column_type: &column_decl,
+                        is_sparse,
+                        is_tensor,
+                        is_bit_sparse: bit_sparse,
+                        query_items: &query_items,
+                        query_elem_type: query_elem_arg.as_deref(),
+                        topn,
+                        metric: &metric,
+                        threshold,
+                        rows: &[],
+                        cache: None,
+                        vector_candidates: None,
+                    };
+                    let none: HashMap<usize, f64> = HashMap::new();
+                    let mut merged: Vec<(usize, f64, f64)> = Vec::new();
+                    for chunk in ids.chunks(RERANK_BATCH) {
+                        let scored: Vec<(usize, f64, f64)> = match (dense, cursor.as_mut()) {
+                            (Some((dim, element_type)), Some(cursor)) => cursor
+                                .vectors(col_idx, dim, element_type, chunk)?
+                                .into_iter()
+                                .map(|(seq, stored)| {
+                                    let (sim, dist) =
+                                        crate::vector_score_f32(&query_f32, &stored, &metric);
+                                    (seq, sim, dist)
+                                })
+                                .collect(),
+                            _ => {
+                                let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
+                                if !has_filter {
+                                    for (_, row) in got.iter_mut() {
+                                        let value =
+                                            row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                        *row = vec![Value::Null; col_idx + 1];
+                                        row[col_idx] = value;
+                                    }
+                                }
+                                let batch = knn_scan::PhysicalKnnScan {
+                                    column_index: col_idx,
+                                    column_type: &column_decl,
+                                    is_sparse,
+                                    is_tensor,
+                                    is_bit_sparse: bit_sparse,
+                                    query_items: &query_items,
+                                    query_elem_type: query_elem_arg.as_deref(),
+                                    topn,
+                                    metric: &metric,
+                                    threshold,
+                                    rows: &got,
+                                    cache: None,
+                                    vector_candidates: None,
+                                };
+                                batch.execute(&keep, &none, &none)?.scored
+                            }
+                        };
+                        // The union of per-batch top-n is a superset of the
+                        // global top-n for a monotone ranking key.
+                        merged.extend(
+                            truncate
+                                .finish(knn_scan::KnnScanOperatorState {
+                                    scored,
+                                    use_sim: truncate.is_knn_min_heap(),
+                                })
+                                .scored,
+                        );
+                    }
+                    streamed = Some(merged);
+                    Vec::new()
+                }
                 None => self.fetch_rows_with_ids(table)?,
             };
         }

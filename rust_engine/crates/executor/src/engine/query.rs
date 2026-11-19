@@ -563,26 +563,10 @@ impl Engine {
             // (`PhysicalFlush::Execute` does the same before its switch).
             if invalidates_result_cache(&qualified) {
                 self.ensure_writable()?;
-                // Backpressure: the last lever after reclaim has failed. Refusing
-                // the write is the only answer that keeps the process alive -
-                // the alternative is the kernel's, and it takes the whole engine
-                // with it. Reads keep working: they need no new memory.
-                let pressure = self.memory_pressure();
-                if pressure.blocks_writes() {
-                    // One reclaim pass now, so a burst that just needs its page
-                    // cache dropped does not turn into a user-visible error.
-                    let _ = self.memory_tick();
-                    if self.memory_pressure().blocks_writes() {
-                        let ceiling = self.memory_ceiling();
-                        return Err(Error::Invalid(format!(
-                            "memory limit exceeded: {} bytes in use against a {} ceiling ({}); \
-                             the write was refused",
-                            self.memory_usage(),
-                            ceiling.bytes,
-                            ceiling.source
-                        )));
-                    }
-                }
+                // Backpressure, the same admission the direct insert primitives
+                // apply (`Engine::admit_write`): a statement is refused at the
+                // critical watermark, after one reclaim pass.
+                self.admit_write()?;
             }
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
