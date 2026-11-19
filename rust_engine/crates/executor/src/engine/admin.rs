@@ -1119,17 +1119,13 @@ impl Engine {
                 })
                 .collect();
             let segments = self.segment_row_counts(&im.table);
-            // Rows a published chain holds but the column deleted: a delta
-            // cannot drop them, so a segment past the bound needs a rebuild -
-            // the same bound the checkpoint uses, so the two agree on when the
-            // tombstone garbage has to go.
-            let dead_by_segment: std::collections::HashMap<u32, u64> = {
-                let mut by: std::collections::HashMap<u32, u64> = Default::default();
-                for id in self.deleted_set(&im.table).iter() {
-                    *by.entry((*id >> 32) as u32).or_insert(0) += 1;
-                }
-                by
-            };
+            // Rows the chains still hold but the table no longer has: a
+            // `DELETE` leaves tombstones and a chunk keeps the member, so the
+            // reclaimable garbage is `chain - live`, read off the row counts
+            // rather than by scanning the delete journal (which is cumulative,
+            // and would make every pass rebuild again).
+            let live_rows = self.row_count(&im.table).unwrap_or(0) as u64;
+            let mut covered_total = 0u64;
             let mut needs_dump = false;
             let mut over_cap = false;
             for (segment, rows) in &segments {
@@ -1146,18 +1142,23 @@ impl Engine {
                     .max()
                     .and_then(|id| recorded.get(&(*segment, id)).copied())
                     .unwrap_or(0);
-                let dead = dead_by_segment.get(segment).copied().unwrap_or(0);
-                let dead_share = *rows > 0
-                    && dead.saturating_mul(100)
-                        >= rows.saturating_mul(Self::SPANN_DEAD_REBUILD_PERCENT);
-                if covered != *rows || dead_share {
+                covered_total += covered;
+                if covered != *rows {
                     needs_dump = true;
                 }
             }
-            if !needs_dump && !over_cap {
+            // The dead-row test is table-wide: `segment_row_counts` is a high
+            // water mark (a delete does not lower it), so per-segment attribution
+            // is not available without a scan. One segment's garbage is enough
+            // to make a dump worth it, and a rebuild recomputes every segment.
+            let dead = covered_total.saturating_sub(live_rows);
+            let dead_share = live_rows > 0
+                && dead.saturating_mul(100)
+                    >= live_rows.saturating_mul(Self::SPANN_DEAD_REBUILD_PERCENT);
+            if !needs_dump && !over_cap && !dead_share {
                 continue;
             }
-            if needs_dump {
+            if needs_dump || dead_share {
                 // Forced: the deprecation loop below drops every layer but the
                 // newest, which is only correct when the newest one is a full
                 // snapshot. A delta here would leave the chain short of rows.

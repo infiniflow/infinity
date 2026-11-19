@@ -22,6 +22,12 @@
 #      supervisor sees it: process spawn -> the `serving on` line. A restart is
 #      only cheap if the recovery path is (this is the nightly form of the
 #      `test_mem_bmp`-style failures).
+#   5. **The delta write window survives a crash.** A timed `kill -9` almost never
+#      lands between "the delta chunk is written" and "the catalog records it",
+#      so round 0.5 injects exactly that: `INFINITY_CRASH_SPANN_DELTA` aborts the
+#      process there (the page-tree writer's `engine.rs` hook). The restart must
+#      find every acknowledged row, the orphan chunk must be swept, and the next
+#      checkpoint must publish those rows again.
 #
 # Everything speaks the HTTP front end (`POST /query`), so the soak needs no SDK
 # and no pytest - just curl and python3.
@@ -34,6 +40,7 @@
 #   --extra=N         rows the killable COPY appends   (SOAK_EXTRA_ROWS, 262144)
 #   --vectors=N       rows in the vector table         (SOAK_VECTOR_ROWS, 20000)
 #   --vector-extra=N  vector rows a round appends      (SOAK_VECTOR_EXTRA, 2000)
+#                     (round 0.5's delta, and each kill round's writer)
 #   --rounds=N        kill -9 rounds                   (SOAK_ROUNDS, 5)
 #   --startup-limit=N startup budget, seconds/restart  (SOAK_STARTUP_LIMIT_S, 120)
 #   --dir=PATH        work directory                   (SOAK_DIR, .scratch/soak-kill9)
@@ -71,7 +78,7 @@ while [ $# -gt 0 ]; do
     --http-port=*) http="${1#*=}" ;;
     --seed=*) seed="${1#*=}" ;;
     --bin=*) bin="${1#*=}" ;;
-    -h|--help) sed -n '2,44p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
@@ -282,7 +289,10 @@ fi
 # point of the soak is the boundary (mem index, checkpoint, chunk chain).
 if [ "$vectors" -gt 0 ]; then
   say "round 0: load $vectors vectors, build the SPANN chain"
-  vec_gen "$dir/vec-values.txt" $((vectors + rounds * vector_extra)) || bad "cannot write the vector values"
+  # One batch more than the kill rounds use: the injected-crash round below
+  # consumes it, and the kill rounds then start after it.
+  vec_gen "$dir/vec-values.txt" $((vectors + (rounds + 1) * vector_extra)) ||
+    bad "cannot write the vector values"
   if start "vectors-0"; then
     run "CREATE TABLE vec (id INTEGER, v EMBEDDING(FLOAT,8));"
     batch=200
@@ -296,6 +306,38 @@ if [ "$vectors" -gt 0 ]; then
          (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=64);"
     run "FLUSH DATA;"
     vec_check "round 0" "$vectors"
+    stop
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Round 0.5: the delta checkpoint's write window, injected instead of timed.
+#
+# `INFINITY_CRASH_SPANN_DELTA` aborts the process between "the delta chunk is
+# written" and "the catalog names it" - the one window of the page-tree writer a
+# random `kill -9` almost never lands in. Afterwards: every acknowledged row,
+# contiguous ids, no row twice (the orphan chunk is swept because no record lists
+# it), and the next checkpoint publishing those rows again.
+# ---------------------------------------------------------------------------
+if [ "$vectors" -gt 0 ] && [ "$vector_extra" -gt 0 ]; then
+  say "round 0.5: crash between writing a delta chunk and recording it"
+  export INFINITY_CRASH_SPANN_DELTA=1
+  if start "crash-delta"; then
+    run "$(vec_insert "$vectors" "$vector_extra")"
+    out=$(q "FLUSH DATA;")
+    case "$out" in
+      ERR:* | "") echo "   the server died in the delta write window" ;;
+      *) bad "the injected crash did not fire (FLUSH answered '$out')" ;;
+    esac
+    stop
+  fi
+  unset INFINITY_CRASH_SPANN_DELTA
+  vectors_seen[0]=$((vectors + vector_extra))
+  if start "crash-delta-restart"; then
+    vec_check "crash-delta" "${vectors_seen[0]}"
+    # The rows the orphan chunk described are published by the next pass.
+    run "FLUSH DATA;"
+    vec_check "crash-delta re-published" "${vectors_seen[0]}"
     stop
   fi
 fi
@@ -338,7 +380,8 @@ while [ "$i" -le "$rounds" ]; do
   # acknowledged batch recorded, so the checks after the restart know what was
   # committed.
   vin="$vectors"
-  vfirst=$(( vectors + (i - 1) * vector_extra ))
+  # One batch past the injected-crash round, which consumed `vectors`..+extra.
+  vfirst=$(( vectors + i * vector_extra ))
   progress="$dir/vec-progress-$i"
   echo "$vfirst" >"$progress"
   (

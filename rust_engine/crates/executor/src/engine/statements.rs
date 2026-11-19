@@ -398,6 +398,10 @@ impl Engine {
                 // checkpoint uses as a segment's layer cap, so the value
                 // `SHOW INDEX` prints is the one that decides a rebuild.
                 max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(8),
+                memory_limit: std::sync::atomic::AtomicU64::new(0),
+                spann_async_build: std::sync::atomic::AtomicBool::new(false),
+                spann_page_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_PAGE_BUDGET),
+                spann_dirty_budget: std::sync::atomic::AtomicUsize::new(Self::SPANN_DIRTY_BUDGET),
                 pending_budget: std::sync::atomic::AtomicUsize::new(512 * 1024 * 1024),
                 scan_gate: ScanGate::new(
                     std::env::var("INFINITY_SCAN_CONCURRENCY")
@@ -427,6 +431,7 @@ impl Engine {
             ddl_lock: tokio::sync::Mutex::new(()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
+            spann_builds_inflight: Mutex::new(std::collections::HashSet::new()),
             batch_locks: Mutex::new(HashMap::new()),
             bottom_gates: Mutex::new(HashMap::new()),
             bottom_queues: Mutex::new(BottomQueues::default()),
@@ -10828,6 +10833,9 @@ impl Engine {
     /// Queues the rebuild of one spann segment. Returns `false` when no
     /// processor is attached (the checkpoint then rebuilds on its own thread
     /// instead of leaving the segment stale).
+    ///
+    /// Returns `true` for a build that is already queued or running: the caller
+    /// wanted the segment out of its hands, and it is.
     pub(crate) fn submit_spann_rebuild(
         &self,
         table: &str,
@@ -10835,9 +10843,16 @@ impl Engine {
         index: &str,
         ts: u64,
     ) -> bool {
+        let key = (table_id, index.to_string());
+        {
+            let mut inflight = self.spann_builds_inflight.lock().unwrap();
+            if !inflight.insert(key.clone()) {
+                return true;
+            }
+        }
         let table = table.to_string();
         let index = index.to_string();
-        self.submit_task(move |engine| {
+        let queued = self.submit_task(move |engine| {
             Box::new(SpannRebuildTask {
                 engine,
                 table,
@@ -10845,7 +10860,12 @@ impl Engine {
                 index,
                 ts,
             })
-        })
+        });
+        if !queued {
+            // Shutting down: the caller must not read this as "handed off".
+            self.spann_builds_inflight.lock().unwrap().remove(&key);
+        }
+        queued
     }
 
     pub(crate) fn submit_task(

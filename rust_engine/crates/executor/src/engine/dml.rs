@@ -2579,6 +2579,51 @@ impl Engine {
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
+    /// Sets the process RSS ceiling (`0` = unset).
+    ///
+    /// The port has no BufferManager, so sealed blocks are page cache the kernel
+    /// evicts under pressure - but a container's `memory_limit` kills before the
+    /// kernel gets the chance. When the cleanup pass sees the process above this,
+    /// it hands mapped pages back (`madvise`/`fadvise`) whether or not the index
+    /// that owns them went idle.
+    pub fn set_memory_limit(&self, bytes: u64) {
+        self.context
+            .memory_limit
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Builds the **first** chunk of a spann segment on the background task
+    /// instead of the checkpoint.
+    ///
+    /// Off by default: a synchronous build makes the index readable as soon as
+    /// the statement returns. An asynchronous one returns immediately, keeps
+    /// answering from the memory tree (or the exact scan), and publishes the
+    /// chain when `SpannRebuildTask` finishes (its progress is
+    /// `spann_build_progress` in `SHOW INDEX`). A checkpoint's delta stays
+    /// inline either way - it is the new rows, not a rebuild.
+    pub fn set_spann_async_build(&self, async_build: bool) {
+        self.context
+            .spann_async_build
+            .store(async_build, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets the two byte budgets a delta checkpoint's `PageTree` runs under:
+    /// cached clean pages, and the dirty pages that are the delta itself.
+    ///
+    /// The dirty budget is the one with a visible consequence: an insert that
+    /// would spend past it is refused (`PageTreeError::Full`), the rows go back
+    /// to the tail, and the **next** checkpoint publishes them. The defaults
+    /// (64 MiB / 512 MiB) are sized for a real segment; a test that wants the
+    /// refusal picks a few kilobytes.
+    pub fn set_spann_page_budgets(&self, page_bytes: usize, dirty_bytes: usize) {
+        self.context
+            .spann_page_budget
+            .store(page_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
+        self.context
+            .spann_dirty_budget
+            .store(dirty_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
+    }
+
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
     /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
     /// keeps every row in memory until a checkpoint.

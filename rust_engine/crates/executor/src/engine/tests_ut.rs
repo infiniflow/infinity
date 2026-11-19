@@ -15314,6 +15314,339 @@ mod tests {
         assert!(!got.is_empty());
     }
 
+    /// The **first** build of a spann segment can leave the checkpoint: the
+    /// segment keeps answering from its memory tree (or the exact scan, when the
+    /// index was created before the rows arrived) and the on-disk chain appears
+    /// when the background task publishes it. Only the first build takes that
+    /// path - a checkpoint's delta is cheap and stays inline.
+    ///
+    /// A checkpoint that runs while the build is queued must not queue a second
+    /// one: without the in-flight set every checkpoint in that window would start
+    /// another full build of the same segment, and two builds of one segment race
+    /// for the directory's chunk id.
+    #[test]
+    fn a_first_spann_build_can_run_on_the_background_task() {
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..8)
+                .map(|d| format!("{}", (i * 17 + d * 31) % 977))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let n = 120usize;
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        e.execute_blocking("CREATE TABLE ab (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        // The index exists before the rows do: `CREATE INDEX` on a populated
+        // table publishes a chunk itself, and then there is no "first build" left
+        // for a checkpoint to defer.
+        e.execute_blocking(
+            "CREATE INDEX ab_i ON ab (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
+        )
+        .unwrap();
+        let mut sql = String::from("INSERT INTO ab VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute_blocking(&sql).unwrap();
+        e.set_spann_async_build(true);
+        // The processor exists but is not started, so a submitted build stays
+        // queued: "the checkpoint published nothing" is observable, and a second
+        // submission would show up in the queue count.
+        let processor = std::sync::Arc::new(crate::bg_task::BGTaskProcessor::new(1));
+        e.attach_bg_task_processor(std::sync::Arc::clone(&processor));
+
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert!(
+            e.live_chunk_files("default_db.ab", "ab_i", 0, dir.path())
+                .is_empty(),
+            "the checkpoint handed the first build to the task"
+        );
+        assert_eq!(processor.running_task_count(), 1, "one build queued");
+        // Nothing published yet, so the next checkpoint sees the same gap - and
+        // must not queue the build a second time.
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(
+            processor.running_task_count(),
+            1,
+            "a checkpoint during the build queues nothing"
+        );
+        // The memory tree still answers while the chunk is being built.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM ab SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(7)
+            ),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
+
+        processor.start();
+        e.drain_background_tasks();
+        assert_eq!(processor.running_task_count(), 0, "the build finished");
+        assert_eq!(
+            e.live_chunk_files("default_db.ab", "ab_i", 0, dir.path())
+                .len(),
+            1,
+            "the task published the segment's chain"
+        );
+        // ... and the chain is what answers now, still with the right row.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM ab SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(7)
+            ),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
+        processor.stop();
+    }
+
+    /// The delta's dirty budget is a **boundary, not a failure**: the rows it
+    /// refuses - and every row the dropped tree had already accepted - go back
+    /// to the tail, and the next checkpoint publishes all of them.
+    ///
+    /// The unit test in `index` pins `PageTreeError::Full`; this pins what the
+    /// checkpoint does with it. Handing back only the refused suffix left the
+    /// accepted rows in no chunk at all: they stayed answerable through the
+    /// exact scan, but the index never covered them again.
+    #[test]
+    fn a_spent_delta_budget_hands_every_row_to_the_next_checkpoint() {
+        let dim = 8;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 13 + d * 41) % 967))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let insert = |e: &Engine, range: std::ops::Range<usize>| {
+            let mut sql = String::from("INSERT INTO fb VALUES ");
+            for i in range.clone() {
+                sql.push_str(&format!("({i}, {})", vector(i)));
+                if i + 1 < range.end {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute_blocking(&sql).unwrap();
+        };
+        let layers = |e: &Engine| -> usize {
+            let key = e.table_key("default_db.fb");
+            let handle = e
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.values().next().cloned())
+                .expect("the index is loaded");
+            match handle.as_ref() {
+                crate::spann_mem::SpannHandle::File(chains) => {
+                    chains.first().map(|chain| chain.layers()).unwrap_or(0)
+                }
+                crate::spann_mem::SpannHandle::Memory(_) => 0,
+            }
+        };
+        let covered = |e: &Engine| -> usize {
+            let key = e.table_key("default_db.fb");
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.values().next().cloned())
+                .map(|handle| handle.len())
+                .expect("the index is loaded")
+        };
+        let dir = tempdir().unwrap();
+        let chunks = |e: &Engine| {
+            e.live_chunk_files("default_db.fb", "fb_i", 0, dir.path())
+                .len()
+        };
+
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE fb (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        insert(&e, 0..40);
+        e.execute_blocking(
+            "CREATE INDEX fb_i ON fb (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(chunks(&e), 1, "the build published one chunk");
+        assert_eq!(covered(&e), 40);
+
+        // A kilobyte of dirty pages: the first few leaves fill it and the rest
+        // of the batch is refused.
+        e.set_spann_page_budgets(1 << 20, 1024);
+        insert(&e, 40..100);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(chunks(&e), 1, "a spent budget writes no delta chunk");
+        assert_eq!(layers(&e), 1, "and adds no layer");
+        assert_eq!(covered(&e), 40, "the published chain is untouched");
+        // The rows the index does not cover are still the table's: the query
+        // path scores them exactly rather than losing them.
+        let got = rows(
+            &e,
+            &format!(
+                "SELECT id FROM fb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                vector(95)
+            ),
+        );
+        assert_eq!(got.first().map(|r| r[0].clone()), Some("95".to_string()));
+
+        // Room for the whole delta: the rows that were handed back are published
+        // as one layer, and the chain covers every row of the segment.
+        e.set_spann_page_budgets(1 << 20, 1 << 20);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(chunks(&e), 2, "the second checkpoint published the delta");
+        assert_eq!(layers(&e), 2, "a delta is one more layer");
+        assert_eq!(covered(&e), 100, "every row is in the chain now");
+        for i in [0usize, 45, 99] {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM fb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            assert_eq!(
+                got.first().map(|r| r[0].clone()),
+                Some(i.to_string()),
+                "row {i} through the two layers"
+            );
+        }
+    }
+
+    /// Two segments, one index: each segment keeps a chain of its own, and a
+    /// checkpoint whose pending rows belong to the **other** segment publishes
+    /// nothing for this one - the tail is a single tree for the whole index, and
+    /// this is the seam where a delta could go to the wrong segment.
+    ///
+    /// A *second* delta layer on each of two segments is not reachable through
+    /// the allocator today: only the newest segment takes new rows (an `INSERT`
+    /// after a `COPY` opens a fresh segment), so the segment that gains rows and
+    /// the segment that already has a chain are never the same one twice.
+    #[test]
+    fn two_segments_keep_a_chain_each() {
+        let dim = 8;
+        let vector = |i: usize| -> String {
+            let body: Vec<String> = (0..dim)
+                .map(|d| format!("{}", (i * 11 + d * 37) % 971))
+                .collect();
+            format!("[{}]", body.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking("CREATE TABLE md (id INT, v EMBEDDING(FLOAT,8));")
+            .unwrap();
+        let copy = |e: &Engine, part: usize, range: std::ops::Range<usize>| {
+            let path = dir.path().join(format!("md{part}.csv"));
+            let mut body = String::new();
+            for i in range {
+                body.push_str(&format!("{},\"{}\"\n", i, vector(i)));
+            }
+            std::fs::write(&path, body).unwrap();
+            // Every COPY seals its own segment.
+            e.execute_blocking(&format!(
+                "COPY md FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                path.display()
+            ))
+            .unwrap();
+        };
+        copy(&e, 0, 0..48);
+        e.execute_blocking(
+            "CREATE INDEX md_i ON md (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
+        )
+        .unwrap();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let index_id = e
+            .storage
+            .catalog
+            .index_by_name("default_db.md", "md_i")
+            .unwrap()
+            .expect("index record")
+            .id;
+        let shape = |e: &Engine| -> Vec<(u32, usize, usize)> {
+            let key = e.table_key("default_db.md");
+            let handle = e
+                .tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .and_then(|entry| entry.spann.get(&index_id))
+                .expect("the index is loaded")
+                .clone();
+            match handle.as_ref() {
+                crate::spann_mem::SpannHandle::File(chains) => chains
+                    .iter()
+                    .map(|chain| (chain.segment(), chain.layers(), chain.len()))
+                    .collect(),
+                crate::spann_mem::SpannHandle::Memory(_) => Vec::new(),
+            }
+        };
+        assert_eq!(shape(&e), vec![(0, 1, 48)], "segment 0 has its own chain");
+
+        // The second COPY seals segment 1, whose rows are the checkpoint's
+        // pending work. Segment 0 must publish nothing (it has no new rows) and
+        // segment 1 must get the chunk instead of being folded into segment 0's
+        // chain.
+        copy(&e, 1, 48..96);
+        crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(
+            shape(&e),
+            vec![(0, 1, 48), (1, 1, 48)],
+            "one chain per segment, neither has a delta layer"
+        );
+        assert_eq!(
+            e.live_chunk_files("default_db.md", "md_i", 0, dir.path())
+                .len(),
+            1,
+            "segment 0 kept its single chunk"
+        );
+        assert_eq!(
+            e.live_chunk_files("default_db.md", "md_i", 1, dir.path())
+                .len(),
+            1,
+            "segment 1 got its own"
+        );
+        // Every row is covered exactly once, and each segment answers for its
+        // own half.
+        let key = e.table_key("default_db.md");
+        let mut ids: Vec<u64> = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|entry| entry.spann.get(&index_id))
+            .map(|handle| handle.row_ids())
+            .expect("the index is loaded");
+        let total = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), total, "no row is in two chains: {total} rows");
+        assert_eq!(total, 96);
+        for i in [0usize, 47, 48, 95] {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM md SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            assert_eq!(
+                got.first().map(|r| r[0].clone()),
+                Some(i.to_string()),
+                "row {i} through the segment that holds it"
+            );
+        }
+    }
+
     /// A spann index below `min_rows` stays **degraded** (`flat`): the catalog
     /// entry exists, no tree is built, and the exact scan answers - which is what
     /// the index would cost at that size anyway (§18's open question, resolved as
@@ -15652,11 +15985,12 @@ mod tests {
         assert_eq!(e.spann_stats(index_id).snapshot().orphans, 1);
     }
 
-    /// A segment whose published chain is mostly dead rows is rebuilt by the
-    /// checkpoint. A delta appends a page, so without this nothing ever drops
-    /// the rows a `DELETE` marked: they would be scanned and filtered forever.
+    /// A segment whose published chain is mostly dead rows is reclaimed by
+    /// compaction, not by the checkpoint. A `DELETE` writes tombstones and the
+    /// query path filters them; a checkpoint publishes pages, it does not scan
+    /// the delete journal to hunt for garbage.
     #[test]
-    fn a_mostly_dead_chain_is_rebuilt_by_the_checkpoint() {
+    fn a_mostly_dead_chain_is_reclaimed_by_compaction() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 17 + d * 31) % 911))
@@ -15691,15 +16025,22 @@ mod tests {
             .id;
         let before = e.spann_stats(index_id).snapshot();
 
-        // 24 of 40 rows: 60%, well past the 20% bound.
+        // 24 of 40 rows: 60%, well past the bound compaction uses.
         e.execute_blocking("DELETE FROM td WHERE id >= 16;")
             .unwrap();
         crate::scheduler::block_on(e.flush()).unwrap();
+        assert_eq!(
+            e.spann_stats(index_id).snapshot().rebuilds,
+            before.rebuilds,
+            "a checkpoint publishes tombstones; it does not rebuild for them"
+        );
 
+        // Compaction decides on its own: `chain - column` rows past the bound.
+        crate::scheduler::block_on(e.optimize_indexes_async()).unwrap();
         let after = e.spann_stats(index_id).snapshot();
         assert!(
             after.rebuilds > before.rebuilds,
-            "the dead rows forced a rebuild: {:?} -> {:?}",
+            "compaction rebuilds the dead chain: {:?} -> {:?}",
             before.rebuilds,
             after.rebuilds
         );

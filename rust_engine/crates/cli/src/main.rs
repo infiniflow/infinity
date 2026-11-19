@@ -231,6 +231,12 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
         let bytes = parse_size_bytes(&size) as usize;
         if bytes > 0 {
             engine.set_buffer_budget(bytes);
+            // The same number is the process's RSS ceiling: the budget above
+            // bounds what the engine *knows* it holds, and this is what the
+            // cleanup pass compares `/proc/self/status` against, so a container
+            // that sized `buffer_manager_size` to its own limit reclaims pages
+            // instead of being killed.
+            engine.set_memory_limit(bytes as u64);
         }
     }
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which

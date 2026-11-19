@@ -934,6 +934,16 @@ mod tests {
     /// A root over `leaves` published leaves of `per_leaf` rows each, every
     /// leaf's centroid on its own axis so a vector routes to one of them.
     fn published_tree(leaves: u64, per_leaf: usize) -> MemPages {
+        capped_tree(leaves, per_leaf, 2)
+    }
+
+    /// [`published_tree`] with the root at `root_level` - the cap a sideways
+    /// split needs (`MAX_DEPTH`).
+    ///
+    /// The centroids are far apart on purpose (`100` on its own axis): the rows
+    /// a test appends can then cluster **around** one leaf without a rival
+    /// centroid becoming the nearer one.
+    fn capped_tree(leaves: u64, per_leaf: usize, root_level: u32) -> MemPages {
         let opts = Options::default();
         let rot = Rotation::new(DIM, opts.seed);
         let mut pages = HashMap::new();
@@ -942,10 +952,8 @@ mod tests {
         for leaf in 0..leaves {
             let key = leaf + 1;
             children.push(key);
-            // A direction of its own per leaf, so a vector built from it routes
-            // here and nowhere else.
             let centroid: Vec<f32> = (0..DIM)
-                .map(|d| ((leaf * 31 + d as u64 * 17) % 97) as f32 / 97.0 + 0.01)
+                .map(|d| if d as u64 == leaf { 100.0 } else { 0.0 })
                 .collect();
             let rot_centroid = rot.apply(&centroid);
             let members: Vec<Member> = (0..per_leaf)
@@ -971,7 +979,7 @@ mod tests {
             0,
             PageMeta {
                 key: 0,
-                level: 2,
+                level: root_level,
                 centroid: vec![0.0; DIM],
                 radius: 1.0,
                 children,
@@ -1029,5 +1037,123 @@ mod tests {
             tree.to_spann_delta().is_some(),
             "the accepted rows are a delta"
         );
+    }
+
+    /// At the height cap a split cannot add a level: the second half becomes a
+    /// **sibling** under the same parent, so `MAX_DEPTH` bounds the descent and
+    /// the size limit keeps applying. (`IncIndex`'s version of this is
+    /// `a_leaf_at_the_depth_cap_splits_sideways`; the page-backed writer has its
+    /// own parent map, so it is a separate path.)
+    #[test]
+    fn a_split_at_the_height_cap_moves_the_second_half_sideways() {
+        let opts = Options {
+            max_partition_size: 16,
+            min_partition_size: 4,
+            kmeans_iterations: 8,
+            ..Options::default()
+        };
+        let src = capped_tree(4, 8, MAX_DEPTH);
+        let rot = Rotation::new(DIM, opts.seed);
+        let mut tree = PageTree::new(DIM, opts.clone(), rot, &src, 0, 1000, 1 << 20, 1 << 20)
+            .expect("the fixture opens");
+        assert_eq!(tree.height(), MAX_DEPTH, "the fixture sits at the cap");
+
+        // Twelve rows in two tight groups around leaf 1's centroid: 8 + 12 is
+        // past `max_partition_size`, and the two groups give the split a real
+        // cut to make.
+        let mut appended = Vec::new();
+        for i in 0..12u64 {
+            let offset = if i % 2 == 0 { -6.0 } else { 6.0 };
+            let mut vector = vec![0.0f32; DIM];
+            vector[0] = 100.0 + offset;
+            vector[1] = (i as f32) * 0.5;
+            let id = 1_000 + i;
+            tree.insert(id, &vector).expect("the row is taken");
+            appended.push(id);
+        }
+        tree.run_fixups(None, usize::MAX);
+
+        assert_eq!(tree.height(), MAX_DEPTH, "a sideways split adds no level");
+        let dirty = tree.dirty_keys();
+        assert_eq!(
+            dirty.len(),
+            3,
+            "the leaf, its sibling and the parent are the write: {dirty:?}"
+        );
+        // The parent gained exactly one child, and the two leaves it now holds
+        // spread the 20 rows instead of one leaf keeping all of them.
+        let root_children = src.pages.get(&0).unwrap().children.len();
+        let delta = tree.to_spann_delta().expect("the moved pages are a delta");
+        assert_eq!(
+            delta.partitions().len(),
+            3,
+            "one partition per dirty page, the parent included"
+        );
+        let leaves: Vec<&Partition> = delta.partitions().iter().filter(|p| p.is_leaf()).collect();
+        assert_eq!(leaves.len(), 2, "the split leaf and its sibling");
+        assert!(
+            leaves
+                .iter()
+                .all(|p| p.members.len() <= opts.max_partition_size),
+            "both halves stay under the size limit: {:?}",
+            leaves.iter().map(|p| p.members.len()).collect::<Vec<_>>()
+        );
+        let mut ids: Vec<u64> = leaves
+            .iter()
+            .flat_map(|p| p.members.iter().map(|m| m.id))
+            .collect();
+        ids.sort_unstable();
+        let mut want: Vec<u64> = (0..8).chain(appended.iter().copied()).collect();
+        want.sort_unstable();
+        assert_eq!(ids, want, "every row of the leaf, once");
+        assert_eq!(
+            root_children + 1,
+            delta
+                .partitions()
+                .iter()
+                .find(|p| !p.is_leaf())
+                .map(|p| p.children.len())
+                .expect("the parent is in the delta"),
+            "the parent lists the old children plus the sibling"
+        );
+    }
+
+    /// A parent already at `FANOUT` has no room for a sibling, so the sideways
+    /// split is refused and the leaf keeps its rows: the alternative - growing a
+    /// level - is what `MAX_DEPTH` exists to prevent.
+    #[test]
+    fn a_full_parent_refuses_the_sideways_split_and_keeps_the_rows() {
+        let opts = Options {
+            max_partition_size: 16,
+            min_partition_size: 4,
+            ..Options::default()
+        };
+        let src = capped_tree(FANOUT as u64, 8, MAX_DEPTH);
+        let rot = Rotation::new(DIM, opts.seed);
+        let mut tree = PageTree::new(DIM, opts.clone(), rot, &src, 0, 1000, 1 << 20, 1 << 20)
+            .expect("the fixture opens");
+
+        let mut appended = Vec::new();
+        for i in 0..12u64 {
+            let mut vector = vec![0.0f32; DIM];
+            vector[0] = 100.0 + if i % 2 == 0 { -6.0 } else { 6.0 };
+            vector[1] = (i as f32) * 0.5;
+            tree.insert(5_000 + i, &vector).expect("the row is taken");
+            appended.push(5_000 + i);
+        }
+        tree.run_fixups(None, usize::MAX);
+
+        assert_eq!(tree.height(), MAX_DEPTH, "no level was added");
+        let delta = tree.to_spann_delta().expect("the leaf is still a delta");
+        let mut ids: Vec<u64> = delta
+            .partitions()
+            .iter()
+            .filter(|p| p.is_leaf())
+            .flat_map(|p| p.members.iter().map(|m| m.id))
+            .collect();
+        ids.sort_unstable();
+        let mut want: Vec<u64> = (0..8).chain(appended.iter().copied()).collect();
+        want.sort_unstable();
+        assert_eq!(ids, want, "every row stayed, none was dropped");
     }
 }

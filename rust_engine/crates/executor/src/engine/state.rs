@@ -5625,6 +5625,25 @@ pub(crate) struct Context {
     /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
     /// trigger (the reference only dumps when a quota is configured).
     pub(crate) memindex_quota: std::sync::atomic::AtomicU64,
+    /// Process RSS ceiling (`0` = unset). The cleanup pass reads it and, when
+    /// the process is over it, gives the mapped pages back instead of waiting
+    /// for an index to go idle - the difference between a slow query and an OOM
+    /// kill under a container limit.
+    pub(crate) memory_limit: std::sync::atomic::AtomicU64,
+    /// Build the **first** chunk of a spann segment on the background task
+    /// instead of inside the checkpoint that needs it. Off by default: a
+    /// synchronous build makes the index readable on the next statement, an
+    /// asynchronous one leaves the segment on its memory tree (or the exact
+    /// scan) until the task publishes the chain. A `CREATE INDEX` that already
+    /// has rows still builds inline - it is the statement's own work.
+    pub(crate) spann_async_build: std::sync::atomic::AtomicBool,
+    /// Bytes the `PageTree` of a delta checkpoint may cache (clean pages).
+    pub(crate) spann_page_budget: std::sync::atomic::AtomicUsize,
+    /// Bytes of **dirty** pages a delta checkpoint may hold. A dirty page cannot
+    /// be evicted - its bytes are the output - so this is what bounds the delta;
+    /// when it is spent the remaining rows go back to the tail and the next
+    /// checkpoint publishes them.
+    pub(crate) spann_dirty_budget: std::sync::atomic::AtomicUsize,
     /// Bytes every in-memory index form holds right now, kept by delta.
     ///
     /// The quota check used to walk every table and lock every index, so a
@@ -5779,6 +5798,13 @@ pub struct Engine {
     /// Weak self handle handed to background tasks (avoids a cycle through
     /// `bg_processor`).
     pub(crate) self_weak: Mutex<std::sync::Weak<Engine>>,
+    /// Spann rebuilds queued or running: `(table_id, index name)`.
+    ///
+    /// A rebuild is minutes on a large segment, and the checkpoint that found
+    /// no chain keeps finding none until the task publishes one - without this
+    /// set every checkpoint in that window queues the same build again, and two
+    /// of them writing the segment's directory would race for the chunk id.
+    pub(crate) spann_builds_inflight: Mutex<std::collections::HashSet<(u64, String)>>,
     /// One gate per table, held for a whole write batch.
     ///
     /// The reference's `DumpMemIndex` transaction retries while an append holds
@@ -9965,10 +9991,18 @@ impl BgTask for SpannRebuildTask {
             let ts = self.ts;
             // The rebuild streams a whole segment's column: it belongs on the
             // blocking pool, where it cannot hold a query's worker for minutes.
+            // The rebuild owns the segment for as long as it runs: the set is
+            // what keeps the next checkpoint from queueing the same build, so
+            // it is cleared however this task ends.
+            let guard = InflightRebuild {
+                engine: engine.clone(),
+                key: (table_id, index.clone()),
+            };
             let joined = tokio::task::spawn_blocking(move || {
                 engine.publish_index_chunks_forced(&table, table_id, Some((&index, ts)))
             })
             .await;
+            drop(guard);
             match joined {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => eprintln!("background spann rebuild failed: {error}"),
@@ -9978,6 +10012,20 @@ impl BgTask for SpannRebuildTask {
                 Err(error) => eprintln!("background spann rebuild panicked: {error}"),
             }
         })
+    }
+}
+
+/// Clears a segment's `spann_builds_inflight` entry when the rebuild ends.
+struct InflightRebuild {
+    engine: std::sync::Arc<Engine>,
+    key: (u64, String),
+}
+
+impl Drop for InflightRebuild {
+    fn drop(&mut self) {
+        if let Ok(mut inflight) = self.engine.spann_builds_inflight.lock() {
+            inflight.remove(&self.key);
+        }
     }
 }
 

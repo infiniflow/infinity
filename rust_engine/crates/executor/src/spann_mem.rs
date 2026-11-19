@@ -889,6 +889,34 @@ impl crate::Engine {
         tails.iter().any(|tail| tail.pending_fixups() > 0)
     }
 
+    /// Drops the resident mapped pages of **every** file-backed index, idle or
+    /// not. Used when the process is over its memory limit: a hot index will
+    /// fault its pages back in on the next query, which is the cost of staying
+    /// alive.
+    pub(crate) fn spann_release_pages_forced(&self) -> usize {
+        let handles: Vec<(u64, Arc<SpannHandle>)> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| {
+                    entry
+                        .spann
+                        .iter()
+                        .map(|(id, handle)| (*id, Arc::clone(handle)))
+                })
+                .collect()
+        };
+        let mut total = 0usize;
+        for (id, handle) in handles {
+            let bytes = handle.release_pages();
+            if bytes > 0 {
+                self.spann_stats(id).record_released(bytes as u64);
+                total += bytes;
+            }
+        }
+        total
+    }
+
     /// Drops the resident mapped pages of every **idle** file-backed index,
     /// returning the bytes handed back to the kernel.
     ///

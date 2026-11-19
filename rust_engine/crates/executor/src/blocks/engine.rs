@@ -1761,12 +1761,26 @@ impl Engine {
     /// The pages are one centroid plus child keys each (~6 KB at 1536d), so this
     /// is roughly 10k partitions - far more than a checkpoint's working set,
     /// and small enough that it does not scale with the segment.
-    const SPANN_PAGE_BUDGET: usize = 64 << 20;
+    pub(crate) const SPANN_PAGE_BUDGET: usize = 64 << 20;
 
     /// Pages a delta checkpoint may hold **for writing**. A dirty page cannot be
     /// evicted, so this is what bounds the delta; when it is spent the remaining
     /// rows go back to the tail and the next checkpoint publishes them.
-    const SPANN_DIRTY_BUDGET: usize = 512 << 20;
+    pub(crate) const SPANN_DIRTY_BUDGET: usize = 512 << 20;
+
+    /// [`Self::SPANN_PAGE_BUDGET`], as the running engine holds it.
+    pub(crate) fn spann_page_budget(&self) -> usize {
+        self.context
+            .spann_page_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// [`Self::SPANN_DIRTY_BUDGET`], as the running engine holds it.
+    pub(crate) fn spann_dirty_budget(&self) -> usize {
+        self.context
+            .spann_dirty_budget
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
 
     pub(crate) fn publish_index_chunks(
         &self,
@@ -1943,19 +1957,6 @@ impl Engine {
                 .flat_map(|(_, chunks)| chunks)
                 .map(|(id, info)| (info.base_row_id, *id as u32))
                 .collect();
-            // Rows a published spann chain still holds but the column no longer
-            // does, per segment - the garbage a delta cannot drop (it appends a
-            // page, it never rewrites a leaf's slot column to remove one). One
-            // pass over the tombstone set the read path already keeps, which is
-            // an `Arc` clone and not a copy of the journal.
-            let spann_dead: Option<std::collections::HashMap<u32, u64>> =
-                im.index_type.eq_ignore_ascii_case("SPANN").then(|| {
-                    let mut by: std::collections::HashMap<u32, u64> = Default::default();
-                    for id in self.deleted_set(table).iter() {
-                        *by.entry((*id >> 32) as u32).or_insert(0) += 1;
-                    }
-                    by
-                });
             for (segment, seg_rows) in &segments {
                 let seg_dir = root.join(format!("idx_{index_id}/seg_{segment}"));
                 // A chunk's ts is the commit ts of the transaction whose dump
@@ -2285,23 +2286,19 @@ impl Engine {
                     // costs a tombstone check, not a wrong answer. A chain that
                     // covers *fewer* rows than the column holds is a gap, and only
                     // a rebuild closes it.
-                    // Rows the published chain holds but the column deleted.
-                    // A reusable chain is one whose **pages** still match the
-                    // segment; dead rows are pages that do not (they are
-                    // scanned and filtered by every query), so a segment past
-                    // the bound is not reusable even when nothing was inserted.
-                    let dead_rows = spann_dead
-                        .as_ref()
-                        .and_then(|by| by.get(segment).copied())
-                        .unwrap_or(0);
-                    let dead_share = *seg_rows > 0
-                        && dead_rows.saturating_mul(100)
-                            >= seg_rows.saturating_mul(Self::SPANN_DEAD_REBUILD_PERCENT);
-                    let reusable = pending_rows == 0
+                    // Reuse is a statement about **pages**: the chain covers the
+                    // segment and this build can read it. A deleted row is a
+                    // tombstone the query path filters; reclaiming it is a
+                    // rebuild, and rebuilds are compaction's job - the checkpoint
+                    // does not scan the delete journal to find garbage, or every
+                    // flush would pay `O(deletes)` to decide nothing new.
+                    // A forced pass (compaction) rebuilds regardless of reuse:
+                    // "the pages are current" is not the question it is asking.
+                    let reusable = !force_rebuild
+                        && pending_rows == 0
                         && !pending_in_segment
                         && covered as u64 >= *seg_rows
-                        && header_ok
-                        && !dead_share;
+                        && header_ok;
                     if reusable {
                         // Nothing to publish: the catalog already lists the chain
                         // that covers this segment.
@@ -2354,21 +2351,33 @@ impl Engine {
                     if !force_rebuild
                         && chain.is_some()
                         && !gap
-                        && (over_cap || dead_share || stale)
+                        && (over_cap || stale)
                         && self.submit_spann_rebuild(table, table_id, &im.name, chunk_ts)
                     {
                         // Nothing to publish this pass: the old chain answers
                         // until the background rebuild installs the new one.
                         continue;
                     }
-                    let rebuild = force_rebuild
-                        || chain.is_none()
-                        || pending_rows == 0
-                        || over_cap
-                        || dead_share;
+                    let rebuild = force_rebuild || chain.is_none() || pending_rows == 0 || over_cap;
                     let mut installed: Option<
                         std::sync::Arc<storage::knn_index::spann::ChunkChain>,
                     > = None;
+                    // An asynchronous build hands the rebuild to the background
+                    // task and returns: the segment stays uncovered, the exact
+                    // scan answers it, and the chain appears when the task
+                    // finishes. Only the **first** build takes this path - a
+                    // checkpoint's delta is cheap and stays inline.
+                    if rebuild
+                        && !force_rebuild
+                        && chain.is_none()
+                        && self
+                            .context
+                            .spann_async_build
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        && self.submit_spann_rebuild(table, table_id, &im.name, chunk_ts)
+                    {
+                        continue;
+                    }
                     let (row_count, index_size) = if rebuild {
                         // `spann_build_progress`: 0 is idle, non-zero is "a
                         // segment is being streamed". The build is a single
@@ -2447,8 +2456,8 @@ impl Engine {
                             chain.as_ref(),
                             u64::from(chain.root()),
                             chain.max_key() + 1,
-                            Self::SPANN_PAGE_BUDGET,
-                            Self::SPANN_DIRTY_BUDGET,
+                            self.spann_page_budget(),
+                            self.spann_dirty_budget(),
                         ) {
                             Ok(tree) => tree,
                             Err(_) => continue,
@@ -2496,14 +2505,18 @@ impl Engine {
                             }
                             tree.run_fixups(Some(&lookup), 8);
                         }
-                        if let Some(start) = overflow {
-                            // Hand the refused rows back to the tail - re-read
-                            // one at a time, not as a batch: this path is rare
-                            // and must not re-introduce the peak it just
-                            // avoided. The tombstones go back too, or a
-                            // deleted-before-publish row would be published by
-                            // the next pass.
-                            for id in ids[start..].iter().copied() {
+                        if overflow.is_some() {
+                            // Hand **every** row back to the tail, not just the
+                            // refused suffix: the tree is dropped without being
+                            // published (a partial delta is not a delta), so the
+                            // rows it did accept would otherwise leave the tail
+                            // without entering a chunk - answerable by the exact
+                            // scan, never published. One at a time, not as a
+                            // batch: this path is rare and must not re-introduce
+                            // the peak it just avoided. The tombstones go back
+                            // too, or a deleted-before-publish row would be
+                            // published by the next pass.
+                            for id in ids.iter().copied() {
                                 if let (Some(tail), Some(vector)) = (tail.as_ref(), lookup(id)) {
                                     let _ = tail.insert(id, &vector);
                                 }
@@ -2533,6 +2546,21 @@ impl Engine {
                             // checkpoint. Losing the tree is not losing the rows.
                             continue;
                         };
+                        // The window between "the delta chunk is on disk" and "the
+                        // catalog names it" is the one this path has to survive: a
+                        // crash there leaves a file no record lists (cleanup sweeps
+                        // it) and the rows in the column (the next checkpoint
+                        // republishes them). `INFINITY_CRASH_SPANN_DELTA` makes that
+                        // window reachable on purpose; `scripts/soak_kill9.sh` is
+                        // its only caller. `abort` and not `exit`: the point is to
+                        // die the way a `kill -9` does, with no destructors run.
+                        if std::env::var_os("INFINITY_CRASH_SPANN_DELTA").is_some() {
+                            eprintln!(
+                                "spann: injected crash after writing chunk {chunk_id} \
+                                 (segment {segment}) and before its record"
+                            );
+                            std::process::abort();
+                        }
                         // §5.4's last step: the chain that now *includes* this
                         // layer has to cover the segment - every row once, no
                         // edge into a page no chunk holds, and exactly the rows
@@ -2609,7 +2637,7 @@ impl Engine {
                         // longer holds those rows.
                         self.spann_stats(index_id as u64).record_rebuild(0);
                     } else {
-                        self.spann_stats(index_id as u64).record_delta(dead_rows);
+                        self.spann_stats(index_id as u64).record_delta(0);
                     }
                     // A delta leaves the older chunks of the segment live, so the
                     // chain keeps every row; only a rebuild supersedes them.
@@ -6758,6 +6786,17 @@ impl Engine {
         // slot bytes are page cache, not heap, and an index nothing queried
         // since the previous pass should not keep them resident.
         let _ = self.spann_release_pages();
+        // Over the ceiling, give back everything: chunk pages are not the only
+        // resident bytes - the column's block files are, and a container's
+        // `memory_limit` kills the process before the kernel reclaims them.
+        let limit = self
+            .context
+            .memory_limit
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if limit > 0 && crate::engine::state::process_rss_bytes() > limit {
+            let _ = self.spann_release_pages_forced();
+            storage::drop_tree_cache(&self.blocks_root());
+        }
         Ok(())
     }
 
