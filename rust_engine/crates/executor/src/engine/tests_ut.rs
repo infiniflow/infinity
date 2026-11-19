@@ -16372,6 +16372,149 @@ mod tests {
         );
     }
 
+    /// What a checkpoint costs, rebuild against delta: the point of §5.4 is that
+    /// a dump is proportional to the rows written since the last one, not to the
+    /// segment. Prints the two side by side - time, rows moved, chunk bytes and
+    /// chain layers - so the claim is a measurement rather than a shape.
+    ///
+    /// `cargo test --release -p executor spann_checkpoint_profile --lib -- --ignored --nocapture`
+    ///
+    /// `INFINITY_SPANN_PROFILE_ROWS` (rows the first load writes, default 20000)
+    /// and `INFINITY_SPANN_PROFILE_APPEND` (rows per round, default rows/10) set
+    /// the shape; the chain folds at eight chunks, so enough rounds also time a
+    /// rebuild of the grown segment.
+    ///
+    /// Measured (release, 128d): 20k rows, 2k per round - rebuild 187 ms, delta
+    /// 195-477 ms; 100k rows, 10k per round - rebuild 833 ms, delta 347-813 ms.
+    /// So the tree build is gone, but the wall time is not yet proportional to the
+    /// moved rows: a checkpoint pays a fixed cost (opening the chain, copying the
+    /// directory, decoding the rows it moves) and it grows with the number of
+    /// layers. That is the thing to profile before claiming §5.4 as a speedup -
+    /// this test is here to keep the claim honest, not to prove it.
+    #[test]
+    #[ignore = "diagnostic: prints the checkpoint profile, asserts nothing"]
+    fn spann_checkpoint_profile() {
+        let env_usize = |name: &str, default: usize| -> usize {
+            std::env::var(name)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(default)
+        };
+        const DIM: usize = 128;
+        let rows_total = env_usize("INFINITY_SPANN_PROFILE_ROWS", 20_000);
+        let append = env_usize("INFINITY_SPANN_PROFILE_APPEND", (rows_total / 10).max(1));
+        let unit = |a: u64, b: u64| -> f32 {
+            let mut x = a
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
+            x ^= x >> 33;
+            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
+            x ^= x >> 29;
+            (x % 100_000) as f32 / 100_000.0
+        };
+        let value = |i: usize, d: usize| -> f32 { unit(i as u64, d as u64) * 20.0 };
+        let vector_text = |i: usize| -> String {
+            let body: Vec<String> = (0..DIM).map(|d| format!("{:.3}", value(i, d))).collect();
+            format!("[{}]", body.join(","))
+        };
+        let insert = |e: &Engine, range: std::ops::Range<usize>| {
+            let batch = 2_000_000 / (DIM * 8);
+            let mut at = range.start;
+            while at < range.end {
+                let end = (at + batch).min(range.end);
+                let data: Vec<Vec<Literal>> = (at..end)
+                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector_text(i))])
+                    .collect();
+                e.insert_literals("default_db.cp", None, data).unwrap();
+                at = end;
+            }
+        };
+        // Everything the index has on disk: chunk bytes and the segment's chain.
+        let chunks = |e: &Engine| -> (usize, u64) {
+            let mut count = 0usize;
+            let mut bytes = 0u64;
+            let mut stack = vec![e.dir.clone()];
+            while let Some(dir) = stack.pop() {
+                let Ok(entries) = std::fs::read_dir(&dir) else {
+                    continue;
+                };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        stack.push(path);
+                    } else if path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.starts_with("chunk_") && name.ends_with(".idx"))
+                    {
+                        count += 1;
+                        bytes += entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+                    }
+                }
+            }
+            (count, bytes)
+        };
+
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute_blocking(&format!("CREATE TABLE cp (id INT, v EMBEDDING(FLOAT,{DIM}));"))
+            .unwrap();
+        insert(&e, 0..rows_total);
+        e.execute_blocking(
+            "CREATE INDEX cp_i ON cp (v) USING SPANN WITH (min_rows = 1, metric='l2');",
+        )
+        .unwrap();
+
+        println!("dim={DIM} rows={rows_total} append={append}");
+        println!("{:>6} {:>9} {:>8} {:>7} {:>6} {:>10} {:>12}", "round", "kind", "moved", "layers", "chunks", "ms", "ms/row");
+        let begin = std::time::Instant::now();
+        crate::scheduler::block_on(e.flush()).unwrap();
+        let ms = begin.elapsed().as_secs_f64() * 1000.0;
+        let (files, bytes) = chunks(&e);
+        println!(
+            "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10.1} {:>12}",
+            "base", "rebuild", rows_total, 1, files, ms, "-"
+        );
+        println!("        (chunk bytes {} = {:.1} B/row)", bytes, bytes as f64 / rows_total as f64);
+
+        let mut written = rows_total;
+        for round in 1..=12 {
+            insert(&e, written..written + append);
+            let begin = std::time::Instant::now();
+            crate::scheduler::block_on(e.flush()).unwrap();
+            let ms = begin.elapsed().as_secs_f64() * 1000.0;
+            let (files, _) = chunks(&e);
+            let layers = {
+                let key = e.table_key("default_db.cp");
+                let handle = e
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&key)
+                    .and_then(|entry| entry.spann.values().next().cloned());
+                match handle.as_ref().map(|handle| handle.as_ref()) {
+                    Some(crate::spann_mem::SpannHandle::File(chains)) => chains
+                        .first()
+                        .map(|chain| chain.layers())
+                        .unwrap_or_default(),
+                    _ => 0,
+                }
+            };
+            let kind = if layers == 1 { "fold" } else { "delta" };
+            println!(
+                "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10.1} {:>12.3}",
+                round,
+                kind,
+                append,
+                layers,
+                files,
+                ms,
+                ms / append as f64
+            );
+            written += append;
+        }
+    }
+
     /// Where one 1536d query's milliseconds go, split by knob instead of by guess.
     ///
     /// `WITH (rerank_multiplier = 0)` shrinks the rerank pool to `topn`, so the
