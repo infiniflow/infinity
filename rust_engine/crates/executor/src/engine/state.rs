@@ -197,16 +197,19 @@ pub(crate) fn rank_features_bonus(cell: &str, tags: &[(String, f64)]) -> f64 {
     sum
 }
 
-/// Overwrites a search-result row's hidden `#_score` column (the last one).
+/// Overwrites a search-result row's hidden `#_score` column.
+///
+/// `#_row_id` is the last hidden column (`column_cnt_ - 1` in the reference's
+/// `BindingRemapper`), so the score is the one before it.
 pub(crate) fn set_score(row: &mut [Value], score: f64) {
-    if let Some(last) = row.last_mut() {
-        *last = Value::Float(score);
+    if let Some(score_cell) = row.iter_mut().rev().nth(1) {
+        *score_cell = Value::Float(score);
     }
 }
 
-/// Reads a search-result row's hidden `#_score` column (the last one).
+/// Reads a search-result row's hidden `#_score` column, one before the row id.
 pub(crate) fn row_score(row: &[Value]) -> f64 {
-    match row.last() {
+    match row.iter().rev().nth(1) {
         Some(Value::Float(f)) => *f,
         Some(Value::Int(i)) => *i as f64,
         _ => 0.0,

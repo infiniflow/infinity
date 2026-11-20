@@ -2150,6 +2150,39 @@ mod tests {
     /// Two separate bugs met here. `COPY` never reported its rows to
     /// `live_rows` (only `INSERT` did, holding the count published by whatever
     /// ran last), so the coverage gate compared against a count that said four
+    /// The pruner decides a `SEARCH`'s output shape, so a projection that reads
+    /// only the hidden columns keeps none of the table's: the plan's scan names
+    /// them alone, and the search never reads the ranked rows out of the blocks.
+    #[tokio::test]
+    async fn a_row_id_only_search_keeps_no_table_column() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ro (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ro VALUES (7, [1.0,0.0,0.0,0.0]), (8, [0.0,1.0,0.0,0.0]);")
+            .await
+            .unwrap();
+        let rows = rows(
+            &e,
+            "SELECT ROW_ID(), SIMILARITY() FROM ro SEARCH MATCH VECTOR \
+             (c2, [1.0,0.0,0.0,0.0], 'float', 'ip', 2);",
+        )
+        .await;
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0], "0", "the nearest row's id");
+        let debug = LAST_PLAN_DEBUG.with(|slot| slot.borrow().clone()).unwrap();
+        // The scan kept the two hidden columns the projection reads and none of
+        // the table's: that is what makes the search skip the block reads.
+        assert!(
+            debug.contains("columns: [\"#_similarity\", \"#_row_id\"]"),
+            "{debug}"
+        );
+        assert!(!debug.contains("c1"), "{debug}");
+    }
+
     /// rows while the table had twelve - and the memory index that a
     /// `CREATE INDEX` after a `COPY` leaves behind covers only the last block.
     /// Together they let an index that holds a third of the table pass as
@@ -3942,6 +3975,7 @@ mod tests {
                 false,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -3978,7 +4012,9 @@ mod tests {
             names: vec!["sum".to_string()],
         };
         let (columns, rows) = e
-            .run_plan(plan, None, None, None, None, false, false, None, false)
+            .run_plan(
+                plan, None, None, None, None, false, false, None, false, None,
+            )
             .await
             .unwrap();
         assert_eq!(columns, vec!["sum".to_string()]);

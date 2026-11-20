@@ -3075,18 +3075,24 @@ impl Engine {
             // A plain projection answered by the block mirror arrives as a block, not
             // as rows: `direct_projection` hands it over untouched.
             let mut override_block: Option<Batch> = None;
-            if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
-                let pred = match where_pred.as_ref() {
-                    Some(p) => Some(planner::predicate_expr(p, &tables[0].1)?),
-                    None => None,
-                };
-                let (rows, hidden) = self.run_search(t, s, pred.as_ref()).await?;
-                if !hidden.is_empty() {
-                    if let Some(entry) = tables.first_mut() {
-                        entry.1.extend(hidden);
-                    }
+            // The search is **deferred** to `run_plan`, which runs it once the
+            // optimizer has pruned the scan's column list. That is what lets
+            // `SELECT ROW_ID()` keep none of the table's columns and skip
+            // reading the ranked rows, without a second copy of the pruner's
+            // decision here. The scan's schema still carries the four hidden
+            // columns, so the binder resolves `SCORE()`/`ROW_ID()` against them.
+            let mut search_pred: Option<Expr> = None;
+            let mut is_search = false;
+            if let (Some(_t), Some(_s)) = (from.as_ref(), search.as_deref()) {
+                if let Some(p) = where_pred.as_ref() {
+                    search_pred = Some(planner::predicate_expr(p, &tables[0].1)?);
                 }
-                override_rows = Some(rows);
+                if let Some(entry) = tables.first_mut() {
+                    entry
+                        .1
+                        .extend(planner::SEARCH_HIDDEN_NAMES.iter().map(|x| x.to_string()));
+                    is_search = true;
+                }
             }
             // Projection-only scan: read just the selected columns from the
             // C++ block mirror when that mirror is as fresh as the row
@@ -3236,10 +3242,17 @@ impl Engine {
                                 ],
                                 filter: None,
                             };
-                            let (rows, _) = self.search_text_terms(t, &m, None, &[]).await?;
+                            // Only the row id is read here, so that is the whole
+                            // column list the search has to produce.
+                            let row_id_only = ["#_row_id".to_string()];
+                            let (rows, _) = self
+                                .search_text_terms(t, &m, None, &[], &row_id_only)
+                                .await?;
                             let mut ids: Vec<u64> = rows
                                 .iter()
-                                .filter_map(|r| match r.iter().rev().nth(3) {
+                                // The row id is the **last** hidden column, as in
+                                // the reference (`column_cnt_ - 1`).
+                                .filter_map(|r| match r.last() {
                                     Some(Value::Int(i)) => Some(*i as u64),
                                     _ => None,
                                 })
@@ -3386,7 +3399,15 @@ impl Engine {
                     .await?;
                 override_rows = Some(rows);
             }
-            let source_columns = tables.first().map(|(_, columns)| columns.clone());
+            // A `SEARCH` materialised its rows in the scan's **pruned** layout,
+            // not the table's: `None` tells the operators the rows already match
+            // `Scan.columns`, so nothing remaps them (a remap would read the
+            // table's offsets out of a row that only carries the kept columns).
+            let source_columns = if is_search {
+                None
+            } else {
+                tables.first().map(|(_, columns)| columns.clone())
+            };
             let (columns, mut rows) = self
                 .run_plan(
                     plan,
@@ -3398,6 +3419,7 @@ impl Engine {
                     fulltext_substring,
                     scan_catalog,
                     rough_filter_done,
+                    search.as_deref().map(|s| (s.clone(), search_pred.clone())),
                 )
                 .await?;
             if *distinct {
@@ -3508,14 +3530,15 @@ impl Engine {
         // does not read). Map one onto the other, and - when they differ -
         // compact each row to the scan layout once, so the projection and the
         // predicate index the same list.
+        // A name that `source_columns` does not hold means the rows are already
+        // in the scan's layout (a `SEARCH` appends hidden columns the table
+        // schema has no name for), so no remapping is needed.
         let pos: Vec<usize> = match source_columns {
-            Some(full) if full != scan_columns => {
-                let mut pos = Vec::with_capacity(scan_columns.len());
-                for name in scan_columns {
-                    pos.push(full.iter().position(|c| c == name)?);
-                }
-                pos
-            }
+            Some(full) if full != scan_columns => scan_columns
+                .iter()
+                .map(|name| full.iter().position(|c| c == name))
+                .collect::<Option<Vec<usize>>>()
+                .unwrap_or_else(|| (0..scan_columns.len()).collect()),
             _ => (0..scan_columns.len()).collect(),
         };
         let (table, columns, predicate) = match &**input {
@@ -7824,6 +7847,7 @@ impl Engine {
         m: &MatchClause,
         pred: Option<&Expr>,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         // A full-text scan holds the whole table's token data; bound how many
         // run at once so a handful of concurrent readers cannot exhaust memory.
@@ -7832,7 +7856,7 @@ impl Engine {
         // fan-out.
         let _scan = self.context.scan_gate.enter().await;
         let out = self
-            .search_text_terms_with_slot(table, m, pred, hidden)
+            .search_text_terms_with_slot(table, m, pred, hidden, columns)
             .await?;
         // An empty answer on a table full of matches is the failure this trace
         // exists for: record what the index held when it answered.
@@ -7882,6 +7906,7 @@ impl Engine {
         m: &MatchClause,
         pred: Option<&Expr>,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         // A full-text search runs through an index; without one the C++ engine
@@ -7987,7 +8012,7 @@ impl Engine {
             // A column-less clause may still name fields inside the query.
             if let Some(groups) = parse_field_query(&query) {
                 return self
-                    .search_field_query(table, &groups, &query, pred, &params, hidden)
+                    .search_field_query(table, &groups, &query, pred, &params, hidden, columns)
                     .await;
             }
             // ...and otherwise falls back to `default_field=<col>`, which is
@@ -8005,8 +8030,10 @@ impl Engine {
                     let mut m2 = m.clone();
                     m2.column = name;
                     // The re-dispatch is recursive, so the future is boxed.
-                    return Box::pin(self.search_text_terms_with_slot(table, &m2, pred, hidden))
-                        .await;
+                    return Box::pin(
+                        self.search_text_terms_with_slot(table, &m2, pred, hidden, columns),
+                    )
+                    .await;
                 }
                 None => return Ok((Vec::new(), hidden.to_vec())),
             }
@@ -8189,13 +8216,11 @@ impl Engine {
                     .collect();
                 let mut out = Vec::new();
                 for (seq, score) in hits {
-                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                    let Some(row) = by_id.remove(&(seq as usize)) else {
                         continue;
                     };
-                    row.push(Value::Int(seq as i64));
-                    row.push(Value::Float(score));
-                    row.push(Value::Float(0.0));
-                    row.push(Value::Float(score));
+                    let mut row = Self::project_search_row(row, columns, &schema);
+                    Self::layout_search_row(&mut row, columns, seq as usize, score, 0.0, true);
                     out.push(row);
                 }
                 // An empty tree result is the answer: falling through to the
@@ -8438,13 +8463,11 @@ impl Engine {
                 }
                 let mut out = Vec::new();
                 for (seq, score) in scored {
-                    let Some(mut row) = by_id.remove(&seq) else {
+                    let Some(row) = by_id.remove(&seq) else {
                         continue;
                     };
-                    row.push(Value::Int(seq as i64));
-                    row.push(Value::Float(score));
-                    row.push(Value::Float(0.0));
-                    row.push(Value::Float(score));
+                    let mut row = Self::project_search_row(row, columns, &schema);
+                    Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
                     out.push(row);
                 }
                 // An empty tree result is the answer: falling through to the
@@ -8777,11 +8800,9 @@ impl Engine {
             .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -8932,6 +8953,7 @@ impl Engine {
         Ok(Some(hits))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn search_field_query(
         &self,
         table: &str,
@@ -8940,6 +8962,7 @@ impl Engine {
         pred: Option<&Expr>,
         params: &str,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let boolean = params.split(';').any(|p| {
             p.split_once('=')
@@ -8951,7 +8974,7 @@ impl Engine {
         });
         if !boolean {
             return self
-                .search_field_query_bm25(table, query, pred, params, hidden)
+                .search_field_query_bm25(table, query, pred, params, hidden, columns)
                 .await;
         }
         let schema = self.table_schema(table)?;
@@ -9087,11 +9110,9 @@ impl Engine {
             self.fetch_rows_with_ids(table).await?.into_iter().collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -9111,6 +9132,7 @@ impl Engine {
         pred: Option<&Expr>,
         params: &str,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         // `column2analyzer`: the driver only needs the column's analyzer name.
@@ -9142,9 +9164,9 @@ impl Engine {
         let tree = SearchDriver::new(field2analyzer, default_field)
             .parse_single(query)
             .map_err(|error| Error::Invalid(format!("{error}")))?;
-        let mut columns: Vec<String> = Vec::new();
-        collect_query_columns(&tree, &mut columns);
-        let mut fields: Vec<FieldGroupField> = columns
+        let mut query_columns: Vec<String> = Vec::new();
+        collect_query_columns(&tree, &mut query_columns);
+        let mut fields: Vec<FieldGroupField> = query_columns
             .iter()
             .filter_map(|name| {
                 Some(FieldGroupField {
@@ -9315,11 +9337,9 @@ impl Engine {
             .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -9482,13 +9502,21 @@ impl Engine {
 
     /// Runs `SEARCH …`. A single `MATCH` clause ranks its own column; several
     /// clauses combined with `FUSION(…)` return the union of the sub-searches.
+    /// Returns the rows plus the hidden column names the search appends.
+    ///
+    /// `columns` is the scan's column list after the pruner narrowed it: the
+    /// table columns the plan reads plus whichever hidden columns it reads, in
+    /// scan order. The rows are laid out in exactly that order, so they line up
+    /// with the `Scan` node. When no table column is named the search skips
+    /// reading the ranked rows out of the blocks altogether.
     pub(crate) async fn run_search(
         &self,
         table: &str,
         s: &SearchClause,
         pred: Option<&Expr>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
-        let hidden: Vec<String> = ["#_row_id", "#_similarity", "#_distance", "#_score"]
+        let hidden: Vec<String> = planner::SEARCH_HIDDEN_NAMES
             .iter()
             .map(|x| x.to_string())
             .collect();
@@ -9496,7 +9524,7 @@ impl Engine {
         // when it has a single child (e.g. `FUSION('match_tensor', …)` re-ranks
         // the one sub-search's candidates).
         if s.matches.len() > 1 || s.fusion.is_some() {
-            return self.fuse_matches(table, s, pred, hidden).await;
+            return self.fuse_matches(table, s, pred, hidden, columns).await;
         }
         match s.matches.first() {
             Some(m) => {
@@ -9506,6 +9534,7 @@ impl Engine {
                     s.using_index.as_deref(),
                     s.with_opts.as_deref(),
                     pred,
+                    columns,
                 )
                 .await
             }
@@ -9524,6 +9553,7 @@ impl Engine {
         s: &SearchClause,
         pred: Option<&Expr>,
         hidden: Vec<String>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let method = s
             .fusion
@@ -9540,6 +9570,31 @@ impl Engine {
                 .map(|(_, v)| v.trim().to_string())
         };
         let num_children = s.matches.len();
+        // `match_tensor` reranks by a tensor column that the projection need not
+        // name: the sub-searches have to carry it, so their rows are read in
+        // `columns` plus that column and cut back afterwards.
+        let tensor_column = (method == "match_tensor")
+            .then(|| opt("column_name"))
+            .flatten()
+            .filter(|c| !columns.iter().any(|x| x == c));
+        // Fusion writes its combined score into `#_score` and dedups on
+        // `#_row_id`, so the children always carry both, even when the
+        // projection reads neither. `match_tensor` also needs its scoring
+        // column. The result is cut back to `columns` before it is returned.
+        let child_columns: Vec<String> = {
+            let mut cols: Vec<String> = columns.to_vec();
+            if let Some(column) = &tensor_column {
+                if !cols.contains(column) {
+                    cols.push(column.clone());
+                }
+            }
+            for extra in ["#_score", "#_row_id"] {
+                if !cols.iter().any(|c| c == extra) {
+                    cols.push(extra.to_string());
+                }
+            }
+            cols
+        };
         // Run each sub-search (best-first) and note whether its score is a
         // similarity (higher is better) or a distance (lower is better).
         let mut children: Vec<Vec<Vec<Value>>> = Vec::with_capacity(num_children);
@@ -9551,6 +9606,7 @@ impl Engine {
                 s.using_index.as_deref(),
                 s.with_opts.as_deref(),
                 pred,
+                &child_columns,
             ));
             let (rows, _) = built.await?;
             min_heap.push(match_is_min_heap(m));
@@ -9559,7 +9615,9 @@ impl Engine {
         // `match_tensor` ignores the children's scores entirely: it reranks the
         // union of the rows by a tensor similarity.
         if method == "match_tensor" {
-            return self.fuse_match_tensor(table, &opt, children, hidden);
+            // The children's rows are in `child_columns` order; the rerank reads
+            // the tensor column by name out of that list.
+            return self.fuse_match_tensor(table, &opt, children, hidden, columns, &child_columns);
         }
         // Per-document child scores, in first-seen order (fragment 0 first, then
         // each document in rank order).
@@ -9572,11 +9630,11 @@ impl Engine {
         let mut index: HashMap<i64, usize> = HashMap::new();
         for (ci, rows) in children.iter().enumerate() {
             for (rank, row) in rows.iter().enumerate() {
-                let id = match row.iter().rev().nth(3) {
+                let id = match row.last() {
                     Some(Value::Int(i)) => *i,
                     _ => continue,
                 };
-                let score = match row.last() {
+                let score = match row.iter().rev().nth(1) {
                     Some(Value::Float(f)) => *f,
                     Some(Value::Int(i)) => *i as f64,
                     _ => 0.0,
@@ -9648,7 +9706,11 @@ impl Engine {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
             docs.truncate(topn);
-            return Ok((docs.into_iter().map(|d| d.row).collect(), hidden));
+            let rows: Vec<Vec<Value>> = docs
+                .into_iter()
+                .map(|doc| Self::reshape_fusion_row(doc.row, columns, &child_columns))
+                .collect();
+            return Ok((rows, hidden));
         }
         if method == "rrf" {
             let rank_constant: f64 = opt("rank_constant")
@@ -9747,7 +9809,50 @@ impl Engine {
             y.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal)
         });
         docs.truncate(topn);
-        Ok((docs.into_iter().map(|d| d.row).collect(), hidden))
+        // The children's rows are in `child_columns` order; the result has the
+        // shape the scan declared.
+        let rows: Vec<Vec<Value>> = docs
+            .into_iter()
+            .map(|doc| Self::reshape_fusion_row(doc.row, columns, &child_columns))
+            .collect();
+        Ok((rows, hidden))
+    }
+
+    /// Cuts a fusion row back to the scan's column list.
+    ///
+    /// The children were read in `child_columns` (which carries the score and
+    /// row id the fusion itself needs); a row is laid out table columns first,
+    /// then the hidden ones, and both lists name their table columns in the
+    /// same order.
+    fn reshape_fusion_row(
+        row: Vec<Value>,
+        columns: &[String],
+        child_columns: &[String],
+    ) -> Vec<Value> {
+        let child_table: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .collect();
+        let child_hidden: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| crate::is_search_hidden(c))
+            .collect();
+        let mut out: Vec<Value> = Vec::with_capacity(columns.len());
+        for column in columns {
+            let value = if crate::is_search_hidden(column) {
+                child_hidden
+                    .iter()
+                    .position(|c| *c == column)
+                    .and_then(|i| row.get(child_table.len() + i))
+            } else {
+                child_table
+                    .iter()
+                    .position(|c| *c == column)
+                    .and_then(|i| row.get(i))
+            };
+            out.push(value.cloned().unwrap_or(Value::Null));
+        }
+        out
     }
 
     /// `FUSION('match_tensor', …)`: reranks the **union** of the sub-search rows
@@ -9760,6 +9865,8 @@ impl Engine {
         opt: &impl Fn(&str) -> Option<String>,
         children: Vec<Vec<Vec<Value>>>,
         hidden: Vec<String>,
+        columns: &[String],
+        child_columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let column = opt("column_name").unwrap_or_default();
         let search_tensor = opt("search_tensor").unwrap_or_default();
@@ -9789,7 +9896,7 @@ impl Engine {
         let mut candidates: Vec<(i64, Vec<Value>)> = Vec::new();
         for child in children {
             for row in child {
-                let id = match row.iter().rev().nth(3) {
+                let id = match row.last() {
                     Some(Value::Int(i)) => *i,
                     _ => continue,
                 };
@@ -9798,9 +9905,29 @@ impl Engine {
                 }
             }
         }
+        // The children's rows are laid out as the scan's pruned column list, not
+        // the table's: the tensor column is wherever that list puts it (and it
+        // may be absent - then this rerank has nothing to score).
+        // A row is laid out table columns first, then the hidden ones, so the
+        // tensor column's index is its position among the **table** columns the
+        // children read (not its position in `child_columns`, which interleaves
+        // the hidden ones).
+        let child_table_columns: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .collect();
+        let cell_index = child_table_columns
+            .iter()
+            .position(|c| **c == column)
+            .unwrap_or(col_idx);
+        eprintln!(
+            "[fus] columns={columns:?} cand={} first={:?}",
+            candidates.len(),
+            candidates.first().map(|c| &c.1)
+        );
         let mut scored: Vec<(i64, f64, Vec<Value>)> = Vec::new();
         for (id, row) in candidates {
-            let cell = match row.get(col_idx) {
+            let cell = match row.get(cell_index) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(v) => v.to_slt_string(),
                 None => continue,
@@ -9823,12 +9950,25 @@ impl Engine {
                 .then(a.0.cmp(&b.0))
         });
         scored.truncate(topn);
+        // The result carries the shape the scan declared: the table columns the
+        // projection kept, then the hidden ones. The extra scoring column the
+        // children needed is dropped here.
+        let table_columns: Vec<usize> = columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .filter_map(|c| schema.iter().position(|s| s == c))
+            .collect();
+        let is_sim = true;
         Ok((
             scored
                 .into_iter()
-                .map(|(_, score, mut row)| {
-                    set_score(&mut row, score);
-                    row
+                .map(|(id, score, row)| {
+                    let mut out: Vec<Value> = table_columns
+                        .iter()
+                        .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                        .collect();
+                    Self::layout_search_row(&mut out, columns, id as usize, score, -score, is_sim);
+                    out
                 })
                 .collect(),
             hidden,
@@ -9837,6 +9977,59 @@ impl Engine {
 
     /// Runs a single `MATCH` clause by brute force, returning the matching rows
     /// with hidden `ROW_ID/SIMILARITY/DISTANCE/SCORE` columns.
+    /// Lays a search hit's row out the way the plan's scan declares it: the
+    /// table columns first (already in `row`, in the scan's order), then
+    /// whichever hidden columns the scan names.
+    ///
+    /// The pruner narrows the scan's column list, so a projection that reads
+    /// only `SCORE()` gets a row of one cell - the other hidden values are not
+    /// computed at all. `is_sim` says whether `sim` is the score (a similarity)
+    /// or `dist` is (`SCORE()` returns the similarity for a similarity metric,
+    /// the distance otherwise).
+    ///
+    /// Cuts a stored row down to the table columns the scan names, in the scan's
+    /// order. `fetch_some_rows_with_ids` returns the table's whole row; a
+    /// `SEARCH` row is laid out as the pruned scan list, so the unread columns
+    /// have to go before the hidden values are appended.
+    ///
+    /// `schema` is the table's column list, which is the order the stored row is
+    /// in.
+    fn project_search_row(row: Vec<Value>, columns: &[String], schema: &[String]) -> Vec<Value> {
+        let positions: Vec<Option<usize>> = columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .map(|c| schema.iter().position(|s| s == c))
+            .collect();
+        if positions.iter().any(Option::is_none) {
+            // The row is already in the scan's layout (the caller materialised
+            // it that way); leave it.
+            return row;
+        }
+        positions
+            .iter()
+            .map(|i| row.get(i.expect("checked")).cloned().unwrap_or(Value::Null))
+            .collect()
+    }
+
+    fn layout_search_row(
+        row: &mut Vec<Value>,
+        columns: &[String],
+        seq: usize,
+        sim: f64,
+        dist: f64,
+        is_sim: bool,
+    ) {
+        for column in columns.iter().filter(|c| crate::is_search_hidden(c)) {
+            match column.as_str() {
+                "#_row_id" => row.push(Value::Int(seq as i64)),
+                "#_similarity" => row.push(Value::Float(sim)),
+                "#_distance" => row.push(Value::Float(dist)),
+                "#_score" => row.push(Value::Float(if is_sim { sim } else { dist })),
+                _ => {}
+            }
+        }
+    }
+
     pub(crate) async fn run_one_match(
         &self,
         table: &str,
@@ -9844,15 +10037,18 @@ impl Engine {
         using_index: Option<&str>,
         with_opts: Option<&str>,
         pred: Option<&Expr>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
-        let hidden: Vec<String> = ["#_row_id", "#_similarity", "#_distance", "#_score"]
+        let hidden: Vec<String> = planner::SEARCH_HIDDEN_NAMES
             .iter()
             .map(|x| x.to_string())
             .collect();
         let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
         if m.kind.eq_ignore_ascii_case("TEXT") {
-            return self.search_text_terms(table, m, pred, &hidden).await;
+            return self
+                .search_text_terms(table, m, pred, &hidden, columns)
+                .await;
         }
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
@@ -10283,10 +10479,14 @@ impl Engine {
                                 let Some(mut row) = by_id.remove(&(seq as usize)) else {
                                     continue;
                                 };
-                                row.push(Value::Int(seq as i64));
-                                row.push(Value::Float(score));
-                                row.push(Value::Float(-score));
-                                row.push(Value::Float(score));
+                                Self::layout_search_row(
+                                    &mut row,
+                                    columns,
+                                    seq as usize,
+                                    score,
+                                    -score,
+                                    true,
+                                );
                                 out.push(row);
                             }
                             return Ok((out, hidden));
@@ -10334,16 +10534,21 @@ impl Engine {
                     let mut by_id: HashMap<usize, Vec<Value>> = self
                         .fetch_some_rows_with_ids(table, &wanted)?
                         .into_iter()
+                        .map(|(seq, row)| (seq, Self::project_search_row(row, columns, &schema)))
                         .collect();
                     let mut out = Vec::new();
                     for (seq, score) in scored {
                         let Some(mut row) = by_id.remove(&(seq as usize)) else {
                             continue;
                         };
-                        row.push(Value::Int(seq as i64));
-                        row.push(Value::Float(score));
-                        row.push(Value::Float(-score));
-                        row.push(Value::Float(score));
+                        Self::layout_search_row(
+                            &mut row,
+                            columns,
+                            seq as usize,
+                            score,
+                            -score,
+                            true,
+                        );
                         out.push(row);
                     }
                     return Ok((out, hidden));
@@ -10429,10 +10634,14 @@ impl Engine {
                                 continue;
                             };
                             let score = f64::from(score);
-                            row.push(Value::Int(seq as i64));
-                            row.push(Value::Float(score));
-                            row.push(Value::Float(-score));
-                            row.push(Value::Float(score));
+                            Self::layout_search_row(
+                                &mut row,
+                                columns,
+                                seq as usize,
+                                score,
+                                -score,
+                                true,
+                            );
                             out.push(row);
                         }
                         return Ok((out, hidden));
@@ -11105,24 +11314,55 @@ impl Engine {
         // them, and a point read per row took the journal/KV path at ~3 ms a
         // row - ten result rows spent 28 ms after the query had finished in
         // 0.2 ms.
-        let mut by_id: HashMap<usize, Vec<Value>> = HashMap::new();
-        let missing: Vec<u64> = scored
+        // The table columns the scan names, in scan order. The hidden columns
+        // are appended by this function, so they are not read here.
+        let table_columns: Vec<&String> = columns
             .iter()
-            .map(|(seq, _, _)| *seq as u64)
-            .filter(|seq| !by_id.contains_key(&(*seq as usize)))
+            .filter(|c| !crate::is_search_hidden(c))
             .collect();
+        let mut by_id: HashMap<usize, Vec<Value>> = HashMap::new();
+        // No table column is named: the projection reads only the hidden ones,
+        // so the ranked rows are never read out of the blocks. That is the whole
+        // point of letting the pruner decide the shape - `SELECT ROW_ID()` pays
+        // for the ranking and nothing else.
+        let missing: Vec<u64> = if table_columns.is_empty() {
+            Vec::new()
+        } else {
+            scored.iter().map(|(seq, _, _)| *seq as u64).collect()
+        };
         if !missing.is_empty() {
             let set: std::collections::HashSet<usize> =
                 missing.iter().map(|seq| *seq as usize).collect();
+            // The columns the plan reads, plus the scored one: the tensor and
+            // sparse paths score from the row itself (`scan.execute`), so
+            // dropping it would leave every score at zero. The extra column is
+            // cut off below.
+            let schema = self.table_schema(table).unwrap_or_default();
+            let mut read: Vec<usize> = table_columns
+                .iter()
+                .filter_map(|c| schema.iter().position(|s| *s == **c))
+                .collect();
+            if !read.contains(&col_idx) {
+                read.push(col_idx);
+            }
             // One pass over the blocks that hold any of the wanted rows, not a
             // point read per row: a point read took the journal/KV path and cost
             // ~3 ms per row on this table, so ten result rows spent 28 ms after
             // the query itself had finished in 0.2 ms.
-            by_id.extend(
-                self.read_blocks_candidates_values(table, &[], &set)
-                    .await?
-                    .1,
-            );
+            // The reader returns a full-width row with the columns it did not
+            // decode as `Null`, so each row is projected down to `read` here.
+            for (seq, cells) in self
+                .read_blocks_candidates_values(table, &read, &set)
+                .await?
+                .1
+            {
+                let row: Vec<Value> = read
+                    .iter()
+                    .take(table_columns.len())
+                    .map(|i| cells.get(*i).cloned().unwrap_or(Value::Null))
+                    .collect();
+                by_id.insert(seq, row);
+            }
         }
         let num = |f: f64| {
             if bit_sparse {
@@ -11135,13 +11375,30 @@ impl Engine {
         for (seq, sim, dist) in scored {
             // A stale sequence id (a row re-keyed by DROP COLUMN or compacted)
             // has no stored row; emitting an empty row would add a phantom hit.
-            let Some(mut row) = by_id.remove(&seq) else {
+            let Some(mut row) = by_id.remove(&seq).or_else(|| {
+                // Hidden-only projections never read the stored row, but the
+                // row still has to exist: a stale id must not become a hit.
+                if table_columns.is_empty() {
+                    Some(Vec::new())
+                } else {
+                    None
+                }
+            }) else {
                 continue;
             };
-            row.push(Value::Int(seq as i64));
-            row.push(num(sim));
-            row.push(Value::Float(dist));
-            row.push(num(if use_sim { sim } else { dist }));
+            let score = num(if use_sim { sim } else { dist });
+            let sim_value = num(sim);
+            // `#_score` is `num(..)`: a bit sparse column renders as an integer.
+            let mut row = std::mem::take(&mut row);
+            for column in columns.iter().filter(|c| crate::is_search_hidden(c)) {
+                match column.as_str() {
+                    "#_row_id" => row.push(Value::Int(seq as i64)),
+                    "#_similarity" => row.push(sim_value.clone()),
+                    "#_distance" => row.push(Value::Float(dist)),
+                    "#_score" => row.push(score.clone()),
+                    _ => {}
+                }
+            }
             out.push(row);
         }
         Ok((out, hidden))

@@ -2881,6 +2881,7 @@ impl Engine {
         fulltext_substring: bool,
         catalog: Option<planner::index_scan::IndexCatalog>,
         rough_filter_done: bool,
+        search: Option<(parser::SearchClause, Option<expression::Expr>)>,
     ) -> Result<(Vec<String>, Batch)> {
         // The index filter was built over the scan layout that still contains
         // the pushed-down columns; remember how those map onto the row before
@@ -2939,6 +2940,22 @@ impl Engine {
         };
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
+        // The optimizer has pruned the scan's column list. For a `SEARCH`, that
+        // list is the shape the search must produce: the table columns the
+        // projection kept, followed by the hidden ones. Running it here - after
+        // the pruner, before the operators - means the search reads exactly the
+        // rows the plan will use, and `SELECT ROW_ID()` keeps no table column
+        // and never touches the blocks that hold them.
+        if let Some((clause, pred)) = search {
+            let (table, columns) = plan_scan_of(&plan)
+                .ok_or_else(|| common::Error::Invalid("SEARCH without a scan".into()))?;
+            // The scan's list is the row's layout: the table columns the
+            // projection kept, then the hidden columns it reads.
+            let (rows, _hidden) = self
+                .run_search(&table, &clause, pred.as_ref(), &columns)
+                .await?;
+            override_rows = Some(rows);
+        }
         // A projection over a plain scan is a column selection (plus, at most, a
         // row predicate): answer it here, where every row costs one `Value`
         // clone instead of a trip through the `DataChunk` machinery.
