@@ -38,7 +38,7 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 
 /// A unit of background work.
 pub trait BgTask: Send + 'static {
@@ -61,8 +61,11 @@ struct Shared {
     /// Tasks submitted but not finished (queued or running).
     outstanding: AtomicUsize,
     /// Signalled when `outstanding` reaches zero.
-    idle: Mutex<()>,
-    idle_cv: Condvar,
+    ///
+    /// A `Notify`, not a `Condvar`: `drain` is awaited from a runtime task, and
+    /// a `Condvar::wait` there would park the worker that the very tasks being
+    /// waited on need to make progress (`AGENTS.md` §7.2).
+    idle: tokio::sync::Notify,
 }
 
 /// A background task processor (`BGTaskProcessor`).
@@ -97,8 +100,7 @@ impl BGTaskProcessor {
             queue: Mutex::new(Some(queue)),
             shared: Arc::new(Shared {
                 outstanding: AtomicUsize::new(0),
-                idle: Mutex::new(()),
-                idle_cv: Condvar::new(),
+                idle: tokio::sync::Notify::new(),
             }),
             handles: Mutex::new(Vec::new()),
         }
@@ -109,7 +111,7 @@ impl BGTaskProcessor {
     /// The queue already exists (`new`), so this only attaches the consumer.
     /// `start` is not what makes `submit` legal: a task submitted before it
     /// waits in the same channel.
-    pub fn start(self: &Arc<Self>) {
+    pub async fn start(self: &Arc<Self>) {
         let mut handles = self.handles.lock().unwrap();
         if !handles.is_empty() {
             return;
@@ -134,8 +136,7 @@ impl BGTaskProcessor {
                 // panic included, so `drain` cannot be left waiting on a task
                 // that is gone.
                 if shared.outstanding.fetch_sub(1, Ordering::SeqCst) == 1 {
-                    let _idle = shared.idle.lock().unwrap();
-                    shared.idle_cv.notify_all();
+                    shared.idle.notify_waiters();
                 }
             }
         });
@@ -180,11 +181,21 @@ impl BGTaskProcessor {
         true
     }
 
-    /// Blocks until the queue is empty and every running task has finished.
-    pub fn drain(&self) {
-        let mut idle = self.shared.idle.lock().unwrap();
-        while self.shared.outstanding.load(Ordering::SeqCst) != 0 {
-            idle = self.shared.idle_cv.wait(idle).unwrap();
+    /// Waits until the queue is empty and every running task has finished.
+    ///
+    /// Awaited rather than parked: the caller is a runtime task, and the tasks
+    /// being waited on run on that same runtime, so blocking the caller would
+    /// deadlock. The notification is registered **before** the count is read,
+    /// so a task that finishes between the two still wakes this wait.
+    pub async fn drain(&self) {
+        loop {
+            let notified = self.shared.idle.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.shared.outstanding.load(Ordering::SeqCst) == 0 {
+                return;
+            }
+            notified.await;
         }
     }
 
@@ -194,7 +205,7 @@ impl BGTaskProcessor {
     }
 
     /// Stops the pool after the current tasks finish. Idempotent.
-    pub fn stop(&self) {
+    pub async fn stop(&self) {
         // Closing the channel lets the worker's `recv().await` return `None`
         // once the queue is drained; `Stop()` in the reference also waits for
         // the tasks already queued. The wait is the outstanding counter, not a
@@ -219,13 +230,12 @@ impl BGTaskProcessor {
         let handles: Vec<tokio::task::JoinHandle<()>> =
             std::mem::take(&mut *self.handles.lock().unwrap());
         drop(handles);
-        self.drain();
+        self.drain().await;
     }
 
     fn wake_if_idle(&self) {
         if self.shared.outstanding.load(Ordering::SeqCst) == 0 {
-            let _idle = self.shared.idle.lock().unwrap();
-            self.shared.idle_cv.notify_all();
+            self.shared.idle.notify_waiters();
         }
     }
 }
@@ -237,8 +247,31 @@ impl Default for BGTaskProcessor {
 }
 
 impl Drop for BGTaskProcessor {
+    /// Closes the queue. It does **not** wait for the tasks already running.
+    ///
+    /// `Drop` cannot await, and the only correct wait (`drain`) is now async -
+    /// so a destructor cannot perform it, and pretending to would mean parking
+    /// a runtime worker for an unbounded time (§7.2). The split is deliberate:
+    ///
+    /// * `Drop` does the synchronous part only - closing the sender, so the
+    ///   worker's `recv` returns `None` once the queue drains and the worker
+    ///   exits on its own;
+    /// * a caller that needs the work **finished** (a shutdown, a test that
+    ///   then inspects the result) calls [`Self::stop`] and awaits it.
+    ///
+    /// A task submitted before `start` has no worker to consume it; its count
+    /// is released here so an outstanding counter cannot outlive the processor.
     fn drop(&mut self) {
-        self.stop();
+        self.jobs.lock().unwrap().take();
+        if self.handles.lock().unwrap().is_empty() {
+            if let Some(queue) = self.queue.lock().unwrap().take() {
+                let queued = queue.len();
+                drop(queue);
+                if queued > 0 {
+                    self.shared.outstanding.fetch_sub(queued, Ordering::SeqCst);
+                }
+            }
+        }
     }
 }
 
@@ -262,10 +295,10 @@ mod tests {
 
     /// C++: `background_process_ut.cpp:37` (`BGProcessTest.test1`) — start,
     /// submit a real task, drain and stop.
-    #[test]
-    fn start_submit_drain_stop() {
+    #[tokio::test]
+    async fn start_submit_drain_stop() {
         let processor = Arc::new(BGTaskProcessor::new(2));
-        processor.start();
+        processor.start().await;
 
         let counter = Arc::new(AtomicUsize::new(0));
         for _ in 0..8 {
@@ -273,11 +306,11 @@ mod tests {
             // tasks without any of them being refused.
             assert!(processor.submit(Box::new(Increment(Arc::clone(&counter)))));
         }
-        processor.drain();
+        processor.drain().await;
         assert_eq!(counter.load(Ordering::SeqCst), 8);
         assert_eq!(processor.running_task_count(), 0);
 
-        processor.stop();
+        processor.stop().await;
         assert_eq!(processor.running_task_count(), 0);
     }
 
@@ -285,13 +318,13 @@ mod tests {
     /// without ever starting must not wait for a worker that does not exist:
     /// without dropping that queue, `stop`'s `drain` parks on a task nothing can
     /// consume.
-    #[test]
-    fn drop_before_start_does_not_hang() {
+    #[tokio::test]
+    async fn drop_before_start_does_not_hang() {
         let counter = Arc::new(AtomicUsize::new(0));
         let processor = BGTaskProcessor::new(1);
         assert!(processor.submit(Box::new(Increment(Arc::clone(&counter)))));
         assert_eq!(processor.running_task_count(), 1);
-        processor.stop();
+        processor.stop().await;
         assert_eq!(processor.running_task_count(), 0);
         // The task never ran: it was cancelled with the queue.
         assert_eq!(counter.load(Ordering::SeqCst), 0);

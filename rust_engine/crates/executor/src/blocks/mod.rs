@@ -81,6 +81,7 @@ pub(crate) mod vector_column;
 pub use chunk::encode_fulltext_chunk;
 pub(crate) use chunk::*;
 pub(crate) use column::*;
+pub(crate) use engine::{RowCells, StagedImportBlock};
 pub(crate) use index_chunk::*;
 pub(crate) use misc::*;
 pub(crate) use value_shape::*;

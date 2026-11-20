@@ -29,8 +29,8 @@ use storage::invertedindex::index_merger::{
 use tempfile::tempdir;
 
 /// `PostingMergerTest::Basic`.
-#[test]
-fn basic() {
+#[tokio::test]
+async fn basic() {
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
     let paragraphs = ["A", "A A"];
@@ -45,7 +45,7 @@ fn basic() {
             &TextTokenizer::default(),
             usize::MAX
         ));
-        assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)));
+        assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)).await);
     }
 
     // `ColumnIndexIterator::Next` + `PostingDecoder::DecodePosList`: each
@@ -100,8 +100,8 @@ fn basic() {
 
 /// The whole path end to end: `ColumnIndexMerger` writes one segment the
 /// product reader then serves, with the merged row range and positions.
-#[test]
-fn column_merger_writes_one_readable_segment() {
+#[tokio::test]
+async fn column_merger_writes_one_readable_segment() {
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
     for (index, paragraph) in ["A", "A A"].iter().enumerate() {
@@ -112,7 +112,7 @@ fn column_merger_writes_one_readable_segment() {
             &TextTokenizer::default(),
             usize::MAX
         ));
-        assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)));
+        assert!(indexer.dump(dir_str, &format!("chunk{}", index + 1)).await);
     }
 
     let sources = [

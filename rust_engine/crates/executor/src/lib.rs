@@ -160,5 +160,5 @@ pub use columnar::{Batch, ColumnData};
 pub use parser::Literal;
 
 mod engine;
-pub use engine::statements::{with_session_scope, with_session_sync};
+pub use engine::statements::with_session_scope;
 pub use engine::*;

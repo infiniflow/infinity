@@ -22,6 +22,10 @@
 use executor::Engine;
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let tables: usize = std::env::args()
         .nth(1)
         .and_then(|v| v.parse().ok())
@@ -57,35 +61,41 @@ fn main() {
         }
         Err(_) => tempfile::tempdir().unwrap(),
     };
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     e.set_memindex_quota(1 << 30);
     for t in 0..tables {
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "CREATE TABLE m{t} (id INT, a INT, b INT, c VARCHAR);"
         ))
+        .await
         .unwrap();
         let mut values = Vec::new();
         for i in 0..rows {
             values.push(format!("({i},{},{},'row-{i}')", i % 97, i % 13));
             if values.len() == 1000 {
-                e.execute_blocking(&format!("INSERT INTO m{t} VALUES {};", values.join(",")))
+                e.execute(&format!("INSERT INTO m{t} VALUES {};", values.join(",")))
+                    .await
                     .unwrap();
                 values.clear();
             }
         }
         if !values.is_empty() {
-            e.execute_blocking(&format!("INSERT INTO m{t} VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO m{t} VALUES {};", values.join(",")))
+                .await
                 .unwrap();
         }
     }
     // Warm the cold path (every block written) before timing.
-    executor::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     for t in 0..tables {
-        e.execute_blocking(&format!("INSERT INTO m{t} VALUES (999999,1,1,'x');"))
+        e.execute(&format!("INSERT INTO m{t} VALUES (999999,1,1,'x');"))
+            .await
             .unwrap();
     }
     let started = std::time::Instant::now();
-    executor::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     eprintln!(
         "{tables} tables x {rows} rows, {workers} workers, steady checkpoint: {:?}",
         started.elapsed()

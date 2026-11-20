@@ -200,7 +200,13 @@ impl Service {
         // The statement chain is awaited on this task: no blocking thread is
         // held for the request's lifetime, so 100k in-flight connections remain
         // futures rather than threads (plan 6.12).
-        let arm = job.await.map_err(application)?;
+        //
+        // **Boxed**: `run` is inlined into the volo-generated dispatch, whose
+        // `match` over every RPC is already the widest frame in the server. The
+        // statement chain behind `dispatch_arm` (plan walk + operator chain)
+        // pushed the combined state machine past the 8 MiB worker stack, so the
+        // chain is kept behind one pointer here.
+        let arm = Box::pin(job).await.map_err(application)?;
         map(arm)
     }
 }
@@ -1181,13 +1187,14 @@ mod tests {
     /// The boundary [`Service::run`] wraps every RPC in: a panicking request
     /// comes back as a value, not as an unwind that kills the handler task and
     /// drops the client's connection.
-    #[test]
-    fn a_panicking_request_becomes_an_error_value() {
-        let out = executor::block_on(executor::panic_guard::guard_async::<(), _>(async {
+    #[tokio::test]
+    async fn a_panicking_request_becomes_an_error_value() {
+        let out = executor::panic_guard::guard_async::<(), _>(async {
             if std::hint::black_box(true) {
                 panic!("boom in a request");
             }
-        }));
+        })
+        .await;
         let payload = out.expect_err("a panic must not unwind the handler task");
         let message = executor::panic_guard::message(payload.as_ref());
         assert!(message.contains("boom in a request"), "{message}");
@@ -1197,27 +1204,29 @@ mod tests {
     /// same instance keeps serving the next statement: the reply changes, the
     /// process does not. (Whether it should be restarted afterwards is the
     /// deployment's decision, so nothing here exits.)
-    #[test]
-    fn a_statement_panic_is_answered_and_the_engine_keeps_serving() {
+    #[tokio::test]
+    async fn a_statement_panic_is_answered_and_the_engine_keeps_serving() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        assert!(engine.execute_blocking("SELECT * FROM t;").is_ok());
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
+        assert!(engine.execute("SELECT * FROM t;").await.is_ok());
 
         engine.arm_injected_panic();
-        let failed = executor::block_on(engine.execute("SELECT * FROM t;"))
+        let failed = engine
+            .execute("SELECT * FROM t;")
+            .await
             .expect_err("a panicking statement must answer with an error");
         assert!(failed.to_string().contains("injected panic"), "{failed}");
 
         // The same engine, in the same process: reads still answer, writes still
         // commit.
-        assert!(engine.execute_blocking("SELECT * FROM t;").is_ok());
-        assert!(engine.execute_blocking("INSERT INTO t VALUES (2);").is_ok());
+        assert!(engine.execute("SELECT * FROM t;").await.is_ok());
+        assert!(engine.execute("INSERT INTO t VALUES (2);").await.is_ok());
         assert_eq!(
-            engine.execute_blocking("SELECT * FROM t;").unwrap().len(),
+            engine.execute("SELECT * FROM t;").await.unwrap().len(),
             1,
             "one Select response"
         );

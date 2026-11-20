@@ -40,10 +40,15 @@ tokio::task_local! {
     pub static READ_TS: u64;
 }
 
-thread_local! {
+tokio::task_local! {
     /// Set while a table is created from the SDK's physical type, where a
     /// sparse dimension of 0 is legal.
-    pub(crate) static ALLOW_ZERO_SPARSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    ///
+    /// A **task** local for the same reason as [`READ_TS`]: the check runs
+    /// inside a statement, which may be resumed on another worker after an
+    /// await, and a thread local set where the caller stood would not be the
+    /// value the validation reads.
+    pub static ALLOW_ZERO_SPARSE: bool;
 }
 
 thread_local! {
@@ -1372,19 +1377,17 @@ pub(crate) fn rewrite_unnest_pred(p: &Predicate, col: &str, alias: &str) -> Pred
 
 /// Runs `f` allowing a zero-dimension sparse column.
 ///
-/// A guard, not a call/restore: the flag is thread-local and the execution
-/// threads are reused by the pool, so a panic inside `f` that left it set would
-/// let an unrelated statement accept a zero-dimension sparse afterwards.
-pub fn with_zero_dimension_sparse<T>(f: impl FnOnce() -> T) -> T {
-    struct Reset(bool);
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            ALLOW_ZERO_SPARSE.with(|c| c.set(self.0));
-        }
-    }
-    let previous = ALLOW_ZERO_SPARSE.with(|c| c.replace(true));
-    let _restore = Reset(previous);
-    f()
+/// A task-local scope, not a flag with a restore: it has to follow the future
+/// across its awaits, and the scope ends (panic included) when `f` does, so a
+/// failed statement cannot leave the allowance on for the next task that runs
+/// on the same worker.
+pub async fn with_zero_dimension_sparse<T, F>(f: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    // `scope` takes the value and the future by value; the value is `Copy`, so
+    // a plain call is all that is needed.
+    ALLOW_ZERO_SPARSE.scope(true, f).await
 }
 
 /// Rejects `AND`/`OR`/`NOT` with non-boolean operands (e.g. `c1 + 0.1 AND …`).
@@ -3228,11 +3231,23 @@ pub(crate) struct MergedIndex {
     pub(crate) postings: HashMap<String, Vec<(u64, u32)>>,
 }
 
-pub(crate) type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
+/// A full-text index shared between the writers and every reader.
+///
+/// `tokio::sync::RwLock`, not `std::sync::RwLock`: a seal, a spill and an
+/// insert all await while the column's index is in scope, and a `std::sync`
+/// guard is not `Send` - holding one across an await made the whole statement
+/// future non-`Send` and a query could not run on a runtime worker.
+pub(crate) type SharedTextIndex = Arc<tokio::sync::RwLock<TextIndex>>;
 
+/// The exact scan's per-column copy of the vectors, in `f32`.
+///
+/// `f32`, not `f64`: the block stores `f32`, so widening to `f64` doubled the
+/// resident size of a 1M x 128d column (512 MB -> 1.024 GB) and bought no
+/// precision the stored value could use. `vector_score_f32` then scores with the
+/// reference's SIMD kernels.
 pub(crate) struct VectorCache {
     pub(crate) dims: usize,
-    pub(crate) rows: Vec<(usize, Vec<f64>)>,
+    pub(crate) rows: Vec<(usize, Vec<f32>)>,
     pub(crate) live: std::collections::HashSet<usize>,
 }
 
@@ -3245,38 +3260,37 @@ pub(crate) type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
 /// such scan materialises a large share of the table, so several concurrent
 /// readers can exhaust the process's memory even when a single query fits.
 pub(crate) struct ScanGate {
-    pub(crate) active: Mutex<usize>,
-    pub(crate) cv: std::sync::Condvar,
-    pub(crate) limit: usize,
+    /// `limit` permits; taking one is an `await`, so a waiting scan yields its
+    /// task instead of parking a thread.
+    sem: tokio::sync::Semaphore,
 }
 
 impl ScanGate {
     pub(crate) fn new(limit: usize) -> Self {
         Self {
-            active: Mutex::new(0),
-            cv: std::sync::Condvar::new(),
-            limit: limit.max(1),
+            sem: tokio::sync::Semaphore::new(limit.max(1)),
         }
     }
 
-    pub(crate) fn enter(&self) -> ScanSlot<'_> {
-        let mut active = self.active.lock().unwrap();
-        while *active >= self.limit {
-            active = self.cv.wait(active).unwrap();
+    /// Waits for a scan slot. The returned guard releases it on drop.
+    pub(crate) async fn enter(&self) -> ScanSlot<'_> {
+        let permit = self
+            .sem
+            .acquire()
+            .await
+            .expect("a scan gate's semaphore is never closed");
+        ScanSlot {
+            gate: self,
+            _permit: permit,
         }
-        *active += 1;
-        ScanSlot(self)
     }
 }
 
-pub(crate) struct ScanSlot<'a>(&'a ScanGate);
-
-impl Drop for ScanSlot<'_> {
-    fn drop(&mut self) {
-        let mut active = self.0.active.lock().unwrap();
-        *active = active.saturating_sub(1);
-        self.0.cv.notify_one();
-    }
+/// One scan slot, released when it is dropped.
+pub(crate) struct ScanSlot<'a> {
+    #[allow(dead_code)] // holds the lifetime of the gate the permit belongs to
+    gate: &'a ScanGate,
+    _permit: tokio::sync::SemaphorePermit<'a>,
 }
 
 /// One multi-vector index in the reference's two forms: the sealed segment
@@ -4934,6 +4948,15 @@ pub(crate) struct TableEntry {
     /// holders. A sealed block needs no such buffer - it is mapped (see
     /// `Context::block_maps`).
     pub(crate) pending_rows: PendingRows,
+    /// Blocks an in-flight import has already written into its staging
+    /// directory, by `(segment, block)`.
+    ///
+    /// Their column files are final; what the commit still owes them is the
+    /// `version` file (its `create` ts is the commit's) and the fast rough
+    /// filter. Recorded here rather than in the writer so a commit that runs
+    /// after the staging loop can tell a block it must not re-encode from one
+    /// whose rows are still buffered.
+    pub(crate) staged_import_blocks: HashMap<(u32, u16), crate::blocks::StagedImportBlock>,
     /// The memory `pending_rows` holds, kept as a running total.
     ///
     /// The quota reads this on every write statement, and summing a million
@@ -4988,12 +5011,28 @@ pub(crate) struct TableEntry {
     pub(crate) column_index_analyzers: HashMap<String, std::collections::BTreeMap<String, String>>,
     /// `CREATE INDEX … COMMENT '…'` per index name.
     pub(crate) comments: HashMap<String, String>,
-    /// HNSW memory segment per **index** (`MemIndex::hnsw_index_`).
+    /// HNSW memory segment per **`(index, segment)`** (`MemIndex::hnsw_index_`).
     ///
-    /// Keyed by the catalog index id, not the column: the reference keeps one
-    /// `MemIndex` per `SegmentIndexMeta` (a `(index, segment)` pair), so two
-    /// `USING HNSW` indexes on one column own two graphs.
-    pub(crate) hnsw_mem: HashMap<u64, Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+    /// The reference keys its `MemIndex` map by `SegmentIndexMeta`, i.e. one
+    /// graph per `(index_id, segment)` pair (`idx_seg|{db}|{tbl}|{index_id}|{seg}
+    /// |mem_index`). Every index type is per-segment for that reason: a
+    /// segment's index is dumped into its own chunk, and a query merges the
+    /// chunks it needs - which is what makes a multi-segment search
+    /// parallelisable. One graph per index cannot be split back into segments,
+    /// so it had to be rebuilt per segment at dump time instead.
+    /// `tokio::sync::Mutex`, not `std::sync::Mutex`: a batch insert awaits its
+    /// bucket fan-out (a `spawn_blocking` fan-out) while holding this lock, and
+    /// a `std::sync` guard is not `Send`, so the future would not be `Send` and
+    /// a build could not run on a runtime worker.
+    pub(crate) hnsw_mem:
+        HashMap<(u64, u32), Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+    /// `(dims, options)` per HNSW index id, remembered so a segment's graph can
+    /// be created when its first row arrives.
+    ///
+    /// A graph is per `(index, segment)`, so the set of graphs is not known
+    /// until the rows name their segments; this is what the write hook needs to
+    /// create one without re-reading the catalog per row.
+    pub(crate) hnsw_options: HashMap<u64, (usize, crate::blocks::index_chunk::HnswOptions)>,
     /// HNSW bytes buffered per index since its last dump (memindex quota).
     pub(crate) index_pending_bytes: HashMap<u64, usize>,
     /// Whether this table's HNSW indexes have been looked up in the catalog at
@@ -5473,13 +5512,12 @@ thread_local! {
 
 /// The timestamp the current statement reads at (`u64::MAX` outside one).
 pub(crate) fn read_ts() -> u64 {
-    // A synchronous span that has to see rows its own statement just wrote
-    // (the import's in-transaction `PopulateIndex`, whose builders scan the
-    // table) sets this. It is a thread-local and not a task-local because the
-    // span it covers contains **no awaits**: it is entered and left inside one
-    // synchronous call on one thread, so there is nothing for a runtime worker
-    // to resume it on.
-    if let Some(ts) = READ_TS_OVERRIDE.with(|cell| cell.get()) {
+    // A span that has to see rows its own statement just wrote (the import's
+    // in-transaction `PopulateIndex`, whose builders scan the table) sets this.
+    // The async form is checked first: an import's population spawns
+    // per-segment tasks, so a span that awaits is pinned as a task-local and
+    // may have resumed on another thread.
+    if let Ok(ts) = READ_TS_ASYNC.try_with(|ts| *ts) {
         return ts;
     }
     match READ_TS.try_with(|ts| *ts) {
@@ -5488,26 +5526,34 @@ pub(crate) fn read_ts() -> u64 {
     }
 }
 
-thread_local! {
-    /// Overrides [`read_ts`] for a synchronous span (see there).
-    static READ_TS_OVERRIDE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+tokio::task_local! {
+    /// See [`with_read_ts_override_async`].
+    static READ_TS_ASYNC: u64;
 }
 
-/// Runs `f` with [`read_ts`] pinned to `ts` for its duration.
+/// [`with_read_ts_override`] for a span that **awaits**.
 ///
-/// Only for a **synchronous** span: a task-local scope cannot cover one that
-/// runs inside an already-scoped statement, and the callers here are single
-/// calls with no awaits inside.
-pub(crate) fn with_read_ts_override<T>(ts: u64, f: impl FnOnce() -> T) -> T {
-    struct Reset(Option<u64>);
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            READ_TS_OVERRIDE.with(|cell| cell.set(self.0));
-        }
-    }
-    let previous = READ_TS_OVERRIDE.with(|cell| cell.replace(Some(ts)));
-    let _restore = Reset(previous);
-    f()
+/// The override has to survive the awaits inside it - an import's index
+/// population spawns per-segment tasks, and each of them must read the rows at
+/// this ts - so the async form pins it as a task-local instead of a
+/// thread-local.
+pub(crate) async fn with_read_ts_override_async<F: std::future::Future>(
+    ts: u64,
+    future: F,
+) -> F::Output {
+    READ_TS_ASYNC.scope(ts, future).await
+}
+
+/// Sets the read timestamp for the duration of `future`, as a **task local**.
+///
+/// The counterpart of [`with_pool_read_ts`] for a bottom half that is a task:
+/// the value has to ride in the task, not the thread, or it is lost the moment
+/// the task resumes elsewhere.
+pub(crate) async fn with_pool_read_ts_async<F: std::future::Future>(
+    ts: u64,
+    future: F,
+) -> F::Output {
+    with_read_ts_override_async(ts, future).await
 }
 
 /// Sets [`POOL_READ_TS`] for the duration of `f` (a blocking-pool job).
@@ -6121,29 +6167,6 @@ pub(crate) fn process_rss_bytes() -> u64 {
 /// Anonymous (heap) resident bytes on Linux, `None` where the split is not
 /// exposed.
 ///
-/// `process_rss_bytes` counts the mapped chunk and column pages too, and those
-/// are page cache: a checkpoint that maps a column legitimately raises RSS by
-/// the column's size. This is the number a heap question has to be asked
-/// against, and the one `/proc/self/status` calls `RssAnon`.
-#[cfg(all(test, target_os = "linux"))]
-pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
-    for line in status.lines() {
-        if let Some(rest) = line.strip_prefix("RssAnon:") {
-            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
-            return Some(kb * 1024);
-        }
-    }
-    None
-}
-
-/// [`process_rss_anon_bytes`] where the kernel does not split RSS: the caller
-/// falls back to reporting only, since `ps`'s figure includes file pages.
-#[cfg(all(test, not(target_os = "linux")))]
-pub(crate) fn process_rss_anon_bytes() -> Option<u64> {
-    None
-}
-
 /// Resident set size in bytes on the platforms without `/proc`: `ps -o rss=`
 /// reads the same figure from libproc (macOS) / the BSDs' kernel interface and
 /// prints it in KiB. Nothing overflows on the way back to bytes - an RSS is a
@@ -6233,19 +6256,16 @@ pub struct PendingRestore<'a> {
 
 impl PendingRestore<'_> {
     /// Applies the restore, as `CommitTxn` does for a restore transaction.
-    pub fn commit(self) -> Result<()> {
+    ///
+    /// Async, like every other statement-level operation: a restore takes the
+    /// DDL turn and writes the catalog and the files, and the statement path
+    /// awaits it on a runtime task. A synchronous twin would park the worker
+    /// that the DDL turn's holder needs.
+    pub async fn commit(self) -> Result<()> {
         match self.scope {
-            // A synchronous adapter for the tests and `EngineTxn`; the
-            // statement path awaits the snapshot functions directly.
-            RestoreScope::Table => {
-                crate::scheduler::block_on(self.engine.restore_table_snapshot(&self.name))
-            }
-            RestoreScope::Database => {
-                crate::scheduler::block_on(self.engine.restore_database_snapshot(&self.name))
-            }
-            RestoreScope::System => {
-                crate::scheduler::block_on(self.engine.restore_system_snapshot(&self.name))
-            }
+            RestoreScope::Table => self.engine.restore_table_snapshot(&self.name).await,
+            RestoreScope::Database => self.engine.restore_database_snapshot(&self.name).await,
+            RestoreScope::System => self.engine.restore_system_snapshot(&self.name).await,
         }
     }
 
@@ -6263,6 +6283,7 @@ impl PendingRestore<'_> {
 /// segment's id, not `base + k`. The WAL frame names both ranges and the bottom
 /// half addresses each row through `seq_at`, so the buffer, the WAL and the
 /// index entries agree across the seam.
+#[cfg(test)]
 pub(crate) struct StagedAppend {
     pub(crate) table: String,
     pub(crate) range: RowRange,
@@ -6271,6 +6292,7 @@ pub(crate) struct StagedAppend {
     pub(crate) rows: Vec<Vec<Literal>>,
 }
 
+#[cfg(test)]
 impl StagedAppend {
     /// The row id of the `k`-th row of this append.
     pub(crate) fn seq_at(&self, k: usize) -> usize {
@@ -6289,6 +6311,7 @@ pub(crate) struct DumpVersion {
 
 /// A `DumpMemIndex` staged in an [`EngineTxn`] (C++ `NewTxn::DumpMemIndex`).
 #[derive(Debug, Clone)]
+#[cfg(test)]
 pub(crate) struct StagedDump {
     pub(crate) table: String,
     pub(crate) index: String,
@@ -6307,6 +6330,20 @@ pub(crate) struct StagedDump {
 /// `rollback` discards the staged writes. The row-id allocator is not rewound
 /// (the reference frees the append range on rollback; no test here reuses ids
 /// from a rolled-back append).
+/// A staged `NewTxn`: rows allocated, index dumps queued, nothing visible.
+///
+/// **Test-only.** The engine's own writes go through the statement path
+/// (`insert_literals_inner` and friends), which stages and commits in one
+/// chain; nothing outside `#[cfg(test)]` ever holds an `EngineTxn`. It exists
+/// because the multi-transaction tests need to interleave two open
+/// transactions deliberately - a conflict, a rollback, a snapshot taken while
+/// another transaction is uncommitted - and no production caller ever does.
+///
+/// `dead_code` is allowed rather than gating each accessor: the tests use a
+/// different subset per file, so every method is unused from some build's
+/// point of view.
+#[cfg(test)]
+#[allow(dead_code)]
 pub struct EngineTxn<'a> {
     pub(crate) engine: &'a Engine,
     /// The same engine, when it lives in an `Arc` (`Engine::open` records a
@@ -6357,6 +6394,7 @@ impl Drop for BottomGuard<'_> {
     }
 }
 
+#[cfg(test)]
 pub(crate) async fn run_bottom(
     engine: &Engine,
     appends: &[StagedAppend],
@@ -6429,9 +6467,9 @@ pub(crate) async fn run_bottom(
                 .update_text_indexes_batch_async(table, &batch, &schema, None)
                 .await;
             for (seq, cells) in &texts {
-                engine.update_vector_caches(table, *seq, cells);
+                engine.update_vector_caches(table, *seq, cells).await;
             }
-            engine.dump_hnsw_over_capacity(table);
+            engine.dump_hnsw_over_capacity(table).await;
             engine.dump_secondary_over_capacity(table).await;
         }
         engine.bump_writes(table);
@@ -6500,7 +6538,7 @@ pub(crate) async fn run_bottom(
     }
     // The catalog is still current: perform the sealed writes now.
     for dump in dumps {
-        engine.dump_index(&dump.table, &dump.index)?;
+        engine.dump_index(&dump.table, &dump.index).await?;
     }
     // `NewTxnManager::CommitBottom`: publishing happens when `visible` drops,
     // on the error path too, so the clock never waits on a half-done bottom.
@@ -6521,7 +6559,16 @@ pub(crate) struct BottomQueues {
 }
 
 /// The job a table's worker runs for one statement's bottom half.
-pub(crate) type BottomJob = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
+///
+/// It takes **no engine argument**: the body is already bound to the engine it
+/// runs on. The pool path closes over an `Arc<Engine>` (the job outlives the
+/// statement), the inline path runs its work on a borrow and never builds one
+/// of these at all. A `FnOnce(&Engine)` signature could not serve both - the
+/// pool job is `'static` and cannot borrow, and a higher-ranked trait object
+/// over the borrow does not unify with either closure.
+pub(crate) type BottomJob = Box<
+    dyn FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>> + Send,
+>;
 
 /// The post-commit work of one statement, handed to a [`BottomExecutor`]
 /// worker (`NewTxnManager::CommitBottom` for a single-table statement).
@@ -6532,6 +6579,10 @@ pub(crate) type BottomJob = Box<dyn FnOnce(&Engine) -> Result<()> + Send>;
 /// the state mutex disappears with the condvar; when the statement path is async
 /// the `wait` becomes `await` without another change.
 pub(crate) struct BottomWork {
+    /// Kept alive for the job's duration: the job's closure holds its own
+    /// handle, and the struct holding one too is what keeps the engine from
+    /// being dropped mid-bottom if that were the last reference.
+    #[allow(dead_code)]
     pub(crate) engine: Arc<Engine>,
     pub(crate) table_id: String,
     /// The tables' gates, locked on the worker: bottom halves of one table take
@@ -6574,26 +6625,33 @@ impl storage::wal::bottom_executor::BottomTask for BottomWork {
         true
     }
 
-    fn commit_bottom(&self) {
-        #[cfg(test)]
-        BOTTOM_WORKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let work = self.work.lock().unwrap().take();
-        let result = match work {
-            Some(work) => {
-                let _turn: Vec<tokio::sync::MutexGuard<'_, ()>> = self
-                    .gates
-                    .iter()
-                    .map(|gate| crate::scheduler::block_on(gate.lock()))
-                    .collect::<Vec<_>>();
-                work(&self.engine)
+    fn commit_bottom(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
+        Box::pin(async move {
+            #[cfg(test)]
+            BOTTOM_WORKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let work = self.work.lock().unwrap().take();
+            let result = match work {
+                Some(work) => {
+                    // The gates are awaited, not bridged: this is a task on the
+                    // engine's runtime now, so a `block_on` here would park the
+                    // very worker that has to poll whatever holds the gate.
+                    let mut turns = Vec::with_capacity(self.gates.len());
+                    for gate in &self.gates {
+                        turns.push(gate.lock().await);
+                    }
+                    work().await
+                }
+                None => Ok(()),
+            };
+            // A waiter that has already given up (`wait` was never called, or
+            // the receiver dropped) simply loses the message; the bottom itself
+            // ran.
+            if let Some(sender) = self.done.lock().unwrap().take() {
+                let _ = sender.send(result);
             }
-            None => Ok(()),
-        };
-        // A waiter that has already given up (`wait` was never called, or the
-        // receiver dropped) simply loses the message; the bottom itself ran.
-        if let Some(sender) = self.done.lock().unwrap().take() {
-            let _ = sender.send(result);
-        }
+        })
     }
 }
 
@@ -6608,6 +6666,7 @@ pub(crate) fn bottom_work_count() -> usize {
     BOTTOM_WORKS.load(std::sync::atomic::Ordering::SeqCst)
 }
 
+#[cfg(test)]
 impl<'a> EngineTxn<'a> {
     /// C++ `NewTxn::BeginTS`: the read timestamp this transaction sees.
     pub fn begin_ts(&self) -> u64 {
@@ -6616,7 +6675,7 @@ impl<'a> EngineTxn<'a> {
 
     /// C++ `NewTxn::Append`: normalize the block like `INSERT` does, reserve
     /// row ids, and stage the encoded rows in the transaction.
-    pub fn append(&mut self, table: &str, rows: Vec<Vec<Literal>>) -> Result<usize> {
+    pub async fn append(&mut self, table: &str, rows: Vec<Vec<Literal>>) -> Result<usize> {
         if rows.is_empty() {
             return Ok(0);
         }
@@ -6661,12 +6720,16 @@ impl<'a> EngineTxn<'a> {
                 }
             }
         }
-        let range = self.engine.reserve_rows(&table, rows.len(), false)?;
+        let range = self.engine.reserve_rows(&table, rows.len(), false).await?;
         let types = self.engine.column_types(&table)?;
-        let mut encoded = Vec::with_capacity(rows.len());
-        for row in rows.iter() {
-            encoded.push(self.engine.encode_row_stored(&table, row, &types)?);
-        }
+        let has_block_layout = self.engine.has_block_layout(&table);
+        // Encoded inline, not on the blocking pool. This function has no
+        // production caller (it is the test-only `NewTxn::Append` equivalent),
+        // so a thread hop would buy nothing; `insert_literals_inner` is the
+        // path a real INSERT takes. A batch is bounded by `MAX_APPEND_ROWS`,
+        // and `encode_row` is the same work the block writer does anyway.
+        let encoded: Vec<String> = rows.iter().map(|row| encode_row(row, &types)).collect();
+        let block = typed_append_block(&rows, &types).filter(|_| has_block_layout);
         // `WalCmdAppendV2`: the rows ride in the log's `DataBlock` (the
         // reference's command), and the commit writes them straight into the
         // block - the engine keeps no `row:` key for either. A table no block
@@ -6674,9 +6737,7 @@ impl<'a> EngineTxn<'a> {
         // command: its rows reach the disk with the block buffer at the next
         // checkpoint.
         let table_id = meta.id.to_string();
-        if let Some(block) =
-            typed_append_block(&rows, &types).filter(|_| self.engine.has_block_layout(&table))
-        {
+        if let Some(block) = block {
             if let Some(txn) = self.txn.as_mut() {
                 txn.set_typed_commands(vec![self.engine.append_command(
                     &table,
@@ -6732,8 +6793,8 @@ impl<'a> EngineTxn<'a> {
 
     /// `NewTxn::CreateTableSnapshot`: reads committed state only, so this
     /// transaction's staged writes are invisible to the snapshot.
-    pub fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
-        crate::scheduler::block_on(self.engine.create_table_snapshot(db, table, name))
+    pub async fn create_table_snapshot(&self, db: &str, table: &str, name: &str) -> Result<()> {
+        self.engine.create_table_snapshot(db, table, name).await
     }
 
     /// C++ `NewTxn::DumpMemIndex`: stages the dump of `index` on `table`.
@@ -6755,7 +6816,10 @@ impl<'a> EngineTxn<'a> {
 
     /// `CommitTxn`: applies the staged batch, then updates the in-memory index
     /// registries and row bookkeeping.
-    pub fn commit(mut self) -> Result<()> {
+    ///
+    /// Async because the bottom half writes chunks and blocks, and those writes
+    /// await their own fan-outs.
+    pub async fn commit(mut self) -> Result<()> {
         // A transaction is only a staged batch until here, so the mode is
         // checked at commit: a node that turned read-only (or uninitialized)
         // after the append must not publish it (`PhysicalInsert` checks the
@@ -6856,24 +6920,29 @@ impl<'a> EngineTxn<'a> {
                 .or_else(|| dumps.first().map(|dump| dump.table.clone()))
                 .unwrap_or_default();
             let (done, finished) = tokio::sync::oneshot::channel();
+            let work_engine = std::sync::Arc::clone(&engine);
             let task = std::sync::Arc::new(BottomWork {
                 engine,
                 table_id,
                 gates,
-                work: std::sync::Mutex::new(Some(Box::new(move |engine: &Engine| {
-                    crate::scheduler::block_on(run_bottom(engine, &appends, &deletes, &dumps, txn))
-                }))),
+                work: std::sync::Mutex::new(Some(Box::new(move || {
+                    let engine = std::sync::Arc::clone(&work_engine);
+                    Box::pin(
+                        async move { run_bottom(&engine, &appends, &deletes, &dumps, txn).await },
+                    )
+                        as std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+                }) as BottomJob)),
                 done: std::sync::Mutex::new(Some(done)),
                 finished: std::sync::Mutex::new(Some(finished)),
             });
-            self.engine.submit_bottom(task.clone());
-            return crate::scheduler::block_on(task.wait());
+            self.engine.submit_bottom(task.clone()).await;
+            return task.wait().await;
         }
-        let _gates: Vec<tokio::sync::MutexGuard<'_, ()>> = gates
-            .iter()
-            .map(|gate| crate::scheduler::block_on(gate.lock()))
-            .collect();
-        crate::scheduler::block_on(run_bottom(self.engine, &appends, &deletes, &dumps, txn))
+        let mut turns = Vec::with_capacity(gates.len());
+        for gate in &gates {
+            turns.push(gate.lock().await);
+        }
+        run_bottom(self.engine, &appends, &deletes, &dumps, txn).await
     }
 
     /// `NewTxn::Rollback`: discards every staged write and counts the rollback
@@ -7011,30 +7080,39 @@ pub(crate) fn index_key(table: &str, column: &str) -> String {
 pub(crate) fn mem_index_key(table: &str, index_id: u64) -> String {
     format!("{table}#{index_id}")
 }
-
-/// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
-///
-/// C++: `MemoryIndexer::Insert` followed by the spill `CommitOffline` performs
-/// when a batch fills the memory budget. A column that outgrows the budget is
-/// spilled to a sorted run and **keeps indexing**: it never goes dark, so a
-/// query can always answer from the postings instead of re-tokenising rows.
-pub(crate) fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
-    let doc = prepare_doc(seq, text, &index.tokenizer);
-    index_row_prepared(index, &doc);
-}
-
 /// [`index_row`] with the document already tokenised (see
 /// [`prepare_doc`]): the write lock is held only for the insertion.
-pub(crate) fn index_row_prepared(index: &mut TextIndex, doc: &PreparedDoc) {
-    let budget = index.budget;
-    if index.mem.insert_prepared(doc, budget) {
-        return;
+/// Inserts one document, spilling a run first when the budget is full.
+///
+/// The index is locked **inside** this function, one short critical section at
+/// a time, rather than held by the caller across the spill's file write: a
+/// `std::sync` guard cannot cross an await, and the spill awaits its encode
+/// fan-out. The caller passes the shared handle, exactly as
+/// `HnswIndexInMem::insert_batch` takes its graph.
+pub(crate) async fn index_row_prepared(shared: &SharedTextIndex, doc: &PreparedDoc) {
+    // Fast path: it fits, so no lock is given up between the check and the
+    // insert.
+    {
+        let mut index = shared.write().await;
+        let budget = index.budget;
+        if index.mem.insert_prepared(doc, budget) {
+            return;
+        }
     }
-    // A spill run is a transient chunk of the segment its rows belong to
-    // (`MemoryIndexer::CommitOffline` writes it beside the chunk files), so it
-    // goes into that segment's directory.
-    let spill_dir = storage::invertedindex::format::segment_chunk_dir(&index.dir, doc.seq >> 32);
-    if index.mem.spill(&spill_dir) && index.mem.insert_prepared(doc, budget) {
+    // The write happens with the index **unlocked**: `spill` reads the tail,
+    // writes its run file and re-takes the lock to install it.
+    let (spilled, budget) = {
+        let mut index = shared.write().await;
+        let budget = index.budget;
+        // A spill run is a transient chunk of the segment its rows belong to
+        // (`MemoryIndexer::CommitOffline` writes it beside the chunk files), so
+        // it goes into that segment's directory.
+        let spill_dir =
+            storage::invertedindex::format::segment_chunk_dir(&index.dir, doc.seq >> 32);
+        (index.mem.spill(&spill_dir).await, budget)
+    };
+    let mut index = shared.write().await;
+    if spilled && index.mem.insert_prepared(doc, budget) {
         return;
     }
     // Either the run could not be written (no directory, disk error) or this
@@ -7044,12 +7122,52 @@ pub(crate) fn index_row_prepared(index: &mut TextIndex, doc: &PreparedDoc) {
     index.mem.insert_prepared(doc, usize::MAX);
 }
 
+/// Indexes one document's tokens into a `TextIndex` held by value.
+///
+/// For a caller that owns the index by value (a unit test): the index is not
+/// shared yet, so the spill writes its run straight through
+/// [`crate::engine::text_index::TextIndex::spill`] on this value instead of
+/// going through a shared handle. The budget behaviour is the published one -
+/// cross it and the tail spills - which is what the spill tests assert; the
+/// published path for a **shared** index is [`index_row_prepared`].
+#[cfg(test)]
+pub(crate) async fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
+    let doc = crate::engine::text_index::prepare_doc(seq, text, &index.tokenizer);
+    let budget = index.budget;
+    if index.mem.insert_prepared(&doc, budget) {
+        return;
+    }
+    // The run is a transient chunk of the segment its rows belong to
+    // (`MemoryIndexer::CommitOffline` writes it beside the chunk files).
+    let spill_dir = storage::invertedindex::format::segment_chunk_dir(&index.dir, doc.seq >> 32);
+    if index.mem.spill(&spill_dir).await && index.mem.insert_prepared(&doc, budget) {
+        return;
+    }
+    // Either the run could not be written (no directory, disk error) or this
+    // single document is larger than the whole budget: keep it in memory past
+    // the budget so the seal still writes it.
+    index.mem.insert_prepared(&doc, usize::MAX);
+}
+
+/// [`index_row_prepared`] for a caller that already holds the index by value
+/// and has **not** shared it yet (a `CREATE INDEX` build).
+///
+/// No spill-await here: a build that has not published yet has no shared
+/// handle for the spill to take, and its rows are the first the index holds.
+pub(crate) fn index_row_direct(index: &mut TextIndex, doc: &PreparedDoc) {
+    let budget = index.budget;
+    if !index.mem.insert_prepared(doc, budget) {
+        // Past the budget with no way to spill: keep the row, the seal writes it.
+        index.mem.insert_prepared(doc, usize::MAX);
+    }
+}
+
 /// [`index_row_prepared`] for a whole batch: one budget check and at most one
 /// spill per document, but the caller already holds the lock once for all of
 /// them.
-pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
+pub(crate) async fn index_rows_prepared(shared: &SharedTextIndex, docs: &[PreparedDoc]) {
     for doc in docs {
-        index_row_prepared(index, doc);
+        index_row_prepared(shared, doc).await;
     }
 }
 
@@ -7074,9 +7192,11 @@ pub(crate) fn index_rows_prepared(index: &mut TextIndex, docs: &[PreparedDoc]) {
 /// seal, a merge, a checkpoint's publish and a rebuild from writing, renaming or
 /// unlinking one chunk file at the same time
 /// ([`crate::engine::text_index::dir_gate`]).
-pub(crate) fn seal_text_index_gated(shared: &SharedTextIndex) {
+pub(crate) async fn seal_text_index_gated(shared: &SharedTextIndex) {
+    // Kept as a plain async fn on purpose: its only non-`Send` risk would be a
+    // `std::sync` guard, and there is none - every lock here is tokio's.
     let job = {
-        let mut index = shared.write().unwrap();
+        let mut index = shared.write().await;
         index.claim_seal()
     };
     let Some(job) = job else {
@@ -7084,9 +7204,9 @@ pub(crate) fn seal_text_index_gated(shared: &SharedTextIndex) {
     };
     // No lock held: the segment files are written here.
     let started = std::time::Instant::now();
-    let written = job.write();
+    let written = job.write().await;
     let elapsed_us = started.elapsed().as_micros() as u64;
-    let mut index = shared.write().unwrap();
+    let mut index = shared.write().await;
     index.last_seal_us = elapsed_us;
     match written {
         Some(segment) => index.complete_seal(job, segment),
@@ -7106,25 +7226,34 @@ pub(crate) fn seal_text_index_gated(shared: &SharedTextIndex) {
 /// files another writer had just published under the same name (`dir_gate`).
 /// Only the lookups this column shares with a query - the index lock itself -
 /// stay outside it.
-pub(crate) fn optimize_text_index_unlocked(
+pub(crate) async fn optimize_text_index_unlocked(
     shared: &SharedTextIndex,
     deleted: &std::collections::HashSet<u64>,
 ) -> crate::Result<usize> {
+    // Async, so the index lock is taken the same way every other caller takes
+    // it. The chunk rewrite and its fsyncs are CPU and I/O, which is what the
+    // caller's `spawn_blocking` is for - not the lock.
     let gate = {
-        let index = shared.read().unwrap();
+        let index = shared.read().await;
         index.gate.clone()
     };
-    let _serial = gate.lock().unwrap();
+    let _serial = gate.lock().await;
     let (plan, dir) = {
-        let index = shared.read().unwrap();
+        let index = shared.read().await;
         let Some(plan) = index.plan_merge(deleted)? else {
             return Ok(0);
         };
         (plan, index.dir.clone())
     };
-    // No index lock held: whole chunks are rewritten here.
-    let merged = TextIndex::merge_runs(&dir, &plan);
-    let mut index = shared.write().unwrap();
+    // No index lock held: whole chunks are rewritten on the blocking pool, so
+    // a long merge never occupies a worker and never blocks a query.
+    let merged = {
+        let plan_for_merge = plan.clone();
+        crate::scheduler::scheduler()
+            .spawn_blocking(move || TextIndex::merge_runs(&dir, &plan_for_merge))
+            .await
+    };
+    let mut index = shared.write().await;
     Ok(index.apply_merge(&plan, merged))
 }
 
@@ -7141,7 +7270,7 @@ pub(crate) fn optimize_text_index_unlocked(
 ///
 /// The return value is the merge count and, per surviving chunk,
 /// `(segment, base_name, base_row_id, row_count, term_count)`.
-pub(crate) fn merge_text_index_from_catalog(
+pub(crate) async fn merge_text_index_from_catalog(
     dir: &str,
     chunks: &[crate::engine::text_index::CatalogChunk],
     deleted: &std::collections::HashSet<u64>,
@@ -7152,10 +7281,10 @@ pub(crate) fn merge_text_index_from_catalog(
     if index.load_sealed_scoped(chunks) == 0 {
         return Ok((0, Vec::new()));
     }
-    let shared: SharedTextIndex = Arc::new(std::sync::RwLock::new(index));
-    let done = optimize_text_index_unlocked(&shared, deleted)?;
+    let shared: SharedTextIndex = Arc::new(tokio::sync::RwLock::new(index));
+    let done = optimize_text_index_unlocked(&shared, deleted).await?;
     let held = {
-        let index = shared.read().unwrap_or_else(|poison| poison.into_inner());
+        let index = shared.read().await;
         index
             .reader
             .segments
@@ -8079,7 +8208,7 @@ impl RowFulltextProvider<'_> {
     pub(crate) fn index_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
         let (index, tokenizer) = self.index?;
         self.row_ids?;
-        let guard = index.read().ok()?;
+        let guard = index.try_read().ok()?;
         if &guard.tokenizer != tokenizer {
             return None;
         }
@@ -10213,18 +10342,13 @@ impl BgTask for SpannRebuildTask {
                 engine: engine.clone(),
                 key: (table_id, index.clone()),
             };
-            let joined = tokio::task::spawn_blocking(move || {
-                engine.publish_index_chunks_forced(&table, table_id, Some((&index, ts)))
-            })
-            .await;
+            let joined: std::result::Result<(), common::Error> = engine
+                .publish_index_chunks_forced(&table, table_id, Some((&index, ts)))
+                .await;
             drop(guard);
             match joined {
-                Ok(Ok(())) => {}
-                Ok(Err(error)) => eprintln!("background spann rebuild failed: {error}"),
-                // A panic here must not take the engine down: the old chain is
-                // still installed and still correct (the new chunk was never
-                // recorded), so the segment simply rebuilds again next time.
-                Err(error) => eprintln!("background spann rebuild panicked: {error}"),
+                Ok(()) => {}
+                Err(error) => eprintln!("background spann rebuild failed: {error}"),
             }
         })
     }

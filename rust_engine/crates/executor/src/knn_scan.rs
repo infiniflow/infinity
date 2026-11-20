@@ -274,7 +274,7 @@ impl Engine {
         widened.min(cap).max(base)
     }
 
-    pub(crate) fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<KnnProbe> {
+    pub(crate) async fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<KnnProbe> {
         let tkey = self.table_key(q.table);
         // IVF: probe `nprobe` centroids of every sealed chunk (C++
         // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
@@ -359,8 +359,12 @@ impl Engine {
                 _ => (width, budget),
             };
             let hits = match q.allowed {
-                Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
-                None => index.search(q.query, budget, Some(width)),
+                Some(allowed) => {
+                    index
+                        .search_filtered(q.query, budget, Some(width), allowed)
+                        .await
+                }
+                None => index.search(q.query, budget, Some(width)).await,
             };
             // §16.4 telemetry: what this query actually cost. `hits.len() <
             // budget` means the beam ran out of partitions before the pool
@@ -485,18 +489,28 @@ impl Engine {
         // labels must cover the live q.rows, else the exact scan runs.
         // The in-memory segment: rows written after the last dump. The
         // reference searches every segment and merges the results.
-        let mem = self
+        // Every **segment's** memory graph, not one per index: the reference
+        // keys `MemIndex` by `(index_id, segment)`, and a query merges what
+        // every segment answers (`MergeKnn`).
+        let mems: Vec<std::sync::Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|e| e.hnsw_mem.get(&index_id).cloned());
+            .map(|e| {
+                e.hnsw_mem
+                    .iter()
+                    .filter(|((id, _), _)| *id == index_id)
+                    .map(|(_, m)| std::sync::Arc::clone(m))
+                    .collect()
+            })
+            .unwrap_or_default();
         // No graph at all: this column is answered by the exact scan. Returning
         // `Some(empty)` here would be read as "the index covers nothing", and
         // the caller (which defers decoding the rows) would then score none of
         // them - that is what made every KNN query on a non-float embedding
         // column return no rows.
-        if segments.is_empty() && mem.is_none() {
+        if segments.is_empty() && mems.is_empty() {
             return None;
         }
         let mut labelled = 0usize;
@@ -532,8 +546,13 @@ impl Engine {
                 .collect();
             merge.search(0, &hits);
         }
-        if let Some(mem) = &mem {
-            if let Ok(mem) = mem.lock() {
+        for mem in &mems {
+            // `try_lock`: the query path is synchronous. A graph the build is
+            // filling is skipped, which is what an empty one would report.
+            if let Ok(mem) = mem.try_lock() {
+                if mem.dims != q.query.len() {
+                    return None;
+                }
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
@@ -572,8 +591,8 @@ impl Engine {
         for seg in &segments {
             covered.extend(seg.labels.iter().map(|label| *label as usize));
         }
-        if let Some(mem) = &mem {
-            if let Ok(mem) = mem.lock() {
+        for mem in &mems {
+            if let Ok(mem) = mem.try_lock() {
                 covered.extend(mem.rows().iter().map(|row| *row as usize));
             }
         }
@@ -640,9 +659,11 @@ impl PhysicalKnnScan<'_> {
 
     /// C++ `Execute()`: score every scanned row (or cache entry) and return
     /// the operator state, before sorting/thresholding.
-    pub(crate) fn execute(
+    pub(crate) async fn execute(
         &self,
-        keep: &dyn Fn(&[Value]) -> bool,
+        // `+ Sync`: the execute future is awaited on a runtime worker and
+        // boxed as `Send`, so every borrow it captures has to be `Sync`.
+        keep: &(dyn Fn(&[Value]) -> bool + Sync),
         bmp_scores: &HashMap<usize, f64>,
         mv_scores: &HashMap<usize, f64>,
     ) -> crate::Result<KnnScanOperatorState> {
@@ -818,7 +839,7 @@ impl PhysicalKnnScan<'_> {
                 scored.push((*seq, sim, dist));
             }
         }
-        self.score_cache(&mut scored);
+        self.score_cache(&mut scored).await;
         Ok(KnnScanOperatorState {
             scored,
             use_sim: self.use_sim(),
@@ -827,16 +848,20 @@ impl PhysicalKnnScan<'_> {
 
     /// The rows decoded once into the scalar row cache (the reference's
     /// in-memory `DataBlock`s): score them without re-reading the store.
-    fn score_cache(&self, scored: &mut Vec<(usize, f64, f64)>) {
+    ///
+    /// The cache holds `f32` (that is the block's own precision), and
+    /// `vector_score_f32` is the scoring path: `l2` then runs the reference's
+    /// SIMD kernel instead of the generic three-pass dot/product/norm form.
+    async fn score_cache(&self, scored: &mut Vec<(usize, f64, f64)>) {
         let Some(shared) = self.cache else {
             return;
         };
-        let qv: Vec<f64> = self
+        let qv: Vec<f32> = self
             .query_items
             .iter()
-            .filter_map(|x| x.parse::<f64>().ok())
+            .filter_map(|x| x.parse::<f32>().ok())
             .collect();
-        let guard = shared.read().unwrap();
+        let guard = shared.read().unwrap_or_else(|p| p.into_inner());
         if qv.is_empty() || qv.len() != guard.dims {
             return;
         }
@@ -863,7 +888,7 @@ impl PhysicalKnnScan<'_> {
                     continue;
                 }
                 let v = &guard.rows[at].1;
-                let (sim, dist) = crate::vector_score(&qv, v, self.metric);
+                let (sim, dist) = crate::vector_score_f32(&qv, v, self.metric);
                 scored.push((seq, sim, dist));
             }
             return;
@@ -872,38 +897,59 @@ impl PhysicalKnnScan<'_> {
             if !guard.live.contains(seq) {
                 continue;
             }
-            let (sim, dist) = crate::vector_score(&qv, v, self.metric);
+            let (sim, dist) = crate::vector_score_f32(&qv, v, self.metric);
             scored.push((*seq, sim, dist));
         }
     }
 
-    /// C++ `MergeKnn`/result-handler finish: sort in the scan's direction,
+    /// C++ `MergeKnn`/result-handler finish: rank in the scan's direction,
     /// apply `threshold`, keep `topn`.
-    pub(crate) fn finish(&self, mut state: KnnScanOperatorState) -> KnnScanOperatorState {
+    ///
+    /// `select_nth_unstable_by` rather than a full sort: the exact scan scores
+    /// every live row, so `scored` holds a million entries for a top-100 answer
+    /// and sorting all of them was most of a brute-force query's time (SIFT 1M:
+    /// 947 ms per query, `sort_by` at the top of the profile). Partitioning at
+    /// `topn` is O(n), and only the kept prefix is sorted.
+    ///
+    /// The comparator is the one this function always used - `(score, row id)`
+    /// with the score direction taken from the metric - so the answer is
+    /// identical to the full-sort version, including the order of ties.
+    pub(crate) fn finish(&self, state: KnnScanOperatorState) -> KnnScanOperatorState {
         let use_sim = state.use_sim;
-        state.scored.sort_by(|a, b| {
+        // For a distance metric the threshold is an upper bound; for a
+        // similarity metric it is a lower bound.
+        let is_dist = !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
+        let passes = |sim: f64, dist: f64| -> bool {
+            match self.threshold {
+                None => true,
+                Some(th) if is_dist => dist <= th,
+                Some(th) if use_sim => sim >= th,
+                Some(th) => dist >= th,
+            }
+        };
+        // `a` sorts before `b` when `a` is the better answer.
+        let better = |a: &(usize, f64, f64), b: &(usize, f64, f64)| -> std::cmp::Ordering {
             let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
             x.partial_cmp(&y)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
-        });
-        if let Some(th) = self.threshold {
-            // For a distance metric the threshold is an upper bound; for a
-            // similarity metric it is a lower bound.
-            let is_dist =
-                !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
-            state.scored.retain(|(_, sim, dist)| {
-                if is_dist {
-                    *dist <= th
-                } else if use_sim {
-                    *sim >= th
-                } else {
-                    *dist >= th
-                }
-            });
+        };
+        let mut scored: Vec<(usize, f64, f64)> = if self.threshold.is_some() {
+            state
+                .scored
+                .into_iter()
+                .filter(|e| passes(e.1, e.2))
+                .collect()
+        } else {
+            state.scored
+        };
+        if scored.len() > self.topn {
+            // Partition so the first `topn` are the best ones (unordered).
+            scored.select_nth_unstable_by(self.topn - 1, better);
+            scored.truncate(self.topn);
         }
-        state.scored.truncate(self.topn);
-        state
+        scored.sort_by(better);
+        KnnScanOperatorState { scored, use_sim }
     }
 }
 

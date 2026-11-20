@@ -30,8 +30,8 @@ use storage::invertedindex::format::OPTION_FLAG_ALL;
 use tempfile::tempdir;
 
 /// `PostingWriterTest::test1`.
-#[test]
-fn test1() {
+#[tokio::test]
+async fn test1() {
     let expected = [1u64, 3, 5, 7, 9];
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
@@ -48,7 +48,9 @@ fn test1() {
             .collect::<Vec<_>>(),
     )]);
     let flags = OPTION_FLAG_ALL;
-    write_segment_index(dir_str, "posting_writer", 0, &docs, &postings, flags).unwrap();
+    write_segment_index(dir_str, "posting_writer", 0, &docs, &postings, flags)
+        .await
+        .unwrap();
 
     let reader = SegmentIndexReader::open(dir_str, "posting_writer", 0, flags).unwrap();
     let mut posting = DecodedPostingList::with_postings(reader.postings("term").unwrap());
@@ -75,8 +77,8 @@ fn test1() {
 }
 
 /// `PostingWriterTest::tf_after_skip_to_across_segments`.
-#[test]
-fn tf_after_skip_to_across_segments() {
+#[tokio::test]
+async fn tf_after_skip_to_across_segments() {
     let flags = OPTION_FLAG_ALL;
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_str().unwrap();
@@ -93,7 +95,9 @@ fn tf_after_skip_to_across_segments() {
                 .collect::<Vec<_>>(),
         )]);
         let base_name = format!("segment_{segment}");
-        write_segment_index(dir_str, &base_name, first_row - 1, &docs, &postings, flags).unwrap();
+        write_segment_index(dir_str, &base_name, first_row - 1, &docs, &postings, flags)
+            .await
+            .unwrap();
         let reader = SegmentIndexReader::open(dir_str, &base_name, first_row - 1, flags).unwrap();
         segments.push(reader.postings("term").unwrap());
     }

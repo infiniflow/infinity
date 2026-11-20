@@ -78,15 +78,19 @@ pub(crate) fn dedupe_posting_entries(list: &mut Vec<(u64, u32, Vec<u32>)>) {
 /// `optimize_text_index_unlocked` and the build all follow that order, and
 /// nothing takes it while holding one - which is what keeps `gate -> index` the
 /// only nesting this index has.
-pub(crate) fn dir_gate(dir: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
-    type Gate = std::sync::Arc<std::sync::Mutex<()>>;
+pub(crate) fn dir_gate(dir: &str) -> std::sync::Arc<tokio::sync::Mutex<()>> {
+    // The gate itself is `tokio::sync::Mutex`: a build holds it across its
+    // awaits (the whole rebuild runs under it), and a `std::sync` guard would
+    // make that future non-`Send`. The registry that hands it out stays a
+    // `std::sync::Mutex` - it is taken for one hash lookup and released.
+    type Gate = std::sync::Arc<tokio::sync::Mutex<()>>;
     type Gates = std::sync::Mutex<std::collections::HashMap<String, Gate>>;
     static GATES: std::sync::OnceLock<Gates> = std::sync::OnceLock::new();
     let gates = GATES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     let mut gates = gates.lock().unwrap_or_else(|poison| poison.into_inner());
     gates
         .entry(dir.to_string())
-        .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
+        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
         .clone()
 }
 
@@ -535,7 +539,7 @@ impl MemoryIndexer {
     /// Returns `false`, leaving the tail untouched, when the run cannot be
     /// written (no directory, disk error): the caller then keeps the documents
     /// in memory rather than lose them.
-    pub(crate) fn spill(&mut self, dir: &str) -> bool {
+    pub(crate) async fn spill(&mut self, dir: &str) -> bool {
         let Some(docs) = self.tail_docs() else {
             return false;
         };
@@ -562,6 +566,7 @@ impl MemoryIndexer {
                 });
             },
         )
+        .await
         .is_err()
         {
             return false;
@@ -928,7 +933,7 @@ impl MemoryIndexer {
     /// Positions travel with each posting (`.pos`), so a sealed segment can
     /// answer phrase queries. The spilled runs are merged in first.
     #[allow(dead_code)] // the product spill path; exercised by `memory_indexer_ut`.
-    pub(crate) fn dump(&self, dir: &str, base_name: &str) -> bool {
+    pub(crate) async fn dump(&self, dir: &str, base_name: &str) -> bool {
         let Some(docs) = self.merged_docs() else {
             return false;
         };
@@ -957,6 +962,7 @@ impl MemoryIndexer {
                 }
             },
         )
+        .await
         .is_ok()
     }
 
@@ -1243,7 +1249,7 @@ pub(crate) struct TextIndex {
     /// The write gate this index's **directory** shares with every other
     /// instance opened on it ([`dir_gate`]). Held around the file-level work of
     /// a seal, a merge and a build, never across an index lock.
-    pub(crate) gate: std::sync::Arc<std::sync::Mutex<()>>,
+    pub(crate) gate: std::sync::Arc<tokio::sync::Mutex<()>>,
 }
 
 /// One chunk a seal wrote: what its catalog record needs.
@@ -1350,6 +1356,7 @@ pub(crate) struct SealPlan {
 }
 
 /// One group of chunks that `optimize` concatenates into a single chunk.
+#[derive(Clone)]
 pub(crate) struct MergeRun {
     /// `(base_name, base_row_id)` of every chunk in the run, in row order.
     sources: Vec<(String, u64)>,
@@ -1358,6 +1365,7 @@ pub(crate) struct MergeRun {
 
 /// The chunk merges `optimize` would perform, computed from the segment headers
 /// alone so the file work can run **without the column's lock**.
+#[derive(Clone)]
 pub(crate) struct MergePlan {
     /// The chunk list the plan was made from, re-checked before it is applied.
     signature: Vec<(String, u64)>,
@@ -1383,7 +1391,7 @@ impl SealJob {
     /// Writes the segment's `.dic` / `.pos` / `.len` and opens it. `None` on an
     /// I/O error; the caller then leaves the tail in flight for a retry rather
     /// than merging it back into a tail other writers may have appended to.
-    pub(crate) fn write(&self) -> Option<SealedSegment> {
+    pub(crate) async fn write(&self) -> Option<SealedSegment> {
         let base_name = format!("ft_{:016x}", self.base_row_id);
         // The chunk belongs to the `ROW_ID` segment its rows come from, and the
         // chunk goes into that segment's directory - the place the catalog's
@@ -1412,7 +1420,8 @@ impl SealJob {
                     });
                 }
             },
-        );
+        )
+        .await;
         if written.is_err() {
             return None;
         }
@@ -1895,12 +1904,12 @@ impl TextIndex {
     /// This variant writes **while the caller holds the write lock**; the insert
     /// and checkpoint paths use [`Self::claim_seal`] + [`Self::complete_seal`]
     /// instead so the I/O runs with no lock held.
-    pub(crate) fn seal(&mut self) -> bool {
+    pub(crate) async fn seal(&mut self) -> bool {
         let Some(job) = self.claim_seal() else {
             return false;
         };
         let started = std::time::Instant::now();
-        let written = job.write();
+        let written = job.write().await;
         self.last_seal_us = started.elapsed().as_micros() as u64;
         match written {
             Some(segment) => {
@@ -2429,9 +2438,9 @@ impl TextIndex {
 
     /// Seals once the unsealed segment (runs included) reaches its size budget
     /// or the configured `mem_index_capacity` row count.
-    pub(crate) fn maybe_seal(&mut self, capacity: usize) {
+    pub(crate) async fn maybe_seal(&mut self, capacity: usize) {
         if self.should_seal(capacity) {
-            self.seal();
+            self.seal().await;
         }
     }
 

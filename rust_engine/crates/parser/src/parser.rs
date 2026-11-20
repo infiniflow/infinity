@@ -2680,36 +2680,107 @@ fn validate_fulltext_options(opts: &str) -> Result<()> {
         let Some((k, v)) = part.split_once('=') else {
             continue;
         };
-        if !k.trim().eq_ignore_ascii_case("minimum_should_match") {
-            continue;
-        }
-        for clause in v.split_whitespace() {
-            // an optional `n<` conditional prefix
-            let spec = match clause.split_once('<') {
-                Some((prefix, rest)) => {
-                    if prefix.trim().parse::<i64>().is_err() {
+        let key = k.trim().to_ascii_lowercase();
+        let value = v.trim();
+        // The reference parses every option of a `filter_fulltext` with
+        // `SearchOptions` and rejects a value it does not understand
+        // (`filter_expression_push_down_indexscanfilter_impl.cpp:856-952`).
+        // Accepting one silently answers a different question than the one
+        // asked: `operator=bogus` would fall back to the default `or`.
+        match key.as_str() {
+            "operator" => {
+                if !value.eq_ignore_ascii_case("and") && !value.eq_ignore_ascii_case("or") {
+                    return Err(Error::Invalid(
+                        "operator option must be \"and\" or \"or\"".into(),
+                    ));
+                }
+            }
+            "similarity" => {
+                if !value.eq_ignore_ascii_case("bm25") && !value.eq_ignore_ascii_case("boolean") {
+                    return Err(Error::Invalid(
+                        "similarity option must be \"BM25\" or \"boolean\"".into(),
+                    ));
+                }
+            }
+            "block_max" => {
+                let known = matches!(
+                    value.to_ascii_lowercase().as_str(),
+                    "" | "auto"
+                        | "batch"
+                        | "false"
+                        | "heap_bmw"
+                        | "heap"
+                        | "true"
+                        | "bmw"
+                        | "compare"
+                );
+                if !known {
+                    return Err(Error::Invalid(
+                        "block_max option must be empty, auto, heap_bmw, batch, false, true, bmw, or compare"
+                            .into(),
+                    ));
+                }
+            }
+            // `bm25_param_b` is a weight in [0, 1]; the deltas are
+            // non-negative additions to the score.
+            "bm25_param_b" => {
+                let b = value.parse::<f64>().map_err(|_| {
+                    Error::Invalid("bm25_param_b must be a float in [0.0, 1.0]".into())
+                })?;
+                if !(0.0..=1.0).contains(&b) {
+                    return Err(Error::Invalid(
+                        "bm25_param_b must be in the range [0.0, 1.0]. default value: 0.75".into(),
+                    ));
+                }
+            }
+            "bm25_param_k1"
+            | "bm25_param_delta"
+            | "bm25_param_delta_term"
+            | "bm25_param_delta_phrase" => {
+                let n = value
+                    .parse::<f64>()
+                    .map_err(|_| Error::Invalid(format!("{key} must be a non-negative float")))?;
+                if n < 0.0 {
+                    return Err(Error::Invalid(format!(
+                        "{key} must be a non-negative float"
+                    )));
+                }
+            }
+            "minimum_should_match" => {
+                for clause in value.split_whitespace() {
+                    // an optional `n<` conditional prefix
+                    let spec = match clause.split_once('<') {
+                        Some((prefix, rest)) => {
+                            if prefix.trim().parse::<i64>().is_err() {
+                                return Err(Error::Invalid(
+                                    "minimum_should_match prefix must be an integer".into(),
+                                ));
+                            }
+                            rest
+                        }
+                        None => clause,
+                    };
+                    let (num, pct) = match spec.strip_suffix('%') {
+                        Some(num) => (num, true),
+                        None => (spec, false),
+                    };
+                    let Ok(n) = num.trim().parse::<i64>() else {
                         return Err(Error::Invalid(
-                            "minimum_should_match prefix must be an integer".into(),
+                            "minimum_should_match must be an integer count or percentage".into(),
+                        ));
+                    };
+                    if pct && !(-100..=100).contains(&n) {
+                        return Err(Error::Invalid(
+                            "minimum_should_match percentage must be within -100..=100%".into(),
                         ));
                     }
-                    rest
                 }
-                None => clause,
-            };
-            let (num, pct) = match spec.strip_suffix('%') {
-                Some(num) => (num, true),
-                None => (spec, false),
-            };
-            let Ok(n) = num.trim().parse::<i64>() else {
-                return Err(Error::Invalid(
-                    "minimum_should_match must be an integer count or percentage".into(),
-                ));
-            };
-            if pct && !(-100..=100).contains(&n) {
-                return Err(Error::Invalid(
-                    "minimum_should_match percentage must be within -100..=100%".into(),
-                ));
             }
+            // Options the reference reads but does not validate by value, and
+            // the ones its service layer consumes.
+            "threshold" | "default_field" | "filter" | "index_name" | "ignore_index" | "topn"
+            | "tail" | "alpha" | "beta" | "use_tail" | "rank_features" => {}
+            _ => {}
         }
     }
     Ok(())
@@ -3082,6 +3153,34 @@ mod tests {
         let mut v = parse(sql).unwrap();
         assert_eq!(v.len(), 1);
         v.remove(0)
+    }
+
+    /// The reference rejects a `filter_fulltext` option value it does not
+    /// understand (`filter_expression_push_down_indexscanfilter_impl.cpp`), so
+    /// a typo is an error rather than a silently different query.
+    #[test]
+    fn filter_fulltext_rejects_invalid_option_values() {
+        for sql in [
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','operator=bogus');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','similarity=bogus');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','block_max=bogus');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','bm25_param_b=5');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','bm25_param_k1=-1');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','bm25_param_delta=-1');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','topn=5');",
+        ] {
+            assert!(parse(sql).is_err(), "expected an error for: {sql}");
+        }
+        // The accepted spellings keep parsing.
+        for sql in [
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','operator=AND');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','similarity=BM25');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','block_max=heap_bmw');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','bm25_param_b=0.5');",
+            "SELECT 1 FROM t WHERE filter_fulltext('b','x','minimum_should_match=-49%');",
+        ] {
+            assert!(parse(sql).is_ok(), "expected success for: {sql}");
+        }
     }
 
     #[test]

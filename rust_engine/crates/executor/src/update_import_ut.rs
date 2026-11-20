@@ -29,9 +29,9 @@ use parser::Literal;
 use storage::format::BlockVersionFile;
 use tempfile::tempdir;
 
-fn create_table(e: &Engine) {
-    h::ok(e, "CREATE DATABASE db1;");
-    h::ok(e, "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);");
+async fn create_table(e: &Engine) {
+    h::ok(e, "CREATE DATABASE db1;").await;
+    h::ok(e, "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);").await;
 }
 
 /// `MakeInputBlock(Value::MakeInt(1), "abcdefghijklmnopqrstuvwxyz", n)`.
@@ -78,21 +78,24 @@ fn import_rows() -> Vec<Vec<Literal>> {
     rows
 }
 
-fn copy(e: &Engine, table: &str, path: &str) {
+async fn copy(e: &Engine, table: &str, path: &str) {
     h::ok(
         e,
         &format!("COPY {table} FROM '{path}' WITH (DELIMITER ',', FORMAT CSV);"),
-    );
+    )
+    .await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:470`
 /// (`TestTxnUpdate.test_update_multiple_blocks`): updating every other row
 /// keeps 2*8192 rows visible, with half carrying the updated values.
-#[test]
-fn update_multiple_blocks() {
+#[tokio::test]
+async fn update_multiple_blocks() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
 
     // Even offsets keep (1, "abcdefghijklmnopqrstuvwxyz"); odd offsets get 2.
     let rows: Vec<Vec<Literal>> = (0..2 * 8192)
@@ -104,27 +107,29 @@ fn update_multiple_blocks() {
             ]
         })
         .collect();
-    h::append(&e, "db1.tb1", rows);
+    h::append(&e, "db1.tb1", rows).await;
 
     h::ok(
         &e,
         "UPDATE db1.tb1 SET col1 = 999, col2 = 'updated_value' WHERE col1 = 2;",
-    );
+    )
+    .await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 2 * 8192);
-    assert_eq!(h::count(&e, "db1.tb1"), 2 * 8192);
+    assert_eq!(h::count(&e, "db1.tb1").await, 2 * 8192);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;").await,
         vec![vec!["8192"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["8192"]]
     );
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'updated_value';"
-        ),
+        )
+        .await,
         vec![vec!["8192"]]
     );
     // The reference sees blocks 0 and 1 with every other row visible and a
@@ -132,7 +137,7 @@ fn update_multiple_blocks() {
     // deleted row's cells in its block and hides it through the block's
     // `version` file (`deleted_`), so the physical total is the 16384 original
     // rows plus the 8192 appended updates, of which 8192 slots are marked.
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     let physical: usize = e
         .block_ids("db1.tb1", 0)
         .iter()
@@ -152,54 +157,61 @@ fn update_multiple_blocks() {
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:581`
 /// (`TestTxnUpdate.test_update_and_drop_db`): an update followed by
 /// `DROP DATABASE` leaves every access failing.
-#[test]
-fn update_then_drop_database() {
+#[tokio::test]
+async fn update_then_drop_database() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::append(&e, "db1.tb1", alternating_block());
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::append(&e, "db1.tb1", alternating_block()).await;
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
 
-    h::ok(&e, "DROP DATABASE db1;");
+    h::ok(&e, "DROP DATABASE db1;").await;
     for sql in [
         "SELECT * FROM db1.tb1;",
         "UPDATE db1.tb1 SET col1 = 3;",
         "INSERT INTO db1.tb1 VALUES (1, 'x');",
         "DELETE FROM db1.tb1;",
     ] {
-        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
+        assert!(e.execute(sql).await.is_err(), "{sql} should fail");
     }
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:738`
 /// (`TestTxnUpdate.test_update_and_drop_table`).
-#[test]
-fn update_then_drop_table() {
+#[tokio::test]
+async fn update_then_drop_table() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::append(&e, "db1.tb1", alternating_block());
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::append(&e, "db1.tb1", alternating_block()).await;
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;").await;
 
-    h::ok(&e, "DROP TABLE db1.tb1;");
+    h::ok(&e, "DROP TABLE db1.tb1;").await;
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute_blocking("UPDATE db1.tb1 SET col1 = 3;").is_err());
-    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e.execute("UPDATE db1.tb1 SET col1 = 3;").await.is_err());
+    assert!(e.execute("SELECT * FROM db1.tb1;").await.is_err());
     assert!(e
-        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .execute("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .await
         .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:935`
 /// (`TestTxnUpdate.test_update_and_drop_index`): dropping a secondary index
 /// after an update leaves the updated values and the row count intact.
-#[test]
-fn update_then_drop_index() {
+#[tokio::test]
+async fn update_then_drop_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     let rows: Vec<Vec<Literal>> = (0..8192)
         .map(|i| {
             let (v, mark) = if i % 2 == 0 {
@@ -210,20 +222,21 @@ fn update_then_drop_index() {
             vec![Literal::Int(v as i64), Literal::Str(mark)]
         })
         .collect();
-    h::append(&e, "db1.tb1", rows);
+    h::append(&e, "db1.tb1", rows).await;
     h::ok(
         &e,
         "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
-    );
-    h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
+    )
+    .await;
+    h::ok(&e, "DROP INDEX index1 ON db1.tb1;").await;
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;").await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;"),
+        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;").await,
         vec![vec!["0"]]
     );
 }
@@ -231,12 +244,14 @@ fn update_then_drop_index() {
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:1084`
 /// (`TestTxnUpdate.test_update_and_dump_index`): a memory-index dump after the
 /// update sees the rewritten rows.
-#[test]
-fn update_then_dump_index() {
+#[tokio::test]
+async fn update_then_dump_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     let rows: Vec<Vec<Literal>> = (0..8192)
         .map(|i| {
             let (v, mark) = if i % 2 == 0 {
@@ -247,12 +262,13 @@ fn update_then_dump_index() {
             vec![Literal::Int(v as i64), Literal::Str(mark)]
         })
         .collect();
-    h::append(&e, "db1.tb1", rows);
+    h::append(&e, "db1.tb1", rows).await;
     h::ok(
         &e,
         "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
-    );
-    crate::scheduler::block_on(e.flush()).unwrap();
+    )
+    .await;
+    e.flush().await.unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     // The rewritten rows carry the marker in the unindexed column; counting
@@ -261,30 +277,33 @@ fn update_then_dump_index() {
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"
-        ),
+        )
+        .await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'keep';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'keep';").await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;"),
+        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;").await,
         vec![vec!["0"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:1199`
 /// (`TestTxnUpdate.test_update_and_add_drop_column_conflicts`): the four
 /// update/add-column and update/drop-column orderings end with the winning
 /// request's schema and the reference's two-column / three-column counts.
-#[test]
-fn update_add_and_drop_column() {
+#[tokio::test]
+async fn update_add_and_drop_column() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::append(&e, "db1.tb1", alternating_block());
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::append(&e, "db1.tb1", alternating_block()).await;
 
     // Update then ADD COLUMN: the update is already committed, so the added
     // column applies to every row with its default (the reference's update
@@ -292,16 +311,17 @@ fn update_add_and_drop_column() {
     h::ok(
         &e,
         "UPDATE db1.tb1 SET col1 = 999, col2 = 'updated_abc' WHERE col1 = 2;",
-    );
-    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 1);");
-    let cols = h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;");
+    )
+    .await;
+    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 1);").await;
+    let cols = h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").await;
     assert_eq!(cols.len(), 3);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 1;").await,
         vec![vec!["8192"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;").await,
         vec![vec!["4096"]]
     );
 
@@ -310,49 +330,52 @@ fn update_add_and_drop_column() {
     h::ok(
         &e,
         "ALTER TABLE db1.tb1 ADD COLUMN (col4 VARCHAR DEFAULT 'd');",
-    );
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;");
+    )
+    .await;
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;").await;
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;").await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col4 = 'd';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col4 = 'd';").await,
         vec![vec!["8192"]]
     );
 
     // DROP COLUMN after the update commit: the column is gone.
-    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col4);");
-    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").len(), 3);
+    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col4);").await;
+    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").await.len(), 3);
 }
 
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:1430`
 /// (`TestTxnUpdate.test_update_and_compact_conflicts`): update and compaction
 /// compose; whichever runs last sees the other's committed rows.
-#[test]
-fn update_and_compact_compose() {
+#[tokio::test]
+async fn update_and_compact_compose() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::append(&e, "db1.tb1", alternating_block());
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::append(&e, "db1.tb1", alternating_block()).await;
 
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;");
-    e.compact_all_segments("db1.tb1").unwrap();
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;").await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 999;").await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["4096"]]
     );
 
     // The other ordering: compact first, then update.
-    e.compact_all_segments("db1.tb1").unwrap();
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;");
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 777 WHERE col1 = 1;").await;
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 777;").await,
         vec![vec!["4096"]]
     );
 }
@@ -361,11 +384,13 @@ fn update_and_compact_compose() {
 /// (`TestTxnUpdate.test_update_and_create_index_conflicts`): a secondary index
 /// built after an update indexes the rewritten rows; when the index exists
 /// first, the update keeps it correct.
-#[test]
-fn update_and_create_index_compose() {
+#[tokio::test]
+async fn update_and_create_index_compose() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let rows: Vec<Vec<Literal>> = (0..8192)
         .map(|i| {
             let (v, mark) = if i % 2 == 0 {
@@ -376,13 +401,14 @@ fn update_and_create_index_compose() {
             vec![Literal::Int(v as i64), Literal::Str(mark)]
         })
         .collect();
-    h::append(&e, "db1.tb1", rows);
+    h::append(&e, "db1.tb1", rows).await;
 
     h::ok(
         &e,
         "UPDATE db1.tb1 SET col1 = 999 WHERE col2 = 'want_update';",
-    );
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    )
+    .await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     // Count through the unindexed marker column: `col1 = 999` is a
     // duplicate key, and the reference's chunk metadata (not a scan) is what
     // the C++ fixture checks here.
@@ -390,20 +416,21 @@ fn update_and_create_index_compose() {
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'want_update';"
-        ),
+        )
+        .await,
         vec![vec!["4096"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;"),
+        h::rows(&e, "SELECT col1 FROM db1.tb1 WHERE col1 = 0;").await,
         vec![vec!["0"]]
     );
 
     // Index first, update second.
-    h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
-    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col1);");
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 555 WHERE col1 = 0;");
+    h::ok(&e, "DROP INDEX index1 ON db1.tb1;").await;
+    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col1);").await;
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 555 WHERE col1 = 0;").await;
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 555;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 555;").await,
         vec![vec!["1"]]
     );
 }
@@ -411,55 +438,61 @@ fn update_and_create_index_compose() {
 /// C++ `src/unit_test/storage/new_catalog/update_ut.cpp:1835`
 /// (`TestTxnUpdate.test_update_and_delete_no_conflicts`): an update followed by
 /// a delete of the updated rows removes exactly those rows.
-#[test]
-fn update_then_delete_leaves_the_rest() {
+#[tokio::test]
+async fn update_then_delete_leaves_the_rest() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::append(&e, "db1.tb1", alternating_block());
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::append(&e, "db1.tb1", alternating_block()).await;
 
-    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;");
-    h::ok(&e, "DELETE FROM db1.tb1 WHERE col1 = 999;");
+    h::ok(&e, "UPDATE db1.tb1 SET col1 = 999 WHERE col1 = 2;").await;
+    h::ok(&e, "DELETE FROM db1.tb1 WHERE col1 = 999;").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 4096);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["4096"]]
     );
-    assert!(h::rows(&e, "SELECT * FROM db1.tb1 WHERE col1 = 999;").is_empty());
+    assert!(h::rows(&e, "SELECT * FROM db1.tb1 WHERE col1 = 999;")
+        .await
+        .is_empty());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:63`
 /// (`TestTxnImport.test_import1`): two imports of two 8192-row blocks give
 /// 32768 rows, with every block's boundary values intact.
-#[test]
-fn import1_keeps_every_block() {
+#[tokio::test]
+async fn import1_keeps_every_block() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
 
     let import = import_rows();
     for name in ["a.csv", "b.csv"] {
         let path = csv(dir.path(), name, &import);
-        copy(&e, "db1.tb1", &path);
+        copy(&e, "db1.tb1", &path).await;
     }
     // The reference reads two imports x two blocks; the engine commits each
     // COPY in 8192-row blocks, so assert the same row/block totals.
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
-    assert_eq!(h::count(&e, "db1.tb1"), 32768);
+    assert_eq!(h::count(&e, "db1.tb1").await, 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col2 FROM db1.tb1 WHERE col1 = 1 LIMIT 1;"),
+        h::rows(&e, "SELECT col2 FROM db1.tb1 WHERE col1 = 1 LIMIT 1;").await,
         vec![vec!["abc"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col2 FROM db1.tb1 WHERE col1 = 2 LIMIT 1;"),
+        h::rows(&e, "SELECT col2 FROM db1.tb1 WHERE col1 = 2 LIMIT 1;").await,
         vec![vec!["abcdefghijklmnopqrstuvwxyz"]]
     );
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 32768);
@@ -471,26 +504,28 @@ fn import1_keeps_every_block() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:212`
 /// (`TestTxnImport.test_import_with_index`): imports populate the secondary
 /// index; every imported row is reachable through it.
-#[test]
-fn import_with_index() {
+#[tokio::test]
+async fn import_with_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
 
     let import = import_rows();
     let path = csv(dir.path(), "a.csv", &import);
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
     // `chunk_info->row_cnt_ == block_row_cnt * 2`: every imported row is in
     // the index.
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
         vec![vec!["16384"]]
     );
 }
@@ -499,17 +534,19 @@ fn import_with_index() {
 /// (`TestTxnImport.test_import_with_index_rollback`): the first import is
 /// committed; a later import that fails against the changed schema commits
 /// nothing, so the visible rows are exactly the first import's.
-#[test]
-fn import_with_index_rollback() {
+#[tokio::test]
+async fn import_with_index_rollback() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col2) USING fulltext;");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col2) USING fulltext;").await;
 
     let import = import_rows();
     let path = csv(dir.path(), "a.csv", &import);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
     // `txn_add_column` commits while the second import is live; the import's
@@ -518,22 +555,24 @@ fn import_with_index_rollback() {
     h::ok(
         &e,
         "ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');",
-    );
+    )
+    .await;
     let mut bad = import.clone();
     for row in bad.iter_mut() {
         row[0] = Literal::Str("not_an_int".to_string());
     }
     let bad_path = csv(dir.path(), "bad.csv", &bad);
     assert!(e
-        .execute_blocking(&format!(
+        .execute(&format!(
             "COPY db1.tb1 FROM '{bad_path}' WITH (DELIMITER ',', FORMAT CSV);"
         ))
+        .await
         .is_err());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-    assert_eq!(h::count(&e, "db1.tb1"), 16384);
+    assert_eq!(h::count(&e, "db1.tb1").await, 16384);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["8192"]]
     );
 }
@@ -547,21 +586,23 @@ fn import_with_index_rollback() {
 /// i.e. below 8,388,608 rows - so a 16384-row import is a **single** segment,
 /// however many blocks it writes. The reference's own fixture shows the same:
 /// its two-block import leaves `{0}`, and the append that follows opens `{1}`.
-#[test]
-fn insert_and_import() {
+#[tokio::test]
+async fn insert_and_import() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
 
-    h::append(&e, "db1.tb1", const_rows(5, "inserted", 8192));
+    h::append(&e, "db1.tb1", const_rows(5, "inserted", 8192)).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
     // INSERT stays in segment 0; the 16384-row COPY seals one new segment.
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1]);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 24576);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 5;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 5;").await,
         vec![vec!["8192"]]
     );
 }
@@ -569,66 +610,73 @@ fn insert_and_import() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:710`
 /// (`TestTxnImport.test_import_drop_db`): the imported rows survive until
 /// `DROP DATABASE`, after which the segments are gone.
-#[test]
-fn import_then_drop_database() {
+#[tokio::test]
+async fn import_then_drop_database() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
 
-    h::ok(&e, "DROP DATABASE db1;");
-    assert!(e.segment_ids("db1.tb1").is_empty());
+    h::ok(&e, "DROP DATABASE db1;").await;
+    assert!(e.segment_ids("db1.tb1").await.is_empty());
     for sql in [
         "SELECT * FROM db1.tb1;",
         "INSERT INTO db1.tb1 VALUES (1, 'x');",
         "COPY db1.tb1 FROM '/nonexistent' WITH (FORMAT CSV);",
     ] {
-        assert!(e.execute_blocking(sql).is_err(), "{sql} should fail");
+        assert!(e.execute(sql).await.is_err(), "{sql} should fail");
     }
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:1257`
 /// (`TestTxnImport.test_import_drop_table`).
-#[test]
-fn import_then_drop_table() {
+#[tokio::test]
+async fn import_then_drop_table() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
-    h::ok(&e, "DROP TABLE db1.tb1;");
-    assert!(e.segment_ids("db1.tb1").is_empty());
-    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    h::ok(&e, "DROP TABLE db1.tb1;").await;
+    assert!(e.segment_ids("db1.tb1").await.is_empty());
+    assert!(e.execute("SELECT * FROM db1.tb1;").await.is_err());
     assert!(e
-        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .execute("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .await
         .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:1858`
 /// (`TestTxnImport.test_import_add_columns`): imported rows read the new
 /// column's default.
-#[test]
-fn import_then_add_columns() {
+#[tokio::test]
+async fn import_then_add_columns() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 7);");
+    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 7);").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 7;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 7;").await,
         vec![vec!["32768"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
 }
@@ -636,41 +684,45 @@ fn import_then_add_columns() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:2499`
 /// (`TestTxnImport.test_import_drop_columns`): dropping the unindexed column
 /// keeps the remaining values.
-#[test]
-fn import_then_drop_columns() {
+#[tokio::test]
+async fn import_then_drop_columns() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);");
+    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
-    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").len(), 1);
+    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").await.len(), 1);
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:3081`
 /// (`TestTxnImport.test_import`): a single import of two blocks.
-#[test]
-fn import_keeps_block_boundaries() {
+#[tokio::test]
+async fn import_keeps_block_boundaries() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["8192"]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
         vec![vec!["8192"]]
     );
     // Two 8192-row blocks.
@@ -680,18 +732,20 @@ fn import_keeps_block_boundaries() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:3220`
 /// (`TestTxnImport.test_import_append_table`): an append after an import
 /// extends the same table.
-#[test]
-fn import_then_append() {
+#[tokio::test]
+async fn import_then_append() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    h::append(&e, "db1.tb1", const_rows(9, "appended", 8192));
+    copy(&e, "db1.tb1", &path).await;
+    h::append(&e, "db1.tb1", const_rows(9, "appended", 8192)).await;
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 9;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 9;").await,
         vec![vec!["8192"]]
     );
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 24576);
@@ -700,35 +754,39 @@ fn import_then_append() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:3840`
 /// (`TestTxnImport.test_import_import_table`): a second import appends to the
 /// table.
-#[test]
-fn import_then_import() {
+#[tokio::test]
+async fn import_then_import() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:4301`
 /// (`TestTxnImport.test_import_rename`): the imported rows follow a rename.
-#[test]
-fn import_then_rename() {
+#[tokio::test]
+async fn import_then_rename() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
 
-    h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;");
+    h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;").await;
     assert_eq!(e.row_count("db1.tb2").unwrap(), 16384);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb2 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb2 WHERE col1 = 1;").await,
         vec![vec!["8192"]]
     );
     assert!(!e.table_exists("db1.tb1"));
@@ -737,96 +795,105 @@ fn import_then_rename() {
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:4689`
 /// (`TestTxnImport.test_import_and_create_index`): the index sees every
 /// imported row.
-#[test]
-fn import_then_create_index() {
+#[tokio::test]
+async fn import_then_create_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    h::ok(&e, "CREATE INDEX idx1 ON db1.tb1 (col1);");
+    h::ok(&e, "CREATE INDEX idx1 ON db1.tb1 (col1);").await;
     // The reference checks the index segment ids; the engine exposes the
     // declaration through SHOW TABLE INDEX. Count via the unindexed column
     // because `col1`'s keys repeat.
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX idx1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX idx1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:5317`
 /// (`TestTxnImport.test_import_and_drop_index`): dropping the index leaves
 /// the imported rows readable.
-#[test]
-fn import_then_drop_index() {
+#[tokio::test]
+async fn import_then_drop_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX idx1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX idx1 ON db1.tb1 (col1);").await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    h::ok(&e, "DROP INDEX idx1 ON db1.tb1;");
+    h::ok(&e, "DROP INDEX idx1 ON db1.tb1;").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
         vec![vec!["16384"]]
     );
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:5958`
 /// (`TestTxnImport.DISABLED_SLOW_test_import_and_compact`).
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ TestTxnImport.DISABLED_SLOW_test_import_and_compact"]
-fn import_and_compact() {
+async fn import_and_compact() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    e.compact_all_segments("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").await.unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/import_ut.cpp:6311`
 /// (`TestTxnImport.test_import_and_optimize_index`): optimize keeps the
 /// imported rows and the index's answer.
-#[test]
-fn import_then_optimize_index() {
+#[tokio::test]
+async fn import_then_optimize_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     let path = csv(dir.path(), "a.csv", &import_rows());
-    copy(&e, "db1.tb1", &path);
-    copy(&e, "db1.tb1", &path);
+    copy(&e, "db1.tb1", &path).await;
+    copy(&e, "db1.tb1", &path).await;
 
-    e.optimize_indexes().unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.optimize_indexes().await.unwrap();
+    e.cleanup().await.unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
-        ),
+        )
+        .await,
         vec![vec!["16384"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }

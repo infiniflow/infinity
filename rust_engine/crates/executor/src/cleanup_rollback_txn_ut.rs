@@ -28,8 +28,8 @@ use crate::{Engine, QueryResult};
 use parser::Literal;
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -39,17 +39,22 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 
 /// C++ `cleanup_rollback_txn.cpp:125`
 /// (`test_import_with_index_rollback_cleanup`).
-#[test]
-fn test_import_with_index_rollback_cleanup() {
+#[tokio::test]
+async fn test_import_with_index_rollback_cleanup() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON db1.tb1(col1);")
+    e.execute("CREATE INDEX index1 ON db1.tb1(col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON db1.tb1(col2) USING fulltext;")
+    e.execute("CREATE INDEX index2 ON db1.tb1(col2) USING fulltext;")
+        .await
         .unwrap();
 
     // `MakeInputBlock`: 8192 rows alternating (1, "abc") / (2, long text).
@@ -66,17 +71,20 @@ fn test_import_with_index_rollback_cleanup() {
         })
         .collect();
     let mut txn = e.begin_txn();
-    assert_eq!(txn.append("db1.tb1", batch).unwrap(), 8192);
+    assert_eq!(txn.append("db1.tb1", batch).await.unwrap(), 8192);
 
     // The other transaction drops the database and commits first.
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
     // Committing the import against the now-missing table must fail.
-    assert!(txn.commit().is_err());
+    assert!(txn.commit().await.is_err());
 
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
 
     // The database (and its tables/indexes) are gone, with no rows left behind.
     assert!(!e.table_exists("db1.tb1"));
-    assert!(!rows(&e, "SHOW DATABASES;").iter().any(|r| r[0] == "db1"));
+    assert!(!rows(&e, "SHOW DATABASES;")
+        .await
+        .iter()
+        .any(|r| r[0] == "db1"));
 }

@@ -80,16 +80,16 @@ fn entry(txn_id: u64, block_id: u64, data: &[u8]) -> WalEntry {
 
 /// Runs the commit protocol for one transaction, stopping at the requested
 /// boundary to simulate a crash (later durable writes never happen).
-fn commit_until(dir: &Path, kv: &RocksMetaStore, txn_id: u64, data: &[u8], stop: Stop) {
+async fn commit_until(dir: &Path, kv: &RocksMetaStore, txn_id: u64, data: &[u8], stop: Stop) {
     let block_id = txn_id;
     fs::create_dir_all(dir.join("blocks")).unwrap();
     fs::write(block_path(dir, block_id), data).unwrap();
     if stop == Stop::AfterBlock {
         return;
     }
-    let mut wal = WalManager::open(dir.join("wal.log")).unwrap();
+    let mut wal = WalManager::open(dir.join("wal.log")).await.unwrap();
     // commit_ts = txn_id + 1 so it is strictly greater than the checkpoint 0.
-    wal.append(&entry(txn_id, block_id, data)).unwrap();
+    wal.append(&entry(txn_id, block_id, data)).await.unwrap();
     if stop == Stop::AfterWal {
         return;
     }
@@ -102,7 +102,7 @@ fn commit_until(dir: &Path, kv: &RocksMetaStore, txn_id: u64, data: &[u8], stop:
 
 /// Recovery: replay the WAL past the KV checkpoint, rebuilding any missing
 /// block file, and record the replayed transactions back into the KV.
-fn recover(dir: &Path, kv: &RocksMetaStore) -> Vec<u64> {
+async fn recover(dir: &Path, kv: &RocksMetaStore) -> Vec<u64> {
     let checkpoint = kv
         .get(checkpoint_key())
         .unwrap()
@@ -122,6 +122,7 @@ fn recover(dir: &Path, kv: &RocksMetaStore) -> Vec<u64> {
         replayed.push(entry.txn_id.max(0) as u64);
         Ok(())
     })
+    .await
     .unwrap();
     replayed
 }
@@ -144,58 +145,58 @@ fn open_kv(dir: &Path) -> RocksMetaStore {
     RocksMetaStore::open(dir.join("kv")).unwrap()
 }
 
-#[test]
-fn crash_after_block_is_invisible() {
+#[tokio::test]
+async fn crash_after_block_is_invisible() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
-    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterBlock);
+    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterBlock).await;
     // The block file exists but nothing references it: the transaction is not
     // committed, and recovery (empty WAL) leaves it that way.
     assert!(block_path(t, 1).exists());
     let kv = open_kv(t);
-    assert!(recover(t, &kv).is_empty());
+    assert!(recover(t, &kv).await.is_empty());
     assert!(!visible(&kv, 1));
 }
 
-#[test]
-fn crash_after_wal_replays_the_transaction() {
+#[tokio::test]
+async fn crash_after_wal_replays_the_transaction() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
-    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal);
+    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal).await;
     let kv = open_kv(t);
-    assert_eq!(recover(t, &kv), vec![1]);
+    assert_eq!(recover(t, &kv).await, vec![1]);
     assert!(visible(&kv, 1));
     assert_eq!(fs::read(block_path(t, 1)).unwrap(), b"row");
 }
 
-#[test]
-fn full_commit_is_visible_without_replay() {
+#[tokio::test]
+async fn full_commit_is_visible_without_replay() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
-    commit_until(t, &open_kv(t), 1, b"row", Stop::Full);
+    commit_until(t, &open_kv(t), 1, b"row", Stop::Full).await;
     let kv = open_kv(t);
     // checkpoint already at ts=2, so nothing needs replaying
-    assert!(recover(t, &kv).is_empty());
+    assert!(recover(t, &kv).await.is_empty());
     assert!(visible(&kv, 1));
 }
 
-#[test]
-fn recovery_rebuilds_a_missing_block_file() {
+#[tokio::test]
+async fn recovery_rebuilds_a_missing_block_file() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
-    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal);
+    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal).await;
     // the block file is lost before recovery
     fs::remove_file(block_path(t, 1)).unwrap();
     let kv = open_kv(t);
-    assert_eq!(recover(t, &kv), vec![1]);
+    assert_eq!(recover(t, &kv).await, vec![1]);
     assert_eq!(fs::read(block_path(t, 1)).unwrap(), b"row");
 }
 
-#[test]
-fn torn_wal_tail_stops_replay_at_the_durable_prefix() {
+#[tokio::test]
+async fn torn_wal_tail_stops_replay_at_the_durable_prefix() {
     let dir = tempfile::tempdir().unwrap();
     let t = dir.path();
-    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal);
+    commit_until(t, &open_kv(t), 1, b"row", Stop::AfterWal).await;
     // append a half-written entry (crash mid-append): the leading size claims
     // a record the file does not hold
     let mut f = fs::OpenOptions::new()
@@ -205,6 +206,6 @@ fn torn_wal_tail_stops_replay_at_the_durable_prefix() {
     std::io::Write::write_all(&mut f, &64i32.to_le_bytes()).unwrap();
     let kv = open_kv(t);
     // only the intact transaction replays; the torn tail is dropped
-    assert_eq!(recover(t, &kv), vec![1]);
+    assert_eq!(recover(t, &kv).await, vec![1]);
     assert!(visible(&kv, 1));
 }

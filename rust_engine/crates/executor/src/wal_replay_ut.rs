@@ -38,20 +38,22 @@ fn table_exists(engine: &Engine, table: &str) -> bool {
     engine.table_exists(table)
 }
 
-fn index_exists(engine: &Engine, table: &str, index: &str) -> bool {
+async fn index_exists(engine: &Engine, table: &str, index: &str) -> bool {
     engine
-        .execute_blocking(&format!("SHOW TABLE {table} INDEX {index};"))
+        .execute(&format!("SHOW TABLE {table} INDEX {index};"))
+        .await
         .is_ok()
 }
 
-fn create_tiny_big_double(engine: &Engine, table: &str) {
+async fn create_tiny_big_double(engine: &Engine, table: &str) {
     h::ok(
         engine,
         &format!(
             "CREATE TABLE {table} \
              (tiny_int_col TINYINT, big_int_col BIGINT, double_col DOUBLE);"
         ),
-    );
+    )
+    .await;
 }
 
 /// C++: `wal_replay_ut.cpp:93` (`WalReplayTest.wal_replay_database`).
@@ -59,36 +61,40 @@ fn create_tiny_big_double(engine: &Engine, table: &str) {
 /// db1..db4 are checkpointed, then db5 is created and db1 dropped in the WAL
 /// tail. After the restart db2/db3/db5 are visible, db1 is gone, and the
 /// post-replay `DROP db4` / `CREATE db1` both succeed.
-#[test]
-fn wal_replay_database() {
+#[tokio::test]
+async fn wal_replay_database() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     for db in ["db1", "db2", "db3", "db4"] {
-        h::ok(&e, &format!("CREATE DATABASE {db};"));
+        h::ok(&e, &format!("CREATE DATABASE {db};")).await;
     }
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
-    h::ok(&e, "CREATE DATABASE db5;");
-    h::ok(&e, "DROP DATABASE db1;");
+    h::ok(&e, "CREATE DATABASE db5;").await;
+    h::ok(&e, "DROP DATABASE db1;").await;
 
-    let e = h::reopen(e, dir.path());
+    let e = h::reopen(e, dir.path()).await;
     assert!(db_exists(&e, "db2"));
     assert!(db_exists(&e, "db3"));
     assert!(db_exists(&e, "db5"));
     assert!(!db_exists(&e, "db1"), "db1 was dropped before the restart");
     assert!(db_exists(&e, "db4"), "db4 is only dropped after recovery");
 
-    h::ok(&e, "DROP DATABASE db4;");
-    h::ok(&e, "CREATE DATABASE db1;");
+    h::ok(&e, "DROP DATABASE db4;").await;
+    h::ok(&e, "CREATE DATABASE db1;").await;
     assert!(!db_exists(&e, "db4"));
     assert!(db_exists(&e, "db1"));
 }
 
 /// C++: `wal_replay_ut.cpp:188` (`WalReplayTest.wal_replay_tables`).
-#[test]
-fn wal_replay_tables() {
+#[tokio::test]
+async fn wal_replay_tables() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     for table in ["tbl1", "tbl2"] {
         h::ok(
             &e,
@@ -96,17 +102,19 @@ fn wal_replay_tables() {
                 "CREATE TABLE default_db.{table} \
                  (tiny_int_col TINYINT, big_int_col BIGINT, double_col DOUBLE);"
             ),
-        );
+        )
+        .await;
     }
-    h::ok(&e, "DROP TABLE default_db.tbl2;");
+    h::ok(&e, "DROP TABLE default_db.tbl2;").await;
     h::ok(
         &e,
         "CREATE TABLE default_db.tbl3 \
          (tiny_int_col TINYINT, big_int_col BIGINT, double_col DOUBLE);",
-    );
-    crate::scheduler::block_on(e.flush()).unwrap();
+    )
+    .await;
+    e.flush().await.unwrap();
 
-    let e = h::reopen(e, dir.path());
+    let e = h::reopen(e, dir.path()).await;
     assert!(table_exists(&e, "tbl1"));
     assert!(!table_exists(&e, "tbl2"));
     assert!(table_exists(&e, "tbl3"));
@@ -115,8 +123,9 @@ fn wal_replay_tables() {
         &e,
         "CREATE TABLE default_db.tbl2 \
          (tiny_int_col TINYINT, big_int_col BIGINT, double_col DOUBLE);",
-    );
-    h::ok(&e, "DROP TABLE default_db.tbl3;");
+    )
+    .await;
+    h::ok(&e, "DROP TABLE default_db.tbl3;").await;
     assert!(table_exists(&e, "tbl2"));
     assert!(!table_exists(&e, "tbl3"));
 }
@@ -125,27 +134,31 @@ fn wal_replay_tables() {
 ///
 /// Two appended rows survive the restart with their values; a table created
 /// after recovery works alongside the replayed one.
-#[test]
-fn wal_replay_append() {
+#[tokio::test]
+async fn wal_replay_append() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     for table in ["tbl1", "tbl3", "tbl4"] {
-        create_tiny_big_double(&e, &format!("default_db.{table}"));
+        create_tiny_big_double(&e, &format!("default_db.{table}")).await;
     }
     let rows = vec![
         vec![Literal::Int(5), Literal::Int(1000), Literal::Float(0.1)],
         vec![Literal::Int(5), Literal::Int(1000), Literal::Float(0.1)],
     ];
     assert_eq!(
-        e.insert_literals("default_db.tbl4", None, rows).unwrap(),
+        e.insert_literals("default_db.tbl4", None, rows)
+            .await
+            .unwrap(),
         QueryResult::Inserted { count: 2 }
     );
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
-    let e = h::reopen(e, dir.path());
-    h::ok(&e, "CREATE TABLE default_db.tbl5 (tiny_int_col TINYINT);");
+    let e = h::reopen(e, dir.path()).await;
+    h::ok(&e, "CREATE TABLE default_db.tbl5 (tiny_int_col TINYINT);").await;
 
-    assert_eq!(e.segment_ids("tbl4"), vec![0]);
+    assert_eq!(e.segment_ids("tbl4").await, vec![0]);
     assert_eq!(h::segment_rows(&e, "tbl4"), 2);
     assert_eq!(e.block_ids("tbl4", 0), vec![0]);
     assert_eq!(e.block_row_count("tbl4", 0, 0), Some(2));
@@ -154,7 +167,8 @@ fn wal_replay_append() {
     let got = h::rows(
         &e,
         "SELECT tiny_int_col, big_int_col, double_col FROM default_db.tbl4;",
-    );
+    )
+    .await;
     assert_eq!(got.len(), 2);
     for row in &got {
         assert_eq!(row[0], "5");
@@ -167,15 +181,17 @@ fn wal_replay_append() {
 ///
 /// Two 8192-row blocks imported into tbl3 replay as segment 0, blocks 0 and
 /// 1, each with 8192 rows.
-#[test]
-fn wal_replay_import() {
+#[tokio::test]
+async fn wal_replay_import() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     for table in ["tbl1", "tbl2"] {
-        create_tiny_big_double(&e, &format!("default_db.{table}"));
+        create_tiny_big_double(&e, &format!("default_db.{table}")).await;
     }
-    crate::scheduler::block_on(e.flush()).unwrap();
-    create_tiny_big_double(&e, "default_db.tbl3");
+    e.flush().await.unwrap();
+    create_tiny_big_double(&e, "default_db.tbl3").await;
 
     for _ in 0..2 {
         let rows = h::repeated_rows(100, "x", 8192);
@@ -184,24 +200,27 @@ fn wal_replay_import() {
             .map(|row| vec![row[0].clone(), Literal::Int(1000), Literal::Float(0.1)])
             .collect();
         assert_eq!(
-            e.insert_literals("default_db.tbl3", None, rows).unwrap(),
+            e.insert_literals("default_db.tbl3", None, rows)
+                .await
+                .unwrap(),
             QueryResult::Inserted { count: 8192 }
         );
     }
 
-    let e = h::reopen(e, dir.path());
-    assert_eq!(e.segment_ids("tbl3"), vec![0]);
+    let e = h::reopen(e, dir.path()).await;
+    assert_eq!(e.segment_ids("tbl3").await, vec![0]);
     assert_eq!(h::segment_rows(&e, "tbl3"), 16384);
     assert_eq!(e.block_ids("tbl3", 0), vec![0, 1]);
     for block in 0..2u16 {
         assert_eq!(e.block_row_count("tbl3", 0, block), Some(8192));
         assert_eq!(e.block_visible_range("tbl3", 0, block), Some((0, 8192)));
     }
-    assert_eq!(h::count(&e, "tbl3"), 16384);
+    assert_eq!(h::count(&e, "tbl3").await, 16384);
     let got = h::rows(
         &e,
         "SELECT tiny_int_col, big_int_col, double_col FROM default_db.tbl3 LIMIT 1;",
-    );
+    )
+    .await;
     assert_eq!(got.len(), 1);
     assert_eq!(got[0][0], "100");
     assert_eq!(got[0][1], "1000");
@@ -217,69 +236,79 @@ fn wal_replay_import() {
 /// state is one segment (0) and the merged segment is id 1. The durable
 /// assertions — one segment, 16384 rows, two 8192-row blocks, unchanged across
 /// a restart — are kept.
-#[test]
-fn wal_replay_compact() {
+#[tokio::test]
+async fn wal_replay_compact() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    h::ok(&e, "CREATE TABLE default_db.tbl1 (tiny_int_col TINYINT);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    h::ok(&e, "CREATE TABLE default_db.tbl1 (tiny_int_col TINYINT);").await;
     for _ in 0..2 {
         let rows: Vec<Vec<Literal>> = (0..8192)
             .map(|i| vec![Literal::Int(if i % 2 == 0 { 1 } else { 2 })])
             .collect();
-        e.insert_literals("default_db.tbl1", None, rows).unwrap();
+        e.insert_literals("default_db.tbl1", None, rows)
+            .await
+            .unwrap();
     }
-    crate::scheduler::block_on(e.flush()).unwrap();
-    assert_eq!(e.segment_ids("tbl1"), vec![0]);
+    e.flush().await.unwrap();
+    assert_eq!(e.segment_ids("tbl1").await, vec![0]);
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
     assert_eq!(e.block_ids("tbl1", 0), vec![0, 1]);
 
-    e.compact_all_segments("default_db.tbl1").unwrap();
-    assert_eq!(e.segment_ids("tbl1"), vec![1]);
+    e.compact_all_segments("default_db.tbl1").await.unwrap();
+    assert_eq!(e.segment_ids("tbl1").await, vec![1]);
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
 
-    let e = h::reopen(e, dir.path());
-    assert_eq!(e.segment_ids("tbl1"), vec![1]);
+    let e = h::reopen(e, dir.path()).await;
+    assert_eq!(e.segment_ids("tbl1").await, vec![1]);
     assert_eq!(h::segment_rows(&e, "tbl1"), 16384);
     // The reference reads the merged segment's `BlockMeta` directly. The Rust
     // engine's block index is a mirror built by `flush`, and it is not rebuilt
     // for the re-keyed segment after replay; assert the same 8192/8192 split
     // through the visible rows instead.
-    assert_eq!(h::count(&e, "tbl1"), 16384);
+    assert_eq!(h::count(&e, "tbl1").await, 16384);
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM default_db.tbl1 WHERE tiny_int_col = 1;"
-        ),
+        )
+        .await,
         vec![vec!["8192".to_string()]]
     );
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM default_db.tbl1 WHERE tiny_int_col = 2;"
-        ),
+        )
+        .await,
         vec![vec!["8192".to_string()]]
     );
 }
 
 /// C++: `wal_replay_ut.cpp:902`
 /// (`WalReplayTest.wal_replay_create_index_IvfFlat`).
-#[test]
-fn wal_replay_create_index_ivf_flat() {
+#[tokio::test]
+async fn wal_replay_create_index_ivf_flat() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     h::ok(
         &e,
         "CREATE TABLE default_db.test_annivfflat (col1 EMBEDDING(FLOAT,128));",
-    );
+    )
+    .await;
     h::ok(
         &e,
         "CREATE INDEX idx1 ON default_db.test_annivfflat (col1) \
          USING IVF WITH (metric = 'l2');",
-    );
-    crate::scheduler::block_on(e.flush()).unwrap();
+    )
+    .await;
+    e.flush().await.unwrap();
 
-    let e = h::reopen(e, dir.path());
-    assert!(index_exists(&e, "default_db.test_annivfflat", "idx1"));
+    let e = h::reopen(e, dir.path()).await;
+    assert!(index_exists(&e, "default_db.test_annivfflat", "idx1").await);
     let indexes = e.catalog().list_indexes().unwrap();
     let meta = indexes
         .iter()
@@ -290,23 +319,27 @@ fn wal_replay_create_index_ivf_flat() {
 
 /// C++: `wal_replay_ut.cpp:1002`
 /// (`WalReplayTest.wal_replay_create_index_hnsw`).
-#[test]
-fn wal_replay_create_index_hnsw() {
+#[tokio::test]
+async fn wal_replay_create_index_hnsw() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     h::ok(
         &e,
         "CREATE TABLE default_db.test_hnsw (col1 EMBEDDING(FLOAT,128));",
-    );
+    )
+    .await;
     h::ok(
         &e,
         "CREATE INDEX hnsw_index ON default_db.test_hnsw (col1) USING HNSW \
          WITH (metric = 'l2', encode = 'plain', m = 16, ef_construction = 200);",
-    );
-    crate::scheduler::block_on(e.flush()).unwrap();
+    )
+    .await;
+    e.flush().await.unwrap();
 
-    let e = h::reopen(e, dir.path());
-    assert!(index_exists(&e, "default_db.test_hnsw", "hnsw_index"));
+    let e = h::reopen(e, dir.path()).await;
+    assert!(index_exists(&e, "default_db.test_hnsw", "hnsw_index").await);
     let indexes = e.catalog().list_indexes().unwrap();
     let meta = indexes
         .iter()
@@ -317,27 +350,29 @@ fn wal_replay_create_index_hnsw() {
 
 const REPEAT_TEXT: &str = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
 
-fn repeat_table(e: &Engine) {
+async fn repeat_table(e: &Engine) {
     h::ok(
         e,
         "CREATE TABLE default_db.tb1 (col1 INTEGER, col2 VARCHAR);",
-    );
+    )
+    .await;
 }
 
-fn append_repeat_row(e: &Engine) {
+async fn append_repeat_row(e: &Engine) {
     assert_eq!(
         e.insert_literals(
             "default_db.tb1",
             None,
             vec![vec![Literal::Int(1), Literal::Str(REPEAT_TEXT.to_string())]],
         )
+        .await
         .unwrap(),
         QueryResult::Inserted { count: 1 }
     );
 }
 
-fn check_repeat_rows(e: &Engine, expected: usize, sealed: bool) {
-    assert_eq!(e.segment_ids("tb1"), vec![0]);
+async fn check_repeat_rows(e: &Engine, expected: usize, sealed: bool) {
+    assert_eq!(e.segment_ids("tb1").await, vec![0]);
     assert_eq!(h::segment_rows(e, "tb1"), expected);
     if sealed {
         // After a flush every row is in a sealed block. The reference packs
@@ -349,7 +384,7 @@ fn check_repeat_rows(e: &Engine, expected: usize, sealed: bool) {
             .map(|block| e.block_row_count("tb1", 0, *block as u16).unwrap())
             .sum();
         assert_eq!(total, expected);
-        let rows = h::rows(e, "SELECT col1, col2 FROM default_db.tb1;");
+        let rows = h::rows(e, "SELECT col1, col2 FROM default_db.tb1;").await;
         assert_eq!(rows.len(), expected);
         for row in rows {
             assert_eq!(row[0], "1");
@@ -362,28 +397,30 @@ fn check_repeat_rows(e: &Engine, expected: usize, sealed: bool) {
 ///
 /// Append, restart, append twice more around a checkpoint, then restart twice:
 /// every row and both columns survive each boundary.
-#[test]
-fn repeat_replay_append() {
+#[tokio::test]
+async fn repeat_replay_append() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    repeat_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    repeat_table(&e).await;
     assert!(table_exists(&e, "tb1"));
 
-    append_repeat_row(&e);
-    let e = h::reopen(e, dir.path());
-    check_repeat_rows(&e, 1, true);
+    append_repeat_row(&e).await;
+    let e = h::reopen(e, dir.path()).await;
+    check_repeat_rows(&e, 1, true).await;
 
-    append_repeat_row(&e);
-    check_repeat_rows(&e, 2, false);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    append_repeat_row(&e).await;
+    check_repeat_rows(&e, 2, false).await;
+    e.flush().await.unwrap();
 
-    append_repeat_row(&e);
-    check_repeat_rows(&e, 3, false);
+    append_repeat_row(&e).await;
+    check_repeat_rows(&e, 3, false).await;
 
-    let e = h::reopen(e, dir.path());
-    check_repeat_rows(&e, 3, true);
-    let e = h::reopen(e, dir.path());
-    check_repeat_rows(&e, 3, true);
+    let e = h::reopen(e, dir.path()).await;
+    check_repeat_rows(&e, 3, true).await;
+    let e = h::reopen(e, dir.path()).await;
+    check_repeat_rows(&e, 3, true).await;
 }
 
 /// C++: `repeat_replay_ut.cpp:236` (`RepeatReplayTest.import`).
@@ -391,47 +428,50 @@ fn repeat_replay_append() {
 /// Three imported blocks around a checkpoint and two restarts. The reference
 /// only checks that the table info is readable; the row counts pin the actual
 /// replayed data.
-#[test]
-fn repeat_replay_import() {
+#[tokio::test]
+async fn repeat_replay_import() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    repeat_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    repeat_table(&e).await;
     assert!(table_exists(&e, "tb1"));
 
-    let import_block = |e: &Engine| {
+    let import_block = async |e: &Engine| {
         assert_eq!(
             e.insert_literals(
                 "default_db.tb1",
                 None,
                 h::repeated_rows(1, "abcdefghijklmnopqrstuvwxyz", 8192),
             )
+            .await
             .unwrap(),
             QueryResult::Inserted { count: 8192 }
         );
     };
 
-    import_block(&e);
-    let e = h::reopen(e, dir.path());
+    import_block(&e).await;
+    let e = h::reopen(e, dir.path()).await;
     assert_eq!(h::segment_rows(&e, "tb1"), 8192);
 
     // The mem tail is visible to `SegmentMeta` before the flush that seals it.
-    import_block(&e);
+    import_block(&e).await;
     assert_eq!(h::segment_rows(&e, "tb1"), 16384);
 
-    crate::scheduler::block_on(e.flush()).unwrap();
-    import_block(&e);
+    e.flush().await.unwrap();
+    import_block(&e).await;
     assert_eq!(h::segment_rows(&e, "tb1"), 24576);
 
-    let e = h::reopen(e, dir.path());
-    assert_eq!(h::count(&e, "tb1"), 24576);
-    assert_eq!(e.segment_ids("tb1"), vec![0]);
+    let e = h::reopen(e, dir.path()).await;
+    assert_eq!(h::count(&e, "tb1").await, 24576);
+    assert_eq!(e.segment_ids("tb1").await, vec![0]);
     assert_eq!(e.block_ids("tb1", 0), vec![0, 1, 2]);
     for block in 0..3u16 {
         assert_eq!(e.block_row_count("tb1", 0, block), Some(8192));
     }
 
-    let e = h::reopen(e, dir.path());
-    assert_eq!(h::count(&e, "tb1"), 24576);
+    let e = h::reopen(e, dir.path()).await;
+    assert_eq!(h::count(&e, "tb1").await, 24576);
 }
 
 /// C++: `recycle_log_ut.cpp:59`
@@ -447,17 +487,19 @@ fn repeat_replay_import() {
 ///   active `wal.log` and reclaims *sealed* segments once they pass the
 ///   applied timestamp, so the equivalent assertion is that the active log is
 ///   still a valid frame stream and replay recovers every row.
-#[test]
-fn recycle_wal_after_delta_checkpoint() {
+#[tokio::test]
+async fn recycle_wal_after_delta_checkpoint() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    h::ok(&e, "CREATE DATABASE db1;");
-    h::ok(&e, "CREATE TABLE db1.t1 (id INTEGER);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    h::ok(&e, "CREATE DATABASE db1;").await;
+    h::ok(&e, "CREATE TABLE db1.t1 (id INTEGER);").await;
     for batch in 0..64 {
         let rows: Vec<Vec<Literal>> = (0..100)
             .map(|i| vec![Literal::Int(batch * 100 + i)])
             .collect();
-        e.insert_literals("db1.t1", None, rows).unwrap();
+        e.insert_literals("db1.t1", None, rows).await.unwrap();
     }
 
     // Checkpoint frames and transaction records share `wal/wal.log`, as in
@@ -470,13 +512,15 @@ fn recycle_wal_after_delta_checkpoint() {
     );
     // The reference checkpoint: make the rows durable, then let the reclaimer
     // drop what the KV base already holds.
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e.checkpoint_wal();
+    e.flush().await.unwrap();
+    e.checkpoint_wal().await;
     // The recycled log must still be a valid frame stream.
-    storage::WalManager::read_all(&wal_path).unwrap();
+    storage::WalManager::read_all(&wal_path).await.unwrap();
     drop(e);
 
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert!(db_exists(&e, "db1"));
-    assert_eq!(h::count(&e, "db1.t1"), 6400);
+    assert_eq!(h::count(&e, "db1.t1").await, 6400);
 }

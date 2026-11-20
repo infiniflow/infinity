@@ -3244,6 +3244,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -3626,7 +3627,6 @@ name = "txn"
 version = "0.1.0"
 dependencies = [
  "common",
- "futures-executor",
  "loom",
  "storage",
  "tempfile",

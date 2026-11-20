@@ -132,9 +132,9 @@ fn golden_dir() -> String {
     std::env::var("FT_BIG_OUT").unwrap_or_else(|_| "/tmp/rust_ft_big".to_string())
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "golden: needs the reference's bytes, ./build/src/test_main --gtest_filter='*FulltextBigGolden*'"]
-fn a_large_corpus_is_byte_identical_to_the_reference() {
+async fn a_large_corpus_is_byte_identical_to_the_reference() {
     let doc_count = env_u32("FT_BIG_DOCS", 20_000);
     let chunk_docs = env_u32("FT_BIG_CHUNK_DOCS", 10000);
     assert_eq!(
@@ -168,6 +168,7 @@ fn a_large_corpus_is_byte_identical_to_the_reference() {
             &postings,
             OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
         sources.push(ColumnSource {
             base_name,

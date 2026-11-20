@@ -77,9 +77,9 @@ fn dir_mb(path: &std::path::Path) -> u64 {
     total / 1_000_000
 }
 
-fn ids(e: &Engine, sql: &str) -> Vec<i64> {
+async fn ids(e: &Engine, sql: &str) -> Vec<i64> {
     use executor::QueryResult;
-    for result in e.execute_blocking(sql).unwrap() {
+    for result in e.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result
                 .rows_text()
@@ -91,13 +91,17 @@ fn ids(e: &Engine, sql: &str) -> Vec<i64> {
     Vec::new()
 }
 
-fn count(e: &Engine, sql: &str) -> i64 {
-    ids(e, sql).first().copied().unwrap_or(-1)
+async fn count(e: &Engine, sql: &str) -> i64 {
+    ids(e, sql).await.first().copied().unwrap_or(-1)
 }
 
-fn timed<T>(label: &str, run: impl FnOnce() -> T) -> T {
+/// Times one step: the label, the wall clock and the value.
+async fn timed_async<T, F>(label: &str, run: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
     let started = Instant::now();
-    let out = run();
+    let out = run.await;
     println!(
         "  {label}: {:.1} ms",
         started.elapsed().as_secs_f64() * 1000.0
@@ -106,6 +110,10 @@ fn timed<T>(label: &str, run: impl FnOnce() -> T) -> T {
 }
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     // Positional: `<rows> [dir]`. Flags overrule the environment (and exist
     // because a run at a large scale needs different knobs than the default
     // gate: the delete stage is a full table scan per statement, so at 10M it
@@ -155,13 +163,15 @@ fn main() {
     std::fs::create_dir_all(&dir).unwrap();
     println!("{rows} rows under {}", dir.display());
 
-    let e = Engine::open(&dir).unwrap();
+    let e = Engine::open_async(&dir, Default::default()).await.unwrap();
     // A bounded tail: the memory index must spill instead of growing with the
     // corpus, which is the shape a 10M import has.
     e.set_memindex_quota(512 << 20);
-    e.execute_blocking("CREATE TABLE t (id INT, title VARCHAR, body VARCHAR);")
+    e.execute("CREATE TABLE t (id INT, title VARCHAR, body VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX t_ft ON t (body) USING FULLTEXT;")
+    e.execute("CREATE INDEX t_ft ON t (body) USING FULLTEXT;")
+        .await
         .unwrap();
 
     let started = Instant::now();
@@ -171,7 +181,8 @@ fn main() {
         let values: Vec<String> = (done..done + count)
             .map(|i| format!("({i}, 'r{i}', '{}')", body(i)))
             .collect();
-        e.execute_blocking(&format!("INSERT INTO t VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO t VALUES {};", values.join(",")))
+            .await
             .unwrap();
         done += count;
         if done % (BATCH * 100) == 0 {
@@ -188,20 +199,22 @@ fn main() {
         rows as f64 / started.elapsed().as_secs_f64()
     );
 
-    timed("flush", || executor::block_on(e.flush()).unwrap());
-    timed("dump", || {
-        executor::block_on(e.dump_index_transaction("t", "t_ft")).unwrap()
-    });
+    timed_async("flush", e.flush()).await.unwrap();
+    timed_async("dump", e.dump_index_transaction("t", "t_ft"))
+        .await
+        .unwrap();
 
-    let check = |e: &Engine, label: &str, deleted: &BTreeSet<i64>| {
+    let check = async |e: &Engine, label: &str, deleted: &BTreeSet<i64>| {
         for i in (0..rows).step_by((rows / probes).max(1)) {
             let want = if deleted.contains(&(i as i64)) { 0 } else { 1 };
-            let found = timed(&format!("uniq{i}"), || {
+            let found = timed_async(
+                &format!("uniq{i}"),
                 count(
                     e,
                     &format!("SELECT count(*) FROM t WHERE filter_fulltext('body', 'uniq{i}');"),
-                )
-            });
+                ),
+            )
+            .await;
             assert_eq!(found, want, "{label}: uniq{i} -> {found}, wanted {want}");
         }
         for bucket in [0, 3, 6] {
@@ -210,43 +223,49 @@ fn main() {
                     .iter()
                     .filter(|i| (*i % 7) as usize == bucket)
                     .count() as i64;
-            let found = timed(&format!("bucket{bucket} count"), || {
+            let found = timed_async(
+                &format!("bucket{bucket} count"),
                 count(
                     e,
                     &format!(
                         "SELECT count(*) FROM t WHERE filter_fulltext('body', 'bucket{bucket}');"
                     ),
-                )
-            });
+                ),
+            )
+            .await;
             assert_eq!(
                 found, alive,
                 "{label}: bucket{bucket} -> {found}, wanted {alive}"
             );
         }
-        let top = timed("alpha beta gamma top-10", || {
+        let top = timed_async(
+            "alpha beta gamma top-10",
             ids(
                 e,
                 "SELECT id FROM t SEARCH MATCH TEXT (body, 'alpha beta gamma', 10);",
-            )
-        });
+            ),
+        )
+        .await;
         assert_eq!(top.len(), 10, "{label}: three-term top-10 -> {}", top.len());
         if phrase {
-            let hits = timed("phrase top-10", || {
+            let hits = timed_async(
+                "phrase top-10",
                 ids(
                     e,
                     "SELECT id FROM t SEARCH MATCH TEXT (body, '\"alpha beta\"', 10);",
-                )
-            });
+                ),
+            )
+            .await;
             assert_eq!(hits.len(), 10, "{label}: phrase top-10 -> {}", hits.len());
         }
     };
     let none = BTreeSet::new();
-    check(&e, "after dump", &none);
+    check(&e, "after dump", &none).await;
 
-    timed("optimize", || {
-        executor::block_on(e.optimize_fulltext_async("t")).unwrap()
-    });
-    check(&e, "after optimize", &none);
+    timed_async("optimize", e.optimize_fulltext_async("t"))
+        .await
+        .unwrap();
+    check(&e, "after optimize", &none).await;
 
     // `id` has no secondary index, so every `DELETE … WHERE id IN (…)` scans the
     // whole table: at 10M rows the 1% stage is hours. `--delete-pct 0` runs the
@@ -256,24 +275,26 @@ fn main() {
         .collect();
     let mut deleted: BTreeSet<i64> = BTreeSet::new();
     if !victims.is_empty() {
-        timed(&format!("delete {delete_pct}%"), || {
+        timed_async(&format!("delete {delete_pct}%"), async {
             for chunk in victims.chunks(5000) {
                 let list = chunk
                     .iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",");
-                e.execute_blocking(&format!("DELETE FROM t WHERE id IN ({list});"))
+                e.execute(&format!("DELETE FROM t WHERE id IN ({list});"))
+                    .await
                     .unwrap();
             }
-        });
+        })
+        .await;
         deleted = victims.iter().copied().collect();
-        check(&e, "after delete", &deleted);
+        check(&e, "after delete", &deleted).await;
 
-        timed("optimize after delete", || {
-            executor::block_on(e.optimize_fulltext_async("t")).unwrap()
-        });
-        check(&e, "after merge", &deleted);
+        timed_async("optimize after delete", e.optimize_fulltext_async("t"))
+            .await
+            .unwrap();
+        check(&e, "after merge", &deleted).await;
     }
 
     println!(
@@ -285,12 +306,12 @@ fn main() {
 
     drop(e);
     let started = Instant::now();
-    let reopened = Engine::open(&dir).unwrap();
+    let reopened = Engine::open_async(&dir, Default::default()).await.unwrap();
     println!(
         "reopen {:.1} s, rss {:.0} MB",
         started.elapsed().as_secs_f64(),
         rss_mb()
     );
-    check(&reopened, "after restart", &deleted);
+    check(&reopened, "after restart", &deleted).await;
     println!("all invariants held");
 }

@@ -100,20 +100,23 @@ fn wait_until(mut cond: impl FnMut() -> bool, what: &str) {
 /// report engine state. The test builds that state — a buffered block, a live
 /// transaction, a rollback, a queued background task — and reads it back
 /// through the same accessor `SHOW VARIABLE` uses.
-#[test]
-fn global_variables_report_real_counts() {
+#[tokio::test]
+async fn global_variables_report_real_counts() {
     let dir = tempdir().unwrap();
-    let engine = Arc::new(Engine::open(dir.path()).unwrap());
+    let engine = Arc::new(
+        Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap(),
+    );
+    engine.execute("CREATE TABLE gv (id INT);").await.unwrap();
     engine
-        .execute_blocking("CREATE TABLE gv (id INT);")
-        .unwrap();
-    engine
-        .execute_blocking("INSERT INTO gv VALUES (1), (2);")
+        .execute("INSERT INTO gv VALUES (1), (2);")
+        .await
         .unwrap();
     // A checkpoint writes the C++ block mirror; reading it back is what puts
     // blocks in the engine's buffer cache (`BlockIndex::get_block`).
-    crate::scheduler::block_on(engine.flush()).unwrap();
-    engine.read_blocks("gv").unwrap();
+    engine.flush().await.unwrap();
+    engine.read_blocks("gv").await.unwrap();
 
     // Reading the block mirror populates the engine's block cache, so the
     // buffer counters must see the blocks the test itself created.
@@ -143,7 +146,7 @@ fn global_variables_report_real_counts() {
     // nothing running. One blocked task: exactly one.
     assert_eq!(number(&engine, "bg_task_count"), 0);
     let processor = Arc::new(BGTaskProcessor::new(1));
-    processor.start();
+    crate::scheduler::block_on(processor.start());
     engine.attach_bg_task_processor(processor.clone());
     assert_eq!(number(&engine, "bg_task_count"), 0);
     let gate = Arc::new((Mutex::new(false), Condvar::new()));
@@ -159,7 +162,7 @@ fn global_variables_report_real_counts() {
         *lock.lock().unwrap() = true;
         cv.notify_all();
     }
-    processor.drain();
+    processor.drain().await;
     assert_eq!(number(&engine, "bg_task_count"), 0);
 
     // The process's own counters, read from /proc.
@@ -177,17 +180,19 @@ fn global_variables_report_real_counts() {
     assert!(global(&engine, "cpu_usage").parse::<f64>().unwrap() >= 0.0);
 
     // Session scope reports this engine's own counters, not constants.
-    engine.execute_blocking("SELECT 1;").unwrap();
+    engine.execute("SELECT 1;").await.unwrap();
     assert!(session(&engine, "query_count").parse::<u64>().unwrap() >= 1);
     assert_eq!(session(&engine, "total_rollback_count"), "1");
 }
 
 /// `SHOW VARIABLES` lists every name in the reference's table, and every value
 /// is the one the single-name accessor returns.
-#[test]
-fn variables_listing_covers_the_name_table() {
+#[tokio::test]
+async fn variables_listing_covers_the_name_table() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     let listed = engine.variables(Scope::Global);
     // `cache_result_capacity` is absent while the result cache is off, which
     // is the reference's default (`DEFAULT_RESULT_CACHE = "off"`) and its
@@ -232,10 +237,12 @@ fn variables_listing_covers_the_name_table() {
 /// `SET VARIABLE` follows `PhysicalCommand`'s rules: session variables are
 /// read-only, `profile` and `profile_record_capacity` are settable, every other
 /// global variable is read-only, and an unknown name is an error.
-#[test]
-fn set_variables_follows_the_reference_rules() {
+#[tokio::test]
+async fn set_variables_follows_the_reference_rules() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
     engine
         .set_variables(Scope::Global, &[("profile".into(), "true".into())])
@@ -276,10 +283,12 @@ fn set_variables_follows_the_reference_rules() {
 
 /// `SHOW TRANSACTIONS` / `SHOW TRANSACTION <id>` read the transaction manager's
 /// registry.
-#[test]
-fn transaction_accessors_expose_the_live_transaction() {
+#[tokio::test]
+async fn transaction_accessors_expose_the_live_transaction() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert!(engine.active_transactions().is_empty());
 
     let txn = engine.begin_txn();
@@ -299,16 +308,18 @@ fn transaction_accessors_expose_the_live_transaction() {
 /// `SHOW QUERIES` / `SHOW QUERY <id>` / `SHOW PROFILES` are backed by the real
 /// registry: a returned statement leaves the running set and, with profiling
 /// on, lands in the profile history.
-#[test]
-fn query_registry_lists_running_and_finished_statements() {
+#[tokio::test]
+async fn query_registry_lists_running_and_finished_statements() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     engine
         .set_variables(Scope::Global, &[("profile".into(), "true".into())])
         .unwrap();
 
     assert!(engine.running_queries().is_empty());
-    engine.execute_blocking("SELECT 1;").unwrap();
+    engine.execute("SELECT 1;").await.unwrap();
     assert!(
         engine.running_queries().is_empty(),
         "a returned statement is no longer running"
@@ -334,7 +345,7 @@ fn query_registry_lists_running_and_finished_statements() {
         )
         .unwrap();
     for _ in 0..3 {
-        engine.execute_blocking("SELECT 2;").unwrap();
+        engine.execute("SELECT 2;").await.unwrap();
     }
     assert_eq!(engine.profiles().len(), 2);
     assert_eq!(engine.profiles()[0].query_text, "SELECT 2;");
@@ -342,30 +353,31 @@ fn query_registry_lists_running_and_finished_statements() {
 
 /// A statement that fails still deregisters: the error path must not leak a
 /// registry row.
-#[test]
-fn failed_statements_leave_the_registry() {
+#[tokio::test]
+async fn failed_statements_leave_the_registry() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert!(engine
-        .execute_blocking("SELECT * FROM missing_table;")
+        .execute("SELECT * FROM missing_table;")
+        .await
         .is_err());
     assert!(engine.running_queries().is_empty());
 }
 
 /// `SHOW BUFFERS` / `SHOW OBJECT <name>`: the rows come from the block cache,
 /// and the object the test touched is addressable by its path.
-#[test]
-fn buffer_objects_describe_the_block_cache() {
+#[tokio::test]
+async fn buffer_objects_describe_the_block_cache() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    engine
-        .execute_blocking("CREATE TABLE bo (id INT);")
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    engine
-        .execute_blocking("INSERT INTO bo VALUES (7);")
-        .unwrap();
-    crate::scheduler::block_on(engine.flush()).unwrap();
-    engine.read_blocks("bo").unwrap();
+    engine.execute("CREATE TABLE bo (id INT);").await.unwrap();
+    engine.execute("INSERT INTO bo VALUES (7);").await.unwrap();
+    engine.flush().await.unwrap();
+    engine.read_blocks("bo").await.unwrap();
 
     let objects = engine.buffer_objects();
     assert_eq!(objects.len(), 1, "one block was written and read");
@@ -385,10 +397,12 @@ fn buffer_objects_describe_the_block_cache() {
 }
 
 /// `SHOW FILES`: every file under the engine directory with its size.
-#[test]
-fn all_files_walks_the_engine_directory() {
+#[tokio::test]
+async fn all_files_walks_the_engine_directory() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     let files = engine.all_files();
     assert!(!files.is_empty(), "an open engine has files on disk");
     for (path, size) in &files {
@@ -400,13 +414,9 @@ fn all_files_walks_the_engine_directory() {
             path.display()
         );
     }
-    engine
-        .execute_blocking("CREATE TABLE af (id INT);")
-        .unwrap();
-    engine
-        .execute_blocking("INSERT INTO af VALUES (1);")
-        .unwrap();
-    crate::scheduler::block_on(engine.flush()).unwrap();
+    engine.execute("CREATE TABLE af (id INT);").await.unwrap();
+    engine.execute("INSERT INTO af VALUES (1);").await.unwrap();
+    engine.flush().await.unwrap();
     assert!(
         engine
             .all_files()
@@ -418,18 +428,23 @@ fn all_files_walks_the_engine_directory() {
 
 /// `SHOW MEMINDEX`: the in-memory part of each index the test created, with the
 /// rows it holds.
-#[test]
-fn memory_indexes_report_the_in_memory_rows() {
+#[tokio::test]
+async fn memory_indexes_report_the_in_memory_rows() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    engine
-        .execute_blocking("CREATE TABLE mi (id INT, body VARCHAR, v EMBEDDING(2));")
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
     engine
-        .execute_blocking("CREATE INDEX mi_ft ON mi (body) USING FULLTEXT;")
+        .execute("CREATE TABLE mi (id INT, body VARCHAR, v EMBEDDING(2));")
+        .await
         .unwrap();
     engine
-        .execute_blocking("INSERT INTO mi VALUES (1, 'hello world', [1.0, 0.0]);")
+        .execute("CREATE INDEX mi_ft ON mi (body) USING FULLTEXT;")
+        .await
+        .unwrap();
+    engine
+        .execute("INSERT INTO mi VALUES (1, 'hello world', [1.0, 0.0]);")
+        .await
         .unwrap();
 
     let rows = engine.memory_indexes();
@@ -450,13 +465,13 @@ fn memory_indexes_report_the_in_memory_rows() {
 /// both places would double count. `Txn::drop` only releases the slot; the
 /// counter is bumped by `rollback` alone, as `NewTxnManager::RollBackTxn` does in
 /// the reference (`~NewTxn` is empty, `new_txn_impl.cpp:128`).
-#[test]
-fn rollback_counter_moves_exactly_once_per_rollback() {
+#[tokio::test]
+async fn rollback_counter_moves_exactly_once_per_rollback() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    engine
-        .execute_blocking("CREATE TABLE rb (id INT);")
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
+    engine.execute("CREATE TABLE rb (id INT);").await.unwrap();
 
     let txn = engine.begin_txn();
     assert_eq!(number(&engine, "active_txn_count"), 1);
@@ -471,8 +486,8 @@ fn rollback_counter_moves_exactly_once_per_rollback() {
     // adds exactly one.
     let commits_before = number(&engine, "total_commit_count");
     let mut txn = engine.begin_txn();
-    txn.append("rb", vec![vec![Literal::Int(1)]]).unwrap();
-    txn.commit().unwrap();
+    txn.append("rb", vec![vec![Literal::Int(1)]]).await.unwrap();
+    txn.commit().await.unwrap();
     assert_eq!(number(&engine, "total_rollback_count"), 1);
     assert_eq!(number(&engine, "total_commit_count"), commits_before + 1);
 
@@ -494,10 +509,12 @@ fn rollback_counter_moves_exactly_once_per_rollback() {
 /// internal "unbounded" sentinel. `result_cache_capacity()` returns
 /// `usize::MAX` when nothing is configured, and that value used to be printed
 /// verbatim (18446744073709551615) by `SHOW VARIABLES` and `GET /variables/*`.
-#[test]
-fn cache_result_capacity_reports_the_configuration_not_the_sentinel() {
+#[tokio::test]
+async fn cache_result_capacity_reports_the_configuration_not_the_sentinel() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert_eq!(
         engine
             .global_variable_value(crate::variables::GlobalVariable::CacheResultCapacity)
@@ -506,7 +523,8 @@ fn cache_result_capacity_reports_the_configuration_not_the_sentinel() {
         "the reference's default capacity, never usize::MAX"
     );
     engine
-        .execute_blocking("SET CONFIG cache_result_capacity 64;")
+        .execute("SET CONFIG cache_result_capacity 64;")
+        .await
         .unwrap();
     assert_eq!(
         engine

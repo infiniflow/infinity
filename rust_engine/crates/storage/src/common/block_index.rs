@@ -65,6 +65,11 @@ impl BlockMeta {
 /// of taking a copy through a buffer manager.
 pub struct BlockIndex {
     root: PathBuf,
+    /// The table this index was opened for. A cache keyed by name alone reused
+    /// the index an earlier table under that name built, and its `BlockId`s
+    /// kept the old `table_id` - so a read after a snapshot restore returned
+    /// the dropped table's block directory (the post-snapshot rows).
+    table_id: u64,
     blocks: BTreeMap<(u32, u16), BlockMeta>,
 }
 
@@ -74,8 +79,14 @@ impl BlockIndex {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
+            table_id: u64::MAX,
             blocks: BTreeMap::new(),
         }
+    }
+
+    /// The table id every `BlockId` in this index names.
+    pub fn table_id(&self) -> u64 {
+        self.table_id
     }
 
     /// C++ `BlockIndex::NewInit`/`BlockMeta::LoadSet`: recovers the block list
@@ -83,6 +94,7 @@ impl BlockIndex {
     /// the cumulative row counts.
     pub fn open(root: impl Into<PathBuf>, db_id: u64, table_id: u64) -> Result<Self> {
         let mut index = Self::new(root);
+        index.table_id = table_id;
         let table_root = index
             .root
             .join(format!("db_{db_id}"))

@@ -24,8 +24,8 @@ use parser::Literal;
 use std::path::Path;
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -34,8 +34,9 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 }
 
 /// `SHOW DATABASES` names, sorted (`NewTxn::ListDatabase`).
-fn db_names(engine: &Engine) -> Vec<String> {
+async fn db_names(engine: &Engine) -> Vec<String> {
     let mut names: Vec<String> = rows(engine, "SHOW DATABASES;")
+        .await
         .into_iter()
         .map(|r| r[0].clone())
         .collect();
@@ -49,90 +50,96 @@ fn constant_rows(n: usize, values: &[Literal]) -> Vec<Vec<Literal>> {
 }
 
 /// Appends one 8192-row block whose columns hold `values`.
-fn append_block(engine: &Engine, table: &str, values: &[Literal]) {
+async fn append_block(engine: &Engine, table: &str, values: &[Literal]) {
     engine
         .insert_literals(table, None, constant_rows(8192, values))
+        .await
         .unwrap();
 }
 
 /// Drops the engine (releasing the store lock) and opens it again, i.e.
 /// `RestartTxnMgr`.
-fn restart(old: Engine, dir: &Path) -> Engine {
+async fn restart(old: Engine, dir: &Path) -> Engine {
     drop(old);
-    Engine::open(dir).unwrap()
+    Engine::open_async(dir, Default::default()).await.unwrap()
 }
 
 /// `RestartTxnMgr` in the `NEW_CONFIG_NOWAL_PATH` configuration.
-fn restart_without_wal(old: Engine, dir: &Path) -> Engine {
+async fn restart_without_wal(old: Engine, dir: &Path) -> Engine {
     drop(old);
-    Engine::open_without_wal(dir).unwrap()
+    Engine::open_without_wal_async(dir).await.unwrap()
 }
 
 /// C++: `checkpoint1_ut.cpp:100` (`checkpoint_and_create_db`).
 ///
 /// With the WAL disabled, a database created before a checkpoint survives the
 /// restart and one created after the checkpoint is gone.
-#[test]
-fn checkpoint_and_create_db() {
+#[tokio::test]
+async fn checkpoint_and_create_db() {
     // Create db, then checkpoint: the catalog is flushed.
     let dir = tempdir().unwrap();
-    let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    let e = restart_without_wal(e, dir.path());
+    let e = Engine::open_without_wal_async(dir.path()).await.unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
+    let e = restart_without_wal(e, dir.path()).await;
     assert_eq!(
-        db_names(&e),
+        db_names(&e).await,
         vec!["db1".to_string(), "default_db".to_string()]
     );
     drop(e);
 
     // Checkpoint first, then create db: the DDL is not durable without WAL.
     let dir = tempdir().unwrap();
-    let e = Engine::open_without_wal(dir.path()).unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    let e = restart_without_wal(e, dir.path());
-    assert_eq!(db_names(&e), vec!["default_db".to_string()]);
+    let e = Engine::open_without_wal_async(dir.path()).await.unwrap();
+    e.flush().await.unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    let e = restart_without_wal(e, dir.path()).await;
+    assert_eq!(db_names(&e).await, vec!["default_db".to_string()]);
 }
 
 /// C++: `checkpoint1_ut.cpp:233` (`checkpoint_and_create_table`).
 ///
 /// Same rule for a table in `default_db`.
-#[test]
-fn checkpoint_and_create_table() {
+#[tokio::test]
+async fn checkpoint_and_create_table() {
     // Create table, then checkpoint.
     let dir = tempdir().unwrap();
-    let e = Engine::open_without_wal(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_without_wal_async(dir.path()).await.unwrap();
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    let e = restart_without_wal(e, dir.path());
+    e.flush().await.unwrap();
+    let e = restart_without_wal(e, dir.path()).await;
     assert!(e.table_exists("default_db.tb1"));
     assert_eq!(e.row_count("default_db.tb1").unwrap(), 0);
     drop(e);
 
     // Checkpoint first, then create table.
     let dir = tempdir().unwrap();
-    let e = Engine::open_without_wal(dir.path()).unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_without_wal_async(dir.path()).await.unwrap();
+    e.flush().await.unwrap();
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
     assert!(e.table_exists("default_db.tb1"));
-    let e = restart_without_wal(e, dir.path());
+    let e = restart_without_wal(e, dir.path()).await;
     assert!(!e.table_exists("default_db.tb1"));
-    assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
+    assert!(rows(&e, "SHOW TABLES FROM default_db;").await.is_empty());
 }
 
 /// C++: `checkpoint_add_column_ut.cpp:82` (`addcol_checkpoint_insert`).
 ///
 /// A column added before a checkpoint must read back for rows appended after
 /// it, and the checkpoint must preserve both blocks.
-#[test]
-fn addcol_checkpoint_insert() {
+#[tokio::test]
+async fn addcol_checkpoint_insert() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
 
     e.insert_literals(
@@ -140,11 +147,13 @@ fn addcol_checkpoint_insert() {
         None,
         constant_rows(10, &[Literal::Int(1), Literal::Str("abcde".into())]),
     )
+    .await
     .unwrap();
 
-    e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+    e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
     e.insert_literals(
         "db1.tb1",
@@ -158,20 +167,21 @@ fn addcol_checkpoint_insert() {
             ],
         ),
     )
+    .await
     .unwrap();
 
-    let e = restart(e, dir.path());
+    let e = restart(e, dir.path()).await;
 
     // C++ walks every block and sums `BlockInfo::row_count_`. The Rust block
     // mirror only covers flushed rows; the row store (which the reopened
     // engine reconstructs) is authoritative for the second block.
     assert_eq!(e.row_count("db1.tb1").unwrap(), 20);
-    assert_eq!(rows(&e, "SELECT count(*) FROM db1.tb1;")[0][0], "20");
+    assert_eq!(rows(&e, "SELECT count(*) FROM db1.tb1;").await[0][0], "20");
 
     // The added column is part of the persisted schema and old rows kept their
     // values.
     assert_eq!(
-        rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 'abcde';")[0][0],
+        rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 'abcde';").await[0][0],
         "10"
     );
 }
@@ -180,12 +190,15 @@ fn addcol_checkpoint_insert() {
 ///
 /// Two 8192-row appends form one segment with two blocks; two checkpoints and a
 /// restart must not duplicate, drop or reorder any row.
-#[test]
-fn checkpoint_internal_test_checkpoint0() {
+#[tokio::test]
+async fn checkpoint_internal_test_checkpoint0() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
 
     append_block(
@@ -195,7 +208,8 @@ fn checkpoint_internal_test_checkpoint0() {
             Literal::Int(1),
             Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
         ],
-    );
+    )
+    .await;
     append_block(
         &e,
         "db1.tb1",
@@ -203,15 +217,16 @@ fn checkpoint_internal_test_checkpoint0() {
             Literal::Int(1),
             Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
         ],
-    );
+    )
+    .await;
 
     // C++ checkpoints twice before the restart.
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
+    e.flush().await.unwrap();
 
-    let e = restart(e, dir.path());
+    let e = restart(e, dir.path()).await;
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0, 1]);
     for block in [0u16, 1u16] {
         assert_eq!(e.block_row_count("db1.tb1", 0, block), Some(8192));
@@ -222,7 +237,8 @@ fn checkpoint_internal_test_checkpoint0() {
             &e,
             "SELECT count(*) FROM db1.tb1 \
              WHERE col1 = 1 AND col2 = 'abcdefghijklmnopqrstuvwxyz';"
-        )[0][0],
+        )
+        .await[0][0],
         "16384"
     );
 }
@@ -232,78 +248,88 @@ fn checkpoint_internal_test_checkpoint0() {
 ///
 /// A long DDL/replay sequence: the table survives every checkpoint + restart,
 /// follows `RENAME`, and an index created afterwards survives another restart.
-#[test]
+#[tokio::test]
 #[ignore = "slow: 8192-row imports interleaved with 15 checkpoints/restarts"]
-fn checkpoint_internal_test_checkpoint1() {
+async fn checkpoint_internal_test_checkpoint1() {
     let dir = tempdir().unwrap();
-    let mut e = Engine::open(dir.path()).unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let mut e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
+        .unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
     let block = [
         Literal::Int(1),
         Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
     ];
-    append_block(&e, "db1.tb1", &block);
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    append_block(&e, "db1.tb1", &block).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
     // `Import` is another 8192-row batch (the reference's physical import).
-    append_block(&e, "db1.tb1", &block);
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    append_block(&e, "db1.tb1", &block).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    assert!(rows(&e, "SHOW DATABASES;").iter().any(|r| r[0] == "db1"));
+    assert!(rows(&e, "SHOW DATABASES;")
+        .await
+        .iter()
+        .any(|r| r[0] == "db1"));
 
-    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .await
         .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.execute_blocking(
+    e.execute(
         "ALTER TABLE db1.tb1 ADD COLUMN (\
          col2 VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyz', col3 INT DEFAULT 1);",
     )
+    .await
     .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.renametable;")
+    e.execute("ALTER TABLE db1.tb1 RENAME TO db1.renametable;")
+        .await
         .unwrap();
     assert!(!e.table_exists("db1.tb1"));
     assert!(e.table_exists("db1.renametable"));
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.execute_blocking("CREATE INDEX index_name ON db1.renametable (col1, col2);")
+    e.execute("CREATE INDEX index_name ON db1.renametable (col1, col2);")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
     assert!(e.table_exists("db1.renametable"));
-    let count: usize = rows(&e, "SELECT count(*) FROM db1.renametable;")[0][0]
+    let count: usize = rows(&e, "SELECT count(*) FROM db1.renametable;").await[0][0]
         .parse()
         .unwrap();
     assert_eq!(count, 16384);
@@ -314,12 +340,15 @@ fn checkpoint_internal_test_checkpoint1() {
 /// Drop + re-add columns around a checkpoint; the reference asserts only that
 /// every DDL transaction succeeds, so the port additionally reads the state
 /// back after the restart.
-#[test]
-fn checkpoint_internal_test_checkpoint2() {
+#[tokio::test]
+async fn checkpoint_internal_test_checkpoint2() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
 
     append_block(
@@ -329,18 +358,21 @@ fn checkpoint_internal_test_checkpoint2() {
             Literal::Int(1),
             Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
         ],
-    );
+    )
+    .await;
 
-    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .await
         .unwrap();
-    e.execute_blocking(
+    e.execute(
         "ALTER TABLE db1.tb1 ADD COLUMN (\
          col2 VARCHAR DEFAULT 'abcdefghijklmnopqrstuvwxyz', col3 INT DEFAULT 1);",
     )
+    .await
     .unwrap();
 
-    crate::scheduler::block_on(e.flush()).unwrap();
-    let e = restart(e, dir.path());
+    e.flush().await.unwrap();
+    let e = restart(e, dir.path()).await;
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     assert_eq!(
@@ -348,7 +380,8 @@ fn checkpoint_internal_test_checkpoint2() {
             &e,
             "SELECT count(*) FROM db1.tb1 \
              WHERE col2 = 'abcdefghijklmnopqrstuvwxyz' AND col3 = 1;"
-        )[0][0],
+        )
+        .await[0][0],
         "8192"
     );
 }
@@ -359,73 +392,81 @@ fn checkpoint_internal_test_checkpoint2() {
 /// A column referenced by an index cannot be dropped; after the index is
 /// dropped the column can go, and both checkpoints and restarts happen in
 /// between.
-#[test]
+#[tokio::test]
 #[ignore = "slow: reference is a long DDL/checkpoint/restart sequence"]
-fn checkpoint_internal_test_checkpoint3() {
+async fn checkpoint_internal_test_checkpoint3() {
     let dir = tempdir().unwrap();
-    let mut e = Engine::open(dir.path()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 VARCHAR);")
+    let mut e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.execute_blocking("CREATE INDEX index_name ON db1.tb1 (col2);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 VARCHAR);")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+
+    e.execute("CREATE INDEX index_name ON db1.tb1 (col2);")
+        .await
+        .unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
     // `DumpMemIndex` — the checkpoint dumps the mem index.
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
     // The index still references col2, so the drop is rejected.
     assert!(e
-        .execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .await
         .is_err());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
-    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col1);")
+        .await
         .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.optimize_indexes().unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.optimize_indexes().await.unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
-    e.execute_blocking("DROP INDEX index_name ON db1.tb1;")
+    e.execute("DROP INDEX index_name ON db1.tb1;")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
-    e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        .await
         .unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
 
-    e.optimize_indexes().unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.optimize_indexes().await.unwrap();
+    e.flush().await.unwrap();
+    e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 }
 
 /// C++: `checkpoint_internal_ut.cpp:696`
@@ -433,13 +474,16 @@ fn checkpoint_internal_test_checkpoint3() {
 ///
 /// One segment holding one block; a checkpoint, a restart and a compaction of
 /// that segment must all succeed and keep the rows.
-#[test]
+#[tokio::test]
 #[ignore = "slow: reference is a long checkpoint/compact/restart sequence"]
-fn checkpoint_internal_test_checkpoint4() {
+async fn checkpoint_internal_test_checkpoint4() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
 
     append_block(
@@ -449,18 +493,19 @@ fn checkpoint_internal_test_checkpoint4() {
             Literal::Int(1),
             Literal::Str("abcdefghijklmnopqrstuvwxyz".into()),
         ],
-    );
+    )
+    .await;
 
-    crate::scheduler::block_on(e.flush()).unwrap();
-    let e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
+    let e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
 
-    e.compact_all_segments("db1.tb1").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    let e = restart(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    e.flush().await.unwrap();
+    let e = restart(e, dir.path()).await;
+    e.flush().await.unwrap();
 
     assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
 }
@@ -469,17 +514,22 @@ fn checkpoint_internal_test_checkpoint4() {
 ///
 /// `DROP DATABASE` followed by a checkpoint and a cleanup removes the database
 /// for good.
-#[test]
-fn checkpoint_internal_test_checkpoint5() {
+#[tokio::test]
+async fn checkpoint_internal_test_checkpoint5() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
 
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
     // `TransactionType::kCleanup` -> `NewTxn::Cleanup`.
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.cleanup().await.unwrap();
 
-    assert_eq!(db_names(&e), vec!["default_db".to_string()]);
-    assert!(rows(&e, "SHOW DATABASES;").iter().all(|r| r[0] != "db1"));
+    assert_eq!(db_names(&e).await, vec!["default_db".to_string()]);
+    assert!(rows(&e, "SHOW DATABASES;")
+        .await
+        .iter()
+        .all(|r| r[0] != "db1"));
 }

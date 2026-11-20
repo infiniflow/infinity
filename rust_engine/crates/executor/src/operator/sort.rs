@@ -190,7 +190,7 @@ mod tests {
         vec![Value::Int(id), Value::Int(rank)]
     }
 
-    fn run(sort: Sort, rows: Vec<Vec<Value>>, batch: usize) -> Vec<Vec<Value>> {
+    async fn run(sort: Sort, rows: Vec<Vec<Value>>, batch: usize) -> Vec<Vec<Value>> {
         let mut operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(sort)];
         for operator in &mut operators {
             operator.init().unwrap();
@@ -200,17 +200,20 @@ mod tests {
         };
         let mut states = OperatorStates::new(&operators);
         let mut source = RowsSource::new(rows, 2, batch);
-        crate::operator::run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        let mut operators = operators;
+        { crate::operator::run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         std::mem::take(&mut states.state_mut(0).data_blocks)
             .into_iter()
             .flat_map(DataChunk::into_rows)
             .collect()
     }
 
-    #[test]
-    fn sorts_across_chunk_boundaries() {
+    #[tokio::test]
+    async fn sorts_across_chunk_boundaries() {
         let rows = vec![row(1, 30), row(2, 10), row(3, 50), row(4, 20), row(5, 40)];
-        let out = run(Sort::new(vec![key(1)]), rows, 2);
+        let out = run(Sort::new(vec![key(1)]), rows, 2).await;
         assert_eq!(
             out,
             vec![row(2, 10), row(4, 20), row(1, 30), row(5, 40), row(3, 50)]
@@ -218,29 +221,29 @@ mod tests {
     }
 
     /// ORDER BY ties keep the input order, across the merge.
-    #[test]
-    fn sort_ties_keep_input_order() {
+    #[tokio::test]
+    async fn sort_ties_keep_input_order() {
         // Ranks repeat inside a run and across runs.
         let rows = vec![row(1, 7), row(2, 7), row(3, 7), row(4, 7), row(5, 7)];
-        let out = run(Sort::new(vec![key(1)]), rows, 2);
+        let out = run(Sort::new(vec![key(1)]), rows, 2).await;
         assert_eq!(
             out,
             vec![row(1, 7), row(2, 7), row(3, 7), row(4, 7), row(5, 7)]
         );
     }
 
-    #[test]
-    fn a_single_run_is_not_merged() {
+    #[tokio::test]
+    async fn a_single_run_is_not_merged() {
         let rows: Vec<Vec<Value>> = (0..5).map(|i| row(i, 5 - i)).collect();
-        let out = run(Sort::new(vec![key(1)]), rows, 8192);
+        let out = run(Sort::new(vec![key(1)]), rows, 8192).await;
         assert_eq!(out, (0..5).map(|i| row(i, 5 - i)).rev().collect::<Vec<_>>());
         assert_eq!(last_run_count(), 1);
     }
 
-    #[test]
-    fn several_runs_are_merged() {
+    #[tokio::test]
+    async fn several_runs_are_merged() {
         let rows: Vec<Vec<Value>> = (0..10).map(|i| row(i, 10 - i)).collect();
-        let out = run(Sort::new(vec![key(1)]), rows, 3);
+        let out = run(Sort::new(vec![key(1)]), rows, 3).await;
         assert_eq!(
             out,
             (0..10).map(|i| row(i, 10 - i)).rev().collect::<Vec<_>>()
@@ -248,44 +251,44 @@ mod tests {
         assert_eq!(last_run_count(), 4);
     }
 
-    #[test]
-    fn a_descending_key_reverses_the_order() {
+    #[tokio::test]
+    async fn a_descending_key_reverses_the_order() {
         let rows = vec![row(1, 30), row(2, 10), row(3, 20)];
-        let out = run(Sort::new(vec![(Expr::Column(1), false)]), rows, 2);
+        let out = run(Sort::new(vec![(Expr::Column(1), false)]), rows, 2).await;
         assert_eq!(out, vec![row(1, 30), row(3, 20), row(2, 10)]);
     }
 
-    #[test]
-    fn nulls_sort_first_and_stay_stable() {
+    #[tokio::test]
+    async fn nulls_sort_first_and_stay_stable() {
         let rows = vec![
             row(1, 30),
             vec![Value::Int(2), Value::Null],
             vec![Value::Int(3), Value::Null],
             row(4, 10),
         ];
-        let out = run(Sort::new(vec![key(1)]), rows, 2);
+        let out = run(Sort::new(vec![key(1)]), rows, 2).await;
         assert_eq!(out[0][0], Value::Int(2));
         assert_eq!(out[1][0], Value::Int(3));
         assert_eq!(out[2], row(4, 10));
         assert_eq!(out[3], row(1, 30));
     }
 
-    #[test]
-    fn the_merge_matches_a_single_stable_sort() {
+    #[tokio::test]
+    async fn the_merge_matches_a_single_stable_sort() {
         // Any batch size must produce the same sequence as one stable sort over
         // the whole relation.
         let rows: Vec<Vec<Value>> = (0..37).map(|i| row(i, (i * 7) % 5)).collect();
         let mut expected = rows.clone();
         crate::sort_rows(&mut expected, &[key(1)]);
         for batch in [1usize, 3, 5, 8192] {
-            let out = run(Sort::new(vec![key(1)]), rows.clone(), batch);
+            let out = run(Sort::new(vec![key(1)]), rows.clone(), batch).await;
             assert_eq!(out, expected, "batch {batch}");
         }
     }
 
-    #[test]
-    fn an_empty_input_emits_an_empty_block() {
-        let out = run(Sort::new(vec![key(1)]), Vec::new(), 4);
+    #[tokio::test]
+    async fn an_empty_input_emits_an_empty_block() {
+        let out = run(Sort::new(vec![key(1)]), Vec::new(), 4).await;
         assert!(out.is_empty());
     }
 }

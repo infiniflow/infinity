@@ -935,9 +935,12 @@ jobs:
           command -v bwrap >/dev/null 2>&1 ||
             { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
 
-      - name: loom (commit-ts ordering model)
+      - name: loom (commit-ts allocation model)
         working-directory: rust_engine
-        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib
+        # Exhaustive interleavings of the `prepare_commit_ts_ += 2` protocol
+        # `TxnManager::reserve_commit_ts` / `turn_done` implement, including the
+        # "smallest unfinished ts never runs ahead" rule. Takes ~15 s.
+        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib loom
       - name: Miri (pure-Rust front end)
         working-directory: rust_engine
         run: |

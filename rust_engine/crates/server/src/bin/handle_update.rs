@@ -21,18 +21,29 @@ use executor::Engine;
 use server::{read_update_call, write_reply_common, CommonResponse};
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = std::env::temp_dir().join(format!("infinity-update-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let engine = Engine::open(&dir).expect("open engine");
+    let engine = Engine::open_async(&dir, Default::default())
+        .await
+        .expect("open engine");
     let (seq, req) = read_update_call(&mut std::io::stdin()).expect("decode Update call");
     let t = &req.table_name;
-    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
-    let _ = engine.execute_blocking(&format!(
-        "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
-    ));
+    let _ = engine
+        .execute(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"))
+        .await;
+    let _ = engine
+        .execute(&format!(
+            "INSERT INTO {t} VALUES (1, 'a'), (2, 'b'), (3, 'c');"
+        ))
+        .await;
 
     let sid = req.session_id;
-    let run = executor::block_on(engine.execute_parsed(vec![req.into_statement()], ""))
+    let run = (engine.execute_parsed(vec![req.into_statement()], ""))
+        .await
         .map_err(|e| e.to_string());
     let resp = match run {
         Ok(_) => CommonResponse {

@@ -30,12 +30,12 @@ fn rows_of(result: &[QueryResult]) -> usize {
     }
 }
 
-fn best(e: &Engine, sql: &str, runs: usize) -> (Duration, usize) {
+async fn best(e: &Engine, sql: &str, runs: usize) -> (Duration, usize) {
     let mut best = Duration::from_secs(3600);
     let mut rows = 0;
     for _ in 0..runs {
         let t0 = Instant::now();
-        let out = e.execute_blocking(sql).expect("execute");
+        let out = e.execute(sql).await.expect("execute");
         best = best.min(t0.elapsed());
         rows = rows_of(&out);
     }
@@ -43,6 +43,10 @@ fn best(e: &Engine, sql: &str, runs: usize) -> (Duration, usize) {
 }
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "/tmp/result-bench".into());
@@ -51,21 +55,24 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(40000);
     let _ = std::fs::remove_dir_all(&dir);
-    let e = Engine::open(&dir).expect("open");
-    let _ = e.execute_blocking("DROP TABLE IF EXISTS t;");
-    let _ = e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);");
+    let e = Engine::open_async(&dir, Default::default())
+        .await
+        .expect("open");
+    let _ = e.execute("DROP TABLE IF EXISTS t;").await;
+    let _ = e.execute("CREATE TABLE t (id INT, name VARCHAR);").await;
     let mut i = 0;
     while i < n {
         let batch = (n - i).min(100);
         let vals: Vec<String> = (0..batch)
             .map(|j| format!("({}, 'v{}')", i + j, i + j))
             .collect();
-        e.execute_blocking(&format!("INSERT INTO t VALUES {};", vals.join(", ")))
+        e.execute(&format!("INSERT INTO t VALUES {};", vals.join(", ")))
+            .await
             .expect("insert");
         i += batch;
     }
     let t0 = Instant::now();
-    executor::block_on(e.flush()).expect("flush");
+    e.flush().await.expect("flush");
     println!("checkpoint: {:?}", t0.elapsed());
 
     for sql in [
@@ -76,7 +83,7 @@ fn main() {
         "SELECT * FROM t ORDER BY id;",
         "SELECT count(*) FROM t;",
     ] {
-        let (elapsed, rows) = best(&e, sql, 5);
+        let (elapsed, rows) = best(&e, sql, 5).await;
         println!("{elapsed:>12?}  {rows:>6} rows  {sql}");
     }
     let _ = std::fs::remove_dir_all(&dir);

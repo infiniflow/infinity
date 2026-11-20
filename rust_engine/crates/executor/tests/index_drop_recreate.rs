@@ -19,8 +19,8 @@
 
 use executor::{Engine, QueryResult};
 
-fn ids(engine: &Engine, sql: &str) -> Vec<i64> {
-    let rs = engine.execute_blocking(sql).expect("select");
+async fn ids(engine: &Engine, sql: &str) -> Vec<i64> {
+    let rs = engine.execute(sql).await.expect("select");
     match &rs[0] {
         QueryResult::Rows { rows, .. } => rows
             .iter()
@@ -30,31 +30,38 @@ fn ids(engine: &Engine, sql: &str) -> Vec<i64> {
     }
 }
 
-#[test]
-fn lookups_stay_correct_across_drop_and_recreate() {
+#[tokio::test]
+async fn lookups_stay_correct_across_drop_and_recreate() {
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INTEGER, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX idx ON t (name);").unwrap();
-    e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+    e.execute("CREATE TABLE t (id INTEGER, name VARCHAR);")
+        .await
+        .unwrap();
+    e.execute("CREATE INDEX idx ON t (name);").await.unwrap();
+    e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+        .await
         .unwrap();
 
     let q = "SELECT id FROM t WHERE name = 'a' ORDER BY id;";
-    assert_eq!(ids(&e, q), vec![1, 3], "before drop");
+    assert_eq!(ids(&e, q).await, vec![1, 3], "before drop");
 
-    e.execute_blocking("DROP INDEX idx;").unwrap();
-    assert_eq!(ids(&e, q), vec![1, 3], "after drop (falls back to a scan)");
+    e.execute("DROP INDEX idx;").await.unwrap();
+    assert_eq!(
+        ids(&e, q).await,
+        vec![1, 3],
+        "after drop (falls back to a scan)"
+    );
 
     // recreate: the rebuilt index must answer the same rows
-    e.execute_blocking("CREATE INDEX idx ON t (name);").unwrap();
-    assert_eq!(ids(&e, q), vec![1, 3], "after recreate");
+    e.execute("CREATE INDEX idx ON t (name);").await.unwrap();
+    assert_eq!(ids(&e, q).await, vec![1, 3], "after recreate");
 
     // and new rows are visible through the rebuilt index
-    e.execute_blocking("INSERT INTO t VALUES (4, 'a');")
-        .unwrap();
+    e.execute("INSERT INTO t VALUES (4, 'a');").await.unwrap();
     assert_eq!(
-        ids(&e, q),
+        ids(&e, q).await,
         vec![1, 3, 4],
         "after insert into the rebuilt index"
     );

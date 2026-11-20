@@ -85,8 +85,8 @@ fn reference_rows() -> Rows {
 }
 
 /// A merge of two chunks must equal one write of the same rows.
-#[test]
-fn a_merge_of_two_chunks_equals_a_single_write() {
+#[tokio::test]
+async fn a_merge_of_two_chunks_equals_a_single_write() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let (docs, postings) = reference_rows();
@@ -116,7 +116,9 @@ fn a_merge_of_two_chunks_equals_a_single_write() {
             (term.clone(), list)
         })
         .collect();
-    write_segment_index(d, "left", 0, &left_docs, &left_postings, OPTION_FLAG_ALL).unwrap();
+    write_segment_index(d, "left", 0, &left_docs, &left_postings, OPTION_FLAG_ALL)
+        .await
+        .unwrap();
     write_segment_index(
         d,
         "right",
@@ -125,6 +127,7 @@ fn a_merge_of_two_chunks_equals_a_single_write() {
         &right_postings,
         OPTION_FLAG_ALL,
     )
+    .await
     .unwrap();
     let sources = [
         ColumnSource {
@@ -139,7 +142,9 @@ fn a_merge_of_two_chunks_equals_a_single_write() {
     ColumnIndexMerger::new(d, OPTION_FLAG_ALL)
         .merge(&sources, "merged")
         .unwrap();
-    write_segment_index(d, "single", 0, &docs, &postings, OPTION_FLAG_ALL).unwrap();
+    write_segment_index(d, "single", 0, &docs, &postings, OPTION_FLAG_ALL)
+        .await
+        .unwrap();
 
     for suffix in SUFFIXES {
         let merged = std::fs::read(dir.path().join(format!("merged{suffix}"))).unwrap();

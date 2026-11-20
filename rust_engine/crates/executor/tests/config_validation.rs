@@ -20,14 +20,16 @@
 
 use executor::Engine;
 
-fn engine() -> (tempfile::TempDir, Engine) {
+async fn engine() -> (tempfile::TempDir, Engine) {
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     (dir, e)
 }
 
-#[test]
-fn valid_values_are_accepted() {
+#[tokio::test]
+async fn valid_values_are_accepted() {
     for sql in [
         "SET CONFIG result_cache \"on\";",
         "SET CONFIG result_cache \"suspend\";",
@@ -36,43 +38,45 @@ fn valid_values_are_accepted() {
         "SET CONFIG CHECKPOINT_INTERVAL 0;",
         "SET CONFIG CHECKPOINT_INTERVAL 30;",
     ] {
-        let (_d, e) = engine();
-        assert!(e.execute_blocking(sql).is_ok(), "should accept: {sql}");
+        let (_d, e) = engine().await;
+        assert!(e.execute(sql).await.is_ok(), "should accept: {sql}");
     }
 }
 
-#[test]
-fn malformed_enum_value_is_rejected() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn malformed_enum_value_is_rejected() {
+    let (_d, e) = engine().await;
     assert!(
-        e.execute_blocking("SET CONFIG result_cache \"sometimes\";")
+        e.execute("SET CONFIG result_cache \"sometimes\";")
+            .await
             .is_err(),
         "an unknown result_cache mode must be rejected"
     );
 }
 
-#[test]
-fn out_of_range_capacity_is_rejected() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn out_of_range_capacity_is_rejected() {
+    let (_d, e) = engine().await;
     // 0 is not a valid capacity (a positive integer is required)
     assert!(e
-        .execute_blocking("SET CONFIG cache_result_capacity 0;")
+        .execute("SET CONFIG cache_result_capacity 0;")
+        .await
         .is_err());
     // a non-numeric value is rejected too
     assert!(e
-        .execute_blocking("SET CONFIG cache_result_capacity \"big\";")
+        .execute("SET CONFIG cache_result_capacity \"big\";")
+        .await
         .is_err());
     // a rejected value is not stored (it must not be silently clamped)
     assert!(e
-        .execute_blocking("SET CONFIG cache_result_capacity -1;")
+        .execute("SET CONFIG cache_result_capacity -1;")
+        .await
         .is_err());
 }
 
-#[test]
-fn unknown_keys_are_tolerated() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn unknown_keys_are_tolerated() {
+    let (_d, e) = engine().await;
     // keys the engine does not model keep the historical lenient behaviour
-    assert!(e
-        .execute_blocking("SET CONFIG some_future_knob 42;")
-        .is_ok());
+    assert!(e.execute("SET CONFIG some_future_knob 42;").await.is_ok());
 }

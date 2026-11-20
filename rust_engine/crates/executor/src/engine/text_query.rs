@@ -103,7 +103,7 @@ impl TermLookup for TextTermLookup {
     /// statistics).
     fn lookup(&self, column: &str, term: &str, boost: f64) -> Option<Box<dyn DocIterator>> {
         let index = self.indexes.get(column)?;
-        let text = index.read().ok()?;
+        let text = index.try_read().ok()?;
         // `TextIndex::merge` is the port's `ColumnIndexReader::Lookup`: every
         // sealed segment plus the unsealed tail, with stale duplicates resolved.
         let merged = text.merge(&[term.to_string()]);
@@ -139,7 +139,7 @@ impl TermLookup for TextTermLookup {
         boost: f64,
     ) -> Option<Box<dyn DocIterator>> {
         let index = self.indexes.get(column)?;
-        let text = index.read().ok()?;
+        let text = index.try_read().ok()?;
         let mut postings: Vec<PhrasePostings> = Vec::with_capacity(terms.len());
         let mut rows: HashSet<u64> = HashSet::new();
         for term in terms {

@@ -11,8 +11,8 @@ tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-# `block_on` for the synchronous tests that call the async commit API.
-futures-executor.workspace = true
+# `#[tokio::test]`: the commit API is async, so a test drives it with `.await`.
+tokio.workspace = true
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"

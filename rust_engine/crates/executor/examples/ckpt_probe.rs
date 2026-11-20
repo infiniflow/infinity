@@ -23,36 +23,46 @@
 use executor::Engine;
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     e.set_memindex_quota(1 << 30);
     let rows: usize = std::env::args()
         .nth(1)
         .and_then(|v| v.parse().ok())
         .unwrap_or(200_000);
-    e.execute_blocking("CREATE TABLE p (id INT, a INT, b INT, c VARCHAR);")
+    e.execute("CREATE TABLE p (id INT, a INT, b INT, c VARCHAR);")
+        .await
         .unwrap();
     let mut values = Vec::new();
     for i in 0..rows {
         values.push(format!("({i},{},{},'row-{i}')", i % 97, i % 13));
         if values.len() == 1000 {
-            e.execute_blocking(&format!("INSERT INTO p VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO p VALUES {};", values.join(",")))
+                .await
                 .unwrap();
             values.clear();
         }
     }
     if !values.is_empty() {
-        e.execute_blocking(&format!("INSERT INTO p VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO p VALUES {};", values.join(",")))
+            .await
             .unwrap();
     }
     // The first checkpoint writes every block; the second rewrites one block,
     // which is the steady state the worker count is judged on.
     let started = std::time::Instant::now();
-    executor::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     eprintln!("cold checkpoint of {rows} rows: {:?}", started.elapsed());
-    e.execute_blocking("INSERT INTO p VALUES (999999,1,1,'x');")
+    e.execute("INSERT INTO p VALUES (999999,1,1,'x');")
+        .await
         .unwrap();
     let started = std::time::Instant::now();
-    executor::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     eprintln!("steady checkpoint: {:?}", started.elapsed());
 }

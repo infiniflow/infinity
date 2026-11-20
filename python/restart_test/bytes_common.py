@@ -198,6 +198,14 @@ def _config(root, engine, pg_port, quota="2GB"):
       row-capacity trigger as the only dumps.
     """
     persistence = "" if engine == "cpp" else f"{root}/persistence"
+    # The Rust CLI serves Thrift, HTTP and PG from **one** process and refuses a
+    # `client_port` that is already bound: with both set to `pg_port` it starts
+    # the PG listener and then aborts with "cannot serve on ...: 127.0.0.1:...
+    # is bound by another process". These harnesses drive everything over PG,
+    # so PG keeps `pg_port` and Thrift moves one port up. The C++ engine is left
+    # alone: its config has always used the default, and its front ends are
+    # separate processes, so the two ports never meet.
+    client_port_line = f"client_port = {pg_port + 1}" if engine == "rust" else ""
     return f"""
 [general]
 version = "0.7.4"
@@ -209,7 +217,7 @@ http_port = 23821
 peer_ip = "0.0.0.0"
 peer_port = 23851
 postgres_port = {pg_port}
-
+{client_port_line}
 [log]
 log_dir = "{root}/log"
 log_to_stdout = true

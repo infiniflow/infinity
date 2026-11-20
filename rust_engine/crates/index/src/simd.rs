@@ -39,22 +39,41 @@ use std::simd::num::SimdFloat;
 /// Lanes of the accumulator: `f32x8` is one AVX register, or two SSE ones.
 const LANES: usize = 8;
 
+/// The lanes of `a` that form a whole vector, and the scalar remainder.
+///
+/// `f32x8::from_slice(&a[i..])` reads correctly but leaves a panicking bounds
+/// check on every iteration, and LLVM cannot fold that into a single vector
+/// load: the hot loop came out as `vaddss`/`vmulss` (scalar) with only the odd
+/// `vaddps`. `as_chunks` makes the length a type-level fact (`&[[f32; LANES]]`),
+/// so the load becomes one `vmovups`.
+#[inline(always)]
+fn split_lanes(a: &[f32]) -> (&[[f32; LANES]], &[f32]) {
+    a.as_chunks::<LANES>()
+}
+
+/// One `f32x8` loaded from a fixed-size lane group.
+#[inline(always)]
+fn lane8(chunk: &[f32; LANES]) -> f32x8 {
+    f32x8::from_array(*chunk)
+}
+
 /// Squared L2 distance, the reference's `F32L2` family.
 #[inline]
 pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len().min(b.len());
+    let (a, b) = (&a[..n], &b[..n]);
+    let (av, at) = split_lanes(a);
+    let (bv, bt) = split_lanes(b);
     let mut acc = f32x8::splat(0.0);
-    let mut i = 0;
-    while i + LANES <= n {
-        let diff = f32x8::from_slice(&a[i..]) - f32x8::from_slice(&b[i..]);
+    for (x, y) in av.iter().zip(bv) {
+        let diff = lane8(x) - lane8(y);
         // `sum + diff * diff`, not `mul_add`: the reference commented the FMA
         // out in `F32L2AVX512` and this keeps the same rounding.
         acc += diff * diff;
-        i += LANES;
     }
     let mut sum = acc.reduce_sum();
-    for j in i..n {
-        let diff = a[j] - b[j];
+    for (x, y) in at.iter().zip(bt) {
+        let diff = x - y;
         sum += diff * diff;
     }
     sum
@@ -64,15 +83,16 @@ pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub fn ip(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len().min(b.len());
+    let (a, b) = (&a[..n], &b[..n]);
+    let (av, at) = split_lanes(a);
+    let (bv, bt) = split_lanes(b);
     let mut acc = f32x8::splat(0.0);
-    let mut i = 0;
-    while i + LANES <= n {
-        acc += f32x8::from_slice(&a[i..]) * f32x8::from_slice(&b[i..]);
-        i += LANES;
+    for (x, y) in av.iter().zip(bv) {
+        acc += lane8(x) * lane8(y);
     }
     let mut sum = acc.reduce_sum();
-    for j in i..n {
-        sum += a[j] * b[j];
+    for (x, y) in at.iter().zip(bt) {
+        sum += x * y;
     }
     sum
 }
@@ -82,21 +102,22 @@ pub fn ip(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub fn cos_parts(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
     let n = a.len().min(b.len());
+    let (a, b) = (&a[..n], &b[..n]);
+    let (av, at) = split_lanes(a);
+    let (bv, bt) = split_lanes(b);
     let (mut dot, mut na, mut nb) = (f32x8::splat(0.0), f32x8::splat(0.0), f32x8::splat(0.0));
-    let mut i = 0;
-    while i + LANES <= n {
-        let x = f32x8::from_slice(&a[i..]);
-        let y = f32x8::from_slice(&b[i..]);
+    for (xc, yc) in av.iter().zip(bv) {
+        let x = lane8(xc);
+        let y = lane8(yc);
         dot += x * y;
         na += x * x;
         nb += y * y;
-        i += LANES;
     }
     let (mut dot, mut na, mut nb) = (dot.reduce_sum(), na.reduce_sum(), nb.reduce_sum());
-    for j in i..n {
-        dot += a[j] * b[j];
-        na += a[j] * a[j];
-        nb += b[j] * b[j];
+    for (x, y) in at.iter().zip(bt) {
+        dot += x * y;
+        na += x * x;
+        nb += y * y;
     }
     (dot, na, nb)
 }

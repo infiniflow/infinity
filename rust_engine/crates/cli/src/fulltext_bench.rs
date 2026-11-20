@@ -165,7 +165,7 @@ fn json_string_at(line: &str, start: usize) -> Option<(String, usize)> {
 
 /// Runs the reference's five queries (`FTBENCH_QUERY_REPEAT` samples each and
 /// the best is reported; `FTBENCH_EXTRA_QUERY` adds one).
-fn run_queries(e: &Engine) -> common::Result<()> {
+async fn run_queries(e: &Engine) -> common::Result<()> {
     let repeat: usize = std::env::var("FTBENCH_QUERY_REPEAT")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -190,7 +190,7 @@ fn run_queries(e: &Engine) -> common::Result<()> {
         let mut hits = 0;
         for i in 0..repeat {
             let t = Instant::now();
-            let rs = e.execute_blocking(&sql)?;
+            let rs = e.execute(&sql).await?;
             let elapsed = t.elapsed();
             if i == 0 {
                 first = elapsed;
@@ -207,18 +207,19 @@ fn run_queries(e: &Engine) -> common::Result<()> {
 }
 
 /// `infinity fulltext-bench <dir> <mode> <corpus.jsonl> [batch]`.
-pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result<()> {
-    let e = Engine::open(dir)?;
+pub async fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result<()> {
+    let e = Engine::open_default_async(dir).await?;
     // `query-only` reuses a directory a previous run left behind: no DDL, no
     // index build. It exists so a profiler sees the query path alone.
     if mode == "query-only" {
-        run_queries(&e)?;
+        run_queries(&e).await?;
         return Ok(());
     }
-    let _ = e.execute_blocking(&format!("DROP TABLE IF EXISTS {TABLE};"));
-    e.execute_blocking(&format!(
+    let _ = e.execute(&format!("DROP TABLE IF EXISTS {TABLE};")).await;
+    e.execute(&format!(
         "CREATE TABLE {TABLE} (id VARCHAR, title VARCHAR, text VARCHAR);"
-    ))?;
+    ))
+    .await?;
 
     // C++ `BenchmarkCreateIndex` times `CreateIndex` + `Flush` together, but
     // the two `Flush`es checkpoint different storage stacks, so the checkpoint
@@ -235,9 +236,9 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
         None => format!("CREATE INDEX {INDEX} ON {TABLE} (text) USING FULLTEXT;"),
     };
     let t = Instant::now();
-    e.execute_blocking(&create_index_sql)?;
+    e.execute(&create_index_sql).await?;
     let create_index = t.elapsed();
-    match checkpoint_cost(&e)? {
+    match checkpoint_cost(&e).await? {
         Some(flush) => {
             println!("Create index cost: {create_index:?} (DDL; Flush {flush:?} not included)")
         }
@@ -265,34 +266,36 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
             })
             .collect()
     };
-    let insert_all = |e: &Engine| -> common::Result<()> {
+    let insert_all = async |e: &Engine| -> common::Result<()> {
         let t = Instant::now();
         for chunk in rows.chunks(batch.max(1)) {
-            e.insert_literals(QUALIFIED, Some(&columns), to_literals(chunk))?;
+            e.insert_literals(QUALIFIED, Some(&columns), to_literals(chunk))
+                .await?;
         }
         println!("Insert data {n} rows cost: {:?}", t.elapsed());
         Ok(())
     };
 
     match mode {
-        "insert" => insert_all(&e)?,
+        "insert" => insert_all(&e).await?,
         "import" => {
             let t = Instant::now();
-            e.import_literals(QUALIFIED, Some(&columns), to_literals(&rows))?;
+            e.import_literals(QUALIFIED, Some(&columns), to_literals(&rows))
+                .await?;
             println!("Import data cost: {:?}", t.elapsed());
         }
         "merge" => {
-            insert_all(&e)?;
+            insert_all(&e).await?;
             let t = Instant::now();
-            e.optimize_indexes()?;
+            e.optimize_indexes_async().await?;
             println!("Merge index cost: {:?}", t.elapsed());
         }
         "query" => {
-            insert_all(&e)?;
+            insert_all(&e).await?;
             let t = Instant::now();
-            e.optimize_indexes()?;
+            e.optimize_indexes_async().await?;
             println!("Merge index cost: {:?}", t.elapsed());
-            run_queries(&e)?;
+            run_queries(&e).await?;
         }
         other => {
             return Err(common::Error::Invalid(format!(
@@ -300,7 +303,7 @@ pub fn run(dir: &Path, mode: &str, corpus: &str, batch: usize) -> common::Result
             )))
         }
     }
-    let _ = checkpoint_cost(&e)?;
+    let _ = checkpoint_cost(&e).await?;
     Ok(())
 }
 
@@ -313,11 +316,11 @@ fn flush_enabled() -> bool {
 
 /// Runs `Engine::flush` (the reference's `Flush`) when `FTBENCH_FLUSH` asks for
 /// it and returns what it cost.
-fn checkpoint_cost(e: &Engine) -> common::Result<Option<std::time::Duration>> {
+async fn checkpoint_cost(e: &Engine) -> common::Result<Option<std::time::Duration>> {
     if !flush_enabled() {
         return Ok(None);
     }
     let t = Instant::now();
-    executor::block_on(e.flush())?;
+    e.flush().await?;
     Ok(Some(t.elapsed()))
 }

@@ -23,8 +23,8 @@ use catalog::value_format::{data_type_json, logical, ColumnDefValue, TableDef};
 use storage::data_block::{BlockValue, Column, ColumnVectorType, DataBlock, DEFAULT_VECTOR_SIZE};
 use storage::format::DEFAULT_BLOCK_CAPACITY;
 
-#[test]
-fn test1() {
+#[tokio::test]
+async fn test1() {
     let column_count = 2;
     let block_count = 3;
     let row_count = DEFAULT_VECTOR_SIZE;
@@ -111,17 +111,21 @@ fn test1() {
 /// (`src/unit_test/planner/node/logical_match_scan_base_ut.cpp`). The reference
 /// only asserts the table creation and the two-row append; the `SEARCH MATCH`
 /// block is commented out there.
-#[test]
-fn logical_match_scan_base_test1() {
+#[tokio::test]
+async fn logical_match_scan_base_test1() {
     let dir = tempfile::tempdir().unwrap();
-    let engine = crate::Engine::open(dir.path()).unwrap();
+    let engine = crate::Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     engine
-        .execute_blocking("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .execute("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .await
         .expect("create table");
     engine
-        .execute_blocking(
+        .execute(
             "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), \
              (2, [0.2, 0.2, 0.2, 0.2])",
         )
+        .await
         .expect("insert rows");
 }

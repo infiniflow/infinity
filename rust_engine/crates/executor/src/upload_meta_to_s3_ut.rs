@@ -72,9 +72,9 @@ fn count_block_dirs(root: &Path, out: &mut usize) {
     }
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "external: C++ DISABLED_MINIO_test1 needs MinIO, set INFINITY_MINIO_*"]
-fn minio_upload_meta_to_s3() {
+async fn minio_upload_meta_to_s3() {
     let Some(config) = minio_config() else {
         return;
     };
@@ -82,19 +82,23 @@ fn minio_upload_meta_to_s3() {
     client.ensure_bucket().unwrap();
 
     let src = tempdir().unwrap();
-    let engine = Engine::open(src.path()).unwrap();
-    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
+    let engine = Engine::open_async(src.path(), Default::default())
+        .await
+        .unwrap();
+    engine.execute("CREATE DATABASE db1;").await.unwrap();
     engine
-        .execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
     engine
-        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'abcdefghijklmnopqrstuvwxyz');")
+        .execute("INSERT INTO db1.tb1 VALUES (1, 'abcdefghijklmnopqrstuvwxyz');")
+        .await
         .unwrap();
 
     // Checkpoint with the real object store: `data` is mirrored by `flush`,
     // the catalog and row store by the checkpoint itself.
     engine.set_object_store(std::sync::Arc::new(client.clone()));
-    crate::scheduler::block_on(engine.checkpoint_to_object_store()).unwrap();
+    engine.checkpoint_to_object_store().await.unwrap();
 
     let remote_files = client.list_objects("").unwrap();
     assert!(
@@ -126,7 +130,9 @@ fn minio_upload_meta_to_s3() {
 
     // The recovered catalog must describe the same table. The reference checks
     // `GetTableMeta` -> segment ids {0} -> block ids {0} -> one row.
-    let restored = Engine::open(dst.path()).unwrap();
+    let restored = Engine::open_async(dst.path(), Default::default())
+        .await
+        .unwrap();
     assert!(restored.table_exists("db1.tb1"));
     assert_eq!(restored.row_count("db1.tb1").unwrap(), 1);
 
@@ -137,7 +143,8 @@ fn minio_upload_meta_to_s3() {
 
     let mut rows = Vec::new();
     for result in restored
-        .execute_blocking("SELECT col1, col2 FROM db1.tb1;")
+        .execute("SELECT col1, col2 FROM db1.tb1;")
+        .await
         .unwrap()
     {
         if let crate::QueryResult::Rows { .. } = result {

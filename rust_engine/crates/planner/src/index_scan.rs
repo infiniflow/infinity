@@ -106,6 +106,29 @@ pub struct IndexCatalog {
     pub secondary: HashMap<String, SecondaryIndexInfo>,
     /// `ExtractFunctionInfo()` spelling → the index it names.
     pub functional: HashMap<String, FunctionalIndexInfo>,
+    /// Full-text columns, with the analyzed form of one query text.
+    ///
+    /// The C++ push-down builds a `SearchDriver` from
+    /// `ColumnIndexReader::GetColumn2Analyzer()` (`filter_expression_push_down_
+    /// indexscanfilter_impl.cpp:980`) and hands it the query text, so the terms
+    /// that reach the index are the **analyzed** ones - `family` and `families`
+    /// both become the stem `famili`. The planner has no analyzer of its own,
+    /// so the executor tokenizes each query with the same tokenizer its index
+    /// was built with and records the result here. A `(column, text)` pair that
+    /// is absent means "not analyzed": the words are taken as written, which is
+    /// what a column with no full-text index gets (and that case is rejected
+    /// before the evaluator runs).
+    pub fulltext_terms: Vec<FulltextTerms>,
+}
+
+/// One `filter_fulltext` query, analyzed with its column's analyzer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FulltextTerms {
+    pub column: String,
+    /// The query text exactly as the statement wrote it.
+    pub text: String,
+    /// The analyzer's terms, in order.
+    pub terms: Vec<String>,
 }
 
 /// A functional index: the base column it reads, and the kind of value it
@@ -1975,22 +1998,45 @@ fn compare_parts(expr: &Expr) -> Option<(&Expr, CmpOp, &Expr)> {
     }
 }
 
-fn parse_fulltext_query(text: &str, options: &str) -> FulltextQuery {
-    // C++ `SearchDriver::AnalyzeAndBuildQueryNode` (infinity syntax,
-    // search_driver_impl.cpp:262) turns several analyzed terms into an
-    // `OrQueryNode`; only `operator=and` asks for `AndQueryNode`. The boolean
-    // keywords are operators in that grammar, not terms.
-    let terms: Vec<String> = text
-        .split_whitespace()
-        .map(|t| {
-            t.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')')
-                .to_ascii_lowercase()
-        })
-        .filter(|t| !t.is_empty() && t != "or" && t != "and" && t != "not")
-        .collect();
+/// Builds the query tree for a `filter_fulltext` predicate.
+///
+/// The terms are the **analyzed** ones: C++ builds a `SearchDriver` from the
+/// column's analyzer and lets it tokenize the query text
+/// (`search_driver_impl.cpp:267-300`), so `family` and `families` both reach
+/// the index as the stem `famili`. `catalog.fulltext_terms` carries what the
+/// executor's own tokenizer produced for this very query text and column; a
+/// column missing from it is not full-text indexed, so the words are taken
+/// as-is (the caller rejects that case before evaluating).
+fn parse_fulltext_query(
+    column: Option<&str>,
+    text: &str,
+    options: &str,
+    catalog: &IndexCatalog,
+) -> FulltextQuery {
+    // C++ `SearchDriver::ParseSingleWithFields` builds a boolean expression
+    // when the text has the query syntax (`a AND b`, `a OR b`), and an
+    // `OrQueryNode` over the analyzed terms otherwise; only `operator=and`
+    // asks for an `AndQueryNode`. The boolean keywords are operators in that
+    // grammar, not terms.
     let and = options
         .split(';')
         .any(|p| p.trim().eq_ignore_ascii_case("operator=and"));
+    let analyzed = catalog
+        .fulltext_terms
+        .iter()
+        .find(|ft| Some(ft.column.as_str()) == column && ft.text == text)
+        .map(|ft| ft.terms.as_slice());
+    let terms: Vec<String> = match analyzed {
+        Some(terms) => terms.to_vec(),
+        None => text
+            .split_whitespace()
+            .map(|t| {
+                t.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')')
+                    .to_ascii_lowercase()
+            })
+            .filter(|t| !t.is_empty() && t != "or" && t != "and" && t != "not")
+            .collect(),
+    };
     let queries: Vec<FulltextQuery> = terms.into_iter().map(FulltextQuery::Term).collect();
     if queries.is_empty() {
         FulltextQuery::Term(String::new())
@@ -2001,12 +2047,18 @@ fn parse_fulltext_query(text: &str, options: &str) -> FulltextQuery {
     }
 }
 
-fn fulltext_evaluator(expr: &Expr) -> Option<IndexFilterEvaluatorFulltext> {
-    let Expr::FullText(_, text, options) = expr else {
+fn fulltext_evaluator(expr: &Expr, catalog: &IndexCatalog) -> Option<IndexFilterEvaluatorFulltext> {
+    let Expr::FullText(column, text, options) = expr else {
         return None;
     };
-    let mut evaluator =
-        IndexFilterEvaluatorFulltext::new(expr.clone(), parse_fulltext_query(text, options));
+    // The query is analyzed with the column's own analyzer, as the reference
+    // does (`SearchDriver` + `column2analyzer`): a plain tokenizer here would
+    // disagree with the index's byte table and `/` unite rules.
+    let name = catalog.column_names.get(*column).map(String::as_str);
+    let mut evaluator = IndexFilterEvaluatorFulltext::new(
+        expr.clone(),
+        parse_fulltext_query(name, text, options, catalog),
+    );
     // The clause count `minimum_should_match` is a share of: the children of the
     // boolean node the query built (C++ `GetMinimumShouldMatchParameter(option,
     // leaf_count)`, `index_filter_evaluators_impl.cpp:571`).
@@ -2328,7 +2380,7 @@ fn build_evaluator(
             json_function_evaluator(&tree.expr, catalog)
         }
         IndexScanInfo::FilterFulltextExpr => Ok(IndexFilterEvaluator::Fulltext(Box::new(
-            fulltext_evaluator(&tree.expr)
+            fulltext_evaluator(&tree.expr, catalog)
                 .ok_or_else(|| Error::Invalid("malformed filter_fulltext expression".into()))?,
         ))),
         IndexScanInfo::AndExpr => {
@@ -2421,7 +2473,7 @@ impl FilterExpressionPushDown {
         let mut out = Vec::new();
         for expression in expressions {
             let tree = ExpressionInfoTree::build(expression, catalog);
-            collect_fulltext(&tree, &mut out)?;
+            collect_fulltext(&tree, catalog, &mut out)?;
         }
         Ok(out)
     }
@@ -2429,17 +2481,18 @@ impl FilterExpressionPushDown {
 
 fn collect_fulltext(
     tree: &ExpressionInfoTree<IndexScanInfo>,
+    catalog: &IndexCatalog,
     out: &mut Vec<IndexFilterEvaluator>,
 ) -> Result<()> {
     if tree.info == IndexScanInfo::FilterFulltextExpr {
         out.push(IndexFilterEvaluator::Fulltext(Box::new(
-            fulltext_evaluator(&tree.expr)
+            fulltext_evaluator(&tree.expr, catalog)
                 .ok_or_else(|| Error::Invalid("malformed filter_fulltext expression".into()))?,
         )));
         return Ok(());
     }
     for child in &tree.children {
-        collect_fulltext(child, out)?;
+        collect_fulltext(child, catalog, out)?;
     }
     Ok(())
 }
@@ -2477,6 +2530,45 @@ pub fn scan_predicate_of(plan: &LogicalPlan) -> Option<Expr> {
         | LogicalPlan::Limit { input, .. }
         | LogicalPlan::Offset { input, .. } => scan_predicate_of(input),
         _ => None,
+    }
+}
+
+/// Drops the `filter_fulltext` conjunctions from a predicate.
+///
+/// The index evaluator already answered them, with the column's analyzer and
+/// the index's own tokenization. Running the same predicate again per row
+/// would answer it a second time through
+/// [`Expr::FullText`](expression::Expr::FullText)'s plain word match, which
+/// has neither - and the two disagree (a `foo_bar` document tokenizes to
+/// `foo_bar` on the index side and to `foo`+`bar` in that matcher). C++ has
+/// only the index check: `IndexFilterEvaluatorFulltext` produces the row mask
+/// and the predicate never re-runs (`filter_fulltext_expression_impl.cpp`,
+/// `expression_evaluator_impl.cpp:306`).
+///
+/// A conjunction keeps its other terms; anything else that is entirely
+/// full-text drops out, and `None` means "no residual left".
+fn strip_fulltext_conjuncts(expr: Expr) -> Option<Expr> {
+    match expr {
+        Expr::FullText(..) => None,
+        Expr::And(a, b) => match (strip_fulltext_conjuncts(*a), strip_fulltext_conjuncts(*b)) {
+            (Some(a), Some(b)) => Some(Expr::And(Box::new(a), Box::new(b))),
+            (Some(one), None) | (None, Some(one)) => Some(one),
+            (None, None) => None,
+        },
+        Expr::Or(a, b) => {
+            let (sa, sb) = (
+                strip_fulltext_conjuncts((*a).clone()),
+                strip_fulltext_conjuncts((*b).clone()),
+            );
+            match (sa, sb) {
+                (Some(sa), Some(sb)) => Some(Expr::Or(Box::new(sa), Box::new(sb))),
+                // An `OR` needs both sides: dropping one changes which rows
+                // pass, so a disjunction keeps every branch.
+                _ => Some(Expr::Or(a, b)),
+            }
+        }
+        Expr::Not(a) => strip_fulltext_conjuncts(*a).map(|a| Expr::Not(Box::new(a))),
+        other => Some(other),
     }
 }
 
@@ -2566,7 +2658,7 @@ impl crate::optimize::OptimizerRule for IndexScanRule {
         // runs above it as the exact check. C++ folds the two into the node
         // because its evaluator is exact per row; this one narrows candidates,
         // so the residual keeps the answer exact.
-        let residual = scan_predicate_of(&plan);
+        let residual = scan_predicate_of(&plan).and_then(strip_fulltext_conjuncts);
         let built = IndexScanBuilder::build_with_regex(plan, &self.catalog, self.regex.as_ref())?;
         let mut plan = built.plan;
         if !built.candidates.is_empty() {

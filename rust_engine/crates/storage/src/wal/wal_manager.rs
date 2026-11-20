@@ -42,9 +42,10 @@
 //! first torn / corrupt record. Appends are serialized by `&mut self` (single
 //! writer), matching the engine's serial `WriteWAL` stage.
 
-use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
+
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 use ::common::{Error, Result, TxnTimeStamp};
 
@@ -55,6 +56,13 @@ use crate::wal_entry::{WalEntry, WAL_ENTRY_HEADER_LEN};
 // `wal_entry` follow.
 
 /// Append-only WAL writer for a single file.
+///
+/// One file, one writer: every method takes `&mut self`, and the engine gives
+/// it exactly one owner - the flush thread in `txn::TxnManager`, which is the
+/// reference's `new_flush_thread_` (`wal_manager.cppm:132`). The reference
+/// keeps that thread and `wal_handle_` in one class; here the file is this
+/// type and the thread wrapper is `WalFlushThread`, because the crash suite drives
+/// `append`/`sync` directly on a thread of its own and must keep doing so.
 pub struct WalManager {
     path: PathBuf,
     file: File,
@@ -65,12 +73,13 @@ pub struct WalManager {
 
 impl WalManager {
     /// Opens (creating if needed) the WAL at `path` for appending.
-    pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
+    pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
         let path = path.into();
         let file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
+            .await
             .map_err(|e| Error::io(&path, e))?;
         Ok(Self {
             path,
@@ -84,12 +93,13 @@ impl WalManager {
     }
 
     /// Appends one entry and returns the byte offset it started at.
-    pub fn append(&mut self, entry: &WalEntry) -> Result<u64> {
+    pub async fn append(&mut self, entry: &WalEntry) -> Result<u64> {
         let mut buf = Vec::with_capacity(entry.size_in_bytes());
         entry.write_adv(&mut buf);
-        let offset = self.file.metadata().map(|m| m.len()).unwrap_or(0);
+        let offset = self.file.metadata().await.map(|m| m.len()).unwrap_or(0);
         self.file
             .write_all(&buf)
+            .await
             .map_err(|e| Error::io(&self.path, e))?;
         self.appended_ts = self.appended_ts.max(entry.commit_ts);
         // The write itself is not synced: `WalManager::NewFlush` owns that
@@ -111,40 +121,73 @@ impl WalManager {
     /// Called after every commit batch and after the checkpoint frame: the
     /// reference's WAL is the durability boundary for everything the catalog
     /// store does not flush, because the store keeps RocksDB's log off.
-    pub fn sync(&mut self) -> Result<()> {
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))
+    pub async fn sync(&mut self) -> Result<()> {
+        self.file
+            .sync_all()
+            .await
+            .map_err(|e| Error::io(&self.path, e))
+    }
+
+    /// A second handle on the same file, for a caller that wants to fsync off
+    /// the thread holding the write lock.
+    ///
+    /// `sync_all` on a clone is an fsync of the same inode, so the bytes it
+    /// covers are exactly the ones the writer has handed to the kernel up to
+    /// that point - the ordering guarantee the single flush thread used to
+    /// give.
+    pub async fn sync_handle(&self) -> Result<File> {
+        self.file
+            .try_clone()
+            .await
+            .map_err(|e| Error::io(&self.path, e))
     }
 
     /// Seals the active log as `wal.log.{seal_ts}` and starts a fresh one.
     /// Rotation is O(1); like `WalManager::SwapWalFile` it closes the old file
     /// and renames it. The directory is synced because the rename and the new
     /// file's name only survive a power loss once the directory entry does.
-    pub fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
+    pub async fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
         // The reference syncs the handle before it renames it away
         // (`WalManager::SwapWalFile`, #3534): a rename only makes the *name*
         // durable, so the contents have to be on disk first. Commit entries are
         // synced one by one, but the checkpoint frame is appended unsynced and
         // `rotate_wal_if_large` can run before `sync_wal`.
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))?;
+        self.file
+            .sync_all()
+            .await
+            .map_err(|e| Error::io(&self.path, e))?;
         let sealed = self.path.with_extension(format!("log.{seal_ts}"));
-        std::fs::rename(&self.path, &sealed).map_err(|e| Error::io(&sealed, e))?;
+        tokio::fs::rename(&self.path, &sealed)
+            .await
+            .map_err(|e| Error::io(&sealed, e))?;
         self.file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&self.path)
+            .await
             .map_err(|e| Error::io(&self.path, e))?;
+        // A directory is synced through a plain `File`: `tokio::fs::File`
+        // cannot open one portably, and the fsync is the whole point (the
+        // rename is only durable once the directory entry is). It is still a
+        // real fsync, so it stays on the blocking pool instead of a worker.
         if let Some(dir) = self.path.parent() {
-            let handle = std::fs::File::open(dir).map_err(|e| Error::io(dir, e))?;
-            handle.sync_all().map_err(|e| Error::io(dir, e))?;
+            let dir = dir.to_path_buf();
+            tokio::task::spawn_blocking(move || {
+                let handle = std::fs::File::open(&dir).map_err(|e| Error::io(&dir, e))?;
+                handle.sync_all().map_err(|e| Error::io(&dir, e))
+            })
+            .await
+            .map_err(|e| Error::Wal(format!("WAL directory sync: {e}")))??;
         }
         Ok(())
     }
 
     /// Current size of the WAL in bytes.
-    pub fn file_size(&self) -> Result<u64> {
+    pub async fn file_size(&self) -> Result<u64> {
         Ok(self
             .file
             .metadata()
+            .await
             .map_err(|e| Error::io(&self.path, e))?
             .len())
     }
@@ -153,20 +196,22 @@ impl WalManager {
     /// record by record so a multi-gigabyte log never has to fit in memory.
     /// Returns the number of entries retained. The append handle is reopened on
     /// the new inode.
-    pub fn truncate_up_to_streaming(&mut self, ts: TxnTimeStamp) -> Result<usize> {
+    pub async fn truncate_up_to_streaming(&mut self, ts: TxnTimeStamp) -> Result<usize> {
         let tmp = self.path.with_extension("log.compact");
-        let file_len = self.file_size()?;
+        let file_len = self.file_size().await?;
         let mut consumed = 0u64;
         let mut kept = 0usize;
         {
-            let src = File::open(&self.path).map_err(|e| Error::io(&self.path, e))?;
+            let src = File::open(&self.path)
+                .await
+                .map_err(|e| Error::io(&self.path, e))?;
             let mut rd = BufReader::new(src);
-            let out = File::create(&tmp).map_err(|e| Error::io(&tmp, e))?;
+            let out = File::create(&tmp).await.map_err(|e| Error::io(&tmp, e))?;
             let mut wr = BufWriter::new(out);
             loop {
                 let mut header = [0u8; WAL_ENTRY_HEADER_LEN];
-                match rd.read_exact(&mut header) {
-                    Ok(()) => {}
+                match rd.read_exact(&mut header).await {
+                    Ok(_) => {}
                     Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
                     Err(e) => return Err(Error::io(&self.path, e)),
                 }
@@ -181,7 +226,7 @@ impl WalManager {
                 let mut frame = Vec::with_capacity(size as usize);
                 frame.extend_from_slice(&header);
                 let mut body = vec![0u8; size as usize - WAL_ENTRY_HEADER_LEN];
-                if rd.read_exact(&mut body).is_err() {
+                if rd.read_exact(&mut body).await.is_err() {
                     break; // torn frame at the tail
                 }
                 frame.extend_from_slice(&body);
@@ -190,23 +235,31 @@ impl WalManager {
                 };
                 consumed += size as u64;
                 if entry.commit_ts > ts {
-                    wr.write_all(&frame).map_err(|e| Error::io(&tmp, e))?;
+                    wr.write_all(&frame).await.map_err(|e| Error::io(&tmp, e))?;
                     kept += 1;
                 }
             }
-            wr.flush().map_err(|e| Error::io(&tmp, e))?;
-            wr.get_ref().sync_all().map_err(|e| Error::io(&tmp, e))?;
+            wr.flush().await.map_err(|e| Error::io(&tmp, e))?;
+            // `sync_all` through the writer's own handle: `BufWriter` flushes
+            // to it on `flush`, so the bytes are on the filesystem before the
+            // rename below.
+            wr.get_ref()
+                .sync_all()
+                .await
+                .map_err(|e| Error::io(&tmp, e))?;
         }
-        std::fs::rename(&tmp, &self.path).map_err(|e| Error::io(&self.path, e))?;
-        *self = WalManager::open(&self.path)?;
+        tokio::fs::rename(&tmp, &self.path)
+            .await
+            .map_err(|e| Error::io(&self.path, e))?;
+        *self = WalManager::open(&self.path).await?;
         Ok(kept)
     }
 
     /// Reads every valid entry from a WAL file path, stopping at the first
     /// record the reference's `ReadAdv` would reject.
-    pub fn read_all(path: impl AsRef<Path>) -> Result<Vec<WalEntry>> {
+    pub async fn read_all(path: impl AsRef<Path>) -> Result<Vec<WalEntry>> {
         let path = path.as_ref();
-        match std::fs::read(path) {
+        match tokio::fs::read(path).await {
             Ok(buf) => Ok(decode_entries(&buf)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
             Err(e) => Err(Error::io(path, e)),
@@ -214,13 +267,13 @@ impl WalManager {
     }
 
     /// Replays entries with `commit_ts > checkpoint_ts` (recovery helper).
-    pub fn replay_since(
+    pub async fn replay_since(
         path: impl AsRef<Path>,
         checkpoint_ts: TxnTimeStamp,
         mut f: impl FnMut(&WalEntry) -> Result<()>,
     ) -> Result<usize> {
         let mut n = 0;
-        for entry in Self::read_all(path)? {
+        for entry in Self::read_all(path).await? {
             if entry.commit_ts > checkpoint_ts {
                 f(&entry)?;
                 n += 1;
@@ -231,23 +284,26 @@ impl WalManager {
 
     /// Rewrites the WAL keeping only entries with `commit_ts > ts` (used at a
     /// checkpoint). Returns the number of entries retained.
-    pub fn truncate_up_to_ts(path: impl AsRef<Path>, ts: TxnTimeStamp) -> Result<usize> {
+    pub async fn truncate_up_to_ts(path: impl AsRef<Path>, ts: TxnTimeStamp) -> Result<usize> {
         let path = path.as_ref();
-        let keep: Vec<WalEntry> = Self::read_all(path)?
+        let keep: Vec<WalEntry> = Self::read_all(path)
+            .await?
             .into_iter()
             .filter(|r| r.commit_ts > ts)
             .collect();
         let tmp = path.with_extension("log.compact");
         {
-            let mut f = File::create(&tmp).map_err(|e| Error::io(&tmp, e))?;
+            let mut f = File::create(&tmp).await.map_err(|e| Error::io(&tmp, e))?;
             for entry in &keep {
                 let mut buf = Vec::with_capacity(entry.size_in_bytes());
                 entry.write_adv(&mut buf);
-                f.write_all(&buf).map_err(|e| Error::io(&tmp, e))?;
+                f.write_all(&buf).await.map_err(|e| Error::io(&tmp, e))?;
             }
-            f.sync_all().map_err(|e| Error::io(&tmp, e))?;
+            f.sync_all().await.map_err(|e| Error::io(&tmp, e))?;
         }
-        std::fs::rename(&tmp, path).map_err(|e| Error::io(path, e))?;
+        tokio::fs::rename(&tmp, path)
+            .await
+            .map_err(|e| Error::io(path, e))?;
         Ok(keep.len())
     }
 }
@@ -330,104 +386,109 @@ mod tests {
 
     /// The writer must produce the reference's bytes, not merely something the
     /// Rust reader understands, and the reader must accept those bytes.
-    #[test]
-    fn writer_emits_the_reference_bytes_and_reader_accepts_them() {
+    #[tokio::test]
+    async fn writer_emits_the_reference_bytes_and_reader_accepts_them() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
-        w.append(&golden_entry()).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
+        w.append(&golden_entry()).await.unwrap();
         drop(w);
 
         assert_eq!(std::fs::read(&path).unwrap(), GOLDEN_ENTRY);
-        assert_eq!(WalManager::read_all(&path).unwrap(), vec![golden_entry()]);
+        assert_eq!(
+            WalManager::read_all(&path).await.unwrap(),
+            vec![golden_entry()]
+        );
     }
 
     /// Check 3 (`wal_entry_impl.cpp:2239`): a payload byte that does not match
     /// the checksum makes `ReadAdv` reject the entry, so replay stops there.
-    #[test]
-    fn a_corrupt_byte_fails_the_checksum() {
+    #[tokio::test]
+    async fn a_corrupt_byte_fails_the_checksum() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
         let mut bytes = GOLDEN_ENTRY.to_vec();
         bytes[33] ^= 0xFF; // inside the `db1` string
         std::fs::write(&path, &bytes).unwrap();
-        assert!(WalManager::read_all(&path).unwrap().is_empty());
+        assert!(WalManager::read_all(&path).await.unwrap().is_empty());
     }
 
     /// Check 2 (`wal_entry_impl.cpp:2233`): the trailing `i32` must repeat the
     /// leading size.
-    #[test]
-    fn a_mismatched_trailing_size_is_rejected() {
+    #[tokio::test]
+    async fn a_mismatched_trailing_size_is_rejected() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
         let mut bytes = GOLDEN_ENTRY.to_vec();
         let wrong = 74i32;
         bytes[71..75].copy_from_slice(&wrong.to_le_bytes());
         std::fs::write(&path, &bytes).unwrap();
-        assert!(WalManager::read_all(&path).unwrap().is_empty());
+        assert!(WalManager::read_all(&path).await.unwrap().is_empty());
     }
 
     /// Check 1 (`wal_entry_impl.cpp:2229`): the leading size may not exceed the
     /// bytes handed to `ReadAdv` — a torn tail is not an entry.
-    #[test]
-    fn a_truncated_entry_is_rejected() {
+    #[tokio::test]
+    async fn a_truncated_entry_is_rejected() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
         std::fs::write(&path, &GOLDEN_ENTRY[..71]).unwrap();
-        assert!(WalManager::read_all(&path).unwrap().is_empty());
+        assert!(WalManager::read_all(&path).await.unwrap().is_empty());
     }
 
-    #[test]
-    fn rotation_seals_the_active_log() {
+    #[tokio::test]
+    async fn rotation_seals_the_active_log() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
-        w.append(&entry(1, 1)).unwrap();
-        w.rotate(1).unwrap();
-        w.append(&entry(2, 2)).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
+        w.append(&entry(1, 1)).await.unwrap();
+        w.rotate(1).await.unwrap();
+        w.append(&entry(2, 2)).await.unwrap();
         assert!(dir.path().join("wal.log.1").exists());
-        assert_eq!(WalManager::read_all(&path).unwrap().len(), 1);
+        assert_eq!(WalManager::read_all(&path).await.unwrap().len(), 1);
         assert_eq!(
             WalManager::read_all(dir.path().join("wal.log.1"))
+                .await
                 .unwrap()
                 .len(),
             1
         );
     }
 
-    #[test]
-    fn streaming_truncate_keeps_only_newer_records() {
+    #[tokio::test]
+    async fn streaming_truncate_keeps_only_newer_records() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
         for ts in 1..=10u64 {
-            w.append(&entry(ts as i64, ts)).unwrap();
+            w.append(&entry(ts as i64, ts)).await.unwrap();
         }
-        assert_eq!(w.truncate_up_to_streaming(6).unwrap(), 4);
-        let recs = WalManager::read_all(&path).unwrap();
+        assert_eq!(w.truncate_up_to_streaming(6).await.unwrap(), 4);
+        let recs = WalManager::read_all(&path).await.unwrap();
         assert_eq!(
             recs.iter().map(|r| r.commit_ts).collect::<Vec<_>>(),
             vec![7, 8, 9, 10]
         );
         // the append handle points at the rewritten file
-        w.append(&entry(11, 11)).unwrap();
-        assert_eq!(WalManager::read_all(&path).unwrap().len(), 5);
+        w.append(&entry(11, 11)).await.unwrap();
+        assert_eq!(WalManager::read_all(&path).await.unwrap().len(), 5);
     }
 
-    #[test]
-    fn append_and_read_roundtrip() {
+    #[tokio::test]
+    async fn append_and_read_roundtrip() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
-        w.append(&WalEntry::new(1, 10, vec![])).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
+        w.append(&WalEntry::new(1, 10, vec![])).await.unwrap();
         w.append(&WalEntry::new(
             2,
             20,
             vec![WalCmd::Checkpoint { max_commit_ts: 9 }],
         ))
+        .await
         .unwrap();
 
-        let recs = WalManager::read_all(&path).unwrap();
+        let recs = WalManager::read_all(&path).await.unwrap();
         assert_eq!(recs.len(), 2);
         assert_eq!(recs[0], WalEntry::new(1, 10, vec![]));
         assert_eq!(
@@ -436,35 +497,35 @@ mod tests {
         );
     }
 
-    #[test]
-    fn torn_tail_is_ignored() {
+    #[tokio::test]
+    async fn torn_tail_is_ignored() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
         {
-            let mut w = WalManager::open(&path).unwrap();
-            w.append(&entry(1, 10)).unwrap();
+            let mut w = WalManager::open(&path).await.unwrap();
+            w.append(&entry(1, 10)).await.unwrap();
         }
         // simulate a crash mid-append: a header claiming more bytes than exist
         {
-            let mut f = OpenOptions::new().append(true).open(&path).unwrap();
-            f.write_all(&4096i32.to_le_bytes()).unwrap();
-            f.write_all(&0u32.to_le_bytes()).unwrap();
-            f.write_all(&0u64.to_le_bytes()).unwrap();
-            f.write_all(&0u64.to_le_bytes()).unwrap();
-            f.sync_all().unwrap();
+            let mut f = OpenOptions::new().append(true).open(&path).await.unwrap();
+            f.write_all(&4096i32.to_le_bytes()).await.unwrap();
+            f.write_all(&0u32.to_le_bytes()).await.unwrap();
+            f.write_all(&0u64.to_le_bytes()).await.unwrap();
+            f.write_all(&0u64.to_le_bytes()).await.unwrap();
+            f.sync_all().await.unwrap();
         }
-        let recs = WalManager::read_all(&path).unwrap();
+        let recs = WalManager::read_all(&path).await.unwrap();
         assert_eq!(recs.len(), 1);
         assert_eq!(recs[0].txn_id, 1);
     }
 
-    #[test]
-    fn replay_since_filters_by_commit_ts() {
+    #[tokio::test]
+    async fn replay_since_filters_by_commit_ts() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
         for i in 1..=5u64 {
-            w.append(&entry(i as i64, i)).unwrap();
+            w.append(&entry(i as i64, i)).await.unwrap();
         }
         drop(w);
         let mut seen = vec![];
@@ -472,23 +533,24 @@ mod tests {
             seen.push(r.txn_id);
             Ok(())
         })
+        .await
         .unwrap();
         assert_eq!(n, 2);
         assert_eq!(seen, vec![4, 5]);
     }
 
-    #[test]
-    fn truncate_keeps_tail() {
+    #[tokio::test]
+    async fn truncate_keeps_tail() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wal.log");
-        let mut w = WalManager::open(&path).unwrap();
+        let mut w = WalManager::open(&path).await.unwrap();
         for i in 1..=5u64 {
-            w.append(&entry(i as i64, i)).unwrap();
+            w.append(&entry(i as i64, i)).await.unwrap();
         }
         drop(w);
-        let kept = WalManager::truncate_up_to_ts(&path, 3).unwrap();
+        let kept = WalManager::truncate_up_to_ts(&path, 3).await.unwrap();
         assert_eq!(kept, 2);
-        let recs = WalManager::read_all(&path).unwrap();
+        let recs = WalManager::read_all(&path).await.unwrap();
         assert_eq!(
             recs.iter().map(|r| r.txn_id).collect::<Vec<_>>(),
             vec![4, 5]

@@ -26,13 +26,13 @@ use parquet::arrow::ArrowWriter;
 use std::sync::Arc;
 
 impl Engine {
-    pub(crate) fn copy_to(
+    pub(crate) async fn copy_to(
         &self,
         table: &str,
         path: &str,
         opts: &[(String, String)],
     ) -> Result<QueryResult> {
-        let rows = self.fetch_rows(table)?;
+        let rows = self.fetch_rows(table).await?;
         let schema = self.table_schema(table)?;
         let column_types = self.column_types(table)?;
         let opt = |name: &str| -> Option<&str> {
@@ -118,7 +118,10 @@ impl Engine {
             }
         }
         // Tolerate unwritable export paths (statement-level success).
-        let _ = std::fs::write(resolve_write_path(path), out);
+        //
+        // Async: the buffer is the whole export, and writing it synchronously
+        // would hold the worker for the duration of the write (§7.2).
+        let _ = tokio::fs::write(resolve_write_path(path), out).await;
         Ok(QueryResult::Inserted {
             count: selected.len(),
         })

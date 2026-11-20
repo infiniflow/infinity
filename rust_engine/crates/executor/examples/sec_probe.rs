@@ -17,6 +17,10 @@
 use executor::Engine;
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let rows: usize = std::env::args()
         .nth(1)
         .and_then(|v| v.parse().ok())
@@ -26,9 +30,12 @@ fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(5000);
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     e.set_memindex_capacity(1 << 30);
-    e.execute_blocking("CREATE TABLE sec (id INTEGER, a INTEGER, b VARCHAR)")
+    e.execute("CREATE TABLE sec (id INTEGER, a INTEGER, b VARCHAR)")
+        .await
         .unwrap();
     // One high-cardinality int and one varchar, the shapes a secondary index
     // actually holds.
@@ -37,14 +44,14 @@ fn main() {
     match std::env::var("SEC_MODE").as_deref() {
         Ok("none") => {}
         Ok("int") => {
-            e.execute_blocking("CREATE INDEX sec_a ON sec (a)").unwrap();
+            e.execute("CREATE INDEX sec_a ON sec (a)").await.unwrap();
         }
         Ok("varchar") => {
-            e.execute_blocking("CREATE INDEX sec_b ON sec (b)").unwrap();
+            e.execute("CREATE INDEX sec_b ON sec (b)").await.unwrap();
         }
         _ => {
-            e.execute_blocking("CREATE INDEX sec_a ON sec (a)").unwrap();
-            e.execute_blocking("CREATE INDEX sec_b ON sec (b)").unwrap();
+            e.execute("CREATE INDEX sec_a ON sec (a)").await.unwrap();
+            e.execute("CREATE INDEX sec_b ON sec (b)").await.unwrap();
         }
     }
     let mut values = Vec::new();
@@ -52,13 +59,15 @@ fn main() {
     for i in 0..rows {
         values.push(format!("({i}, {}, 'k{}')", i, i % 50_000));
         if values.len() == batch {
-            e.execute_blocking(&format!("INSERT INTO sec VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO sec VALUES {};", values.join(",")))
+                .await
                 .unwrap();
             values.clear();
         }
     }
     if !values.is_empty() {
-        e.execute_blocking(&format!("INSERT INTO sec VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO sec VALUES {};", values.join(",")))
+            .await
             .unwrap();
     }
     eprintln!(

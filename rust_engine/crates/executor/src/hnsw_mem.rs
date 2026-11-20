@@ -24,6 +24,21 @@ use index::vector::HnswIndex;
 
 pub(crate) struct HnswIndexInMem {
     pub dims: usize,
+    /// The `ROW_ID` segment this graph covers.
+    ///
+    /// The reference keys `MemIndex` by `(index_id, segment)`
+    /// (`idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`): every segment owns a
+    /// graph and a chunk of its own, and a query merges them. One graph per
+    /// index cannot be split back into segments at dump time, which is why a
+    /// multi-segment table had to rebuild per segment there.
+    pub segment: u32,
+    /// `HnswIndexInMem::begin_row_id_`: the first row this graph holds. A
+    /// chunk's record names it, so an incremental dump of one segment starts
+    /// where the previous chunk ended.
+    ///
+    /// Set when the graph is created (the segment's base) and advanced as rows
+    /// arrive, so it always names the first row actually inserted.
+    begin_row_id: u64,
     handler: HnswHandler,
     /// Row id per added vector (the graph's labels).
     rows: Vec<u64>,
@@ -41,9 +56,11 @@ pub(crate) struct HnswIndexInMem {
 impl HnswIndexInMem {
     /// `InitAbstractIndexT`: the memory segment uses the index's encoding and
     /// metric (plain / LVQ / RaBitQ, l2 / ip / cosine), and its LSG config.
-    pub fn new_with(dims: usize, options: &HnswOptions) -> Self {
+    pub fn new_with(dims: usize, options: &HnswOptions, segment: u32, begin_row_id: u64) -> Self {
         Self {
             dims,
+            segment,
+            begin_row_id,
             handler: HnswHandler::from_index(HnswIndex::with_encoding(
                 dims,
                 options.m,
@@ -57,25 +74,49 @@ impl HnswIndexInMem {
         }
     }
 
+    /// `HnswIndexInMem::begin_row_id_`: the first row this graph holds.
+    pub fn begin_row_id(&self) -> u64 {
+        self.begin_row_id
+    }
+
     /// `Add`: returns false when the vector does not match the segment's dims.
-    pub fn insert(&mut self, seq: u64, vector: &[f32]) -> bool {
+    ///
+    /// Async like [`Self::insert_batch`]: the store's insert awaits its own
+    /// bucket fan-out, so the caller's lock guard has to be one that may cross
+    /// an await (`tokio::sync::Mutex`).
+    pub async fn insert(&mut self, seq: u64, vector: &[f32]) -> bool {
         if vector.len() != self.dims {
             return false;
         }
-        if self.handler.insert_vecs(std::iter::once(vector.to_vec())) != 1 {
+        if self
+            .handler
+            .insert_vecs(std::iter::once(vector.to_vec()))
+            .await
+            != 1
+        {
             return false;
+        }
+        if self.rows.is_empty() {
+            self.begin_row_id = seq;
         }
         self.rows.push(seq);
         true
     }
 
     /// `InsertVecs` over a whole batch: the reference stores the batch and
-    /// builds it in parallel buckets, one tokio task each.
-    pub fn insert_batch<V: AsRef<[f32]> + Sync>(
-        &mut self,
+    /// builds it in parallel buckets, one task each.
+    ///
+    /// **Async, taking the lock itself.** The bucket fan-out awaits
+    /// `spawn_blocking`, so the graph has to be locked with a guard that may
+    /// cross an await - which is `tokio::sync::Mutex`, not `std::sync::Mutex`.
+    /// The lock lives here rather than in the caller so no guard outlives this
+    /// call into code that cannot await.
+    pub async fn insert_batch<V: AsRef<[f32]> + Sync>(
+        graph: &std::sync::Arc<tokio::sync::Mutex<Self>>,
         rows: &[(u64, V)],
         threads: usize,
     ) -> bool {
+        let mut this = graph.lock().await;
         // Borrowed, not copied: the batch is the caller's `rows` column, and a
         // 20k x 128 copy here (plus the one the caller used to make) was pure
         // overhead on the way to the store, which copies each vector once into
@@ -83,27 +124,36 @@ impl HnswIndexInMem {
         let mut batch: Vec<&[f32]> = Vec::with_capacity(rows.len());
         for (_, v) in rows {
             let v = v.as_ref();
-            if v.len() != self.dims {
+            if v.len() != this.dims {
                 return false;
             }
             batch.push(v);
         }
-        self.train_from_first_batch(&batch);
-        if self.handler.insert_vecs_threaded(batch, threads) != rows.len() {
+        this.train_from_first_batch(&batch);
+        if this.handler.insert_vecs_threaded(batch, threads).await != rows.len() {
             return false;
         }
-        self.rows.extend(rows.iter().map(|(seq, _)| *seq));
+        if let Some((first, _)) = rows.first() {
+            if this.rows.is_empty() {
+                this.begin_row_id = *first;
+            }
+        }
+        this.rows.extend(rows.iter().map(|(seq, _)| *seq));
         true
     }
 
     /// `IndexHnsw::InitAbstractIndexT`: the quantizer (LVQ's per-dimension mean,
-    /// RaBitQ's centroid) and the LSG averages are trained from the whole column
-    /// *before* any row is inserted. A code written with an untrained (all-zero)
-    /// mean carries none of the vector's magnitude, and an untrained LSG leaves
-    /// every row scaled by zero.
+    /// RaBitQ's centroid) and the LSG averages are trained *before* any row is
+    /// inserted. A code written with an untrained (all-zero) mean carries none
+    /// of the vector's magnitude, and an untrained LSG leaves every row scaled
+    /// by zero.
     ///
     /// Only from the first non-empty batch, and only while the store is still
-    /// empty: re-training after rows exist would invalidate their codes.
+    /// empty: re-training after rows exist would invalidate their codes - which
+    /// is why a caller that feeds the rows in several batches trains from the
+    /// **first block**, not from the whole column. The mean is not part of the
+    /// chunk (`lvq_mean` has no writer), so this changes the graph's build
+    /// distances, not the file.
     fn train_from_first_batch<V: AsRef<[f32]> + Sync>(&mut self, batch: &[V]) {
         if batch.is_empty() || !self.handler.is_empty() {
             return;

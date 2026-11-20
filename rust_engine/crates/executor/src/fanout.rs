@@ -48,11 +48,10 @@ where
 /// Whether the caller is a **runtime worker** (driving tasks), as opposed to a
 /// blocking-pool thread or a plain thread.
 ///
-/// A synchronous fan-out from a worker is what deadlocks: `drive_on` hands the
-/// worker's core to a replacement and parks it, so the items it spawned need
-/// another worker; if every worker is parked the same way, none is left to
-/// poll them. Callers that can also run inline (a block decode) should skip the
-/// fan-out while this is true.
+/// A synchronous wait from a worker is what deadlocks: parking the worker
+/// leaves the tasks it spawned without one to poll them, and if every worker
+/// is parked the same way none is left. Callers that can also run inline (a
+/// block decode) should skip the fan-out while this is true.
 pub(crate) fn on_a_runtime_worker() -> bool {
     tokio::runtime::Handle::try_current()
         .map(|handle| {
@@ -62,15 +61,23 @@ pub(crate) fn on_a_runtime_worker() -> bool {
         .unwrap_or(false)
 }
 
-/// [`for_each_blocking`] that collects the values, in input order.
-pub(crate) fn map_blocking<T, U, F>(items: Vec<T>, workers: usize, f: F) -> common::Result<Vec<U>>
+/// The engine's parallel map for items whose body is **pure CPU**.
+///
+/// The body must not wait on anything - no lock, no I/O, no `block_on`. It runs
+/// on the CPU-bound dispatch, which is why such a leaf can never be what fills
+/// the blocking pool a parked scan needs a thread from.
+pub(crate) async fn map_cpu_bound<T, U, F>(
+    items: Vec<T>,
+    workers: usize,
+    f: F,
+) -> common::Result<Vec<U>>
 where
     T: Send + 'static,
     U: Send + 'static,
     F: Fn(T) -> common::Result<U> + Send + Sync + 'static,
 {
     let _ = crate::scheduler::scheduler();
-    index::parallel::map_blocking(items, workers, f)
+    index::parallel::map_cpu_bound(items, workers, f).await
 }
 
 #[cfg(test)]
@@ -78,19 +85,22 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    /// No `fan-out` pool exists any more, so a fan-out with no runtime on the
-    /// calling thread must land on the engine's `task-scheduler` workers - both
-    /// its worker threads and its blocking pool carry that name.
+    /// A fan-out builds **no** runtime of its own.
     ///
-    /// The name matters: the deleted fallback built a separate `fan-out` pool,
-    /// so a body named anything else means a second runtime came back.
-    #[test]
-    fn a_fan_out_with_no_caller_runtime_uses_the_engines_workers() {
+    /// It spawns on the calling thread's runtime (or, when the thread has none,
+    /// on the engine's `task-scheduler`) - the deleted fallback used to build a
+    /// separate `fan-out` pool, and a body carrying that name means a second
+    /// runtime came back. The check is the absence of that pool, not the exact
+    /// worker name: any runtime the caller brings is a legitimate home.
+    #[tokio::test]
+    async fn a_fan_out_never_builds_a_pool_of_its_own() {
         let dir = tempfile::tempdir().unwrap();
-        let _engine = crate::Engine::open(dir.path()).unwrap();
+        let _engine = crate::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let seen: std::sync::Arc<Mutex<Vec<String>>> = Default::default();
         let record = std::sync::Arc::clone(&seen);
-        map_blocking((0..8).collect(), 4, move |item| {
+        map_cpu_bound((0..8).collect(), 4, move |item| {
             record.lock().unwrap().push(
                 std::thread::current()
                     .name()
@@ -99,13 +109,14 @@ mod tests {
             );
             Ok(item)
         })
+        .await
         .unwrap();
         let names = seen.lock().unwrap().clone();
         assert_eq!(names.len(), 8, "every item runs");
         for name in &names {
             assert!(
-                name.starts_with("task-scheduler"),
-                "a fan-out body ran on '{name}', not on the engine's runtime: {names:?}"
+                !name.starts_with("fan-out"),
+                "a fan-out body ran on '{name}', i.e. a pool of its own: {names:?}"
             );
         }
     }

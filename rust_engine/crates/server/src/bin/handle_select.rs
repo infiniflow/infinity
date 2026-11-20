@@ -22,22 +22,33 @@ use executor::{Engine, QueryResult};
 use server::{read_select_call, select_response_from, write_select_response, SelectResponseWire};
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = std::env::temp_dir().join(format!("infinity-select-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let engine = Engine::open(&dir).expect("open engine");
+    let engine = Engine::open_async(&dir, Default::default())
+        .await
+        .expect("open engine");
 
     let mut stdin = std::io::stdin();
     let (seq, req) = read_select_call(&mut stdin).expect("decode Select call");
     let t = &req.table_name;
 
     // fixture so the query returns data
-    let _ = engine.execute_blocking(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"));
-    let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (1, 'a');"));
-    let _ = engine.execute_blocking(&format!("INSERT INTO {t} VALUES (2, 'b');"));
+    let _ = engine
+        .execute(&format!("CREATE TABLE {t} (id INT, name VARCHAR);"))
+        .await;
+    let _ = engine
+        .execute(&format!("INSERT INTO {t} VALUES (1, 'a');"))
+        .await;
+    let _ = engine
+        .execute(&format!("INSERT INTO {t} VALUES (2, 'b');"))
+        .await;
 
     let display = req.to_sql();
-    let resp = match executor::block_on(engine.execute_parsed(vec![req.into_statement()], &display))
-    {
+    let resp = match (engine.execute_parsed(vec![req.into_statement()], &display)).await {
         Ok(rs) => match rs.into_iter().next() {
             Some(QueryResult::Rows { columns, rows }) => {
                 let text: Vec<Vec<String>> = rows
@@ -62,7 +73,7 @@ fn main() {
             extra_result: String::new(),
         },
     };
-    let _ = executor::block_on(engine.flush());
+    let _ = (engine.flush()).await;
 
     let mut out = std::io::stdout().lock();
     write_select_response(&mut out, seq, &resp).expect("write reply");

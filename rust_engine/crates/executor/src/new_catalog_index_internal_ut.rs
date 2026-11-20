@@ -34,10 +34,11 @@
 
 use crate::{Engine, QueryResult};
 use parser::Literal;
+use storage::wal::index_def::IndexType;
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -46,104 +47,56 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
 }
 
 /// One `DumpMemIndex` transaction, the reference's dump.
-fn dump(engine: &Engine, index: &str) {
-    crate::scheduler::block_on(engine.dump_index_transaction("db1.tb1", index)).unwrap();
+async fn dump(engine: &Engine, index: &str) {
+    engine
+        .dump_index_transaction("db1.tb1", index)
+        .await
+        .unwrap();
 }
 
 impl Engine {
     /// Memory tail of a secondary index: `(begin row id, row count)`.
+    ///
+    /// Delegates to [`crate::Engine::secondary_index_state`]; the shape is kept
+    /// as a tuple so the call sites read the same as the reference's
+    /// `GetBeginRowID()/GetRowCount()` pair.
     fn secondary_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let index = tables
-            .get(&key)?
-            .secondary
-            .indexes
-            .get(&self.test_secondary_id(table, column))?;
-        Some((index.begin_row_id()?, index.row_count()))
+        self.secondary_index_state(table, column)
+            .and_then(|state| state.tail)
+            .map(|tail| (tail.begin_row_id, tail.row_count))
     }
 
     /// Sealed secondary chunks: `(base row id, row count)` (C++
     /// `ChunkIndexMetaInfo`).
     fn secondary_chunks(&self, table: &str, column: &str) -> Vec<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        tables
-            .get(&key)
-            .and_then(|e| e.secondary.disk.get(&self.test_secondary_id(table, column)))
-            .map(|chunks| {
-                chunks
-                    .iter()
-                    .map(|(base, reader)| (*base, reader.len()))
-                    .collect()
-            })
+        self.secondary_index_state(table, column)
+            .map(|state| state.chunks)
             .unwrap_or_default()
     }
 
     /// Memory tail of a full-text index: `(begin row id, doc count)`.
     fn fulltext_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let index = tables
-            .get(&key)?
-            .text
-            .get(&self.test_index_id(table, column, "FULLTEXT"))?
-            .read()
-            .ok()?;
-        let docs = &index.mem.docs;
-        Some((*docs.keys().min()?, docs.len()))
+        self.index_tail(table, column, IndexType::FullText)
     }
 
     /// Memory tail of an HNSW index: `(begin row id, row count)`.
     fn hnsw_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let index = tables
-            .get(&key)?
-            .hnsw_mem
-            .get(&self.test_index_id(table, column, "HNSW"))?
-            .lock()
-            .ok()?;
-        let rows = index.rows();
-        Some((*rows.first()?, rows.len()))
+        self.index_tail(table, column, IndexType::Hnsw)
     }
 
     /// Memory tail of an IVF index: `(begin row id, row count)`.
     fn ivf_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let rows = tables
-            .get(&key)?
-            .ivf_mem
-            .get(&self.test_index_id(table, column, "IVF"))?;
-        Some((rows.iter().map(|(seq, _)| *seq).min()?, rows.len()))
+        self.index_tail(table, column, IndexType::Ivf)
     }
 
     /// Memory tail of a BMP (sparse) index: `(begin row id, row count)`.
     fn sparse_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let index = tables
-            .get(&key)?
-            .sparse
-            .get(&self.test_index_id(table, column, "BMP"))?
-            .read()
-            .ok()?;
-        Some((*index.tail.keys().min()?, index.tail.len()))
+        self.index_tail(table, column, IndexType::Bmp)
     }
 
-    /// Memory tail of an EMVB (multi-vector) index: `(begin row id, row
-    /// count)`.
+    /// Memory tail of an EMVB (multi-vector) index: `(begin row id, row count)`.
     fn mv_tail(&self, table: &str, column: &str) -> Option<(u64, usize)> {
-        let key = self.table_key(table);
-        let tables = self.tables.lock().unwrap();
-        let index = tables
-            .get(&key)?
-            .mv
-            .get(&self.test_index_id(table, column, "EMVB"))?
-            .read()
-            .ok()?;
-        Some((*index.tail.keys().min()?, index.tail.len()))
+        self.index_tail(table, column, IndexType::Emvb)
     }
 }
 
@@ -179,14 +132,16 @@ fn five_column_rows(start: usize, n: usize) -> Vec<Vec<Literal>> {
 /// C++ `index_internal_ut.cpp:87` (`test_index0`): a secondary index dumped
 /// after the first block keeps the second block in its memory tail, starting at
 /// row id 8192 with 8192 rows; the sealed chunk covers the first block.
-#[test]
-fn test_index0() {
+#[tokio::test]
+async fn test_index0() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT);").await.unwrap();
+    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .await
         .unwrap();
 
     e.insert_literals(
@@ -197,8 +152,9 @@ fn test_index0() {
             .map(|r| vec![r[0].clone()])
             .collect(),
     )
+    .await
     .unwrap();
-    dump(&e, "index1");
+    dump(&e, "index1").await;
     e.insert_literals(
         "db1.tb1",
         None,
@@ -207,9 +163,10 @@ fn test_index0() {
             .map(|r| vec![r[0].clone()])
             .collect(),
     )
+    .await
     .unwrap();
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((8192, 8192)));
     // One dumped chunk covering the first block.
     assert_eq!(e.secondary_chunks("db1.tb1", "col1"), vec![(0, 8192)]);
@@ -218,7 +175,7 @@ fn test_index0() {
     // Second dump + third block, then OptimizeIndex: the two chunks of the
     // segment fold into one (`InsertMergeData` over their `(key, offset)` pairs,
     // `OptimizeIndexInner`'s secondary case).
-    dump(&e, "index1");
+    dump(&e, "index1").await;
     e.insert_literals(
         "db1.tb1",
         None,
@@ -227,8 +184,9 @@ fn test_index0() {
             .map(|r| vec![r[0].clone()])
             .collect(),
     )
+    .await
     .unwrap();
-    e.optimize_indexes().unwrap();
+    e.optimize_indexes().await.unwrap();
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), Some((16384, 8192)));
     // The merged chunk records base row id 0 (the reference's
     // `ChunkIndexMetaInfo::base_row_id_ == RowID(0,0)`) and covers both blocks
@@ -240,48 +198,58 @@ fn test_index0() {
 /// C++ `index_internal_ut.cpp:293` (`test_index`): six index kinds over one
 /// table; after a dump and another append every kind has a 8192-row memory tail
 /// starting at row id 8192, and HNSW has one sealed chunk.
-#[test]
-fn test_index() {
+#[tokio::test]
+async fn test_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking(
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute(
         "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,4), \
          col4 SPARSE(FLOAT,10), col5 TENSOR(FLOAT,4));",
     )
+    .await
     .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+    e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+    e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);").await
         .unwrap();
 
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
+        .await
         .unwrap();
     // The dump seals each index's memory tail; the checkpoint then mirrors the
     // block columns and the full-text chunk (it does not dump a memory tail).
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
-        crate::scheduler::block_on(e.dump_index_transaction("db1.tb1", index)).unwrap();
+        e.dump_index_transaction("db1.tb1", index).await.unwrap();
     }
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
+        .await
         .unwrap();
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
 
     // Trigger the lazily built full-text index before reading it.
     rows(
         &e,
         "SELECT col1 FROM db1.tb1 SEARCH MATCH TEXT ('col2', 'abcdefghijklmnopqrstuvwxyz', 'topn=1');",
-    );
+    ).await;
 
     // Every memory index restarts at row id 8192 and holds one block: the
     // dump transactions above sealed the first block, and the checkpoint
@@ -299,7 +267,8 @@ fn test_index() {
 
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
         assert!(e
-            .execute_blocking(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .execute(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .await
             .is_ok());
     }
 }
@@ -307,33 +276,40 @@ fn test_index() {
 /// C++ `index_internal_ut.cpp:706` (`test_populate_index0`): indexes created
 /// on an empty table are populated by the later appends; after the dump the
 /// secondary chunk covers both blocks (`row_cnt = 2 * 8192`, base row id 0).
-#[test]
-fn test_populate_index0() {
+#[tokio::test]
+async fn test_populate_index0() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .await
+        .unwrap();
+    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .await
         .unwrap();
 
     // Two blocks appended after the indexes were created (populate path).
     e.insert_literals("db1.tb1", None, two_block_rows(0, 8192))
+        .await
         .unwrap();
     e.insert_literals("db1.tb1", None, two_block_rows(8192, 8192))
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.dump_all_memory_indexes());
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.dump_all_memory_indexes().await;
+    e.flush().await.unwrap();
 
     // Trigger the lazily built full-text index.
     rows(
         &e,
         "SELECT col1 FROM db1.tb1 SEARCH MATCH TEXT ('col2', 'abcdefghijklmnopqrstuvwxyz', 'topn=1');",
-    );
+    ).await;
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     // Everything is sealed: the secondary and full-text memory tails are empty
     // after the checkpoint's dump.
     assert_eq!(e.secondary_tail("db1.tb1", "col1"), None);
@@ -348,43 +324,54 @@ fn test_populate_index0() {
 /// when the indexes are created, and the block appended afterwards stays in the
 /// memory tails at row 16384. The reference never dumps here, so neither does
 /// this port - a dump would seal the third block and hide the split.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ TestTxnIndexInternal.DISABLED_SLOW_test_populate_index"]
-fn populate_index() {
+async fn populate_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking(
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute(
         "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR, col3 EMBEDDING(FLOAT,4), \
          col4 SPARSE(FLOAT,10), col5 TENSOR(FLOAT,4));",
     )
+    .await
     .unwrap();
 
     // The first two blocks predate every index: creating an index populates
     // them (the reference appends twice before `create_index`).
     e.insert_literals("db1.tb1", None, five_column_rows(0, 8192))
+        .await
         .unwrap();
     e.insert_literals("db1.tb1", None, five_column_rows(8192, 8192))
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON db1.tb1 (col1);")
+    e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+    e.execute("CREATE INDEX index2 ON db1.tb1 (col2) USING FULLTEXT;")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+    e.execute("CREATE INDEX index3 ON db1.tb1 (col3) USING IVF WITH (metric = l2);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+    e.execute("CREATE INDEX index4 ON db1.tb1 (col3) USING HNSW WITH (metric = l2);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+    e.execute("CREATE INDEX index5 ON db1.tb1 (col4) USING BMP;")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+    e.execute("CREATE INDEX index6 ON db1.tb1 (col5) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);").await
         .unwrap();
 
     // The third block lands after every index exists, so nothing populates it:
     // it stays in the memory tail.
     e.insert_literals("db1.tb1", None, five_column_rows(16384, 8192))
+        .await
         .unwrap();
 
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     assert_eq!(e.row_count("db1.tb1").unwrap(), 24576);
     // The reference's `check_index` reads `SegmentIndexMeta::GetMemIndex` (the
     // tail) and `ChunkIndexMetaInfo` of chunk 0 for every kind: after
@@ -405,7 +392,8 @@ fn populate_index() {
     assert_eq!(e.fulltext_tail("db1.tb1", "col2"), Some((0, 24576)));
     for index in ["index1", "index2", "index3", "index4", "index5", "index6"] {
         assert!(e
-            .execute_blocking(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .execute(&format!("SHOW TABLE db1.tb1 INDEX {index};"))
+            .await
             .is_ok());
     }
 }
@@ -418,31 +406,36 @@ fn populate_index() {
 /// BuildOtherParamsString`. A JSON index is always low cardinality, so `low` is
 /// accepted and `high` is an invalid definition
 /// (`index_secondary_impl.cpp:83-89`).
-#[test]
-fn test_json_index() {
+#[tokio::test]
+async fn test_json_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (id INT, meta JSON);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (id INT, meta JSON);")
+        .await
         .unwrap();
 
     // `cardinality = high` contradicts a JSON index; `low` is what the index is
     // anyway, so it is accepted.
     assert!(e
-        .execute_blocking(
+        .execute(
             "CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY \
              WITH (cardinality = 'high');"
         )
+        .await
         .is_err());
     // Without the hint the JSON secondary index is created.
-    e.execute_blocking("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
+    e.execute("CREATE INDEX idx_json ON db1.tb1 (meta) USING SECONDARY;")
+        .await
         .unwrap();
     assert!(e
-        .execute_blocking("SHOW TABLE db1.tb1 INDEX idx_json;")
+        .execute("SHOW TABLE db1.tb1 INDEX idx_json;")
+        .await
         .is_ok());
 
-    e.execute_blocking("DROP INDEX idx_json ON db1.tb1;")
-        .unwrap();
-    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    e.execute("DROP INDEX idx_json ON db1.tb1;").await.unwrap();
+    e.execute("DROP TABLE db1.tb1;").await.unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
 }

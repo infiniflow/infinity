@@ -18,6 +18,10 @@
 use executor::Engine;
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let rows: usize = std::env::args()
         .nth(1)
         .and_then(|v| v.parse().ok())
@@ -27,11 +31,15 @@ fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(1000);
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.set_memindex_capacity(1 << 30);
-    e.execute_blocking("CREATE TABLE ft (id INTEGER, body VARCHAR)")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX ft_idx ON ft (body) USING FULLTEXT")
+    e.set_memindex_capacity(1 << 30);
+    e.execute("CREATE TABLE ft (id INTEGER, body VARCHAR)")
+        .await
+        .unwrap();
+    e.execute("CREATE INDEX ft_idx ON ft (body) USING FULLTEXT")
+        .await
         .unwrap();
     // A prose-like document: ~40 words, the shape the bench corpus uses.
     // A realistic corpus vocabulary (the fulltext bench uses 20k); a tiny
@@ -50,13 +58,15 @@ fn main() {
             .collect();
         values.push(format!("({i}, '{}')", doc.join(" ")));
         if values.len() == batch {
-            e.execute_blocking(&format!("INSERT INTO ft VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO ft VALUES {};", values.join(",")))
+                .await
                 .unwrap();
             values.clear();
         }
     }
     if !values.is_empty() {
-        e.execute_blocking(&format!("INSERT INTO ft VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO ft VALUES {};", values.join(",")))
+            .await
             .unwrap();
     }
     eprintln!(

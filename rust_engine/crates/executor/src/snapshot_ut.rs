@@ -19,22 +19,24 @@
 use crate::Engine;
 use tempfile::tempdir;
 
-fn engine() -> (tempfile::TempDir, Engine) {
+async fn engine() -> (tempfile::TempDir, Engine) {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     (dir, e)
 }
 
-fn result(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    let r = e.execute_blocking(sql).unwrap().into_iter().next().unwrap();
+async fn result(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+    let r = e.execute(sql).await.unwrap().into_iter().next().unwrap();
     match &r {
         crate::QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows, got {other:?}"),
     }
 }
 
-fn columns(e: &Engine, sql: &str) -> Vec<String> {
-    match e.execute_blocking(sql).unwrap().into_iter().next().unwrap() {
+async fn columns(e: &Engine, sql: &str) -> Vec<String> {
+    match e.execute(sql).await.unwrap().into_iter().next().unwrap() {
         crate::QueryResult::Rows { columns, .. } => columns,
         other => panic!("expected rows, got {other:?}"),
     }
@@ -43,14 +45,17 @@ fn columns(e: &Engine, sql: &str) -> Vec<String> {
 /// `TableSnapshotInfo::CreateSnapshotMetadataJSON`
 /// (`snapshot_info_impl.cpp:443`) for a two-column table. `nlohmann::json`
 /// dumps object keys sorted, so the text is comparable byte for byte.
-#[test]
-fn a_table_snapshot_writes_the_reference_metadata() {
-    let (dir, e) = engine();
-    e.execute_blocking("CREATE TABLE snap_t (a INT, b VARCHAR);")
+#[tokio::test]
+async fn a_table_snapshot_writes_the_reference_metadata() {
+    let (dir, e) = engine().await;
+    e.execute("CREATE TABLE snap_t (a INT, b VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("INSERT INTO snap_t VALUES (1, 'x'), (2, 'y');")
+    e.execute("INSERT INTO snap_t VALUES (1, 'x'), (2, 'y');")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE snap_t;")
+    e.execute("CREATE SNAPSHOT s1 ON TABLE snap_t;")
+        .await
         .unwrap();
 
     let root = e.snapshot_dir();
@@ -69,7 +74,7 @@ fn a_table_snapshot_writes_the_reference_metadata() {
     // `SHOW SNAPSHOTS` reports the ts the metadata carries, so read it first
     // and pin the JSON to it (the reference never fills this field and prints
     // an uninitialized value instead).
-    let shown = result(&e, "SHOW SNAPSHOTS;");
+    let shown = result(&e, "SHOW SNAPSHOTS;").await;
     let commit = shown[0][3].clone();
     assert_ne!(commit, "0", "the snapshot's ts must be a real value");
     assert!(
@@ -110,10 +115,10 @@ fn a_table_snapshot_writes_the_reference_metadata() {
 
     // `SHOW SNAPSHOTS` reads that directory (`physical_show_list_snapshots_impl`).
     assert_eq!(
-        columns(&e, "SHOW SNAPSHOTS;"),
+        columns(&e, "SHOW SNAPSHOTS;").await,
         vec!["name", "scope", "time", "commit", "size"]
     );
-    let rows = result(&e, "SHOW SNAPSHOTS;");
+    let rows = result(&e, "SHOW SNAPSHOTS;").await;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], "s1");
     assert_eq!(rows[0][1], "Table");
@@ -121,7 +126,7 @@ fn a_table_snapshot_writes_the_reference_metadata() {
 
     // `SHOW SNAPSHOT <name>` describes it (`physical_show_snapshot_impl`) and
     // reports the same ts.
-    let rows = result(&e, "SHOW SNAPSHOT s1;");
+    let rows = result(&e, "SHOW SNAPSHOT s1;").await;
     assert_eq!(rows[0], vec!["snapshot_name", "s1"]);
     assert_eq!(rows[1], vec!["snapshot_scope", "Table"]);
     assert_eq!(rows[3], vec!["commit_timestamp".to_string(), commit]);
@@ -132,23 +137,28 @@ fn a_table_snapshot_writes_the_reference_metadata() {
 /// chunk's row range and index size (`ChunkIndexMeta::MapMetaToSnapShotInfo`,
 /// `chunk_index_meta_impl.cpp:810`). Deriving them from the file names used to
 /// force `base_row_id`/`row_cnt` to 0 and the segment id to 0.
-#[test]
-fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
-    let (_d, e) = engine();
-    e.execute_blocking("CREATE TABLE snap_i (a INT, b VARCHAR);")
+#[tokio::test]
+async fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE TABLE snap_i (a INT, b VARCHAR);")
+        .await
         .unwrap();
     let block: Vec<Vec<parser::Literal>> = (0..8192)
         .map(|_| vec![parser::Literal::Int(1), parser::Literal::Str("x".into())])
         .collect();
-    e.execute_blocking("CREATE INDEX idx_a ON snap_i (a);")
+    e.execute("CREATE INDEX idx_a ON snap_i (a);")
+        .await
         .unwrap();
-    e.import_literals("default_db.snap_i", None, block).unwrap();
-    e.dump_index("default_db.snap_i", "idx_a").unwrap();
+    e.import_literals("default_db.snap_i", None, block)
+        .await
+        .unwrap();
+    e.dump_index("default_db.snap_i", "idx_a").await.unwrap();
     // The mirror publishes the `idx_chunk|…` records the snapshot reads (the
     // reference writes them inside the dump transaction; the port's mirror
     // writes them at checkpoint time).
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE snap_i;")
+    e.flush().await.unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE snap_i;")
+        .await
         .unwrap();
 
     let text = std::fs::read_to_string(e.snapshot_dir().join("s1").join("s1.json")).unwrap();
@@ -244,18 +254,19 @@ fn a_table_snapshot_records_the_index_chunks_the_catalog_holds() {
 
 /// Database and system snapshots use the same directory, with the
 /// `snapshot_scope` of their metadata and one ts for the whole snapshot.
-#[test]
-fn database_and_system_snapshots_nest_their_tables() {
-    let (_d, e) = engine();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.t1 (a INT);").unwrap();
-    e.execute_blocking("INSERT INTO db1.t1 VALUES (1), (2);")
+#[tokio::test]
+async fn database_and_system_snapshots_nest_their_tables() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.t1 (a INT);").await.unwrap();
+    e.execute("INSERT INTO db1.t1 VALUES (1), (2);")
+        .await
         .unwrap();
 
-    e.execute_blocking("CREATE SNAPSHOT sdb ON DATABASE db1;")
+    e.execute("CREATE SNAPSHOT sdb ON DATABASE db1;")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE SNAPSHOT ssys ON SYSTEM;")
-        .unwrap();
+    e.execute("CREATE SNAPSHOT ssys ON SYSTEM;").await.unwrap();
 
     let root = e.snapshot_dir();
     let db_json = std::fs::read_to_string(root.join("sdb").join("sdb.json")).unwrap();
@@ -269,7 +280,7 @@ fn database_and_system_snapshots_nest_their_tables() {
 
     // Every record of one snapshot carries the same ts, and `SHOW SNAPSHOTS`
     // reports it for all three scopes.
-    let shown = result(&e, "SHOW SNAPSHOTS;");
+    let shown = result(&e, "SHOW SNAPSHOTS;").await;
     let scopes: Vec<String> = shown.iter().map(|r| r[1].clone()).collect();
     assert_eq!(scopes, vec!["Database", "System"]);
     let ts = [json_ts(&db_json), json_ts(&sys_json)];
@@ -312,73 +323,141 @@ fn nested_ts(text: &str) -> Vec<u64> {
 
 /// `TableSnapshotInfo` + `Snapshot::DropSnapshot`: the directory disappears,
 /// and a name can be used again afterwards.
-#[test]
-fn drop_snapshot_removes_the_directory() {
-    let (_d, e) = engine();
-    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
-        .unwrap();
+#[tokio::test]
+async fn drop_snapshot_removes_the_directory() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE TABLE t (a INT);").await.unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").await.unwrap();
     let path = e.snapshot_dir().join("s1");
     assert!(path.exists());
 
-    e.execute_blocking("DROP SNAPSHOT s1;").unwrap();
+    e.execute("DROP SNAPSHOT s1;").await.unwrap();
     assert!(!path.exists());
     assert!(e.snapshot_names().unwrap().is_empty());
     assert!(!e.snapshot_dir().join("deleted_s1").exists());
 
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
-        .unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").await.unwrap();
     assert!(e.snapshot_names().unwrap().iter().any(|n| n == "s1"));
 
-    let err = e.execute_blocking("DROP SNAPSHOT missing;").unwrap_err();
+    let err = e.execute("DROP SNAPSHOT missing;").await.unwrap_err();
     assert!(err.to_string().contains("not found"), "{err}");
 }
 
 /// The reference refuses a name that is already taken
 /// (`Status::SnapshotAlreadyExists`, `query_context_impl.cpp:633`) and reports
 /// a missing table with its own wording.
-#[test]
-fn snapshot_creation_reports_the_reference_errors() {
-    let (_d, e) = engine();
-    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
-        .unwrap();
+#[tokio::test]
+async fn snapshot_creation_reports_the_reference_errors() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE TABLE t (a INT);").await.unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").await.unwrap();
 
     let err = e
-        .execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
+        .execute("CREATE SNAPSHOT s1 ON TABLE t;")
+        .await
         .unwrap_err();
     assert_eq!(err.to_string(), "Snapshot: s1 already exists");
 
     let err = e
-        .execute_blocking("CREATE SNAPSHOT s2 ON TABLE nope;")
+        .execute("CREATE SNAPSHOT s2 ON TABLE nope;")
+        .await
         .unwrap_err();
     assert_eq!(err.status_code(), 3022);
     assert!(err.to_string().contains("nope"), "{err}");
 
-    let err = e.execute_blocking("SHOW SNAPSHOT nope;").unwrap_err();
+    let err = e.execute("SHOW SNAPSHOT nope;").await.unwrap_err();
     assert!(err.to_string().contains("can't find snapshot"), "{err}");
 }
 
 /// The snapshot carries the rows: restoring into a dropped table brings them
 /// back, and a second restore rewrites the same content.
-#[test]
-fn a_restored_table_keeps_its_rows() {
-    let (_d, e) = engine();
-    e.execute_blocking("CREATE TABLE t (a INT, b VARCHAR);")
+#[tokio::test]
+async fn a_restored_table_keeps_its_rows() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE TABLE t (a INT, b VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("INSERT INTO t VALUES (1, 'x'), (2, 'y'), (3, 'z');")
+    e.execute("INSERT INTO t VALUES (1, 'x'), (2, 'y'), (3, 'z');")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE SNAPSHOT s1 ON TABLE t;")
-        .unwrap();
-    e.execute_blocking("DROP TABLE t;").unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").await.unwrap();
+    e.execute("DROP TABLE t;").await.unwrap();
 
-    e.execute_blocking("RESTORE TABLE SNAPSHOT s1;").unwrap();
+    e.execute("RESTORE TABLE SNAPSHOT s1;").await.unwrap();
     assert_eq!(
-        result(&e, "SELECT a, b FROM t ORDER BY a;"),
+        result(&e, "SELECT a, b FROM t ORDER BY a;").await,
         vec![
             vec!["1".to_string(), "x".to_string()],
             vec!["2".to_string(), "y".to_string()],
             vec!["3".to_string(), "z".to_string()],
         ]
+    );
+}
+
+/// A snapshot taken before a write must restore **only** the rows it held, and
+/// the restored table must still hold exactly those rows after a restart.
+///
+/// The rows written after the snapshot go into the same block as the ones
+/// before it (the block is append-only, and no checkpoint ran in between), so
+/// the dropped table's block directory still names five rows when the restore
+/// begins. The restore hands the new table a *different* id - ids never run
+/// backwards, or a recreated table would inherit the dropped one's blocks -
+/// which is why replay has to name the id the restore actually handed out: a
+/// stale one points the reopened table at those five-row blocks and the
+/// post-snapshot rows come back.
+#[tokio::test]
+async fn a_restore_does_not_bring_back_rows_written_after_the_snapshot() {
+    let dir = tempdir().unwrap();
+    let snaps = tempdir().unwrap();
+    let opts = || crate::engine::EngineOptions {
+        snapshot_dir: Some(snaps.path().to_path_buf()),
+        ..Default::default()
+    };
+    let e = Engine::open_async(dir.path(), opts()).await.unwrap();
+    // The reference config this mirrors runs with a 1 KB mem index quota, so the
+    // post-snapshot rows are dumped into the block before the restore starts.
+    e.set_memindex_quota(1024);
+    e.execute("CREATE TABLE t (a INT, b VARCHAR);")
+        .await
+        .unwrap();
+    e.execute("INSERT INTO t VALUES (1, 'x'), (2, 'y'), (3, 'z');")
+        .await
+        .unwrap();
+    e.execute("CREATE SNAPSHOT s1 ON TABLE t;").await.unwrap();
+    // Written after the snapshot but before any checkpoint, so it lands in the
+    // same block the snapshot copied.
+    e.execute("INSERT INTO t VALUES (4, 'w'), (5, 'v');")
+        .await
+        .unwrap();
+    assert_eq!(
+        result(&e, "SELECT count(*) FROM t;").await,
+        vec![vec!["5".to_string()]]
+    );
+    e.flush().await.unwrap();
+
+    e.execute("DROP TABLE t;").await.unwrap();
+    e.execute("RESTORE TABLE SNAPSHOT s1;").await.unwrap();
+    assert_eq!(
+        result(&e, "SELECT a FROM t ORDER BY a;").await,
+        vec![
+            vec!["1".to_string()],
+            vec!["2".to_string()],
+            vec!["3".to_string()],
+        ],
+        "the restore must not bring back the rows written after the snapshot"
+    );
+
+    // The whole point of the test: reopen from the same directory, which
+    // replays the restore's WAL command.
+    drop(e);
+    let e = Engine::open_async(dir.path(), opts()).await.unwrap();
+    assert_eq!(
+        result(&e, "SELECT a FROM t ORDER BY a;").await,
+        vec![
+            vec!["1".to_string()],
+            vec!["2".to_string()],
+            vec!["3".to_string()],
+        ],
+        "replay must not resolve the restored table to the dropped one's id"
     );
 }

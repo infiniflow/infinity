@@ -42,7 +42,7 @@ pub(crate) struct StagedRows {
 }
 
 impl StagedRows {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             memory: Vec::new(),
             spill: None,
@@ -245,28 +245,24 @@ impl Engine {
             .find(|(k, _)| k == "FORMAT")
             .map(|(_, v)| v.to_ascii_uppercase());
         // The whole file is only read for the formats that need it in one
-        // piece (binary vectors, the JSON forms). CSV streams, and reading the
-        // 326 MB file into a `Vec` first only to open it again was a full extra
-        // pass over the input.
+        // piece (the JSON forms). CSV streams, and so does every binary vector
+        // format: a 3.8 GB fvecs read with `std::fs::read` held the bytes, the
+        // text rows, the published values and the append buffer at once.
         let whole_file = |path: &std::path::Path| -> Option<Vec<u8>> { std::fs::read(path).ok() };
         // Missing fixtures stay a statement-level success with no rows.
         // The binary formats parse into the same literal rows the CSV path
         // builds, then commit them the same way.
+        let elem_width = match format.as_deref() {
+            Some("FVECS") => Some(4usize),
+            Some("BVECS") => Some(1usize),
+            _ => None,
+        };
+        if let Some(elem_width) = elem_width {
+            return self
+                .copy_from_binary_vectors(table, &resolved, elem_width)
+                .await;
+        }
         let rows = match format.as_deref() {
-            Some("FVECS") => Some(self.binary_vector_rows(
-                table,
-                &whole_file(&resolved).ok_or_else(|| {
-                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
-                })?,
-                4,
-            )?),
-            Some("BVECS") => Some(self.binary_vector_rows(
-                table,
-                &whole_file(&resolved).ok_or_else(|| {
-                    Error::Invalid(format!("cannot read '{}'", resolved.display()))
-                })?,
-                1,
-            )?),
             Some("CSR") => Some(self.csr_sparse_rows(
                 table,
                 &whole_file(&resolved).ok_or_else(|| {
@@ -310,11 +306,17 @@ impl Engine {
         }
         // CSV: read line by line and commit in blocks, so an 8-million-row
         // import does not hold the file and its parsed rows in memory.
-        let file = match std::fs::File::open(&resolved) {
+        //
+        // The read is **async**: an 8M-row file read line by line on a worker
+        // would hold that worker for the whole statement (`AGENTS.md` §7.2),
+        // and the statement's own commit work needs the same runtime. The
+        // buffer is `tokio::io::BufReader`, so a slow disk yields the worker
+        // between batches instead of parking it.
+        let file = match tokio::fs::File::open(&resolved).await {
             Ok(f) => f,
             Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
         };
-        let mut reader = std::io::BufReader::new(file);
+        let mut reader = tokio::io::BufReader::new(file);
         let mut total = 0usize;
         // The statement's own segment cursor (`ApplySegmentIDs`): the table's
         // shared counter belongs to whoever allocated last, so reading it again
@@ -335,6 +337,7 @@ impl Engine {
         // a batch's worth: the whole statement's text does not stay resident.
         let mut staged_rows = StagedRows::new();
         let spill_dir = self.dir.join("tmp");
+
         // `HEADER true` makes the first line a header: the reference validates
         // its column count against the table and then drops it without counting
         // it as a row (`PhysicalImport::NewCSVHeaderHandler`).
@@ -352,8 +355,8 @@ impl Engine {
             let mut eof = false;
             while batch.len() < Self::COPY_BATCH_ROWS {
                 let mut line = String::new();
-                use std::io::BufRead;
-                match reader.read_line(&mut line) {
+                use tokio::io::AsyncBufReadExt;
+                match reader.read_line(&mut line).await {
                     Ok(0) => {
                         eof = true;
                         break;
@@ -459,7 +462,7 @@ impl Engine {
                     let base = range.base;
                     cursor = Some(next_cursor);
                     batches_all.push(take);
-                    self.note_index_insert(table, take);
+                    self.note_index_insert(table, take).await;
                     for (k, row) in batch[start..start + take].iter().enumerate() {
                         // The rows ride in the transaction only as its `ImportV2`
                         // extent; their values go to the block buffer at commit.
@@ -497,8 +500,13 @@ impl Engine {
                             .collect();
                         self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
                             .await;
+                        // One batch for the HNSW graphs, so the build uses the
+                        // bucket fan-out (`note_hnsw_insert_batch`); the IVF
+                        // segment and the query cache are per row.
+                        self.note_hnsw_insert_batch(table, &text_batch).await;
                         for (seq, texts) in &texts_by_row {
-                            self.update_vector_caches(table, *seq, texts);
+                            self.note_ivf_insert(table, *seq as u64, texts);
+                            self.update_vector_cache_only(table, *seq, texts);
                         }
                     }
                     total += take;
@@ -653,7 +661,7 @@ impl Engine {
         let opened = self.begin_import(table).await?;
         let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
-        self.note_index_insert(table, rows.len());
+        self.note_index_insert(table, rows.len()).await;
         let mut t = self.txn.begin();
         t.set_op(TxnOp::Import {
             table: table.to_string(),
@@ -682,14 +690,23 @@ impl Engine {
             .collect();
         self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
             .await;
+        // One batch for the HNSW graphs, so the build uses the bucket fan-out
+        // (see `note_hnsw_insert_batch`).
+        let vector_batch: Vec<(usize, &[String])> = texts_by_row
+            .iter()
+            .map(|(seq, cells)| (*seq, cells.as_slice()))
+            .collect();
+        self.note_hnsw_insert_batch(table, &vector_batch).await;
         for (seq, texts) in &texts_by_row {
-            self.update_vector_caches(table, *seq, texts);
+            self.note_ivf_insert(table, *seq as u64, texts);
+            self.update_vector_cache_only(table, *seq, texts);
         }
         let segment = (base >> 32) as u32;
         drop(_staging);
-        crate::engine::state::with_read_ts_override(u64::MAX, || {
-            self.populate_import_indexes(table, &[segment], _ts);
-        });
+        crate::engine::state::with_read_ts_override_async(u64::MAX, async {
+            self.populate_import_indexes(table, &[segment], _ts).await;
+        })
+        .await;
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -712,7 +729,7 @@ impl Engine {
         let opened = self.begin_import(table).await?;
         let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
-        self.note_index_insert(table, rows.len());
+        self.note_index_insert(table, rows.len()).await;
         let mut t = self.txn.begin();
         t.set_op(TxnOp::Import {
             table: table.to_string(),
@@ -745,21 +762,28 @@ impl Engine {
         // does not re-enter it).
         let gate = self.bottom_gate(table);
         let _turn = gate.lock().await;
-        let _held = crate::engine::statements::HeldBottom::enter(&self.table_key(table));
-        self.publish_rows(table, base, &rows)?;
-        // `AppendInBlock`: the import's block is readable as soon as the
-        // statement commits, exactly like the CSV path.
-        if self.has_block_layout(table) {
-            self.write_blocks_commit(table, ts)?;
-        }
-        // `PopulateIndex(…, kImport)`: the chunks are written inside the import
-        // transaction, with its ts, before the rows are visible. The read is
-        // unbounded so the builders see the rows this commit just wrote
-        // (`with_read_ts_override`).
-        crate::engine::state::with_read_ts_override(u64::MAX, || {
-            self.populate_import_indexes(table, &[segment], ts);
-        });
-        drop(_held);
+        let key = self.table_key(table);
+        // The gate is held for the whole block below, so this import *is* the
+        // table's bottom for its duration: marked, so the block writer and the
+        // index builders do not take the gate a second time.
+        crate::engine::statements::HeldBottom::scope(&key, async {
+            self.publish_rows(table, base, &rows)?;
+            // `AppendInBlock`: the import's block is readable as soon as the
+            // statement commits, exactly like the CSV path.
+            if self.has_block_layout(table) {
+                self.write_blocks_commit(table, ts)?;
+            }
+            // `PopulateIndex(…, kImport)`: the chunks are written inside the
+            // import transaction, with its ts, before the rows are visible. The
+            // read is unbounded so the builders see the rows this commit just
+            // wrote (`with_read_ts_override`).
+            crate::engine::state::with_read_ts_override_async(u64::MAX, async {
+                self.populate_import_indexes(table, &[segment], ts).await;
+            })
+            .await;
+            Ok::<(), ::common::Error>(())
+        })
+        .await?;
         drop(_turn);
         drop(_visible);
         // §9.2's row bound. `COPY` has a commit path of its own, and it is the
@@ -783,15 +807,283 @@ impl Engine {
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
-    /// One literal row per record of a binary vector file (`FORMAT FVECS`,
-    /// `FORMAT BVECS`): each record is an `i32 dim` followed by `dim`
-    /// elements. `elem_width` is 4 for `f32` and 1 for `u8`.
-    fn binary_vector_rows(
+    /// Stages one batch of parsed rows into the import transaction.
+    ///
+    /// Returns how many rows it took. The statement keeps its own segment
+    /// cursor (`ImportCursor`): the table's shared counter belongs to whoever
+    /// allocated last, and an `INSERT` during a long `COPY` moves it on.
+    /// `SEGMENT_CAPACITY` bounds one segment - the reference seals a full
+    /// segment and continues in the next, so a `COPY` of more rows than that
+    /// ends up with two.
+    ///
+    /// Shared by the CSV reader and the binary vector stream: both produce the
+    /// same literal rows and must stage them identically.
+    #[allow(clippy::too_many_arguments)]
+    async fn stage_import_batch(
         &self,
         table: &str,
-        bytes: &[u8],
+        batch: &[Vec<Literal>],
+        slots: &[Option<Vec<Option<Vec<u8>>>>],
+        cursor: &mut Option<ImportCursor>,
+        types_for_scan: &[String],
+        segments: &mut Vec<u32>,
+        batches_all: &mut Vec<usize>,
+        buffered: &mut Vec<usize>,
+        staging: &mut ImportStaging<'_>,
+        staging_root: &std::path::Path,
+    ) -> Result<usize> {
+        let schema = self.table_schema(table).unwrap_or_default();
+        // Resolved once per batch, not per cell: both take the catalog lock.
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut done = 0usize;
+        while done < batch.len() {
+            let mut current = cursor.take();
+            if current
+                .as_ref()
+                .is_some_and(|c| c.offset as usize >= Self::SEGMENT_CAPACITY)
+            {
+                current = None;
+            }
+            let room = current.as_ref().map_or(Self::SEGMENT_CAPACITY, |c| {
+                Self::SEGMENT_CAPACITY - c.offset as usize
+            });
+            let take = (batch.len() - done).min(room);
+            let (range, next_cursor) = match current {
+                Some(cursor) => self.reserve_import_rows(table, take, cursor).await?,
+                None => {
+                    let opened = self.begin_import(table).await?;
+                    self.reserve_import_rows(table, take, opened).await?
+                }
+            };
+            let base = range.base;
+            *cursor = Some(next_cursor);
+            batches_all.push(take);
+            self.note_index_insert(table, take).await;
+            // The batch's values go into the append buffer **now**, not at the
+            // commit: keeping the stored text until then meant holding every
+            // row twice (its text and, after the commit, its values). On GIST
+            // 1M that text is 6.6 KB per row - 6.6 GB - and the peak was
+            // 13.5 GiB. The rows are stamped only when the commit succeeds
+            // (`note_append` with `ts: None` here, `settle_append_at` there), so
+            // a reader sees none of them until then, exactly like the
+            // reference's `AppendInBlock` before `CommitBottomAppend`.
+            // Row by row, straight into the buffer: a whole batch of parsed
+            // values held first and copied in afterwards doubles the working
+            // set of an import that is already carrying its text.
+            // The blocks this run fills completely are written from their
+            // slots first: no text, no `Value`, and their rows never enter the
+            // append buffer. Only what is left (a block still filling, the
+            // statement's tail) is published through text.
+            let slot_staged =
+                self.stage_complete_slot_blocks(table, done, take, base, slots, staging_root)?;
+            let mut staged_all = slot_staged.clone();
+            let slot_staged: std::collections::HashSet<usize> = slot_staged.into_iter().collect();
+            let mut published: Vec<(usize, Vec<Value>)> = Vec::with_capacity(take);
+            for (k, row) in batch[done..done + take].iter().enumerate() {
+                if slot_staged.contains(&(base + k)) {
+                    continue;
+                }
+                // A record that arrived as bytes (`fvecs`) has no literal row;
+                // its cell text comes from the slot, which is the same text the
+                // block writer stores. Everything else (CSV) already has one.
+                let encoded = if row.is_empty() {
+                    match slots.get(done + k).and_then(|s| s.as_ref()) {
+                        Some(slot_bytes) => slot_to_cell_text(types_for_scan, slot_bytes),
+                        None => String::new(),
+                    }
+                } else {
+                    self.encode_row_stored(table, row, types_for_scan)?
+                };
+                let values = match self.parse_stored_row(
+                    table,
+                    &defaults,
+                    types_for_scan,
+                    encoded.as_bytes(),
+                ) {
+                    Ok(values) => values,
+                    // Never drop a row because its text form would not parse:
+                    // the cells are that text, which is what the writer stores.
+                    Err(_) => encoded
+                        .split('\t')
+                        .map(|c| Value::Str(c.to_string()))
+                        .collect(),
+                };
+                published.push((base + k, values));
+            }
+            // One buffer call for the batch: the hook resolves the schema,
+            // the coercions and the append log once per call, and paying that
+            // per row made the staging loop's own bookkeeping quadratic.
+            if !published.is_empty() {
+                self.refresh_block_mirror_extra(table, &published)?;
+            }
+            // Every block this batch completed goes to the staging directory
+            // now, and its rows leave the append buffer: that is what bounds an
+            // import's memory. The reference does the same - one `DataBlock` per
+            // `DEFAULT_BLOCK_CAPACITY` rows, written to
+            // `<temp>/import<txn>/db_/tbl_/seg_/blk_/` and moved into the data
+            // directory by the commit (`NewTxn::Import`).
+            //
+            // Without it the whole file stays resident as parsed values: GIST
+            // 1M is 960 dimensions per row, so that is ~6.6 GB of text and the
+            // values built from it, and the import peaked at 14.5 GiB.
+            // A row the reader already has as block-file bytes (`fvecs`,
+            // `bvecs`) is written from those rather than from its text: the
+            // bytes are the same, and the `encode_value_with_shape` parse it
+            // would have taken is skipped. `slots` is indexed by batch position
+            // while `published` is keyed by row id, and a run can span a segment
+            // boundary, hence the `seq - base` hop.
+            let flushed =
+                self.stage_complete_import_blocks_with(table, &published, staging_root, |_| None)?;
+            staged_all.extend(flushed.iter().copied());
+            buffered.extend(staged_all.iter().copied());
+            let segment = (base >> 32) as u32;
+            if !segments.contains(&segment) {
+                segments.push(segment);
+            }
+            // Both hooks take a lock and allocate per row; on a table with no
+            // secondary index or no text/vector index they find nothing eight
+            // million times over.
+            let secondary_targets = if self.has_secondary_indexes(table) {
+                self.secondary_targets(table, &schema)
+            } else {
+                Vec::new()
+            };
+            let needs_texts = self.has_text_or_vector_indexes(table);
+            let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(take);
+            staging.note((0..take).map(|k| base + k));
+            for (k, row) in batch[done..done + take].iter().enumerate() {
+                self.insert_secondary_keys(&secondary_targets, base + k, row)?;
+                if needs_texts {
+                    texts_by_row.push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                }
+            }
+            if needs_texts {
+                // One batch for the full-text columns: tokenise without the
+                // column lock, insert under it once.
+                let text_batch: Vec<(usize, &[String])> = texts_by_row
+                    .iter()
+                    .map(|(seq, cells)| (*seq, cells.as_slice()))
+                    .collect();
+                self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                    .await;
+                // The HNSW graphs take the whole run at once: `insert_batch`
+                // is what carries the bucket fan-out (`InsertVecs` in the
+                // reference), and feeding it row by row made a 1M-row import a
+                // single-core graph build.
+                let vector_batch: Vec<(usize, &[String])> = texts_by_row
+                    .iter()
+                    .map(|(seq, cells)| (*seq, cells.as_slice()))
+                    .collect();
+                self.note_hnsw_insert_batch(table, &vector_batch).await;
+                for (seq, texts) in &texts_by_row {
+                    self.note_ivf_insert(table, *seq as u64, texts);
+                    self.update_vector_cache_only(table, *seq, texts);
+                }
+            }
+            done += take;
+        }
+        Ok(done)
+    }
+
+    /// `COPY … FROM … WITH (FORMAT fvecs|bvecs)`: records are streamed and
+    /// staged in `COPY_BATCH_ROWS` batches inside **one** transaction.
+    ///
+    /// `NewTxn::Import` is one transaction for the whole statement, so every
+    /// batch stages into a single `Txn` exactly like the CSV path. What changes
+    /// is residency: neither the file's bytes nor its formatted text are ever
+    /// all held. A 3.8 GB GIST import used to keep the file, the text rows, the
+    /// published values and the append buffer at the same time.
+    async fn copy_from_binary_vectors(
+        &self,
+        table: &str,
+        path: &std::path::Path,
         elem_width: usize,
-    ) -> Result<Vec<Vec<Literal>>> {
+    ) -> Result<QueryResult> {
+        let types_for_scan = self.column_types(table)?;
+        let mut reader = self.open_binary_vector_reader(table, path, elem_width)?;
+        let t = self.txn.begin();
+        let mut cursor: Option<ImportCursor> = None;
+        let mut staged = 0usize;
+        let mut total = 0usize;
+        let mut segments: Vec<u32> = Vec::new();
+        let mut batches_all: Vec<usize> = Vec::new();
+        // Every row this statement put in the append buffer, so a rollback can
+        // drop them.
+        let mut buffered: Vec<usize> = Vec::new();
+        // Where the blocks this statement completes are written until it
+        // commits (`NewTxn::Import`'s `TempDir/import<txn>`).
+        let staging_root = self.import_staging_root(t.id);
+        let mut staging = self.stage_import(table);
+        loop {
+            // The records as their block-file bytes. A complete block is
+            // written from these and never becomes text at all.
+            let mut slots: Vec<Option<Vec<Option<Vec<u8>>>>> =
+                Vec::with_capacity(Self::COPY_BATCH_ROWS);
+            while slots.len() < Self::COPY_BATCH_ROWS {
+                match reader.next_slot()? {
+                    Some(slot) => slots.push(Some(slot)),
+                    None => break,
+                }
+            }
+            if slots.is_empty() {
+                break;
+            }
+            let n = slots.len();
+            // The reader gives slots; a row only needs its text when it lands
+            // in the append buffer, which `stage_import_batch` decides per
+            // block. `batch` therefore carries one placeholder per record.
+            let batch: Vec<Vec<Literal>> = vec![Vec::new(); n];
+            let staged_now = self
+                .stage_import_batch(
+                    table,
+                    &batch,
+                    &slots,
+                    &mut cursor,
+                    &types_for_scan,
+                    &mut segments,
+                    &mut batches_all,
+                    &mut buffered,
+                    &mut staging,
+                    &staging_root,
+                )
+                .await?;
+            total += staged_now;
+            staged += staged_now;
+            if n < Self::COPY_BATCH_ROWS {
+                break;
+            }
+        }
+        if staged > 0 {
+            // This path has no staged text: every row went to a block through
+            // its slot bytes (`stage_complete_slot_blocks`), or is the
+            // statement's tail in the append buffer, which `write_blocks_import`
+            // writes. An empty set is what tells `commit_import_chunk` there is
+            // nothing to replay; the `?` on the commit is also what makes a
+            // failure surface here instead of being swallowed.
+            let no_staged_text = StagedRows::new();
+            self.commit_import_chunk(table, t, &segments, &no_staged_text, &batches_all)
+                .await?;
+            self.note_live_rows(table, staged as isize);
+            staging.committed();
+        } else {
+            drop(t);
+        }
+        Ok(QueryResult::Inserted { count: total })
+    }
+
+    /// Opens a binary vector file for record-by-record reading (`FORMAT
+    /// FVECS`, `FORMAT BVECS`): each record is an `i32 dim` followed by `dim`
+    /// elements, `elem_width` bytes each.
+    ///
+    /// The reader is pull-based rather than callback-based so the caller can
+    /// `.await` between batches: a 3.8 GB GIST import must stage 8192 rows,
+    /// commit their block and drop them, not hold the file's text.
+    fn open_binary_vector_reader(
+        &self,
+        table: &str,
+        path: &std::path::Path,
+        elem_width: usize,
+    ) -> Result<BinaryVectorReader> {
         let types = self.column_types(table)?;
         if types.len() != 1 {
             return Err(Error::Invalid(format!(
@@ -800,45 +1092,25 @@ impl Engine {
             )));
         }
         let declared = type_dim(&types[0]).unwrap_or(0);
-        let mut rows = Vec::new();
-        let mut pos = 0usize;
-        while pos + 4 <= bytes.len() {
-            let dim = i32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
-            pos += 4;
-            let Ok(dim) = usize::try_from(dim) else {
-                return Err(Error::Invalid(
-                    "import: the vector file has a negative dimension".into(),
-                ));
-            };
-            if dim == 0 || pos + dim * elem_width > bytes.len() {
-                return Err(Error::Invalid(
-                    "import: the vector file is truncated".into(),
-                ));
-            }
-            if declared != 0 && declared != dim {
-                return Err(Error::Invalid(format!(
-                    "import: the file's dimension ({dim}) does not match the column's ({declared})"
-                )));
-            }
-            let vals: Vec<String> = (0..dim)
-                .map(|i| {
-                    let at = pos + i * elem_width;
-                    if elem_width == 4 {
-                        fmt_f32_cpp(f32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()))
-                    } else {
-                        bytes[at].to_string()
-                    }
+        let file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            // A missing fixture is a statement-level success with no rows,
+            // like the CSV path.
+            Err(_) => {
+                return Ok(BinaryVectorReader {
+                    inner: None,
+                    declared,
+                    elem_width,
+                    path: path.to_path_buf(),
                 })
-                .collect();
-            pos += dim * elem_width;
-            rows.push(vec![Literal::Str(format!("[{}]", vals.join(",")))]);
-        }
-        if rows.is_empty() || pos != bytes.len() {
-            return Err(Error::Invalid(
-                "import: the vector file has trailing bytes".into(),
-            ));
-        }
-        Ok(rows)
+            }
+        };
+        Ok(BinaryVectorReader {
+            inner: Some(std::io::BufReader::with_capacity(1 << 20, file)),
+            declared,
+            elem_width,
+            path: path.to_path_buf(),
+        })
     }
 
     /// One literal row per row of a CSR sparse matrix (`FORMAT CSR`):
@@ -1238,5 +1510,124 @@ impl Drop for ImportStaging<'_> {
         if let Some(entry) = self.engine.tables.lock().unwrap().get_mut(&self.key) {
             entry.importing = entry.importing.saturating_sub(1);
         }
+    }
+}
+
+/// The cell text of a one-column embedding row, from its block-file bytes.
+///
+/// The inverse of what `next_slot` builds: `push_embedding_element` wrote
+/// `dim` elements, and this renders them the way `encode_cell_stored` would
+/// have (`[a,b,c]`, each `f32` in its shortest round-tripping form). Only the
+/// rows that reach the append buffer need it.
+fn slot_to_cell_text(types: &[String], slots: &[Option<Vec<u8>>]) -> String {
+    let (Some(Some(slot)), Some(ty)) = (slots.first(), types.first()) else {
+        return String::new();
+    };
+    // A scalar fixed-width column: the slot *is* the value, little-endian.
+    if let Some(column_type) = crate::blocks::column_type_of(ty) {
+        let width = slot.len();
+        if let Some(value) = crate::blocks::decode_scalar_value(column_type, width, slot, 0) {
+            return crate::blocks::mirror_cell_text(&value);
+        }
+        if column_type == 0 {
+            return (slot.first().copied().unwrap_or(0) != 0).to_string();
+        }
+    }
+    let Some((dim, elem)) = crate::blocks::embedding_shape(ty) else {
+        return String::from_utf8_lossy(slot).into_owned();
+    };
+    let width = storage::definition::format::embedding_size(elem, 1).max(1);
+    let mut vals: Vec<String> = Vec::with_capacity(dim);
+    for i in 0..dim {
+        let at = i * width;
+        let Some(bytes) = slot.get(at..at + width) else {
+            break;
+        };
+        let Some(v) = storage::definition::format::read_embedding_element(bytes, elem) else {
+            break;
+        };
+        vals.push(if elem == 6 {
+            fmt_f32_cpp(v as f32)
+        } else {
+            crate::engine::state::fmt_f64_cpp(v)
+        });
+    }
+    format!("[{}]", vals.join(","))
+}
+
+/// One record at a time out of an `fvecs`/`bvecs` file.
+///
+/// The caller stages a batch, commits its block and asks for the next one, so
+/// the whole file is never resident. `inner` is `None` when the file does not
+/// exist: the reference treats a missing fixture as an empty import.
+pub(crate) struct BinaryVectorReader {
+    inner: Option<std::io::BufReader<std::fs::File>>,
+    declared: usize,
+    elem_width: usize,
+    path: std::path::PathBuf,
+}
+
+impl BinaryVectorReader {
+    /// The next record as both its literal row and its block-file bytes.
+    ///
+    /// One read, two forms, so they cannot drift apart. The text is what the
+    /// append buffer and every reader use; the slot is what the block file
+    /// stores, and a complete block is written from it without ever going
+    /// through `Value` or `encode_value_with_shape`.
+    fn next_slot(&mut self) -> Result<Option<Vec<Option<Vec<u8>>>>> {
+        use std::io::Read;
+        let BinaryVectorReader {
+            inner,
+            declared,
+            elem_width,
+            path,
+        } = self;
+        let Some(reader) = inner.as_mut() else {
+            return Ok(None);
+        };
+        let mut header = [0u8; 4];
+        match reader.read_exact(&mut header) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(Error::io(path.as_path(), e)),
+        }
+        let dim = i32::from_le_bytes(header);
+        let Ok(dim) = usize::try_from(dim) else {
+            return Err(Error::Invalid(
+                "import: the vector file has a negative dimension".into(),
+            ));
+        };
+        if dim == 0 {
+            return Err(Error::Invalid(
+                "import: the vector file is truncated".into(),
+            ));
+        }
+        if *declared != 0 && *declared != dim {
+            return Err(Error::Invalid(format!(
+                "import: the file's dimension ({dim}) does not match the column's ({})",
+                declared
+            )));
+        }
+        let mut record = vec![0u8; dim * *elem_width];
+        reader
+            .read_exact(&mut record)
+            .map_err(|_| Error::Invalid("import: the vector file is truncated".into()))?;
+        let element_type = if *elem_width == 4 { 6 } else { 1 };
+        let mut slot = Vec::with_capacity(storage::definition::format::embedding_size(
+            element_type,
+            dim,
+        ));
+        for i in 0..dim {
+            let at = i * *elem_width;
+            let value = if *elem_width == 4 {
+                f64::from(f32::from_le_bytes(
+                    record[at..at + 4].try_into().expect("4 bytes"),
+                ))
+            } else {
+                f64::from(record[at])
+            };
+            storage::definition::format::push_embedding_element(&mut slot, element_type, value);
+        }
+        Ok(Some(vec![Some(slot)]))
     }
 }

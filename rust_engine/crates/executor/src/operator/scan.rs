@@ -65,62 +65,67 @@ pub struct TableScan {
 impl TableScan {
     /// Reads the relation. The index filter runs over the pre-`LazyLoad` layout
     /// and the rows are then aligned onto the pruned one.
-    fn rows(&mut self, engine: &Engine) -> Result<Vec<Vec<Value>>> {
-        // A full-text index filter answers from the column's inverted index,
-        // which is keyed by the storage row id (C++ `IndexFilterEvaluatorFulltext`
-        // queries the `ColumnIndexReader`), so the scan needs the ids alongside
-        // the rows.
-        // The secondary filter reads its index, which is keyed by the storage row
-        // id, so an index scan carries the ids as well; the full-text filter has
-        // always needed them for the same reason.
-        let needs_ids = self.candidate.is_some();
-        // Only a plain full scan of the node is cacheable: an override or an
-        // index filter answers a *predicate*, not the node's rows.
-        let cacheable = self.override_rows.is_none() && self.candidate.is_none();
-        let (mut rows, row_ids) = match self.override_rows.take() {
-            Some(rows) => (rows, None),
-            None if needs_ids => {
-                let pairs = engine.fetch_rows_with_ids(&self.table)?;
-                let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
-                (pairs.into_iter().map(|(_, row)| row).collect(), Some(ids))
-            }
-            None => (engine.fetch_rows_pruned(&self.table, &self.prune)?, None),
-        };
-        // The index filter refers to the pre-`LazyLoad` scan layout, so it maps
-        // back onto the unpruned row before the rows compact.
-        if let (Some(candidate), Some(positions)) = (&self.candidate, &self.index_positions) {
-            let tokenizer = self
-                .fulltext_index_column
-                .as_ref()
-                .map(|column| engine.index_tokenizer(&self.table, column));
-            let fulltext_index = match (&self.fulltext_index_column, &row_ids, &tokenizer) {
-                // The index and its tokeniser come back as a pair: a column with
-                // two `FULLTEXT` indexes has one tokeniser per record, and the
-                // provider can only look a term up when the two agree.
-                (Some(column), Some(_), Some(tokenizer)) if !self.fulltext_substring => Some(
-                    engine.text_index_with_tokenizer(&self.table, column, tokenizer.clone())?,
+    fn rows<'a>(&'a mut self, engine: &'a Engine) -> super::SourceFuture<'a, Vec<Vec<Value>>> {
+        Box::pin(async move {
+            // A full-text index filter answers from the column's inverted index,
+            // which is keyed by the storage row id (C++ `IndexFilterEvaluatorFulltext`
+            // queries the `ColumnIndexReader`), so the scan needs the ids alongside
+            // the rows.
+            // The secondary filter reads its index, which is keyed by the storage row
+            // id, so an index scan carries the ids as well; the full-text filter has
+            // always needed them for the same reason.
+            let needs_ids = self.candidate.is_some();
+            // Only a plain full scan of the node is cacheable: an override or an
+            // index filter answers a *predicate*, not the node's rows.
+            let cacheable = self.override_rows.is_none() && self.candidate.is_none();
+            let (mut rows, row_ids) = match self.override_rows.take() {
+                Some(rows) => (rows, None),
+                None if needs_ids => {
+                    let pairs = engine.fetch_rows_with_ids(&self.table).await?;
+                    let ids: Vec<usize> = pairs.iter().map(|(id, _)| *id).collect();
+                    (pairs.into_iter().map(|(_, row)| row).collect(), Some(ids))
+                }
+                None => (
+                    engine.fetch_rows_pruned(&self.table, &self.prune).await?,
+                    None,
                 ),
-                _ => None,
             };
-            rows = crate::apply_index_filter(
-                rows,
-                row_ids.as_deref(),
-                fulltext_index.as_ref(),
-                candidate,
-                positions,
-                self.fulltext_substring,
-                Some(engine),
-                &self.table,
-                self.index_columns.as_deref(),
-            )?;
-        }
-        if let Some(full) = &self.source_columns {
-            rows = crate::align_rows(rows, &self.columns, full);
-        }
-        if cacheable {
-            engine.cache_scan_rows(&self.table, &self.columns, &rows);
-        }
-        Ok(rows)
+            // The index filter refers to the pre-`LazyLoad` scan layout, so it maps
+            // back onto the unpruned row before the rows compact.
+            if let (Some(candidate), Some(positions)) = (&self.candidate, &self.index_positions) {
+                let tokenizer = self
+                    .fulltext_index_column
+                    .as_ref()
+                    .map(|column| engine.index_tokenizer(&self.table, column));
+                let fulltext_index = match (&self.fulltext_index_column, &row_ids, &tokenizer) {
+                    (Some(column), Some(_), Some(tokenizer)) if !self.fulltext_substring => Some((
+                        engine
+                            .text_index_for(&self.table, column, tokenizer.clone())
+                            .await?,
+                        tokenizer.clone(),
+                    )),
+                    _ => None,
+                };
+                rows = crate::apply_index_filter(
+                    rows,
+                    row_ids.as_deref(),
+                    fulltext_index.as_ref(),
+                    candidate,
+                    positions,
+                    self.fulltext_substring,
+                    Some(engine),
+                    &self.table,
+                    self.index_columns.as_deref(),
+                )?;
+            }
+            if let Some(full) = &self.source_columns {
+                rows = crate::align_rows(rows, &self.columns, full);
+            }
+            if cacheable {
+                engine.cache_scan_rows(&self.table, &self.columns, &rows);
+            }
+            Ok(rows)
+        })
     }
 }
 
@@ -197,10 +202,10 @@ impl<'a> PhysicalSource<'a> {
         &self.columns
     }
 
-    fn materialise(&mut self) -> Result<Vec<Vec<Value>>> {
+    async fn materialise(&mut self) -> Result<Vec<Vec<Value>>> {
         let rows = match &mut self.spec {
             SourceSpec::Values { rows, .. } => std::mem::take(rows),
-            SourceSpec::Table(scan) => scan.rows(self.engine)?,
+            SourceSpec::Table(scan) => scan.rows(self.engine).await?,
             SourceSpec::Join(join) => {
                 let lrows = match join.left_rows.take() {
                     Some(rows) => match join.left_source_columns.as_ref() {
@@ -208,13 +213,13 @@ impl<'a> PhysicalSource<'a> {
                         None => rows,
                     },
                     None => crate::align_rows(
-                        self.engine.fetch_rows(&join.left)?,
+                        self.engine.fetch_rows(&join.left).await?,
                         &join.left_columns,
                         &self.engine.table_schema(&join.left)?,
                     ),
                 };
                 let rrows = crate::align_rows(
-                    self.engine.fetch_rows(&join.right)?,
+                    self.engine.fetch_rows(&join.right).await?,
                     &join.right_columns,
                     &self.engine.table_schema(&join.right)?,
                 );
@@ -239,39 +244,41 @@ impl ChunkSource for PhysicalSource<'_> {
         self.columns.len()
     }
 
-    fn next(&mut self, state: &mut SourceState) -> Result<()> {
-        state.data_blocks = Vec::new();
-        if self.rows.is_none() {
-            let rows = self.materialise()?;
-            state.empty_source = rows.is_empty();
-            self.rows = Some(rows.into_iter());
-        }
-        let width = self.columns.len();
-        let mut chunk = DataChunk::with_capacity(width, self.batch);
-        let mut any = false;
-        for row in self
-            .rows
-            .as_mut()
-            .expect("filled above")
-            .by_ref()
-            .take(self.batch)
-        {
-            let mut row = row;
-            row.resize(width, Value::Null);
-            chunk.push_row(&row)?;
-            any = true;
-        }
-        let exhausted = self
-            .rows
-            .as_ref()
-            .map(|rows| rows.as_slice().is_empty())
-            .unwrap_or(true);
-        if any {
-            chunk.finalize();
-            state.data_blocks.push(chunk);
-        }
-        state.complete = exhausted;
-        Ok(())
+    fn next<'a>(&'a mut self, state: &'a mut SourceState) -> super::SourceFuture<'a, ()> {
+        Box::pin(async move {
+            state.data_blocks = Vec::new();
+            if self.rows.is_none() {
+                let rows = self.materialise().await?;
+                state.empty_source = rows.is_empty();
+                self.rows = Some(rows.into_iter());
+            }
+            let width = self.columns.len();
+            let mut chunk = DataChunk::with_capacity(width, self.batch);
+            let mut any = false;
+            for row in self
+                .rows
+                .as_mut()
+                .expect("filled above")
+                .by_ref()
+                .take(self.batch)
+            {
+                let mut row = row;
+                row.resize(width, Value::Null);
+                chunk.push_row(&row)?;
+                any = true;
+            }
+            let exhausted = self
+                .rows
+                .as_ref()
+                .map(|rows| rows.as_slice().is_empty())
+                .unwrap_or(true);
+            if any {
+                chunk.finalize();
+                state.data_blocks.push(chunk);
+            }
+            state.complete = exhausted;
+            Ok(())
+        })
     }
 }
 
@@ -280,15 +287,17 @@ mod tests {
     use super::*;
     use expression::Value;
 
-    fn engine() -> (tempfile::TempDir, Engine) {
+    async fn engine() -> (tempfile::TempDir, Engine) {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         (dir, engine)
     }
 
-    #[test]
-    fn a_values_source_hands_out_chunks_and_completes() {
-        let (_dir, engine) = engine();
+    #[tokio::test]
+    async fn a_values_source_hands_out_chunks_and_completes() {
+        let (_dir, engine) = engine().await;
         let rows = (0..5).map(|i| vec![Value::Int(i)]).collect();
         let spec = SourceSpec::Values {
             columns: vec!["a".into()],
@@ -296,40 +305,42 @@ mod tests {
         };
         let mut source = PhysicalSource::new(&engine, spec, 2);
         let mut state = SourceState::default();
-        source.next(&mut state).unwrap();
+        { source.next(&mut state) }.await.unwrap();
         assert_eq!(state.data_blocks.len(), 1);
         assert_eq!(state.data_blocks[0].row_count(), 2);
         assert!(!state.complete);
-        source.next(&mut state).unwrap();
-        source.next(&mut state).unwrap();
+        { source.next(&mut state) }.await.unwrap();
+        { source.next(&mut state) }.await.unwrap();
         assert_eq!(state.data_blocks[0].row_count(), 1);
         assert!(state.complete);
         assert_eq!(source.columns(), &["a".to_string()]);
     }
 
-    #[test]
-    fn an_empty_values_source_is_remembered_as_empty() {
-        let (_dir, engine) = engine();
+    #[tokio::test]
+    async fn an_empty_values_source_is_remembered_as_empty() {
+        let (_dir, engine) = engine().await;
         let spec = SourceSpec::Values {
             columns: vec!["a".into()],
             rows: Vec::new(),
         };
         let mut source = PhysicalSource::new(&engine, spec, 4);
         let mut state = SourceState::default();
-        source.next(&mut state).unwrap();
+        { source.next(&mut state) }.await.unwrap();
         assert!(state.empty_source);
         assert!(state.complete);
         assert!(state.data_blocks.is_empty());
     }
 
-    #[test]
-    fn a_table_scan_reads_the_table_and_aligns_the_pruned_layout() {
-        let (_dir, engine) = engine();
+    #[tokio::test]
+    async fn a_table_scan_reads_the_table_and_aligns_the_pruned_layout() {
+        let (_dir, engine) = engine().await;
         engine
-            .execute_blocking("CREATE TABLE s (a INT, b INT);")
+            .execute("CREATE TABLE s (a INT, b INT);")
+            .await
             .unwrap();
         engine
-            .execute_blocking("INSERT INTO s VALUES (1, 10), (2, 20);")
+            .execute("INSERT INTO s VALUES (1, 10), (2, 20);")
+            .await
             .unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
@@ -345,18 +356,16 @@ mod tests {
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         assert_eq!(
-            source.collect().unwrap(),
+            { source.collect() }.await.unwrap(),
             vec![vec![Value::Int(10)], vec![Value::Int(20)]]
         );
     }
 
-    #[test]
-    fn an_unmatchable_scan_yields_no_row() {
-        let (_dir, engine) = engine();
-        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO s VALUES (1);")
-            .unwrap();
+    #[tokio::test]
+    async fn an_unmatchable_scan_yields_no_row() {
+        let (_dir, engine) = engine().await;
+        engine.execute("CREATE TABLE s (a INT);").await.unwrap();
+        engine.execute("INSERT INTO s VALUES (1);").await.unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],
@@ -371,16 +380,14 @@ mod tests {
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
         source.set_unmatchable(true);
-        assert!(source.collect().unwrap().is_empty());
+        assert!({ source.collect() }.await.unwrap().is_empty());
     }
 
-    #[test]
-    fn an_override_supplies_the_rows_instead_of_the_table() {
-        let (_dir, engine) = engine();
-        engine.execute_blocking("CREATE TABLE s (a INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO s VALUES (1);")
-            .unwrap();
+    #[tokio::test]
+    async fn an_override_supplies_the_rows_instead_of_the_table() {
+        let (_dir, engine) = engine().await;
+        engine.execute("CREATE TABLE s (a INT);").await.unwrap();
+        engine.execute("INSERT INTO s VALUES (1);").await.unwrap();
         let scan = TableScan {
             table: "default_db.s".into(),
             columns: vec!["a".into()],
@@ -394,6 +401,9 @@ mod tests {
             prune: Vec::new(),
         };
         let mut source = PhysicalSource::new(&engine, SourceSpec::Table(Box::new(scan)), 8192);
-        assert_eq!(source.collect().unwrap(), vec![vec![Value::Int(42)]]);
+        assert_eq!(
+            { source.collect() }.await.unwrap(),
+            vec![vec![Value::Int(42)]]
+        );
     }
 }

@@ -23,14 +23,16 @@
 use crate::{Engine, QueryResult};
 use tempfile::tempdir;
 
-fn engine() -> (tempfile::TempDir, Engine) {
+async fn engine() -> (tempfile::TempDir, Engine) {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     (dir, e)
 }
 
-fn result(e: &Engine, sql: &str) -> QueryResult {
-    e.execute_blocking(sql).unwrap().into_iter().next().unwrap()
+async fn result(e: &Engine, sql: &str) -> QueryResult {
+    e.execute(sql).await.unwrap().into_iter().next().unwrap()
 }
 
 /// Rows as display text, for assertions.
@@ -38,22 +40,24 @@ fn texts(rows: &crate::Batch) -> Vec<Vec<String>> {
     rows.text_rows()
 }
 
-fn select_rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    let r = result(e, sql);
+async fn select_rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+    let r = result(e, sql).await;
     match &r {
         QueryResult::Rows { .. } => r.rows_text(),
         other => panic!("expected rows, got {other:?}"),
     }
 }
 
-fn row_strings(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-    select_rows(e, sql)
+async fn row_strings(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+    select_rows(e, sql).await
 }
 
-fn seed_source(e: &Engine) {
-    e.execute_blocking("CREATE TABLE src (a INT, b VARCHAR);")
+async fn seed_source(e: &Engine) {
+    e.execute("CREATE TABLE src (a INT, b VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("INSERT INTO src VALUES (1,'x'), (2,'y'), (3,'z');")
+    e.execute("INSERT INTO src VALUES (1,'x'), (2,'y'), (3,'z');")
+        .await
         .unwrap();
 }
 
@@ -62,11 +66,12 @@ fn seed_source(e: &Engine) {
 /// reference: any `INSERT … SELECT` that reads one dies there
 /// (`expression_state_impl.cpp:68`). A select list of constants survives, and
 /// is the only shape the port runs.
-#[test]
-fn insert_select_is_refused_when_the_select_list_reads_a_column() {
-    let (_d, e) = engine();
-    seed_source(&e);
-    e.execute_blocking("CREATE TABLE dst (id INT, name VARCHAR);")
+#[tokio::test]
+async fn insert_select_is_refused_when_the_select_list_reads_a_column() {
+    let (_d, e) = engine().await;
+    seed_source(&e).await;
+    e.execute("CREATE TABLE dst (id INT, name VARCHAR);")
+        .await
         .unwrap();
 
     for sql in [
@@ -74,7 +79,7 @@ fn insert_select_is_refused_when_the_select_list_reads_a_column() {
         "INSERT INTO dst SELECT * FROM src;",
         "INSERT INTO dst SELECT a + 1, b FROM src;",
     ] {
-        let err = e.execute_blocking(sql).unwrap_err();
+        let err = e.execute(sql).await.unwrap_err();
         assert_eq!(
             err.to_string(),
             "Unknown expression type: Column. expression name: a",
@@ -83,36 +88,38 @@ fn insert_select_is_refused_when_the_select_list_reads_a_column() {
     }
     // The explicit list does not change which column is reported first.
     let err = e
-        .execute_blocking("INSERT INTO dst (name, id) SELECT b, a FROM src;")
+        .execute("INSERT INTO dst (name, id) SELECT b, a FROM src;")
+        .await
         .unwrap_err();
     assert_eq!(
         err.to_string(),
         "Unknown expression type: Column. expression name: b"
     );
     // The reference fails before it appends, so nothing landed.
-    assert_eq!(select_rows(&e, "SELECT id, name FROM dst;").len(), 0);
+    assert_eq!(select_rows(&e, "SELECT id, name FROM dst;").await.len(), 0);
 }
 
-#[test]
-fn insert_select_of_constants_inserts_one_row_per_source_row() {
-    let (_d, e) = engine();
-    seed_source(&e);
-    e.execute_blocking("CREATE TABLE dst (id INT, name VARCHAR);")
+#[tokio::test]
+async fn insert_select_of_constants_inserts_one_row_per_source_row() {
+    let (_d, e) = engine().await;
+    seed_source(&e).await;
+    e.execute("CREATE TABLE dst (id INT, name VARCHAR);")
+        .await
         .unwrap();
 
     assert_eq!(
-        e.execute_blocking("INSERT INTO dst SELECT 7, 'z';")
-            .unwrap(),
+        e.execute("INSERT INTO dst SELECT 7, 'z';").await.unwrap(),
         vec![QueryResult::Inserted { count: 1 }]
     );
     // A constant list over a source still yields one row per source row.
     assert_eq!(
-        e.execute_blocking("INSERT INTO dst SELECT 8, 'w' FROM src;")
+        e.execute("INSERT INTO dst SELECT 8, 'w' FROM src;")
+            .await
             .unwrap(),
         vec![QueryResult::Inserted { count: 3 }]
     );
     assert_eq!(
-        row_strings(&e, "SELECT id, name FROM dst ORDER BY id;"),
+        row_strings(&e, "SELECT id, name FROM dst ORDER BY id;").await,
         vec![
             vec!["7".to_string(), "z".to_string()],
             vec!["8".to_string(), "w".to_string()],
@@ -122,14 +129,15 @@ fn insert_select_of_constants_inserts_one_row_per_source_row() {
     );
 }
 
-#[test]
-fn insert_select_reports_arity_and_name_errors() {
-    let (_d, e) = engine();
-    seed_source(&e);
-    e.execute_blocking("CREATE TABLE dst (id INT, name VARCHAR);")
+#[tokio::test]
+async fn insert_select_reports_arity_and_name_errors() {
+    let (_d, e) = engine().await;
+    seed_source(&e).await;
+    e.execute("CREATE TABLE dst (id INT, name VARCHAR);")
+        .await
         .unwrap();
 
-    let err = e.execute_blocking("INSERT INTO dst SELECT 1;").unwrap_err();
+    let err = e.execute("INSERT INTO dst SELECT 1;").await.unwrap_err();
     assert!(
         err.to_string()
             .contains("INSERT has 2 target column(s) but SELECT returns 1 column(s)"),
@@ -137,7 +145,8 @@ fn insert_select_reports_arity_and_name_errors() {
     );
 
     let err = e
-        .execute_blocking("INSERT INTO dst (nope) SELECT 1, 'x';")
+        .execute("INSERT INTO dst (nope) SELECT 1, 'x';")
+        .await
         .unwrap_err();
     assert!(
         err.to_string().contains("column 'nope' does not exist"),
@@ -145,14 +154,16 @@ fn insert_select_reports_arity_and_name_errors() {
     );
 
     let err = e
-        .execute_blocking("INSERT INTO missing SELECT 1, 'x';")
+        .execute("INSERT INTO missing SELECT 1, 'x';")
+        .await
         .unwrap_err();
     assert!(err.to_string().contains("table"), "{err}");
 
     // The binder runs before the evaluator, so an unknown column keeps its
     // bind error rather than the unrecoverable one.
     let err = e
-        .execute_blocking("INSERT INTO dst SELECT c FROM src;")
+        .execute("INSERT INTO dst SELECT c FROM src;")
+        .await
         .unwrap_err();
     assert!(
         !err.to_string().starts_with("Unknown expression type"),
@@ -160,13 +171,14 @@ fn insert_select_reports_arity_and_name_errors() {
     );
 }
 
-#[test]
-fn create_table_as_select_is_rejected_like_the_reference() {
-    let (_d, e) = engine();
-    seed_source(&e);
+#[tokio::test]
+async fn create_table_as_select_is_rejected_like_the_reference() {
+    let (_d, e) = engine().await;
+    seed_source(&e).await;
 
     let err = e
-        .execute_blocking("CREATE TABLE copy AS SELECT a, b FROM src;")
+        .execute("CREATE TABLE copy AS SELECT a, b FROM src;")
+        .await
         .unwrap_err();
     assert_eq!(
         err.to_string(),
@@ -174,24 +186,24 @@ fn create_table_as_select_is_rejected_like_the_reference() {
     );
     assert_eq!(err.status_code(), 3048);
     // Nothing was created.
-    assert!(e.execute_blocking("SELECT * FROM copy;").is_err());
+    assert!(e.execute("SELECT * FROM copy;").await.is_err());
 
     let err = e
-        .execute_blocking("CREATE TABLE typed (x DOUBLE, y VARCHAR) AS SELECT a, b FROM src;")
+        .execute("CREATE TABLE typed (x DOUBLE, y VARCHAR) AS SELECT a, b FROM src;")
+        .await
         .unwrap_err();
     assert!(err.to_string().contains("unexpected AS"), "{err}");
-    assert!(e.execute_blocking("SELECT * FROM typed;").is_err());
+    assert!(e.execute("SELECT * FROM typed;").await.is_err());
 }
 
-#[test]
-fn describe_returns_the_reference_columns_in_definition_order() {
-    let (_d, e) = engine();
-    e.execute_blocking(
-        "CREATE TABLE described (id INT NOT NULL DEFAULT 7 COMMENT 'pk', name VARCHAR);",
-    )
-    .unwrap();
+#[tokio::test]
+async fn describe_returns_the_reference_columns_in_definition_order() {
+    let (_d, e) = engine().await;
+    e.execute("CREATE TABLE described (id INT NOT NULL DEFAULT 7 COMMENT 'pk', name VARCHAR);")
+        .await
+        .unwrap();
 
-    let QueryResult::Rows { columns, rows } = result(&e, "DESCRIBE described;") else {
+    let QueryResult::Rows { columns, rows } = result(&e, "DESCRIBE described;").await else {
         panic!("DESCRIBE must return rows");
     };
     assert_eq!(columns, vec!["name", "type", "default", "comment"]);
@@ -213,8 +225,8 @@ fn describe_returns_the_reference_columns_in_definition_order() {
         ]
     );
     // `DESC` is the accepted legacy spelling.
-    assert_eq!(select_rows(&e, "DESC described;").len(), 2);
-    assert!(e.execute_blocking("DESCRIBE missing;").is_err());
+    assert_eq!(select_rows(&e, "DESC described;").await.len(), 2);
+    assert!(e.execute("DESCRIBE missing;").await.is_err());
 }
 
 /// The reference has no view implementation: `PhysicalCreateView` is an empty
@@ -222,10 +234,10 @@ fn describe_returns_the_reference_columns_in_definition_order() {
 /// dies in `UnrecoverableException("Unknown DDL type")`
 /// (`query_context_impl.cpp:467`) and `DROP VIEW` at `:489`. Nothing is
 /// registered, so a later `FROM v` reports the missing table.
-#[test]
-fn views_are_rejected_like_the_reference() {
-    let (_d, e) = engine();
-    seed_source(&e);
+#[tokio::test]
+async fn views_are_rejected_like_the_reference() {
+    let (_d, e) = engine().await;
+    seed_source(&e).await;
 
     for sql in [
         "CREATE VIEW v AS SELECT a, b FROM src;",
@@ -233,10 +245,10 @@ fn views_are_rejected_like_the_reference() {
         "DROP VIEW v;",
         "DROP VIEW IF EXISTS v;",
     ] {
-        let err = e.execute_blocking(sql).unwrap_err();
+        let err = e.execute(sql).await.unwrap_err();
         assert_eq!(err.to_string(), "Unknown DDL type", "{sql}");
     }
-    assert!(e.execute_blocking("SELECT * FROM v;").is_err());
+    assert!(e.execute("SELECT * FROM v;").await.is_err());
     // A table of that name is still creatable: the view never occupied it.
-    e.execute_blocking("CREATE TABLE v (a INT);").unwrap();
+    e.execute("CREATE TABLE v (a INT);").await.unwrap();
 }
