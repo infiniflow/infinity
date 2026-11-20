@@ -51,9 +51,40 @@ while i + LANES <= n {
 算，与实测一致。
 
 内核只有 2.3×（而不是 8×）是因为 128 维、每向量 512 B 的负载是**带宽**受限：22.9 ns
-对应约 22 GB/s，正好是单核可用的内存带宽。因此 `-C target-cpu=native`（打开 AVX2）
-在这份数据上没有稳定收益（实测 20.5–29.6 ns，噪声大于差异），默认的 SSE2 基线已经够用，
-也就没有改构建参数。
+对应约 22 GB/s，正好是单核可用的内存带宽。因此在 HNSW 建索引的随机访问模式下，
+`-C target-cpu=native` 没有稳定收益（实测 20.5–29.6 ns，噪声大于差异）。
+
+## 2.1 暴力扫描：AVX2 基线必须打开
+
+上面那个结论**只适用于 HNSW 的随机访问**。顺序全扫是另一回事：它一次流过整列
+（SIFT 1M × 128d = 512 MB），`l2_sq` 的占比从 HNSW 的 8% 升到 **79%**，此时
+`f32x8` 有没有落到 256 位寄存器直接决定吞吐。
+
+默认的 `x86-64` 目标只有 SSE2，`f32x8` 被拆成两个 128 位半区，反汇编里
+`l2_sq` 全是 `subps`/`mulps`/`addps`，一个 `ymm` 都没有。`-C target-cpu=x86-64-v3`
+（AVX2 基线，Haswell 2013）让它变成单条 `vsubps`/`vmulps`/`vaddps`，并且 LLVM 会
+展开 4 路。因此 `rust_engine/.cargo/config.toml` 现在带 `target-cpu=x86-64-v3`：
+不用 `native`，是因为发布出去的二进制要在别的机器上跑。
+
+SIFT 1M 暴力扫描，同一台机器，100 条查询，一个 psql session
+（`tools/perf_sift.py --no-index --queries 100 --batch`）：
+
+| 版本 | p50 | p95 | qps |
+|---|---|---|---|
+| SSE2 基线 + 每块 `select_nth` | 39.4 ms | 44.3 ms | 25.0 |
+| + AVX2（v3） | 34.9 ms | - | - |
+| + 跨块 top-n 收集器 | 34.5 ms | - | - |
+| 两者都有 | **24.5 ms** | 27.2 ms | 39.8 |
+| 参考（C++） | 21.1 ms | 21.8 ms | 47.4 |
+
+比值为 1.17×（此前 1.85×）。第二项改动是 `PhysicalKnnScan::topn_collector`：
+原来每块对 8192 个候选做一次 `select_nth_unstable_by`（SIFT 1M 共 122 次，
+`perf` 里占 16%），现在整条扫描只维护一个 top-n，每个候选与当前第 n 名的分数
+比一次即可。`keep_topn` 保留为测试参照（`#[cfg(test)]`），两者在 l2/ip/cosine
+和带 threshold 的组合上逐一比对过。
+
+剩下 24.5 ms 里 `l2_sq` + `vector_score_f32` 占 85%，`l2_sq` 单独 79%，即
+18 GB/s 的顺序读，已接近单核带宽上限。再往下要走多线程或量化，不在本分支。
 
 ## 3. 没做的
 

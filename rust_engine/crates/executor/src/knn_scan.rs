@@ -843,6 +843,11 @@ impl PhysicalKnnScan<'_> {
     /// the last reduction has to be ordered - the caller's final `finish` does
     /// that. Sorting every block's set (123 blocks on SIFT 1M) was wasted work
     /// on a monotone key.
+    ///
+    /// The exact scan now feeds [`Self::topn_collector`] instead, which drops
+    /// the per-block selection entirely. This stays as the reference the
+    /// collector is tested against.
+    #[cfg(test)]
     pub(crate) fn keep_topn(&self, mut scored: Vec<(usize, f64, f64)>) -> Vec<(usize, f64, f64)> {
         if self.threshold.is_some() {
             let is_dist =
@@ -867,6 +872,28 @@ impl PhysicalKnnScan<'_> {
             scored.truncate(self.topn);
         }
         scored
+    }
+
+    /// A running top-n across every block of a scan.
+    ///
+    /// The block-at-a-time exact scan used to call [`Self::keep_topn`] once per
+    /// block, which ran a full `select_nth_unstable_by` over that block's 8192
+    /// candidates - 123 of those on SIFT 1M, and `perf` put 16% of the query
+    /// there. A scan visits each row exactly once, so the running set only has
+    /// to answer "is this row better than the current n-th?", which one
+    /// comparison against a cached cutoff does.
+    ///
+    /// `cutoff` is `None` until the set holds `topn` rows; after that it is the
+    /// score of the current n-th best, and a row that cannot beat it is dropped
+    /// without touching the set. Ties keep the smaller row id, the same rule
+    /// [`Self::keep_topn`] uses, so the answer is unchanged.
+    pub(crate) fn topn_collector(&self) -> TopN {
+        TopN::new(
+            self.topn,
+            self.use_sim(),
+            self.threshold,
+            self.metric.to_string(),
+        )
     }
 
     pub(crate) fn finish(&self, state: KnnScanOperatorState) -> KnnScanOperatorState {
@@ -975,6 +1002,43 @@ mod tests {
         assert_eq!(merged.scored, all.scored);
     }
 
+    /// The running collector and the per-block `keep_topn` must agree: it
+    /// replaced the latter on the exact scan's hot path, and a difference would
+    /// silently change which rows a query returns.
+    #[test]
+    fn the_running_collector_matches_keep_topn() {
+        for (metric, threshold) in [
+            ("l2", None),
+            ("ip", None),
+            ("cosine", None),
+            ("l2", Some(2.0)),
+            ("ip", Some(0.5)),
+        ] {
+            let scan = scan(metric, threshold);
+            // Ties on both the score and the id, so the tie-break rule is
+            // exercised too.
+            let scored: Vec<(usize, f64, f64)> = (0..50)
+                .map(|i| {
+                    let sim = (i % 5) as f64 / 5.0;
+                    (i, sim, 1.0 - sim)
+                })
+                .collect();
+
+            let mut expected = scan.keep_topn(scored.clone());
+            let mut got = {
+                let mut top = scan.topn_collector();
+                for row in scored.iter().copied() {
+                    top.push(row);
+                }
+                top.into_rows()
+            };
+            // Both are unordered; the caller's `finish` is what orders them.
+            expected.sort_unstable_by_key(|r| r.0);
+            got.sort_unstable_by_key(|r| r.0);
+            assert_eq!(got, expected, "metric={metric} threshold={threshold:?}");
+        }
+    }
+
     #[test]
     fn finish_ranks_by_metric_and_applies_threshold_and_topn() {
         let state = KnnScanOperatorState {
@@ -1010,5 +1074,138 @@ mod beam_tests {
         // A statement's own beam always wins, and never becomes zero.
         assert_eq!(Engine::search_width(Some(8), 4_000_000), 8);
         assert_eq!(Engine::search_width(Some(0), 100), 1);
+    }
+}
+
+/// A bounded top-n set, fed one scored row at a time.
+///
+/// See [`PhysicalKnnScan::topn_collector`]: the scan compares each row against
+/// the set's current cutoff instead of re-selecting per block.
+pub(crate) struct TopN {
+    topn: usize,
+    /// Higher is better: the score is a similarity, so the worst kept row has
+    /// the smallest score. Otherwise the score is a distance.
+    use_sim: bool,
+    threshold: Option<f64>,
+    metric: String,
+    rows: Vec<(usize, f64, f64)>,
+    /// The score a row has to beat to enter the full set, cached so the common
+    /// reject costs one comparison.
+    cutoff: Option<f64>,
+    /// Index of the row that currently holds `cutoff`.
+    worst: usize,
+}
+
+impl TopN {
+    fn new(topn: usize, use_sim: bool, threshold: Option<f64>, metric: String) -> Self {
+        Self {
+            topn: topn.max(1),
+            use_sim,
+            threshold,
+            metric,
+            rows: Vec::new(),
+            cutoff: None,
+            worst: 0,
+        }
+    }
+
+    /// Whether `row` would enter a full set: `true` while the set still has
+    /// room, then a comparison against the cached cutoff.
+    #[inline]
+    fn admits(&self, row: &(usize, f64, f64)) -> bool {
+        if self.rows.len() < self.topn {
+            return true;
+        }
+        let Some(cutoff) = self.cutoff else {
+            return true;
+        };
+        // Compare exactly as `keep_topn` orders rows: score first, then the
+        // row id, so a tie on the score keeps the smaller id. A similarity
+        // improves upward, a distance downward.
+        let mine = if self.use_sim { row.1 } else { row.2 };
+        let better = if self.use_sim {
+            mine.partial_cmp(&cutoff)
+        } else {
+            cutoff.partial_cmp(&mine)
+        };
+        match better {
+            Some(std::cmp::Ordering::Greater) => true,
+            Some(std::cmp::Ordering::Equal) => row.0 < self.rows[self.worst].0,
+            _ => false,
+        }
+    }
+
+    /// Offers one scored row. Cheap when the set is full and the row loses.
+    pub(crate) fn push(&mut self, row: (usize, f64, f64)) {
+        if self.threshold.is_some() && !self.passes_threshold(&row) {
+            return;
+        }
+        if !self.admits(&row) {
+            return;
+        }
+        if self.rows.len() < self.topn {
+            self.rows.push(row);
+            if self.rows.len() == self.topn {
+                self.refresh();
+            }
+            return;
+        }
+        self.rows[self.worst] = row;
+        self.refresh();
+    }
+
+    fn passes_threshold(&self, row: &(usize, f64, f64)) -> bool {
+        let Some(th) = self.threshold else {
+            return true;
+        };
+        let is_dist = !matches!(self.metric.as_str(), "cosine" | "ip");
+        if is_dist && !self.use_sim {
+            row.2 <= th
+        } else if self.use_sim {
+            row.1 >= th
+        } else {
+            row.2 >= th
+        }
+    }
+
+    /// Finds the worst kept row and caches its score as the cutoff. Only the
+    /// set (`topn` rows) is scanned, never a whole block.
+    fn refresh(&mut self) {
+        let mut worst = 0;
+        for i in 1..self.rows.len() {
+            if self.is_worse(&self.rows[i], &self.rows[worst]) {
+                worst = i;
+            }
+        }
+        self.worst = worst;
+        self.cutoff = Some(if self.use_sim {
+            self.rows[worst].1
+        } else {
+            self.rows[worst].2
+        });
+    }
+
+    /// `a` is worse than `b` for this scan's direction: a similarity improves
+    /// upward, a distance downward. Equal scores are broken by the row id, the
+    /// larger id being worse.
+    fn is_worse(&self, a: &(usize, f64, f64), b: &(usize, f64, f64)) -> bool {
+        // "a loses to b" is the same comparison `admits` makes against the
+        // cutoff, so both use one ordering rule.
+        let (a_score, b_score) = if self.use_sim { (a.1, b.1) } else { (a.2, b.2) };
+        let a_better = if self.use_sim {
+            a_score.partial_cmp(&b_score)
+        } else {
+            b_score.partial_cmp(&a_score)
+        };
+        match a_better {
+            Some(std::cmp::Ordering::Less) => true,
+            Some(std::cmp::Ordering::Equal) => a.0 > b.0,
+            _ => false,
+        }
+    }
+
+    /// The kept rows, unordered. The caller's `finish` sorts them.
+    pub(crate) fn into_rows(self) -> Vec<(usize, f64, f64)> {
+        self.rows
     }
 }

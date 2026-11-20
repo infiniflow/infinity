@@ -11062,7 +11062,11 @@ impl Engine {
                         // scans; this reduces per block instead of collecting
                         // every row, so the working set is `topn` per block
                         // rather than 1M `(id, sim, dist)` triples.
-                        let mut hits: Vec<(usize, f64, f64)> = Vec::new();
+                        // One running top-n for the whole scan: each row is
+                        // compared against the set's current cutoff, so the
+                        // 122 per-block `select_nth_unstable_by` calls (16% of
+                        // this query) are gone.
+                        let mut top = truncate.topn_collector();
                         cursor.for_each_block_f32(
                             col_idx,
                             dim,
@@ -11077,15 +11081,12 @@ impl Engine {
                                     };
                                     let (sim, dist) =
                                         crate::vector_score_f32(&query_f32, row, &metric);
-                                    hits.push((base + slot, sim, dist));
+                                    top.push((base + slot, sim, dist));
                                 }
-                                // Keep this block's top-n, unordered; only the
-                                // final `finish` sorts.
-                                hits = truncate.keep_topn(std::mem::take(&mut hits));
                                 true
                             },
                         )?;
-                        merged.extend(hits);
+                        merged.extend(top.into_rows());
                     } else {
                         // Sparse, tensor or filtered: the row path, one batch at
                         // a time, because the score is built from other columns
