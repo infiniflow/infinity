@@ -572,7 +572,6 @@ impl Engine {
             allocator: Mutex::new(None),
             allocator_jobs: std::sync::atomic::AtomicUsize::new(0),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
-            vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
             profile_enabled: std::sync::atomic::AtomicBool::new(false),
@@ -982,7 +981,7 @@ impl Engine {
         scored: &[(usize, f64, f64)],
         elapsed: std::time::Duration,
     ) {
-        if scan.cache.is_none() || scored.is_empty() {
+        if scored.is_empty() {
             return;
         }
         {
@@ -1157,9 +1156,6 @@ impl Engine {
     /// multi-vector) is maintained in memory. An insert into a table with none
     /// skips the per-row index hook entirely.
     pub(crate) fn any_in_memory_index(&self) -> bool {
-        if !self.vector_cache.lock().unwrap().is_empty() {
-            return true;
-        }
         self.tables.lock().unwrap().values().any(|e| {
             !e.text.is_empty()
                 || !e.hnsw_mem.is_empty()
@@ -1177,16 +1173,6 @@ impl Engine {
     /// thread - queued behind every other table.
     pub(crate) fn table_has_memory_index(&self, table: &str) -> bool {
         let key = self.table_key(table);
-        let prefix = format!("{key}.");
-        if self
-            .vector_cache
-            .lock()
-            .unwrap()
-            .keys()
-            .any(|cache| cache.starts_with(&prefix))
-        {
-            return true;
-        }
         self.tables.lock().unwrap().get(&key).is_some_and(|entry| {
             !entry.text.is_empty()
                 || !entry.hnsw_mem.is_empty()
@@ -4207,145 +4193,6 @@ impl Engine {
             }
         }
         Ok(out)
-    }
-
-    /// The cached vector column, when one was already built for the table's
-    /// current row count. Never decodes anything.
-    ///
-    /// Building the cache reads and parses the whole column (1M x 128 `f32`
-    /// held in memory), so the query path only *peeks* here: when an index
-    /// answers, the candidate rows are decoded instead and the cache is never
-    /// needed.
-    ///
-    /// The freshness test is the table's published row count, which every write
-    /// path maintains (`note_live_rows`/`set_live_rows`). Counting rows from
-    /// scratch (`block_visible_row_count`) walks every block's version file and
-    /// every slot - 15 ms per query on a 20k-row table - so it must not run
-    /// here.
-    pub(crate) fn vector_cache_peek(&self, table: &str, column: &str) -> Option<SharedVectorCache> {
-        let key = index_key(table, column);
-        let map = self.vector_cache.lock().unwrap();
-        let cache = map.get(&key)?;
-        let published = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&self.table_key(table))
-            .and_then(|e| e.live_rows);
-        let live = cache.read().map(|g| g.live.len()).unwrap_or(0);
-        published
-            .filter(|rows| *rows == live)
-            .map(|_| cache.clone())
-    }
-
-    /// Builds the whole-column vector cache, unless the column is too large for
-    /// the share it is allowed.
-    ///
-    /// The cache is a heap copy of every vector in the column - 1M x 128 `f32`
-    /// is 512 MB, and a table an order of magnitude bigger would be tens of
-    /// gigabytes held at once, which no reclaim pass can take back mid-scan.
-    /// It is capped at a quarter of the buffer budget; past that this returns an
-    /// error and the caller streams the scan in batches instead (the exact-scan
-    /// path treats a missing cache as "stream", so the query still answers -
-    /// only the repeat-query optimization is lost).
-    pub(crate) async fn vector_cache_for(
-        &self,
-        table: &str,
-        column: &str,
-        dims: usize,
-    ) -> Result<SharedVectorCache> {
-        if let Some(cache) = self.vector_cache_peek(table, column) {
-            return Ok(cache);
-        }
-        let key = index_key(table, column);
-        let schema = self.table_schema(table)?;
-        let col = schema
-            .iter()
-            .position(|c| c == column)
-            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let cap = self
-            .context
-            .buffer_budget
-            .load(std::sync::atomic::Ordering::Relaxed)
-            .max(1)
-            / 4;
-        // What the cache retains, tracked as it grows: the `f32` payload at the
-        // capacity `push` left behind (`VectorCache::rows` is
-        // `Vec<(usize, Vec<f32>)>`), the row's slot in that `Vec`, and its entry
-        // in the live set (a key plus the hash table's slack). Growth of `rows`
-        // is charged when the allocation moves, not per row.
-        const LIVE_SET_ENTRY: usize = 2 * std::mem::size_of::<usize>();
-        let mut charge = 0usize;
-        let mut slots = 0usize;
-        let mut cache = VectorCache {
-            dims,
-            rows: Vec::new(),
-            live: Default::default(),
-        };
-        // Bounded batches: the row ids first (the walk the coverage check does
-        // anyway), then one batch of rows at a time. The projected read this
-        // replaces built every row of the column - a full-width `Vec<Value>` per
-        // row - before pushing the first vector, so the peak was the column's
-        // Values *plus* the cache; here it is one batch, and the loop stops at
-        // the cap without decoding the rest.
-        const CACHE_BUILD_BATCH: usize = 4096;
-        let mut ids: Vec<u64> = self
-            .live_row_ids(table)
-            .into_iter()
-            .map(|seq| seq as u64)
-            .collect();
-        ids.sort_unstable();
-        for batch in ids.chunks(CACHE_BUILD_BATCH) {
-            for (seq, cells) in self.fetch_some_rows_with_ids(table, batch)? {
-                let Some(Value::Str(text)) = cells.get(col) else {
-                    continue;
-                };
-                let v = parse_vec_f32(text);
-                if v.len() != dims {
-                    continue;
-                }
-                // The cache stores `f32` (the exact scan scores through
-                // `l2_sq`), so that is what is charged for.
-                let payload =
-                    v.capacity() * std::mem::size_of::<f32>() + std::mem::size_of::<Vec<f32>>();
-                cache.rows.push((seq, v));
-                cache.live.insert(seq);
-                charge = charge
-                    .saturating_add(payload)
-                    .saturating_add(LIVE_SET_ENTRY);
-                let grown = cache.rows.capacity();
-                if grown != slots {
-                    charge = charge.saturating_add(
-                        grown.saturating_sub(slots) * std::mem::size_of::<(usize, Vec<f32>)>(),
-                    );
-                    slots = grown;
-                }
-                if charge > cap {
-                    return Err(Error::Invalid(format!(
-                        "the vector cache for {table}.{column} would exceed {cap} bytes \
-                         (a quarter of the buffer budget); the scan streams instead"
-                    )));
-                }
-            }
-        }
-        // The scan sweeps the candidates against `rows` in one pass, which needs
-        // ascending ids; a batch read groups by block and appends the buffer
-        // last, so the order is restored here.
-        cache.rows.sort_unstable_by_key(|(seq, _)| *seq);
-        let built = cache.live.len();
-        let shared = Arc::new(std::sync::RwLock::new(cache));
-        self.vector_cache
-            .lock()
-            .unwrap()
-            .insert(key, shared.clone());
-        // Record what the cache now holds, so the next lookup can compare
-        // against the published count without recounting the blocks.
-        let table_key = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        if tables.get(&table_key).and_then(|e| e.live_rows).is_none() {
-            tables.entry(table_key).or_default().live_rows = Some(built);
-        }
-        Ok(shared)
     }
 
     /// `IndexBuilder`: builds the HNSW index of `column` from every live row.
@@ -10594,36 +10441,6 @@ impl Engine {
             }
         }
 
-        // A *warm* cache only. Building one decodes the whole column, which an
-        // indexed query never needs: the graph names its candidates and those
-        // rows are decoded below. Asking for the cache here built one per cold
-        // process - 500 ms at 200k rows, seconds at 1M - for ten result rows.
-        // The exact scan below still builds it, once, because there it saves
-        // parsing the whole column on every repeat query.
-        let cache_eligible: Option<(String, usize)> = (|| {
-            if is_sparse || is_tensor {
-                return None;
-            }
-            if pred.is_some() || in_filter.is_some() || search_filter.is_some() {
-                return None;
-            }
-            let decl = types.get(col_idx)?.to_ascii_uppercase();
-            if decl.contains("MULTI") || !decl.contains("FLOAT") || decl.contains("INT") {
-                return None;
-            }
-            if !matches!(metric.as_str(), "l2" | "cosine" | "ip") {
-                return None;
-            }
-            let dims = type_dim(types.get(col_idx)?)?;
-            if dims == 0 {
-                return None;
-            }
-            let col = match_columns(&m.column).first()?.clone();
-            Some((col, dims))
-        })();
-        let cache_warm: Option<SharedVectorCache> = cache_eligible
-            .as_ref()
-            .and_then(|(col, _)| self.vector_cache_peek(table, col));
         // Rows come from whichever consumer needs them: an index answers with a
         // candidate set and only those rows are decoded; the exact scan needs
         // the table. `rows` therefore starts empty and is filled once the
@@ -10816,30 +10633,23 @@ impl Engine {
             // `Some(usize)` here avoids (an indexed query must never fall back
             // to the table just because nothing was cached yet).
             let live_count = index_id.and_then(|_| {
-                cache_warm
-                    .as_ref()
-                    .and_then(|c| c.read().ok().map(|g| g.live.len()))
-                    // A cache that exists but holds no row is **unknown**, not
-                    // "the table is empty": taking its `0` as the count made
-                    // `all_covered` false for every indexed query on a table
-                    // with rows, and the coverage fallback then walked every
-                    // row->partition mapping - 138 ms of a 112 ms query at 200k
-                    // rows x 1536d, and 1.1 s of it at 2M.
-                    .filter(|live| *live > 0)
-                    .or_else(|| {
-                        self.tables
-                            .lock()
-                            .unwrap()
-                            .get(&self.table_key(table))
-                            .and_then(|e| e.live_rows)
-                    })
-                    // Nothing published the count yet: a table that was only ever
-                    // written to keeps `live_rows` at `None` (`note_live_rows` adds
-                    // to an existing count), so the first vector query used to
-                    // declare the graph incomplete and decode the whole table. The
-                    // count walks the block versions (and publishes itself), which
-                    // is bounded work done once per table.
-                    .or_else(|| self.row_count(table).ok().filter(|rows| *rows > 0))
+                // The count the write paths publish; without one the first
+                // query walks the block versions (bounded, done once per
+                // table) rather than guessing at the coverage.
+                //
+                // The guard must be dropped **before** `row_count` runs: it
+                // locks `tables` itself, and a temporary `MutexGuard` in this
+                // chain would live to the end of the statement - a
+                // self-deadlock on a non-reentrant lock.
+                let published = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&self.table_key(table))
+                    .and_then(|e| e.live_rows);
+                published
+                    .or_else(|| self.row_count(table).ok())
+                    .filter(|rows| *rows > 0)
             });
             // `candidates ∪ uncovered`: the rows the index can win plus the rows
             // it does not cover (`§9.7`). Both are scored exactly, so a partly
@@ -10851,7 +10661,6 @@ impl Engine {
                 rows: &rows,
                 live_rows: None,
                 live_count,
-                cache: cache_warm.as_ref(),
                 topn,
                 metric: &metric,
                 options: &knn_opts,
@@ -10866,11 +10675,6 @@ impl Engine {
         // column is never read whole. Without one the exact scan wants the
         // parsed column, and building the cache is what makes a repeated exact
         // query cheap.
-        let cache: Option<SharedVectorCache> = match (&vector_candidates, &cache_eligible) {
-            (Some(_), _) => cache_warm,
-            (None, Some((col, dims))) => self.vector_cache_for(table, col, *dims).await.ok(),
-            (None, None) => None,
-        };
         // The scan's own metadata, needed by the streamed per-batch scans below.
         let column_decl = types
             .get(col_idx)
@@ -10890,15 +10694,19 @@ impl Engine {
         // per-query working set stops mattering next to the index itself.
         const RERANK_BATCH: usize = 64;
         // The candidate set is known: decode only the rows it kept, or the whole
-        // table when no index answered.
-        if cache.is_none() {
-            // No index answered and the cache was refused its budget: there is no
-            // candidate list to decode, and materializing the table (a full-width
-            // `Vec<Value>` per row) is exactly the allocation the cap refused. Score
-            // the visible vectors one batch at a time and keep each batch's top-n;
-            // the output rows are fetched afterwards, for the final hits only.
-            // Sparse and tensor scans still take the whole column: their scores are
-            // built from it before ranking (the BMP index and MaxSim read `rows`).
+        // table when no index answered. There is no vector cache to consult -
+        // the mapped blocks are the cache (the pages stay in the OS page cache
+        // and the mapping is shared), and a heap copy of the column would only
+        // duplicate what the mapping already hands out.
+        {
+            // No index answered: there is no candidate list to decode, and
+            // materializing the table (a full-width `Vec<Value>` per row) is
+            // exactly the allocation the old cache made. Score the visible
+            // vectors one batch at a time and keep each batch's top-n; the
+            // output rows are fetched afterwards, for the final hits only.
+            // Sparse and tensor scans still take the whole column: their scores
+            // are built from it before ranking (the BMP index and MaxSim read
+            // `rows`).
             rows = match &vector_candidates {
                 // The fast path: an unfiltered dense embedding whose declared
                 // shape matches the query. The row is decoded as `f32` out of its
@@ -10956,7 +10764,6 @@ impl Engine {
                             metric: &metric,
                             threshold,
                             rows: &got,
-                            cache: None,
                             vector_candidates: None,
                         };
                         merged.extend(
@@ -11024,7 +10831,6 @@ impl Engine {
                         metric: &metric,
                         threshold,
                         rows: &[],
-                        cache: None,
                         vector_candidates: None,
                     };
                     let none: HashMap<usize, f64> = HashMap::new();
@@ -11062,7 +10868,6 @@ impl Engine {
                                     metric: &metric,
                                     threshold,
                                     rows: &got,
-                                    cache: None,
                                     vector_candidates: None,
                                 };
                                 batch.execute(&keep, &none, &none).await?.scored
@@ -11228,7 +11033,6 @@ impl Engine {
             metric: &metric,
             threshold,
             rows: &rows,
-            cache: cache.as_ref(),
             vector_candidates,
         };
         // Scoring only ever reads the vector column, so the rows it decoded are

@@ -4494,7 +4494,11 @@ impl Engine {
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<BlockRows> {
-        self.read_blocks_wanted(table, Some(wanted), prune).await
+        // An empty `wanted` is "every column", not "none": the caller that
+        // projects nothing wants the whole row, which is what the plain
+        // `read_blocks` did before it was folded into this one.
+        let wanted = (!wanted.is_empty()).then_some(wanted);
+        self.read_blocks_wanted(table, wanted, prune).await
     }
 
     /// [`Self::read_blocks_pruned`] with the cells already decoded to
@@ -4509,7 +4513,8 @@ impl Engine {
         wanted: &[usize],
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<BlockValueRows> {
-        self.read_blocks_values(table, Some(wanted), prune, None, None)
+        let wanted = (!wanted.is_empty()).then_some(wanted);
+        self.read_blocks_values(table, wanted, prune, None, None)
             .await
     }
 
@@ -6804,17 +6809,17 @@ impl Engine {
             let covered = self
                 .hnsw_chunk_path(&im.table, &im.name)
                 .ok()
-                .and_then(|p| storage::chunk_store::read_file(p).ok())
-                .and_then(|b| {
-                    knn_format::decode_hnsw_chunk(
-                        &b,
-                        4,
-                        knn_format::VERTEX_L0_SIZE,
-                        knn_format::VERTEX_LX_SIZE,
-                    )
-                    .ok()
+                // Only the header's `cur_vec_num` is needed, so the chunk is
+                // **mapped** and just the header decoded: `read_file` pulled
+                // the whole graph into a `Vec` to read one `u64`, and a mapping
+                // faults in only the header's page.
+                .and_then(|p| {
+                    storage::chunk_store::chunk_store()
+                        .open(std::path::Path::new(&p))
+                        .ok()
                 })
-                .map(|c| c.header.cur_vec_num as usize)
+                .and_then(|mapped| knn_format::HnswHeader::decode(&mapped).ok())
+                .map(|(header, _)| header.cur_vec_num as usize)
                 .unwrap_or(0);
             if covered >= rows {
                 // The newest chunk already claims every live row: nothing to
@@ -7080,17 +7085,17 @@ impl Engine {
             let covered = self
                 .hnsw_chunk_path(&im.table, &im.name)
                 .ok()
-                .and_then(|p| storage::chunk_store::read_file(p).ok())
-                .and_then(|b| {
-                    knn_format::decode_hnsw_chunk(
-                        &b,
-                        4,
-                        knn_format::VERTEX_L0_SIZE,
-                        knn_format::VERTEX_LX_SIZE,
-                    )
-                    .ok()
+                // Only the header's `cur_vec_num` is needed, so the chunk is
+                // **mapped** and just the header decoded: `read_file` pulled
+                // the whole graph into a `Vec` to read one `u64`, and a mapping
+                // faults in only the header's page.
+                .and_then(|p| {
+                    storage::chunk_store::chunk_store()
+                        .open(std::path::Path::new(&p))
+                        .ok()
                 })
-                .map(|c| c.header.cur_vec_num as usize)
+                .and_then(|mapped| knn_format::HnswHeader::decode(&mapped).ok())
+                .map(|(header, _)| header.cur_vec_num as usize)
                 .unwrap_or(0);
             // The newest chunk covers the table only when it is a merged
             // chunk; incremental dumps cover just their own rows. A committed
@@ -7495,10 +7500,14 @@ impl Engine {
     pub fn read_hnsw_index(&self, table: &str, index_name: &str) -> Result<VectorRows> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let bytes = storage::chunk_store::read_file(&path)
+        // Mapped, not read: the decode borrows the mapping, so the load's
+        // transient peak is the decoded graph alone rather than the file plus
+        // the graph. `chunk_store().open` keeps the object-store mode working.
+        let mapped = storage::chunk_store::chunk_store()
+            .open(std::path::Path::new(&path))
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
-            .read_hnsw_chunk_parts(&table, index_name, &bytes)
+            .read_hnsw_chunk_parts(&table, index_name, &mapped)
             .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
         let index = HnswIndex::from_chunk_parts(
             parts.dims,
@@ -7644,10 +7653,14 @@ impl Engine {
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
         let table = self.qualified_table(table);
         let path = self.hnsw_chunk_path(&table, index_name)?;
-        let bytes = storage::chunk_store::read_file(&path)
+        // Mapped, not read: the decode borrows the mapping, so the load's
+        // transient peak is the decoded graph alone rather than the file plus
+        // the graph. `chunk_store().open` keeps the object-store mode working.
+        let mapped = storage::chunk_store::chunk_store()
+            .open(std::path::Path::new(&path))
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let parts = self
-            .read_hnsw_chunk_parts(&table, index_name, &bytes)
+            .read_hnsw_chunk_parts(&table, index_name, &mapped)
             .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
         Self::assemble_loaded_index(parts, 0, file_stamp(&path))
             .ok_or_else(|| Error::Invalid("HNSW mirror has no vectors".to_string()))
@@ -7678,10 +7691,12 @@ impl Engine {
             if after.is_some_and(|a| chunk_id <= a) {
                 continue;
             }
-            let Ok(bytes) = storage::chunk_store::read_file(&path) else {
+            // Mapped for the same reason as `load_vector_index`.
+            let Ok(mapped) = storage::chunk_store::chunk_store().open(std::path::Path::new(&path))
+            else {
                 continue;
             };
-            let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
+            let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &mapped) else {
                 continue;
             };
             if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id, file_stamp(&path)) {

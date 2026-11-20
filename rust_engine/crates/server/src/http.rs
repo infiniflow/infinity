@@ -3616,7 +3616,7 @@ mod tests {
         // The checkpoint wrote the block mirror; reading it back maps the
         // block, so the buffer/objects routes must list the mapping the test
         // itself touched.
-        (engine.read_blocks("t")).await.unwrap();
+        (engine.read_blocks_pruned("t", &[], &[])).await.unwrap();
         let (s, b) = (route(&engine, &peer, "GET", "/instance/buffer", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");

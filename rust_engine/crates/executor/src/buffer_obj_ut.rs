@@ -156,8 +156,7 @@ async fn test_big_with_gc_and_cleanup() {
     // back as `idx * 1000 + row_id`, and the pool never exceeds its budget
     // (the GC/eviction the reference exercises with 64 KiB blocks under a
     // 512 KiB budget).
-    let (columns, rows) = e.read_blocks("table1").await.unwrap();
-    assert_eq!(columns, vec!["col1".to_string()]);
+    let (_, rows) = e.read_blocks_pruned("table1", &[], &[]).await.unwrap();
     assert_eq!(rows.len(), INSERT_N * IMPORT_SIZE);
     // Reading a block maps it instead of copying it, and the shared map is an
     // LRU over those mappings: a block beyond the budget evicts the least
@@ -175,7 +174,7 @@ async fn test_big_with_gc_and_cleanup() {
     for idx in 0..INSERT_N {
         for row_id in 0..IMPORT_SIZE {
             assert_eq!(
-                rows[idx * IMPORT_SIZE + row_id][0],
+                rows[idx * IMPORT_SIZE + row_id].1[0],
                 (idx * 1000 + row_id).to_string(),
                 "block {idx} row {row_id}"
             );

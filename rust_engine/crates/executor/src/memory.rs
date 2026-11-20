@@ -551,7 +551,6 @@ impl super::Engine {
             // Pure copies: a query that needs them recomputes them.
             self.result_cache.lock().unwrap().clear();
             self.plan_cache.clear();
-            self.vector_cache.lock().unwrap().clear();
         }
         // The page advice reports the mappings' length, which is an upper bound
         // on what was actually resident (and a cgroup keeps charging a page
@@ -778,11 +777,11 @@ mod tests {
         assert!(e.context.memory_reclaim_passes.load(Ordering::Relaxed) >= 1);
     }
 
-    /// The whole-column vector cache is a heap copy of every vector in the
-    /// column, so it is capped at a share of the buffer budget: past that the
-    /// exact scan streams instead of building it, and the query still answers.
+    /// The exact scan no longer builds a heap copy of the column: it reads the
+    /// mapped blocks one batch at a time, so there is no budget to refuse and
+    /// no cache to keep. What must still hold is the answer.
     #[tokio::test]
-    async fn a_vector_cache_beyond_its_share_is_not_built() {
+    async fn an_exact_scan_answers_without_building_a_cache() {
         let dir = tempfile::tempdir().unwrap();
         let e = super::super::Engine::open_async(dir.path(), Default::default())
             .await
@@ -793,17 +792,9 @@ mod tests {
         e.execute("INSERT INTO memv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,1.0,1.0,1.0]);")
             .await
             .unwrap();
-        // A quarter of 64 bytes is smaller than one cached row.
+        // A quarter of 64 bytes would refuse any heap cache; the scan must
+        // still answer from the mapped blocks.
         e.set_buffer_budget(64);
-        assert!(
-            e.vector_cache_for("default_db.memv", "v", 4).await.is_err(),
-            "the column does not fit the cache's share"
-        );
-        assert!(
-            e.vector_cache.lock().unwrap().is_empty(),
-            "a refused build keeps nothing"
-        );
-        // The exact scan falls back to streaming and still answers.
         let mut out = Vec::new();
         for r in e
             .execute(

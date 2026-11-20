@@ -3239,20 +3239,6 @@ pub(crate) struct MergedIndex {
 /// future non-`Send` and a query could not run on a runtime worker.
 pub(crate) type SharedTextIndex = Arc<tokio::sync::RwLock<TextIndex>>;
 
-/// The exact scan's per-column copy of the vectors, in `f32`.
-///
-/// `f32`, not `f64`: the block stores `f32`, so widening to `f64` doubled the
-/// resident size of a 1M x 128d column (512 MB -> 1.024 GB) and bought no
-/// precision the stored value could use. `vector_score_f32` then scores with the
-/// reference's SIMD kernels.
-pub(crate) struct VectorCache {
-    pub(crate) dims: usize,
-    pub(crate) rows: Vec<(usize, Vec<f32>)>,
-    pub(crate) live: std::collections::HashSet<usize>,
-}
-
-pub(crate) type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
-
 /// The in-memory form of a vector index: the rows written since the last dump.
 /// The reference keeps one `HnswIndexInMem` per segment; a query searches this
 /// segment and merges it with the sealed (on-disk) ones.
@@ -6090,7 +6076,6 @@ pub struct Engine {
     pub(crate) allocator_jobs: std::sync::atomic::AtomicUsize,
     /// Write batches since the last `malloc_trim` (see `insert_literals`).
     pub(crate) batches_since_trim: std::sync::atomic::AtomicUsize,
-    pub(crate) vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
     /// C++'s `SystemInfo::CPUUsage` sleeps 200 ms between two snapshots; an
     /// accessor must not block, so this engine keeps the previous sample and
     /// reports the delta since the last call instead.

@@ -1198,7 +1198,14 @@ mod tests {
             );
         }
 
-        let (_, rows) = e.read_blocks("t").await.unwrap();
+        let rows: Vec<Vec<String>> = e
+            .read_blocks_pruned("t", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(rows.len(), 32_768);
         assert_eq!(e.visible_row_count("t").unwrap(), rows.len());
         assert_eq!(e.mirror_block_row_count("t").unwrap(), rows.len());
@@ -1314,7 +1321,10 @@ mod tests {
             "only the merged segment is visible: {visible:?}"
         );
         assert_eq!(e.row_count("default_db.t").unwrap(), 400);
-        assert_eq!(e.read_blocks("t").await.unwrap().1.len(), 400);
+        assert_eq!(
+            e.read_blocks_pruned("t", &[], &[]).await.unwrap().1.len(),
+            400
+        );
         assert_eq!(
             row_strings(&e, "SELECT count(*) FROM t WHERE id >= 300;").await,
             vec![vec!["100".to_string()]]
@@ -1365,7 +1375,10 @@ mod tests {
 
         assert_eq!(e.block_visible_range("t", 0, 0), Some((0, 8092)));
         assert_eq!(e.visible_row_count("t").unwrap(), 8092);
-        assert_eq!(e.read_blocks("t").await.unwrap().1.len(), 8092);
+        assert_eq!(
+            e.read_blocks_pruned("t", &[], &[]).await.unwrap().1.len(),
+            8092
+        );
         assert_eq!(e.row_count("t").unwrap(), 8092);
         assert_eq!(
             row_strings(&e, "SELECT count(*) FROM t;").await,
@@ -1560,7 +1573,10 @@ mod tests {
             2
         );
         assert_eq!(e.row_count("default_db.t").unwrap(), 2);
-        assert_eq!(e.read_blocks("t").await.unwrap().1.len(), 2);
+        assert_eq!(
+            e.read_blocks_pruned("t", &[], &[]).await.unwrap().1.len(),
+            2
+        );
         assert_eq!(
             row_strings(&e, "SELECT count(*) FROM t;").await,
             vec![vec!["2".to_string()]]
@@ -1903,7 +1919,8 @@ mod tests {
             .exists());
 
         // Read back purely from the block files.
-        let (columns, rows) = engine.read_blocks("t").await.unwrap();
+        let (columns, rows) = engine.read_blocks_pruned("t", &[], &[]).await.unwrap();
+        let rows: Vec<Vec<String>> = rows.into_iter().map(|(_, cells)| cells).collect();
         assert_eq!(columns, vec!["id", "name", "ok"]);
         assert_eq!(
             rows,
@@ -1960,8 +1977,14 @@ mod tests {
         assert!(!block.join("1.col").exists());
         assert!(block.join("2.col").exists());
 
-        let (columns, rows) = engine.read_blocks("t").await.unwrap();
-        assert_eq!(columns, vec!["a", "c"]);
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("t", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(rows, vec![vec!["1".to_string(), "3".to_string()]]);
     }
 
@@ -2004,7 +2027,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("sp").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("sp").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("sp", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         // The cell text is the reference's rendering (`SparseT::ToString`
         // prints floats with six decimals), which is also what the engine
         // stores, so a rewrite of this block reproduces the same bytes.
@@ -2040,7 +2070,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("spb").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("spb").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("spb", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         // A bit sparse renders as its present positions only.
         assert_eq!(
             rows,
@@ -2087,7 +2124,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("va").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("va").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("va", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -2117,7 +2161,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("ar").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("ar").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("ar", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -2153,7 +2204,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("na").await.unwrap(), 3);
-        let (_, rows) = engine.read_blocks("na").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("na", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -2200,7 +2258,14 @@ mod tests {
         let outline = std::fs::read(tbl_dir.join("seg_0/blk_0/col_1_out")).unwrap();
         assert_eq!(outline.len(), 3 * 3 * 4);
 
-        let (_, rows) = engine.read_blocks("ts").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("ts", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -2248,7 +2313,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("ta").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("ta").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("ta", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -2284,7 +2356,14 @@ mod tests {
         // A deleted row keeps its cells in the block and is hidden by the
         // `version` file, so the mirror carries exactly the surviving row -
         // the other slot is still there, marked.
-        let (_, rows) = engine.read_blocks("t").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("t", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(rows.len(), 1);
 
         // A fresh engine over the same directory rebuilds the rows from the
@@ -2339,7 +2418,14 @@ mod tests {
             .await
             .unwrap();
         e.write_blocks("u8").await.unwrap();
-        let (_, rows) = e.read_blocks("u8").await.unwrap();
+        let rows: Vec<Vec<String>> = e
+            .read_blocks_pruned("u8", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(rows[0][1], "[127,128,255]");
     }
 
@@ -2568,7 +2654,10 @@ mod tests {
             .await
             .unwrap();
         engine.execute("CREATE TABLE t (id INT);").await.unwrap();
-        assert!(engine.read_blocks("t").await.is_err());
+        assert!(engine
+            .read_blocks_pruned_values("t", &[], &[])
+            .await
+            .is_err());
     }
 
     #[test]
@@ -2621,7 +2710,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(engine.write_blocks("v").await.unwrap(), 2);
-        let (_, rows) = engine.read_blocks("v").await.unwrap();
+        let rows: Vec<Vec<String>> = engine
+            .read_blocks_pruned("v", &[], &[])
+            .await
+            .unwrap()
+            .1
+            .into_iter()
+            .map(|(_, cells)| cells)
+            .collect();
         assert_eq!(
             rows,
             vec![

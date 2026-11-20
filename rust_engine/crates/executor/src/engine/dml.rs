@@ -1657,16 +1657,6 @@ impl Engine {
         if has_mem {
             return true;
         }
-        let prefix = format!("{table}.");
-        if self
-            .vector_cache
-            .lock()
-            .unwrap()
-            .keys()
-            .any(|k| k.starts_with(&prefix))
-        {
-            return true;
-        }
         // An index the registries have not opened yet (a fresh directory, or a
         // column this table entry has not seen): the catalog record decides.
         self.storage
@@ -1894,43 +1884,6 @@ impl Engine {
         }
     }
 
-    /// The query-cache half of [`Self::update_vector_caches`], for a caller
-    /// that has already fed the HNSW and IVF memory indexes in batch.
-    pub(crate) fn update_vector_cache_only(&self, table: &str, seq: usize, cells: &[String]) {
-        let prefix = format!("{table}.");
-        let caches: Vec<(String, SharedVectorCache)> = self
-            .vector_cache
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(k, _)| k.starts_with(&prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        if caches.is_empty() {
-            return;
-        }
-        let Ok(schema) = self.table_schema(table) else {
-            return;
-        };
-        for (key, shared) in caches {
-            let column = &key[prefix.len()..];
-            let Some(ci) = schema.iter().position(|c| c == column) else {
-                continue;
-            };
-            let Some(text) = cells.get(ci) else { continue };
-            let v = parse_vec_f32(text);
-            let mut cache = shared.write().unwrap();
-            if v.len() != cache.dims {
-                continue;
-            }
-            match cache.rows.iter_mut().find(|(s, _)| *s == seq) {
-                Some(entry) => entry.1 = v,
-                None => cache.rows.push((seq, v)),
-            }
-            cache.live.insert(seq);
-        }
-    }
-
     /// [`Self::note_hnsw_insert`] for a whole run of rows.
     ///
     /// The reference inserts a `COPY`'s vectors through
@@ -1990,42 +1943,10 @@ impl Engine {
     }
 
     pub(crate) async fn update_vector_caches(&self, table: &str, seq: usize, cells: &[String]) {
-        let prefix = format!("{table}.");
-        let caches: Vec<(String, SharedVectorCache)> = self
-            .vector_cache
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(k, _)| k.starts_with(&prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        // The HNSW/IVF memory indexes are maintained regardless of whether a
-        // query cache exists.
+        // Only the HNSW/IVF memory indexes remain to maintain here: the vector
+        // query cache was deleted, the mapped blocks being what a scan reads.
         self.note_hnsw_insert(table, seq as u64, cells).await;
         self.note_ivf_insert(table, seq as u64, cells);
-        if caches.is_empty() {
-            return;
-        }
-        let Ok(schema) = self.table_schema(table) else {
-            return;
-        };
-        for (key, shared) in caches {
-            let column = &key[prefix.len()..];
-            let Some(ci) = schema.iter().position(|c| c == column) else {
-                continue;
-            };
-            let Some(text) = cells.get(ci) else { continue };
-            let v = parse_vec_f32(text);
-            let mut cache = shared.write().unwrap();
-            if v.len() != cache.dims {
-                continue;
-            }
-            match cache.rows.iter_mut().find(|(s, _)| *s == seq) {
-                Some(entry) => entry.1 = v,
-                None => cache.rows.push((seq, v)),
-            }
-            cache.live.insert(seq);
-        }
     }
 
     /// Feeds a row into the IVF memory segment (rows written since the last

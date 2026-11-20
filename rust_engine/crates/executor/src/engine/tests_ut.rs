@@ -10970,7 +10970,11 @@ mod tests {
             .is_ok());
         for t in &tables {
             assert!(
-                !e.read_blocks(t).await.unwrap().1.is_empty(),
+                !e.read_blocks_pruned(t, &[], &[])
+                    .await
+                    .unwrap()
+                    .1
+                    .is_empty(),
                 "{t} was not mirrored by the 1-worker sweep"
             );
         }
@@ -10980,7 +10984,11 @@ mod tests {
             .is_ok());
         for t in &tables {
             assert!(
-                !e.read_blocks(t).await.unwrap().1.is_empty(),
+                !e.read_blocks_pruned(t, &[], &[])
+                    .await
+                    .unwrap()
+                    .1
+                    .is_empty(),
                 "{t} was not mirrored by the 4-worker sweep"
             );
         }
@@ -15491,7 +15499,6 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),
@@ -15564,7 +15571,6 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n + 1),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),
@@ -15599,7 +15605,6 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),

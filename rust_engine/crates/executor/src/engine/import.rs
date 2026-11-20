@@ -506,7 +506,6 @@ impl Engine {
                         self.note_hnsw_insert_batch(table, &text_batch).await;
                         for (seq, texts) in &texts_by_row {
                             self.note_ivf_insert(table, *seq as u64, texts);
-                            self.update_vector_cache_only(table, *seq, texts);
                         }
                     }
                     total += take;
@@ -699,7 +698,6 @@ impl Engine {
         self.note_hnsw_insert_batch(table, &vector_batch).await;
         for (seq, texts) in &texts_by_row {
             self.note_ivf_insert(table, *seq as u64, texts);
-            self.update_vector_cache_only(table, *seq, texts);
         }
         let segment = (base >> 32) as u32;
         drop(_staging);
@@ -977,7 +975,6 @@ impl Engine {
                 self.note_hnsw_insert_batch(table, &vector_batch).await;
                 for (seq, texts) in &texts_by_row {
                     self.note_ivf_insert(table, *seq as u64, texts);
-                    self.update_vector_cache_only(table, *seq, texts);
                 }
             }
             done += take;

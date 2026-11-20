@@ -90,7 +90,7 @@ use std::collections::{HashMap, HashSet};
 
 use expression::Value;
 
-use crate::{Engine, SharedVectorCache};
+use crate::Engine;
 
 /// The candidate phase of a KNN scan: probe the IVF/HNSW indexes and return
 /// the row ids to score exactly.
@@ -109,10 +109,8 @@ pub(crate) struct KnnCandidateScan<'a> {
     pub live_rows: Option<&'a [usize]>,
     /// How many live rows the table has, when that is known without counting
     /// them. The query path passes the published counter, so an indexed query
-    /// can prove the graph covers the table without a warm vector cache - the
-    /// cache is only built for the exact scan now.
+    /// can prove the graph covers the table without decoding it.
     pub live_count: Option<usize>,
-    pub cache: Option<&'a SharedVectorCache>,
     pub topn: usize,
     pub metric: &'a str,
     pub options: &'a KnnScanOptions,
@@ -169,9 +167,6 @@ fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
     if let Some(count) = q.live_count {
         return labelled == count;
     }
-    if let Some(c) = &q.cache {
-        return c.read().map(|g| labelled == g.live.len()).unwrap_or(false);
-    }
     labelled == q.rows.len()
 }
 
@@ -179,12 +174,6 @@ fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
 fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
     if let Some(live) = q.live_rows {
         return live.iter().all(|seq| covered.contains(seq));
-    }
-    if let Some(c) = &q.cache {
-        return c
-            .read()
-            .map(|g| g.live.iter().all(|s| covered.contains(s)))
-            .unwrap_or(false);
     }
     // Counting only: the caller's `rows` are still empty at this point (an
     // indexed query decodes its candidates afterwards), so comparing against
@@ -223,14 +212,6 @@ impl Engine {
     fn uncovered_rows(&self, q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> Vec<usize> {
         if let Some(live) = q.live_rows {
             return live
-                .iter()
-                .copied()
-                .filter(|seq| !covered.contains(seq))
-                .collect();
-        }
-        if let Some(guard) = q.cache.and_then(|c| c.read().ok()) {
-            return guard
-                .live
                 .iter()
                 .copied()
                 .filter(|seq| !covered.contains(seq))
@@ -633,8 +614,6 @@ pub(crate) struct PhysicalKnnScan<'a> {
     pub threshold: Option<f64>,
     /// The decoded rows (`KnnScanSharedData`'s blocks).
     pub rows: &'a [(usize, Vec<Value>)],
-    /// Pre-decoded rows used instead of `rows` on the cache path.
-    pub cache: Option<&'a SharedVectorCache>,
     /// `PlanWithIndex()` result: rows the sealed index says can win.
     pub vector_candidates: Option<HashSet<usize>>,
 }
@@ -839,67 +818,11 @@ impl PhysicalKnnScan<'_> {
                 scored.push((*seq, sim, dist));
             }
         }
-        self.score_cache(&mut scored).await;
+
         Ok(KnnScanOperatorState {
             scored,
             use_sim: self.use_sim(),
         })
-    }
-
-    /// The rows decoded once into the scalar row cache (the reference's
-    /// in-memory `DataBlock`s): score them without re-reading the store.
-    ///
-    /// The cache holds `f32` (that is the block's own precision), and
-    /// `vector_score_f32` is the scoring path: `l2` then runs the reference's
-    /// SIMD kernel instead of the generic three-pass dot/product/norm form.
-    async fn score_cache(&self, scored: &mut Vec<(usize, f64, f64)>) {
-        let Some(shared) = self.cache else {
-            return;
-        };
-        let qv: Vec<f32> = self
-            .query_items
-            .iter()
-            .filter_map(|x| x.parse::<f32>().ok())
-            .collect();
-        let guard = shared.read().unwrap_or_else(|p| p.into_inner());
-        if qv.is_empty() || qv.len() != guard.dims {
-            return;
-        }
-        // An index already said which rows can win: walk the candidates, not the
-        // cache. Iterating the table and testing membership is the same answer
-        // for O(n) hash lookups instead of O(k), and on a 20k-row table that was
-        // most of the query's time.
-        if let Some(cands) = &self.vector_candidates {
-            // One sorted walk, not a lookup per candidate: the cache is built in
-            // id order (and the update path only replaces values in place), so
-            // both sides can be swept together. 64 binary searches over 20k rows
-            // was costing 1.27 ms of the query - more than the HNSW search.
-            let mut wanted: Vec<usize> = cands.iter().copied().collect();
-            wanted.sort_unstable();
-            let mut at = 0usize;
-            for seq in wanted {
-                while at < guard.rows.len() && guard.rows[at].0 < seq {
-                    at += 1;
-                }
-                if at == guard.rows.len() {
-                    break;
-                }
-                if guard.rows[at].0 != seq {
-                    continue;
-                }
-                let v = &guard.rows[at].1;
-                let (sim, dist) = crate::vector_score_f32(&qv, v, self.metric);
-                scored.push((seq, sim, dist));
-            }
-            return;
-        }
-        for (seq, v) in &guard.rows {
-            if !guard.live.contains(seq) {
-                continue;
-            }
-            let (sim, dist) = crate::vector_score_f32(&qv, v, self.metric);
-            scored.push((*seq, sim, dist));
-        }
     }
 
     /// C++ `MergeKnn`/result-handler finish: rank in the scan's direction,
@@ -982,7 +905,6 @@ mod tests {
             metric,
             threshold,
             rows: &[],
-            cache: None,
             vector_candidates: None,
         }
     }
