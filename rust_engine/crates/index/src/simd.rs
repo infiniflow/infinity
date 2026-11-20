@@ -79,6 +79,38 @@ pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
     sum
 }
 
+/// [`l2_sq`] over a row that is still its little-endian `f32` bytes.
+///
+/// A block stores `EMBEDDING(FLOAT, d)` as `d` LE `f32` per row, so the exact
+/// scan has the query as `f32` and the row as bytes. Transcoding the row into a
+/// `Vec<f32>` first costs one allocation-free pass but still touches every byte
+/// twice; reading it in place makes the load the comparison. `8` lanes of `f32`
+/// are `32` bytes, so one `[u8; 32]` group is one `f32x8`.
+#[inline]
+pub fn l2_sq_bytes(a: &[f32], b: &[u8]) -> f32 {
+    const GROUP: usize = LANES * 4;
+    let (bv, bt) = b.as_chunks::<GROUP>();
+    let n = a.len().min(bv.len() * LANES);
+    let (av, at) = a[..n].as_chunks::<LANES>();
+    let mut acc = f32x8::splat(0.0);
+    for (x, y) in av.iter().zip(bv) {
+        let mut lanes = [0f32; LANES];
+        for (slot, bytes) in lanes.iter_mut().zip(y.as_chunks::<4>().0) {
+            *slot = f32::from_le_bytes(*bytes);
+        }
+        let diff = lane8(x) - f32x8::from_array(lanes);
+        acc += diff * diff;
+    }
+    let mut sum = acc.reduce_sum();
+    // The tail: the row's bytes past the last whole group, paired with the
+    // query's remaining lanes. `bt` is that remainder for the bytes.
+    for (x, bytes) in at.iter().zip(bt.as_chunks::<4>().0) {
+        let diff = x - f32::from_le_bytes(*bytes);
+        sum += diff * diff;
+    }
+    sum
+}
+
 /// Inner product, the reference's `F32IP` family.
 #[inline]
 pub fn ip(a: &[f32], b: &[f32]) -> f32 {

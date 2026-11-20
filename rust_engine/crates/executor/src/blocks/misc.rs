@@ -345,6 +345,128 @@ impl<'a> BlockCursor<'a> {
         Ok(out)
     }
 
+    /// The exact dense scan's zero-allocation walk: every visible `f32` row of
+    /// the column, handed to `each` as its **mapped bytes** (`dim` little-endian
+    /// `f32`), block by block.
+    ///
+    /// Unlike [`Self::for_each_block_vector`] this never builds a `Vec<f32>` per
+    /// row: the caller scores straight out of the mapping. The profile put that
+    /// copy at 64% of a SIFT 1M scan. The caller must treat `row` as
+    /// `chunks_exact(4).map(f32::from_le_bytes)`.
+    ///
+    /// `each(seq, row)` returns whether to keep walking. Rows still in the
+    /// append buffer have no block bytes, so they are handed to `each_buffered`
+    /// as decoded `f32` after the blocks - a table with no checkpoint yet is
+    /// entirely this case.
+    pub(crate) fn for_each_block_f32(
+        &mut self,
+        col: usize,
+        dim: usize,
+        element_type: i32,
+        each: &mut dyn FnMut(usize, &[f32], bool) -> bool,
+    ) -> Result<()> {
+        if element_type != 6 {
+            return Ok(());
+        }
+        // The cursor already holds the visible set and the block index from
+        // construction: asking the engine again re-reads the catalog (RocksDB)
+        // and re-locks the index, per query, for a list the cursor has.
+        let blocks: Vec<storage::definition::format::BlockId> = match &self.index {
+            Some(index) => {
+                let index = index.lock().unwrap();
+                index
+                    .metas()
+                    .filter(|meta| {
+                        self.visible
+                            .contains(&(meta.id.segment_id, meta.id.block_id))
+                    })
+                    .map(|meta| meta.id)
+                    .collect()
+            }
+            None => Vec::new(),
+        };
+        let column = crate::blocks::engine::EmbeddingColumn {
+            declared: &self.meta.types,
+            storage: &self.types,
+            col,
+            dim,
+            element_type,
+        };
+        let has_dead = !self.dead.is_empty();
+        for id in blocks {
+            if !self.visible.contains(&(id.segment_id, id.block_id)) {
+                continue;
+            }
+            let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                break;
+            };
+            self.block = Some((id, block));
+            let (_, block) = self.block.as_ref().unwrap();
+            let version = block.version();
+            let base =
+                ((id.segment_id as usize) << 32) | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY);
+
+            let Some((body, slots)) =
+                self.engine
+                    .block_f32_body(&self.meta.ids, column, version, block.as_ref())
+            else {
+                break;
+            };
+
+            // The block's data region typed as `f32` in place: a row is then a
+            // slice of that array, which is what the SIMD kernel takes.
+            let Some(floats) = storage::mapped::f32_slice(body) else {
+                break;
+            };
+            for slot in slots {
+                let seq = base + slot;
+                if has_dead && self.dead.contains(&(seq as u64)) {
+                    continue;
+                }
+                let at = slot * dim;
+                let Some(row) = floats.get(at..at + dim) else {
+                    continue;
+                };
+                if !each(seq, row, false) {
+                    return Ok(());
+                }
+            }
+            // The block is done: the caller may reduce what it has scored so
+            // far to its own top-n instead of holding the whole table.
+            if !each(0, &[], true) {
+                return Ok(());
+            }
+        }
+        // Rows a commit appended since the last checkpoint: text in the buffer,
+        // decoded here so the caller scores them the same way.
+        for (seq, values) in self.engine.pending_rows_of(&self.table) {
+            {
+                if self.dead.contains(&(seq as u64)) {
+                    continue;
+                }
+                let Some(Value::Str(text)) = values.get(col) else {
+                    continue;
+                };
+                let parsed: Vec<f32> = if element_type == 0 {
+                    crate::parse_bit_leaves(text)
+                        .into_iter()
+                        .flatten()
+                        .map(|bit| bit as f32)
+                        .collect()
+                } else {
+                    crate::parse_vec_f32(text)
+                };
+                if parsed.len() != dim {
+                    continue;
+                }
+                if !each(seq, &parsed, false) {
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// One **block** of the embedding column at a time, as `f32`.
     ///
     /// [`Self::vectors`] materialises the whole column before returning, which
@@ -438,6 +560,8 @@ impl<'a> BlockCursor<'a> {
                 break;
             };
             let version = block.version();
+            let mut wanted_vec: Vec<usize> = wanted.iter().copied().collect();
+            wanted_vec.sort_unstable();
             let Some(rows) = Engine::decode_vectors_of_block(
                 &self.meta.ids,
                 crate::blocks::engine::EmbeddingColumn {
@@ -450,7 +574,7 @@ impl<'a> BlockCursor<'a> {
                 block_id,
                 version,
                 block.as_ref(),
-                &wanted,
+                Some(&wanted_vec),
             ) else {
                 break;
             };
@@ -585,6 +709,8 @@ impl<'a> BlockCursor<'a> {
             if wanted.is_empty() {
                 continue;
             }
+            let mut wanted_vec: Vec<usize> = wanted.iter().copied().collect();
+            wanted_vec.sort_unstable();
             let Some(rows) = Engine::decode_vectors_of_block(
                 &self.meta.ids,
                 crate::blocks::engine::EmbeddingColumn {
@@ -597,12 +723,12 @@ impl<'a> BlockCursor<'a> {
                 id,
                 version,
                 block.as_ref(),
-                &wanted,
+                Some(&wanted_vec),
             ) else {
                 *complete = false;
                 continue;
             };
-            if rows.len() < wanted.len() {
+            if rows.len() < wanted_vec.len() {
                 *complete = false;
             }
             out.extend(rows);

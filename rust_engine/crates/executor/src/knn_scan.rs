@@ -837,6 +837,38 @@ impl PhysicalKnnScan<'_> {
     /// The comparator is the one this function always used - `(score, row id)`
     /// with the score direction taken from the metric - so the answer is
     /// identical to the full-sort version, including the order of ties.
+    /// [`Self::finish`] without the final sort: the top-n, unordered.
+    ///
+    /// A block-at-a-time scan reduces its running set once per block, and only
+    /// the last reduction has to be ordered - the caller's final `finish` does
+    /// that. Sorting every block's set (123 blocks on SIFT 1M) was wasted work
+    /// on a monotone key.
+    pub(crate) fn keep_topn(&self, mut scored: Vec<(usize, f64, f64)>) -> Vec<(usize, f64, f64)> {
+        if self.threshold.is_some() {
+            let is_dist =
+                !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
+            let use_sim = self.is_sparse || self.is_tensor || self.is_knn_min_heap();
+            scored.retain(|e| match self.threshold {
+                Some(th) if is_dist => e.2 <= th,
+                Some(th) if use_sim => e.1 >= th,
+                Some(th) => e.2 >= th,
+                None => true,
+            });
+        }
+        if scored.len() > self.topn {
+            let use_sim = self.is_sparse || self.is_tensor || self.is_knn_min_heap();
+            let better = |a: &(usize, f64, f64), b: &(usize, f64, f64)| -> std::cmp::Ordering {
+                let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
+                x.partial_cmp(&y)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.0.cmp(&b.0))
+            };
+            scored.select_nth_unstable_by(self.topn - 1, better);
+            scored.truncate(self.topn);
+        }
+        scored
+    }
+
     pub(crate) fn finish(&self, state: KnnScanOperatorState) -> KnnScanOperatorState {
         let use_sim = state.use_sim;
         // For a distance metric the threshold is an upper bound; for a

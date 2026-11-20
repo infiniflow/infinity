@@ -4205,8 +4205,11 @@ impl Engine {
         let deleted = self.tombstone_set_at(table, read_ts).unwrap_or_default();
         let pending = self.pending_rows_of(table);
         // Every row id the visible blocks cover, live or not: the append buffer
-        // may still list one of them.
+        // may still list one of them. Built only when there is a buffer to test
+        // against - on a checkpointed table it would be a `HashSet` of every row
+        // inserted one at a time, 1M SipHashes per scan for a set nothing reads.
         let mut have: std::collections::HashSet<usize> = Default::default();
+        let track_have = !pending.is_empty();
         for id in self.visible_block_ids(table) {
             let Some(version) = self.read_block_version(id) else {
                 continue;
@@ -4233,8 +4236,10 @@ impl Engine {
             // from the buffer, but a rewrite that lands under another name - a
             // rename racing it - leaves them there, and counting both sides
             // reported twice the table.
-            for slot in 0..created as u64 {
-                have.insert((base + slot) as usize);
+            if track_have {
+                for slot in 0..created as u64 {
+                    have.insert((base + slot) as usize);
+                }
             }
         }
         // Rows a commit appended since the last checkpoint live in the append
@@ -4998,13 +5003,69 @@ impl Engine {
     ///
     /// NULL slots are skipped: a rerank has no distance to a missing vector, and
     /// `decode_rows_of_values` answers `Value::Null` for them as well.
+    /// One block's `EMBEDDING(FLOAT, d)` body and the slots a scan should
+    /// score, **without decoding**: the body is the mapped bytes and a row's
+    /// payload is `slots` × `dim` little-endian `f32`.
+    ///
+    /// This is [`Self::decode_vectors_of_block`]'s zero-allocation form. The
+    /// owned decode allocates a `Vec<f32>` per row - 1M of them, 512 MB moved,
+    /// 64% of a SIFT 1M scan in the profile. A caller that only scores can read
+    /// the row straight out of the mapping with `chunks_exact(4)`, so this hands
+    /// back the body and the slot list and lets the caller score in place.
+    ///
+    /// Only a plain `f32` column has this form; anything else returns `None` and
+    /// the caller takes the owned decode.
+    pub(crate) fn block_f32_body<'a>(
+        &self,
+        ids: &[u64],
+        vector: EmbeddingColumn<'_>,
+        version: &storage::definition::format::BlockVersionFile,
+        columns: &'a dyn BlockColumns,
+    ) -> Option<(&'a [u8], Vec<usize>)> {
+        if vector.element_type != 6 {
+            return None;
+        }
+        let row_count: usize = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count as usize)
+            .unwrap_or(0);
+        let column_id = ids.get(vector.col).copied().unwrap_or(vector.col as u64);
+        let (body, _outline) = columns.column(column_id)?;
+        let layout = layout_of(
+            vector.declared.get(vector.col)?,
+            *vector.storage.get(vector.col)?,
+        )?;
+        let (body_data, body_null) =
+            storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+        let width = vector.dim.checked_mul(4)?;
+        let mut slots: Vec<usize> = Vec::with_capacity(row_count.min(64));
+        for slot in 0..row_count {
+            if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+                continue;
+            }
+            let null = body_null.len() > slot / 8 && body_null[slot / 8] & (1 << (slot % 8)) == 0;
+            if null {
+                continue;
+            }
+            if body_data.len() < (slot + 1).checked_mul(width)? {
+                continue;
+            }
+            slots.push(slot);
+        }
+        Some((body_data, slots))
+    }
+
     pub(crate) fn decode_vectors_of_block(
         ids: &[u64],
         vector: EmbeddingColumn<'_>,
         id: BlockId,
         version: &storage::definition::format::BlockVersionFile,
         columns: &dyn BlockColumns,
-        rows_wanted: &std::collections::HashSet<usize>,
+        // The block's slots to decode, ascending, or `None` for every slot the
+        // version created. A slice, not a `HashSet`: the exact full scan has the
+        // slots already in order, and hashing them was most of its cost.
+        rows_wanted: Option<&[usize]>,
     ) -> Option<Vec<(usize, Vec<f32>)>> {
         let row_count: usize = version
             .created
@@ -5021,12 +5082,15 @@ impl Engine {
             storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
         let base =
             ((id.segment_id as usize) << 32) | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY);
-        let mut slots: Vec<usize> = rows_wanted
-            .iter()
-            .filter(|seq| **seq >= base && **seq < base + DEFAULT_BLOCK_CAPACITY)
-            .map(|seq| *seq - base)
-            .collect();
-        slots.sort_unstable();
+        let slots: Vec<usize> = match rows_wanted {
+            Some(wanted) => wanted
+                .iter()
+                .filter(|seq| **seq >= base && **seq < base + DEFAULT_BLOCK_CAPACITY)
+                .map(|seq| *seq - base)
+                .collect(),
+            // The block's own visible range, already ascending.
+            None => (0..row_count).collect(),
+        };
         let mut out = Vec::with_capacity(slots.len());
         for row in slots {
             if row >= row_count {
