@@ -131,6 +131,10 @@ pub(crate) struct BlockCursor<'a> {
 /// Receives one block's vectors; returns whether to keep walking.
 pub(crate) type VectorBlockSink<'a> = dyn FnMut(&[(u64, Vec<f32>)]) -> bool + 'a;
 
+/// Receives one block's mapped `f32` array, its base row id and the slots to
+/// score; returns whether to keep walking.
+pub(crate) type F32BlockSink<'a> = dyn FnMut(usize, &[f32], &[usize]) -> bool + 'a;
+
 impl<'a> BlockCursor<'a> {
     pub(crate) fn new(engine: &'a Engine, table: &str) -> Result<Self> {
         let table = engine.qualified_table(table);
@@ -363,7 +367,10 @@ impl<'a> BlockCursor<'a> {
         col: usize,
         dim: usize,
         element_type: i32,
-        each: &mut dyn FnMut(usize, &[f32], bool) -> bool,
+        // `(base, floats, slots)`: the block's `f32` array and the slots to
+        // score, handed over once per block rather than once per row, so the
+        // caller's loop is one call per 8192 rows instead of 8192.
+        each_block: &mut F32BlockSink<'_>,
     ) -> Result<()> {
         if element_type != 6 {
             return Ok(());
@@ -418,22 +425,18 @@ impl<'a> BlockCursor<'a> {
             let Some(floats) = storage::mapped::f32_slice(body) else {
                 break;
             };
-            for slot in slots {
-                let seq = base + slot;
-                if has_dead && self.dead.contains(&(seq as u64)) {
-                    continue;
-                }
-                let at = slot * dim;
-                let Some(row) = floats.get(at..at + dim) else {
-                    continue;
-                };
-                if !each(seq, row, false) {
-                    return Ok(());
-                }
-            }
-            // The block is done: the caller may reduce what it has scored so
-            // far to its own top-n instead of holding the whole table.
-            if !each(0, &[], true) {
+            // The block's visible slots are already decided (`block_f32_body`
+            // drops the version's deleted ones); `dead` is the uncheckpointed
+            // delete log, filtered here so the caller sees one clean block.
+            let kept: Vec<usize> = if has_dead {
+                slots
+                    .into_iter()
+                    .filter(|slot| !self.dead.contains(&((base + *slot) as u64)))
+                    .collect()
+            } else {
+                slots
+            };
+            if !kept.is_empty() && !each_block(base, floats, &kept) {
                 return Ok(());
             }
         }
@@ -459,7 +462,7 @@ impl<'a> BlockCursor<'a> {
                 if parsed.len() != dim {
                     continue;
                 }
-                if !each(seq, &parsed, false) {
+                if !each_block(seq, &parsed, &[0]) {
                     return Ok(());
                 }
             }

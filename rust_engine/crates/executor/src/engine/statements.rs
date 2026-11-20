@@ -10858,17 +10858,21 @@ impl Engine {
                             col_idx,
                             dim,
                             element_type,
-                            &mut |seq, row, end| {
-                                if end {
-                                    // One block scored: keep its top-n, unordered -
-                                    // only the final `finish` sorts.
-                                    hits = truncate.keep_topn(std::mem::take(&mut hits));
-                                    return true;
+                            // The whole block at once: one call per block, and
+                            // the row slices come straight out of the mapping.
+                            &mut |base, floats, slots| {
+                                for slot in slots.iter().copied() {
+                                    let at = slot * dim;
+                                    let Some(row) = floats.get(at..at + dim) else {
+                                        continue;
+                                    };
+                                    let (sim, dist) =
+                                        crate::vector_score_f32(&query_f32, row, &metric);
+                                    hits.push((base + slot, sim, dist));
                                 }
-                                // `row` is already `&[f32]` out of the mapping, so
-                                // the kernel reads it in place - no copy.
-                                let (sim, dist) = crate::vector_score_f32(&query_f32, row, &metric);
-                                hits.push((seq, sim, dist));
+                                // Keep this block's top-n, unordered; only the
+                                // final `finish` sorts.
+                                hits = truncate.keep_topn(std::mem::take(&mut hits));
                                 true
                             },
                         )?;
