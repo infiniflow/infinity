@@ -49,7 +49,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::vector::l2_sq;
 
 use super::incr::{kmeans_k, FANOUT, MAX_DEPTH};
-use super::kmeans::balanced_kmeans_2;
+use super::kmeans::balanced_kmeans_2_pinned;
 use super::partition::Partition;
 use super::quantize::{self, Rotation};
 use super::{Member, Options, PartitionKey, SpannError, SpannIndex, ROOT_KEY};
@@ -640,10 +640,24 @@ impl<'a> PageTree<'a> {
             vectors.len().div_ceil((target / 2).max(1)).clamp(2, FANOUT)
         };
         let seed = self.opts.seed ^ key.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        // The page keeps its centroid and becomes an interior node (I1), so one
+        // child keeps that region: pin it (`pinLeftCentroid`) instead of letting
+        // k-means++ reseed both sides.
+        let pin = self
+            .pages
+            .get(&key)
+            .map(|page| page.centroid.clone())
+            .unwrap_or_default();
         let groups: Vec<Vec<(u64, &[f32])>> = if groups_wanted == 2 {
             // A two-way cut has to be balanced, or one child lands under
             // `min_partition_size` and the merge pass folds it straight back.
-            let split = balanced_kmeans_2(&refs, self.dim, self.opts.kmeans_iterations, seed);
+            let split = balanced_kmeans_2_pinned(
+                &refs,
+                self.dim,
+                self.opts.kmeans_iterations,
+                seed,
+                Some(&pin),
+            );
             let mut groups: Vec<Vec<(u64, &[f32])>> = vec![Vec::new(), Vec::new()];
             for (i, second) in split.second.iter().enumerate() {
                 groups[usize::from(*second)].push((ids[i], refs[i]));
@@ -656,6 +670,7 @@ impl<'a> PageTree<'a> {
                 groups_wanted,
                 self.opts.kmeans_iterations,
                 seed,
+                Some(&pin),
             );
             let mut groups: Vec<Vec<(u64, &[f32])>> = vec![Vec::new(); groups_wanted];
             for (i, slot) in assign.iter().enumerate() {
@@ -719,12 +734,20 @@ impl<'a> PageTree<'a> {
             return Ok(());
         }
         let refs: Vec<&[f32]> = vectors.iter().map(|v| v.as_slice()).collect();
+        // The page keeps its key and moves to one half, so that half stays in its
+        // region: pin the current centroid and find only the sibling's.
+        let pin = self
+            .pages
+            .get(&key)
+            .map(|page| page.centroid.clone())
+            .unwrap_or_default();
         let (_, assign) = kmeans_k(
             &refs,
             self.dim,
             2,
             self.opts.kmeans_iterations,
             self.opts.seed ^ key.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            Some(&pin),
         );
         let mut halves: [Vec<(u64, &[f32])>; 2] = [Vec::new(), Vec::new()];
         for (i, slot) in assign.iter().enumerate() {

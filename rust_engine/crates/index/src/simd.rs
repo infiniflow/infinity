@@ -129,6 +129,44 @@ pub fn ip(a: &[f32], b: &[f32]) -> f32 {
     sum
 }
 
+/// One centroid against four rows in a single pass.
+///
+/// k-means assignment is "one centroid against every row", so the centroid is the
+/// loop-invariant operand: loading its lane blocks once and reusing them for four
+/// rows quarters its traffic and leaves the rows streaming from memory. This is
+/// the register-blocked form of the `‖x‖² − 2·x·c + ‖c‖²` assignment in
+/// [`crate::spann::kmeans::assign_by_norms`].
+#[inline]
+pub fn ip_x4(rows: [&[f32]; 4], b: &[f32]) -> [f32; 4] {
+    let n = rows
+        .iter()
+        .map(|row| row.len())
+        .min()
+        .unwrap_or(0)
+        .min(b.len());
+    let mut acc = [f32x8::splat(0.0); 4];
+    let mut i = 0;
+    while i + LANES <= n {
+        let y = f32x8::from_slice(&b[i..]);
+        for (a, row) in acc.iter_mut().zip(rows) {
+            *a += f32x8::from_slice(&row[i..]) * y;
+        }
+        i += LANES;
+    }
+    let mut sum = [
+        acc[0].reduce_sum(),
+        acc[1].reduce_sum(),
+        acc[2].reduce_sum(),
+        acc[3].reduce_sum(),
+    ];
+    for j in i..n {
+        for (s, row) in sum.iter_mut().zip(rows) {
+            *s += row[j] * b[j];
+        }
+    }
+    sum
+}
+
 /// `(dot, |a|, |b|)` in one pass, the reference's `F32Cos*` (`F32CosAVX512`
 /// carries three accumulators through the same loop).
 #[inline]
