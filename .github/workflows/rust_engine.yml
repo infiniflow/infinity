@@ -43,6 +43,28 @@ env:
   RUST_DESELECT: |
     python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
 
+  # The level `rust_engine/.cargo/config.toml` leaves at `native` is wrong for a
+  # binary that has to run elsewhere, so every lane pins its own here.
+  #
+  # These are the *target-scoped* variables, not `RUSTFLAGS`: cargo appends them
+  # to the section's list, so the `link-arg=-fuse-ld=mold` in `config.toml`
+  # survives and the later `-C target-cpu=` wins. `RUSTFLAGS` would replace the
+  # list wholesale and drop mold. The loom and sanitizer steps set `RUSTFLAGS`
+  # deliberately - they want a clean slate - and pass the linker flag themselves
+  # where it matters.
+  #
+  # `+pclmulqdq` is required: no x86-64-vN level defines `__PCLMUL__`, and
+  # `librocksdb-sys`'s `crc32c.cc` calls `_mm_clmulepi64_si128` unconditionally,
+  # so without it the build fails with "needs target feature pclmul".
+  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
+    -C target-cpu=x86-64-v3 -C target-feature=+pclmulqdq
+  # ARMv9-A with SVE2, which is what `ubuntu-24.04-arm` (Azure Cobalt 100) is.
+  # The default `generic` has NEON only, so `f32x8` would split across two
+  # 128-bit registers. macOS lanes are `aarch64-apple-darwin` and read neither
+  # variable - Apple Silicon has no SVE and must not inherit this.
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
+    -C target-cpu=neoverse-n2
+
 jobs:
   quality:
     # Gate F: formatting, lints, licenses / advisories.

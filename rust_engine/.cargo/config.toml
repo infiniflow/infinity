@@ -6,32 +6,64 @@
 CC = "clang"
 CXX = "clang++"
 
-# Link with mold. A full link of this workspace is dominated by the ~40 MB
-# binary plus the static RocksDB, and mold does that several times faster than
-# the system `ld` without changing the output.
+# One section per target triple, so each architecture gets its own baseline and
+# neither can affect the other. `cargo` only reads the section whose triple it
+# is building for: an `aarch64-unknown-linux-gnu` build never sees the x86_64
+# flags, and the macOS lanes (`aarch64-apple-darwin`) match no section here at
+# all - Apple Silicon has no SVE, so it must not inherit the Linux ARMv9 one.
 #
-# `target-cpu=x86-64-v3` is the AVX2 baseline (Haswell, 2013). Without it the
-# default `x86-64` target has only SSE2, and `std::simd`'s `f32x8` is split into
-# two 128-bit halves: the exact scan's `l2_sq` came out as `subps`/`mulps`/
-# `addps` with no `ymm` register at all. With v3 the same kernel is one
-# `vsubps`/`vmulps`/`vaddps` over 256 bits, which took the SIFT 1M brute-force
-# scan from 39.4 to 34.9 ms p50. `native` measures the same on this box; v3 is
-# chosen because a released binary has to run on machines other than the one
-# that built it.
+# `target-cpu=native` is the local default: a developer's build uses whatever
+# the machine has, which is the right answer when the binary only runs there.
+# A release cannot use it - the output would depend on whichever runner the job
+# landed on, and a machine with AVX-512 would emit `zmm` the users' CPUs fault
+# on. The release and test lanes override it with
+# `CARGO_TARGET_<TRIPLE>_RUSTFLAGS`, which **appends** to this list rather than
+# replacing it: the later `-C target-cpu=...` wins, and the `link-arg` below
+# survives. (Setting `RUSTFLAGS` instead would replace the list wholesale and
+# drop mold, so the CI must use the target-scoped variable.)
 #
-# `+pclmulqdq` is not part of any x86-64-vN level (v3 and v4 both leave
-# `__PCLMUL__` undefined), but `cc-rs` forwards this target's feature list to
-# the C compiler, and `librocksdb-sys`'s `crc32c.cc` calls
-# `_mm_clmulepi64_si128` unconditionally. Without the flag the build dies with
-# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul` - which is what
-# broke every amd64 job on this branch. The instruction is SSE-era and present
-# on every CPU that has AVX2, so adding it narrows nothing.
-#
-# This section is keyed by the x86_64 triple, so an aarch64 build does not see
-# it at all.
+# `link-arg=-fuse-ld=mold` stays in each section for that reason: a full link of
+# this workspace is dominated by the ~40 MB binary plus the static RocksDB, and
+# mold does that several times faster than the system `ld` without changing the
+# output.
 [target.x86_64-unknown-linux-gnu]
 rustflags = [
     "-C", "link-arg=-fuse-ld=mold",
-    "-C", "target-cpu=x86-64-v3",
-    "-C", "target-feature=+pclmulqdq",
+    "-C", "target-cpu=native",
+]
+
+# The CI override for this triple is
+#   -C target-cpu=x86-64-v3 -C target-feature=+pclmulqdq
+#
+# `x86-64-v3` is the AVX2 baseline (Haswell, 2013). Without it the default
+# `x86-64` target has only SSE2, and `std::simd`'s `f32x8` is split into two
+# 128-bit halves: the exact scan's `l2_sq` came out as `subps`/`mulps`/`addps`
+# with no `ymm` register at all. With v3 the same kernel is one
+# `vsubps`/`vmulps`/`vaddps` over 256 bits, which took the SIFT 1M brute-force
+# scan from 39.4 to 34.9 ms p50.
+#
+# `+pclmulqdq` is not part of any x86-64-vN level (v3 and v4 both leave
+# `__PCLMUL__` undefined), but `cc-rs` forwards this target's feature list to the
+# C compiler, and `librocksdb-sys`'s `crc32c.cc` calls `_mm_clmulepi64_si128`
+# unconditionally. Without the flag the build dies with
+# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul`. The instruction is
+# SSE-era and present on every CPU that has AVX2, so adding it narrows nothing.
+# `native` implies it, which is why the local default needs no separate flag.
+
+# aarch64 Linux. The CI override for this triple is
+#   -C target-cpu=neoverse-n2
+#
+# `neoverse-n2` is the CPU in `ubuntu-24.04-arm` (Azure Cobalt 100) and the
+# smallest named ARMv9 profile `rustc` knows: it enables `v9a` plus `sve2`, so
+# `std::simd`'s `f32x8` can use 256-bit SVE registers instead of being split
+# across two 128-bit NEON ones. The default `generic` target has `neon` only.
+#
+# This is a bigger commitment than the x86 side: `sve2` is absent from ARMv8
+# parts, and a binary built this way faults on them. It is pinned because the
+# release lane and the arm64 test lane both run on that hardware; a build meant
+# for older ARM servers needs the override changed to `generic`.
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "target-cpu=native",
 ]
