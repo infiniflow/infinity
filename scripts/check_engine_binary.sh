@@ -63,13 +63,20 @@ sed -e "s#/var/infinity#${probe_dir}#g" \
     -e 's/^client_port.*/client_port = 25434/' \
     -e 's/^peer_port.*/peer_port = 25435/' \
     "${config}" > "${probe_conf}"
-cleanup_probe() { rm -rf "${probe_dir}"; }
+# `timeout` sends SIGTERM, and the engine's shutdown is graceful enough that it
+# can outlive the signal - a probe process left running holds the global
+# resources the real start needs, which made that start hang with an empty log.
+# Kill by the probe's own config path so nothing else can be hit.
+cleanup_probe() {
+  pkill -9 -f "${probe_conf}" 2>/dev/null || true
+  rm -rf "${probe_dir}"
+}
 trap cleanup_probe EXIT
 if command -v gdb >/dev/null 2>&1; then
   # Under gdb a SIGILL stops instead of killing the process, so the faulting
   # instruction can be named. This is the whole reason the probe exists: a bare
   # "exit 132" says the CPU rejected an instruction but not which one.
-  timeout 20 gdb -batch \
+  timeout -s KILL 20 gdb -batch \
     -ex 'run' \
     -ex 'printf "\n--- faulting instruction ---\n"' \
     -ex 'x/i $pc' \
@@ -83,7 +90,7 @@ if command -v gdb >/dev/null 2>&1; then
     echo "no SIGILL in the probe log"
   fi
 else
-  timeout 5 "${bin}" --config="${probe_conf}" > /tmp/engine_probe.log 2>&1
+  timeout -s KILL 5 "${bin}" --config="${probe_conf}" > /tmp/engine_probe.log 2>&1
   status=$?
   if [ "${status}" -eq 124 ]; then
     echo "still running at the timeout, which is healthy"
