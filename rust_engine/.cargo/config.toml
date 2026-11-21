@@ -18,5 +18,20 @@ CXX = "clang++"
 # scan from 39.4 to 34.9 ms p50. `native` measures the same on this box; v3 is
 # chosen because a released binary has to run on machines other than the one
 # that built it.
+#
+# `+pclmulqdq` is not part of any x86-64-vN level (v3 and v4 both leave
+# `__PCLMUL__` undefined), but `cc-rs` forwards this target's feature list to
+# the C compiler, and `librocksdb-sys`'s `crc32c.cc` calls
+# `_mm_clmulepi64_si128` unconditionally. Without the flag the build dies with
+# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul` - which is what
+# broke every amd64 job on this branch. The instruction is SSE-era and present
+# on every CPU that has AVX2, so adding it narrows nothing.
+#
+# This section is keyed by the x86_64 triple, so an aarch64 build does not see
+# it at all.
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "target-cpu=x86-64-v3"]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "target-cpu=x86-64-v3",
+    "-C", "target-feature=+pclmulqdq",
+]
