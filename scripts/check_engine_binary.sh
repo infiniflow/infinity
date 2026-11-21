@@ -51,6 +51,20 @@ for pair in "avx:avx" "avx2:avx2" "bmi1:bmi1" "bmi2:bmi2" "f16c:f16c" "fma:fma" 
 done
 
 echo "=== direct execution (5s) ==="
+# Run against a throwaway data directory and its own ports. Starting the real
+# one here and killing it left `/var/infinity` locked, so the "Start the engine"
+# step that follows timed out at 60 s with a log that looked empty - the probe
+# was the thing breaking the start it was meant to diagnose.
+probe_dir="$(mktemp -d)"
+probe_conf="${probe_dir}/engine.toml"
+sed -e "s#/var/infinity#${probe_dir}#g" \
+    -e 's/^postgres_port.*/postgres_port = 25432/' \
+    -e 's/^http_port.*/http_port = 25433/' \
+    -e 's/^client_port.*/client_port = 25434/' \
+    -e 's/^peer_port.*/peer_port = 25435/' \
+    "${config}" > "${probe_conf}"
+cleanup_probe() { rm -rf "${probe_dir}"; }
+trap cleanup_probe EXIT
 if command -v gdb >/dev/null 2>&1; then
   # Under gdb a SIGILL stops instead of killing the process, so the faulting
   # instruction can be named. This is the whole reason the probe exists: a bare
@@ -61,7 +75,7 @@ if command -v gdb >/dev/null 2>&1; then
     -ex 'x/i $pc' \
     -ex 'info registers rip' \
     -ex 'bt 8' \
-    --args "${bin}" --config="${config}" > /tmp/engine_probe.log 2>&1
+    --args "${bin}" --config="${probe_conf}" > /tmp/engine_probe.log 2>&1
   # gdb's own exit status is not the program's; the log says what happened.
   if grep -q "SIGILL\|Illegal instruction" /tmp/engine_probe.log 2>/dev/null; then
     echo "::error::the binary died on an illegal instruction"
@@ -69,7 +83,7 @@ if command -v gdb >/dev/null 2>&1; then
     echo "no SIGILL in the probe log"
   fi
 else
-  timeout 5 "${bin}" --config="${config}" > /tmp/engine_probe.log 2>&1
+  timeout 5 "${bin}" --config="${probe_conf}" > /tmp/engine_probe.log 2>&1
   status=$?
   if [ "${status}" -eq 124 ]; then
     echo "still running at the timeout, which is healthy"
