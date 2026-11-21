@@ -18,9 +18,11 @@
 //! This used to wrap `crc32fast`. That crate compiles an AVX-512 path
 //! (`calculate_avx512`) behind `#[target_feature(enable = "avx512f")]`, which is
 //! emitted into the binary whatever `target-cpu` says - measured, 52 `zmm`
-//! instructions in a build for `x86-64-v3` and 26 even for `x86-64-v2`. Some CI
-//! runners advertise `avx512f` in CPUID and then reject the instructions, so the
-//! engine died with SIGILL before it could log a line.
+//! instructions in a build for `x86-64-v3` and 26 even for `x86-64-v2`. A
+//! binary that carries instructions its CPU rejects dies with SIGILL before it
+//! can log a line, so the crate is patched away rather than relied on to honour
+//! the target level. (The SIGILL that first prompted this was a separate
+//! `insertq` from RocksDB built with `-march=native`; see the CI's `CFLAGS`.)
 //!
 //! The CRC here is table-driven: eight tables, eight bytes per step
 //! (`slicing-by-8`), no SIMD. That runs at a few GB/s, far more than the WAL
@@ -104,8 +106,8 @@ pub fn crc32_ieee(bytes: &[u8]) -> u32 {
 /// table lookups.
 #[inline]
 fn update(mut state: u32, bytes: &[u8]) -> u32 {
-    let mut chunks = bytes.chunks_exact(8);
-    for chunk in &mut chunks {
+    let (chunks, remainder) = bytes.as_chunks::<8>();
+    for chunk in chunks {
         let lo = state ^ u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
         let hi = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);
         state = TABLES[7][(lo & 0xFF) as usize]
@@ -117,7 +119,7 @@ fn update(mut state: u32, bytes: &[u8]) -> u32 {
             ^ TABLES[1][((hi >> 16) & 0xFF) as usize]
             ^ TABLES[0][((hi >> 24) & 0xFF) as usize];
     }
-    for &byte in chunks.remainder() {
+    for &byte in remainder {
         state = TABLES[0][((state ^ u32::from(byte)) & 0xFF) as usize] ^ (state >> 8);
     }
     state

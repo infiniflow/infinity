@@ -84,11 +84,15 @@ pilota-thrift-parser = { git = "https://github.com/yuzhichang/pilota", branch = 
 # `crc32fast` compiles an AVX-512 path (`calculate_avx512`) behind
 # `#[target_feature(enable = "avx512f")]`, which lands in the binary whatever
 # `target-cpu` says: measured, 52 `zmm` instructions when building for
-# `x86-64-v3` and 26 for `x86-64-v2`. Some CI runners advertise `avx512f` in
-# CPUID and then reject the instruction, so the engine died with SIGILL before
-# it could log anything.
+# `x86-64-v3` and 26 for `x86-64-v2`. A binary that carries instructions its CPU
+# rejects dies with SIGILL before it can log anything, and a crate-level flag
+# cannot remove a `#[target_feature]` function.
 #
 # It arrives through `parquet -> flate2` as well as directly, so patching is the
 # only way to keep AVX2 in the rest of the build without carrying that path. The
 # stand-in is the same slicing-by-8 CRC with no SIMD.
+#
+# This is not what the Xeon SIGILL turned out to be - that was an `insertq` in
+# RocksDB built with `-march=native`, fixed by the CI's `CXXFLAGS`. The patch
+# stays because the hazard it removes is real on its own.
 crc32fast = { path = "crates/crc32fast-shim" }

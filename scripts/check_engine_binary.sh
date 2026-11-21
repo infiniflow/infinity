@@ -50,6 +50,30 @@ for pair in "avx:avx" "avx2:avx2" "bmi1:bmi1" "bmi2:bmi2" "f16c:f16c" "fma:fma" 
   fi
 done
 
+# `x86-64-v3` is a *level*, and a level is not the only thing a compiler can
+# emit. `-march=native` on an AMD build host picks `znver3`/`znver4`, and those
+# profiles include SSE4a - `insertq`/`extrq` - which no Intel part implements.
+# A build that leaked one of those dies on Intel in a library we did not write
+# (RocksDB's C++ in `rocksdb::ImmutableDBOptions`), so grep the binary itself
+# and name the instruction rather than waiting for a bare SIGILL.
+echo "=== instructions the CPU cannot run ==="
+if command -v objdump >/dev/null 2>&1; then
+  # Disassemble once: the binary is ~55 MB and two passes double the cost.
+  disasm="$(objdump -d "${bin}" 2>/dev/null)"
+  sse4a_count=$(printf '%s\n' "${disasm}" | grep -cE '\b(insertq|extrq)\b' || true)
+  avx512_count=$(printf '%s\n' "${disasm}" | grep -cE '%zmm|%k[0-7]\b' || true)
+  echo "sse4a (insertq/extrq): ${sse4a_count}"
+  echo "avx-512 (zmm/mask):    ${avx512_count}"
+  if [ "${sse4a_count}" != "0" ] && ! has_flag sse4a sse4a; then
+    echo "::error::the binary has ${sse4a_count} SSE4a instructions (AMD-only) and this CPU lacks sse4a"
+  fi
+  if [ "${avx512_count}" != "0" ] && ! has_flag avx512f avx512f; then
+    echo "::error::the binary has ${avx512_count} AVX-512 instructions and this CPU lacks avx512f"
+  fi
+else
+  echo "objdump is unavailable; skipping the instruction scan"
+fi
+
 echo "=== direct execution (5s) ==="
 # Run against a throwaway data directory and its own ports. Starting the real
 # one here and killing it left `/var/infinity` locked, so the "Start the engine"

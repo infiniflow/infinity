@@ -34,7 +34,14 @@ rustflags = [
 
 # The CI override for this triple is
 #   -C target-cpu=x86-64-v3
-# plus `CFLAGS`/`CXXFLAGS_x86_64_unknown_linux_gnu=-mpclmul` for the C side.
+# plus `CFLAGS`/`CXXFLAGS_x86_64_unknown_linux_gnu="-march=x86-64-v3 -mpclmul"`
+# for the C side.
+#
+# The C flags need the level spelled out, and not only `-mpclmul`: this file's
+# `native` still reaches `librocksdb-sys`, whose build script takes the *first*
+# `target-cpu` in `CARGO_ENCODED_RUSTFLAGS` while rustc takes the last. A
+# `-march=native` build on an AMD host therefore emits SSE4a (`insertq`) into
+# RocksDB, which faults on any Intel CPU.
 #
 # `crc32fast` is patched to a SIMD-free stand-in, so nothing here pulls in an
 # AVX-512 path that a hypervisor might advertise and then reject.
@@ -53,10 +60,9 @@ rustflags = [
 #
 # That flag belongs on `CFLAGS`, **not** on `-C target-feature=+pclmulqdq`.
 # Giving it to rustc makes LLVM emit 52 AVX-512 instructions elsewhere in the
-# binary - measured: `zmm` goes 0 -> 52 with the target feature, 0 without - and
-# those fault on a CPU whose `avx512f` does not cover the whole set: a Xeon
-# 6975P-C died with SIGILL on a binary an EPYC 9V45 ran fine. `native` implies
-# `pclmul` anyway, which is why the local default needs no separate flag.
+# binary - measured: `zmm` goes 0 -> 52 with the target feature, 0 without.
+# `native` implies `pclmul` anyway, which is why the local default needs no
+# separate flag.
 
 # aarch64 Linux. The CI override for this triple is
 #   -C target-cpu=neoverse-n2
@@ -70,6 +76,10 @@ rustflags = [
 # parts, and a binary built this way faults on them. It is pinned because the
 # release lane and the arm64 test lane both run on that hardware; a build meant
 # for older ARM servers needs the override changed to `generic`.
+#
+# The CI also sets `CFLAGS`/`CXXFLAGS_aarch64_unknown_linux_gnu=-mcpu=neoverse-n2`,
+# for the same reason as on x86_64: the RocksDB build script sees the `native`
+# above, not this override.
 [target.aarch64-unknown-linux-gnu]
 rustflags = [
     "-C", "link-arg=-fuse-ld=mold",

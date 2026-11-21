@@ -59,16 +59,35 @@ env:
   # crate emits 52 `zmm` instructions whatever `target-cpu` says, and on this
   # runner pool some CPUs advertise `avx512f` in CPUID and then reject it - the
   # engine died with SIGILL before it could log a line.
+  #
+  # The C flags repeat the level for a different reason: rustc's flag does not
+  # reach RocksDB. `librocksdb-sys`'s build script reads
+  # `CARGO_ENCODED_RUSTFLAGS` and takes the *first* `target-cpu` it finds
+  # (`rustflags::from_env().find_map()`), which is the `native` in
+  # `rust_engine/.cargo/config.toml` - the override above only wins for rustc,
+  # which takes the last. So the C++ side was always `-march=native`: built on
+  # an AMD runner it carried `insertq` (SSE4a, AMD-only), and an Intel Xeon
+  # 6975P-C died in `rocksdb::ImmutableDBOptions` with SIGILL while an EPYC ran
+  # the same artifact fine. `cc` appends `CFLAGS`/`CXXFLAGS` after every flag
+  # the build script sets, so repeating the level here is what pins RocksDB.
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
     -C target-cpu=x86-64-v3
-  CFLAGS_x86_64_unknown_linux_gnu: -mpclmul
-  CXXFLAGS_x86_64_unknown_linux_gnu: -mpclmul
+  CFLAGS_x86_64_unknown_linux_gnu: -march=x86-64-v3 -mpclmul
+  CXXFLAGS_x86_64_unknown_linux_gnu: -march=x86-64-v3 -mpclmul
   # ARMv9-A with SVE2, which is what `ubuntu-24.04-arm` (Azure Cobalt 100) is.
   # The default `generic` has NEON only, so `f32x8` would split across two
   # 128-bit registers. macOS lanes are `aarch64-apple-darwin` and read neither
   # variable - Apple Silicon has no SVE and must not inherit this.
+  #
+  # `CFLAGS`/`CXXFLAGS` repeat the level for the same reason as on x86_64: the
+  # RocksDB build script takes the first `target-cpu`, which is the `native`
+  # in `rust_engine/.cargo/config.toml`. On this triple `native` and
+  # `neoverse-n2` describe the same hardware, so the repeat changes nothing
+  # today; it keeps the two sides from drifting if the pin ever moves.
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
     -C target-cpu=neoverse-n2
+  CFLAGS_aarch64_unknown_linux_gnu: -mcpu=neoverse-n2
+  CXXFLAGS_aarch64_unknown_linux_gnu: -mcpu=neoverse-n2
 
 jobs:
   quality:
