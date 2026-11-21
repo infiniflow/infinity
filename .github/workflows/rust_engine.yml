@@ -682,6 +682,8 @@ jobs:
         # `/var/infinity/test_data`; this is the same generate-and-copy step
         # the other Go jobs run.
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         # `ulimit -n` is for the many-client case: it holds 5 000 sockets and
         # the server, started here with the same limit, holds the 5 000 it
@@ -743,6 +745,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
+      - name: Check the binary can run on this CPU
+        # The binary is built on one runner and executed on another, so a
+        # `target-cpu` the executor lacks shows up as a bare SIGILL with an
+        # empty log - which is what "unhealthy in 60s" looked like when this was
+        # first pinned to a level.
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
@@ -814,6 +822,8 @@ jobs:
         # generate-and-copy step the reference's jobs run (`-jc` copies without
         # running the .slt suite).
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
@@ -867,6 +877,8 @@ jobs:
         # The HTTP suite runs the same PySDK cases (`--http`), imports
         # included, so it reads `/var/infinity/test_data/*` too.
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
