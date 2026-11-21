@@ -9920,11 +9920,6 @@ impl Engine {
             .iter()
             .position(|c| **c == column)
             .unwrap_or(col_idx);
-        eprintln!(
-            "[fus] columns={columns:?} cand={} first={:?}",
-            candidates.len(),
-            candidates.first().map(|c| &c.1)
-        );
         let mut scored: Vec<(i64, f64, Vec<Value>)> = Vec::new();
         for (id, row) in candidates {
             let cell = match row.get(cell_index) {
@@ -10476,9 +10471,12 @@ impl Engine {
                                 .collect();
                             let mut out = Vec::new();
                             for (seq, score) in scored {
-                                let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                                let Some(row) = by_id.remove(&(seq as usize)) else {
                                     continue;
                                 };
+                                // The stored row is the table's whole row; the
+                                // scan names only some of it.
+                                let mut row = Self::project_search_row(row, columns, &schema);
                                 Self::layout_search_row(
                                     &mut row,
                                     columns,
@@ -10630,10 +10628,13 @@ impl Engine {
                             .collect();
                         let mut out = Vec::new();
                         for (seq, score) in hits {
-                            let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                            let Some(row) = by_id.remove(&(seq as usize)) else {
                                 continue;
                             };
                             let score = f64::from(score);
+                            // The stored row is the table's whole row; the scan
+                            // names only some of it.
+                            let mut row = Self::project_search_row(row, columns, &schema);
                             Self::layout_search_row(
                                 &mut row,
                                 columns,
@@ -10929,8 +10930,13 @@ impl Engine {
                         && !has_filter
                         && !is_sparse
                         && !is_tensor
+                        // `f32` only: `cursor.vectors` below decodes the block
+                        // as `f32`, so an integer or double column has to take
+                        // the row path.
                         && crate::blocks::embedding_shape(&column_decl)
-                            .is_some_and(|(dim, _)| dim == query_f32.len()) =>
+                            .is_some_and(|(dim, element_type)| {
+                                dim == query_f32.len() && element_type == 6
+                            }) =>
                 {
                     let (dim, element_type) =
                         crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
@@ -11010,11 +11016,18 @@ impl Engine {
                     // query and the column's declared element agree on it; a
                     // filtered query needs the whole row, so it takes the row
                     // batches below.
+                    //
+                    // The element has to be `f32` (code 6): `for_each_block_f32`
+                    // walks the block's bytes as `f32` and returns immediately
+                    // for anything else, so a `TINYINT`/`UINT8`/`DOUBLE` column
+                    // would take the dense branch and produce no rows at all -
+                    // `test_knn_hnsw_u8` read that as an empty result.
                     let dense = if has_filter {
                         None
                     } else {
-                        crate::blocks::embedding_shape(&column_decl)
-                            .filter(|(dim, _)| *dim == query_f32.len())
+                        crate::blocks::embedding_shape(&column_decl).filter(
+                            |(dim, element_type)| *dim == query_f32.len() && *element_type == 6,
+                        )
                     };
                     // The row-id list is only for the fallback that decodes
                     // rows; the dense path walks the blocks themselves. Building
