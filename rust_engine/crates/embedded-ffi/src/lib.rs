@@ -118,13 +118,15 @@ pub unsafe extern "C" fn inf_embedded_start(
             .build()
             .map_err(|e| format!("runtime: {e}"))?;
 
-        let engine = runtime
-            .block_on(Engine::open_async(&data_dir, Default::default()))
-            .map_err(|e| format!("open {data_dir}: {e}"))?;
+        let engine = std::sync::Arc::new(
+            runtime
+                .block_on(Engine::open_async(&data_dir, Default::default()))
+                .map_err(|e| format!("open {data_dir}: {e}"))?,
+        );
         // `install_engine_handle` records the running runtime, so the bind has
         // to happen inside its context.
         let _guard = runtime.enter();
-        let bound = Server::bind_unix_with_engine(&socket_path, std::sync::Arc::new(engine))
+        let bound = Server::bind_unix_with_engine(&socket_path, engine.clone())
             .map_err(|e| format!("bind {socket_path}: {e}"))?;
         drop(_guard);
 
@@ -141,6 +143,20 @@ pub unsafe extern "C" fn inf_embedded_start(
                     tokio::select! {
                         _ = bound.serve() => {}
                         _ = stop_rx => {}
+                    }
+                    // The last chance to checkpoint. Without it the host's data
+                    // directory opens by replaying every record the log holds
+                    // beyond the newest frame - and the replay reads each
+                    // segment whole, so the log's whole history paid for every
+                    // open. Skipped when the session wrote nothing, so a
+                    // read-only host does not rewrite the block mirror on its
+                    // way out. The checkpoint also reclaims the segments it
+                    // seals (`flush_storage`), which is what keeps the log at
+                    // the size of one checkpoint.
+                    if engine.has_work_since_checkpoint().await {
+                        if let Err(e) = engine.flush().await {
+                            eprintln!("embedded engine: final checkpoint failed: {e}");
+                        }
                     }
                 });
                 // The select drops `serve` mid-listen; the socket file is ours
@@ -174,7 +190,7 @@ pub unsafe extern "C" fn inf_embedded_start(
     }
 }
 
-/// Stops the engine, removes the socket file and waits for the serving thread.
+/// Stops the engine and waits for the serving thread, which unlinks the socket.
 ///
 /// Returns 0 on success. A handle is not usable afterwards, and passing null is
 /// a no-op (so a caller may `stop` from a destructor without tracking whether
@@ -195,11 +211,10 @@ pub unsafe extern "C" fn inf_embedded_stop(handle: *mut InfEmbedded) -> c_int {
     if let Some(join) = boxed.join.take() {
         let _ = join.join();
     }
-    // The thread removes the file on its way out; a file still there means the
-    // thread was never started, and leaving it would break the next bind.
-    if let Ok(path) = boxed.socket.to_str() {
-        let _ = std::fs::remove_file(path);
-    }
+    // The serving thread unlinks the socket on its way out, and it does so only
+    // while the path still names the file it bound. Removing it here as well
+    // would delete the socket of an engine that bound the same path between
+    // that unlink and this join.
     0
 }
 

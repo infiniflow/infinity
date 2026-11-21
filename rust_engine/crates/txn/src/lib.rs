@@ -1941,13 +1941,18 @@ fn build_append(
     let values = storage::wal::block::ColumnValues::varchars(
         &texts.iter().map(|t| Some(*t)).collect::<Vec<_>>(),
     );
-    let block = vec![storage::wal::block::BlockColumn::new(
+    let mut column = storage::wal::block::BlockColumn::new(
         storage::wal::ddl_def::DataType {
             logical_type: storage::wal::ddl_def::LogicalType::Varchar,
             type_info: storage::wal::ddl_def::TypeInfo::None,
         },
         values,
-    )];
+    );
+    // The column carries the row's stored text, not a typed value: mark it, or
+    // the replay cannot tell this frame from a one-column table the reference
+    // wrote (`row_text`).
+    column.vector_type = storage::wal::block::VECTOR_ROW_TEXT;
+    let block = vec![column];
     // Contiguous row ids are one range, as the reference writes them.
     let mut row_ranges: Vec<(WalRowId, u64)> = Vec::new();
     for (seq, _) in rows {
@@ -2009,6 +2014,11 @@ fn append_rows(
     // multi-vector, a tensor) has no rows to hand back here: the rows live in
     // the segment's block files, which the checkpoint wrote, and refusing the
     // frame would make the directory unopenable.
+    // Whether the frame's single column is the row's stored text (this engine,
+    // `build_append`) or a typed column (the reference, and any one-column
+    // table): the answer is a property of the frame, which the decoded block
+    // does not keep, so it is read here.
+    let row_text_frame = storage::wal::block::is_row_text_frame(block);
     let Some(block) = storage::wal::block::to_data_block(block) else {
         return Ok(Vec::new());
     };
@@ -2022,7 +2032,7 @@ fn append_rows(
             // unreadable here; the block the checkpoint wrote still holds it,
             // so the replay skips it rather than refusing to open the
             // directory.
-            let Some(text) = row_text(block, row) else {
+            let Some(text) = row_text(block, row, row_text_frame) else {
                 row += 1;
                 continue;
             };
@@ -2038,10 +2048,11 @@ fn append_rows(
 /// (`Engine::encode_row_stored`).
 ///
 /// This engine's own append records carry that text in a single varchar column
-/// (`build_append`), so the one-column case returns the blob verbatim; the
-/// reference's `WalCmdAppendV2` carries the table's real typed columns instead
-/// (`DataBlock::WriteAdv`), so they have to be rendered back.
-fn row_text(block: &DataBlock, row: usize) -> Option<String> {
+/// (`build_append`, tagged so it can be recognised); the reference's
+/// `WalCmdAppendV2` carries the table's real typed columns instead
+/// (`DataBlock::WriteAdv`), so they have to be rendered back. A one-column
+/// table is one column either way, which is what `row_text_frame` settles.
+fn row_text(block: &DataBlock, row: usize, row_text_frame: bool) -> Option<String> {
     // A table whose columns carry no per-row scalar (a multi-vector) reports a
     // zero row count; the row still has to come back, so the bound only applies
     // when the block does count rows.
@@ -2049,14 +2060,23 @@ fn row_text(block: &DataBlock, row: usize) -> Option<String> {
         return None;
     }
     let mut cells = Vec::with_capacity(block.column_count());
-    // A one-column block already *is* the row text (the port stores the joined
-    // row in a single varchar column), so it is returned verbatim: escaping a
-    // cell that carries the separators would escape the row, not a value.
     if block.column_count() == 1 && block.row_count() > 0 {
-        return Some(match block.get_value(0, row) {
+        let value = match block.get_value(0, row) {
             Some(value) => cell_text(&value),
             None => "null".to_string(),
-        });
+        };
+        // One column is ambiguous: this engine's frames carry the whole row in
+        // it (`build_append`, tagged `VECTOR_ROW_TEXT`), while the reference's
+        // frames carry the table's typed columns, and a one-column table has
+        // exactly one of those. Only the tag decides. A value already in the
+        // marked form is this engine's either way - the reference writes
+        // rendered cells, never escapes - so it is kept as it is.
+        if row_text_frame || common::row_text::is_marked(&value) {
+            return Some(value);
+        }
+        // A typed cell: a TAB inside it must stay inside it, or the reader sees
+        // the rest of the value as other columns' cells.
+        return Some(common::row_text::encode(&[value]));
     }
     for column in 0..block.column_count() {
         // Inside the block a missing value is a NULL slot (`BlockValue::Null`
