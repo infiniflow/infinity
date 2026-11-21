@@ -40,6 +40,34 @@ import row_id;
 
 namespace infinity {
 
+namespace {
+// Attempt budget before a dump task is dropped. A dropped dump is no longer
+// permanent: the tracer reservation is released on drop (see DoDump), so the
+// next capacity trigger re-proposes the mem index.
+constexpr i64 kDumpMaxAttempts = 5;
+
+// Which failures are worth retrying. kTxnConflict is a commit-level conflict
+// with a concurrent transaction. kRocksDBError is treated as transient here
+// because KVInstance::Put flattens the rocksdb lock-wait timeout into that
+// code; classification failures such as kIndexNotExist are permanent and get
+// a single attempt.
+bool IsRetriableDumpFailure(const Status &status) { return status.code_ == ErrorCode::kTxnConflict || status.code_ == ErrorCode::kRocksDBError; }
+} // namespace
+
+i64 DumpBackoffDelayMs(i64 failed_attempts) {
+    if (failed_attempts <= 0) {
+        return 0;
+    }
+    return std::min<i64>(30000, 500 * (1LL << std::min<i64>(failed_attempts - 1, 6)));
+}
+
+void DumpIndexProcessor::WaitBackoff(i64 delay_ms) {
+    constexpr i64 kSliceMs = 50;
+    for (i64 waited = 0; waited < delay_ms && !stopping_.load(std::memory_order_relaxed); waited += kSliceMs) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSliceMs));
+    }
+}
+
 DumpIndexProcessor::DumpIndexProcessor() {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("DumpIndexProcessor");
@@ -59,6 +87,7 @@ void DumpIndexProcessor::Start() {
 
 void DumpIndexProcessor::Stop() {
     LOG_INFO("Dump index processor is stopping.");
+    stopping_.store(true, std::memory_order_relaxed);
     std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
@@ -84,8 +113,25 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
 
     Status commit_status = Status::Ignore();
     Status rollback_status = Status::Ignore();
+    // Result of the most recent attempt, covering both the pre-commit
+    // DumpMemIndex failure and the commit failure. The original loop read
+    // commit_status, which is only assigned on the success path, so a
+    // pre-commit failure left a stale value behind.
+    Status last_status = Status::Ignore();
     i64 dump_count = 0;
+    bool rollback_done = false;
     do {
+        rollback_done = false;
+        if (dump_count > 0) {
+            // Backoff between attempts: lock contention with a concurrent
+            // optimize transaction is the expected failure, and an immediate
+            // retry just burns the attempt budget inside the contention
+            // window. WaitBackoff honors Stop() between slices.
+            WaitBackoff(DumpBackoffDelayMs(dump_count));
+            if (stopping_.load(std::memory_order_relaxed)) {
+                break;
+            }
+        }
         dump_count++;
         auto bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
         std::shared_ptr<NewTxn> new_txn_shared =
@@ -121,10 +167,15 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
                     bg_task_info->status_list_.emplace_back(commit_status.message());
                 }
             }
+            // Assigned after the consumers above: Status::operator=(Status &)
+            // moves the message out of the source, so an earlier assignment
+            // would leave commit_status.message() null for the diagnostics.
+            last_status = commit_status;
         } else {
             LOG_ERROR(
                 fmt::format("Dump mem index {}.{}.{} in segment: {} failed: {}", db_name, table_name, index_name, segment_id, status.message()));
             rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
+            rollback_done = true;
             if (!rollback_status.ok()) {
                 UnrecoverableError(rollback_status.message());
             }
@@ -132,12 +183,41 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
             std::string task_text = fmt::format("Dump mem index: {}.{}.{} in segment: {}", db_name, table_name, index_name, segment_id);
             bg_task_info->task_info_list_.emplace_back(task_text);
             bg_task_info->status_list_.emplace_back(status.message());
+            last_status = status;
         }
 
         if (!bg_task_info->task_info_list_.empty()) {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
-    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict || dump_count <= 5));
+    } while (!last_status.ok() && (!rollback_done || rollback_status.ok()) && IsRetriableDumpFailure(last_status) && dump_count < kDumpMaxAttempts &&
+             !stopping_.load(std::memory_order_relaxed));
+
+    // Release the reservation this task was proposed with, on every exit
+    // path. On a clean success DumpDone (from PostCommit) has already removed
+    // the matching entry, so this is a no-op. On a terminal drop it is the
+    // actual release. On a success after a generation switch - an append
+    // installed a newer mem index for the segment, the rollback restore of
+    // the popped generation failed (only logged), and a later attempt dumped
+    // or skipped the newer generation - nothing else removes the popped
+    // generation's entry, which would pin its memory charge until restart.
+    {
+        auto *storage = InfinityContext::instance().storage();
+        if (storage != nullptr) {
+            if (auto *memindex_tracer = storage->memindex_tracer(); memindex_tracer != nullptr) {
+                memindex_tracer->DumpFailed(db_name, table_name, index_name, segment_id, begin_row_id);
+            }
+        }
+    }
+    if (!last_status.ok()) {
+        LOG_ERROR(fmt::format("Dump mem index {}.{}.{} in segment: {} dropped after {} attempts: {}. Tracer reservation released; the next "
+                              "capacity trigger will re-propose it.",
+                              db_name,
+                              table_name,
+                              index_name,
+                              segment_id,
+                              dump_count,
+                              last_status.message()));
+    }
 }
 
 void DumpIndexProcessor::Process() {

@@ -311,6 +311,12 @@ Status KVStore::Init(const std::string &db_path) {
     write_options_.disableWAL = true;
 
     txn_options_.set_snapshot = true;
+    // Modest bump from the 1s default: background optimize transactions hold
+    // catalog keys (e.g. next_chunk_id) longer than 1s while merging chunks, so
+    // with the default a dump under concurrent inserts times out on every
+    // attempt. Dump retries with backoff and dropped tasks are re-proposed by
+    // the tracer, so this only needs to outlast typical merge key-hold windows.
+    txn_db_options_.transaction_lock_timeout = 5000; // 5s
 
     auto *config = infinity::InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
