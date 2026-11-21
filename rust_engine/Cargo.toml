@@ -13,6 +13,7 @@ members = [
     "crates/index",
     "crates/executor",
     "crates/server",
+    "crates/embedded-ffi",
     "crates/cli",
 ]
 

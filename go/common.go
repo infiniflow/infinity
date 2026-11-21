@@ -31,6 +31,15 @@ func (na NetworkAddress) String() string {
 	return fmt.Sprintf("IP: %s, Port: %d", na.IP, na.Port)
 }
 
+// UnixAddress is a unix domain socket endpoint. The protocol is the same thrift
+// wire as NetworkAddress; only the dialer differs. An embedded engine serves on
+// one of these, so a host process can reach the database without a port.
+type UnixAddress string
+
+func (ua UnixAddress) String() string {
+	return fmt.Sprintf("Unix: %s", string(ua))
+}
+
 // SparseVector represents a sparse vector with indices and values
 type SparseVector struct {
 	Indices []int

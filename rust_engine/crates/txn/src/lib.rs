@@ -1299,7 +1299,23 @@ impl TxnManager {
         deletes: &mut Vec<ReplayedDelete>,
     ) -> Result<usize> {
         let mut applied = 0;
+        // A sealed segment's name carries the timestamp it was sealed at, and
+        // every record inside it is at or below that. One the checkpoint already
+        // covers is therefore skipped **without being read**: the loop below
+        // floors each record out anyway, but only after the whole file - and
+        // `WalEntryIterator::make` reads a segment whole - so a directory with a
+        // long history paid for it on every open (measured: 227 MB of segments,
+        // 33 s to open 4.6 k rows).
+        let covered: std::collections::HashSet<std::path::PathBuf> =
+            sealed_segments(&self.wal_path)?
+                .into_iter()
+                .filter(|(_, seal_ts)| *seal_ts <= checkpoint_ts)
+                .map(|(path, _)| path)
+                .collect();
         for path in segment_paths(&self.wal_path)? {
+            if covered.contains(&path) {
+                continue;
+            }
             let mut iter = WalEntryIterator::make(&path, false).await?;
             while iter.has_next() {
                 let Some(entry) = iter.next() else {
@@ -1596,23 +1612,62 @@ impl TxnManager {
         Ok(())
     }
 
+    /// Every segment that holds a `Checkpoint` frame at or above `applied`.
+    ///
+    /// The frame *is* the replay floor: every record at or below it is skipped
+    /// on the next open because the checkpoint's files hold it. It therefore has
+    /// to survive the truncation that follows it
+    /// ([`Self::append_checkpoint_flushed`]) — with the frame gone
+    /// [`Self::applied_ts`] answers 0, and an open whose log has since been
+    /// emptied replays from the beginning and loses the state the checkpoint
+    /// already covered.
+    ///
+    /// A frame can be in more than one segment: `rotate_wal_if_large` runs after
+    /// the frame is appended, so the active log is sealed *with* the frame in it
+    /// and a copy can also sit in the log that follows. Every such segment is
+    /// kept, not just the first found — dropping the sealed copy is what left a
+    /// restart with a single 41-byte log as its only floor.
+    async fn checkpoint_frame_segments(
+        &self,
+        applied: TxnTimeStamp,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        let mut out = Vec::new();
+        for path in segment_paths(&self.wal_path)? {
+            for entry in WalManager::read_all(&path).await? {
+                for cmd in &entry.cmds {
+                    if let WalCmd::Checkpoint { max_commit_ts } = cmd {
+                        if *max_commit_ts >= applied {
+                            out.push(path.clone());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// Drops the sealed segments whose records the KV store already holds.
     ///
     /// C++ `WalManager::Cleanup` (`wal_manager_impl.cpp`): a checkpoint keeps
     /// its sealed file — the reference deletes `wal.log.<ts>` only at a
     /// cleanup — so the deletion lives here rather than in the checkpoint path.
     /// The caller must pass a timestamp whose records have been fsynced.
-    pub fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
+    ///
+    /// The segment that holds the newest checkpoint frame is never dropped, even
+    /// when its records are covered: see [`Self::checkpoint_frame_segments`].
+    pub async fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
         let applied = applied.min(self.synced.load(Ordering::SeqCst));
         if applied == 0 {
             return Ok(false);
         }
+        let floors = self.checkpoint_frame_segments(applied).await?;
         let mut dropped = false;
         for (path, seal_ts) in sealed_segments(&self.wal_path)? {
-            if seal_ts <= applied {
-                std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
-                dropped = true;
+            if seal_ts > applied || floors.contains(&path) {
+                continue;
             }
+            std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
+            dropped = true;
         }
         Ok(dropped)
     }
@@ -1941,13 +1996,18 @@ fn build_append(
     let values = storage::wal::block::ColumnValues::varchars(
         &texts.iter().map(|t| Some(*t)).collect::<Vec<_>>(),
     );
-    let block = vec![storage::wal::block::BlockColumn::new(
+    let mut column = storage::wal::block::BlockColumn::new(
         storage::wal::ddl_def::DataType {
             logical_type: storage::wal::ddl_def::LogicalType::Varchar,
             type_info: storage::wal::ddl_def::TypeInfo::None,
         },
         values,
-    )];
+    );
+    // The column carries the row's stored text, not a typed value: mark it, or
+    // the replay cannot tell this frame from a one-column table the reference
+    // wrote (`row_text`).
+    column.vector_type = storage::wal::block::VECTOR_ROW_TEXT;
+    let block = vec![column];
     // Contiguous row ids are one range, as the reference writes them.
     let mut row_ranges: Vec<(WalRowId, u64)> = Vec::new();
     for (seq, _) in rows {
@@ -2009,6 +2069,11 @@ fn append_rows(
     // multi-vector, a tensor) has no rows to hand back here: the rows live in
     // the segment's block files, which the checkpoint wrote, and refusing the
     // frame would make the directory unopenable.
+    // Whether the frame's single column is the row's stored text (this engine,
+    // `build_append`) or a typed column (the reference, and any one-column
+    // table): the answer is a property of the frame, which the decoded block
+    // does not keep, so it is read here.
+    let row_text_frame = storage::wal::block::is_row_text_frame(block);
     let Some(block) = storage::wal::block::to_data_block(block) else {
         return Ok(Vec::new());
     };
@@ -2022,7 +2087,7 @@ fn append_rows(
             // unreadable here; the block the checkpoint wrote still holds it,
             // so the replay skips it rather than refusing to open the
             // directory.
-            let Some(text) = row_text(block, row) else {
+            let Some(text) = row_text(block, row, row_text_frame) else {
                 row += 1;
                 continue;
             };
@@ -2038,10 +2103,11 @@ fn append_rows(
 /// (`Engine::encode_row_stored`).
 ///
 /// This engine's own append records carry that text in a single varchar column
-/// (`build_append`), so the one-column case returns the blob verbatim; the
-/// reference's `WalCmdAppendV2` carries the table's real typed columns instead
-/// (`DataBlock::WriteAdv`), so they have to be rendered back.
-fn row_text(block: &DataBlock, row: usize) -> Option<String> {
+/// (`build_append`, tagged so it can be recognised); the reference's
+/// `WalCmdAppendV2` carries the table's real typed columns instead
+/// (`DataBlock::WriteAdv`), so they have to be rendered back. A one-column
+/// table is one column either way, which is what `row_text_frame` settles.
+fn row_text(block: &DataBlock, row: usize, row_text_frame: bool) -> Option<String> {
     // A table whose columns carry no per-row scalar (a multi-vector) reports a
     // zero row count; the row still has to come back, so the bound only applies
     // when the block does count rows.
@@ -2049,6 +2115,24 @@ fn row_text(block: &DataBlock, row: usize) -> Option<String> {
         return None;
     }
     let mut cells = Vec::with_capacity(block.column_count());
+    if block.column_count() == 1 && block.row_count() > 0 {
+        let value = match block.get_value(0, row) {
+            Some(value) => cell_text(&value),
+            None => "null".to_string(),
+        };
+        // One column is ambiguous: this engine's frames carry the whole row in
+        // it (`build_append`, tagged `VECTOR_ROW_TEXT`), while the reference's
+        // frames carry the table's typed columns, and a one-column table has
+        // exactly one of those. Only the tag decides. A value already in the
+        // marked form is this engine's either way - the reference writes
+        // rendered cells, never escapes - so it is kept as it is.
+        if row_text_frame || common::row_text::is_marked(&value) {
+            return Some(value);
+        }
+        // A typed cell: a TAB inside it must stay inside it, or the reader sees
+        // the rest of the value as other columns' cells.
+        return Some(common::row_text::encode(&[value]));
+    }
     for column in 0..block.column_count() {
         // Inside the block a missing value is a NULL slot (`BlockValue::Null`
         // is the encoder's own marker, the decoder reports the slot as absent),
@@ -2058,7 +2142,9 @@ fn row_text(block: &DataBlock, row: usize) -> Option<String> {
             None => "null".to_string(),
         });
     }
-    Some(cells.join("\t"))
+    // A cell may carry a TAB of its own (a VARCHAR holding source code), which
+    // a plain join would turn into a column separator.
+    Some(common::row_text::encode(&cells))
 }
 
 /// `.slt`/storage text of one typed value (`Literal::to_slt_string`).

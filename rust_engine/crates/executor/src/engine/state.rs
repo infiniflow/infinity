@@ -915,11 +915,14 @@ pub(crate) fn prune_conditions(
 }
 
 pub(crate) fn encode_row(row: &[Literal], types: &[String]) -> String {
-    row.iter()
+    // `row_text::encode`, not a plain join: a VARCHAR cell may contain a TAB,
+    // and a TAB inside a cell is indistinguishable from the separator.
+    let cells: Vec<String> = row
+        .iter()
         .enumerate()
         .map(|(i, v)| encode_cell_stored(v, types.get(i)))
-        .collect::<Vec<_>>()
-        .join("\t")
+        .collect();
+    common::row_text::encode(&cells)
 }
 
 /// The stored text of one cell, normalised by its declared type.
@@ -6515,8 +6518,9 @@ pub(crate) async fn run_bottom(
                     Ok(row) => published.push((append.seq_at(k), row)),
                     Err(_) => published.push((
                         append.seq_at(k),
-                        text.split('\t')
-                            .map(|c| Value::Str(c.to_string()))
+                        common::row_text::split(text)
+                            .into_iter()
+                            .map(|c| Value::Str(c.into_owned()))
                             .collect(),
                     )),
                 }

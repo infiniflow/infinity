@@ -77,6 +77,43 @@ impl SnapshotBrief {
     }
 }
 
+/// The directory a snapshot create made, removed again unless it finished.
+///
+/// The directory *is* how the name is reserved (`prepare_snapshot_dir` refuses
+/// one that exists), so a create that fails after it exists - the copy, the
+/// metadata write, the commit - reserves the name for a snapshot that never
+/// appears. The next attempt then answers "already exists", for good: both the
+/// client's retry after a transient failure and the front end's retry after a
+/// commit conflict are refused. Dropping the directory with the statement keeps
+/// the reservation and the snapshot in step.
+pub(crate) struct SnapshotDir {
+    path: PathBuf,
+    keep: bool,
+}
+
+impl SnapshotDir {
+    /// Keeps the directory: the snapshot is complete and logged.
+    fn keep(mut self) {
+        self.keep = true;
+    }
+}
+
+impl std::ops::Deref for SnapshotDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for SnapshotDir {
+    fn drop(&mut self) {
+        if !self.keep {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
 impl Engine {
     /// Every snapshot with its `SHOW SNAPSHOTS` line
     /// (`SnapshotBrief::GetSnapshots`): the directory has to hold
@@ -219,7 +256,9 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
-        .await
+        .await?;
+        dir.keep();
+        Ok(())
     }
 
     /// `CREATE SNAPSHOT <name> ON DATABASE <db>`: every table of `db`, under
@@ -259,7 +298,9 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
-        .await
+        .await?;
+        dir.keep();
+        Ok(())
     }
 
     /// `CREATE SNAPSHOT <name> ON SYSTEM`: every table of every database,
@@ -311,7 +352,9 @@ impl Engine {
             snapshot_name: name.to_string(),
             max_commit_ts: snapshot_ts,
         })
-        .await
+        .await?;
+        dir.keep();
+        Ok(())
     }
 
     /// `DROP SNAPSHOT <name>`: the reference renames the directory to
@@ -851,7 +894,7 @@ impl Engine {
     /// `<snapshot_dir>/<name>/`, created empty. The reference refuses a name
     /// that is already there before it does any work
     /// (`PrepareCommitCreateTableSnapshot`).
-    fn prepare_snapshot_dir(&self, name: &str) -> Result<PathBuf> {
+    pub(crate) fn prepare_snapshot_dir(&self, name: &str) -> Result<SnapshotDir> {
         let dir = self.snapshot_dir().join(name);
         if dir.exists() {
             return Err(Error::SnapshotAlreadyExists(format!(
@@ -859,7 +902,10 @@ impl Engine {
             )));
         }
         std::fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
-        Ok(dir)
+        Ok(SnapshotDir {
+            path: dir,
+            keep: false,
+        })
     }
 
     /// Copies everything the table owns in the data directory

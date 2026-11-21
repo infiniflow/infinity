@@ -910,23 +910,22 @@ impl Engine {
         // stored form of the columns where it does not (a multivector is
         // reshaped, a sparse vector re-spelled). Reusing the display string
         // keeps the append buffer from formatting every vector element twice.
+        // `row_text::encode` escapes a cell that carries a TAB itself; a plain
+        // join would let such a value shift every following column.
         let encoded_rows: Vec<String> = rows
             .iter()
             .zip(&cells)
             .map(|(row, rendered)| {
-                let mut text = String::new();
+                let mut parts: Vec<String> = Vec::with_capacity(row.len());
                 for (i, cell) in row.iter().enumerate() {
-                    if i > 0 {
-                        text.push('\t');
-                    }
                     match types.get(i) {
                         Some(ty) if !stored_text_is_display(ty) => {
-                            text.push_str(&encode_cell_stored(cell, Some(ty)))
+                            parts.push(encode_cell_stored(cell, Some(ty)))
                         }
-                        _ => text.push_str(rendered.get(i).map(String::as_str).unwrap_or("")),
+                        _ => parts.push(rendered.get(i).cloned().unwrap_or_default()),
                     }
                 }
-                text
+                common::row_text::encode(&parts)
             })
             .collect();
         // Emit the reference `WalCmdAppendV2` (real typed columns) when the

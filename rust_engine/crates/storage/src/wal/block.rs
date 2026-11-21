@@ -57,6 +57,21 @@ pub const VECTOR_FLAT: u8 = 1;
 pub const VECTOR_CONSTANT: u8 = 2;
 pub const VECTOR_COMPACT_BIT: u8 = 3;
 
+/// Vector-type bit this engine sets on the single column of an append frame
+/// whose value is already the row's stored text (`txn::build_append`), so the
+/// replay can tell it from a typed one-column table written by the reference.
+///
+/// `read_values` compares against [`VECTOR_COMPACT_BIT`] alone, so the bit rides
+/// along without changing how the values decode - here or in the reference,
+/// which only ever asks whether a column is bit-packed.
+pub const VECTOR_ROW_TEXT: u8 = VECTOR_FLAT | 0x80;
+
+/// True when `columns` is an append frame this engine wrote: one column that
+/// carries the row's stored text rather than a typed value.
+pub fn is_row_text_frame(columns: &[BlockColumn]) -> bool {
+    columns.len() == 1 && columns[0].vector_type == VECTOR_ROW_TEXT
+}
+
 /// `EmbeddingDataType` element width in bytes; `Bit` has no byte width.
 pub fn element_width(elem: EmbeddingDataType) -> Option<usize> {
     Some(match elem {

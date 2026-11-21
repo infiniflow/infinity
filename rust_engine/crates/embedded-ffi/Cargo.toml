@@ -1,0 +1,20 @@
+[package]
+name = "embedded-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# The shared library a host process (rgrep's daemon) loads: the engine runs
+# inside that process, so its lifetime is the host's.
+name = "infinity_embedded"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+executor.workspace = true
+server.workspace = true
+tokio.workspace = true
+libc = "0.2"
+
+[lints]
+workspace = true

@@ -461,3 +461,37 @@ async fn a_restore_does_not_bring_back_rows_written_after_the_snapshot() {
         "replay must not resolve the restored table to the dropped one's id"
     );
 }
+/// A create that stops after its directory exists must give the name back.
+///
+/// The directory *is* the reservation, and `execute_stmt_retrying` re-runs a
+/// statement that lost its commit: without the guard the retry is answered with
+/// "Snapshot: <name> already exists" for a snapshot nobody ever wrote - the
+/// shape of the `test_snapshot_naming_conventions` failure in CI, where the
+/// first attempt of the loop's third name left the directory behind and every
+/// attempt after it was refused.
+#[tokio::test]
+async fn a_failed_create_does_not_reserve_the_name() {
+    let (_dir, e) = engine().await;
+    e.execute("CREATE TABLE snap_f (a INT);").await.unwrap();
+    {
+        // What a failing copy / metadata write / commit leaves: the directory,
+        // and nothing else.
+        let staged = e.prepare_snapshot_dir("snap_failed").unwrap();
+        assert!(staged.exists(), "the reservation is the directory");
+    }
+    assert!(
+        !e.snapshot_dir().join("snap_failed").exists(),
+        "the name has to be free again once the statement is gone"
+    );
+    // The same name now goes through, which is what the retry needs.
+    e.execute("CREATE SNAPSHOT snap_failed ON TABLE snap_f;")
+        .await
+        .unwrap();
+    assert!(
+        e.snapshot_dir()
+            .join("snap_failed")
+            .join("snap_failed.json")
+            .exists(),
+        "the retried create has to write its metadata"
+    );
+}

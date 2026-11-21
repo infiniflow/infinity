@@ -335,9 +335,70 @@ pub(crate) fn reject_taken_loopback(addr: &str) -> Result<()> {
     }
 }
 
+/// Where the thrift front end accepts connections.
+enum Listen {
+    Tcp(TcpListener),
+    /// A socket file: the embedded mode. It is unlinked on shutdown, so a
+    /// crashed run leaves one stale path that `bind_unix` clears. The inode is
+    /// the one the bind created: unlinking is only this server's business while
+    /// the path still names that inode, since a peer engine may bind the same
+    /// path the moment this listener closes.
+    #[cfg(unix)]
+    Unix(
+        std::os::unix::net::UnixListener,
+        std::path::PathBuf,
+        Option<u64>,
+    ),
+}
+
+/// Refuses a socket path a live listener still serves, and clears one that a
+/// killed run left behind.
+///
+/// The file's presence says nothing: a crash leaves it, and unlinking it while
+/// another engine serves it would take the endpoint away from a client that is
+/// already connected. Ask the socket instead - a connect that succeeds means a
+/// live listener, and `ECONNREFUSED` is the one answer that means stale.
+#[cfg(unix)]
+fn clear_stale_socket(path: &std::path::Path) -> Result<()> {
+    use std::io::ErrorKind;
+    match std::os::unix::net::UnixStream::connect(path) {
+        Ok(_) => {
+            return Err(Error::Invalid(format!(
+                "cannot serve on {}: a live listener already accepts connections there. \
+                 Stop it or serve on another path",
+                path.display()
+            )))
+        }
+        Err(e) if e.kind() == ErrorKind::ConnectionRefused => {}
+        // Nothing there, or a path that is not a socket at all: the bind is the
+        // one that has to report it, and it must not be us deleting a file.
+        Err(_) => return Ok(()),
+    }
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(Error::io(path.display().to_string(), e)),
+    }
+}
+
+/// The inode of the socket file at `path`, when it is there.
+#[cfg(unix)]
+fn socket_ino(path: &std::path::Path) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(path).ok().map(|m| m.ino())
+}
+
+/// Unlinks the socket file only while it is still the one this server bound.
+#[cfg(unix)]
+fn remove_socket_owned_by(path: &std::path::Path, ino: Option<u64>) {
+    if ino.is_some() && socket_ino(path) == ino {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 /// A minimal TCP server that handles one `Connect` per connection.
 pub struct Server {
-    listener: TcpListener,
+    listen: Listen,
     sessions: Arc<RwLock<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
@@ -352,7 +413,7 @@ impl Server {
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
         let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         Ok(Self {
-            listener,
+            listen: Listen::Tcp(listener),
             sessions: Arc::new(RwLock::new(HashMap::new())),
             next_session: Arc::new(AtomicI64::new(1)),
             engine: None,
@@ -380,6 +441,35 @@ impl Server {
         Ok(s)
     }
 
+    /// [`Self::bind_with_engine`] on a unix socket: the engine runs inside the
+    /// caller's process and no port is taken, which is what the embedded mode
+    /// of a local client wants. The path is removed on shutdown.
+    #[cfg(unix)]
+    pub fn bind_unix_with_engine(
+        path: impl AsRef<std::path::Path>,
+        engine: Arc<Engine>,
+    ) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        // A previous run that was killed leaves the socket file behind, and a
+        // bind on it fails with EADDRINUSE - but a *live* listener's file must
+        // not be taken away. `clear_stale_socket` tells the two apart.
+        clear_stale_socket(&path)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| Error::io(parent.display().to_string(), e))?;
+        }
+        let listener = std::os::unix::net::UnixListener::bind(&path)
+            .map_err(|e| Error::io(path.display().to_string(), e))?;
+        engine.install_engine_handle();
+        Ok(Self {
+            listen: Listen::Unix(listener, path.clone(), socket_ino(&path)),
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+            next_session: Arc::new(AtomicI64::new(1)),
+            engine: Some(engine),
+            peer: Arc::new(PeerManager::new("leader", path.display().to_string(), 0)),
+        })
+    }
+
     /// The peer/cluster manager shared with every connection. Mutating node
     /// state through it (`register_peer`, `heartbeat_peer`, `change_role`) is
     /// reflected by `SHOW CURRENT NODE`.
@@ -388,11 +478,14 @@ impl Server {
     }
 
     pub fn local_addr(&self) -> Result<String> {
-        Ok(self
-            .listener
-            .local_addr()
-            .map_err(|e| Error::io("<addr>", e))?
-            .to_string())
+        match &self.listen {
+            Listen::Tcp(listener) => Ok(listener
+                .local_addr()
+                .map_err(|e| Error::io("<addr>", e))?
+                .to_string()),
+            #[cfg(unix)]
+            Listen::Unix(_, path, _) => Ok(path.display().to_string()),
+        }
     }
 
     /// Serves Thrift on the **caller's** runtime, until it is shut down.
@@ -408,18 +501,39 @@ impl Server {
         use volo_thrift::codec::default::thrift::MakeThriftCodec;
         use volo_thrift::codec::default::DefaultMakeCodec;
 
-        self.listener
-            .set_nonblocking(true)
-            .expect("set the thrift listener non-blocking");
-        let listener =
-            tokio::net::TcpListener::from_std(self.listener).expect("adopt the thrift listener");
         let service =
             service::Service::new(self.engine, self.sessions, self.next_session, self.peer);
         // Unframed `TBinaryProtocol`, which is what the python/go SDKs speak.
         let server = volo_gen::infinity::InfinityServiceServer::new(service)
             .make_codec(DefaultMakeCodec::new(MakeThriftCodec::new()));
-        if let Err(e) = server.run(DefaultIncoming::from(listener)).await {
-            eprintln!("[THRIFT] server stopped: {e}");
+        match self.listen {
+            Listen::Tcp(listener) => {
+                listener
+                    .set_nonblocking(true)
+                    .expect("set the thrift listener non-blocking");
+                let listener =
+                    tokio::net::TcpListener::from_std(listener).expect("adopt the thrift listener");
+                if let Err(e) = server.run(DefaultIncoming::from(listener)).await {
+                    eprintln!("[THRIFT] server stopped: {e}");
+                }
+            }
+            #[cfg(unix)]
+            Listen::Unix(listener, path, ino) => {
+                listener
+                    .set_nonblocking(true)
+                    .expect("set the unix listener non-blocking");
+                let listener =
+                    tokio::net::UnixListener::from_std(listener).expect("adopt the unix listener");
+                let out = server.run(DefaultIncoming::from(listener)).await;
+                // The socket file this bind made is ours to unlink - no longer
+                // once a peer engine has rebound the path, which the inode
+                // tells apart. Leaving ours behind would make the next
+                // `bind_unix` look like a live server.
+                remove_socket_owned_by(&path, ino);
+                if let Err(e) = out {
+                    eprintln!("[THRIFT] server stopped: {e}");
+                }
+            }
         }
     }
 }

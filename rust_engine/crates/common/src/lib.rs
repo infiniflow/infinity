@@ -43,6 +43,7 @@ pub mod datetime;
 pub mod error;
 pub mod fp16;
 pub mod json;
+pub mod row_text;
 pub mod simd;
 pub mod types;
 pub mod utility;

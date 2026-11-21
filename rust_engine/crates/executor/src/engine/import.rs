@@ -901,9 +901,9 @@ impl Engine {
                     Ok(values) => values,
                     // Never drop a row because its text form would not parse:
                     // the cells are that text, which is what the writer stores.
-                    Err(_) => encoded
-                        .split('\t')
-                        .map(|c| Value::Str(c.to_string()))
+                    Err(_) => common::row_text::split(&encoded)
+                        .into_iter()
+                        .map(|c| Value::Str(c.into_owned()))
                         .collect(),
                 };
                 published.push((base + k, values));
