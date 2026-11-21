@@ -53,13 +53,12 @@ env:
   # deliberately - they want a clean slate - and pass the linker flag themselves
   # where it matters.
   #
-  # RocksDB's `crc32c.cc` calls `_mm_clmulepi64_si128`, and no x86-64-vN level
-  # defines `__PCLMUL__`, so the C side needs `-mpclmul`. It goes through
-  # `CFLAGS`/`CXXFLAGS` rather than `-C target-feature=+pclmulqdq`, because the
-  # latter makes LLVM emit 52 AVX-512 instructions elsewhere in the binary -
-  # measured: `zmm` goes 0 -> 52 - and those fault on a CPU whose `avx512f` does
-  # not cover the whole set (Xeon 6975P-C died with SIGILL while an EPYC 9V45
-  # ran the same binary).
+  # AVX2 baseline (Haswell, 2013). The binary carries no AVX-512: `crc32fast`
+  # was the only source of it, and it is patched to a slicing-by-8 stand-in
+  # (`crates/crc32fast-shim`, see `[patch.crates-io]`). Without that patch the
+  # crate emits 52 `zmm` instructions whatever `target-cpu` says, and on this
+  # runner pool some CPUs advertise `avx512f` in CPUID and then reject it - the
+  # engine died with SIGILL before it could log a line.
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
     -C target-cpu=x86-64-v3
   CFLAGS_x86_64_unknown_linux_gnu: -mpclmul

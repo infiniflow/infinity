@@ -66,7 +66,7 @@ use std::path::{Path, PathBuf};
 
 use ::common::{Error, LogicalType, Result, TxnTimeStamp};
 
-use crate::crc::crc32_ieee;
+use crate::crc::{crc32_ieee, Crc32};
 use crate::data_block::{BlockValue, Column, ColumnVector, DataBlock};
 
 /// `WalEntryHeader` (`wal_entry.cppm:879`) is 24 bytes on the wire.
@@ -644,7 +644,7 @@ impl WalEntry {
         if trailing as usize != size {
             return None;
         }
-        let mut hasher = crc32fast::Hasher::new();
+        let mut hasher = Crc32::new();
         hasher.update(&buf[..4]);
         hasher.update(&[0u8; 4]);
         hasher.update(&buf[8..size]);

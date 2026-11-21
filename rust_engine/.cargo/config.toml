@@ -36,6 +36,9 @@ rustflags = [
 #   -C target-cpu=x86-64-v3
 # plus `CFLAGS`/`CXXFLAGS_x86_64_unknown_linux_gnu=-mpclmul` for the C side.
 #
+# `crc32fast` is patched to a SIMD-free stand-in, so nothing here pulls in an
+# AVX-512 path that a hypervisor might advertise and then reject.
+#
 # `x86-64-v3` is the AVX2 baseline (Haswell, 2013). Without it the default
 # `x86-64` target has only SSE2, and `std::simd`'s `f32x8` is split into two
 # 128-bit halves: the exact scan's `l2_sq` came out as `subps`/`mulps`/`addps`
