@@ -927,6 +927,73 @@ mod tests {
         );
     }
 
+    /// A row whose **sealed** copy was retired and then re-published into the
+    /// tail must answer again.
+    ///
+    /// `overridden` is filtered by `MergeCursor::settle` on **every** source,
+    /// the tail included, so a stale mark silences the fresh copy as well: the
+    /// document is in the tail, `total_docs` counts it, and no `MATCH` can
+    /// return it. That is the shape of the flaky
+    /// `concurrent_insert_query_seal_and_optimize_do_not_deadlock` failure in CI
+    /// (`35` of `36` rows, `total_docs=36`, `overridden=1`, one tail document).
+    #[tokio::test]
+    async fn a_row_republished_into_the_tail_answers_again() {
+        let q = "SELECT id FROM rep SEARCH MATCH TEXT (body, 'alpha', 100);";
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_memindex_capacity(4);
+        e.execute("CREATE TABLE rep (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rep_idx ON rep (body) USING FULLTEXT")
+            .await
+            .unwrap();
+        for i in 0..8 {
+            e.execute(&format!(
+                "INSERT INTO rep VALUES ({i}, 'alpha beta row{i}');"
+            ))
+            .await
+            .unwrap();
+        }
+        e.flush().await.unwrap();
+        assert!(
+            fulltext_chunks(&e).await > 0,
+            "the rows have to be in a chunk"
+        );
+        assert_eq!(rows(&e, q).await.len(), 8, "the sealed rows answer first");
+        let tkey = e.table_key("rep");
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|entry| entry.text.get(&e.test_index_id("rep", "body", "FULLTEXT")))
+                .cloned()
+                .expect("the index is cached")
+        };
+        {
+            let tokenizer = shared.read().await.tokenizer.clone();
+            let doc = crate::engine::text_index::prepare_doc(0, "alpha beta row0", &tokenizer);
+            // The insert path's pair: retire the sealed copy, publish the fresh
+            // one into the tail (`update_text_indexes_batch`). The retirement
+            // takes its own short guard; `index_row_prepared` takes the handle
+            // and locks it itself, so the two are sequential rather than nested.
+            {
+                let mut index = shared.write().await;
+                crate::engine::state::index_delete_row(&mut index, 0);
+            }
+            crate::engine::state::index_row_prepared(&shared, &doc).await;
+        }
+        let mut got: Vec<String> = rows(&e, q).await.into_iter().flatten().collect();
+        got.sort();
+        assert_eq!(
+            got,
+            (0..8).map(|i| i.to_string()).collect::<Vec<_>>(),
+            "the re-published row lost its own answer"
+        );
+    }
+
     /// The worst schedule: every attempt is both renumbered *and* left without a
     /// cache to read. Answering from such a build returns rows no fetch can
     /// resolve (an empty `MATCH` on a table full of matches), so the statement
@@ -13249,23 +13316,40 @@ mod tests {
             // not resolve are three different bugs, and the count alone cannot
             // tell them apart. A reopen answers the last question - whether the
             // cache in this process is the only thing that is short.
-            let ids: Vec<u64> = missing.iter().filter_map(|id| id.parse().ok()).collect();
             let index_id = e.fulltext_index_id("mix", "body").unwrap_or_default();
-            let state = e.text_index_state("mix", index_id, &ids);
+            // `text_index_state` probes **row ids**, while `missing` holds `id`
+            // column values: handing the value straight over asked a 36-row
+            // table about row 2011, and "in no source" answered nothing at all.
+            // Resolve each value to the seq its row is stored under.
+            let seqs: Vec<u64> = e
+                .fetch_rows_including_deleted_from("mix", 0)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|(_, values)| {
+                    values.first().is_some_and(|value| {
+                        let text = value.to_slt_string();
+                        missing.iter().any(|id| id.as_str() == text.as_str())
+                    })
+                })
+                .map(|(seq, _)| seq as u64)
+                .collect();
+            let state = e.text_index_state("mix", index_id, &seqs);
             let after_reopen = match Engine::open_async(dir.path(), Default::default()).await {
-                Ok(fresh) => Some(
+                Ok(fresh) => format!(
+                    "{} matches",
                     rows(
                         &fresh,
-                        "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+                        "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);"
                     )
                     .await
-                    .len(),
+                    .len()
                 ),
-                Err(_) => None,
+                Err(err) => format!("open failed: {err}"),
             };
             panic!(
-                "the full-text index lost rows {missing:?} (scanned {}, matched {} of {})\n\
-                 matched={matched:?}\n{state}\nmatched after a reopen={after_reopen:?}",
+                "the full-text index lost rows {missing:?} (scanned {}, matched {} of {}, \
+                 row ids {seqs:?})\n\
+                 matched={matched:?}\n{state}\nmatched after a reopen={after_reopen}",
                 scanned.len(),
                 matched.len(),
                 WRITERS * PER_WRITER

@@ -7070,6 +7070,7 @@ pub(crate) fn mem_index_key(table: &str, index_id: u64) -> String {
 }
 /// [`index_row`] with the document already tokenised (see
 /// [`prepare_doc`]): the write lock is held only for the insertion.
+///
 /// Inserts one document, spilling a run first when the budget is full.
 ///
 /// The index is locked **inside** this function, one short critical section at
@@ -7082,6 +7083,14 @@ pub(crate) async fn index_row_prepared(shared: &SharedTextIndex, doc: &PreparedD
     // insert.
     {
         let mut index = shared.write().await;
+        // Publishing a document makes its row id answerable again, so the id
+        // must not stay retired: [`MergeCursor::settle`] filters `overridden` on
+        // **every** source, the tail included, so a mark left by the retirement
+        // of an older, sealed copy of this row would silence the fresh one - the
+        // document counts towards `total_docs` (the cache looks complete) and no
+        // `MATCH` returns it. [`TextIndex::complete_seal`] clears the same marks
+        // for the rows a new chunk takes; this is the tail's half of that rule.
+        index.overridden.remove(&doc.seq);
         let budget = index.budget;
         if index.mem.insert_prepared(doc, budget) {
             return;

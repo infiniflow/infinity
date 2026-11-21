@@ -748,12 +748,15 @@ impl IncIndex {
         let k = want.min(FANOUT).min(viable).clamp(2, FANOUT);
 
         let refs: Vec<&[f32]> = rows.iter().map(|row| row.as_slice()).collect();
+        // No pin: the subtree is being created, so there is no existing region a
+        // half has to keep.
         let (_, assign) = kmeans_k(
             &refs,
             self.dim,
             k,
             self.opts.kmeans_iterations,
             self.opts.seed ^ key.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            None,
         );
         let mut groups: Vec<Vec<Vec<f32>>> = vec![Vec::new(); k];
         for (i, slot) in assign.iter().enumerate() {
@@ -997,6 +1000,10 @@ impl IncIndex {
             vectors.len().div_ceil((target / 2).max(1)).clamp(2, FANOUT)
         };
         let seed = self.opts.seed ^ key.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        // The node keeps its centroid (I1), so the group nearest to it is the
+        // region the node already owns: pin one centre there (Cockroach's
+        // `pinLeftCentroid`) and let the rest of the cut be estimated against it.
+        let pin = self.parts[idx].centroid.clone();
         let groups: Vec<Vec<(u64, &[f32])>> = if groups_wanted == 2 {
             // Two-way cuts are the common case (a leaf crosses `max` by a row or
             // two) and have to be *balanced*: Cockroach bisects with
@@ -1005,11 +1012,12 @@ impl IncIndex {
             // pass folds it straight back into its sibling, and the leaf refills
             // and splits again - measured at 1344 merges per 200k pure inserts,
             // one per two splits. A balanced cut makes that zero.
-            let split = super::kmeans::balanced_kmeans_2(
+            let split = super::kmeans::balanced_kmeans_2_pinned(
                 &refs,
                 self.dim,
                 self.opts.kmeans_iterations,
                 seed,
+                Some(&pin),
             );
             let mut groups: Vec<Vec<(u64, &[f32])>> = vec![Vec::new(), Vec::new()];
             for (i, &second) in split.second.iter().enumerate() {
@@ -1023,6 +1031,7 @@ impl IncIndex {
                 groups_wanted,
                 self.opts.kmeans_iterations,
                 seed,
+                Some(&pin),
             );
             let mut groups: Vec<Vec<(u64, &[f32])>> = vec![Vec::new(); centroids.len()];
             for (i, slot) in assign.iter().enumerate() {
@@ -1138,12 +1147,17 @@ impl IncIndex {
             return Ok(());
         }
         let refs: Vec<&[f32]> = vectors.iter().map(|v| v.as_slice()).collect();
+        // The overflowing leaf keeps its key and moves to one half, so that half
+        // has to stay in its region: pin the leaf's own centroid and only find
+        // the sibling's (`pinLeftCentroid`).
+        let pin = self.parts[idx].centroid.clone();
         let (_, assign) = kmeans_k(
             &refs,
             self.dim,
             2,
             self.opts.kmeans_iterations,
             self.opts.seed ^ key.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            Some(&pin),
         );
         let mut halves: [Vec<(u64, &[f32])>; 2] = [Vec::new(), Vec::new()];
         for (i, slot) in assign.iter().enumerate() {
@@ -1461,28 +1475,51 @@ impl Rng {
 /// recall collapsed to ~0.55 on a 600-row test. Cutting into up to `FANOUT`
 /// groups keeps the depth at 2–3 for the whole 8.4 M-row segment.
 ///
-/// Empty clusters are repaired by stealing a point from the largest cluster, so
-/// a split never yields an empty leaf (which would split again on the very next
-/// insert, forever).
+/// Three things keep this cheap enough to run inside a fixup:
+///
+/// - the centres are **estimated on a bounded sample** (`SAMPLE_POINTS` rows,
+///   evenly spaced), so a leaf holding a bulk import's rows does not pay
+///   `iterations × n` distance passes; the node itself is then visited exactly
+///   once, by the final assignment - the same trade
+///   [`super::kmeans::balanced_kmeans_2_by`] makes;
+/// - assignment runs the norm expansion in `assign_by_norms` instead of a
+///   direct per-pair loop (two operations per element instead of three, with the
+///   centroid register-blocked over four rows);
+/// - `pin` fixes the first centre, Cockroach's `pinLeftCentroid`: the half that
+///   owns the node's existing centroid keeps that region, and the remaining
+///   `k - 1` centres are found by k-means++ against it.
+///
+/// Empty clusters are repaired by stealing the farthest row of the largest
+/// cluster, so a split never yields an empty leaf (which would split again on
+/// the very next insert, forever).
 pub(crate) fn kmeans_k(
     points: &[&[f32]],
     dim: usize,
     k: usize,
     iterations: usize,
     seed: u64,
+    pin: Option<&[f32]>,
 ) -> (Vec<Vec<f32>>, Vec<u32>) {
     let n = points.len();
     let k = k.min(n).max(1);
     let mut rng = Rng::new(seed);
 
-    // k-means++ seeding: first centre uniformly, the rest proportional to D².
+    let sampled = super::kmeans::sample_indices(n);
+    let sample: Vec<&[f32]> = sampled.iter().map(|at| points[*at]).collect();
+    let m = sample.len();
+
+    // k-means++ seeding: first centre uniformly (or the caller's pinned one),
+    // the rest proportional to D².
     let mut centroids: Vec<Vec<f32>> = Vec::with_capacity(k);
-    centroids.push(points[(rng.next() % n as u64) as usize].to_vec());
-    let mut nearest = vec![f32::INFINITY; n];
+    match pin.filter(|centre| centre.len() == dim) {
+        Some(centre) => centroids.push(centre.to_vec()),
+        None => centroids.push(sample[(rng.next() % m as u64) as usize].to_vec()),
+    }
+    let mut nearest = vec![f32::INFINITY; m];
     while centroids.len() < k {
         let last = centroids.last().expect("non-empty by construction");
         let mut total = 0.0f64;
-        for (i, p) in points.iter().enumerate() {
+        for (i, p) in sample.iter().enumerate() {
             let d = l2_sq(p, last);
             if d < nearest[i] {
                 nearest[i] = d;
@@ -1491,11 +1528,11 @@ pub(crate) fn kmeans_k(
         }
         if total <= 0.0 {
             // Every point coincides with a centre already chosen.
-            centroids.push(points[(rng.next() % n as u64) as usize].to_vec());
+            centroids.push(sample[(rng.next() % m as u64) as usize].to_vec());
             continue;
         }
         let mut target = rng.next_f64() * total;
-        let mut pick = n - 1;
+        let mut pick = m - 1;
         for (i, d) in nearest.iter().enumerate() {
             target -= *d as f64;
             if target <= 0.0 {
@@ -1503,65 +1540,106 @@ pub(crate) fn kmeans_k(
                 break;
             }
         }
-        centroids.push(points[pick].to_vec());
+        centroids.push(sample[pick].to_vec());
     }
 
-    let mut assign = vec![0u32; n];
-    for _ in 0..iterations {
-        let mut changed = false;
-        for i in 0..n {
-            let mut best = 0usize;
-            let mut best_d = f32::INFINITY;
-            for (c, centre) in centroids.iter().enumerate() {
-                let d = l2_sq(points[i], centre);
-                if d < best_d {
-                    best_d = d;
-                    best = c;
-                }
-            }
-            if assign[i] as usize != best {
-                assign[i] = best as u32;
-                changed = true;
-            }
-        }
-        if !changed {
+    let mut assign = super::kmeans::assign_by_norms(&sample, &centroids);
+    let keep_first = pin.is_some_and(|centre| centre.len() == dim);
+    for _ in 0..iterations.max(1) {
+        recompute_centroids(&sample, &assign, dim, keep_first, &mut centroids);
+        let next = super::kmeans::assign_by_norms(&sample, &centroids);
+        if next == assign {
             break;
         }
-        let mut sums = vec![vec![0.0f32; dim]; k];
-        let mut counts = vec![0usize; k];
-        for (i, p) in points.iter().enumerate() {
-            let c = assign[i] as usize;
-            counts[c] += 1;
-            for (o, x) in sums[c].iter_mut().zip(*p) {
-                *o += *x;
-            }
-        }
-        for c in 0..k {
-            if counts[c] == 0 {
-                let (mut big, mut big_n) = (0usize, 0usize);
-                for (j, count) in counts.iter().enumerate() {
-                    if *count > big_n {
-                        big_n = *count;
-                        big = j;
-                    }
-                }
-                if big_n > 1 {
-                    if let Some(i) = (0..n).find(|i| assign[*i] as usize == big) {
-                        assign[i] = c as u32;
-                        centroids[c] = points[i].to_vec();
-                        counts[c] = 1;
-                        counts[big] -= 1;
-                    }
-                }
-                continue;
-            }
-            let inv = 1.0 / counts[c] as f32;
-            for d in 0..dim {
-                centroids[c][d] = sums[c][d] * inv;
-            }
+        assign = next;
+    }
+
+    // Every row still has to be given a leaf; the sample only placed the centres.
+    let mut assign = super::kmeans::assign_by_norms(points, &centroids);
+    repair_empty_clusters(points, dim, &mut assign, &mut centroids);
+    recompute_centroids(points, &assign, dim, false, &mut centroids);
+    (centroids, assign)
+}
+
+/// Replaces each centroid with the mean of the rows assigned to it.
+///
+/// `keep_first` leaves centroid 0 alone: a pinned centre must not move, or the
+/// region it owns drifts and the pin means nothing.
+fn recompute_centroids(
+    points: &[&[f32]],
+    assign: &[u32],
+    dim: usize,
+    keep_first: bool,
+    centroids: &mut [Vec<f32>],
+) {
+    let k = centroids.len();
+    let mut sums = vec![vec![0.0f32; dim]; k];
+    let mut counts = vec![0usize; k];
+    for (i, p) in points.iter().enumerate() {
+        let c = assign[i] as usize;
+        counts[c] += 1;
+        for (o, x) in sums[c].iter_mut().zip(*p) {
+            *o += *x;
         }
     }
-    (centroids, assign)
+    for (c, count) in counts.iter().enumerate() {
+        if *count == 0 || (keep_first && c == 0) {
+            continue;
+        }
+        let inv = 1.0 / *count as f32;
+        for d in 0..dim {
+            centroids[c][d] = sums[c][d] * inv;
+        }
+    }
+}
+
+/// Gives every empty cluster the farthest row of the largest one.
+///
+/// A centroid with no members is a zero vector that wins no assignment, so it
+/// stays empty forever; the split it came from then yields an empty leaf and the
+/// next insert splits again.
+fn repair_empty_clusters(
+    points: &[&[f32]],
+    dim: usize,
+    assign: &mut [u32],
+    centroids: &mut [Vec<f32>],
+) {
+    let k = centroids.len();
+    loop {
+        let mut counts = vec![0usize; k];
+        for c in assign.iter() {
+            counts[*c as usize] += 1;
+        }
+        let Some(empty) = counts.iter().position(|count| *count == 0) else {
+            return;
+        };
+        let (mut big, mut big_n) = (0usize, 0usize);
+        for (c, count) in counts.iter().enumerate() {
+            if *count > big_n {
+                big_n = *count;
+                big = c;
+            }
+        }
+        if big_n <= 1 {
+            return;
+        }
+        // The farthest member, so the new centre sits where the data is rather
+        // than on the cluster's fringe.
+        let mut worst = (0usize, f32::NEG_INFINITY);
+        for (i, c) in assign.iter().enumerate() {
+            if *c as usize != big {
+                continue;
+            }
+            let d = l2_sq(points[i], &centroids[big]);
+            if d > worst.1 {
+                worst = (i, d);
+            }
+        }
+        assign[worst.0] = empty as u32;
+        let mut centre = points[worst.0].to_vec();
+        centre.resize(dim, 0.0);
+        centroids[empty] = centre;
+    }
 }
 
 fn dequantize_member(rot: &Rotation, rot_centroid: &[f32], member: &Member) -> Vec<f32> {

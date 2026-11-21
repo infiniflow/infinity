@@ -130,6 +130,35 @@ pub fn balanced_kmeans_2<V: AsRef<[f32]> + Sync>(
     )
 }
 
+/// [`balanced_kmeans_2`] with the first centroid **pinned**.
+///
+/// This is Cockroach's `pinLeftCentroid` (`cspann/kmeans.go:85`, used from
+/// `fixup_split.go:839`): when a partition that already has a centroid is split,
+/// one half must stay in that centroid's region - the node that keeps the key
+/// keeps its routing - so only the *new* side is estimated. Concretely the first
+/// centre starts at `pin` and is never recomputed by the Lloyd loop, while the
+/// second one is still drawn by k-means++ against it.
+///
+/// The two child centroids are recomputed from their members afterwards, as
+/// everywhere else in this tree (a child's radius and codes are relative to its
+/// own mean), so pinning decides *which rows go where*, not the final values.
+pub fn balanced_kmeans_2_pinned<V: AsRef<[f32]> + Sync>(
+    points: &[V],
+    dim: usize,
+    iterations: usize,
+    seed: u64,
+    pin: Option<&[f32]>,
+) -> Split {
+    balanced_kmeans_2_by_pinned(
+        points.len(),
+        |at| Cow::Borrowed(points[at].as_ref()),
+        dim,
+        iterations,
+        seed,
+        pin,
+    )
+}
+
 /// A position-indexed view of the vectors being split: the vector at `at`, as a
 /// borrow when the source can give one and as an owned vector when it has to be
 /// converted.
@@ -148,6 +177,19 @@ pub fn balanced_kmeans_2_by<'a>(
     dim: usize,
     iterations: usize,
     seed: u64,
+) -> Split {
+    balanced_kmeans_2_by_pinned(count, point, dim, iterations, seed, None)
+}
+
+/// [`balanced_kmeans_2_by`] with an optional pinned first centroid: see
+/// [`balanced_kmeans_2_pinned`].
+pub fn balanced_kmeans_2_by_pinned<'a>(
+    count: usize,
+    point: impl Fn(usize) -> Cow<'a, [f32]> + Sync + 'a,
+    dim: usize,
+    iterations: usize,
+    seed: u64,
+    pin: Option<&[f32]>,
 ) -> Split {
     if count == 0 {
         return Split {
@@ -169,18 +211,27 @@ pub fn balanced_kmeans_2_by<'a>(
     let sample_refs: Vec<&[f32]> = sample.iter().map(|v| v.as_ref()).collect();
     let sample_point = |at: usize| Cow::Borrowed(sample_refs[at]);
 
-    // k-means++: the first centre is drawn uniformly, the second with
-    // probability proportional to `d²`. The seed goes through a multiplication
-    // so adjacent seeds (`k ^ key`) do not collapse onto the same stream.
+    // k-means++: the first centre is drawn uniformly (or taken from the caller,
+    // when it is pinned), the second with probability proportional to `d²`. The
+    // seed goes through a multiplication so adjacent seeds (`k ^ key`) do not
+    // collapse onto the same stream.
     let mut rng = Lcg(seed
         .wrapping_mul(0x9E37_79B9_7F4A_7C15)
         .wrapping_add(0x2545_F491_4F6C_DD1D)
         | 1);
-    let first = ((rng.next() as usize) * sample.len()) % sample.len();
-    let c0 = sample[first].to_vec();
+    let pinned = pin.filter(|c| c.len() == dim);
+    // The fallback second centre is the row after the drawn first one; a pinned
+    // first centre owns no row, so that scan starts at the head.
+    let (c0, next) = match pinned {
+        Some(centre) => (centre.to_vec(), 0),
+        None => {
+            let first = ((rng.next() as usize) * sample.len()) % sample.len();
+            (sample[first].to_vec(), (first + 1) % sample.len())
+        }
+    };
     let weights: Vec<f32> = sample.iter().map(|p| d2(p, &c0)).collect();
     let total: f32 = weights.iter().sum();
-    let mut c1 = sample[(first + 1) % sample.len()].to_vec();
+    let mut c1 = sample[next].to_vec();
     if total > 0.0 {
         let target = rng.next() * total;
         let mut acc = 0.0f32;
@@ -205,7 +256,12 @@ pub fn balanced_kmeans_2_by<'a>(
         if a.is_empty() || b.is_empty() {
             break;
         }
-        centroids = [mean(&a, dim), mean(&b, dim)];
+        // A pinned centre is not recomputed: that is the whole point of pinning.
+        let first = match pinned {
+            Some(_) => centroids[0].clone(),
+            None => mean(&a, dim),
+        };
+        centroids = [first, mean(&b, dim)];
     }
 
     // The node is visited once: assignment, then the balance pass works off the
@@ -221,7 +277,7 @@ pub fn balanced_kmeans_2_by<'a>(
 
 /// `min(n, SAMPLE_POINTS)` evenly spaced indices - deterministic, and spread
 /// over the node instead of its head.
-fn sample_indices(n: usize) -> Vec<usize> {
+pub(crate) fn sample_indices(n: usize) -> Vec<usize> {
     if n <= SAMPLE_POINTS {
         return (0..n).collect();
     }
@@ -325,6 +381,70 @@ fn rebalance(point: &Point<'_>, dim: usize, centroids: &mut [Vec<f32>; 2], cells
     let a_refs: Vec<&[f32]> = a.iter().map(|v| v.as_ref()).collect();
     let b_refs: Vec<&[f32]> = b.iter().map(|v| v.as_ref()).collect();
     *centroids = [mean(&a_refs, dim), mean(&b_refs, dim)];
+}
+
+/// k-way assignment by the norm expansion: `‖x−c‖² = ‖x‖² − 2·x·c + ‖c‖²`.
+///
+/// The direct form ([`d2`] per pair) runs three operations per element - subtract,
+/// square, add - and re-reads the point for every centroid. The expansion makes it
+/// two (multiply, add) and lets the rows be blocked four at a time against one
+/// centroid ([`crate::simd::ip_x4`]), so each centroid block is loaded once per
+/// four rows instead of once per row. SuperKMeans (`AssignPoints` -> `Sgemm`) and
+/// FAISS's IVF assignment use exactly this shape.
+///
+/// The price is cancellation: `‖x‖²` and `‖c‖²` are O(d·|x|²) while the gap
+/// between two near neighbours can be O(1), so ties a few ulps apart may break
+/// either way. Membership is all this decides - every cluster's centroid is
+/// recomputed from its members afterwards - so the tree does not see a quality
+/// loss, but a build is no longer bit-identical to the direct form.
+pub(crate) fn assign_by_norms(points: &[&[f32]], centroids: &[Vec<f32>]) -> Vec<u32> {
+    let mut out = vec![0u32; points.len()];
+    if centroids.is_empty() {
+        return out;
+    }
+    let centroid_norms: Vec<f32> = centroids.iter().map(|c| crate::simd::ip(c, c)).collect();
+
+    let mut row = 0;
+    while row + 4 <= points.len() {
+        let rows = [
+            points[row],
+            points[row + 1],
+            points[row + 2],
+            points[row + 3],
+        ];
+        let mut norm = [0.0f32; 4];
+        for (n, p) in norm.iter_mut().zip(rows) {
+            *n = crate::simd::ip(p, p);
+        }
+        let mut best = [f32::INFINITY; 4];
+        let mut best_c = [0u32; 4];
+        for (c, centre) in centroids.iter().enumerate() {
+            let dots = crate::simd::ip_x4(rows, centre);
+            for r in 0..4 {
+                let d = norm[r] - 2.0 * dots[r] + centroid_norms[c];
+                if d < best[r] {
+                    best[r] = d;
+                    best_c[r] = c as u32;
+                }
+            }
+        }
+        out[row..row + 4].copy_from_slice(&best_c);
+        row += 4;
+    }
+    for (i, p) in points.iter().enumerate().skip(row) {
+        let norm = crate::simd::ip(p, p);
+        let mut best = f32::INFINITY;
+        let mut best_c = 0u32;
+        for (c, centre) in centroids.iter().enumerate() {
+            let d = norm - 2.0 * crate::simd::ip(p, centre) + centroid_norms[c];
+            if d < best {
+                best = d;
+                best_c = c as u32;
+            }
+        }
+        out[i] = best_c;
+    }
+    out
 }
 
 #[cfg(test)]
@@ -474,6 +594,64 @@ mod tests {
                 assert_eq!(old_second, new_second, "trial {trial}: mask differs");
                 assert_eq!(old_c, new_c, "trial {trial}: centroids differ");
             }
+        }
+    }
+
+    /// The norm expansion must pick the same centroid as the direct form
+    /// wherever the two are not a rounding tie apart.
+    #[test]
+    fn norm_expansion_assigns_like_the_direct_form() {
+        let mut state = 987_654_321u64;
+        let mut rand = move || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((state >> 33) as f32) / ((1u64 << 31) as f32)
+        };
+        for trial in 0..40 {
+            let (k, dim) = (2 + trial % 7, 3 + trial % 5);
+            let n = 9 + trial % 23;
+            let points: Vec<Vec<f32>> = (0..n)
+                .map(|_| (0..dim).map(|_| rand() * 10.0).collect())
+                .collect();
+            let centroids: Vec<Vec<f32>> = (0..k)
+                .map(|_| (0..dim).map(|_| rand() * 10.0).collect())
+                .collect();
+            let refs: Vec<&[f32]> = points.iter().map(|p| p.as_slice()).collect();
+            let got = assign_by_norms(&refs, &centroids);
+            for (i, row) in refs.iter().enumerate() {
+                let mut best = 0u32;
+                let mut best_d = f32::INFINITY;
+                for (c, centre) in centroids.iter().enumerate() {
+                    let d = d2(row, centre);
+                    if d < best_d {
+                        best_d = d;
+                        best = c as u32;
+                    }
+                }
+                let ours = best_d - d2(row, &centroids[got[i] as usize]);
+                assert!(
+                    got[i] == best || ours.abs() < 1e-3 * best_d.max(1.0),
+                    "trial {trial} row {i}: expansion picked {} (direct {best}), \
+                     d(worse) - d(best) = {ours}",
+                    got[i]
+                );
+            }
+        }
+    }
+
+    /// A pinned centre keeps the region it owns: with two well separated
+    /// clusters and the pin on one of them, that half is the pinned one and the
+    /// other centre is found against it.
+    #[test]
+    fn a_pinned_split_keeps_the_pinned_region() {
+        let data = clusters();
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let pinned = vec![0.0f32, 0.0];
+        let split = balanced_kmeans_2_pinned(&refs, 2, 16, 7, Some(&pinned));
+        let (a, b) = split.sizes();
+        assert_eq!(a, b, "a pinned split is still balanced");
+        for (i, second) in split.second.iter().enumerate() {
+            // The even rows sit at 0 and are the pinned half (`second == false`).
+            assert_eq!(*second, i % 2 == 1, "row {i} landed in the wrong half");
         }
     }
 }
