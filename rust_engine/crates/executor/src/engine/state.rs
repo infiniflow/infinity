@@ -3981,7 +3981,7 @@ impl MultiVectorIndex {
         &self,
         query: &[Vec<f32>],
         k: usize,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
         exact: Option<&dyn Fn(u64) -> Option<f32>>,
         plaid: &PlaidSearchOptions,
         allowed: Option<&std::collections::HashSet<u64>>,
@@ -3996,7 +3996,7 @@ impl MultiVectorIndex {
                 for (doc, seq) in self.plaid_seqs.iter().enumerate() {
                     // `CalculateFilterBitmask` + the tombstone mask: only rows the
                     // statement admits take part in the search.
-                    if !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)) {
+                    if !dead.contains(*seq) && allowed.is_none_or(|set| set.contains(seq)) {
                         mask.set(doc as u32);
                     }
                 }
@@ -4041,7 +4041,7 @@ impl MultiVectorIndex {
                 let permitted: Vec<bool> = self
                     .smve_seqs
                     .iter()
-                    .map(|seq| !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)))
+                    .map(|seq| !dead.contains(*seq) && allowed.is_none_or(|set| set.contains(seq)))
                     .collect();
                 let (scores, docs) = index.search(query, k.max(1), 5, Some(&permitted));
                 let mut hits: Vec<(u64, f32)> = docs
@@ -4053,7 +4053,7 @@ impl MultiVectorIndex {
                             (*seq, rank)
                         })
                     })
-                    .filter(|(seq, _)| !dead.contains(seq))
+                    .filter(|(seq, _)| !dead.contains(*seq))
                     .collect();
                 if !hits.is_empty() {
                     hits.sort_by(|a, b| {
@@ -4078,7 +4078,7 @@ impl MultiVectorIndex {
             };
             for doc in docs {
                 let Some(seq) = ids.get(doc) else { continue };
-                if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
+                if dead.contains(*seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                     continue;
                 }
                 hits.push((*seq, reader.maxsim(query, doc)));
@@ -4111,13 +4111,13 @@ impl MultiVectorIndex {
             if let Some(tail) = guard.as_ref() {
                 for (doc, _) in tail.data.view().search(
                     query,
-                    (k + dead.len()).max(1),
+                    (k + dead.len() as usize).max(1),
                     index::emvb::EmvbSearchOptions::for_topk(k.max(1)),
                 ) {
                     let Some(seq) = tail.seqs.get(doc as usize) else {
                         continue;
                     };
-                    if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
+                    if dead.contains(*seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                         continue;
                     }
                     if let Some(tokens) = self.tail.get(seq) {
@@ -4128,7 +4128,7 @@ impl MultiVectorIndex {
             drop(guard);
         } else {
             for (seq, doc) in &self.tail {
-                if dead.contains(seq)
+                if dead.contains(*seq)
                     || doc.is_empty()
                     || allowed.is_some_and(|set| !set.contains(seq))
                 {
@@ -4421,7 +4421,7 @@ impl SparseIndex {
         &self,
         query: &[(i32, f32)],
         k: usize,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
         options: index::sparse::BmpSearchOptions,
     ) -> Vec<(u64, f32)> {
         let mut hits: Vec<(u64, f32)> = Vec::new();
@@ -4430,9 +4430,9 @@ impl SparseIndex {
             // top-k; `search` clamps to the chunk's document count. The on-disk
             // reader runs the same `BMPAlgBase::SearchKnn` (`alpha`, `beta`,
             // `use_tail`) as the in-memory one.
-            for (row, score) in reader.search(query, k + dead.len(), options) {
+            for (row, score) in reader.search(query, k + dead.len() as usize, options) {
                 let seq = (segment << 32) | u64::from(row as u32);
-                if !dead.contains(&seq) {
+                if !dead.contains(seq) {
                     hits.push((seq, score));
                 }
             }
@@ -4464,9 +4464,9 @@ impl SparseIndex {
             // The memory index is a `BMPAlg` too, so `use_tail`/`beta` apply to
             // its own unsealed tail exactly as `bmp_search` does in the
             // reference.
-            for (doc, score) in tail.alg.search_knn(&qv, k + dead.len(), options) {
+            for (doc, score) in tail.alg.search_knn(&qv, k + dead.len() as usize, options) {
                 if let Some(seq) = tail.seqs.get(doc) {
-                    if !dead.contains(seq) {
+                    if !dead.contains(*seq) {
                         hits.push((*seq, score));
                     }
                 }
@@ -4977,15 +4977,21 @@ pub(crate) struct TableEntry {
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
     /// on first use.
     pub(crate) deleted_ids: Option<Vec<u64>>,
-    /// [`Self::deleted_ids`] as a set, so a single row's tombstone is one hash
-    /// lookup instead of a linear scan of the journal.
+    /// [`Self::deleted_ids`] as a bitmap, so a single row's tombstone is one
+    /// container lookup instead of a linear scan of the journal.
     ///
     /// A bulk `DELETE`/`UPDATE` asks `is_deleted` once per row, and the scan
     /// made that quadratic in the journal's length (a 5k-row statement against
     /// a 50k-entry journal walked 250M entries). Built lazily on the first
     /// lookup, extended by `note_deleted_ids`, dropped whenever the journal is
     /// rebuilt (`ensure_journals`).
-    pub(crate) deleted_set: Option<Arc<std::collections::HashSet<u64>>>,
+    ///
+    /// A `RoaringTreemap` rather than a hash set: the reference expresses the
+    /// same information as a CRoaring bitmap (`Bitmask`, whose per-segment
+    /// universes a row id's high 32 bits map onto exactly), and a `DELETE …
+    /// WHERE id < n` marks a *run* - a few dozen bytes here against ~15 KB in a
+    /// `HashSet`, tested once per candidate row on every indexed query.
+    pub(crate) deleted_set: Option<Arc<common::RowBitmap>>,
     /// Commit timestamp of every delete, one entry per `deleted_ids` entry
     /// (`delete_ts:{table}`).
     pub(crate) delete_ts: Option<Vec<u64>>,
@@ -7229,7 +7235,7 @@ pub(crate) async fn seal_text_index_gated(shared: &SharedTextIndex) {
 /// stay outside it.
 pub(crate) async fn optimize_text_index_unlocked(
     shared: &SharedTextIndex,
-    deleted: &std::collections::HashSet<u64>,
+    deleted: &common::RowBitmap,
 ) -> crate::Result<usize> {
     // Async, so the index lock is taken the same way every other caller takes
     // it. The chunk rewrite and its fsyncs are CPU and I/O, which is what the
@@ -7274,7 +7280,7 @@ pub(crate) async fn optimize_text_index_unlocked(
 pub(crate) async fn merge_text_index_from_catalog(
     dir: &str,
     chunks: &[crate::engine::text_index::CatalogChunk],
-    deleted: &std::collections::HashSet<u64>,
+    deleted: &common::RowBitmap,
 ) -> crate::Result<(usize, Vec<crate::engine::text_index::HeldTextChunk>)> {
     let mut index = TextIndex::new(dir.to_string(), TextTokenizer::default());
     // Nothing is re-indexed: `load_sealed_scoped` maps the chunks the catalog

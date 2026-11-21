@@ -70,6 +70,26 @@ impl IvfIndex {
 
     /// Top-k candidate row offsets: scan the `nprobe` best centroids' parts.
     pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+        self.candidates_filtered(query, k, nprobe, metric, None)
+    }
+
+    /// [`Self::candidates`] with the statement's filter applied **inside** the
+    /// part scan.
+    ///
+    /// This is the reference's `IVF_Filter` (`ivf_index_search.cppm:80-91`):
+    /// `SearchIndex` calls `SatisfyFilter(offset)` per vector and only then
+    /// `AddResult`, so a rejected row never takes a slot in the result heap.
+    /// Testing the mask after the truncation instead is what made a
+    /// mostly-deleted segment answer an empty top-k: `k` slots were filled with
+    /// rows the mask then rejected.
+    pub fn candidates_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allowed: Option<&common::RowMask>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -96,6 +116,12 @@ impl IvfIndex {
         for (c, _) in centroids.into_iter().take(nprobe) {
             if let Some(part) = self.parts.get(c) {
                 for (offset, vector) in part {
+                    // `SatisfyFilter` before `AddResult`: a rejected row never
+                    // fills a slot, so the top-k stays exact among the admitted
+                    // rows instead of being truncated and then filtered.
+                    if allowed.is_some_and(|mask| !mask.contains(u64::from(*offset))) {
+                        continue;
+                    }
                     if vector.len() == self.dims {
                         hits.push((*offset, self.score(query, vector, metric)));
                     }
@@ -248,6 +274,19 @@ impl IvfSqIndex {
 
     /// Top-k candidate row offsets (`SearchIndexT` for `kScalarQuantization`).
     pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+        self.candidates_filtered(query, k, nprobe, metric, None)
+    }
+
+    /// [`Self::candidates`] with the statement's filter applied per offset,
+    /// before the row can take a result slot (`IVF_Filter`).
+    pub fn candidates_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allowed: Option<&common::RowMask>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -296,6 +335,11 @@ impl IvfSqIndex {
             for i in 0..part.offsets.len() {
                 let base = i * bytes;
                 let offset = part.offsets[i];
+                // `SatisfyFilter` before the score is even computed: a rejected
+                // row cannot take a slot, and skipping it saves the work too.
+                if allowed.is_some_and(|mask| !mask.contains(u64::from(offset))) {
+                    continue;
+                }
                 let score = match metric {
                     // dot(x, v) = dot(x, c + b) + dot(v, e) + dot(x * a, code)
                     "ip" => {
@@ -355,10 +399,29 @@ pub enum IvfSegment {
 impl IvfSegment {
     /// Top-k candidate row offsets for `query`.
     pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+        self.candidates_filtered(query, k, nprobe, metric, None)
+    }
+
+    /// [`Self::candidates`] with the statement's filter, which every storage
+    /// layout applies per offset as the reference's `IVF_Filter` does.
+    pub fn candidates_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allowed: Option<&common::RowMask>,
+    ) -> Vec<u32> {
         match self {
-            IvfSegment::Plain(index) => index.candidates(query, k, nprobe, metric),
-            IvfSegment::Scalar(index) => index.candidates(query, k, nprobe, metric),
-            IvfSegment::Product(index) => index.candidates(query, k, nprobe, metric),
+            IvfSegment::Plain(index) => {
+                index.candidates_filtered(query, k, nprobe, metric, allowed)
+            }
+            IvfSegment::Scalar(index) => {
+                index.candidates_filtered(query, k, nprobe, metric, allowed)
+            }
+            IvfSegment::Product(index) => {
+                index.candidates_filtered(query, k, nprobe, metric, allowed)
+            }
         }
     }
 
@@ -626,6 +689,19 @@ impl IvfPqIndex {
 
     /// Top-k candidate row offsets (`SearchIndexT` for `kProductQuantization`).
     pub fn candidates(&self, query: &[f32], k: usize, nprobe: usize, metric: &str) -> Vec<u32> {
+        self.candidates_filtered(query, k, nprobe, metric, None)
+    }
+
+    /// [`Self::candidates`] with the statement's filter applied per offset,
+    /// before the row can take a result slot (`IVF_Filter`).
+    pub fn candidates_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        nprobe: usize,
+        metric: &str,
+        allowed: Option<&common::RowMask>,
+    ) -> Vec<u32> {
         if k == 0
             || self.dims == 0
             || query.len() != self.dims
@@ -661,6 +737,9 @@ impl IvfPqIndex {
             let residual_table = self.ip_table(&residual);
             let query_centroid_ip = dot(query, c);
             for (i, offset) in part.offsets.iter().enumerate() {
+                if allowed.is_some_and(|mask| !mask.contains(u64::from(*offset))) {
+                    continue;
+                }
                 let score = match metric {
                     "ip" => {
                         let mut d = query_centroid_ip;

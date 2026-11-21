@@ -90,10 +90,10 @@ impl LiveStats {
     }
 
     /// Compact the statistics, dropping the rows `deleted` names.
-    pub fn without(docs: &[(u64, u32)], deleted: &std::collections::HashSet<u64>) -> Self {
+    pub fn without(docs: &[(u64, u32)], deleted: &common::RowBitmap) -> Self {
         let mut live = Self::default();
         for (row, len) in docs {
-            if *len > 0 && !deleted.contains(row) {
+            if *len > 0 && !deleted.contains(*row) {
                 live.docs += 1;
                 live.total_len += u64::from(*len);
             }
@@ -102,17 +102,13 @@ impl LiveStats {
     }
 
     /// Recompute the statistics over a chunk's `.len` array.
-    pub fn over_slots(
-        lens: &[u32],
-        deleted: Option<&std::collections::HashSet<u64>>,
-        base: u64,
-    ) -> Self {
+    pub fn over_slots(lens: &[u32], deleted: Option<&common::RowBitmap>, base: u64) -> Self {
         let mut live = Self::default();
         for (offset, len) in lens.iter().enumerate() {
             if *len == 0 {
                 continue;
             }
-            if deleted.is_some_and(|deleted| deleted.contains(&(base + offset as u64))) {
+            if deleted.is_some_and(|deleted| deleted.contains(base + offset as u64)) {
                 continue;
             }
             live.docs += 1;

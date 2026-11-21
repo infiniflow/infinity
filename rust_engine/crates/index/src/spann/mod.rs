@@ -53,6 +53,7 @@ pub use store::{MemStore, SpannStore};
 use std::fmt::{self, Display};
 
 use crate::vector::Metric;
+use common::RowMask;
 
 /// Partition identifier. `u32` because the metadata table is 64 B per partition
 /// and the root is fixed at 0.
@@ -419,7 +420,7 @@ impl SpannIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
     }
@@ -429,7 +430,7 @@ impl SpannIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         if k == 0 || q.len() != self.dim {
             return Vec::new();
@@ -643,21 +644,22 @@ mod tests {
         let index = SpannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
 
         // One admitted row: whatever the beam, that row is the only answer.
-        let one: std::collections::HashSet<u64> = [rows[7].0].into_iter().collect();
+        let one = common::RowMask::from_rows([rows[7].0].into_iter().collect());
         let hits = index.search_filtered(&rows[200].1, 5, Some(usize::MAX), &one);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].0, rows[7].0);
 
         // A sparse mask: the answer must be the exact best *among the mask*.
-        let mask: std::collections::HashSet<u64> = rows
-            .iter()
-            .map(|(id, _)| *id)
-            .filter(|id| id % 97 == 0)
-            .collect();
+        let mask = common::RowMask::from_rows(
+            rows.iter()
+                .map(|(id, _)| *id)
+                .filter(|id| id % 97 == 0)
+                .collect(),
+        );
         let query = &rows[123].1;
         let mut want: Vec<(u64, f32)> = rows
             .iter()
-            .filter(|(id, _)| mask.contains(id))
+            .filter(|(id, _)| mask.contains(*id))
             .map(|(id, v)| {
                 let d: f32 = v
                     .iter()
@@ -674,7 +676,7 @@ mod tests {
             got.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
             want.iter().take(3).map(|(id, _)| *id).collect::<Vec<_>>()
         );
-        assert!(got.iter().all(|(id, _)| mask.contains(id)));
+        assert!(got.iter().all(|(id, _)| mask.contains(*id)));
     }
 
     #[test]

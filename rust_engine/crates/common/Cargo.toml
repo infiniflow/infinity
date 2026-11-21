@@ -13,6 +13,9 @@ thiserror.workspace = true
 # `cargo test` alike - no per-target boilerplate, and no link-time conflict when
 # a binary happens to reach two crates that both wanted it.
 mimalloc.workspace = true
+# The tombstone / filter bitmaps: the reference's `Bitmask` is a CRoaring
+# bitmap (`roaring_bitmap.cppm`), and every read path builds one per statement.
+roaring.workspace = true
 
 [lints]
 workspace = true

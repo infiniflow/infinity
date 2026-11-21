@@ -1892,14 +1892,20 @@ impl Engine {
         self.load_deletes(table).0
     }
 
-    /// [`Self::deleted_ids`] as a set, built once per journal load.
+    /// [`Self::deleted_ids`] as a bitmap, built once per journal load.
     ///
     /// A bulk `DELETE`/`UPDATE` asks whether each of its rows is already gone
     /// (`row_is_present` -> `is_deleted`), and scanning the journal for every
     /// one of them made the statement quadratic in the journal's length. The
-    /// set is built on the first lookup, shared (`Arc`) by every later reader,
-    /// and dropped when `ensure_journals` rebuilds the journal from the blocks.
-    pub(crate) fn deleted_set(&self, table: &str) -> Arc<std::collections::HashSet<u64>> {
+    /// bitmap is built on the first lookup, shared (`Arc`) by every later
+    /// reader, and dropped when `ensure_journals` rebuilds the journal from the
+    /// blocks.
+    ///
+    /// Shared rather than copied: a statement reads the tombstones several
+    /// times (the index probe, the mask, the exact scan), and each read used to
+    /// deep-copy the whole set. Handing out the `Arc` makes those reads one
+    /// refcount bump.
+    pub(crate) fn deleted_set(&self, table: &str) -> Arc<common::RowBitmap> {
         let key = self.table_key(table);
         {
             let tables = self.tables.lock().unwrap();
@@ -1912,11 +1918,7 @@ impl Engine {
         }
         // Loading the journal takes the table lock itself, so it runs outside
         // it (`ensure_journals` re-reads the block `version` files).
-        let set = Arc::new(
-            self.deleted_ids(table)
-                .into_iter()
-                .collect::<std::collections::HashSet<u64>>(),
-        );
+        let set = Arc::new(common::RowBitmap::of(self.deleted_ids(table)));
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
         match entry.deleted_set {
@@ -3663,7 +3665,7 @@ impl Engine {
                             .tombstone_set_at(table, crate::read_ts())
                             .unwrap_or_default();
                         rows.into_iter()
-                            .filter(|(seq, _)| !dead.contains(&(*seq as u64)))
+                            .filter(|(seq, _)| !dead.contains(*seq as u64))
                             .map(|(_, cells)| cells)
                             .collect()
                     }
@@ -3842,7 +3844,7 @@ impl Engine {
         Ok(self
             .pending_rows_of(table)
             .into_iter()
-            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+            .filter(|(seq, _)| !deleted.contains(*seq as u64))
             .collect())
     }
 
@@ -3999,7 +4001,7 @@ impl Engine {
         let hidden = self.tombstone_set_at(table, crate::read_ts())?;
         let mut out: Vec<(usize, Vec<Value>)> = rows
             .into_iter()
-            .filter(|(seq, _): &(usize, Vec<Value>)| !hidden.contains(&(*seq as u64)))
+            .filter(|(seq, _): &(usize, Vec<Value>)| !hidden.contains(*seq as u64))
             .collect();
         // A mirror that is untouched since it was written is the whole table.
         // `mirror_dirty` also covers what a replay sets when it applies a frame
@@ -4014,7 +4016,7 @@ impl Engine {
         out.extend(
             self.pending_rows_of(table)
                 .into_iter()
-                .filter(|(seq, _)| !hidden.contains(&(*seq as u64)) && !have.contains(seq)),
+                .filter(|(seq, _)| !hidden.contains(*seq as u64) && !have.contains(seq)),
         );
         out.sort_by_key(|(seq, _)| *seq);
         Ok(Some(out))
@@ -4087,7 +4089,7 @@ impl Engine {
                 let deleted = self.tombstone_set(table)?;
                 let kept: Vec<Vec<Value>> = rows
                     .into_iter()
-                    .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+                    .filter(|(seq, _)| !deleted.contains(*seq as u64))
                     .map(|(_, cells)| cells)
                     .collect();
                 return Ok(Some(self.block_of(table, &wanted, kept)?));
@@ -5758,11 +5760,14 @@ impl Engine {
     ///
     /// `None` is not "no rows" - it is "use the exact scan", which is the only
     /// safe answer for a shape this module does not evaluate.
-    async fn columnar_mask_rows(
-        &self,
-        table: &str,
-        filters: &[&Expr],
-    ) -> Option<std::collections::HashSet<usize>> {
+    ///
+    /// The tombstones are folded in here rather than by the caller, which is
+    /// what the reference does: `CommonQueryFilter::NewBuildFilter` ends with
+    /// `CheckSegmentRowsVisible` writing the deleted rows into the same bitmap
+    /// the predicate produced (`common_query_filter_impl.cpp:234-241`). One
+    /// filter reaches the index, so a delete that leaves a row at the top of an
+    /// index's ranking hides it instead of making the answer one row short.
+    async fn columnar_mask_rows(&self, table: &str, filters: &[&Expr]) -> Option<common::RowMask> {
         if filters.is_empty() {
             return None;
         }
@@ -5806,12 +5811,16 @@ impl Engine {
             });
         }
         let keep = keep?;
-        Some(
+        // `fetch_rows_with_ids_projected_some` is the live population, so the
+        // tombstones are already gone from `seqs`. Folding the journal in again
+        // would be redundant work on every filtered query; `with_excluded` is
+        // left for the caller that has no predicate to read the rows through.
+        Some(common::RowMask::from_rows(
             seqs.into_iter()
                 .zip(keep)
-                .filter_map(|(seq, kept)| kept.then_some(seq))
-                .collect(),
-        )
+                .filter_map(|(seq, kept)| kept.then_some(seq as u64))
+                .collect::<common::RowBitmap>(),
+        ))
     }
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
@@ -6318,12 +6327,16 @@ impl Engine {
     }
 
     /// Tombstoned sequence ids of a table; index hits are validated against it.
-    pub(crate) fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
+    ///
+    /// Shared, not copied: the caller hands it to the index probe, the filter
+    /// mask and the exact scan in turn, and a copy per read was the largest
+    /// avoidable allocation on the read path of a table with many deletes.
+    pub(crate) fn tombstone_set(&self, table: &str) -> Result<Arc<common::RowBitmap>> {
         // A delete the checkpoint has not written yet is in the table's delete
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
-        // carries it after the flush. The set is the one the journal keeps for
-        // single-row lookups, so building it is not repeated per query.
-        Ok((*self.deleted_set(table)).clone())
+        // carries it after the flush. The bitmap is the one the journal keeps
+        // for single-row lookups, so building it is not repeated per query.
+        Ok(self.deleted_set(table))
     }
 
     /// [`Self::tombstone_set`] as of `read_ts`: a delete that committed after
@@ -6332,14 +6345,14 @@ impl Engine {
         &self,
         table: &str,
         read_ts: u64,
-    ) -> Result<std::collections::HashSet<u64>> {
+    ) -> Result<Arc<common::RowBitmap>> {
         if read_ts == u64::MAX {
             return self.tombstone_set(table);
         }
         // Both journal halves in one load: each `deleted_ids`/`delete_ts` call
         // clones the whole journal, and this is the read path of every query.
         let (ids, ts) = self.load_deletes(table);
-        let mut dead: std::collections::HashSet<u64> = Default::default();
+        let mut dead = common::RowBitmap::new();
         for (at, id) in ids.iter().enumerate() {
             let deleted = ts.get(at).copied().unwrap_or(0);
             // An unsettled entry is a delete the commit already accepted but
@@ -6348,7 +6361,8 @@ impl Engine {
                 dead.insert(*id);
             }
         }
-        Ok(dead)
+        dead.run_optimize();
+        Ok(Arc::new(dead))
     }
 
     /// Several columns with only `idxs` parsed: the shape a predicate needs, and
@@ -7846,7 +7860,7 @@ impl Engine {
         pred: Option<&Expr>,
         in_filter: Option<&Expr>,
         opt_filter: Option<&Expr>,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
     ) -> Result<Option<wand::DocFilter>> {
         if pred.is_none() && in_filter.is_none() && opt_filter.is_none() {
             return Ok(None);
@@ -7856,7 +7870,7 @@ impl Engine {
             let row_id = seq as u64;
             // A tombstone can never be scored, so it is not an admitted row
             // either: leaving it out makes the seek skip deletes too.
-            if dead.contains(&row_id) {
+            if dead.contains(row_id) {
                 continue;
             }
             let ok = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true)
@@ -8639,7 +8653,7 @@ impl Engine {
                     continue;
                 }
             }
-            if !dead.contains(&doc) {
+            if !dead.contains(doc) {
                 // `rank_features=<col>^<tag>^<weight>` adds `weight_of_tag * weight`,
                 // where `weight_of_tag` is the posting's doc payload decoded with
                 // `SmallFloat::UInt16ToFloat122`.
@@ -9292,7 +9306,7 @@ impl Engine {
                     None => Value::Null,
                 });
             }
-            let live = !dead.contains(&(seq as u64));
+            let live = !dead.contains(seq as u64);
             let passes = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
             #[cfg(test)]
             MATCH_ROWS_TOKENIZED.with(|n| n.set(n.get() + 1));
@@ -10713,15 +10727,37 @@ impl Engine {
         // compared to a column), and then a filtered query keeps the exact scan
         // - an index whose candidates the mask cannot prune would answer a short
         // top-k (`docs/SPANN_DESIGN.md` §12.5).
-        let allowed: Option<std::collections::HashSet<usize>> = if has_filter {
-            let filters: Vec<&Expr> = pred
-                .into_iter()
-                .chain(in_filter.as_ref())
-                .chain(search_filter.as_ref())
-                .collect();
-            self.columnar_mask_rows(table, &filters).await
-        } else {
+        //
+        // The tombstones are part of this mask even when there is no predicate:
+        // the reference folds them into `filter_result_` unconditionally
+        // (`common_query_filter_impl.cpp:234-241`), which is why an index with
+        // no filter still hides a deleted row instead of returning it. Skipping
+        // that here is what made a mostly-deleted table answer a short - or
+        // empty - top-k: the beam and the candidate pool were sized for
+        // `topn`, and every row they reached had been deleted.
+        let tombstones = if has_filter {
             None
+        } else {
+            // Only needed when nothing else reads the journal for this
+            // statement: a predicate's mask is built from the live row set,
+            // which already excludes the tombstones. A journal that cannot be
+            // read leaves the mask out, which falls back to the exact scan -
+            // never to answering a row the statement may not see.
+            self.tombstone_set_at(table, crate::read_ts()).ok()
+        };
+        let allowed: Option<common::RowMask> = match (has_filter, tombstones) {
+            (true, _) => {
+                let filters: Vec<&Expr> = pred
+                    .into_iter()
+                    .chain(in_filter.as_ref())
+                    .chain(search_filter.as_ref())
+                    .collect();
+                self.columnar_mask_rows(table, &filters).await
+            }
+            (false, Some(dead)) if !dead.is_empty() => {
+                Some(common::RowMask::all_true().with_excluded(Some((*dead).clone())))
+            }
+            (false, _) => None,
         };
         // Walk a persisted HNSW graph instead of every row when one is loaded
         // for this column (plan #70). The candidates are still scored exactly

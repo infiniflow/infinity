@@ -37,6 +37,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
+use common::RowMask;
 use index::spann::search::{self, SearchSet};
 use index::spann::{Member, Options, PartitionKey, SpannError, ROOT_KEY};
 use index::vector::Metric;
@@ -430,7 +431,9 @@ impl ChunkChain {
     /// [`Self::coverage`] plus "which live rows the tree does **not** hold".
     ///
     /// The caller's `live` is the segment's row set; a delta that dropped a leaf
-    /// page shows up here rather than as a silently smaller index.
+    /// page shows up here rather than as a silently smaller index. This is a
+    /// diagnostic (the tests' `covers`), not a query path, so it takes a plain
+    /// set rather than the [`RowBitmap`] a filter uses.
     pub fn covers(&self, live: &HashSet<u64>) -> Coverage {
         let mut out = self.coverage();
         let mut held: HashSet<u64> = HashSet::new();
@@ -455,7 +458,7 @@ impl ChunkChain {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
     }
@@ -465,7 +468,7 @@ impl ChunkChain {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         let dims = self.dims();
         if k == 0 || q.len() != dims || self.owners.is_empty() {

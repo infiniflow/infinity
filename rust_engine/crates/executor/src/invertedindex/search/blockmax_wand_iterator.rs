@@ -280,7 +280,7 @@ impl<'a> Cursor<'a> {
 /// OR terms (no phrase / require-all).
 pub(crate) struct BlockMaxWandIterator<'a> {
     fields: usize,
-    dead: &'a HashSet<u64>,
+    dead: &'a common::RowBitmap,
     /// Rows a `FILTER(…)` admits; `None` scores every row the postings reach.
     /// See [`DocFilter`] for why it is a row list and not a predicate closure.
     filter: Option<&'a DocFilter>,
@@ -328,7 +328,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     pub fn new(
         fields: Vec<WandField<'a>>,
         k: usize,
-        dead: &'a HashSet<u64>,
+        dead: &'a common::RowBitmap,
         delta: f64,
         min_should: usize,
         mode: WandMode,
@@ -554,7 +554,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 return false;
             };
             let eligible =
-                self.matched_units() >= self.min_should.max(1) && !self.dead.contains(&doc);
+                self.matched_units() >= self.min_should.max(1) && !self.dead.contains(doc);
             if eligible {
                 return true;
             }
@@ -631,7 +631,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
             WandMode::Boolean => self.prefix.len(),
         };
-        if matched < self.min_should.max(1) || self.dead.contains(&doc_id) {
+        if matched < self.min_should.max(1) || self.dead.contains(doc_id) {
             return;
         }
         let better = if self.best.len() < self.k {
@@ -1056,7 +1056,7 @@ mod tests {
         let alpha: &[(u64, u32)] = &[(0, 1), (1, 1), (3, 2)];
         let beta: &[(u64, u32)] = &[(2, 1), (3, 1)];
         let lens: &[(u64, u32)] = &[(0, 2), (1, 2), (2, 2), (3, 3)];
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let weights = vec![1.0, 1.0];
         let make = || {
             vec![field(
@@ -1090,7 +1090,7 @@ mod tests {
             .map(|d| (d, 1 + (d % 11).min(d % 31) as u32))
             .collect();
         let lens: HashMap<u64, u32> = doc_len.iter().copied().collect();
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let ranker = Bm25Ranker::new(0.0);
         let n = 400.0f64;
         let total_len: u64 = doc_len.iter().map(|(_, l)| *l as u64).sum();
@@ -1134,7 +1134,7 @@ mod tests {
         let postings: Vec<(u64, u32)> = (0..docs)
             .map(|d| (d, if (d as usize) < BLOCK_SIZE { 20 } else { 1 }))
             .collect();
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let make = || {
             vec![field(
                 &[("alpha", &postings)],
@@ -1176,7 +1176,7 @@ mod tests {
         const DOCS: u64 = 2000;
         let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 20 + (d % 37) as u32)).collect();
         let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1 + (d % 5) as u32)).collect();
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         // Every fifth row survives the filter.
         let allowed: Vec<u64> = (0..DOCS).step_by(5).collect();
         let filter = DocFilter::new(allowed.clone());
@@ -1222,7 +1222,7 @@ mod tests {
         const DOCS: u64 = 2000;
         let doc_len: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 50)).collect();
         let postings: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 1)).collect();
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let allowed: Vec<u64> = (0..DOCS).step_by(20).collect();
         let filter = DocFilter::new(allowed.clone());
         let make = || {
@@ -1270,7 +1270,7 @@ mod tests {
         weights: &[f64],
         terms: &[String],
         k: usize,
-        dead: &HashSet<u64>,
+        dead: &common::RowBitmap,
         delta: f64,
         min_should: usize,
         mode: WandMode,
@@ -1314,7 +1314,7 @@ mod tests {
                 WandMode::Bm25 => seen_terms.len(),
                 WandMode::Boolean => matched,
             };
-            if hits < min_should.max(1) || dead.contains(&doc) {
+            if hits < min_should.max(1) || dead.contains(doc) {
                 continue;
             }
             scored.push((doc, score));
@@ -1357,7 +1357,7 @@ mod tests {
         }
         let total_len: u64 = lens.values().map(|l| *l as u64).sum();
         let weights = vec![1.0, 0.5, 1.0, 2.0, 1.0];
-        let dead: HashSet<u64> = (0..DOCS)
+        let dead: common::RowBitmap = (0..DOCS)
             .filter(|_| lcg(&mut rng).is_multiple_of(20))
             .collect();
 
@@ -1477,7 +1477,7 @@ mod tests {
             }
             let total_len: u64 = lens.values().map(|l| *l as u64).sum();
             let weights = vec![1.0, 0.5, 2.0, 1.0, 1.5, 0.25];
-            let dead: HashSet<u64> = (0..DOCS).filter(|_| lcg(&mut rng) % 13 == 0).collect();
+            let dead: common::RowBitmap = (0..DOCS).filter(|_| lcg(&mut rng) % 13 == 0).collect();
             let lens_slice: Vec<(u64, u32)> = lens.iter().map(|(d, l)| (*d, *l)).collect();
             let make = || {
                 let ranker = Bm25Ranker::new(0.0);
@@ -1550,7 +1550,7 @@ mod tests {
                 c.push((doc, 1 + (lcg(&mut rng) % 3) as u32));
             }
         }
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let make = || {
             vec![field(
                 &[("a", &a), ("b", &b), ("c", &c)],
@@ -1615,7 +1615,7 @@ mod tests {
                 }],
             }]
         };
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let (best, evaluations, deepest) =
             BlockMaxWandIterator::new(make(), 10, &dead, 0.0, 1, WandMode::Bm25).drive_with_stats();
         assert_eq!(best.len(), 10);

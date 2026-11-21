@@ -3080,7 +3080,7 @@ mod tests {
         assert_eq!(index.total_docs(), 4);
         assert_eq!(index.term_df("alpha"), 4);
 
-        let deleted: std::collections::HashSet<u64> = [1u64].into_iter().collect();
+        let deleted: common::RowBitmap = [1u64].into_iter().collect();
         assert_eq!(
             index.optimize_chunks_with(&deleted).unwrap(),
             1,
@@ -15337,7 +15337,7 @@ mod tests {
         );
         let tombstones = engine.tombstone_set("stress").unwrap().len();
         assert_eq!(
-            expected.len() + tombstones,
+            expected.len() + tombstones as usize,
             total_written as usize,
             "the table's rows and its tombstones account for every insert \
              ({} + {tombstones})",
@@ -15550,6 +15550,64 @@ mod tests {
         assert_eq!(got, vec![vec!["3".to_string()]]);
     }
 
+    /// A table whose index is mostly tombstones still answers a full top-k.
+    ///
+    /// The tombstones ride the same filter the probe takes
+    /// (`CommonQueryFilter`'s `filter_result_`), so the graph and the IVF part
+    /// scan skip a deleted row instead of ranking it. Testing the mask after
+    /// the truncation - the shape before the fold - left `topn * 4` candidate
+    /// slots filled with rows no fetch could resolve, and a query against 980
+    /// deleted rows of a 1000-row table came back **empty**.
+    #[tokio::test]
+    async fn a_mostly_deleted_index_still_fills_the_top_k() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE hd (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        let values: Vec<String> = (0..1000)
+            .map(|i| format!("({i}, [{i}.0,0.0,0.0,1.0])"))
+            .collect();
+        e.execute(&format!("INSERT INTO hd VALUES {};", values.join(",")))
+            .await
+            .unwrap();
+        let query =
+            "SELECT id FROM hd SEARCH MATCH VECTOR (v, [0.0,0.0,0.0,1.0], 'float', 'l2', 10);";
+        for kind in ["HNSW", "IVF"] {
+            e.execute(&format!(
+                "CREATE INDEX hd_i ON hd (v) USING {kind} WITH (metric = l2);"
+            ))
+            .await
+            .unwrap();
+            e.flush().await.unwrap();
+            // Sealed into a chunk, then 98% of the segment deleted: the rows the
+            // query wants are the *last* ones, so a candidate list truncated
+            // before the mask cannot reach them.
+            e.execute("DELETE FROM hd WHERE id < 980;").await.unwrap();
+            let got = rows(&e, query).await;
+            assert_eq!(
+                got.len(),
+                10,
+                "{kind} answered {} rows for a 20-row table",
+                got.len()
+            );
+            // The exact scan is the truth, and the index has to agree with it.
+            e.execute("DROP INDEX hd_i;").await.unwrap();
+            let exact = rows(&e, query).await;
+            e.execute("DROP TABLE hd;").await.unwrap();
+            assert_eq!(got, exact, "{kind} disagrees with the exact scan");
+            // Rebuild the table for the next index kind.
+            e.execute("CREATE TABLE hd (id INT, v EMBEDDING(FLOAT,4));")
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO hd VALUES {};", values.join(",")))
+                .await
+                .unwrap();
+        }
+    }
+
     /// A `WHERE` on a scalar column no longer bypasses the vector index
     /// (`docs/SPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
     /// graph search consumes, and the answer is the exact top-k over the rows
@@ -15599,19 +15657,20 @@ mod tests {
 
         // The mask reaches the graph search: the probe's candidates are all
         // admitted rows, which a probe without the mask is not.
-        let allowed: std::collections::HashSet<usize> = e
-            .fetch_rows_with_ids("hf")
-            .await
-            .unwrap()
-            .into_iter()
-            .filter(|(_, row)| row.get(1) == Some(&Value::Int(4)))
-            .map(|(seq, _)| seq)
-            .collect();
-        assert_eq!(allowed.len(), n / 8);
+        let allowed = common::RowMask::from_rows(
+            e.fetch_rows_with_ids("hf")
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|(_, row)| row.get(1) == Some(&Value::Int(4)))
+                .map(|(seq, _)| seq as u64)
+                .collect::<common::RowBitmap>(),
+        );
+        assert_eq!(allowed.len(), Some((n / 8) as u64));
         let index_id = e.test_index_id("default_db.hf", "v", "HNSW");
         assert_ne!(index_id, 0, "the HNSW index is registered");
         let q: Vec<f32> = (100..104).map(|d| d as f32).collect();
-        let probe = async |allowed: Option<&std::collections::HashSet<usize>>| {
+        let probe = async |allowed: Option<&common::RowMask>| {
             e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
                 table: "hf",
                 index_id: Some(index_id),
@@ -15634,7 +15693,10 @@ mod tests {
             "a 12% selective mask must still fill a candidate list"
         );
         assert!(
-            filtered.candidates.iter().all(|seq| allowed.contains(seq)),
+            filtered
+                .candidates
+                .iter()
+                .all(|seq| allowed.contains(*seq as u64)),
             "the graph search kept a row the filter rejects"
         );
         assert!(filtered.uncovered.is_empty(), "the graph covers every row");
@@ -15643,7 +15705,7 @@ mod tests {
             unfiltered
                 .candidates
                 .iter()
-                .any(|seq| !allowed.contains(seq)),
+                .any(|seq| !allowed.contains(*seq as u64)),
             "without the mask the same probe names rows the filter rejects"
         );
     }

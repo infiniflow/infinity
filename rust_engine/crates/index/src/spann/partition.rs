@@ -25,6 +25,7 @@
 //! §16 P1 exit criterion).
 
 use crate::vector::{l2_sq, Metric};
+use common::RowMask;
 
 use super::quantize::{self, Code, QueryCode, Rotation};
 use super::search::SearchSet;
@@ -202,11 +203,11 @@ impl Partition {
         q_raw: &[f32],
         metric: Metric,
         out: &mut SearchSet,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) {
         for (index, member) in self.members.iter().enumerate() {
             if let Some(allowed) = allowed {
-                if !allowed.contains(&member.id) {
+                if !allowed.contains(member.id) {
                     continue;
                 }
             }

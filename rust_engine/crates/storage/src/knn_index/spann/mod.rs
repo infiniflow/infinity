@@ -51,6 +51,7 @@
 //! `segment << 32 | row_off`. Storing the engine-wide id here would cost four
 //! bytes per row and go stale the moment a compaction renumbered the segment.
 
+use common::RowMask;
 use index::spann::{
     partition::{metric_score, Member, Partition},
     quantize::{self, Code, Rotation},
@@ -906,7 +907,7 @@ impl FileIndex {
         &self,
         key: PartitionKey,
         q: &[f32],
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
         set: &mut SearchSet,
     ) {
         let chunk = self.chunk();
@@ -974,7 +975,7 @@ impl FileIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
     }
@@ -984,7 +985,7 @@ impl FileIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         let dims = self.dims();
         if k == 0 || q.len() != dims {
@@ -1056,7 +1057,7 @@ impl FileIndex {
         q: &[f32],
         metric: Metric,
         dims: usize,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
         set: &mut SearchSet,
     ) {
         let (Some(slots), Some(centroid)) = (chunk.slots(key), chunk.centroid(key)) else {
@@ -1071,7 +1072,7 @@ impl FileIndex {
                 continue;
             };
             if let Some(allowed) = allowed {
-                if !allowed.contains(&row) {
+                if !allowed.contains(row) {
                     continue;
                 }
             }
@@ -1449,8 +1450,8 @@ mod tests {
 
                 // The filtered probe is the path the statement takes whenever a
                 // predicate was pushed down, so it has to agree too.
-                let allowed: std::collections::HashSet<u64> =
-                    (0..data.len() as u64).filter(|i| i % 3 == 0).collect();
+                let allowed: RowMask =
+                    RowMask::from_rows((0..data.len() as u64).filter(|i| i % 3 == 0).collect());
                 for query in &queries {
                     let memory: Vec<u64> = index
                         .search_filtered(query, 10, Some(8), &allowed)
@@ -1464,7 +1465,7 @@ mod tests {
                         .collect();
                     assert_eq!(memory, mapped, "{metric:?}/{encode:?} filtered");
                     assert!(
-                        mapped.iter().all(|id| allowed.contains(id)),
+                        mapped.iter().all(|id| allowed.contains(*id)),
                         "{metric:?}/{encode:?}: the probe returned a filtered-out row"
                     );
                 }

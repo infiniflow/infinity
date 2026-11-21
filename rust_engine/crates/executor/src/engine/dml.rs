@@ -430,7 +430,7 @@ impl Engine {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
         entry.deleted_ids = Some(log);
-        // Keep the lazily built lookup in step with the journal it mirrors, or
+        // Keep the lazily built bitmap in step with the journal it mirrors, or
         // the rows this commit just deleted would read as live until the next
         // journal rebuild.
         if let Some(set) = entry.deleted_set.as_mut() {
