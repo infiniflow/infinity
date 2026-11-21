@@ -101,6 +101,16 @@ impl WalManager {
             .write_all(&buf)
             .await
             .map_err(|e| Error::io(&self.path, e))?;
+        // Hand the bytes to the kernel before returning. `write_all` on a
+        // `tokio::fs::File` completes the write, but the handle's own buffer is
+        // only drained on `flush`, and a reader that opens the path straight
+        // afterwards (`std::fs::read` in the golden-bytes test, or a restart
+        // that reopens the log) could otherwise see a short file. This is not
+        // an fsync - durability stays with `sync`, one per commit batch.
+        self.file
+            .flush()
+            .await
+            .map_err(|e| Error::io(&self.path, e))?;
         self.appended_ts = self.appended_ts.max(entry.commit_ts);
         // The write itself is not synced: `WalManager::NewFlush` owns that
         // decision. Upstream ends every flush batch with
@@ -198,6 +208,16 @@ impl WalManager {
     /// the new inode.
     pub async fn truncate_up_to_streaming(&mut self, ts: TxnTimeStamp) -> Result<usize> {
         let tmp = self.path.with_extension("log.compact");
+        // The size below bounds how far the reader walks, and it comes from the
+        // file's metadata. A `write_all` that has not been flushed can still be
+        // queued in the file object, so the length read here would be short and
+        // the reader would stop at a frame boundary that is not the end of the
+        // log - `streaming_truncate_keeps_only_newer_records` saw that as four
+        // records retained instead of five, one run in five.
+        self.file
+            .flush()
+            .await
+            .map_err(|e| Error::io(&self.path, e))?;
         let file_len = self.file_size().await?;
         let mut consumed = 0u64;
         let mut kept = 0usize;
