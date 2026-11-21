@@ -33,7 +33,8 @@ rustflags = [
 ]
 
 # The CI override for this triple is
-#   -C target-cpu=x86-64-v3 -C target-feature=+pclmulqdq
+#   -C target-cpu=x86-64-v3
+# plus `CFLAGS`/`CXXFLAGS_x86_64_unknown_linux_gnu=-mpclmul` for the C side.
 #
 # `x86-64-v3` is the AVX2 baseline (Haswell, 2013). Without it the default
 # `x86-64` target has only SSE2, and `std::simd`'s `f32x8` is split into two
@@ -42,13 +43,17 @@ rustflags = [
 # `vsubps`/`vmulps`/`vaddps` over 256 bits, which took the SIFT 1M brute-force
 # scan from 39.4 to 34.9 ms p50.
 #
-# `+pclmulqdq` is not part of any x86-64-vN level (v3 and v4 both leave
-# `__PCLMUL__` undefined), but `cc-rs` forwards this target's feature list to the
-# C compiler, and `librocksdb-sys`'s `crc32c.cc` calls `_mm_clmulepi64_si128`
-# unconditionally. Without the flag the build dies with
-# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul`. The instruction is
-# SSE-era and present on every CPU that has AVX2, so adding it narrows nothing.
-# `native` implies it, which is why the local default needs no separate flag.
+# RocksDB's `crc32c.cc` calls `_mm_clmulepi64_si128`, and no x86-64-vN level
+# defines `__PCLMUL__` (v3 and v4 both leave it undefined), so the C compiler
+# needs `-mpclmul` or the build dies with
+# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul`.
+#
+# That flag belongs on `CFLAGS`, **not** on `-C target-feature=+pclmulqdq`.
+# Giving it to rustc makes LLVM emit 52 AVX-512 instructions elsewhere in the
+# binary - measured: `zmm` goes 0 -> 52 with the target feature, 0 without - and
+# those fault on a CPU whose `avx512f` does not cover the whole set: a Xeon
+# 6975P-C died with SIGILL on a binary an EPYC 9V45 ran fine. `native` implies
+# `pclmul` anyway, which is why the local default needs no separate flag.
 
 # aarch64 Linux. The CI override for this triple is
 #   -C target-cpu=neoverse-n2

@@ -27,23 +27,57 @@ grep -m1 '^flags' /proc/cpuinfo \
   | sort \
   | tr '\n' ' ' || true
 echo
+# The whole list, because the one that matters is the one nobody thought to
+# check: `x86-64-v3` needs BMI1, BMI2, F16C, FMA, LZCNT and MOVBE besides AVX2,
+# and a VM can expose a subset.
+echo "all flags:"
+grep -m1 '^flags' /proc/cpuinfo | cut -d: -f2- || true
 
 echo "=== required vs available ==="
-# `x86-64-v3` needs AVX2. Without it the process dies on the first vector
-# instruction, which is why the log stays empty.
-if ! grep -q ' avx2 ' /proc/cpuinfo; then
-  echo "::error::this CPU has no AVX2, but the binary was built for x86-64-v3"
-fi
+# What `x86-64-v3` needs, checked one by one so a missing feature names itself
+# instead of showing up as a SIGILL with no explanation. `lzcnt` is reported as
+# `abm` on Intel, and some kernels list only that spelling.
+has_flag() {
+  grep -qw "$1" /proc/cpuinfo && return 0
+  grep -qw "$2" /proc/cpuinfo 2>/dev/null && return 0
+  return 1
+}
+for pair in "avx:avx" "avx2:avx2" "bmi1:bmi1" "bmi2:bmi2" "f16c:f16c" "fma:fma" "lzcnt:abm" "movbe:movbe"; do
+  want="${pair%%:*}"
+  alias="${pair##*:}"
+  if ! has_flag "${want}" "${alias}"; then
+    echo "::error::this CPU lacks '${want}', which x86-64-v3 requires"
+  fi
+done
 
 echo "=== direct execution (5s) ==="
-timeout 5 "${bin}" --config="${config}" > /tmp/engine_probe.log 2>&1
-status=$?
-if [ "${status}" -eq 124 ]; then
-  echo "still running at the timeout, which is healthy"
+if command -v gdb >/dev/null 2>&1; then
+  # Under gdb a SIGILL stops instead of killing the process, so the faulting
+  # instruction can be named. This is the whole reason the probe exists: a bare
+  # "exit 132" says the CPU rejected an instruction but not which one.
+  timeout 20 gdb -batch \
+    -ex 'run' \
+    -ex 'printf "\n--- faulting instruction ---\n"' \
+    -ex 'x/i $pc' \
+    -ex 'info registers rip' \
+    -ex 'bt 8' \
+    --args "${bin}" --config="${config}" > /tmp/engine_probe.log 2>&1
+  # gdb's own exit status is not the program's; the log says what happened.
+  if grep -q "SIGILL\|Illegal instruction" /tmp/engine_probe.log 2>/dev/null; then
+    echo "::error::the binary died on an illegal instruction"
+  else
+    echo "no SIGILL in the probe log"
+  fi
 else
-  echo "::error::the binary exited with ${status} before the timeout"
+  timeout 5 "${bin}" --config="${config}" > /tmp/engine_probe.log 2>&1
+  status=$?
+  if [ "${status}" -eq 124 ]; then
+    echo "still running at the timeout, which is healthy"
+  else
+    echo "::error::the binary exited with ${status} before the timeout"
+  fi
 fi
-tail -20 /tmp/engine_probe.log || true
+tail -40 /tmp/engine_probe.log || true
 
 # Never fail the job here: the point is to leave a readable trace, and the
 # "Start the engine" step that follows is what decides pass or fail.

@@ -53,11 +53,17 @@ env:
   # deliberately - they want a clean slate - and pass the linker flag themselves
   # where it matters.
   #
-  # `+pclmulqdq` is required: no x86-64-vN level defines `__PCLMUL__`, and
-  # `librocksdb-sys`'s `crc32c.cc` calls `_mm_clmulepi64_si128` unconditionally,
-  # so without it the build fails with "needs target feature pclmul".
+  # RocksDB's `crc32c.cc` calls `_mm_clmulepi64_si128`, and no x86-64-vN level
+  # defines `__PCLMUL__`, so the C side needs `-mpclmul`. It goes through
+  # `CFLAGS`/`CXXFLAGS` rather than `-C target-feature=+pclmulqdq`, because the
+  # latter makes LLVM emit 52 AVX-512 instructions elsewhere in the binary -
+  # measured: `zmm` goes 0 -> 52 - and those fault on a CPU whose `avx512f` does
+  # not cover the whole set (Xeon 6975P-C died with SIGILL while an EPYC 9V45
+  # ran the same binary).
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
-    -C target-cpu=x86-64-v3 -C target-feature=+pclmulqdq
+    -C target-cpu=x86-64-v3
+  CFLAGS_x86_64_unknown_linux_gnu: -mpclmul
+  CXXFLAGS_x86_64_unknown_linux_gnu: -mpclmul
   # ARMv9-A with SVE2, which is what `ubuntu-24.04-arm` (Azure Cobalt 100) is.
   # The default `generic` has NEON only, so `f32x8` would split across two
   # 128-bit registers. macOS lanes are `aarch64-apple-darwin` and read neither
