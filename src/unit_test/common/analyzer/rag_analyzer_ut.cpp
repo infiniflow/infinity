@@ -74,6 +74,22 @@ public:
         return tokens;
     }
 
+    // Runs rag_tokenizer.py on one text and returns its output line.
+    std::string PythonTokenize(const std::string &text, const std::string &options = "") {
+        std::string python_cmd = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + options + " \"" + text + "\"";
+        FILE *pipe = popen(python_cmd.c_str(), "r");
+        std::string python_result;
+        char buffer[128];
+        if (pipe) {
+            while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+                python_result += buffer;
+            }
+            pclose(pipe);
+        }
+        python_result.erase(python_result.find_last_not_of(" \n\r\t") + 1);
+        return python_result;
+    }
+
     RAGAnalyzer *analyzer_;
     std::string rag_tokenizer_path_ = "python/infinity_sdk/infinity";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
@@ -471,6 +487,138 @@ TEST_F(RAGAnalyzerTest, test_out_of_range_diacritics_parity_with_python) {
     EXPECT_TRUE(cxx_result.find("한국어") != std::string::npos);
     EXPECT_TRUE(cxx_result.find("ṣṭḥ") != std::string::npos);
     EXPECT_EQ(cxx_result, python_result);
+}
+
+TEST_F(RAGAnalyzerTest, test_latin_diacritics_parity_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // Latin letters with diacritics stay inside their word instead of being
+    // split off ("tiếng" used to become "ti ế ng", "café" -> "caf é"). The
+    // last three inputs tokenize exactly as before the change.
+    const std::pair<std::string, std::string> cases[] = {
+        {"tôi đang học tiếng Việt", "tôi đang học tiếng việt"},
+        {"bữa sáng ở quán phở", "bữa sáng ở quán phở"},
+        {"le café est très bon", "le café est très bon"},
+        // Accented words that end in an ASCII letter are not stemmed.
+        {"ngày máy này giấy", "ngày máy này giấy"},
+        {"vậy thấy chạy đây", "vậy thấy chạy đây"},
+        // Capital accented letters are lowercased, as in Python.
+        {"Über die Brücke", "über die brücke"},
+        {"ĐƯỜNG PHỐ HÀ NỘI", "đường phố hà nội"},
+        {"Đà Nẵng PHẢI", "đà nẵng phải"},
+        {"ÀÁÂ àáâ ỸỸ", "àáâ àáâ ỹỹ"},
+        // Tokens with digits are not stemmed, as in Python.
+        {"abc123s win10s 100mbps", "abc123s win10s 100mbps"},
+        {"南京市长江大桥 cà phê 测试", "南京市 长江大桥 cà phê 测试"},
+        {"The quick brown foxes are running quickly", "the quick brown fox are run quick"},
+        {"RAGFlow 支持 English 和 中文 mixed text", "ragflow 支持 english 和 中文 mix text"},
+        {"version 1.2.3 costs 4,500", "version 123 cost 4 500"},
+    };
+    for (const auto &[input, expected] : cases) {
+        std::string cxx_result = analyzer_->Tokenize(input);
+        EXPECT_EQ(cxx_result, expected);
+        EXPECT_EQ(cxx_result, PythonTokenize(input));
+    }
+}
+
+TEST_F(RAGAnalyzerTest, test_math_signs_in_latin1_unchanged) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // × and ÷ sit inside U+00C0-U+024F but are not letters: they stay out of
+    // the word run and tokenize as before the diacritics change.
+    const std::pair<std::string, std::string> cases[] = {
+        {"2×3", "23"},
+        {"a÷b", "ab"},
+    };
+    for (const auto &[input, expected] : cases) {
+        std::string cxx_result = analyzer_->Tokenize(input);
+        EXPECT_EQ(cxx_result, expected);
+        EXPECT_EQ(cxx_result, PythonTokenize(input));
+    }
+}
+
+TEST_F(RAGAnalyzerTest, test_large_token_tokenize) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // A token longer than the 12 288-byte lowercase buffer must neither
+    // overflow it nor be cut: 13 000 ASCII letters, and 4 334 x "Ầ" (13 002
+    // bytes).
+    std::string latin_upper;
+    std::string latin_lower;
+    for (int i = 0; i < 4334; ++i) {
+        latin_upper += "Ầ";
+        latin_lower += "ầ";
+    }
+    const std::pair<std::string, std::string> cases[] = {
+        {std::string(13000, 'A'), std::string(13000, 'a')},
+        {latin_upper, latin_lower},
+    };
+    for (const auto &[input, expected] : cases) {
+        EXPECT_EQ(analyzer_->Tokenize(input), expected);
+        EXPECT_EQ(PythonTokenize(input), expected);
+        auto [tokens, positions] = analyzer_->TokenizeWithPosition(input);
+        ASSERT_EQ(tokens.size(), 1u);
+        EXPECT_EQ(tokens[0], expected);
+        ASSERT_EQ(positions.size(), 1u);
+        EXPECT_EQ(positions[0].first, 0u);
+        EXPECT_EQ(positions[0].second, static_cast<unsigned>(input.size()));
+    }
+    // The fine-grained pass lowercases the ASCII run again in EnglishNormalize.
+    const std::string mixed = "中文测试 " + std::string(13000, 'A');
+    const std::string expected = "中文 测试 " + std::string(13000, 'a');
+    std::vector<std::string> fine;
+    analyzer_->FineGrainedTokenize(analyzer_->Tokenize(mixed), fine);
+    std::string fine_tokens;
+    for (const auto &token : fine) {
+        fine_tokens += (fine_tokens.empty() ? "" : " ") + token;
+    }
+    EXPECT_EQ(fine_tokens, expected);
+    EXPECT_EQ(PythonTokenize(mixed, "--fine-grained"), expected);
+}
+
+TEST_F(RAGAnalyzerTest, test_latin_uppercase_tokenize_with_position) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // Lowercasing an accented capital keeps its UTF-8 length, so the offsets
+    // still point into the original input ("Ờ" and "Ố" are 3 bytes, "Đ" and
+    // "Ư" are 2).
+    auto [tokens, positions] = analyzer_->TokenizeWithPosition("ĐƯỜNG PHỐ");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], "đường");
+    EXPECT_EQ(tokens[1], "phố");
+    ASSERT_EQ(positions.size(), 2u);
+    EXPECT_EQ(positions[0].first, 0u);
+    EXPECT_EQ(positions[0].second, 9u);
+    EXPECT_EQ(positions[1].first, 10u);
+    EXPECT_EQ(positions[1].second, 15u);
+}
+
+TEST_F(RAGAnalyzerTest, test_lowercase_changes_class_parity_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // rag_tokenizer.py lowercases before it splits, so a capital whose
+    // lowercase is outside the word class splits off its word and one whose
+    // lowercase is inside joins it. The split equals Python's; only letters
+    // C++ does not lowercase keep their case.
+    struct Case {
+        std::string input;
+        std::string expected;
+        std::string python_expected;
+    };
+    const Case cases[] = {
+        {"Ɛwe Ɔkɔ ƁAMA Ɗaka", "Ɛ we Ɔ k ɔ Ɓ ama Ɗ aka", "ɛ we ɔ k ɔ ɓ ama ɗ aka"},
+        {"Ⱥb Ⱦc", "Ⱥ b Ⱦ c", "ⱥ b ⱦ c"},
+        {"Ȿx Ɀy", "Ȿx Ɀy", "ȿx ɀy"},
+    };
+    for (const auto &[input, expected, python_expected] : cases) {
+        EXPECT_EQ(analyzer_->Tokenize(input), expected);
+        EXPECT_EQ(PythonTokenize(input), python_expected);
+    }
 }
 
 TEST_F(RAGAnalyzerTest, test_slovak_tokenize_with_position) {

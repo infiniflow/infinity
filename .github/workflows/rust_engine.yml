@@ -320,9 +320,11 @@ jobs:
       - name: Install the NLTK data the Python tokenizer needs
         # The analyzer's parity tests shell out to
         # `uv run python/infinity_sdk/infinity/rag_tokenizer.py`, which
-        # sentence-splits with NLTK's punkt_tab; a missing model makes the
-        # script print an error and every comparison fails.
-        run: uv run --python 3.13 python -m nltk.downloader punkt_tab
+        # sentence-splits with NLTK's punkt_tab and lemmatizes English tokens
+        # with WordNet; with a model missing, each affected line becomes a
+        # multi-line ERROR: the single-text parity tests fail and the two
+        # fixture tests skip.
+        run: uv run --python 3.13 python -m nltk.downloader punkt_tab wordnet
       - name: test
         # `RUST_BACKTRACE` so a failing assertion carries its call stack: a
         # flake reports the value it compared but not which path produced it,
