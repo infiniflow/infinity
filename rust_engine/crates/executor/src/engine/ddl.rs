@@ -439,7 +439,9 @@ impl Engine {
                 .chain(&text_ids)
                 .chain(&multi_ids)
             {
-                any_hnsw |= entry.hnsw_mem.remove(id).is_some();
+                let before = entry.hnsw_mem.len();
+                entry.hnsw_mem.retain(|(i, _), _| i != id);
+                any_hnsw |= entry.hnsw_mem.len() != before;
                 entry.index_pending_bytes.remove(id);
                 entry.vector.remove(id);
                 entry.ivf.remove(id);
@@ -458,7 +460,10 @@ impl Engine {
         };
 
         for index in texts {
-            if let Ok(g) = index.read() {
+            // `try_read`: this is the synchronous drop path, and a chunk that is
+            // locked right now belongs to a write still in flight - its tree is
+            // removed by the next cleanup.
+            if let Ok(g) = index.try_read() {
                 storage::chunk_store::remove_tree(g.dir.clone());
             }
         }

@@ -54,19 +54,21 @@ impl HnswHandler {
     /// in parallel buckets (`kBuildBucketSize`); `add_batch` does the same.
     /// Returns the number of vectors inserted; vectors with the
     /// wrong dimension are skipped.
-    pub fn insert_vecs<I>(&mut self, vectors: I) -> usize
+    pub async fn insert_vecs<I>(&mut self, vectors: I) -> usize
     where
         I: IntoIterator<Item = Vec<f32>>,
+        I::IntoIter: Send,
     {
-        self.insert_vecs_threaded(vectors, 1)
+        self.insert_vecs_threaded(vectors, 1).await
     }
 
     /// `InsertVecs` with the dense-index pool size; `threads <= 1` keeps the
     /// serial path.
-    pub fn insert_vecs_threaded<I>(&mut self, vectors: I, threads: usize) -> usize
+    pub async fn insert_vecs_threaded<I>(&mut self, vectors: I, threads: usize) -> usize
     where
         I: IntoIterator,
-        I::Item: AsRef<[f32]>,
+        I::Item: AsRef<[f32]> + Send + Sync,
+        I::IntoIter: Send,
     {
         let dims = self.index.dims();
         let batch: Vec<I::Item> = vectors
@@ -76,7 +78,7 @@ impl HnswHandler {
         if batch.is_empty() {
             return 0;
         }
-        self.index.add_batch(&batch, threads)
+        self.index.add_batch(&batch, threads).await
     }
     /// C++: `SearchIndex(q, k, option)` without a filter.
     pub fn search_index(
@@ -170,20 +172,20 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn insert_vecs_counts_only_matching_dimensions() {
+    #[tokio::test]
+    async fn insert_vecs_counts_only_matching_dimensions() {
         let mut handler = HnswHandler::new(3, 8, 32, 32);
         let mut batch = vectors(10, 3);
         batch.push(vec![1.0, 2.0]); // wrong dimension
-        assert_eq!(handler.insert_vecs(batch), 10);
+        assert_eq!(handler.insert_vecs(batch).await, 10);
         assert_eq!(handler.len(), 10);
         assert_eq!(handler.dims(), 3);
     }
 
-    #[test]
-    fn search_index_honours_the_ef_option() {
+    #[tokio::test]
+    async fn search_index_honours_the_ef_option() {
         let mut handler = HnswHandler::new(2, 4, 16, 4);
-        handler.insert_vecs(vectors(64, 2));
+        handler.insert_vecs(vectors(64, 2)).await;
         let query = vec![0.0f32, 0.0];
         let default = handler.search_index(&query, 3, KnnSearchOption::default());
         let wide = handler.search_index(&query, 3, KnnSearchOption { ef: Some(64) });
@@ -232,9 +234,9 @@ mod reference_suite {
             .collect()
     }
 
-    fn handler(data: &[Vec<f32>]) -> HnswHandler {
+    async fn handler(data: &[Vec<f32>]) -> HnswHandler {
         let mut handler = HnswHandler::new(DIM, M, EF_CONSTRUCTION, EF_SEARCH);
-        assert_eq!(handler.insert_vecs(data.iter().cloned()), data.len());
+        assert_eq!(handler.insert_vecs(data.iter().cloned()).await, data.len());
         handler
     }
 
@@ -300,10 +302,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.test_memory`.
-    #[test]
-    fn test_memory() {
+    #[tokio::test]
+    async fn test_memory() {
         let data = data();
-        let handler = handler(&data);
+        let handler = handler(&data).await;
 
         let (mem_usage, vec_num) = handler.get_info();
         assert_eq!(vec_num, N);
@@ -332,10 +334,10 @@ mod reference_suite {
     }
 
     /// C++: `HnswHandlerTest.test_compress`.
-    #[test]
-    fn test_compress() {
+    #[tokio::test]
+    async fn test_compress() {
         let data = data();
-        let mut handler = handler(&data);
+        let mut handler = handler(&data).await;
         let plain_size = handler.size_in_bytes();
 
         handler.compress_to_lvq();

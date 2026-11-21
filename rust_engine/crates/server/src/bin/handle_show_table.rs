@@ -21,13 +21,23 @@ use executor::Engine;
 use server::{read_show_table_call, write_show_table_response};
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = std::env::temp_dir().join(format!("infinity-show-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let engine = Engine::open(&dir).expect("open engine");
+    let engine = Engine::open_async(&dir, Default::default())
+        .await
+        .expect("open engine");
     let (seq, db, table, _sid) =
         read_show_table_call(&mut std::io::stdin()).expect("decode ShowTable");
-    let _ = engine.execute_blocking(&format!("CREATE TABLE {table} (id INT, name VARCHAR);"));
-    let _ = engine.execute_blocking(&format!("INSERT INTO {table} VALUES (1, 'a'), (2, 'b');"));
+    let _ = engine
+        .execute(&format!("CREATE TABLE {table} (id INT, name VARCHAR);"))
+        .await;
+    let _ = engine
+        .execute(&format!("INSERT INTO {table} VALUES (1, 'a'), (2, 'b');"))
+        .await;
 
     let col_count = engine
         .catalog()

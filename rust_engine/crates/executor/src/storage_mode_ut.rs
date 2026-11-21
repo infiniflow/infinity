@@ -32,8 +32,8 @@ use crate::{Engine, QueryResult, StorageMode};
 use parser::Literal;
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -41,9 +41,10 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     Vec::new()
 }
 
-fn create_table(engine: &Engine) {
+async fn create_table(engine: &Engine) {
     engine
-        .execute_blocking("CREATE TABLE st (id INT, name VARCHAR);")
+        .execute("CREATE TABLE st (id INT, name VARCHAR);")
+        .await
         .unwrap();
 }
 
@@ -53,18 +54,21 @@ const INVALID_NODE_ROLE: i64 = 8007;
 /// The reference's standalone/leader startup reaches `kWritable` before it
 /// serves a request (`InfinityContext::ChangeServerRole` → `AdminToWriter`), and
 /// every write below works.
-#[test]
-fn open_is_writable_and_accepts_writes() {
+#[tokio::test]
+async fn open_is_writable_and_accepts_writes() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
 
-    create_table(&engine);
+    create_table(&engine).await;
     engine
-        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .await
         .unwrap();
     assert_eq!(
-        rows(&engine, "SELECT id FROM st;"),
+        rows(&engine, "SELECT id FROM st;").await,
         vec![vec!["1".to_string()]]
     );
 }
@@ -73,13 +77,16 @@ fn open_is_writable_and_accepts_writes() {
 /// reads keep working. The failure is the reference's
 /// `Status::InvalidNodeRole("Attempt to write on non-writable node")`, and it
 /// carries the reference's node-role code rather than a generic parameter error.
-#[test]
-fn readable_rejects_writes_but_allows_reads() {
+#[tokio::test]
+async fn readable_rejects_writes_but_allows_reads() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    create_table(&engine);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&engine).await;
     engine
-        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .await
         .unwrap();
 
     engine.set_storage_mode(StorageMode::Readable).unwrap();
@@ -87,7 +94,7 @@ fn readable_rejects_writes_but_allows_reads() {
 
     // SELECT is unaffected.
     assert_eq!(
-        rows(&engine, "SELECT id FROM st;"),
+        rows(&engine, "SELECT id FROM st;").await,
         vec![vec!["1".to_string()]]
     );
 
@@ -97,7 +104,7 @@ fn readable_rejects_writes_but_allows_reads() {
         "DELETE FROM st;",
         "DROP TABLE st;",
     ] {
-        let error = engine.execute_blocking(sql).unwrap_err();
+        let error = engine.execute(sql).await.unwrap_err();
         assert_eq!(error.status_code(), INVALID_NODE_ROLE, "{sql}");
         assert_eq!(error.to_string(), "Attempt to write on non-writable node");
     }
@@ -106,45 +113,48 @@ fn readable_rejects_writes_but_allows_reads() {
     // gated there too.
     let error = engine
         .insert_literals("st", None, vec![vec![Literal::Int(3)]])
+        .await
         .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // A checkpoint needs `kWritable` (`physical_flush_impl.cpp:42-52`) ...
     assert_eq!(
-        crate::scheduler::block_on(engine.flush())
-            .unwrap_err()
-            .status_code(),
+        engine.flush().await.unwrap_err().status_code(),
         INVALID_NODE_ROLE
     );
     // ... while cleanup runs on a read-only replica too
     // (`background_process_impl.cpp:109`).
-    crate::scheduler::block_on(engine.cleanup()).unwrap();
+    engine.cleanup().await.unwrap();
 
     // Nothing was published.
     assert_eq!(
-        rows(&engine, "SELECT count(*) FROM st;"),
+        rows(&engine, "SELECT count(*) FROM st;").await,
         vec![vec!["1".to_string()]]
     );
 }
 
 /// `ReaderToWriter` (`storage_impl.cpp:600-712`): writes come back.
-#[test]
-fn returning_to_writable_restores_writes() {
+#[tokio::test]
+async fn returning_to_writable_restores_writes() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    create_table(&engine);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&engine).await;
 
     engine.set_storage_mode(StorageMode::Readable).unwrap();
     assert!(engine
-        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .await
         .is_err());
 
     engine.set_storage_mode(StorageMode::Writable).unwrap();
     assert_eq!(engine.storage_mode(), StorageMode::Writable);
     engine
-        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .await
         .unwrap();
     assert_eq!(
-        rows(&engine, "SELECT id FROM st;"),
+        rows(&engine, "SELECT id FROM st;").await,
         vec![vec!["1".to_string()]]
     );
 }
@@ -152,10 +162,12 @@ fn returning_to_writable_restores_writes() {
 /// `kUnInitialized` only moves to `kAdmin` (`storage_impl.cpp:813-818`); the
 /// reference calls `UnrecoverableError` on anything else, so the port returns
 /// the same message as an error instead of aborting.
-#[test]
-fn uninitialized_to_writable_is_rejected() {
+#[tokio::test]
+async fn uninitialized_to_writable_is_rejected() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
     engine.set_storage_mode(StorageMode::UnInitialized).unwrap();
     let error = engine.set_storage_mode(StorageMode::Writable).unwrap_err();
@@ -169,7 +181,8 @@ fn uninitialized_to_writable_is_rejected() {
     // A mutating statement on an uninitialized storage is the reference's
     // fatal case, not 8007.
     let error = engine
-        .execute_blocking("CREATE TABLE st (id INT);")
+        .execute("CREATE TABLE st (id INT);")
+        .await
         .unwrap_err();
     assert_eq!(error.to_string(), "Uninitialized storage mode");
 
@@ -182,28 +195,29 @@ fn uninitialized_to_writable_is_rejected() {
 
 /// `kAdmin` (the start of `ChangeServerRole`) reads the catalog but accepts no
 /// user write.
-#[test]
-fn admin_allows_reads_but_not_writes() {
+#[tokio::test]
+async fn admin_allows_reads_but_not_writes() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    create_table(&engine);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&engine).await;
 
     engine.set_storage_mode(StorageMode::Admin).unwrap();
 
     // The catalog is readable (`InitToAdmin` opens the `KVStore` read-only).
     assert_eq!(
-        rows(&engine, "SELECT count(*) FROM st;"),
+        rows(&engine, "SELECT count(*) FROM st;").await,
         vec![vec!["0".to_string()]]
     );
     let error = engine
-        .execute_blocking("INSERT INTO st VALUES (1, 'a');")
+        .execute("INSERT INTO st VALUES (1, 'a');")
+        .await
         .unwrap_err();
     assert_eq!(error.status_code(), INVALID_NODE_ROLE);
     // Admin is below `kReadable`, so even the replica-level cleanup is refused.
     assert_eq!(
-        crate::scheduler::block_on(engine.cleanup())
-            .unwrap_err()
-            .status_code(),
+        engine.cleanup().await.unwrap_err().status_code(),
         INVALID_NODE_ROLE
     );
 }

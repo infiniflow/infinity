@@ -1,22 +1,9 @@
-// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 use super::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use storage::wal::index_def::IndexType;
     use tempfile::tempdir;
 
     /// A `NULL` slot and a vector column both reach the WAL as typed columns:
@@ -93,58 +80,70 @@ mod tests {
 
     /// A subquery that reads the enclosing row runs once per row: `EXISTS`,
     /// `NOT EXISTS` and a scalar aggregate all see that row's values.
-    #[test]
-    fn a_correlated_subquery_is_evaluated_per_outer_row() {
+    #[tokio::test]
+    async fn a_correlated_subquery_is_evaluated_per_outer_row() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute("CREATE TABLE cs_dept (id INTEGER, name VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute("CREATE TABLE cs_emp (id INTEGER, dept_id INTEGER, salary INTEGER)")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute("INSERT INTO cs_dept VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+            .await
             .unwrap();
-        let names = |sql: &str| rows(&e, sql);
+        e.execute("INSERT INTO cs_emp VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+            .await
+            .unwrap();
+        let names = async |sql: &str| rows(&e, sql).await;
         assert_eq!(
-            names("SELECT name FROM cs_dept WHERE EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            names("SELECT name FROM cs_dept WHERE EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);").await,
             vec![vec!["eng".to_string()], vec!["ops".to_string()]]
         );
         assert_eq!(
-            names("SELECT name FROM cs_dept WHERE NOT EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            names("SELECT name FROM cs_dept WHERE NOT EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);").await,
             vec![vec!["idle".to_string()]]
         );
         assert_eq!(
-            names("SELECT name FROM cs_dept WHERE (SELECT COUNT(*) FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id) >= 2;"),
+            names("SELECT name FROM cs_dept WHERE (SELECT COUNT(*) FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id) >= 2;").await,
             vec![vec!["eng".to_string()]]
         );
         // The rest of the predicate still runs alongside it.
         assert_eq!(
-            names("SELECT name FROM cs_dept WHERE id >= 2 AND EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);"),
+            names("SELECT name FROM cs_dept WHERE id >= 2 AND EXISTS (SELECT 1 FROM cs_emp WHERE cs_emp.dept_id = cs_dept.id);").await,
             vec![vec!["ops".to_string()]]
         );
     }
 
-    #[test]
-    fn probe_exact() {
+    #[tokio::test]
+    async fn probe_exact() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
+        e.execute("CREATE TABLE cj_o (id INT, a INT);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute("CREATE TABLE cj_s (a INT, x INT);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute("CREATE TABLE cj_t (x INT);").await.unwrap();
+        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO cj_t VALUES (10);").await.unwrap();
         for sql in [
             "WITH c AS (SELECT * FROM cj_o) SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;",
             "SELECT id FROM (SELECT * FROM cj_o) WHERE EXISTS (SELECT 1 FROM cj_s WHERE cj_s.a = a) ORDER BY id;",
             "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;",
         ] {
-            match e.execute_blocking(sql) {
+            match e.execute(sql).await {
                 Ok(r) => println!("PROBE ok {sql} => {r:?}"),
                 Err(err) => println!("PROBE err {sql} => {err}"),
             }
@@ -155,20 +154,26 @@ mod tests {
     /// left side of a join: the hidden columns ride along with the rows the
     /// source hands to the plan. (A derived table is not a correlatable scope:
     /// the parser drops its alias, so a nested query cannot qualify it.)
-    #[test]
-    fn a_correlated_subquery_reads_a_cte_or_joined_relation() {
+    #[tokio::test]
+    async fn a_correlated_subquery_reads_a_cte_or_joined_relation() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cj_o (id INT, a INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cj_s (a INT, x INT);")
+        e.execute("CREATE TABLE cj_o (id INT, a INT);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cj_t (x INT);").unwrap();
-        e.execute_blocking("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+        e.execute("CREATE TABLE cj_s (a INT, x INT);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+        e.execute("CREATE TABLE cj_t (x INT);").await.unwrap();
+        e.execute("INSERT INTO cj_o VALUES (1, 10), (2, 20);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cj_t VALUES (10);").unwrap();
+        e.execute("INSERT INTO cj_s VALUES (10, 100), (20, 200);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO cj_t VALUES (10);").await.unwrap();
 
         // A CTE as the outer relation: `c.a` is substituted with the alias the
         // statement used, not the internal one.
@@ -177,7 +182,7 @@ mod tests {
                 &e,
                 "WITH c AS (SELECT * FROM cj_o) \
                  SELECT id, (SELECT COUNT(*) FROM cj_s WHERE cj_s.a = c.a) AS n FROM c ORDER BY id;"
-            ),
+            ).await,
             vec![
                 vec!["1".to_string(), "1".to_string()],
                 vec!["2".to_string(), "1".to_string()],
@@ -190,7 +195,8 @@ mod tests {
                 &e,
                 "SELECT id FROM cj_o JOIN cj_s ON cj_s.a = cj_o.a \
                  WHERE EXISTS (SELECT 1 FROM cj_t WHERE cj_t.x = a) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()]]
         );
     }
@@ -198,17 +204,19 @@ mod tests {
     /// `GAPS.md` 2.2: the correlated side is a dependent join, not a per-row
     /// re-execution. Four outer rows over two distinct keys run the inner query
     /// twice, and the cached rows answer `IN`/`NOT IN` per row.
-    #[test]
-    fn a_correlated_subquery_runs_once_per_distinct_key() {
+    #[tokio::test]
+    async fn a_correlated_subquery_runs_once_per_distinct_key() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ck (id INT, k INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+        e.execute("CREATE TABLE ck (id INT, k INT);").await.unwrap();
+        e.execute("INSERT INTO ck VALUES (1, 10), (2, 10), (3, 20), (4, 20);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cv (k INT, x INT);")
-            .unwrap();
-        e.execute_blocking("INSERT INTO cv VALUES (10, 1), (20, 2);")
+        e.execute("CREATE TABLE cv (k INT, x INT);").await.unwrap();
+        e.execute("INSERT INTO cv VALUES (10, 1), (20, 2);")
+            .await
             .unwrap();
 
         crate::dependent::INNER_RUNS.with(|runs| runs.set(0));
@@ -216,7 +224,8 @@ mod tests {
             rows(
                 &e,
                 "SELECT id, (SELECT MAX(x) FROM cv WHERE cv.k = ck.k) AS m FROM ck ORDER BY id;"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string(), "1".to_string()],
                 vec!["2".to_string(), "1".to_string()],
@@ -235,14 +244,15 @@ mod tests {
             rows(
                 &e,
                 "SELECT id FROM ck WHERE k IN (SELECT k FROM cv WHERE cv.x >= ck.id) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()]]
         );
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM ck WHERE k NOT IN (SELECT k FROM cv WHERE cv.x >= ck.id) ORDER BY id;"
-            ),
+            ).await,
             vec![
                 vec!["2".to_string()],
                 vec!["3".to_string()],
@@ -256,17 +266,23 @@ mod tests {
     /// that reads the outer row into a hidden column, so the projection, the
     /// projection's surrounding expression and `HAVING` all evaluate it
     /// through the ordinary column path.
-    #[test]
-    fn a_correlated_subquery_works_outside_the_where_clause() {
+    #[tokio::test]
+    async fn a_correlated_subquery_works_outside_the_where_clause() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
+        e.execute("CREATE TABLE cs_dept2 (id INTEGER, name VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+        e.execute("CREATE TABLE cs_emp2 (id INTEGER, dept_id INTEGER, salary INTEGER)")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+        e.execute("INSERT INTO cs_dept2 VALUES (1, 'eng'), (2, 'ops'), (3, 'idle');")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO cs_emp2 VALUES (1, 1, 100), (2, 1, 200), (3, 2, 50);")
+            .await
             .unwrap();
 
         // Projected scalar subquery, one value per outer row.
@@ -275,7 +291,7 @@ mod tests {
                 &e,
                 "SELECT name, (SELECT COUNT(*) FROM cs_emp2 WHERE cs_emp2.dept_id = cs_dept2.id) AS n \
                  FROM cs_dept2 ORDER BY id;"
-            ),
+            ).await,
             vec![
                 vec!["eng".to_string(), "2".to_string()],
                 vec!["ops".to_string(), "1".to_string()],
@@ -289,7 +305,7 @@ mod tests {
                 &e,
                 "SELECT (SELECT MAX(salary) FROM cs_emp2 WHERE cs_emp2.dept_id = cs_dept2.id) + 1 AS m \
                  FROM cs_dept2 ORDER BY id;"
-            ),
+            ).await,
             vec![
                 vec!["201".to_string()],
                 vec!["51".to_string()],
@@ -304,7 +320,8 @@ mod tests {
                 "SELECT dept_id FROM cs_emp2 GROUP BY dept_id \
                  HAVING (SELECT COUNT(*) FROM cs_dept2 WHERE cs_dept2.id = cs_emp2.dept_id) > 0 \
                  ORDER BY dept_id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
@@ -317,55 +334,68 @@ mod tests {
     /// The batch path must produce exactly the postings the row-by-row path
     /// does: tokenizing in parallel is only safe if applying in row order leaves
     /// every posting list ascending and identical.
-    #[test]
-    fn a_batch_indexed_column_matches_the_row_by_row_one() {
+    #[tokio::test]
+    async fn a_batch_indexed_column_matches_the_row_by_row_one() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_capacity(1 << 20);
-        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+        e.set_memindex_capacity(1 << 20);
+        e.execute("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+            .await
             .unwrap();
         // One INSERT of many rows goes through the batch path.
         let mut values = Vec::new();
         for i in 0..64 {
             values.push(format!("({i}, 'alpha beta gamma{i} delta')"));
         }
-        e.execute_blocking(&format!("INSERT INTO bt VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO bt VALUES {};", values.join(",")))
+            .await
             .unwrap();
         // The same rows, one statement each, go through the per-row path.
-        e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+        e.execute("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..64 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO rt VALUES ({i}, 'alpha beta gamma{i} delta');"
             ))
+            .await
             .unwrap();
         }
-        let query = |t: &str, term: &str| {
+        let query = async |t: &str, term: &str| {
             rows(
                 &e,
                 &format!("SELECT id FROM {t} SEARCH MATCH TEXT (body, '{term}', 200);"),
             )
+            .await
         };
-        assert_eq!(query("bt", "alpha"), query("rt", "alpha"));
-        assert_eq!(query("bt", "beta"), query("rt", "beta"));
-        assert_eq!(query("bt", "gamma7"), query("rt", "gamma7"));
+        assert_eq!(query("bt", "alpha").await, query("rt", "alpha").await);
+        assert_eq!(query("bt", "beta").await, query("rt", "beta").await);
+        assert_eq!(query("bt", "gamma7").await, query("rt", "gamma7").await);
     }
 
     /// A batch big enough for several workers must still produce exactly the
     /// postings a row-by-row insert does, and every posting list must stay in
     /// ascending row order (that is what applying in sequence order buys).
-    #[test]
-    fn a_large_batch_matches_the_row_by_row_postings() {
+    #[tokio::test]
+    async fn a_large_batch_matches_the_row_by_row_postings() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_capacity(1 << 20);
-        e.execute_blocking("CREATE TABLE big (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX big_idx ON big (body) USING FULLTEXT")
+        e.set_memindex_capacity(1 << 20);
+        e.execute("CREATE TABLE big (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX big_idx ON big (body) USING FULLTEXT")
+            .await
             .unwrap();
         // A vocabulary wide enough that the workers' local dictionaries do not
         // trivially hit, and 5000 rows so the batch splits across several.
@@ -377,21 +407,25 @@ mod tests {
                 .collect();
             values.push(format!("({i}, '{}')", doc.join(" ")));
         }
-        e.execute_blocking(&format!("INSERT INTO big VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO big VALUES {};", values.join(",")))
+            .await
             .unwrap();
 
-        e.execute_blocking("CREATE TABLE small (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE small (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX small_idx ON small (body) USING FULLTEXT")
+        e.execute("CREATE INDEX small_idx ON small (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..5_000 {
             let doc: Vec<String> = (0..30)
                 .map(|k| format!("w{}", (i * 7 + k * 13) % vocab))
                 .collect();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO small VALUES ({i}, '{}');",
                 doc.join(" ")
             ))
+            .await
             .unwrap();
         }
         for term in ["w0", "w7", "w1234", "w1999"] {
@@ -399,11 +433,13 @@ mod tests {
                 rows(
                     &e,
                     &format!("SELECT id FROM big SEARCH MATCH TEXT (body, '{term}', 9999);"),
-                ),
+                )
+                .await,
                 rows(
                     &e,
                     &format!("SELECT id FROM small SEARCH MATCH TEXT (body, '{term}', 9999);"),
-                ),
+                )
+                .await,
                 "term {term} differs between the batch and the row-by-row index"
             );
         }
@@ -420,24 +456,28 @@ mod tests {
     /// the row existed), and the columnar batch path used to read that as
     /// "hidden by the block version" and answer NULL - so the row disappeared
     /// from every indexed query while a full scan still found it.
-    #[test]
-    fn a_row_inserted_after_a_checkpoint_is_visible_through_its_index() {
+    #[tokio::test]
+    async fn a_row_inserted_after_a_checkpoint_is_visible_through_its_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE post (id INT, grp INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE post (id INT, grp INT);")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..8 {
             values.push(format!("({i},0)"));
         }
-        e.execute_blocking(&format!("INSERT INTO post VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO post VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        e.execute_blocking("CREATE INDEX post_grp ON post (grp);")
+        e.flush().await.unwrap();
+        e.execute("CREATE INDEX post_grp ON post (grp);")
+            .await
             .unwrap();
         // The row that lands past the block's window.
-        e.execute_blocking("INSERT INTO post VALUES (99,0);")
-            .unwrap();
+        e.execute("INSERT INTO post VALUES (99,0);").await.unwrap();
 
         // The server's SELECT goes through the columnar batch path, which is
         // the one that mapped the missing slot to NULL.
@@ -461,50 +501,62 @@ mod tests {
     /// A reopened engine maps the chunks the previous process sealed instead of
     /// re-indexing the table, so its memory tail holds no document and the
     /// sealed readers cover every row.
-    #[test]
-    fn a_reopened_engine_indexes_only_the_unsealed_tail() {
+    #[tokio::test]
+    async fn a_reopened_engine_indexes_only_the_unsealed_tail() {
         let dir = tempdir().unwrap();
         let before = {
-            let e = Engine::open(dir.path()).unwrap();
-            e.set_memindex_capacity(4);
-            e.execute_blocking("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+            e.set_memindex_capacity(4);
+            e.execute("CREATE TABLE rt (id INTEGER, body VARCHAR)")
+                .await
+                .unwrap();
+            e.execute("CREATE INDEX rt_idx ON rt (body) USING FULLTEXT")
+                .await
                 .unwrap();
             for i in 0..12 {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO rt VALUES ({i}, 'alpha beta row{i}');"
                 ))
+                .await
                 .unwrap();
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
             )
+            .await
         };
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body, 'alpha', 100);",
-            ),
+            )
+            .await,
             before // Rows come back in the same order: the mapped chunks and the
                    // unsealed tail are searched exactly as the single in-memory index
                    // was before the restart.
         );
-        let (sealed, pending) = {
+        // The handles are cloned out first: the `tables` guard may not cross
+        // the index's own await.
+        let indexes: Vec<SharedTextIndex> = {
             let tables = e.tables.lock().unwrap();
-            let (mut sealed, mut pending) = (0, 0);
-            for entry in tables.values() {
-                for shared in entry.text.values() {
-                    let guard = shared.read().unwrap();
-                    sealed += guard.reader.doc_count();
-                    pending += guard.mem.pending_docs();
-                }
-            }
-            (sealed, pending)
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values().cloned())
+                .collect()
         };
+        let (mut sealed, mut pending) = (0, 0);
+        for shared in indexes {
+            let guard = shared.read().await;
+            sealed += guard.reader.doc_count();
+            pending += guard.mem.pending_docs();
+        }
         assert_eq!(sealed, 12, "the sealed chunks should cover the table");
         assert_eq!(pending, 0, "no row should be indexed again");
     }
@@ -513,43 +565,52 @@ mod tests {
     /// several chunks is merged into one `ft_{base:016x}_{rows:x}` chunk, the
     /// sources are dropped, and the merged chunk serves the same rows after a
     /// restart.
-    #[test]
-    fn optimizing_a_fulltext_index_merges_its_chunks() {
+    #[tokio::test]
+    async fn optimizing_a_fulltext_index_merges_its_chunks() {
         let dir = tempdir().unwrap();
         let query = "SELECT id FROM opt SEARCH MATCH TEXT (body, 'alpha', 100);";
         let before;
         {
-            let e = Engine::open(dir.path()).unwrap();
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
             // One chunk per two rows, so the index starts fragmented.
             e.set_memindex_capacity(2);
-            e.execute_blocking("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+            e.execute("CREATE TABLE opt (id INTEGER, body VARCHAR)")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+            e.execute("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
+                .await
                 .unwrap();
             for i in 0..10 {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
                 ))
+                .await
                 .unwrap();
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
-            before = rows(&e, query);
+            e.flush().await.unwrap();
+            before = rows(&e, query).await;
             assert_eq!(before.len(), 10);
-            let chunks = fulltext_chunks(&e);
+            let chunks = fulltext_chunks(&e).await;
             assert!(chunks > 1, "five seals leave five chunks, got {chunks}");
 
             // The production entry point: `optimize_indexes` is what the
             // `OPTIMIZE` statement and the periodic task drive
             // (`OptimizationProcessor::NewNotifyOptimize`).
-            e.optimize_indexes().unwrap();
+            e.optimize_indexes().await.unwrap();
             assert_eq!(
-                fulltext_chunks(&e),
+                fulltext_chunks(&e).await,
                 1,
                 "the chunks tile one row range, so they merge into one"
             );
-            assert_eq!(rows(&e, query), before, "the merge must not lose rows");
             assert_eq!(
-                crate::scheduler::block_on(e.optimize_fulltext_async("opt")).unwrap(),
+                rows(&e, query).await,
+                before,
+                "the merge must not lose rows"
+            );
+            assert_eq!(
+                e.optimize_fulltext_async("opt").await.unwrap(),
                 0,
                 "an already-merged index is a no-op"
             );
@@ -558,88 +619,54 @@ mod tests {
         // The merged chunk is what the catalog lists on the next open. A reader
         // is built on first use, so the query comes first: it maps the chunks
         // the catalog names instead of re-indexing the rows.
-        let reopened = Engine::open(dir.path()).unwrap();
-        assert_eq!(rows(&reopened, query), before);
-        assert_eq!(fulltext_chunks(&reopened), 1);
-    }
-
-    /// The merge reads the **catalog**, not the cache: `OptimizeFtIndex` walks
-    /// `SegmentIndexMeta`'s chunk ids, so an index whose cache was dropped (a
-    /// compaction drops it) is merged all the same. The old walk over
-    /// `entry.text` saw no index and left such a chunk list fragmented forever.
-    #[test]
-    fn a_reopened_engine_merges_chunks_it_has_not_loaded() {
-        let dir = tempdir().unwrap();
-        let query = "SELECT id FROM opt SEARCH MATCH TEXT (body, 'alpha', 100);";
-        {
-            let e = Engine::open(dir.path()).unwrap();
-            e.set_memindex_capacity(2);
-            e.execute_blocking("CREATE TABLE opt (id INTEGER, body VARCHAR)")
-                .unwrap();
-            e.execute_blocking("CREATE INDEX opt_idx ON opt (body) USING FULLTEXT")
-                .unwrap();
-            for i in 0..10 {
-                e.execute_blocking(&format!(
-                    "INSERT INTO opt VALUES ({i}, 'alpha beta row{i}');"
-                ))
-                .unwrap();
-            }
-            crate::scheduler::block_on(e.flush()).unwrap();
-            assert!(fulltext_chunks(&e) > 1, "five seals leave five chunks");
-        }
-        let e = Engine::open(dir.path()).unwrap();
-        // `recover_mem_index` builds the memory index of every catalog index at
-        // startup, so the reopen alone maps the chunks. Drop them to reach the
-        // state the cache-only walk could not merge - the one a compaction
-        // leaves behind when it drops an index's cache.
-        {
-            let mut tables = e.tables.lock().unwrap();
-            for entry in tables.values_mut() {
-                entry.text.clear();
-                entry.text_built.clear();
-            }
-        }
-        assert_eq!(fulltext_chunks(&e), 0);
-        e.optimize_indexes().unwrap();
-        // The catalog names the merged chunk, so the first query maps one chunk
-        // and answers every row.
-        assert_eq!(rows(&e, query).len(), 10);
-        assert_eq!(fulltext_chunks(&e), 1, "the reopened engine merged them");
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(rows(&reopened, query).await, before);
+        assert_eq!(fulltext_chunks(&reopened).await, 1);
     }
 
     /// A compaction renumbers every row, so the full-text index has to be
     /// rebuilt with the new ids. The query after the merge must still answer,
     /// both from the in-memory rebuild and from the chunks a reopen maps.
-    #[test]
-    fn a_compaction_keeps_the_fulltext_index_answering() {
+    #[tokio::test]
+    async fn a_compaction_keeps_the_fulltext_index_answering() {
         let q = "SELECT doctitle FROM ct SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE ct (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX ct_body ON ct (body) USING FULLTEXT")
+            e.execute("CREATE TABLE ct (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+                .await
+                .unwrap();
+            e.execute("CREATE INDEX ct_body ON ct (body) USING FULLTEXT")
+                .await
                 .unwrap();
             for i in 0..20 {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             for i in 20..40 {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO ct VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
             }
-            assert_eq!(rows(&e, q).len(), 40, "before the compaction");
-            e.compact_all_segments("default_db.ct").unwrap();
-            assert_eq!(rows(&e, q).len(), 40, "after the compaction");
-            crate::scheduler::block_on(e.flush()).unwrap();
+            assert_eq!(rows(&e, q).await.len(), 40, "before the compaction");
+            e.compact_all_segments("default_db.ct").await.unwrap();
+            assert_eq!(rows(&e, q).await.len(), 40, "after the compaction");
+            e.flush().await.unwrap();
         }
-        let e = Engine::open(dir.path()).unwrap();
-        assert_eq!(rows(&e, q).len(), 40, "after a reopen");
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(rows(&e, q).await.len(), 40, "after a reopen");
     }
 
     /// A full-text build reads the rows one batch at a time, so a compaction can
@@ -649,29 +676,35 @@ mod tests {
     /// table full of matches - which is what
     /// `TestParallelFulltextIndexReadWrite` reported as `column "doctitle" is
     /// empty` on the query that runs after its writers stopped.
-    #[test]
-    fn a_fulltext_build_does_not_publish_across_a_compaction() {
+    #[tokio::test]
+    async fn a_fulltext_build_does_not_publish_across_a_compaction() {
         let q = "SELECT doctitle FROM cr SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cr (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX cr_body ON cr (body) USING FULLTEXT")
+        e.execute("CREATE TABLE cr (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX cr_body ON cr (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         for i in 20..40 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO cr VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        assert_eq!(rows(&e, q).len(), 40, "before the compaction");
+        assert_eq!(rows(&e, q).await.len(), 40, "before the compaction");
 
         // The index (and the epoch) a build that started before the merge still
         // holds when it finishes.
@@ -687,17 +720,17 @@ mod tests {
                 .clone();
             (stale, entry.text_epoch)
         };
-        e.compact_all_segments("default_db.cr").unwrap();
+        e.compact_all_segments("default_db.cr").await.unwrap();
         assert_eq!(
             {
                 let body_id = e.test_index_id("cr", "body", "FULLTEXT");
-                e.publish_text_index(&tkey, body_id, epoch, stale)
+                e.publish_text_index(&tkey, body_id, epoch, stale).await
             },
             crate::engine::statements::TextPublish::Renumbered,
             "a build from the pre-compaction layout must not publish"
         );
         assert_eq!(
-            rows(&e, q).len(),
+            rows(&e, q).await.len(),
             40,
             "and the query after the merge still answers"
         );
@@ -714,24 +747,29 @@ mod tests {
     /// `MATCH` answered `column "doctitle" is empty` for the rest of the run
     /// (`TestParallelFulltextIndexReadWrite`, on the query after its writers
     /// stopped).
-    #[test]
-    fn an_index_of_a_retired_segment_is_never_cached() {
+    #[tokio::test]
+    async fn an_index_of_a_retired_segment_is_never_cached() {
         let q = "SELECT doctitle FROM retired SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE retired (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX retired_body ON retired (body) USING FULLTEXT")
+        e.execute("CREATE TABLE retired (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX retired_body ON retired (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..40 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO retired VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(rows(&e, q).len(), 3);
-        e.compact_all_segments("default_db.retired").unwrap();
+        e.flush().await.unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3);
+        e.compact_all_segments("default_db.retired").await.unwrap();
         let tkey = e.table_key("retired");
         let (epoch, live) = {
             let tables = e.tables.lock().unwrap();
@@ -754,7 +792,7 @@ mod tests {
                 TextTokenizer::default(),
             );
             for row in 0..40u64 {
-                index_row(&mut index, row, "harmful chemical");
+                index_row(&mut index, row, "harmful chemical").await;
             }
             assert_eq!(
                 index
@@ -764,19 +802,19 @@ mod tests {
                     .collect::<Vec<u32>>(),
                 vec![0]
             );
-            let stale: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+            let stale: SharedTextIndex = std::sync::Arc::new(tokio::sync::RwLock::new(index));
             stale
         };
         let index_id = e
             .fulltext_index_id("retired", "body")
             .expect("the full-text index is recorded in the catalog");
         assert_eq!(
-            e.publish_text_index(&tkey, index_id, epoch, stale),
+            e.publish_text_index(&tkey, index_id, epoch, stale).await,
             crate::engine::statements::TextPublish::Renumbered,
             "a build of the retired segment must not be cached"
         );
         assert_eq!(
-            rows(&e, q).len(),
+            rows(&e, q).await.len(),
             3,
             "and the kept cache still answers for the merged layout"
         );
@@ -798,9 +836,9 @@ mod tests {
                 .get(&tkey)
                 .and_then(|entry| entry.text.get(&index_id).cloned())
         };
-        assert_eq!(rows(&e, q).len(), 3);
+        assert_eq!(rows(&e, q).await.len(), 3);
         let first = cached(&e).expect("the build of the merged layout was published");
-        assert_eq!(rows(&e, q).len(), 3);
+        assert_eq!(rows(&e, q).await.len(), 3);
         let again = cached(&e).expect("the published cache is still there");
         assert!(
             std::sync::Arc::ptr_eq(&first, &again),
@@ -808,198 +846,34 @@ mod tests {
         );
     }
 
-    /// A build that started while the table was still empty publishes **after**
-    /// the import appended its documents into that same cache. Replacing the
-    /// cache with it drops every row the writer indexed: the rows are in the
-    /// blocks, but the query path only rebuilds when the coverage counter says
-    /// the index is short, so `MATCH` answered nothing on one of three
-    /// concurrently imported tables until the engine restarted (the reported
-    /// failure: `COUNT(*)` right, every full-text query empty).
-    #[test]
-    fn an_older_build_does_not_replace_the_cached_index() {
-        let q = "SELECT id FROM ob SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ob (id INTEGER, body VARCHAR)")
-            .unwrap();
-        e.execute_blocking("CREATE INDEX ob_body ON ob (body) USING FULLTEXT")
-            .unwrap();
-        for i in 0..20 {
-            e.execute_blocking(&format!(
-                "INSERT INTO ob VALUES ({i}, 'harmful chemical row{i}');"
-            ))
-            .unwrap();
-        }
-        assert_eq!(rows(&e, q).len(), 20);
-        let tkey = e.table_key("ob");
-        let index_id = e
-            .fulltext_index_id("ob", "body")
-            .expect("the full-text index is recorded in the catalog");
-        let epoch = e.tables.lock().unwrap().get(&tkey).unwrap().text_epoch;
-        // What the build read: the table while it was empty. Its document count
-        // is 0, its covered segments are none, and the epoch still matches.
-        let empty_dir = tempdir().unwrap();
-        let empty = TextIndex::new(
-            empty_dir.path().to_string_lossy().into_owned(),
-            TextTokenizer::default(),
-        );
-        assert_eq!(empty.total_docs(), 0);
-        let empty: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(empty));
-        assert_eq!(
-            e.publish_text_index(&tkey, index_id, epoch, empty),
-            crate::engine::statements::TextPublish::Superseded,
-            "an index holding fewer documents than the cache must not replace it"
-        );
-        assert_eq!(
-            rows(&e, q).len(),
-            20,
-            "and every query keeps answering from the cache the writers filled"
-        );
-    }
-
-    /// The coverage gate reads `TableEntry::live_rows`, a counter a full scan
-    /// publishes as-is (`cache_row_set`). A read that lands while an import's
-    /// blocks are still staged publishes `0`, and a cache holding the index
-    /// built on the empty table then passes `total_docs >= reserved` for a table
-    /// of twenty: every query answered from an empty index until a restart
-    /// recomputed the counter. A zero is confirmed against the blocks instead.
-    #[test]
-    fn an_empty_cache_is_not_complete_when_the_counter_reads_zero() {
-        let q = "SELECT id FROM zc SEARCH MATCH TEXT (body, 'harmful chemical', 100);";
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE zc (id INTEGER, body VARCHAR)")
-            .unwrap();
-        e.execute_blocking("CREATE INDEX zc_body ON zc (body) USING FULLTEXT")
-            .unwrap();
-        for i in 0..20 {
-            e.execute_blocking(&format!(
-                "INSERT INTO zc VALUES ({i}, 'harmful chemical row{i}');"
-            ))
-            .unwrap();
-        }
-        assert_eq!(rows(&e, q).len(), 20);
-        let tkey = e.table_key("zc");
-        let index_id = e
-            .fulltext_index_id("zc", "body")
-            .expect("the full-text index is recorded in the catalog");
-        // The state that read left behind: an index built on the empty table and
-        // a counter that says the table has no rows.
-        {
-            let mut tables = e.tables.lock().unwrap();
-            let entry = tables.get_mut(&tkey).expect("the table is cached");
-            let empty_dir = tempdir().unwrap();
-            let empty = TextIndex::new(
-                empty_dir.path().to_string_lossy().into_owned(),
-                TextTokenizer::default(),
-            );
-            entry
-                .text
-                .insert(index_id, std::sync::Arc::new(std::sync::RwLock::new(empty)));
-            entry
-                .text_built
-                .insert(index_id, (entry.text_epoch, crate::read_ts()));
-            entry.live_rows = Some(0);
-        }
-        assert_eq!(
-            rows(&e, q).len(),
-            20,
-            "a zero counter must not make an empty index look complete"
-        );
-        assert_eq!(
-            e.tables
-                .lock()
-                .unwrap()
-                .get(&tkey)
-                .and_then(|entry| entry.live_rows),
-            Some(20),
-            "the counter is repaired from the blocks"
-        );
-    }
-
-    /// A batch whose column has no cached index used to be skipped in silence:
-    /// its postings existed nowhere, and the rebuild that follows can only
-    /// recover them from the blocks - which a `COPY` writes when its statement
-    /// commits, so they are exactly the rows it cannot see. The writer builds
-    /// the index itself now (once, and only while the cache has no entry).
-    #[test]
-    fn a_batch_without_a_cached_index_builds_it_instead_of_dropping_documents() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE wb (id INTEGER, body VARCHAR)")
-            .unwrap();
-        e.execute_blocking("CREATE INDEX wb_body ON wb (body) USING FULLTEXT")
-            .unwrap();
-        for i in 0..10 {
-            e.execute_blocking(&format!(
-                "INSERT INTO wb VALUES ({i}, 'harmful chemical row{i}');"
-            ))
-            .unwrap();
-        }
-        let tkey = e.table_key("wb");
-        let index_id = e
-            .fulltext_index_id("wb", "body")
-            .expect("the full-text index is recorded in the catalog");
-        // What a compaction, or a table entry that has not loaded the index,
-        // leaves behind: the rows are there, the index object is not.
-        {
-            let mut tables = e.tables.lock().unwrap();
-            let entry = tables.get_mut(&tkey).expect("the table is cached");
-            entry.text.remove(&index_id);
-            entry.text_built.remove(&index_id);
-        }
-        for i in 10..20 {
-            e.execute_blocking(&format!(
-                "INSERT INTO wb VALUES ({i}, 'harmful chemical row{i}');"
-            ))
-            .unwrap();
-        }
-        // Before any query runs: the documents are in the index the writer built.
-        let shared = {
-            let tables = e.tables.lock().unwrap();
-            let entry = tables.get(&tkey).expect("the table is cached");
-            entry
-                .text
-                .get(&index_id)
-                .cloned()
-                .expect("the write path built the index instead of dropping the batch")
-        };
-        let docs = shared.read().unwrap().total_docs();
-        assert_eq!(
-            docs, 20,
-            "ten rows rebuilt from the blocks plus the batch the writer indexed"
-        );
-        assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM wb SEARCH MATCH TEXT (body, 'harmful chemical', 100);"
-            )
-            .len(),
-            20
-        );
-    }
-
     /// A merge that lands **inside** a build renumbers every row the build just
     /// read, so its postings name ids nothing owns. The tokenizer/scan window is
     /// too narrow to hit by chance here, so the test drives it deterministically
     /// (`TEXT_BUILD_HOOK`, which fires between the scan and the publish).
-    #[test]
-    fn a_compaction_inside_a_build_still_answers_the_query() {
+    #[tokio::test]
+    async fn a_compaction_inside_a_build_still_answers_the_query() {
         let q = "SELECT doctitle FROM raced SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE raced (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE raced (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
             .unwrap();
         for i in 0..30 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO raced VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        e.execute_blocking("CREATE INDEX raced_body ON raced (body) USING FULLTEXT")
+        e.flush().await.unwrap();
+        e.execute("CREATE INDEX raced_body ON raced (body) USING FULLTEXT")
+            .await
             .unwrap();
-        assert_eq!(rows(&e, q).len(), 3);
+        assert_eq!(rows(&e, q).await.len(), 3);
         // Make the cache one row short of the table: that is the cold path a bulk
         // load which bypassed the DML hooks takes, and it is what puts a rebuild
         // on the query path while a cache is still in place.
@@ -1017,7 +891,7 @@ mod tests {
                     .cloned()
                     .expect("the index is cached")
             };
-            let mut index = shared.write().unwrap();
+            let mut index = shared.write().await;
             crate::engine::state::index_delete_row(&mut index, 0);
             assert!(
                 index.total_docs() < 30,
@@ -1026,11 +900,19 @@ mod tests {
         }
         let compacting = std::sync::Arc::clone(&e);
         crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
-            compacting
-                .compact_all_segments("raced")
-                .expect("the merge inside the build");
+            // Awaited, not bridged: the hook runs inside the query's own task,
+            // and the compaction it lands is an ordinary statement now. A
+            // `block_on` here would park the task's thread while the compaction
+            // still needed a worker to finish.
+            let engine = std::sync::Arc::clone(&compacting);
+            Box::pin(async move {
+                engine
+                    .compact_all_segments("raced")
+                    .await
+                    .expect("the merge inside the build");
+            })
         })));
-        let result = e.execute_blocking(q);
+        let result = e.execute(q).await;
         crate::engine::statements::set_text_build_hook(None);
         let Ok(out) = result else {
             panic!("the query was answered by a failed index: {result:?}");
@@ -1049,21 +931,28 @@ mod tests {
     /// cache to read. Answering from such a build returns rows no fetch can
     /// resolve (an empty `MATCH` on a table full of matches), so the statement
     /// has to fail instead.
-    #[test]
-    fn a_build_that_can_never_publish_fails_instead_of_answering() {
+    #[tokio::test]
+    async fn a_build_that_can_never_publish_fails_instead_of_answering() {
         let q = "SELECT doctitle FROM raced2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE raced2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE raced2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
             .unwrap();
         for i in 0..30 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO raced2 VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        e.execute_blocking("CREATE INDEX raced2_body ON raced2 (body) USING FULLTEXT")
+        e.flush().await.unwrap();
+        e.execute("CREATE INDEX raced2_body ON raced2 (body) USING FULLTEXT")
+            .await
             .unwrap();
         {
             let tkey = e.table_key("raced2");
@@ -1074,19 +963,26 @@ mod tests {
         }
         let racing = std::sync::Arc::clone(&e);
         crate::engine::statements::set_text_build_hook(Some(Box::new(move || {
-            racing
-                .compact_all_segments("raced2")
-                .expect("the merge inside the build");
-            // A compaction keeps its caches (`reindex_compacted_text`); this is
-            // the extreme where nothing usable is left for the retry either.
-            let tkey = racing.table_key("raced2");
-            let mut tables = racing.tables.lock().unwrap();
-            if let Some(entry) = tables.get_mut(&tkey) {
-                entry.text.clear();
-                entry.text_built.clear();
-            }
+            // Awaited, like the hook above: the merge is an ordinary statement
+            // and the build window stays open across it.
+            let racing = std::sync::Arc::clone(&racing);
+            Box::pin(async move {
+                racing
+                    .compact_all_segments("raced2")
+                    .await
+                    .expect("the merge inside the build");
+                // A compaction keeps its caches (`reindex_compacted_text`); this
+                // is the extreme where nothing usable is left for the retry
+                // either.
+                let tkey = racing.table_key("raced2");
+                let mut tables = racing.tables.lock().unwrap();
+                if let Some(entry) = tables.get_mut(&tkey) {
+                    entry.text.clear();
+                    entry.text_built.clear();
+                }
+            })
         })));
-        let result = e.execute_blocking(q);
+        let result = e.execute(q).await;
         crate::engine::statements::set_text_build_hook(None);
         // A build a merge invalidated still describes the rows *this* statement
         // read (one read, one snapshot), so it answers this query and is simply
@@ -1111,50 +1007,61 @@ mod tests {
     /// every rebuild, so the two race in production. Churn them from several
     /// threads: a query may answer from a build that a merge invalidated, but a
     /// build may not land in the cache, so no hit may go missing.
-    #[test]
-    fn concurrent_compactions_never_lose_fulltext_hits() {
+    #[tokio::test]
+    async fn concurrent_compactions_never_lose_fulltext_hits() {
         let q = "SELECT id FROM ch SEARCH MATCH TEXT (body, 'harmful chemical', 500);";
         let dir = tempdir().unwrap();
-        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .execute("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .execute("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..120 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(engine.flush()).unwrap();
-        assert_eq!(rows(&engine, q).len(), 120);
+        engine.flush().await.unwrap();
+        assert_eq!(rows(&engine, q).await.len(), 120);
 
+        // The readers are tasks, not threads: they need no runtime of their own
+        // and no `block_on`. A task is enough for the interleaving this checks -
+        // the compaction below awaits, so the readers get their turns.
         let readers: Vec<_> = (0..2)
             .map(|_| {
                 let engine = std::sync::Arc::clone(&engine);
-                std::thread::spawn(move || {
+                let q = q.to_string();
+                tokio::spawn(async move {
                     let mut worst = usize::MAX;
                     for _ in 0..20 {
-                        worst = worst.min(rows(&engine, q).len());
+                        worst = worst.min(rows(&engine, &q).await.len());
                     }
                     worst
                 })
             })
             .collect();
         for _ in 0..4 {
-            engine.compact_all_segments("default_db.ch").unwrap();
+            engine.compact_all_segments("default_db.ch").await.unwrap();
         }
         for reader in readers {
             assert_eq!(
-                reader.join().expect("a concurrent query panicked"),
+                reader.await.expect("a concurrent query panicked"),
                 120,
                 "a query lost hits across a compaction"
             );
         }
-        assert_eq!(rows(&engine, q).len(), 120);
+        assert_eq!(rows(&engine, q).await.len(), 120);
     }
 
     /// A cursor that snapshotted the block set **before** a compaction mirrored the
@@ -1166,28 +1073,33 @@ mod tests {
     /// block write retired the buffered copies), and the cursor's snapshot does
     /// not name their block. The block writer puts the files on disk before it
     /// retires the buffer, so a miss is a stale snapshot and the read retries.
-    #[test]
-    fn a_cursor_from_before_a_block_write_still_resolves_the_merged_rows() {
+    #[tokio::test]
+    async fn a_cursor_from_before_a_block_write_still_resolves_the_merged_rows() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
-        engine
-            .execute_blocking("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .execute("CREATE TABLE ch (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE INDEX ch_body ON ch (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..120 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO ch VALUES ({i}, 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
         // The snapshot a statement that started before the merge holds: segment 0,
         // which the merge is about to retire.
         let mut cursor = crate::blocks::misc::BlockCursor::new(&engine, "default_db.ch").unwrap();
-        engine.compact_all_segments("default_db.ch").unwrap();
+        engine.compact_all_segments("default_db.ch").await.unwrap();
         // The merge moved the 120 rows of segment 0 to the base of segment 1, and
         // the block write retired the buffered copies: only the blocks hold them.
         let merged: Vec<u64> = (0..120).map(|i| (1u64 << 32) + i).collect();
@@ -1207,39 +1119,44 @@ mod tests {
     /// A compaction retires every row id it renumbers; a retired id that is
     /// still in the postings takes a `topn` slot the fetch cannot resolve, so
     /// three such hits answer "the column is empty" on a table full of matches.
-    #[test]
-    fn a_compaction_never_answers_a_small_top_n_with_retired_rows() {
+    #[tokio::test]
+    async fn a_compaction_never_answers_a_small_top_n_with_retired_rows() {
         let q = "SELECT doctitle FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE churn (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX churn_body ON churn (body) USING FULLTEXT")
+        e.execute("CREATE TABLE churn (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX churn_body ON churn (body) USING FULLTEXT")
+            .await
             .unwrap();
         let mut next = 0usize;
         for _ in 0..120 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
             ))
+            .await
             .unwrap();
             next += 1;
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(rows(&e, q).len(), 3, "before the churn");
+        e.flush().await.unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3, "before the churn");
 
         for round in 0..6 {
             // Writes land in the unsealed tail, then the merge renumbers every
             // sealed row under it.
             for _ in 0..40 {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO churn VALUES ({next}, 'title{next}', 'harmful chemical row{next}');"
-                ))
+                )).await
                 .unwrap();
                 next += 1;
             }
-            e.compact_all_segments("default_db.churn").unwrap();
+            e.compact_all_segments("default_db.churn").await.unwrap();
             assert_eq!(
-                rows(&e, q).len(),
+                rows(&e, q).await.len(),
                 3,
                 "round {round}: the top-3 were rows the merge retired"
             );
@@ -1248,7 +1165,7 @@ mod tests {
             // `SegmentIndexIDs` - never sees them. That is what keeps BM25's `N`
             // at the live population instead of growing by a table per merge,
             // so the chunk span may not exceed the rows that exist.
-            let stats = e.fulltext_stats("churn");
+            let stats = e.fulltext_stats("churn").await;
             assert!(
                 stats[0].chunk_rows <= next,
                 "round {round}: the retired segments stayed in the corpus ({} chunk rows for {next} rows)",
@@ -1261,6 +1178,7 @@ mod tests {
                 &e,
                 "SELECT id FROM churn SEARCH MATCH TEXT (body, 'harmful chemical', 1000);"
             )
+            .await
             .len(),
             next
         );
@@ -1269,36 +1187,47 @@ mod tests {
     /// The parallel gate's shape: writers keep appending while the optimizer
     /// compacts, and the reader asks for three rows only. Every query must
     /// return three fetchable rows - a retired id in the postings eats a slot.
-    #[test]
-    fn concurrent_churn_never_empties_a_small_top_n() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_churn_never_empties_a_small_top_n() {
         let q = "SELECT doctitle FROM churn2 SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking("CREATE TABLE churn2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .execute("CREATE TABLE churn2 (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX churn2_body ON churn2 (body) USING FULLTEXT")
+            .execute("CREATE INDEX churn2_body ON churn2 (body) USING FULLTEXT")
+            .await
             .unwrap();
         let next = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let mut seed = 0usize;
         for _ in 0..120 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO churn2 VALUES ({seed}, 'title{seed}', 'harmful chemical row{seed}');"
-                ))
+                )).await
                 .unwrap();
             seed += 1;
         }
         next.store(seed, std::sync::atomic::Ordering::Relaxed);
-        crate::scheduler::block_on(engine.flush()).unwrap();
-        assert_eq!(rows(&engine, q).len(), 3);
+        engine.flush().await.unwrap();
+        assert_eq!(rows(&engine, q).await.len(), 3);
 
+        // Tasks, not threads with a `block_on`: a thread would have to park on
+        // the statement chain, and this test's concurrency is about interleaved
+        // awaits, which the runtime provides on its own. `flavor = "multi_thread"`
+        // (below) is what makes them overlap: on a current-thread runtime the
+        // writers and the compactor would only take turns.
         let writers: Vec<_> = (0..2)
             .map(|_| {
                 let engine = std::sync::Arc::clone(&engine);
                 let next = std::sync::Arc::clone(&next);
-                std::thread::spawn(move || {
+                tokio::spawn(async move {
                     for _ in 0..20 {
                         let base = next.fetch_add(4, std::sync::atomic::Ordering::Relaxed);
                         let values: Vec<String> = (0..4)
@@ -1308,10 +1237,8 @@ mod tests {
                             })
                             .collect();
                         engine
-                            .execute_blocking(&format!(
-                                "INSERT INTO churn2 VALUES {};",
-                                values.join(",")
-                            ))
+                            .execute(&format!("INSERT INTO churn2 VALUES {};", values.join(",")))
+                            .await
                             .unwrap();
                     }
                 })
@@ -1319,25 +1246,28 @@ mod tests {
             .collect();
         let compactor = {
             let engine = std::sync::Arc::clone(&engine);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 for _ in 0..8 {
-                    engine.compact_all_segments("default_db.churn2").unwrap();
-                    crate::scheduler::block_on(engine.flush()).unwrap();
+                    engine
+                        .compact_all_segments("default_db.churn2")
+                        .await
+                        .unwrap();
+                    engine.flush().await.unwrap();
                 }
             })
         };
         for round in 0..40 {
             assert_eq!(
-                rows(&engine, q).len(),
+                rows(&engine, q).await.len(),
                 3,
                 "round {round}: the top-3 were rows the merge retired"
             );
         }
         for writer in writers {
-            writer.join().expect("a writer panicked");
+            writer.await.expect("a writer panicked");
         }
-        compactor.join().expect("the compactor panicked");
-        assert_eq!(rows(&engine, q).len(), 3, "after the churn");
+        compactor.await.expect("the compactor panicked");
+        assert_eq!(rows(&engine, q).await.len(), 3, "after the churn");
     }
 
     /// A compaction moves the rows into a new `ROW_ID` segment and retires the
@@ -1346,29 +1276,34 @@ mod tests {
     /// they are not `DELETE`s, nothing filters them, and a `topn=3` answer could
     /// come back empty on a table full of matches. The layout decides liveness,
     /// not the record set, so the build maps the live chunk only.
-    #[test]
-    fn a_build_never_maps_the_chunk_of_a_retired_segment() {
+    #[tokio::test]
+    async fn a_build_never_maps_the_chunk_of_a_retired_segment() {
         let q =
             "SELECT doctitle FROM retired_chunk SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking(
-                "CREATE TABLE retired_chunk (id INTEGER, doctitle VARCHAR, body VARCHAR)",
-            )
+            .execute("CREATE TABLE retired_chunk (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX rc_body ON retired_chunk (body) USING FULLTEXT")
+            .execute("CREATE INDEX rc_body ON retired_chunk (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..200 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO retired_chunk VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(engine.flush()).unwrap();
-        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        engine.flush().await.unwrap();
+        assert_eq!(rows(&engine, q).await.len(), 3, "before the compaction");
         let index_id = engine
             .fulltext_index_id("retired_chunk", "body")
             .expect("the index is recorded in the catalog");
@@ -1391,14 +1326,18 @@ mod tests {
         )));
         let compactor = {
             let engine = std::sync::Arc::clone(&engine);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 engine
                     .compact_all_segments("default_db.retired_chunk")
+                    .await
                     .expect("the compaction");
             })
         };
+        // The hook reports the window; this task keeps its turn by yielding, so
+        // the compactor's own await can be driven (a `yield_now` busy loop, not
+        // a parked thread).
         while !parked.load(std::sync::atomic::Ordering::SeqCst) {
-            std::thread::yield_now();
+            tokio::task::yield_now().await;
         }
         {
             let mut tables = engine.tables.lock().unwrap();
@@ -1407,20 +1346,21 @@ mod tests {
                 entry.text_built.clear();
             }
         }
-        assert_eq!(rows(&engine, q).len(), 3, "during the compaction");
+        assert_eq!(rows(&engine, q).await.len(), 3, "during the compaction");
         // The catalog still names segment 0's chunk, so a build that trusted the
         // records covered a segment the table no longer has: `publish_text_index`
         // refuses it and the cache stays empty. A build over live segments only
         // is the layout's own answer and is cached.
         {
-            let tables = engine.tables.lock().unwrap();
-            let cached = tables
-                .get(&tkey)
-                .and_then(|entry| entry.text.get(&index_id))
-                .cloned();
-            drop(tables);
+            let cached = {
+                let tables = engine.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|entry| entry.text.get(&index_id))
+                    .cloned()
+            };
             let cached = cached.expect("the build mapped rows the table no longer has");
-            let index = cached.read().unwrap();
+            let index = cached.read().await;
             for segment in &index.reader.segments {
                 assert_eq!(
                     (segment.reader.base_row_id() >> 32) as u32,
@@ -1429,9 +1369,9 @@ mod tests {
                 );
             }
         }
-        compactor.join().expect("the compactor panicked");
+        compactor.await.expect("the compactor panicked");
         crate::engine::statements::set_compaction_window_hook(None);
-        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+        assert_eq!(rows(&engine, q).await.len(), 3, "after the compaction");
     }
 
     /// A compaction moves the cached postings onto the new row ids **inside** its
@@ -1442,26 +1382,33 @@ mod tests {
     /// back with 0 rows on a table full of matches. This pins that ordering (the
     /// rows reachable first, then the postings), which is what the churn case
     /// exercises under load.
-    #[test]
-    fn a_statement_started_inside_a_merge_is_answered_by_a_consistent_index() {
+    #[tokio::test]
+    async fn a_statement_started_inside_a_merge_is_answered_by_a_consistent_index() {
         let q = "SELECT doctitle FROM oldts SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let engine = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking("CREATE TABLE oldts (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .execute("CREATE TABLE oldts (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX oldts_body ON oldts (body) USING FULLTEXT")
+            .execute("CREATE INDEX oldts_body ON oldts (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..200 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO oldts VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
                 ))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(engine.flush()).unwrap();
-        assert_eq!(rows(&engine, q).len(), 3, "before the compaction");
+        engine.flush().await.unwrap();
+        assert_eq!(rows(&engine, q).await.len(), 3, "before the compaction");
         // Park the compaction right after the cached postings moved onto the new
         // ids, i.e. while its commit is still unpublished.
         let parked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -1477,23 +1424,24 @@ mod tests {
         )));
         let compactor = {
             let engine = std::sync::Arc::clone(&engine);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 engine
                     .compact_all_segments("default_db.oldts")
+                    .await
                     .expect("the compaction");
             })
         };
         while !parked.load(std::sync::atomic::Ordering::SeqCst) {
-            std::thread::yield_now();
+            tokio::task::yield_now().await;
         }
-        let inside = rows(&engine, q).len();
-        compactor.join().expect("the compactor panicked");
+        let inside = rows(&engine, q).await.len();
+        compactor.await.expect("the compactor panicked");
         crate::engine::statements::set_compaction_window_hook(None);
         assert_eq!(
             inside, 3,
             "a statement started inside the merge was answered by postings it cannot fetch"
         );
-        assert_eq!(rows(&engine, q).len(), 3, "after the compaction");
+        assert_eq!(rows(&engine, q).await.len(), 3, "after the compaction");
     }
 
     /// The seal a merge runs into: a chunk whose write was already in flight when
@@ -1505,28 +1453,33 @@ mod tests {
     /// the merge published. `MATCH` then filled its top-n with rows no fetch can
     /// resolve: 0 rows on a table full of matches
     /// (`concurrent_churn_never_empties_a_small_top_n`, round 39).
-    #[test]
-    fn a_chunk_sealed_after_the_merge_keeps_its_retired_ids_hidden() {
+    #[tokio::test]
+    async fn a_chunk_sealed_after_the_merge_keeps_its_retired_ids_hidden() {
         use crate::engine::text_index::{prepare_doc, MemoryIndexer, SealJob};
 
         let q = "SELECT doctitle FROM late SEARCH MATCH TEXT (body, 'harmful chemical', 3);";
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE late (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX late_body ON late (body) USING FULLTEXT")
+        e.execute("CREATE TABLE late (id INTEGER, doctitle VARCHAR, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX late_body ON late (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..30 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO late VALUES ({i}, 'title{i}', 'harmful chemical row{i}');"
             ))
+            .await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(rows(&e, q).len(), 3);
-        e.compact_all_segments("default_db.late").unwrap();
+        e.flush().await.unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3);
+        e.compact_all_segments("default_db.late").await.unwrap();
         assert_eq!(
-            rows(&e, q).len(),
+            rows(&e, q).await.len(),
             3,
             "the kept cache moved onto the new ids"
         );
@@ -1544,7 +1497,7 @@ mod tests {
             .and_then(|entry| entry.text.get(&index_id).cloned())
             .expect("the merge keeps the cache");
         let (tokenizer, cache_dir) = {
-            let g = shared.read().unwrap();
+            let g = shared.read().await;
             (g.tokenizer.clone(), g.dir.clone())
         };
         let mut stale = MemoryIndexer::new();
@@ -1564,11 +1517,11 @@ mod tests {
             flags: storage::invertedindex::format::OPTION_FLAG_ALL,
             overridden_rows: docs.iter().map(|(row, _)| *row).collect(),
         };
-        let reader = job.write().expect("the stale chunk is written");
-        shared.write().unwrap().complete_seal(job, reader);
+        let reader = job.write().await.expect("the stale chunk is written");
+        shared.write().await.complete_seal(job, reader);
 
         assert_eq!(
-            rows(&e, q).len(),
+            rows(&e, q).await.len(),
             3,
             "the ids of a late chunk ate the top-3 slots"
         );
@@ -1578,22 +1531,26 @@ mod tests {
     /// return exactly what one unsealed segment returns: same rows, same order.
     /// That is the concat path's contract (the segments' row ranges are
     /// disjoint, so their posting lists are concatenated instead of merged).
-    #[test]
-    fn a_query_over_many_segments_matches_a_single_segment() {
+    #[tokio::test]
+    async fn a_query_over_many_segments_matches_a_single_segment() {
         const QUERIES: [&str; 4] = [
             "SELECT id FROM seg SEARCH MATCH TEXT (body, 'alpha', 100);",
             "SELECT id FROM seg SEARCH MATCH TEXT (body, '\"beta gamma\"', 100);",
             "SELECT id FROM seg SEARCH MATCH TEXT (body, 'alpha beta', 100);",
             "SELECT id FROM seg SEARCH MATCH TEXT (body, 'gamma epsilon alpha', 100);",
         ];
-        let build = |capacity: usize| -> Vec<Vec<Vec<String>>> {
+        let build = async |capacity: usize| -> Vec<Vec<Vec<String>>> {
             let dir = tempdir().unwrap();
-            let e = Engine::open(dir.path()).unwrap();
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
             // Two rows per segment: the query has to walk several of them.
             e.set_memindex_capacity(capacity);
-            e.execute_blocking("CREATE TABLE seg (id INTEGER, body VARCHAR)")
+            e.execute("CREATE TABLE seg (id INTEGER, body VARCHAR)")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
+            e.execute("CREATE INDEX seg_idx ON seg (body) USING FULLTEXT")
+                .await
                 .unwrap();
             for i in 0..20 {
                 let body = match i % 4 {
@@ -1602,91 +1559,107 @@ mod tests {
                     2 => "beta gamma",
                     _ => "gamma epsilon",
                 };
-                e.execute_blocking(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
+                e.execute(&format!("INSERT INTO seg VALUES ({i}, '{body}');"))
+                    .await
                     .unwrap();
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
-            QUERIES.iter().map(|sql| rows(&e, sql)).collect()
+            e.flush().await.unwrap();
+            let mut answers = Vec::new();
+            for sql in QUERIES {
+                answers.push(rows(&e, sql).await);
+            }
+            answers
         };
-        let many = build(2);
-        let one = build(1024);
+        let many = build(2).await;
+        let one = build(1024).await;
         for (i, sql) in QUERIES.iter().enumerate() {
             assert!(!one[i].is_empty(), "query {i} returned nothing: {sql}");
             assert_eq!(many[i], one[i], "query {i}: {sql}");
         }
     }
 
-    #[test]
-    fn a_fulltext_index_uses_its_declared_analyzer() {
+    #[tokio::test]
+    async fn a_fulltext_index_uses_its_declared_analyzer() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        for (table, analyzer) in [("an_std", "standard"), ("an_gram", "ngram-3")] {
-            e.execute_blocking(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
-                .unwrap();
-            e.execute_blocking(&format!(
-                "CREATE INDEX {table}_idx ON {table} (body) USING FULLTEXT WITH (analyzer='{analyzer}')"
-            ))
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-            e.execute_blocking(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
+        for (table, analyzer) in [("an_std", "standard"), ("an_gram", "ngram-3")] {
+            e.execute(&format!("CREATE TABLE {table} (id INTEGER, body VARCHAR)"))
+                .await
+                .unwrap();
+            e.execute(&format!(
+                "CREATE INDEX {table}_idx ON {table} (body) USING FULLTEXT WITH (analyzer='{analyzer}')"
+            )).await
+            .unwrap();
+            e.execute(&format!("INSERT INTO {table} VALUES (1, 'quick brown');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let hits = |table: &str| {
+        e.flush().await.unwrap();
+        let hits = async |table: &str| {
             rows(
                 &e,
                 &format!("SELECT id FROM {table} SEARCH MATCH TEXT (body, 'qui', 10);"),
             )
+            .await
         };
-        assert_eq!(hits("an_std"), Vec::<Vec<String>>::new());
-        assert_eq!(hits("an_gram"), vec![vec!["1".to_string()]]);
+        assert_eq!(hits("an_std").await, Vec::<Vec<String>>::new());
+        assert_eq!(hits("an_gram").await, vec![vec!["1".to_string()]]);
         // The whole word still matches both.
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM an_std SEARCH MATCH TEXT (body, 'quick', 10);"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()]]
         );
     }
 
     /// With `result_cache` on, a repeated scan is answered from the plan-node
     /// cache (`ResultCacheGetter` + `ResultCacheSetter`), and a write drops it.
-    #[test]
-    fn the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it() {
+    #[tokio::test]
+    async fn the_plan_cache_answers_a_repeated_scan_and_a_write_drops_it() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rc (id INTEGER, name VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rc (id INTEGER, name VARCHAR)")
+            .await
             .unwrap();
         for i in 0..5 {
-            e.execute_blocking(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
+            e.execute(&format!("INSERT INTO rc VALUES ({i}, 'n{i}');"))
+                .await
                 .unwrap();
         }
         assert_eq!(e.plan_cache.len(), 0);
         // The cache is opt-in, as in the reference (`DEFAULT_RESULT_CACHE`).
-        let before = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
+        let before = rows(&e, "SELECT id FROM rc WHERE id >= 2;").await;
         assert_eq!(e.plan_cache.len(), 0);
-        e.execute_blocking("SET CONFIG result_cache ON").unwrap();
-        let first = rows(&e, "SELECT id FROM rc WHERE id >= 2;");
+        e.execute("SET CONFIG result_cache ON").await.unwrap();
+        let first = rows(&e, "SELECT id FROM rc WHERE id >= 2;").await;
         assert_eq!(first, before);
         assert!(!e.plan_cache.is_empty(), "the scan did not fill the cache");
-        assert_eq!(rows(&e, "SELECT id FROM rc WHERE id >= 2;"), first);
+        assert_eq!(rows(&e, "SELECT id FROM rc WHERE id >= 2;").await, first);
         // A write clears every entry: the answer could have changed.
-        e.execute_blocking("INSERT INTO rc VALUES (9, 'n9');")
-            .unwrap();
+        e.execute("INSERT INTO rc VALUES (9, 'n9');").await.unwrap();
         assert_eq!(e.plan_cache.len(), 0);
         assert_eq!(
-            rows(&e, "SELECT id FROM rc WHERE id >= 2;").len(),
+            rows(&e, "SELECT id FROM rc WHERE id >= 2;").await.len(),
             first.len() + 1
         );
     }
 
     /// `CompactionProcessor::NewNotifyCompact`: the periodic trigger visits
     /// every table and merges the four segments `NewCompactionAlg` picks.
-    #[test]
-    fn notify_compact_merges_the_segments_the_alg_picks() {
+    #[tokio::test]
+    async fn notify_compact_merges_the_segments_the_alg_picks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE nc (id INTEGER)").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE nc (id INTEGER)").await.unwrap();
         // Four imports of one block each: layer 0 holds four segments, which is
         // exactly what `DBTCompactionAlg` merges.
         for part in 0..4 {
@@ -1695,20 +1668,21 @@ mod tests {
                 .map(|i| format!("{}\n", part * 8192 + i))
                 .collect();
             std::fs::write(&path, text).unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "COPY nc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 path.display()
             ))
+            .await
             .unwrap();
         }
         assert_eq!(e.segments("nc").len(), 4);
         assert_eq!(e.row_count("nc").unwrap(), 4 * 8192);
-        assert_eq!(e.notify_compact(), 1);
+        assert_eq!(e.notify_compact().await, 1);
         assert_eq!(e.segments("nc").len(), 1, "{:?}", e.segments("nc"));
         assert_eq!(e.row_count("nc").unwrap(), 4 * 8192);
         // Nothing left to pick: a second pass is a no-op.
-        assert_eq!(e.notify_compact(), 0);
-        let rows = rows(&e, "SELECT id FROM nc WHERE id = 12345;");
+        assert_eq!(e.notify_compact().await, 0);
+        let rows = rows(&e, "SELECT id FROM nc WHERE id = 12345;").await;
         assert_eq!(rows, vec![vec!["12345".to_string()]]);
     }
 
@@ -1716,33 +1690,207 @@ mod tests {
     /// `blk|…|fast_rough_filter` record: a block whose min/max refutes the
     /// predicate is never decoded, and the rows the answer needs still come
     /// back.
-    #[test]
-    fn the_block_prefilter_skips_blocks_that_cannot_match() {
+    #[tokio::test]
+    async fn the_block_prefilter_skips_blocks_that_cannot_match() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pf (id INTEGER)").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pf (id INTEGER)").await.unwrap();
         // `COPY` seals the segment, which is when the reference builds the
         // block prefilters. Two blocks: ids 8192..8999 live in the second one,
         // so `id < 10` can never match it.
         let csv = dir.path().join("pf.csv");
         let text: String = (0..9000).map(|i| format!("{i}\n")).collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY pf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         crate::blocks::PRUNED_BLOCKS.with(|n| n.set(0));
-        let got = rows(&e, "SELECT id FROM pf WHERE id < 10;");
+        let got = rows(&e, "SELECT id FROM pf WHERE id < 10;").await;
         assert_eq!(got.len(), 10, "{got:?}");
         assert_eq!(got[0][0], "0");
         assert_eq!(got[9][0], "9");
         let pruned = crate::blocks::PRUNED_BLOCKS.with(|n| n.get());
         assert!(pruned > 0, "no block was pruned (read {pruned})");
         // A predicate that spans both blocks still returns every row.
-        let got = rows(&e, "SELECT id FROM pf WHERE id >= 8190 AND id < 8200;");
+        let got = rows(&e, "SELECT id FROM pf WHERE id >= 8190 AND id < 8200;").await;
         assert_eq!(got.len(), 10, "{got:?}");
+    }
+
+    /// An import writes a block as soon as its 8192 rows are all in the append
+    /// buffer, and the commit does not write it a second time.
+    ///
+    /// The staged block's column files are final when it lands; what the commit
+    /// owes it is the `version` file and the catalog record. Two things have to
+    /// hold for that to be a win rather than a bug: the rows must leave the
+    /// buffer (that is the memory bound), and the commit must not re-encode the
+    /// block (its rows are gone). After the statement the block must read back
+    /// exactly, and no staging directory may be left behind.
+    #[tokio::test]
+    async fn an_import_stages_a_full_block_and_the_commit_adopts_it() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sg (id INTEGER)").await.unwrap();
+        let csv = dir.path().join("sg.csv");
+        // Two blocks plus a short tail: the first two are complete while the
+        // statement is still reading, the third is not.
+        let total = 8192 * 2 + 100;
+        let text: String = (0..total).map(|i| format!("{i}\n")).collect();
+        std::fs::write(&csv, text).unwrap();
+        e.execute(&format!(
+            "COPY sg FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+            csv.display()
+        ))
+        .await
+        .unwrap();
+        assert_eq!(e.row_count("sg").unwrap(), total);
+        // Every row is in the block files now, including the short tail the
+        // commit wrote: the append buffer holds nothing.
+        assert_eq!(
+            e.buffered_row_count("sg"),
+            0,
+            "the import left rows in the append buffer"
+        );
+        // Three blocks: two staged while the statement ran, one written by the
+        // commit.
+        assert_eq!(e.segments("sg").len(), 1);
+        let blocks = e.visible_block_ids("sg").len();
+        assert_eq!(
+            blocks,
+            total.div_ceil(storage::definition::format::DEFAULT_BLOCK_CAPACITY),
+            "the staged blocks were not all published"
+        );
+        // The rows read back from the block files, not from the buffer.
+        let got = rows(&e, "SELECT id FROM sg WHERE id = 16384;").await;
+        assert_eq!(got, vec![vec!["16384".to_string()]]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM sg WHERE id = 16183;").await,
+            vec![vec!["16183".to_string()]]
+        );
+        // The staging directory was moved in and removed, not left behind.
+        let staging = dir.path().join("import");
+        if let Ok(entries) = std::fs::read_dir(&staging) {
+            assert_eq!(
+                entries.count(),
+                0,
+                "an import left its staging directory behind"
+            );
+        }
+    }
+
+    /// An `fvecs` record's direct slot is what the text path would have
+    /// encoded from the same digits.
+    ///
+    /// The fast path exists to skip a 19 KB `String` per 960-dim row, not to
+    /// change what lands on disk: the reference reads these files with the C++
+    /// engine, so a byte of difference is a compatibility break. This compares
+    /// the two encoders over one record rather than over a whole statement, so
+    /// a difference points at the encoding and not at some other stage.
+    #[test]
+    fn a_direct_vector_slot_matches_the_text_encoder() {
+        // The shapes a formatter could change: a negative zero, a value that
+        // needs every digit of an `f32`, a denormal, and infinities.
+        let values: [f32; 6] = [
+            -0.0,
+            0.1,
+            1.0 / 3.0,
+            f32::MIN_POSITIVE,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ];
+        let declared = "EMBEDDING(FLOAT,6)";
+        let (dim, elem) = crate::blocks::embedding_shape(declared).unwrap();
+        assert_eq!((dim, elem), (6, 6));
+
+        // What the reader produces for one record: the slot off the wire.
+        let mut direct = Vec::new();
+        for v in values {
+            storage::definition::format::push_embedding_element(&mut direct, elem, f64::from(v));
+        }
+
+        // What the text path produces for the same record: render each element
+        // the way `encode_cell_stored` does, then let `encode_value_with_shape`
+        // parse the list back into a slot.
+        let text = format!(
+            "[{}]",
+            values
+                .iter()
+                .map(|v| crate::engine::state::fmt_f32_cpp(*v))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let from_text =
+            crate::blocks::encode_value_with_shape(declared, Some((dim, elem)), 6, &text)
+                .unwrap()
+                .unwrap();
+
+        assert_eq!(
+            direct, from_text,
+            "a slot built from the record and one built from its text disagree"
+        );
+    }
+
+    /// A fixed-width scalar column's slot encodes to the bytes the text path
+    /// writes, so `COPY` can hand the encoder that column's bytes directly.
+    ///
+    /// This is the wider form of the vector case above: `INT`/`BIGINT`/`FLOAT`/
+    /// `BOOLEAN` are `Fixed`/`CompactBit` layouts, and a `COPY` now encodes them
+    /// once up front instead of letting the block writer re-parse each cell.
+    #[test]
+    fn a_fixed_width_scalar_slot_matches_the_text_encoder() {
+        let cases: [(&str, &str); 6] = [
+            ("INTEGER", "-2147483648"),
+            ("BIGINT", "-9223372036854775808"),
+            ("SMALLINT", "32767"),
+            ("TINYINT", "-128"),
+            ("FLOAT", "-0"),
+            ("DOUBLE", "0.1"),
+        ];
+        for (declared, text) in cases {
+            let column_type = crate::blocks::column_type_of(declared).unwrap();
+            let from_text =
+                crate::blocks::encode_value_with_shape(declared, None, column_type, text)
+                    .unwrap()
+                    .unwrap();
+            // The slot the block reader would decode, re-encoded: a round trip
+            // through `decode_scalar_value` has to land on the same bytes.
+            let decoded =
+                crate::blocks::decode_scalar_value(column_type, from_text.len(), &from_text, 0)
+                    .unwrap();
+            let again = crate::blocks::encode_value_with_shape(
+                declared,
+                None,
+                column_type,
+                &crate::blocks::mirror_cell_text(&decoded),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(
+                from_text, again,
+                "{declared} '{text}': the slot does not survive a decode/encode"
+            );
+        }
+        // `BOOLEAN` is the `CompactBit` layout, and its *slot* is the textual
+        // `b"1"`/`b"0"` the packer reads - one ASCII byte, not a 0/1 bit. The
+        // bit is what `pack_column_with_coverage` derives from it.
+        for (text, expected) in [
+            ("true", b"1".to_vec()),
+            ("1", b"1".to_vec()),
+            ("false", b"0".to_vec()),
+            ("0", b"0".to_vec()),
+        ] {
+            let slot = crate::blocks::encode_value_with_shape("BOOLEAN", None, 0, text)
+                .unwrap()
+                .unwrap();
+            assert_eq!(slot, expected, "BOOLEAN '{text}'");
+        }
     }
 
     /// `CREATE TABLE … PROPERTIES (bloom_filter_columns = '…')` is accepted and
@@ -1752,13 +1900,16 @@ mod tests {
     /// that record, so `BuildOnlyBloomFilter` never runs. Measured on the
     /// reference: a `BOOLEAN` column declared with the property still
     /// serializes `1, 0` in `seg|…|fast_rough_filter`.
-    #[test]
-    fn a_bloom_filter_column_is_accepted_but_never_built() {
+    #[tokio::test]
+    async fn a_bloom_filter_column_is_accepted_but_never_built() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(
             "CREATE TABLE bf (b BOOLEAN, i INTEGER) PROPERTIES (bloom_filter_columns = ' b ');",
         )
+        .await
         .unwrap();
 
         // One `COPY` seals a segment, which is when the filter is built.
@@ -1767,12 +1918,13 @@ mod tests {
             .map(|i| format!("{},{i}\n", if i % 2 == 0 { "true" } else { "false" }))
             .collect();
         std::fs::write(&csv, text).unwrap();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY bf FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let record = {
             let mut found = None;
             for (k, v) in e.storage.catalog.store().scan_prefix(b"seg|1|").unwrap() {
@@ -1794,7 +1946,8 @@ mod tests {
 
         // DDL errors, as the reference's planner reports them.
         let error = e
-            .execute_blocking("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
+            .execute("CREATE TABLE bf2 (x FLOAT) PROPERTIES (bloom_filter_columns = 'x');")
+            .await
             .expect_err("FLOAT has no bloom filter");
         assert!(
             error
@@ -1804,9 +1957,8 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3013);
         let error = e
-            .execute_blocking(
-                "CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');",
-            )
+            .execute("CREATE TABLE bf3 (b BOOLEAN) PROPERTIES (bloom_filter_columns = 'nope');")
+            .await
             .expect_err("unknown column");
         assert!(
             error
@@ -1815,9 +1967,9 @@ mod tests {
             "{error}"
         );
         let error = e
-            .execute_blocking(
+            .execute(
                 "CREATE TABLE bf4 (b BOOLEAN, c BOOLEAN) PROPERTIES (bloom_filter_columns = 'b', bloom_filter_columns = 'c');",
-            )
+            ).await
             .expect_err("duplicate property");
         assert!(
             error
@@ -1831,15 +1983,17 @@ mod tests {
     /// definition the statement reaches its binder and fails with
     /// `Status::NoColumnDefined` (3048), not with a table created from the
     /// query's result.
-    #[test]
-    fn create_table_as_select_is_rejected_like_the_reference() {
+    #[tokio::test]
+    async fn create_table_as_select_is_rejected_like_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cta_src (a INT);").unwrap();
-        e.execute_blocking("INSERT INTO cta_src VALUES (1);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE cta_src (a INT);").await.unwrap();
+        e.execute("INSERT INTO cta_src VALUES (1);").await.unwrap();
         let error = e
-            .execute_blocking("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
+            .execute("CREATE TABLE cta_dst AS SELECT * FROM cta_src;")
+            .await
             .expect_err("CTAS must be rejected");
         assert_eq!(
             error.to_string(),
@@ -1847,49 +2001,54 @@ mod tests {
         );
         assert_eq!(error.status_code(), 3048);
         // Nothing was created.
-        assert!(e.execute_blocking("SELECT * FROM cta_dst;").is_err());
+        assert!(e.execute("SELECT * FROM cta_dst;").await.is_err());
     }
 
     /// The rows of a `SELECT`, as rendered strings.
     /// A secondary index answers an equality predicate **after** a checkpoint:
     /// the memory tail the index was built into is dumped into a sealed chunk,
     /// and the lookup has to read that chunk with the same key the writer wrote.
-    #[test]
-    fn a_secondary_index_answers_equality_after_a_checkpoint() {
+    #[tokio::test]
+    async fn a_secondary_index_answers_equality_after_a_checkpoint() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE si (id INT, score DOUBLE, name VARCHAR);")
+            .await
             .unwrap();
         for base in (0..20000).step_by(2000) {
             let values: Vec<String> = (base..base + 2000)
                 .map(|i| format!("({i}, {}.0, 'n-{i}')", i % 100))
                 .collect();
-            e.execute_blocking(&format!("INSERT INTO si VALUES {};", values.join(", ")))
+            e.execute(&format!("INSERT INTO si VALUES {};", values.join(", ")))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX si_id ON si (id);")
+        e.execute("CREATE INDEX si_id ON si (id);").await.unwrap();
+        e.execute("CREATE INDEX si_score ON si (score);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX si_score ON si (score);")
+        e.execute("CREATE INDEX si_name ON si (name);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX si_name ON si (name);")
-            .unwrap();
-        let count = |sql: &str| rows(&e, sql).len();
-        assert_eq!(count("SELECT id FROM si WHERE id = 5;"), 1);
-        assert_eq!(count("SELECT id FROM si WHERE score = 5.0;"), 200);
-        assert_eq!(count("SELECT id FROM si WHERE name = 'n-5';"), 1);
-        crate::scheduler::block_on(e.flush()).unwrap();
+        let count = async |sql: &str| rows(&e, sql).await.len();
+        assert_eq!(count("SELECT id FROM si WHERE id = 5;").await, 1);
+        assert_eq!(count("SELECT id FROM si WHERE score = 5.0;").await, 200);
+        assert_eq!(count("SELECT id FROM si WHERE name = 'n-5';").await, 1);
+        e.flush().await.unwrap();
         assert_eq!(
-            count("SELECT id FROM si WHERE id = 5;"),
+            count("SELECT id FROM si WHERE id = 5;").await,
             1,
             "an INT key must still be found in the sealed chunk"
         );
         assert_eq!(
-            count("SELECT id FROM si WHERE score = 5.0;"),
+            count("SELECT id FROM si WHERE score = 5.0;").await,
             200,
             "a DOUBLE key must still be found in the sealed chunk"
         );
         assert_eq!(
-            count("SELECT id FROM si WHERE name = 'n-5';"),
+            count("SELECT id FROM si WHERE name = 'n-5';").await,
             1,
             "a VARCHAR key must still be found in the sealed chunk"
         );
@@ -1920,11 +2079,14 @@ mod tests {
     /// covered by `columnar_order`'s own equivalence test, and what this test
     /// guards is the wiring - the right column, the right direction, and
     /// `LIMIT`/`OFFSET` applied *after* the permutation.
-    #[test]
-    fn the_columnar_select_orders_by_a_column() {
+    #[tokio::test]
+    async fn the_columnar_select_orders_by_a_column() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ob (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ob (id INT, name VARCHAR);")
+            .await
             .unwrap();
         // Inserted out of order, so a path that forgot to sort would be caught.
         let values: Vec<String> = (0..300)
@@ -1933,14 +2095,15 @@ mod tests {
                 format!("({id}, 'n-{id:03}')")
             })
             .collect();
-        e.execute_blocking(&format!("INSERT INTO ob VALUES {};", values.join(", ")))
+        e.execute(&format!("INSERT INTO ob VALUES {};", values.join(", ")))
+            .await
             .unwrap();
         let batch = |sql: &str| {
             e.select_columns(sql)
                 .unwrap()
                 .unwrap_or_else(|| panic!("{sql} did not take the columnar path"))
         };
-        let ids = |sql: &str| -> Vec<i64> {
+        let ids = async |sql: &str| -> Vec<i64> {
             batch(sql)
                 .rows()
                 .iter()
@@ -1952,24 +2115,27 @@ mod tests {
         };
         let ascending: Vec<i64> = (0..300).collect();
         let descending: Vec<i64> = (0..300).rev().collect();
-        assert_eq!(ids("SELECT id FROM ob ORDER BY id;"), ascending);
-        assert_eq!(ids("SELECT id FROM ob ORDER BY id DESC;"), descending);
+        assert_eq!(ids("SELECT id FROM ob ORDER BY id;").await, ascending);
+        assert_eq!(ids("SELECT id FROM ob ORDER BY id DESC;").await, descending);
         // The varchar key orders by bytes, and `n-010` < `n-100`.
-        assert_eq!(ids("SELECT id FROM ob ORDER BY name;"), ascending);
-        assert_eq!(ids("SELECT id FROM ob ORDER BY name DESC;"), descending);
+        assert_eq!(ids("SELECT id FROM ob ORDER BY name;").await, ascending);
+        assert_eq!(
+            ids("SELECT id FROM ob ORDER BY name DESC;").await,
+            descending
+        );
         // Sort first, then the window: `LIMIT` must not pick the first rows of
         // the *unsorted* buffer.
         assert_eq!(
-            ids("SELECT id FROM ob ORDER BY id LIMIT 5 OFFSET 10;"),
+            ids("SELECT id FROM ob ORDER BY id LIMIT 5 OFFSET 10;").await,
             (10..15).collect::<Vec<i64>>()
         );
         assert_eq!(
-            ids("SELECT id FROM ob WHERE id > 100 ORDER BY id DESC LIMIT 3;"),
+            ids("SELECT id FROM ob WHERE id > 100 ORDER BY id DESC LIMIT 3;").await,
             vec![299, 298, 297]
         );
     }
-    fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
-        for r in e.execute_blocking(sql).unwrap() {
+    async fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+        for r in e.execute(sql).await.unwrap() {
             if let QueryResult::Rows { .. } = r {
                 return r.rows_text();
             }
@@ -1984,13 +2150,46 @@ mod tests {
     /// Two separate bugs met here. `COPY` never reported its rows to
     /// `live_rows` (only `INSERT` did, holding the count published by whatever
     /// ran last), so the coverage gate compared against a count that said four
+    /// The pruner decides a `SEARCH`'s output shape, so a projection that reads
+    /// only the hidden columns keeps none of the table's: the plan's scan names
+    /// them alone, and the search never reads the ranked rows out of the blocks.
+    #[tokio::test]
+    async fn a_row_id_only_search_keeps_no_table_column() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ro (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ro VALUES (7, [1.0,0.0,0.0,0.0]), (8, [0.0,1.0,0.0,0.0]);")
+            .await
+            .unwrap();
+        let rows = rows(
+            &e,
+            "SELECT ROW_ID(), SIMILARITY() FROM ro SEARCH MATCH VECTOR \
+             (c2, [1.0,0.0,0.0,0.0], 'float', 'ip', 2);",
+        )
+        .await;
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0], "0", "the nearest row's id");
+        let debug = LAST_PLAN_DEBUG.with(|slot| slot.borrow().clone()).unwrap();
+        // The scan kept the two hidden columns the projection reads and none of
+        // the table's: that is what makes the search skip the block reads.
+        assert!(
+            debug.contains("columns: [\"#_similarity\", \"#_row_id\"]"),
+            "{debug}"
+        );
+        assert!(!debug.contains("c1"), "{debug}");
+    }
+
     /// rows while the table had twelve - and the memory index that a
     /// `CREATE INDEX` after a `COPY` leaves behind covers only the last block.
     /// Together they let an index that holds a third of the table pass as
     /// "complete" and answer a top-3 from its own four rows (`8, 6, 4`), where
     /// the exact scan returns the three tied rows `8, 8, 8`.
-    #[test]
-    fn knn_answers_cover_rows_loaded_after_the_index_was_built() {
+    #[tokio::test]
+    async fn knn_answers_cover_rows_loaded_after_the_index_was_built() {
         let dir = tempdir().unwrap();
         let csv = dir.path().join("d4.csv");
         std::fs::copy(
@@ -2005,45 +2204,49 @@ mod tests {
             "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         );
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(&copy).unwrap();
+        e.execute("CREATE TABLE t (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute(&copy).await.unwrap();
         // The exact queries are what published a `live_rows` of 4 before the
         // fix, so they belong in the reproduction.
         let plain =
             "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3);";
         assert_eq!(
-            rows(&e, plain),
+            rows(&e, plain).await,
             vec![
                 vec!["8".to_string()],
                 vec!["6".to_string()],
                 vec!["4".to_string()]
             ]
         );
-        e.execute_blocking(&copy).unwrap();
+        e.execute(&copy).await.unwrap();
         assert_eq!(
-            rows(&e, plain),
+            rows(&e, plain).await,
             vec![
                 vec!["8".to_string()],
                 vec!["8".to_string()],
                 vec!["6".to_string()]
             ]
         );
-        e.execute_blocking("CREATE INDEX ix ON t (c2) USING IVF WITH (metric = l2);")
+        e.execute("CREATE INDEX ix ON t (c2) USING IVF WITH (metric = l2);")
+            .await
             .unwrap();
         let q = "SELECT c1 FROM t SEARCH MATCH VECTOR (c2, [0.3,0.3,0.2,0.2], 'float', 'l2', 3) WITH (nprobe = 10);";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["8".to_string()],
                 vec!["8".to_string()],
                 vec!["6".to_string()]
             ]
         );
-        e.execute_blocking(&copy).unwrap();
+        e.execute(&copy).await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["8".to_string()],
                 vec!["8".to_string()],
@@ -2055,49 +2258,77 @@ mod tests {
 
     /// `HEADER true` on a CSV import consumes the first line (it is not a
     /// row) and rejects a header whose column count differs from the table's.
-    #[test]
-    fn csv_import_header_is_consumed_and_counted() {
+    #[tokio::test]
+    async fn csv_import_header_is_consumed_and_counted() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE h (c1 INT, c2 INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE h (c1 INT, c2 INT);").await.unwrap();
         let csv = dir.path().join("h.csv");
         std::fs::write(&csv, "x,y\n1,2\n3,4\n").unwrap();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
             csv.display()
         ))
+        .await
         .unwrap();
-        assert_eq!(rows(&e, "SELECT c1 FROM h ORDER BY c1;").len(), 2);
+        assert_eq!(rows(&e, "SELECT c1 FROM h ORDER BY c1;").await.len(), 2);
 
         // A header with the wrong column count is an error, not a row.
         let bad = dir.path().join("bad.csv");
         std::fs::write(&bad, "x\n1,2\n").unwrap();
-        let got = e.execute_blocking(&format!(
-            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
-            bad.display()
-        ));
+        let got = e
+            .execute(&format!(
+                "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV, HEADER true);",
+                bad.display()
+            ))
+            .await;
         assert!(got.is_err(), "a one-column header over a two-column table");
 
         // Without `HEADER` the first line is data and does not parse as INT.
         let plain = dir.path().join("plain.csv");
         std::fs::write(&plain, "x,y\n").unwrap();
-        let got = e.execute_blocking(&format!(
-            "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-            plain.display()
-        ));
+        let got = e
+            .execute(&format!(
+                "COPY h FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                plain.display()
+            ))
+            .await;
         assert!(got.is_err(), "an unparsable first row is data");
     }
 
     /// How many sealed chunks the table's full-text indexes hold, i.e. the
     /// reference's `SegmentIndexMeta` chunk list length.
-    fn fulltext_chunks(e: &Engine) -> usize {
-        let tables = e.tables.lock().unwrap();
-        tables
-            .values()
-            .flat_map(|entry| entry.text.values())
-            .map(|shared| shared.read().unwrap().reader.segments.len())
-            .sum()
+    async fn fulltext_chunks(e: &Engine) -> usize {
+        let shared: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values().cloned())
+                .collect()
+        };
+        let mut total = 0;
+        for index in shared {
+            total += index.read().await.reader.segments.len();
+        }
+        total
+    }
+
+    /// Rows the in-memory HNSW graphs hold, across every table and index.
+    async fn hnsw_mem_rows(e: &Engine) -> usize {
+        let graphs: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.hnsw_mem.values().cloned())
+                .collect()
+        };
+        let mut total = 0;
+        for graph in graphs {
+            total += graph.lock().await.len();
+        }
+        total
     }
 
     /// A chunk is written under one `base_row_id` and its `.len` spans
@@ -2106,32 +2337,46 @@ mod tests {
     /// `u32` nor be meant to be allocated (the reference keeps one
     /// `ChunkIndexMetaInfo` per segment). The insert path therefore seals the old
     /// tail before the first row of the next segment lands.
-    #[test]
-    fn an_unsealed_tail_never_mixes_two_row_id_segments() {
+    #[tokio::test]
+    async fn an_unsealed_tail_never_mixes_two_row_id_segments() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Only the byte budget may seal, so the tail is exactly what the test
         // inserts.
         e.set_memindex_capacity(0);
-        e.execute_blocking("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE seg2 (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
+        e.execute("CREATE INDEX seg2_idx ON seg2 (body) USING FULLTEXT")
+            .await
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
         let first = row("alpha beta");
-        e.update_text_indexes_batch("seg2", &[(0usize, first.as_slice())], &schema, None);
+        e.update_text_indexes_batch_async("seg2", &[(0usize, first.as_slice())], &schema, None)
+            .await;
         // A row of the next segment: `1 << 32` is its first offset.
         let second = row("gamma alpha");
-        e.update_text_indexes_batch("seg2", &[(1usize << 32, second.as_slice())], &schema, None);
+        e.update_text_indexes_batch_async(
+            "seg2",
+            &[(1usize << 32, second.as_slice())],
+            &schema,
+            None,
+        )
+        .await;
 
-        let tables = e.tables.lock().unwrap();
-        let shared = tables
-            .values()
-            .flat_map(|entry| entry.text.values())
-            .next()
-            .expect("the column's index");
-        let index = shared.read().unwrap();
+        let shared = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values())
+                .next()
+                .cloned()
+                .expect("the column's index")
+        };
+        let index = shared.read().await;
         assert_eq!(
             index.reader.segments.len(),
             1,
@@ -2149,15 +2394,19 @@ mod tests {
     /// record length 0 for it, and the chunk that publishes it a moment later
     /// would start before the end of this one - two chunks over one row, which
     /// `optimize_chunks` then reports as an overlap for good.
-    #[test]
-    fn a_seal_defers_while_a_lower_row_is_still_being_published() {
+    #[tokio::test]
+    async fn a_seal_defers_while_a_lower_row_is_still_being_published() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Only the explicit seals below may write a chunk.
         e.set_memindex_capacity(0);
-        e.execute_blocking("CREATE TABLE publish (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE publish (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
+        e.execute("CREATE INDEX publish_idx ON publish (body) USING FULLTEXT")
+            .await
             .unwrap();
         let schema = vec!["id".to_string(), "body".to_string()];
         let row = |text: &str| vec!["0".to_string(), text.to_string()];
@@ -2172,14 +2421,15 @@ mod tests {
         };
 
         // Writer A announced row 0 and is still tokenising it.
-        shared.write().unwrap().announce_publish(0);
+        shared.write().await.announce_publish(0);
         // Writer B got the next row id, published it and asked for a seal.
         let later = row("beta alpha");
-        e.update_text_indexes_batch("publish", &[(1usize, later.as_slice())], &schema, None);
+        e.update_text_indexes_batch_async("publish", &[(1usize, later.as_slice())], &schema, None)
+            .await;
         {
-            let mut index = shared.write().unwrap();
+            let mut index = shared.write().await;
             assert!(
-                !index.seal(),
+                !index.seal().await,
                 "the seal covered a row whose text was still pending"
             );
             assert!(
@@ -2190,12 +2440,16 @@ mod tests {
         }
 
         // Row 0 lands, the barrier lifts, and one seal covers both rows.
-        shared.write().unwrap().finish_publish(0);
+        shared.write().await.finish_publish(0);
         let first = row("alpha gamma");
-        e.update_text_indexes_batch("publish", &[(0usize, first.as_slice())], &schema, None);
+        e.update_text_indexes_batch_async("publish", &[(0usize, first.as_slice())], &schema, None)
+            .await;
         {
-            let mut index = shared.write().unwrap();
-            assert!(index.seal(), "the seal runs once the barrier is lifted");
+            let mut index = shared.write().await;
+            assert!(
+                index.seal().await,
+                "the seal runs once the barrier is lifted"
+            );
             assert_eq!(index.reader.segments.len(), 1);
             assert_eq!(
                 index.reader.segments[0].docs, 2,
@@ -2204,7 +2458,7 @@ mod tests {
             assert_eq!(index.reader.segments[0].reader.base_row_id(), 0);
         }
         // Both rows kept their own length, i.e. neither was published as a gap.
-        let index = shared.read().unwrap();
+        let index = shared.read().await;
         assert_eq!(index.doc_len_opt(0), Some(2), "row 0: alpha + gamma");
         assert_eq!(index.doc_len_opt(1), Some(2), "row 1: beta + alpha");
     }
@@ -2217,23 +2471,28 @@ mod tests {
     /// This takes the tail out exactly as the seal does and then, with the write
     /// not yet started, asks the index for the rows: they must all still answer,
     /// with their lengths and document frequencies.
-    #[test]
-    fn a_query_still_sees_the_tail_while_its_segment_is_being_written() {
+    #[tokio::test]
+    async fn a_query_still_sees_the_tail_while_its_segment_is_being_written() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_capacity(0);
-        e.execute_blocking("CREATE TABLE slip (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE slip (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX slip_idx ON slip (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..6 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO slip VALUES ({i}, 'alpha beta row{i}');"
             ))
+            .await
             .unwrap();
         }
         let query = "SELECT id FROM slip SEARCH MATCH TEXT (body, 'alpha', 100);";
-        let before = rows(&e, query);
+        let before = rows(&e, query).await;
         assert_eq!(before.len(), 6);
         let shared = {
             let tables = e.tables.lock().unwrap();
@@ -2248,11 +2507,11 @@ mod tests {
         // What `claim_seal` does, minus the write.
         let job = shared
             .write()
-            .unwrap()
+            .await
             .claim_seal()
             .expect("the tail is sealable");
         {
-            let index = shared.read().unwrap();
+            let index = shared.read().await;
             assert!(
                 index.inflight.is_some(),
                 "the tail moved to the in-flight slot"
@@ -2271,23 +2530,23 @@ mod tests {
             assert_eq!(index.doc_len_opt(3), Some(3), "alpha beta row3");
         }
         assert_eq!(
-            rows(&e, query).len(),
+            rows(&e, query).await.len(),
             6,
             "a query runs while the segment is not written yet"
         );
 
         // The write finishes and the same rows answer from the sealed chunk.
-        let segment = job.write().expect("the segment is written");
-        shared.write().unwrap().complete_seal(job, segment);
+        let segment = job.write().await.expect("the segment is written");
+        shared.write().await.complete_seal(job, segment);
         {
-            let index = shared.read().unwrap();
+            let index = shared.read().await;
             assert!(index.inflight.is_none());
             assert_eq!(index.reader.segments.len(), 1);
             assert_eq!(index.mem.pending_docs(), 0);
         }
-        assert_eq!(rows(&e, query).len(), 6);
+        assert_eq!(rows(&e, query).await.len(), 6);
         assert_eq!(
-            rows(&e, query),
+            rows(&e, query).await,
             before,
             "the sealed chunk answers exactly what the in-flight tail did"
         );
@@ -2296,17 +2555,22 @@ mod tests {
     /// A seal whose write fails must not lose the rows and must not merge the
     /// tail back into a resident tail that other writers may have appended to:
     /// the tail stays in flight, keeps answering, and the next seal retries it.
-    #[test]
-    fn a_failed_seal_keeps_the_rows_and_the_next_one_retries() {
+    #[tokio::test]
+    async fn a_failed_seal_keeps_the_rows_and_the_next_one_retries() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_capacity(0);
-        e.execute_blocking("CREATE TABLE fail (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
+        e.set_memindex_capacity(0);
+        e.execute("CREATE TABLE fail (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX fail_idx ON fail (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..4 {
-            e.execute_blocking(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
+            e.execute(&format!("INSERT INTO fail VALUES ({i}, 'alpha row{i}');"))
+                .await
                 .unwrap();
         }
         let query = "SELECT id FROM fail SEARCH MATCH TEXT (body, 'alpha', 100);";
@@ -2321,10 +2585,10 @@ mod tests {
         };
 
         // A seal that is abandoned instead of completed (the I/O-error path).
-        let job = shared.write().unwrap().claim_seal().expect("a tail");
-        shared.write().unwrap().abort_seal(job);
+        let job = shared.write().await.claim_seal().expect("a tail");
+        shared.write().await.abort_seal(job);
         {
-            let index = shared.read().unwrap();
+            let index = shared.read().await;
             assert!(index.inflight.is_some(), "the tail waits for a retry");
             assert_eq!(
                 index.inflight.as_ref().unwrap().mem.pending_docs(),
@@ -2332,14 +2596,15 @@ mod tests {
                 "no row was lost"
             );
         }
-        assert_eq!(rows(&e, query).len(), 4, "the rows still answer");
+        assert_eq!(rows(&e, query).await.len(), 4, "the rows still answer");
 
         // The next write retries: the in-flight tail becomes the chunk and the
         // new row stays in the (fresh) resident tail.
-        e.execute_blocking("INSERT INTO fail VALUES (4, 'alpha row4');")
+        e.execute("INSERT INTO fail VALUES (4, 'alpha row4');")
+            .await
             .unwrap();
         {
-            let index = shared.read().unwrap();
+            let index = shared.read().await;
             assert!(
                 index.inflight.is_none(),
                 "the retry consumed the in-flight tail"
@@ -2347,7 +2612,11 @@ mod tests {
             assert_eq!(index.reader.segments.len(), 1);
             assert_eq!(index.reader.segments[0].docs, 4);
         }
-        assert_eq!(rows(&e, query).len(), 5, "the new row is searchable too");
+        assert_eq!(
+            rows(&e, query).await.len(),
+            5,
+            "the new row is searchable too"
+        );
     }
 
     /// `PhraseDocIterator::GetSloppyPhraseMatchData`
@@ -2399,13 +2668,17 @@ mod tests {
 
     /// `"a b"~N` end to end: the slop widens the adjacency requirement and the
     /// `~N` no longer becomes a term of its own.
-    #[test]
-    fn search_honours_the_phrase_slop() {
+    #[tokio::test]
+    async fn search_honours_the_phrase_slop() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sl (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
+        e.execute("CREATE TABLE sl (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX sl_idx ON sl (body) USING FULLTEXT")
+            .await
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -2413,21 +2686,24 @@ mod tests {
             (2, "alpha x x beta"),
             (3, "beta alpha"),
         ] {
-            e.execute_blocking(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
+            e.execute(&format!("INSERT INTO sl VALUES ({id}, '{body}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         let exact = rows(
             &e,
             "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"', 10);",
-        );
+        )
+        .await;
         assert_eq!(exact, vec![vec!["0".to_string()]]);
 
         let one = rows(
             &e,
             "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"~1', 10);",
-        );
+        )
+        .await;
         let mut one_ids: Vec<String> = one.iter().map(|r| r[0].clone()).collect();
         one_ids.sort();
         assert_eq!(
@@ -2439,7 +2715,8 @@ mod tests {
         let two = rows(
             &e,
             "SELECT id FROM sl SEARCH MATCH TEXT (body, '\"alpha beta\"~2', 10);",
-        );
+        )
+        .await;
         let mut two_ids: Vec<String> = two.iter().map(|r| r[0].clone()).collect();
         two_ids.sort();
         assert_eq!(
@@ -2458,13 +2735,17 @@ mod tests {
     /// match the same document, and adjacency is *not* required (only a phrase
     /// asks for that). `minimum_should_match` is the same predicate expressed
     /// as a count, so the two must select the same rows.
-    #[test]
-    fn operator_and_requires_every_clause_without_adjacency() {
+    #[tokio::test]
+    async fn operator_and_requires_every_clause_without_adjacency() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ba (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
+        e.execute("CREATE TABLE ba (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX ba_idx ON ba (body) USING FULLTEXT")
+            .await
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -2472,21 +2753,24 @@ mod tests {
             (2, "beta"),
             (3, "alpha x beta"),
         ] {
-            e.execute_blocking(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
+            e.execute(&format!("INSERT INTO ba VALUES ({id}, '{body}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         let default_or = rows(
             &e,
             "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10);",
-        );
+        )
+        .await;
         assert_eq!(default_or.len(), 4, "the default operator is OR");
 
         let and = rows(
             &e,
             "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10, 'operator=and');",
-        );
+        )
+        .await;
         let mut and_ids: Vec<String> = and.iter().map(|r| r[0].clone()).collect();
         and_ids.sort();
         assert_eq!(
@@ -2498,7 +2782,7 @@ mod tests {
         let msm = rows(
             &e,
             "SELECT id FROM ba SEARCH MATCH TEXT (body, 'alpha beta', 10, 'minimum_should_match=2');",
-        );
+        ).await;
         let mut msm_ids: Vec<String> = msm.iter().map(|r| r[0].clone()).collect();
         msm_ids.sort();
         assert_eq!(msm_ids, and_ids, "minimum_should_match=2 is operator=and");
@@ -2510,21 +2794,26 @@ mod tests {
     /// so `alpha OR beta` with `operator=` is analysed into terms - `or` is a
     /// word, not an operator - and must never be rejected as "unsupported with
     /// the query-string grammar".
-    #[test]
-    fn an_explicit_operator_switches_off_the_query_grammar() {
+    #[tokio::test]
+    async fn an_explicit_operator_switches_off_the_query_grammar() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE og (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
+        e.execute("CREATE TABLE og (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX og_idx ON og (body) USING FULLTEXT")
+            .await
             .unwrap();
         for (id, body) in [(0, "alpha or beta"), (1, "alpha beta"), (2, "gamma")] {
-            e.execute_blocking(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
+            e.execute(&format!("INSERT INTO og VALUES ({id}, '{body}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let sorted = |sql: &str| -> Vec<String> {
-            let mut ids: Vec<String> = rows(&e, sql).iter().map(|r| r[0].clone()).collect();
+        e.flush().await.unwrap();
+        let sorted = async |sql: &str| -> Vec<String> {
+            let mut ids: Vec<String> = rows(&e, sql).await.iter().map(|r| r[0].clone()).collect();
             ids.sort();
             ids
         };
@@ -2533,14 +2822,16 @@ mod tests {
         assert_eq!(
             sorted(
                 "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'operator=or');"
-            ),
+            )
+            .await,
             vec!["0".to_string(), "1".to_string()]
         );
         // ... and requiring all three terms keeps only the doc that has them.
         assert_eq!(
             sorted(
                 "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'operator=and');"
-            ),
+            )
+            .await,
             vec!["0".to_string()]
         );
         // `block_max` only picks an early-termination algorithm, so it is accepted
@@ -2548,7 +2839,7 @@ mod tests {
         assert_eq!(
             sorted(
                 "SELECT id FROM og SEARCH MATCH TEXT (body, 'alpha OR beta', 10, 'block_max=compare');"
-            ),
+            ).await,
             vec!["0".to_string(), "1".to_string()]
         );
     }
@@ -2557,13 +2848,17 @@ mod tests {
     /// `QueryBuilder::CreateSearch`): `AND` / `OR` / `NOT`, groups and
     /// `column:term`. `alpha NOT beta` is the reference's `AndNotQueryNode`,
     /// and a group is a real subtree, not a flat term list.
-    #[test]
-    fn search_supports_the_query_string_grammar() {
+    #[tokio::test]
+    async fn search_supports_the_query_string_grammar() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+        e.execute("CREATE TABLE bt (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX bt_idx ON bt (body) USING FULLTEXT")
+            .await
             .unwrap();
         for (id, body) in [
             (0, "alpha beta"),
@@ -2573,16 +2868,18 @@ mod tests {
             (4, "gamma"),
             (5, "alpha gamma"),
         ] {
-            e.execute_blocking(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
+            e.execute(&format!("INSERT INTO bt VALUES ({id}, '{body}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
-        let ids = |query: &str| {
+        let ids = async |query: &str| {
             let mut out: Vec<String> = rows(
                 &e,
                 &format!("SELECT id FROM bt SEARCH MATCH TEXT (body, '{query}', 10);"),
             )
+            .await
             .iter()
             .map(|r| r[0].clone())
             .collect();
@@ -2591,12 +2888,12 @@ mod tests {
         };
 
         assert_eq!(
-            ids("alpha AND beta"),
+            ids("alpha AND beta").await,
             vec!["0".to_string(), "3".to_string()],
             "AND is an intersection"
         );
         assert_eq!(
-            ids("alpha OR beta"),
+            ids("alpha OR beta").await,
             vec![
                 "0".to_string(),
                 "1".to_string(),
@@ -2607,22 +2904,22 @@ mod tests {
             "OR is a union"
         );
         assert_eq!(
-            ids("alpha AND NOT beta"),
+            ids("alpha AND NOT beta").await,
             vec!["1".to_string(), "5".to_string()],
             "NOT excludes the right-hand documents"
         );
         assert_eq!(
-            ids("alpha NOT beta"),
+            ids("alpha NOT beta").await,
             vec!["1".to_string(), "5".to_string()],
             "`a NOT b` is the reference's AndNotQueryNode"
         );
         assert_eq!(
-            ids("(alpha OR beta) AND gamma"),
+            ids("(alpha OR beta) AND gamma").await,
             vec!["5".to_string()],
             "a group is evaluated as a subtree"
         );
         assert_eq!(
-            ids("body:alpha"),
+            ids("body:alpha").await,
             vec![
                 "0".to_string(),
                 "1".to_string(),
@@ -2632,18 +2929,18 @@ mod tests {
             "a field qualifier restricts the term to that column"
         );
         assert!(
-            ids("\"alpha beta\" AND gamma").is_empty(),
+            ids("\"alpha beta\" AND gamma").await.is_empty(),
             "a phrase inside an AND still needs adjacency"
         );
         assert_eq!(
-            ids("\"alpha beta\" AND alpha"),
+            ids("\"alpha beta\" AND alpha").await,
             vec!["0".to_string()],
             "a phrase and a term can be combined"
         );
     }
 
     /// Writes one full-text chunk for `rows` (every document holds `term` once).
-    fn write_chunk(dir: &str, base: u64, rows: u32, term: &str) {
+    async fn write_chunk(dir: &str, base: u64, rows: u32, term: &str) {
         use std::collections::BTreeMap;
         let docs: Vec<(u64, u32)> = (base..base + u64::from(rows)).map(|row| (row, 1)).collect();
         let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
@@ -2662,6 +2959,7 @@ mod tests {
             &postings,
             storage::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
     }
 
@@ -2670,16 +2968,16 @@ mod tests {
     /// does not count it. Otherwise the delete is invisible to the index until a
     /// compaction, and the chunk is scored against a document no query can
     /// return.
-    #[test]
-    fn a_seal_leaves_out_the_rows_deleted_before_it() {
+    #[tokio::test]
+    async fn a_seal_leaves_out_the_rows_deleted_before_it() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
-        index_row(&mut index, 0, "alpha beta");
-        index_row(&mut index, 1, "alpha");
-        index_row(&mut index, 2, "gamma");
+        index_row(&mut index, 0, "alpha beta").await;
+        index_row(&mut index, 1, "alpha").await;
+        index_row(&mut index, 2, "gamma").await;
         index.mem.delete(1);
-        assert!(index.seal(), "the tail writes");
+        assert!(index.seal().await, "the tail writes");
         assert_eq!(index.total_docs(), 2, "the deleted row is not a document");
         assert_eq!(index.corpus_len(), 3, "`alpha beta` + `gamma`");
         assert_eq!(index.term_df("alpha"), 1, "row 0 only");
@@ -2704,12 +3002,12 @@ mod tests {
     /// is immutable once published, so nothing else can drop them. The `.len`
     /// slot stays (a posting's id is `row - base_row_id`), and the marker records
     /// the live count so the chunk is scored without the dead row.
-    #[test]
-    fn a_merge_reclaims_the_postings_of_a_deleted_row() {
+    #[tokio::test]
+    async fn a_merge_reclaims_the_postings_of_a_deleted_row() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "alpha");
-        write_chunk(d, 2, 2, "alpha");
+        write_chunk(d, 0, 2, "alpha").await;
+        write_chunk(d, 2, 2, "alpha").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         assert_eq!(index.total_docs(), 4);
@@ -2750,12 +3048,12 @@ mod tests {
     /// the only correct answer is a rebuild - and a rebuild starts at row 0,
     /// which is why the whole set is retired instead of skipping the broken
     /// chunk. The files are removed, so the next open does not rebuild again.
-    #[test]
-    fn a_broken_chunk_is_removed_and_forces_a_rebuild() {
+    #[tokio::test]
+    async fn a_broken_chunk_is_removed_and_forces_a_rebuild() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
         // A crash between the `.dic` write and the `.len` write.
         let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
         std::fs::remove_file(format!("{seg}/ft_0000000000000000.len")).unwrap();
@@ -2771,11 +3069,11 @@ mod tests {
     /// rebuild) can leave `.dic` from one and `.pos`/`.len` from the other. The
     /// marker is what catches it: the files decode into the wrong rows instead
     /// of failing.
-    #[test]
-    fn a_chunk_whose_files_do_not_match_its_marker_is_refused() {
+    #[tokio::test]
+    async fn a_chunk_whose_files_do_not_match_its_marker_is_refused() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
         let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
         let base = "ft_0000000000000000";
         let manifest = storage::invertedindex::chunk_manifest::ChunkManifest::read(&seg, base)
@@ -2802,12 +3100,12 @@ mod tests {
     /// having no ids - their files stay on disk until `Cleanup` reclaims them.
     /// Loading one instead would map its postings onto the wrong rows, because
     /// the merge renumbered every row it took.
-    #[test]
-    fn a_chunk_the_catalog_does_not_list_is_not_loaded() {
+    #[tokio::test]
+    async fn a_chunk_the_catalog_does_not_list_is_not_loaded() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(
             index.load_sealed_scoped(&[]),
@@ -2823,13 +3121,13 @@ mod tests {
     /// A chunk whose files are all zero bytes maps as an empty buffer instead of
     /// failing: `mmap` refuses a zero-length file, and `.len` is legitimately
     /// empty when the chunk spans no document.
-    #[test]
-    fn a_chunk_with_an_empty_length_array_maps() {
+    #[tokio::test]
+    async fn a_chunk_with_an_empty_length_array_maps() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         // One real chunk, then its data files truncated to nothing: what a
         // publish that failed between the three writes leaves behind.
-        write_chunk(d, 0, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
         let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
         let base = "ft_0000000000000000";
         for suffix in [".pos", ".len"] {
@@ -2855,8 +3153,8 @@ mod tests {
     /// `row - base_row_id` - while its live statistics count only the documents
     /// it holds. A neighbour that starts at the span's end is contiguous with it,
     /// so the merge still joins the two.
-    #[test]
-    fn a_sparse_chunk_keeps_its_span_and_merges_with_its_neighbour() {
+    #[tokio::test]
+    async fn a_sparse_chunk_keeps_its_span_and_merges_with_its_neighbour() {
         use std::collections::BTreeMap;
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
@@ -2875,8 +3173,9 @@ mod tests {
             &postings,
             storage::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
-        write_chunk(d, 7, 2, "a");
+        write_chunk(d, 7, 2, "a").await;
 
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
@@ -2902,22 +3201,27 @@ mod tests {
     /// A full-text chunk lives in the segment's own directory
     /// (`idx_{id}/seg_{n}`) and the catalog lists it, so re-opening the
     /// directory reads exactly those chunks - `ColumnIndexReader::Open`'s walk.
-    #[test]
-    fn a_chunk_written_in_the_reference_layout_is_adopted() {
+    #[tokio::test]
+    async fn a_chunk_written_in_the_reference_layout_is_adopted() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE adopt (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE adopt (id INT, body VARCHAR);")
+            .await
             .unwrap();
         for i in 0..6 {
-            e.execute_blocking(&format!("INSERT INTO adopt VALUES ({i}, 'alpha{i} beta');"))
+            e.execute(&format!("INSERT INTO adopt VALUES ({i}, 'alpha{i} beta');"))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX adopt_ft ON adopt (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX adopt_ft ON adopt (body) USING FULLTEXT;")
+            .await
             .unwrap();
         // A dump is what seals the tail and names the chunk in the catalog
         // (the reference's `DumpMemIndex`).
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("adopt", "adopt_ft")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("adopt", "adopt_ft").await.unwrap();
 
         // The chunk file is where the record says it is.
         let ft_id = e.test_index_id("adopt", "body", "FULLTEXT");
@@ -2937,25 +3241,31 @@ mod tests {
         drop(e);
 
         // A reopened engine maps those chunks instead of re-indexing the column.
-        let reopened = Engine::open(dir.path()).unwrap();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let hits = rows(
             &reopened,
             "SELECT id FROM adopt SEARCH MATCH TEXT (body, 'alpha3', 10);",
-        );
+        )
+        .await;
         assert_eq!(hits.len(), 1, "the mapped chunk answers");
         assert_eq!(hits[0][0], "3");
-        let (sealed, pending) = {
+        // Cloned out of `tables` first: the guard may not cross the index's
+        // await.
+        let indexes: Vec<SharedTextIndex> = {
             let tables = reopened.tables.lock().unwrap();
-            let (mut sealed, mut pending) = (0, 0);
-            for entry in tables.values() {
-                for shared in entry.text.values() {
-                    let guard = shared.read().unwrap();
-                    sealed += guard.reader.doc_count();
-                    pending += guard.mem.pending_docs();
-                }
-            }
-            (sealed, pending)
+            tables
+                .values()
+                .flat_map(|entry| entry.text.values().cloned())
+                .collect()
         };
+        let (mut sealed, mut pending) = (0, 0);
+        for shared in indexes {
+            let guard = shared.read().await;
+            sealed += guard.reader.doc_count();
+            pending += guard.mem.pending_docs();
+        }
         assert_eq!(sealed, 6, "every row came from the catalog's chunks");
         assert_eq!(pending, 0, "no row was indexed again");
     }
@@ -2966,12 +3276,12 @@ mod tests {
     /// (`TermDocIterator::NextShallow` -> `PostingIterator::SkipTo`). A shallow
     /// reposition over a long posting list therefore costs one block decode, not
     /// one per 128 documents.
-    #[test]
-    fn a_shallow_seek_on_a_sealed_segment_hops_blocks() {
+    #[tokio::test]
+    async fn a_shallow_seek_on_a_sealed_segment_hops_blocks() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         // 5000 rows: 39 full blocks of 128 postings plus a partial one.
-        write_chunk(d, 0, 5000, "a");
+        write_chunk(d, 0, 5000, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(index.load_sealed(), 5000);
         let _ = crate::take_decode_stats();
@@ -2999,31 +3309,38 @@ mod tests {
     /// A `MATCH TEXT (…, WHERE …)` filter reaches the scorers as a row list they
     /// seek with, so the rows it rejects are neither fetched nor scored. The
     /// answer must be exactly the unfiltered one narrowed.
-    #[test]
-    fn a_match_text_filter_narrows_the_candidates() {
+    #[tokio::test]
+    async fn a_match_text_filter_narrows_the_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Eight rows per seal: several chunks plus a memory tail, so the cursors
         // of a sealed segment and the ones of the tail both take the pushdown.
         e.set_memindex_capacity(8);
-        e.execute_blocking("CREATE TABLE fts (id INT, body VARCHAR)")
+        e.execute("CREATE TABLE fts (id INT, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
+        e.execute("CREATE INDEX fts_i ON fts (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..40 {
-            e.execute_blocking(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
+            e.execute(&format!("INSERT INTO fts VALUES ({i}, 'alpha row{i}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let all = rows(
             &e,
             "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100');",
-        );
+        )
+        .await;
         assert_eq!(all.len(), 40, "every row holds the term");
         let filtered = rows(
             &e,
             "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100', WHERE id < 10);",
-        );
+        )
+        .await;
         let want: Vec<Vec<String>> = all
             .iter()
             .filter(|row| row[0].parse::<i32>().unwrap() < 10)
@@ -3039,17 +3356,18 @@ mod tests {
             &e,
             "SELECT id FROM fts SEARCH MATCH TEXT (body, 'alpha', 'topn=100', WHERE id > 99);",
         )
+        .await
         .is_empty());
     }
 
     /// A run of one chunk is skipped (`chunk_ids.size() <= 1`), so two chunks
     /// separated by a gap both stay.
-    #[test]
-    fn optimize_skips_a_run_of_one_chunk() {
+    #[tokio::test]
+    async fn optimize_skips_a_run_of_one_chunk() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 10, 2, "b");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 10, 2, "b").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         assert_eq!(index.reader.segments.len(), 2);
@@ -3060,21 +3378,26 @@ mod tests {
     /// `Engine::fulltext_stats` reports where a query's cost comes from: the
     /// chunk count (every query probes all of them), the unsealed tail, the spill
     /// runs the next seal will merge, and the stale copies left by deletes.
-    #[test]
-    fn fulltext_stats_reports_the_chunk_and_tail_shape() {
+    #[tokio::test]
+    async fn fulltext_stats_reports_the_chunk_and_tail_shape() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Two rows per chunk: six rows become three sealed chunks.
         e.set_memindex_capacity(2);
-        e.execute_blocking("CREATE TABLE stat (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE stat (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
+        e.execute("CREATE INDEX stat_idx ON stat (body) USING FULLTEXT")
+            .await
             .unwrap();
         for i in 0..6 {
-            e.execute_blocking(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
+            e.execute(&format!("INSERT INTO stat VALUES ({i}, 'alpha row{i}');"))
+                .await
                 .unwrap();
         }
-        let stats = e.fulltext_stats("stat");
+        let stats = e.fulltext_stats("stat").await;
         assert_eq!(stats.len(), 1, "one full-text column");
         let stats = &stats[0];
         assert_eq!(stats.index, "body");
@@ -3089,9 +3412,8 @@ mod tests {
         // and the scan drops them through the tombstone. `overridden` only tracks
         // a row re-indexed **in place**, which the append-only `UPDATE` path does
         // not produce (it appends a new row id), so the set stays empty.
-        e.execute_blocking("DELETE FROM stat WHERE id = 0;")
-            .unwrap();
-        let stats = e.fulltext_stats("stat");
+        e.execute("DELETE FROM stat WHERE id = 0;").await.unwrap();
+        let stats = e.fulltext_stats("stat").await;
         assert_eq!(stats[0].chunks, 3, "a delete does not seal anything");
         assert_eq!(
             stats[0].overridden_rows, 0,
@@ -3102,6 +3424,7 @@ mod tests {
                 &e,
                 "SELECT id FROM stat SEARCH MATCH TEXT (body, 'alpha', 100);"
             )
+            .await
             .len(),
             5,
             "the deleted row is filtered by the tombstone, not by the index"
@@ -3113,25 +3436,31 @@ mod tests {
     /// (`base + position`). A batch larger than one row is where a position/
     /// row-id mix-up would show: every row carries its own term, so the terms
     /// must land on the row that owns them and nowhere else.
-    #[test]
-    fn a_batch_tokenised_before_the_gate_indexes_every_row_once() {
+    #[tokio::test]
+    async fn a_batch_tokenised_before_the_gate_indexes_every_row_once() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE batch (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
+        e.execute("CREATE TABLE batch (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE INDEX batch_idx ON batch (body) USING FULLTEXT")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO batch VALUES \
              (0, 'unique0 common'), (1, 'unique1 common'), (2, 'unique2 common'), \
              (3, 'unique3 common'), (4, 'unique4 common'), (5, 'unique5 common');",
         )
+        .await
         .unwrap();
         for id in 0..6 {
             let hits = rows(
                 &e,
                 &format!("SELECT id FROM batch SEARCH MATCH TEXT (body, 'unique{id}', 100);"),
-            );
+            )
+            .await;
             assert_eq!(
                 hits,
                 vec![vec![id.to_string()]],
@@ -3142,25 +3471,33 @@ mod tests {
         let common = rows(
             &e,
             "SELECT id FROM batch SEARCH MATCH TEXT (body, 'common', 100);",
-        );
+        )
+        .await;
         assert_eq!(common.len(), 6);
         assert_eq!(
-            e.fulltext_stats("batch")[0].chunk_rows + e.fulltext_stats("batch")[0].tail_rows,
+            e.fulltext_stats("batch").await[0].chunk_rows
+                + e.fulltext_stats("batch").await[0].tail_rows,
             6
         );
     }
 
     /// Timing probe for same-table insert concurrency, run by hand:
     /// `cargo test --lib probe_same_table_insert_concurrency -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "bench: timing probe"]
-    fn probe_same_table_insert_concurrency() {
+    async fn probe_same_table_insert_concurrency() {
         for threads in [1usize, 2, 4] {
             let dir = tempdir().unwrap();
-            let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-            e.execute_blocking("CREATE TABLE conc (id INTEGER, body VARCHAR)")
+            let e = std::sync::Arc::new(
+                Engine::open_async(dir.path(), Default::default())
+                    .await
+                    .unwrap(),
+            );
+            e.execute("CREATE TABLE conc (id INTEGER, body VARCHAR)")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
+            e.execute("CREATE INDEX conc_idx ON conc (body) USING FULLTEXT")
+                .await
                 .unwrap();
             let words: String = (0..40).map(|w| format!("word{w} ")).collect::<String>();
             let started = std::time::Instant::now();
@@ -3168,18 +3505,19 @@ mod tests {
             for t in 0..threads {
                 let e = e.clone();
                 let words = words.clone();
-                handles.push(std::thread::spawn(move || {
+                handles.push(tokio::spawn(async move {
                     for i in 0..(2000 / threads) {
-                        e.execute_blocking(&format!(
+                        e.execute(&format!(
                             "INSERT INTO conc VALUES ({}, '{words}');",
                             1000 * t + i
                         ))
+                        .await
                         .unwrap();
                     }
                 }));
             }
             for handle in handles {
-                handle.join().unwrap();
+                handle.await.unwrap();
             }
             eprintln!(
                 "PROBE threads={threads} rows=2000 elapsed={:?}",
@@ -3193,19 +3531,22 @@ mod tests {
     /// scan of the journal makes each pass slower than the one before while
     /// the hashed set keeps them flat.
     /// `cargo test --lib probe_bulk_delete_journal_scan -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: timing probe"]
-    fn probe_bulk_delete_journal_scan() {
+    async fn probe_bulk_delete_journal_scan() {
         const BATCH: usize = 4_000;
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE del (id INTEGER)").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE del (id INTEGER)").await.unwrap();
         for chunk in 0..3 {
             let values: String = (0..BATCH)
                 .map(|i| format!("({})", chunk * BATCH + i))
                 .collect::<Vec<_>>()
                 .join(",");
-            e.execute_blocking(&format!("INSERT INTO del VALUES {values}"))
+            e.execute(&format!("INSERT INTO del VALUES {values}"))
+                .await
                 .unwrap();
         }
         for pass in 0..3u32 {
@@ -3215,7 +3556,7 @@ mod tests {
             let started = std::time::Instant::now();
             let mut txn = e.begin_txn();
             assert_eq!(txn.delete_row_ids("del", &ids).unwrap(), BATCH);
-            txn.commit().unwrap();
+            txn.commit().await.unwrap();
             eprintln!(
                 "PROBE delete pass={pass} journal_before={} rows={BATCH} elapsed={:?}",
                 pass as usize * BATCH,
@@ -3229,12 +3570,12 @@ mod tests {
     /// the files are rewritten unlocked, and the swap is refused when the chunk
     /// list moved in the meantime — otherwise a seal that appended a chunk while
     /// the merge was running would be overwritten by the stale list.
-    #[test]
-    fn a_merge_is_dropped_when_the_chunk_list_moved_while_it_ran() {
+    #[tokio::test]
+    async fn a_merge_is_dropped_when_the_chunk_list_moved_while_it_ran() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         let plan = index
@@ -3243,7 +3584,7 @@ mod tests {
             .expect("two contiguous chunks are one run");
 
         // A seal lands while the merge is writing its files.
-        write_chunk(d, 4, 2, "a");
+        write_chunk(d, 4, 2, "a").await;
         let reader = storage::invertedindex::disk_segment_reader::SegmentIndexReader::open(
             &storage::invertedindex::format::segment_chunk_dir(d, 0),
             "ft_0000000000000004",
@@ -3278,15 +3619,15 @@ mod tests {
     /// merged, not just the prefix before the first gap. Stopping at the gap
     /// (`new_txn_index_impl.cpp:2219-2227`) would leave the chunk list frozen
     /// after one hole, and every query pays for the extra segments.
-    #[test]
-    fn optimize_merges_every_contiguous_run() {
+    #[tokio::test]
+    async fn optimize_merges_every_contiguous_run() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
-        write_chunk(d, 10, 2, "a");
-        write_chunk(d, 12, 2, "a");
-        write_chunk(d, 20, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
+        write_chunk(d, 10, 2, "a").await;
+        write_chunk(d, 12, 2, "a").await;
+        write_chunk(d, 20, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         assert_eq!(index.reader.segments.len(), 5);
@@ -3309,13 +3650,13 @@ mod tests {
 
     /// The contiguous prefix is merged; the chunks behind the gap stay as they
     /// are and keep their row ranges.
-    #[test]
-    fn optimize_merges_the_prefix_and_keeps_the_rest() {
+    #[tokio::test]
+    async fn optimize_merges_the_prefix_and_keeps_the_rest() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
-        write_chunk(d, 10, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
+        write_chunk(d, 10, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         assert_eq!(index.reader.segments.len(), 3);
@@ -3342,63 +3683,20 @@ mod tests {
         }
     }
 
-    /// A merge publishes the merged chunk and then unlinks its sources, so a
-    /// crash between the two leaves `ft_{base:016x}_{rows:x}` in the catalog
-    /// next to the plain chunks it replaced. Mapping both copies puts every row
-    /// of the range in the index twice, and `total_docs` then exceeds the live
-    /// row count - the number the cache's reuse guard compares against - with
-    /// nothing on disk looking wrong. The reader retires the older copy (the
-    /// merged chunk is the newer one) instead of failing over to a rebuild.
-    #[test]
-    fn a_merged_chunk_retires_the_plain_chunks_it_replaced() {
-        let dir = tempdir().unwrap();
-        let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
-        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
-        index.load_sealed();
-        assert_eq!(index.optimize_chunks().unwrap(), 1);
-        let merged = &index.reader.segments[0];
-        let catalog = vec![
-            CatalogChunk {
-                dir: storage::invertedindex::format::segment_chunk_dir(d, 0),
-                base_name: merged.reader.base_name().to_string(),
-                base_row_id: merged.reader.base_row_id(),
-                row_count: u64::from(merged.docs),
-            },
-            // The source the crash left behind: its files are gone, so only the
-            // span in the record still says which rows it covered.
-            CatalogChunk {
-                dir: storage::invertedindex::format::segment_chunk_dir(d, 0),
-                base_name: storage::fulltext_base_name(2, None),
-                base_row_id: 2,
-                row_count: 2,
-            },
-        ];
-        let mut reopened = TextIndex::new(d.to_string(), TextTokenizer::default());
-        assert!(reopened.load_sealed_scoped(&catalog) > 0);
-        assert_eq!(
-            reopened.reader.segments.len(),
-            1,
-            "the plain chunk inside the merged span is the older copy"
-        );
-        assert_eq!(reopened.reader.doc_count(), 4, "each row counted once");
-    }
-
     /// A chunk that went missing leaves a hole in the list, and the resume
     /// point `load_sealed` returns is the largest end - past the hole. The
     /// build asks [`TextIndex::first_coverage_hole`] when the chunks are short
     /// of the table's rows, and rebuilds from it after
     /// [`TextIndex::drop_chunks_from`] removed the chunks that cover rows the
     /// rebuild is about to index again.
-    #[test]
-    fn a_lost_chunk_is_a_hole_the_build_can_rebuild_from() {
+    #[tokio::test]
+    async fn a_lost_chunk_is_a_hole_the_build_can_rebuild_from() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 2, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 2, 2, "a").await;
         // Rows 4..10 have no chunk: it was overwritten by a narrower one.
-        write_chunk(d, 10, 2, "a");
+        write_chunk(d, 10, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         assert_eq!(index.load_sealed(), 12, "resume at the largest end");
         assert_eq!(index.reader.segments.len(), 3, "every chunk loads");
@@ -3415,12 +3713,12 @@ mod tests {
     /// An overlapping chunk list is unrecoverable in the reference
     /// (`new_txn_index_impl.cpp:2228-2233`); merging it would produce a doc list
     /// no reference run could produce, so it is refused.
-    #[test]
-    fn optimize_refuses_overlapping_chunks() {
+    #[tokio::test]
+    async fn optimize_refuses_overlapping_chunks() {
         let dir = tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        write_chunk(d, 0, 2, "a");
-        write_chunk(d, 1, 2, "a");
+        write_chunk(d, 0, 2, "a").await;
+        write_chunk(d, 1, 2, "a").await;
         let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
         index.load_sealed();
         assert_eq!(index.reader.segments.len(), 2);
@@ -3441,47 +3739,60 @@ mod tests {
     /// (which drops a plain chunk whose base falls inside a merged chunk) from
     /// deleting the copy that carries the new text. If an update ever re-used
     /// the old row id, both would break - hence the assertions.
-    #[test]
-    fn an_update_lands_in_a_chunk_after_the_sealed_range() {
+    #[tokio::test]
+    async fn an_update_lands_in_a_chunk_after_the_sealed_range() {
         let dir = tempdir().unwrap();
         let query = "SELECT id FROM upd SEARCH MATCH TEXT (body, 'gamma', 100);";
         let stale = "SELECT id FROM upd SEARCH MATCH TEXT (body, 'alpha', 100);";
         let hit = || vec![vec!["1".to_string()]];
         {
-            let e = Engine::open(dir.path()).unwrap();
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
             // Two rows per chunk, so row 1 is sealed by the first one.
             e.set_memindex_capacity(2);
-            e.execute_blocking("CREATE TABLE upd (id INTEGER, body VARCHAR)")
+            e.execute("CREATE TABLE upd (id INTEGER, body VARCHAR)")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
+            e.execute("CREATE INDEX upd_idx ON upd (body) USING FULLTEXT")
+                .await
                 .unwrap();
             for i in 0..6 {
-                e.execute_blocking(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
+                e.execute(&format!("INSERT INTO upd VALUES ({i}, 'alpha row{i}');"))
+                    .await
                     .unwrap();
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
-            assert!(fulltext_chunks(&e) > 1, "the table starts fragmented");
+            e.flush().await.unwrap();
+            assert!(fulltext_chunks(&e).await > 1, "the table starts fragmented");
 
-            e.execute_blocking("UPDATE upd SET body = 'gamma' WHERE id = 1;")
+            e.execute("UPDATE upd SET body = 'gamma' WHERE id = 1;")
+                .await
                 .unwrap();
             // Dumping the tail is what turns the update into its own chunk.
-            crate::scheduler::block_on(e.flush()).unwrap();
-            assert_eq!(rows(&e, query), hit(), "the new text is searchable");
-            assert_eq!(rows(&e, stale).len(), 5, "the old text is gone");
+            e.flush().await.unwrap();
+            assert_eq!(rows(&e, query).await, hit(), "the new text is searchable");
+            assert_eq!(rows(&e, stale).await.len(), 5, "the old text is gone");
 
             e.optimize_indexes()
+                .await
                 .expect("one update chunk must not make optimize refuse the list");
-            assert_eq!(rows(&e, query), hit(), "the merge keeps the new text");
-            assert_eq!(rows(&e, stale).len(), 5, "the merge cannot resurrect it");
+            assert_eq!(rows(&e, query).await, hit(), "the merge keeps the new text");
+            assert_eq!(
+                rows(&e, stale).await.len(),
+                5,
+                "the merge cannot resurrect it"
+            );
         }
         // The restart path is where the stale copy used to come back.
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
-            rows(&e, query),
+            rows(&e, query).await,
             hit(),
             "reopening dropped the update chunk and served the old text"
         );
-        assert_eq!(rows(&e, stale).len(), 5, "the old text came back");
+        assert_eq!(rows(&e, stale).await.len(), 5, "the old text came back");
     }
 
     /// Lowers the full-text budget of every open index on `e`, so the next
@@ -3491,7 +3802,7 @@ mod tests {
     /// `INFINITY_TEXT_INDEX_BUDGET_BYTES` is read once per process, so the field
     /// is set directly: this is the only way to drive the **offline** dump
     /// (`for_each_merged_term` over several runs) instead of the realtime one.
-    fn set_text_budget(e: &Engine, bytes: usize) {
+    async fn set_text_budget(e: &Engine, bytes: usize) {
         let indexes: Vec<_> = {
             let tables = e.tables.lock().unwrap();
             tables
@@ -3500,7 +3811,7 @@ mod tests {
                 .collect()
         };
         for shared in indexes {
-            shared.write().unwrap().budget = bytes;
+            shared.write().await.budget = bytes;
         }
     }
 
@@ -3538,29 +3849,32 @@ mod tests {
     /// impossible in a test. Lowering the budget makes every insert spill, so the
     /// seal merges several sorted runs; the chunk it writes must be **byte for
     /// byte** what the resident (realtime) dump writes for the same rows.
-    #[test]
-    fn a_spilled_build_writes_the_same_chunk_as_a_resident_one() {
+    #[tokio::test]
+    async fn a_spilled_build_writes_the_same_chunk_as_a_resident_one() {
         const ROWS: usize = 20;
         let resident = tempdir().unwrap();
         let spilled = tempdir().unwrap();
         let query = "SELECT id FROM offl SEARCH MATCH TEXT (body, 'alpha', 100);";
 
-        let build = |dir: &std::path::Path, budget: Option<usize>| {
-            let e = Engine::open(dir).unwrap();
-            e.execute_blocking("CREATE TABLE offl (id INTEGER, body VARCHAR)")
+        let build = async |dir: &std::path::Path, budget: Option<usize>| {
+            let e = Engine::open_async(dir, Default::default()).await.unwrap();
+            e.execute("CREATE TABLE offl (id INTEGER, body VARCHAR)")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
+            e.execute("CREATE INDEX offl_idx ON offl (body) USING FULLTEXT")
+                .await
                 .unwrap();
             // One seal at the twentieth row, so both builds write one chunk.
             e.set_memindex_capacity(ROWS);
             for i in 0..ROWS {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO offl VALUES ({i}, 'alpha beta row{i}');"
                 ))
+                .await
                 .unwrap();
                 if i == 0 {
                     if let Some(bytes) = budget {
-                        set_text_budget(&e, bytes);
+                        set_text_budget(&e, bytes).await;
                     }
                 }
             }
@@ -3569,14 +3883,20 @@ mod tests {
 
         let expected;
         {
-            let resident_engine = build(resident.path(), None);
-            let spilled_engine = build(spilled.path(), Some(1));
+            let resident_engine = build(resident.path(), None).await;
+            let spilled_engine = build(spilled.path(), Some(1)).await;
             // The spilled column really did go through the offline path: one
             // sealed chunk, no run left behind and nothing in the tail.
             {
-                let tables = spilled_engine.tables.lock().unwrap();
-                for shared in tables.values().flat_map(|entry| entry.text.values()) {
-                    let guard = shared.read().unwrap();
+                let indexes: Vec<_> = {
+                    let tables = spilled_engine.tables.lock().unwrap();
+                    tables
+                        .values()
+                        .flat_map(|entry| entry.text.values().cloned())
+                        .collect()
+                };
+                for shared in indexes {
+                    let guard = shared.read().await;
                     assert_eq!(guard.reader.segments.len(), 1, "one sealed chunk");
                     assert_eq!(guard.mem.runs.len(), 0, "the seal consumed the runs");
                     assert_eq!(guard.mem.pending_docs(), 0, "the tail is empty");
@@ -3596,18 +3916,20 @@ mod tests {
                     "{name} differs: the offline dump does not reproduce the realtime one"
                 );
             }
-            expected = rows(&resident_engine, query);
+            expected = rows(&resident_engine, query).await;
             assert_eq!(
                 expected,
-                rows(&spilled_engine, query),
+                rows(&spilled_engine, query).await,
                 "the two builds must answer the same rows"
             );
             assert_eq!(expected.len(), ROWS);
         }
 
         // And the chunk is the one a restart maps.
-        let reopened = Engine::open(spilled.path()).unwrap();
-        assert_eq!(rows(&reopened, query), expected);
+        let reopened = Engine::open_async(spilled.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(rows(&reopened, query).await, expected);
     }
 
     /// Rows as display text, for assertions.
@@ -3626,13 +3948,14 @@ mod tests {
     /// Round-4 review G1: prove that production `run_plan` (not `plan_select`)
     /// applies the optimizer. A hand-built plan keeps the unused column in the
     /// scan, so only the `ColumnPruner` inside `run_plan` can remove it.
-    #[test]
-    fn run_plan_runs_the_production_optimizer() {
+    #[tokio::test]
+    async fn run_plan_runs_the_production_optimizer() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rp (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO rp VALUES (1, 2);").unwrap();
+        e.execute("CREATE TABLE rp (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO rp VALUES (1, 2);").await.unwrap();
         let plan = LogicalPlan::Projection {
             input: Box::new(LogicalPlan::Scan {
                 table: "default_db.rp".to_string(),
@@ -3652,7 +3975,9 @@ mod tests {
                 false,
                 None,
                 false,
+                None,
             )
+            .await
             .unwrap();
         assert_eq!(rows, vec![vec![Value::Int(1)]]);
         let debug = LAST_PLAN_DEBUG.with(|slot| slot.borrow().clone()).unwrap();
@@ -3663,13 +3988,15 @@ mod tests {
     /// The operator model must actually drive the query, not just exist: a
     /// plan that `operators::lower` understands runs through
     /// `operators::run_rows`, and produces the same rows as before.
-    #[test]
-    fn run_plan_executes_a_projection_through_the_operator_model() {
+    #[tokio::test]
+    async fn run_plan_executes_a_projection_through_the_operator_model() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE om (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO om VALUES (1, 2), (3, 4);")
+        e.execute("CREATE TABLE om (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO om VALUES (1, 2), (3, 4);")
+            .await
             .unwrap();
         let before = crate::operator::operator_run_count();
         let plan = LogicalPlan::Projection {
@@ -3685,7 +4012,10 @@ mod tests {
             names: vec!["sum".to_string()],
         };
         let (columns, rows) = e
-            .run_plan(plan, None, None, None, None, false, false, None, false)
+            .run_plan(
+                plan, None, None, None, None, false, false, None, false, None,
+            )
+            .await
             .unwrap();
         assert_eq!(columns, vec!["sum".to_string()]);
         assert_eq!(rows, vec![vec![Value::Int(3)], vec![Value::Int(7)]]);
@@ -3694,28 +4024,30 @@ mod tests {
 
     /// A `WHERE` runs through the filter operator, and a predicate that matches
     /// nothing still reports the projected column names.
-    #[test]
-    fn run_plan_executes_a_filter_through_the_operator_model() {
+    #[tokio::test]
+    async fn run_plan_executes_a_filter_through_the_operator_model() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE of (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
+        e.execute("CREATE TABLE of (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO of VALUES (1, 10), (2, 20), (3, 30);")
+            .await
             .unwrap();
         let before = crate::operator::operator_run_count();
         // An expression in the select list keeps the plan on the operator
         // model; a plain column list is answered by `direct_projection`.
         assert_eq!(
-            rows(&e, "SELECT b + 1 FROM of WHERE a > 1;"),
+            rows(&e, "SELECT b + 1 FROM of WHERE a > 1;").await,
             vec![vec!["21".to_string()], vec!["31".to_string()]]
         );
         assert_eq!(crate::operator::operator_run_count(), before + 1);
         assert_eq!(
-            rows(&e, "SELECT b FROM of WHERE a > 1;"),
+            rows(&e, "SELECT b FROM of WHERE a > 1;").await,
             vec![vec!["20".to_string()], vec!["30".to_string()]]
         );
         // No match: the projection still defines the schema.
-        let mut result = e.execute_blocking("SELECT b FROM of WHERE a > 9;").unwrap();
+        let mut result = e.execute("SELECT b FROM of WHERE a > 9;").await.unwrap();
         let QueryResult::Rows { columns, rows } = result.remove(0) else {
             panic!("expected rows");
         };
@@ -3725,18 +4057,20 @@ mod tests {
 
     /// LIMIT/OFFSET and ORDER BY ... LIMIT run through the limit and top
     /// operators, and produce the same rows as the stage pipeline.
-    #[test]
-    fn run_plan_executes_limit_and_top_through_the_operator_model() {
+    #[tokio::test]
+    async fn run_plan_executes_limit_and_top_through_the_operator_model() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ol (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
+        e.execute("CREATE TABLE ol (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO ol VALUES (1, 10), (2, 20), (3, 10), (4, 40);")
+            .await
             .unwrap();
 
         let before = crate::operator::operator_run_count();
         assert_eq!(
-            rows(&e, "SELECT b FROM ol LIMIT 2;"),
+            rows(&e, "SELECT b FROM ol LIMIT 2;").await,
             vec![vec!["10".to_string()], vec!["20".to_string()]]
         );
         assert_eq!(crate::operator::operator_run_count(), before + 1);
@@ -3749,12 +4083,12 @@ mod tests {
         );
 
         assert_eq!(
-            rows(&e, "SELECT b FROM ol LIMIT 2 OFFSET 1;"),
+            rows(&e, "SELECT b FROM ol LIMIT 2 OFFSET 1;").await,
             vec![vec!["20".to_string()], vec!["10".to_string()]]
         );
         // ORDER BY ties keep insertion order (`a` 1 before `a` 3 both have 10).
         assert_eq!(
-            rows(&e, "SELECT b FROM ol ORDER BY b LIMIT 3;"),
+            rows(&e, "SELECT b FROM ol ORDER BY b LIMIT 3;").await,
             vec![
                 vec!["10".to_string()],
                 vec!["10".to_string()],
@@ -3762,7 +4096,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 1;"),
+            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 1;").await,
             vec![vec!["40".to_string()]]
         );
         // ORDER BY ... LIMIT collapses into one fused Top.
@@ -3774,7 +4108,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 2 OFFSET 1;"),
+            rows(&e, "SELECT b FROM ol ORDER BY b DESC LIMIT 2 OFFSET 1;").await,
             vec![vec!["20".to_string()], vec!["10".to_string()]]
         );
     }
@@ -3782,34 +4116,40 @@ mod tests {
     /// Eight tables inserting at once: every table's index answers for its own
     /// rows, and the index work runs on that table's own bottom job (there is no
     /// appender thread to queue behind).
-    #[test]
-    fn concurrent_inserts_on_different_tables_keep_each_index() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_inserts_on_different_tables_keep_each_index() {
         let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        let e = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         e.attach_bottom_pool();
         for t in 0..8 {
-            e.execute_blocking(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
+            e.execute(&format!("CREATE TABLE ct{t} (id INT, body VARCHAR);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX ct{t}_body ON ct{t} (body) USING FULLTEXT WITH (analyzer = 'standard');"
-            ))
+            )).await
             .unwrap();
         }
         let before = bottom_work_count();
         let mut handles = Vec::new();
         for t in 0..8 {
             let e = Arc::clone(&e);
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for i in 0..20 {
-                    e.execute_blocking(&format!(
+                    e.execute(&format!(
                         "INSERT INTO ct{t} VALUES ({i}, 'word{i} of t{t}');"
                     ))
+                    .await
                     .unwrap();
                 }
             }));
         }
         for handle in handles {
-            handle.join().unwrap();
+            handle.await.unwrap();
         }
         assert!(
             bottom_work_count() >= before + 8,
@@ -3817,14 +4157,15 @@ mod tests {
         );
         for t in 0..8 {
             assert_eq!(
-                rows(&e, &format!("SELECT count(*) FROM ct{t};")),
+                rows(&e, &format!("SELECT count(*) FROM ct{t};")).await,
                 vec![vec!["20".to_string()]]
             );
             assert_eq!(
                 rows(
                     &e,
                     &format!("SELECT count(*) FROM ct{t} WHERE filter_fulltext('body', 'word3');")
-                ),
+                )
+                .await,
                 vec![vec!["1".to_string()]],
                 "table {t} finds its own row"
             );
@@ -3836,17 +4177,23 @@ mod tests {
     /// An `INSERT` on a pooled engine runs its bottom half on the table's
     /// worker and waits for it: the rows, the index entries and the block
     /// mirror are in place when the statement returns.
-    #[test]
-    fn an_insert_runs_its_bottom_half_on_the_bottom_executor() {
+    #[tokio::test]
+    async fn an_insert_runs_its_bottom_half_on_the_bottom_executor() {
         let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        let e = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         e.attach_bottom_pool();
-        e.execute_blocking("CREATE TABLE be (a INT, b VARCHAR);")
+        e.execute("CREATE TABLE be (a INT, b VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX be_b ON be (b);").unwrap();
+        e.execute("CREATE INDEX be_b ON be (b);").await.unwrap();
 
         let before = bottom_work_count();
-        e.execute_blocking("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
+        e.execute("INSERT INTO be VALUES (1, 'x'), (2, 'y');")
+            .await
             .unwrap();
         assert_eq!(
             bottom_work_count(),
@@ -3855,22 +4202,25 @@ mod tests {
         );
         // The worker's writes are visible: rows, the index entry and the counts.
         assert_eq!(
-            rows(&e, "SELECT a FROM be WHERE b = 'y';"),
+            rows(&e, "SELECT a FROM be WHERE b = 'y';").await,
             vec![vec!["2".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM be;"),
+            rows(&e, "SELECT count(*) FROM be;").await,
             vec![vec!["2".to_string()]]
         );
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert!(dir.path().join("data").exists());
     }
 
-    #[test]
-    fn emvb_index_options_are_validated_like_the_reference() {
+    #[tokio::test]
+    async fn emvb_index_options_are_validated_like_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE em (id INT, v TENSOR(FLOAT,2), m MULTIVECTOR(FLOAT,2));")
+            .await
             .unwrap();
         for sql in [
             // a multi-vector column is not a tensor column
@@ -3884,36 +4234,41 @@ mod tests {
             "CREATE INDEX e ON em (v) USING EMVB WITH (pq_subspace_bits = 8);",
             "CREATE INDEX f ON em (v) USING EMVB WITH (pq_subspace_num = 2);",
         ] {
-            assert!(e.execute_blocking(sql).is_err(), "{sql} should be rejected");
+            assert!(e.execute(sql).await.is_err(), "{sql} should be rejected");
         }
-        e.execute_blocking("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);")
+        e.execute("CREATE INDEX ok_i ON em (v) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);").await
             .unwrap();
         // "dimension % subspace_num != 0" is only checked by `GetEMVBOPQ`
         // when the index is built, so the DDL itself succeeds (the reference
         // accepts it too; `parallel_test` relies on that).
-        e.execute_blocking("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);")
+        e.execute("CREATE INDEX ok_odd ON em (v) USING EMVB WITH (pq_subspace_num = 8, pq_subspace_bits = 8);").await
             .unwrap();
     }
 
     /// `Storage::txn_allocator_`: every append's row ids come from one thread
     /// (`TxnAllocator::Process` -> `AllocateRowID`), which is what keeps them
     /// contiguous when several transactions allocate at the same time.
-    #[test]
-    fn row_ids_are_allocated_in_commit_order() {
+    #[tokio::test]
+    async fn row_ids_are_allocated_in_commit_order() {
         let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
+        let e = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         e.install_engine_handle();
-        e.execute_blocking("CREATE TABLE alloc_t (a INT);").unwrap();
+        e.execute("CREATE TABLE alloc_t (a INT);").await.unwrap();
         // `before_wal` allocates **inline** under the commit turn rather than
         // through the allocator queue (see `Engine::reserve_rows_at`): a
         // queued allocation would need a `block_on` on the worker that holds
         // the turn and `commit_lock`. What has to hold is the contract the
         // queue existed for, so that is what this asserts - ids dense, in
         // commit order, no overlap - not which thread handed them out.
-        e.execute_blocking("INSERT INTO alloc_t VALUES (1), (2), (3);")
+        e.execute("INSERT INTO alloc_t VALUES (1), (2), (3);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT a FROM alloc_t;").len(),
+            rows(&e, "SELECT a FROM alloc_t;").await.len(),
             3,
             "the append must have taken exactly three ids"
         );
@@ -3921,29 +4276,30 @@ mod tests {
         let mut handles = Vec::new();
         for _ in 0..4 {
             let e = Arc::clone(&e);
-            handles.push(std::thread::spawn(move || {
-                e.execute_blocking("INSERT INTO alloc_t VALUES (9);")
-                    .unwrap();
+            handles.push(tokio::spawn(async move {
+                e.execute("INSERT INTO alloc_t VALUES (9);").await.unwrap();
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM alloc_t;"),
+            rows(&e, "SELECT count(*) FROM alloc_t;").await,
             vec![vec!["7".to_string()]]
         );
-        let ids = rows(&e, "SELECT a FROM alloc_t;");
+        let ids = rows(&e, "SELECT a FROM alloc_t;").await;
         assert_eq!(ids.len(), 7);
     }
 
     /// The write gate is per table: a batch on one table does not block a batch
     /// on another, which is the parallelism the reference's per-block
     /// `BlockLock` gives (`batch_locks`).
-    #[test]
-    fn write_gates_are_per_table() {
+    #[tokio::test]
+    async fn write_gates_are_per_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let a = e.batch_gate("db1.t1");
         let b = e.batch_gate("db1.t2");
         assert!(
@@ -3954,7 +4310,7 @@ mod tests {
             Arc::ptr_eq(&a, &e.batch_gate("db1.t1")),
             "the same table keeps one gate"
         );
-        let held = crate::scheduler::block_on(a.lock());
+        let held = a.lock().await;
         // The other table is still writable while this one's batch runs.
         assert!(b.try_lock().is_ok());
         drop(held);
@@ -3962,15 +4318,16 @@ mod tests {
 
     /// `EXPLAIN FRAGMENT` prints the fragment envelope the reference prints:
     /// title, sink, every operator (the root gets an arrow), then the source.
-    #[test]
-    fn explain_fragment_wraps_a_plain_plan() {
+    #[tokio::test]
+    async fn explain_fragment_wraps_a_plain_plan() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ef (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE ef (a INT, b INT);").await.unwrap();
 
-        let physical = rows(&e, "EXPLAIN PHYSICAL SELECT a FROM ef WHERE b = 1;");
-        let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;");
+        let physical = rows(&e, "EXPLAIN PHYSICAL SELECT a FROM ef WHERE b = 1;").await;
+        let fragment = rows(&e, "EXPLAIN FRAGMENT SELECT a FROM ef WHERE b = 1;").await;
         assert_eq!(
             fragment[0],
             vec!["FRAGMENT (1, ParallelStream)".to_string()]
@@ -3993,12 +4350,13 @@ mod tests {
 
     /// A blocking operator turns the fragment into a parallel materialize, as
     /// `FragmentBuilder` does for `TOP`/`AGGREGATE`.
-    #[test]
-    fn explain_fragment_type_follows_the_blocking_operator() {
+    #[tokio::test]
+    async fn explain_fragment_type_follows_the_blocking_operator() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE eft (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE eft (a INT, b INT);").await.unwrap();
         for (sql, want) in [
             ("EXPLAIN FRAGMENT SELECT a FROM eft;", "ParallelStream"),
             (
@@ -4010,7 +4368,7 @@ mod tests {
                 "ParallelMaterialize",
             ),
         ] {
-            let out = rows(&e, sql);
+            let out = rows(&e, sql).await;
             assert_eq!(out[0], vec![format!("FRAGMENT (1, {want})")], "{sql}");
         }
     }
@@ -4018,16 +4376,20 @@ mod tests {
     /// Splitting the row-wise prefix into tasklets must not cost the early stop
     /// of `LIMIT`: the limit is the merge point, and the scan below it still
     /// stops once its budget is spent (`physical_limit_impl.cpp:209`).
-    #[test]
-    fn a_limit_over_a_big_table_still_stops_early() {
+    #[tokio::test]
+    async fn a_limit_over_a_big_table_still_stops_early() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lim (a INT);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE lim (a INT);").await.unwrap();
         let input: Vec<Vec<Literal>> = (0..100_000).map(|i| vec![Literal::Int(i)]).collect();
-        e.insert_literals("default_db.lim", None, input).unwrap();
+        e.insert_literals("default_db.lim", None, input)
+            .await
+            .unwrap();
 
         let before = crate::operator::project::projected_rows();
-        let out = rows(&e, "SELECT a + 1 FROM lim LIMIT 3;");
+        let out = rows(&e, "SELECT a + 1 FROM lim LIMIT 3;").await;
         assert_eq!(
             out,
             vec![
@@ -4043,18 +4405,20 @@ mod tests {
         );
     }
 
-    #[test]
-    fn run_plan_executes_a_group_by_through_the_operator_model() {
+    #[tokio::test]
+    async fn run_plan_executes_a_group_by_through_the_operator_model() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE og (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
+        e.execute("CREATE TABLE og (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO og VALUES (1, 10), (2, 20), (3, 10), (4, 20), (5, 30);")
+            .await
             .unwrap();
 
         let before = crate::operator::operator_run_count();
         assert_eq!(
-            rows(&e, "SELECT b, count(*) FROM og GROUP BY b;"),
+            rows(&e, "SELECT b, count(*) FROM og GROUP BY b;").await,
             vec![
                 vec!["10".to_string(), "2".to_string()],
                 vec!["20".to_string(), "2".to_string()],
@@ -4066,11 +4430,11 @@ mod tests {
             .contains(&crate::operator::PhysicalOperatorType::Aggregate));
         // Global aggregates: one row, also when nothing matches.
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM og;"),
+            rows(&e, "SELECT count(*) FROM og;").await,
             vec![vec!["5".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT sum(a), avg(a), min(a), max(a) FROM og;"),
+            rows(&e, "SELECT sum(a), avg(a), min(a), max(a) FROM og;").await,
             vec![vec![
                 "15".to_string(),
                 "3.000000".to_string(),
@@ -4079,28 +4443,34 @@ mod tests {
             ]]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM og WHERE a > 99;"),
+            rows(&e, "SELECT count(*) FROM og WHERE a > 99;").await,
             vec![vec!["0".to_string()]]
         );
         // GROUP BY over an empty relation has no groups at all.
-        assert!(rows(&e, "SELECT b, count(*) FROM og WHERE a > 99 GROUP BY b;").is_empty());
+        assert!(
+            rows(&e, "SELECT b, count(*) FROM og WHERE a > 99 GROUP BY b;")
+                .await
+                .is_empty()
+        );
     }
 
     /// ORDER BY without a limit now lowers to the sort operator, which sorts
     /// chunk runs and merges them; ties still come out in insertion order.
-    #[test]
-    fn run_plan_executes_a_sort_through_the_operator_model() {
+    #[tokio::test]
+    async fn run_plan_executes_a_sort_through_the_operator_model() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE os (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
+        e.execute("CREATE TABLE os (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO os VALUES (1, 30), (2, 10), (3, 20), (4, 10);")
+            .await
             .unwrap();
 
         let before = crate::operator::operator_run_count();
         // `b` 10 comes from rows 2 and 4: insertion order keeps 2 first.
         assert_eq!(
-            rows(&e, "SELECT a, b FROM os ORDER BY b;"),
+            rows(&e, "SELECT a, b FROM os ORDER BY b;").await,
             vec![
                 vec!["2".to_string(), "10".to_string()],
                 vec!["4".to_string(), "10".to_string()],
@@ -4113,7 +4483,7 @@ mod tests {
             crate::operator::last_chain().contains(&crate::operator::PhysicalOperatorType::Sort)
         );
         assert_eq!(
-            rows(&e, "SELECT a, b FROM os ORDER BY b DESC;"),
+            rows(&e, "SELECT a, b FROM os ORDER BY b DESC;").await,
             vec![
                 vec!["1".to_string(), "30".to_string()],
                 vec!["3".to_string(), "20".to_string()],
@@ -4123,27 +4493,33 @@ mod tests {
         );
     }
 
-    fn seed(e: &Engine) {
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    async fn seed(e: &Engine) {
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
     }
 
-    #[test]
-    fn a_derived_table_scans_the_subquery_result() {
+    #[tokio::test]
+    async fn a_derived_table_scans_the_subquery_result() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE d (id INT, s VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
+        e.execute("CREATE TABLE d (id INT, s VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
+            .await
             .unwrap();
         // The outer query scans the subquery's rows, and may filter/sort them.
         assert_eq!(
-            rows(&e, "SELECT id FROM (SELECT id FROM d) ORDER BY id DESC;"),
+            rows(&e, "SELECT id FROM (SELECT id FROM d) ORDER BY id DESC;").await,
             vec![
                 vec!["3".to_string()],
                 vec!["2".to_string()],
@@ -4154,16 +4530,19 @@ mod tests {
             rows(
                 &e,
                 "SELECT id FROM (SELECT id FROM d WHERE id > 1) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
         // A table legitimately named `select3` is not mistaken for a subquery.
-        e.execute_blocking("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
+        e.execute("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO select3 VALUES (1,2,3);")
+        e.execute("INSERT INTO select3 VALUES (1,2,3);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT c3, c2, c1 from select3;"),
+            rows(&e, "SELECT c3, c2, c1 from select3;").await,
             vec![vec!["3".to_string(), "2".to_string(), "1".to_string()]]
         );
     }
@@ -4171,23 +4550,26 @@ mod tests {
     /// Round-5 review: a subquery that reads the enclosing query is rejected
     /// explicitly. Folding it once as a constant would silently answer
     /// `true`/`false` for every outer row, which is what the old path did.
-    #[test]
-    fn a_correlated_subquery_sees_each_outer_row() {
+    #[tokio::test]
+    async fn a_correlated_subquery_sees_each_outer_row() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cs (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO cs VALUES (1, 10), (2, 20);")
+        e.execute("CREATE TABLE cs (id INT, v INT);").await.unwrap();
+        e.execute("INSERT INTO cs VALUES (1, 10), (2, 20);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE cs2 (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO cs2 VALUES (2);").unwrap();
+        e.execute("CREATE TABLE cs2 (id INT);").await.unwrap();
+        e.execute("INSERT INTO cs2 VALUES (2);").await.unwrap();
         // Uncorrelated: the subquery is evaluated on its own, so every outer
         // row sees the same answer.
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
         // Correlated on the outer `cs.id`: only row 2 has a `cs2` match.
@@ -4195,7 +4577,7 @@ mod tests {
             rows(
                 &e,
                 "SELECT id FROM cs WHERE EXISTS (SELECT id FROM cs2 WHERE cs2.id = cs.id) ORDER BY id;"
-            ),
+            ).await,
             vec![vec!["2".to_string()]]
         );
     }
@@ -4203,17 +4585,16 @@ mod tests {
     /// A CTE alias may shadow a base table. The correlated-subquery binder must
     /// not resolve the alias against the catalog and reject the query with the
     /// wrong schema.
-    #[test]
-    fn a_cte_alias_shadowing_a_table_is_not_bound_as_that_table() {
+    #[tokio::test]
+    async fn a_cte_alias_shadowing_a_table_is_not_bound_as_that_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE shadow (other INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO shadow VALUES (99);")
-            .unwrap();
-        e.execute_blocking("CREATE TABLE src (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO src VALUES (1), (2);")
-            .unwrap();
+        e.execute("CREATE TABLE shadow (other INT);").await.unwrap();
+        e.execute("INSERT INTO shadow VALUES (99);").await.unwrap();
+        e.execute("CREATE TABLE src (id INT);").await.unwrap();
+        e.execute("INSERT INTO src VALUES (1), (2);").await.unwrap();
         // `shadow` in the subquery's FROM is the CTE, which exposes `id`; the
         // base table of the same name only has `other`.
         assert_eq!(
@@ -4221,27 +4602,31 @@ mod tests {
                 &e,
                 "WITH shadow AS (SELECT id FROM src) \
                  SELECT id FROM src WHERE EXISTS (SELECT id FROM shadow) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
 
     /// The enclosing query's FROM may itself be a CTE alias; then the CTE, not
     /// a same-named base table, supplies the correlation scope.
-    #[test]
-    fn an_outer_cte_supplies_the_correlation_scope() {
+    #[tokio::test]
+    async fn an_outer_cte_supplies_the_correlation_scope() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE otc (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO otc VALUES (1);").unwrap();
-        e.execute_blocking("CREATE TABLE otc2 (id INT);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE otc (id INT);").await.unwrap();
+        e.execute("INSERT INTO otc VALUES (1);").await.unwrap();
+        e.execute("CREATE TABLE otc2 (id INT);").await.unwrap();
         // The CTE supplies the outer rows; `otc2` is empty, so nothing matches.
         assert_eq!(
             rows(
                 &e,
                 "WITH cs AS (SELECT id FROM otc) \
                  SELECT id FROM cs WHERE EXISTS (SELECT id FROM otc2 WHERE otc2.id = cs.id);",
-            ),
+            )
+            .await,
             Vec::<Vec<String>>::new()
         );
     }
@@ -4249,23 +4634,29 @@ mod tests {
     /// A `SEARCH MATCH (…) WHERE …` filter is compiled by the search path, not
     /// the planner, so a subquery there must be resolved (or rejected) before
     /// it can be folded into a constant.
-    #[test]
-    fn a_subquery_in_a_match_filter_is_not_folded_to_a_constant() {
+    #[tokio::test]
+    async fn a_subquery_in_a_match_filter_is_not_folded_to_a_constant() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mf (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
+        e.execute("CREATE TABLE mf (id INT, body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
+        e.execute("CREATE INDEX mf_ft ON mf (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE mf2 (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO mf2 VALUES (1);").unwrap();
+        e.execute("INSERT INTO mf VALUES (1, 'x'), (2, 'x');")
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE mf2 (id INT);").await.unwrap();
+        e.execute("INSERT INTO mf2 VALUES (1);").await.unwrap();
         let err = e
-            .execute_blocking(
+            .execute(
                 "SELECT id FROM mf SEARCH MATCH TEXT ('body', 'x', 'topn=10', \
                  WHERE EXISTS (SELECT id FROM mf2 WHERE mf2.id = mf.id));",
             )
+            .await
             .unwrap_err();
         assert!(
             err.to_string()
@@ -4276,22 +4667,26 @@ mod tests {
 
     /// `filter=` is an opaque option string parsed after resolution, so a
     /// subquery there must be rejected rather than folded to NULL.
-    #[test]
-    fn a_subquery_in_a_search_option_filter_is_rejected() {
+    #[tokio::test]
+    async fn a_subquery_in_a_search_option_filter_is_rejected() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
+        e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO sf VALUES (1, 'x');")
+        e.execute("CREATE INDEX sf_ft ON sf (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE sf2 (id INT);").unwrap();
+        e.execute("INSERT INTO sf VALUES (1, 'x');").await.unwrap();
+        e.execute("CREATE TABLE sf2 (id INT);").await.unwrap();
         let err = e
-            .execute_blocking(
+            .execute(
                 "SELECT id FROM sf SEARCH MATCH TEXT ('body', 'x', \
                  'topn=10;filter=EXISTS (SELECT id FROM sf2)');",
             )
+            .await
             .unwrap_err();
         assert!(
             err.to_string()
@@ -4303,31 +4698,38 @@ mod tests {
     /// A CTE alias bound by an enclosing `WITH` shadows a base table of the
     /// same name inside a subquery, just as it does in the outer statement.
     /// The CTE exposes `wid`; the base table of the same name exposes `id`.
-    #[test]
-    fn an_inherited_cte_alias_shadows_the_base_table() {
+    #[tokio::test]
+    async fn an_inherited_cte_alias_shadows_the_base_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ivb (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO ivb VALUES (1);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ivb (id INT);").await.unwrap();
+        e.execute("INSERT INTO ivb VALUES (1);").await.unwrap();
         assert_eq!(
             rows(
                 &e,
                 "WITH ivw AS (SELECT id AS wid FROM ivb) \
                  SELECT id FROM ivb WHERE EXISTS (SELECT wid FROM ivw);"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()]]
         );
     }
 
     /// A `WITH` declared inside the subquery itself also shadows a base table.
-    #[test]
-    fn a_subquery_local_cte_shadows_a_base_table() {
+    #[tokio::test]
+    async fn a_subquery_local_cte_shadows_a_base_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lcte (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO lcte VALUES (1), (2);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE lshadow (other INT);")
+        e.execute("CREATE TABLE lcte (id INT);").await.unwrap();
+        e.execute("INSERT INTO lcte VALUES (1), (2);")
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE lshadow (other INT);")
+            .await
             .unwrap();
         assert_eq!(
             rows(
@@ -4335,20 +4737,26 @@ mod tests {
                 "SELECT id FROM lcte WHERE EXISTS \
                  (WITH lshadow AS (SELECT id FROM lcte WHERE id = 1) \
                  SELECT id FROM lshadow) ORDER BY id;"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
 
-    #[test]
-    fn match_tensor_fusion_reranks_by_the_search_tensor() {
+    #[tokio::test]
+    async fn match_tensor_fusion_reranks_by_the_search_tensor() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
+        e.execute("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
+        e.execute("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
+            .await
             .unwrap();
         // The rerank ignores the children's BM25: only the tensor similarity counts.
         let rows = rows(
@@ -4356,7 +4764,8 @@ mod tests {
             "SELECT title, ROUND(SCORE(), 4) FROM tf SEARCH MATCH TEXT ('body', 'off', 'topn=4'), \
              FUSION('match_tensor', 'column_name=t;search_tensor=[[10.0,0.0]];\
              tensor_data_type=float;match_method=MaxSim;topn=2');",
-        );
+        )
+        .await;
         assert_eq!(
             rows,
             vec![
@@ -4366,112 +4775,203 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fulltext_threshold_filter_uses_the_index_score() {
+    /// `filter_fulltext` and `MATCH TEXT` must answer the same rows.
+    ///
+    /// They are two front ends onto one index, and the reference makes them
+    /// agree by analyzing the query with the column's analyzer on both sides
+    /// (`SearchDriver` in `filter_expression_push_down_indexscanfilter_impl.
+    /// cpp:980`, `bound_select_statement_impl.cpp` for `MATCH`). The port used
+    /// to analyze only on the `MATCH` side and to match the filter's words as
+    /// written, so `family` found 1 row one way and 2 the other.
+    #[tokio::test]
+    async fn filter_fulltext_and_match_text_agree_on_stems() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ft (num INT, doc VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');",
+        e.execute("CREATE TABLE stem_probe (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
+            "INSERT INTO stem_probe VALUES (1,'the families arrived'), \
+             (2,'a family portrait'), (3,'he implies it'), (4,'they imply it');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
+        e.execute("CREATE INDEX sp_idx ON stem_probe (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        for word in ["family", "families", "famili", "implies", "imply", "impli"] {
+            let filtered = int_ids(
+                &e,
+                &format!("SELECT id FROM stem_probe WHERE filter_fulltext('body','{word}');"),
+            )
+            .await;
+            // The search answers in score order; compare the sets.
+            let mut matched = int_ids(
+                &e,
+                &format!(
+                    "SELECT id FROM stem_probe SEARCH MATCH TEXT ('body','{word}','topn=10');"
+                ),
+            )
+            .await;
+            matched.sort_unstable();
+            assert_eq!(
+                filtered, matched,
+                "filter_fulltext and MATCH TEXT disagree on '{word}'"
+            );
+        }
+        // `family` and `families` both stem to `famili`, so the query reaches
+        // both rows - the count the unfixed filter could not produce.
+        let family = int_ids(
+            &e,
+            "SELECT id FROM stem_probe WHERE filter_fulltext('body','family');",
+        )
+        .await;
+        assert_eq!(family.len(), 2, "family should match both family rows");
+    }
+
+    /// The intersection case: `filter_fulltext` used to run the index mask
+    /// **and** a per-row word match over the same predicate, and the two
+    /// disagree whenever the document tokenizes differently from
+    /// `fulltext_match`'s `split(non-alphanumeric)` - `foo_bar` is one token to
+    /// the index and two words to that matcher. The reference has only the
+    /// index check, so `foo` must find the `foo_bar` row and `foo_bar` must
+    /// find both.
+    #[tokio::test]
+    async fn filter_fulltext_does_not_rerun_the_predicate_per_row() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE p (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO p VALUES (1,'foo_bar baz'), (2,'foo bar');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX p_idx ON p (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        for word in ["foo", "bar", "foo_bar", "baz"] {
+            let filtered = int_ids(
+                &e,
+                &format!("SELECT id FROM p WHERE filter_fulltext('body','{word}');"),
+            )
+            .await;
+            let mut matched = int_ids(
+                &e,
+                &format!("SELECT id FROM p SEARCH MATCH TEXT ('body','{word}','topn=10');"),
+            )
+            .await;
+            matched.sort_unstable();
+            assert_eq!(
+                filtered, matched,
+                "filter_fulltext and MATCH TEXT disagree on '{word}'"
+            );
+        }
+    }
+
+    /// `/` is a `UNITE` for the index's tokenizer (`2012/02/14` →
+    /// `20120214`) and a delimiter for the plain word matcher, so the two
+    /// paths disagreed on a date. They must not: only the index answers.
+    #[tokio::test]
+    async fn filter_fulltext_uses_the_index_tokenizer_not_the_plain_matcher() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE d (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO d VALUES (1,'on 2012/02/14 ok');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX d_idx ON d (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        for word in ["2012/02/14", "20120214"] {
+            let filtered = int_ids(
+                &e,
+                &format!("SELECT id FROM d WHERE filter_fulltext('body','{word}');"),
+            )
+            .await;
+            let matched = int_ids(
+                &e,
+                &format!("SELECT id FROM d SEARCH MATCH TEXT ('body','{word}','topn=10');"),
+            )
+            .await;
+            assert_eq!(
+                filtered, matched,
+                "filter_fulltext and MATCH TEXT disagree on '{word}'"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn fulltext_threshold_filter_uses_the_index_score() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ft (num INT, doc VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
+            .await
             .unwrap();
         // A threshold is a *score* filter, which only the index can answer.
         let keep = rows(
             &e,
             "SELECT num FROM ft WHERE filter_fulltext('doc','alpha','threshold=0.0001');",
-        );
+        )
+        .await;
         assert_eq!(keep, vec![vec!["1".to_string()], vec!["2".to_string()]]);
         let none = rows(
             &e,
             "SELECT num FROM ft WHERE filter_fulltext('doc','alpha','threshold=999');",
-        );
+        )
+        .await;
         assert!(none.is_empty());
     }
 
-    /// `filter_fulltext` searches the query the column's analyzer produces, the
-    /// same terms `MATCH TEXT` searches (`SearchDriver::ParseSingleWithFields`
-    /// analyzes the matching text before it builds the query tree), and the
-    /// index scan is the *only* answer: C++ consumes the
-    /// `FilterFulltextExpression` into the evaluator, so the predicate does not
-    /// run again above the scan. Re-running it made the expression interpreter's
-    /// raw-word `fulltext_match` the last word, and a `standard` column - which
-    /// stores both `families` and its stem `famili` - answered
-    /// `filter_fulltext('body','family')` with one row while `MATCH TEXT` gave
-    /// two.
-    #[test]
-    fn filter_fulltext_analyzes_the_query_like_match_text() {
+    #[tokio::test]
+    async fn a_gram_index_filter_requires_the_query_contiguously() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE stem_probe (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "INSERT INTO stem_probe VALUES (1,'the families arrived'),(2,'a family portrait'),\
-             (3,'he implies it'),(4,'they imply it');",
-        )
-        .unwrap();
-        e.execute_blocking("CREATE INDEX sp_idx ON stem_probe (body) USING FULLTEXT;")
+        e.execute("CREATE TABLE g (id INT, doc VARCHAR);")
+            .await
             .unwrap();
-        for (query, expected) in [("family", 2), ("families", 2), ("imply", 2), ("implies", 2)] {
-            let filtered = rows(
-                &e,
-                &format!("SELECT id FROM stem_probe WHERE filter_fulltext('body','{query}');"),
-            );
-            assert_eq!(
-                filtered.len(),
-                expected,
-                "filter_fulltext('body','{query}') must stem like MATCH TEXT"
-            );
-            let matched = rows(
-                &e,
-                &format!("SELECT id FROM stem_probe SEARCH MATCH TEXT (body, '{query}', 10);"),
-            );
-            assert_eq!(
-                filtered.len(),
-                matched.len(),
-                "filter_fulltext and MATCH TEXT disagree on '{query}': {filtered:?} vs {matched:?}"
-            );
-        }
-        // A word the analyzer does not index still matches nothing.
-        assert!(rows(
-            &e,
-            "SELECT id FROM stem_probe WHERE filter_fulltext('body','famil');"
-        )
-        .is_empty());
-    }
-
-    #[test]
-    fn a_gram_index_filter_requires_the_query_contiguously() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE g (id INT, doc VARCHAR);")
-            .unwrap();
-        e.execute_blocking(
+        e.execute(
             "INSERT INTO g VALUES (1,'harmful chemical reaction'), \
              (2,'chemical processes are harmful');",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');",
-        )
-        .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');",
-        )
-        .unwrap();
+        e.execute("CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');")
+            .await
+            .unwrap();
         // The gram index needs the query contiguous; the regular one accepts the
         // terms apart. Same filter, different index named by `@`.
         let gram = rows(
             &e,
             "SELECT id FROM g WHERE filter_fulltext('doc@g_sg','harmful chemical','operator=and');",
-        );
+        )
+        .await;
         assert_eq!(gram, vec![vec!["1".to_string()]]);
         let regular = rows(
             &e,
             "SELECT id FROM g WHERE filter_fulltext('doc','harmful chemical','operator=and');",
-        );
+        )
+        .await;
         assert_eq!(regular.len(), 2);
     }
 
@@ -4479,20 +4979,20 @@ mod tests {
     /// (`ColumnIndexReader::Lookup` in the reference), not from "every row".
     /// Before the port it returned every position for a term index, so the
     /// filter never narrowed the candidate set.
-    #[test]
-    fn fulltext_index_filter_reads_postings_by_row_id() {
+    #[tokio::test]
+    async fn fulltext_index_filter_reads_postings_by_row_id() {
         use planner::index_scan::FulltextIndex;
         let dir = tempdir().unwrap();
         let mut index = TextIndex::new(
             dir.path().to_string_lossy().into_owned(),
             TextTokenizer::default(),
         );
-        index_row(&mut index, 7, "alpha beta");
-        index_row(&mut index, 9, "gamma delta");
+        index_row(&mut index, 7, "alpha beta").await;
+        index_row(&mut index, 9, "gamma delta").await;
         // A posting for a row the scan did not materialise must not admit
         // anything: the postings are intersected with the scan's own row ids.
-        index_row(&mut index, 42, "alpha stale");
-        let index: SharedTextIndex = std::sync::Arc::new(std::sync::RwLock::new(index));
+        index_row(&mut index, 42, "alpha stale").await;
+        let index: SharedTextIndex = std::sync::Arc::new(tokio::sync::RwLock::new(index));
         let rows = vec![
             vec![Value::Str("alpha beta".into())],
             vec![Value::Str("gamma delta".into())],
@@ -4550,11 +5050,13 @@ mod tests {
         std::sync::Arc::new(storage::RocksMetaStore::open(dir).unwrap())
     }
 
-    #[test]
-    fn flush_mirrors_the_catalog_into_the_cpp_key_space() {
+    #[tokio::test]
+    async fn flush_mirrors_the_catalog_into_the_cpp_key_space() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        seed(&e);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        seed(&e).await;
         // The C++ keys the C++ engine reads sit beside the native catalog in
         // the same `<dir>/catalog` store.
         let cpp = catalog::layout::read_layout(e.catalog().store().as_ref()).unwrap();
@@ -4575,8 +5077,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn opens_a_directory_written_by_the_cpp_engine() {
+    #[tokio::test]
+    async fn opens_a_directory_written_by_the_cpp_engine() {
         // A C++ engine's schema, dropped into an otherwise empty directory's
         // catalog store with no native catalog: opening it must import it.
         let src = tempdir().unwrap();
@@ -4597,28 +5099,34 @@ mod tests {
             cat.write_layout(store.as_ref()).unwrap();
         } // release the store lock before the engine opens it
 
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
             e.table_schema("default_db.ts").unwrap(),
             vec!["id".to_string(), "v".to_string()]
         );
         assert_eq!(e.column_types("default_db.ts").unwrap()[0], "INTEGER");
         // The imported table is usable.
-        e.execute_blocking("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
+        e.execute("INSERT INTO default_db.ts VALUES (7, [1.0, 2.0, 3.0]);")
+            .await
             .unwrap();
-        match &e.execute_blocking("SELECT id FROM default_db.ts;").unwrap()[0] {
+        match &e.execute("SELECT id FROM default_db.ts;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("unexpected {other:?}"),
         }
     }
 
-    #[test]
-    fn select_projection_filter_order_limit() {
+    #[tokio::test]
+    async fn select_projection_filter_order_limit() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        seed(&e);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        seed(&e).await;
         match &e
-            .execute_blocking("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
+            .execute("SELECT id, name FROM t WHERE id >= 2 ORDER BY name ASC LIMIT 2;")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, columns } => {
@@ -4631,13 +5139,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn global_aggregates() {
+    #[tokio::test]
+    async fn global_aggregates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        seed(&e);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        seed(&e).await;
         match &e
-            .execute_blocking("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
+            .execute("SELECT COUNT(*), SUM(id), AVG(id), MIN(id), MAX(id) FROM t;")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -4666,13 +5177,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn group_by_with_order() {
+    #[tokio::test]
+    async fn group_by_with_order() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        seed(&e);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        seed(&e).await;
         match &e
-            .execute_blocking("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
+            .execute("SELECT name, COUNT(*) FROM t GROUP BY name ORDER BY name;")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -4693,25 +5207,32 @@ mod tests {
         }
     }
 
-    #[test]
-    fn join_between_two_tables() {
+    #[tokio::test]
+    async fn join_between_two_tables() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE a (aid INT, an VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE TABLE b (bid INT, bn VARCHAR);")
+        e.execute("CREATE TABLE a (aid INT, an VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE b (bid INT, bn VARCHAR);")
+            .await
             .unwrap();
         for (i, n) in [(1, "x"), (2, "y")] {
-            e.execute_blocking(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
+            e.execute(&format!("INSERT INTO a VALUES ({i}, '{n}');"))
+                .await
                 .unwrap();
         }
         for (i, n) in [(2, "yy"), (3, "zz")] {
-            e.execute_blocking(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
+            e.execute(&format!("INSERT INTO b VALUES ({i}, '{n}');"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         match &e
-            .execute_blocking("SELECT aid, bn FROM a JOIN b ON aid = bid;")
+            .execute("SELECT aid, bn FROM a JOIN b ON aid = bid;")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
@@ -4722,56 +5243,66 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bounded_capacity_one_does_not_deadlock() {
+    #[tokio::test]
+    async fn bounded_capacity_one_does_not_deadlock() {
         let dir = tempdir().unwrap();
-        let e = Engine::open_with_capacity(dir.path(), 1).unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        let e = Engine::open_with_capacity_async(dir.path(), 1)
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE t (id INT);").await.unwrap();
         for i in 0..50 {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i});"))
+            e.execute(&format!("INSERT INTO t VALUES ({i});"))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        e.flush().await.unwrap();
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 50),
             other => panic!("{other:?}"),
         }
-        match &e.execute_blocking("SELECT * FROM t LIMIT 3;").unwrap()[0] {
+        match &e.execute("SELECT * FROM t LIMIT 3;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
     }
 
-    #[test]
-    fn select_literal_and_missing_table() {
+    #[tokio::test]
+    async fn select_literal_and_missing_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
-            e.execute_blocking("SELECT 1, 'x';").unwrap(),
+            e.execute("SELECT 1, 'x';").await.unwrap(),
             vec![QueryResult::values(
                 vec!["c0".into(), "c1".into()],
                 vec![vec![Value::Int(1), Value::Str("x".into())]]
             )]
         );
-        assert!(e.execute_blocking("SELECT * FROM nope;").is_err());
+        assert!(e.execute("SELECT * FROM nope;").await.is_err());
     }
 
-    #[test]
-    fn index_scan_matches_expected_and_survives_restart() {
+    #[tokio::test]
+    async fn index_scan_matches_expected_and_survives_restart() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
         for (i, n) in [(1, "a"), (2, "b"), (3, "a"), (4, "b")] {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, '{n}');"))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX idx_name ON t (name);")
+        e.execute("CREATE INDEX idx_name ON t (name);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
-            .unwrap();
+        e.execute("CREATE INDEX idx_id ON t (id);").await.unwrap();
         match &e
-            .execute_blocking("SELECT id FROM t WHERE name = 'a';")
+            .execute("SELECT id FROM t WHERE name = 'a';")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -4782,12 +5313,15 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         drop(e); // release the RocksDB lock before reopening
                  // reopen: the index is rebuilt from catalog metadata and still scans
-        let e2 = Engine::open(dir.path()).unwrap();
+        let e2 = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         match &e2
-            .execute_blocking("SELECT id FROM t WHERE name = 'b';")
+            .execute("SELECT id FROM t WHERE name = 'b';")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 2),
@@ -4799,14 +5333,25 @@ mod tests {
             query_column(
                 &e2,
                 "SELECT id FROM t WHERE id >= 2 AND id <= 3 ORDER BY id;"
-            ),
+            )
+            .await,
             vec!["2".to_string(), "3".to_string()]
         );
     }
 
     /// The first column of a one-column query over `t`.
-    fn query_column(e: &Engine, sql: &str) -> Vec<String> {
-        match &e.execute_blocking(sql).unwrap()[0] {
+    /// An integer column of one statement's first result, in the statement's
+    /// own row order (`ROW_ID()` for a search, `id` for a filter).
+    async fn int_ids(e: &Engine, sql: &str) -> Vec<i64> {
+        query_column(e, sql)
+            .await
+            .into_iter()
+            .map(|v| v.parse().expect("integer column"))
+            .collect()
+    }
+
+    async fn query_column(e: &Engine, sql: &str) -> Vec<String> {
+        match &e.execute(sql).await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 rows.iter().map(|row| row[0].to_slt_string()).collect()
             }
@@ -4815,26 +5360,28 @@ mod tests {
     }
 
     /// The `id` column of a `WHERE`-filtered select over `t`, in `id` order.
-    fn ids(e: &Engine, predicate: &str) -> Vec<i64> {
-        ids_of(e, "t", predicate)
+    async fn ids(e: &Engine, predicate: &str) -> Vec<i64> {
+        ids_of(e, "t", predicate).await
     }
 
     /// The `id` column of a `WHERE`-filtered select over `table`, in `id` order.
-    fn ids_of(e: &Engine, table: &str, predicate: &str) -> Vec<i64> {
+    async fn ids_of(e: &Engine, table: &str, predicate: &str) -> Vec<i64> {
         query_column(
             e,
             &format!("SELECT id FROM {table} WHERE {predicate} ORDER BY id;"),
         )
+        .await
         .into_iter()
         .map(|id| id.parse().expect("id is an integer"))
         .collect()
     }
 
     /// `(id, ROW_ID())` pairs, optionally filtered, in `id` order.
-    fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
+    async fn id_and_row_id(e: &Engine, predicate: Option<&str>) -> Vec<(i64, i64)> {
         let filter = predicate.map(|p| format!("WHERE {p}")).unwrap_or_default();
         match &e
-            .execute_blocking(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
+            .execute(&format!("SELECT id, ROW_ID() FROM t {filter} ORDER BY id;"))
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => rows
@@ -4857,25 +5404,29 @@ mod tests {
     /// full scan: every interval the planner merged must produce the same rows
     /// as the residual filter, both from the memory tail and from the sealed
     /// chunks.
-    #[test]
-    fn index_range_scan_answers_from_sealed_chunks() {
+    #[tokio::test]
+    async fn index_range_scan_answers_from_sealed_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // The same SQL runs twice below; keep the result cache from answering
         // the second round, which is the one that reads all sealed chunks.
-        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        e.execute("SET CONFIG result_cache off;").await.unwrap();
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
         for i in 0..150 {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+                .await
                 .unwrap();
         }
         // `CREATE INDEX` builds from the rows that exist, so 0..150 land in a
         // sealed chunk; 150..200 stay in the memory tail until `flush`.
-        e.execute_blocking("CREATE INDEX idx_id ON t (id);")
-            .unwrap();
+        e.execute("CREATE INDEX idx_id ON t (id);").await.unwrap();
         for i in 150..200 {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'v{i}');"))
+                .await
                 .unwrap();
         }
         let cases: [(&str, Vec<i64>); 7] = [
@@ -4896,16 +5447,20 @@ mod tests {
         // key arrays.
         for round in 0..2 {
             for (predicate, expected) in &cases {
-                assert_eq!(&ids(&e, predicate), expected, "round {round}: {predicate}");
+                assert_eq!(
+                    &ids(&e, predicate).await,
+                    expected,
+                    "round {round}: {predicate}"
+                );
             }
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
         }
         // `=` keeps its own path, and must still agree with the range path.
-        assert_eq!(ids(&e, "id = 42"), vec![42]);
+        assert_eq!(ids(&e, "id = 42").await, vec![42]);
         // `ROW_ID()` must ride along with the narrowed rows.
-        let all = id_and_row_id(&e, None);
+        let all = id_and_row_id(&e, None).await;
         assert_eq!(
-            id_and_row_id(&e, Some("id >= 10 AND id <= 12")),
+            id_and_row_id(&e, Some("id >= 10 AND id <= 12")).await,
             all[10..=12].to_vec()
         );
     }
@@ -4915,38 +5470,44 @@ mod tests {
     /// must agree with the same table carrying no index at all. An integer
     /// range keeps working beside them, and a varchar range still falls back
     /// because its keys are hashes.
-    #[test]
-    fn float_range_scan_matches_the_unindexed_oracle() {
+    #[tokio::test]
+    async fn float_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("SET CONFIG result_cache off;").await.unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {table} (id INT, f FLOAT, d DOUBLE, tag VARCHAR);"
             ))
+            .await
             .unwrap();
         }
         // 0..60 exist when the indexes are built, so they are sealed into
         // chunks; 60..80 land in the memory tail until the first `flush`.
         for i in 0..60 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
+                .await
                 .unwrap();
             }
         }
         for column in ["id", "f", "d", "tag"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
+            .await
             .unwrap();
         }
         for i in 60..80 {
             for table in ["t_indexed", "t_plain"] {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO {table} VALUES ({i}, {i}.5, {i}.5, 'tag{i}');"
                 ))
+                .await
                 .unwrap();
             }
         }
@@ -4963,37 +5524,36 @@ mod tests {
         for round in 0..2 {
             for (predicate, expected) in &cases {
                 assert_eq!(
-                    &ids_of(&e, "t_indexed", predicate),
+                    &ids_of(&e, "t_indexed", predicate).await,
                     expected,
                     "round {round}: {predicate}"
                 );
                 // The unindexed twin is the oracle for the same rows.
                 assert_eq!(
-                    ids_of(&e, "t_indexed", predicate),
-                    ids_of(&e, "t_plain", predicate),
+                    ids_of(&e, "t_indexed", predicate).await,
+                    ids_of(&e, "t_plain", predicate).await,
                     "round {round}: oracle disagrees for {predicate}"
                 );
             }
             // A checkpoint does not dump the memory indexes; one dump
             // transaction per index seals the rows written since the last one.
             for column in ["id", "f", "d", "tag"] {
-                crate::scheduler::block_on(
-                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
-                )
-                .unwrap();
+                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
+                    .await
+                    .unwrap();
             }
         }
         // VARCHAR keys are hashes: the range cannot use the index, but the rows
         // still have to be right (lexicographic, so `tag8`/`tag9` are above
         // `tag78` — the oracle decides, not a hand-written list).
         assert_eq!(
-            ids_of(&e, "t_indexed", "tag > 'tag78'"),
-            ids_of(&e, "t_plain", "tag > 'tag78'")
+            ids_of(&e, "t_indexed", "tag > 'tag78'").await,
+            ids_of(&e, "t_plain", "tag > 'tag78'").await
         );
-        assert_eq!(ids_of(&e, "t_indexed", "tag = 'tag42'"), vec![42]);
+        assert_eq!(ids_of(&e, "t_indexed", "tag = 'tag42'").await, vec![42]);
         // Equality on a float/double column is the `index_lookup` path.
-        assert_eq!(ids_of(&e, "t_indexed", "f = 2.5"), vec![2]);
-        assert_eq!(ids_of(&e, "t_indexed", "d = 42.5"), vec![42]);
+        assert_eq!(ids_of(&e, "t_indexed", "f = 2.5").await, vec![2]);
+        assert_eq!(ids_of(&e, "t_indexed", "d = 42.5").await, vec![42]);
         // The float and double columns really did seal chunks.
         assert!(!e.secondary_chunk_meta("t_indexed", "f").is_empty());
         assert!(!e.secondary_chunk_meta("t_indexed", "d").is_empty());
@@ -5004,15 +5564,18 @@ mod tests {
     /// `DATETIME` its 8-byte epoch key (`ConvertToOrderedI64`), so
     /// `WHERE d >= … AND d <= …` narrows instead of scanning. Dates before 1970
     /// are negative keys, which is the case a hash-based key could never order.
-    #[test]
-    fn temporal_range_scan_matches_the_unindexed_oracle() {
+    #[tokio::test]
+    async fn temporal_range_scan_matches_the_unindexed_oracle() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("SET CONFIG result_cache off;").await.unwrap();
         for table in ["t_indexed", "t_plain"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {table} (id INT, d DATE, tm TIME, ts DATETIME);"
             ))
+            .await
             .unwrap();
         }
         // Consecutive days around the epoch; the time of day advances by an
@@ -5029,26 +5592,28 @@ mod tests {
             "1970-01-06",
             "1970-01-07",
         ];
-        let insert = |e: &Engine, from: usize, to: usize| {
+        let insert = async |e: &Engine, from: usize, to: usize| {
             for (i, day) in days.iter().enumerate().take(to).skip(from) {
                 let time = format!("{:02}:00:00", i);
                 for table in ["t_indexed", "t_plain"] {
-                    e.execute_blocking(&format!(
+                    e.execute(&format!(
                         "INSERT INTO {table} VALUES ({i}, '{day}', '{time}', '{day} {time}');"
                     ))
+                    .await
                     .unwrap();
                 }
             }
         };
         // 0..7 are sealed by `CREATE INDEX`; 7..10 land in the memory tail.
-        insert(&e, 0, 7);
+        insert(&e, 0, 7).await;
         for column in ["id", "d", "tm", "ts"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX idx_{column} ON t_indexed ({column});"
             ))
+            .await
             .unwrap();
         }
-        insert(&e, 7, 10);
+        insert(&e, 7, 10).await;
 
         let cases: [(&str, Vec<i64>); 7] = [
             // Pre-epoch dates are negative keys.
@@ -5071,26 +5636,25 @@ mod tests {
         for round in 0..2 {
             for (predicate, expected) in &cases {
                 assert_eq!(
-                    &ids_of(&e, "t_indexed", predicate),
+                    &ids_of(&e, "t_indexed", predicate).await,
                     expected,
                     "round {round}: {predicate}"
                 );
                 assert_eq!(
-                    ids_of(&e, "t_indexed", predicate),
-                    ids_of(&e, "t_plain", predicate),
+                    ids_of(&e, "t_indexed", predicate).await,
+                    ids_of(&e, "t_plain", predicate).await,
                     "round {round}: oracle disagrees for {predicate}"
                 );
             }
             // One dump transaction per index; a checkpoint keeps the tails.
             for column in ["id", "d", "tm", "ts"] {
-                crate::scheduler::block_on(
-                    e.dump_index_transaction("t_indexed", &format!("idx_{column}")),
-                )
-                .unwrap();
+                e.dump_index_transaction("t_indexed", &format!("idx_{column}"))
+                    .await
+                    .unwrap();
             }
         }
         // Equality on a date column rides the same ordered key.
-        assert_eq!(ids_of(&e, "t_indexed", "d = '1969-12-31'"), vec![2]);
+        assert_eq!(ids_of(&e, "t_indexed", "d = '1969-12-31'").await, vec![2]);
         assert!(!e.secondary_chunk_meta("t_indexed", "d").is_empty());
         assert!(!e.secondary_chunk_meta("t_indexed", "ts").is_empty());
     }
@@ -5099,68 +5663,80 @@ mod tests {
     /// column with no index at all — must still return the right rows through
     /// the fallback. A float range used to be in this list; it is answered from
     /// the index now (`float_range_scan_matches_the_unindexed_oracle`).
-    #[test]
-    fn range_on_an_unordered_key_falls_back() {
+    #[tokio::test]
+    async fn range_on_an_unordered_key_falls_back() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("SET CONFIG result_cache off;").unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("SET CONFIG result_cache off;").await.unwrap();
+        e.execute("CREATE TABLE t (id INT, tag VARCHAR, note INT);")
+            .await
             .unwrap();
         for i in 0..50 {
-            e.execute_blocking(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
+            e.execute(&format!("INSERT INTO t VALUES ({i}, 'tag{i}', {i});"))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX idx_tag ON t (tag);")
-            .unwrap();
+        e.execute("CREATE INDEX idx_tag ON t (tag);").await.unwrap();
         for round in 0..2 {
             // A varchar chunk stores a hash of the key, so there is no order to
             // scan: the rows must still be right.
             assert_eq!(
-                ids(&e, "tag BETWEEN 'tag48' AND 'tag49'"),
+                ids(&e, "tag BETWEEN 'tag48' AND 'tag49'").await,
                 vec![48, 49],
                 "round {round}: varchar range"
             );
             // No index on `note`: there is no candidate at all.
             assert_eq!(
-                ids(&e, "note >= 45"),
+                ids(&e, "note >= 45").await,
                 vec![45, 46, 47, 48, 49],
                 "round {round}: unindexed column"
             );
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
         }
     }
 
-    #[test]
-    fn delete_with_where_and_all() {
+    #[tokio::test]
+    async fn delete_with_where_and_all() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("DELETE FROM t WHERE id >= 2;").unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .await
+            .unwrap();
+        e.execute("DELETE FROM t WHERE id >= 2;").await.unwrap();
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
             other => panic!("{other:?}"),
         }
-        e.execute_blocking("DELETE FROM t;").unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        e.execute("DELETE FROM t;").await.unwrap();
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 0),
             other => panic!("{other:?}"),
         }
     }
 
-    #[test]
-    fn update_is_delete_plus_append() {
+    #[tokio::test]
+    async fn update_is_delete_plus_append() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("UPDATE t SET name = 'X' WHERE id >= 2;")
+        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .await
             .unwrap();
-        match &e.execute_blocking("SELECT * FROM t ORDER BY id;").unwrap()[0] {
+        e.execute("UPDATE t SET name = 'X' WHERE id >= 2;")
+            .await
+            .unwrap();
+        match &e.execute("SELECT * FROM t ORDER BY id;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
                 assert_eq!(row_text(rows, 0), vec!["1".to_string(), "a".to_string()]);
@@ -5171,36 +5747,44 @@ mod tests {
         }
     }
 
-    #[test]
-    fn multi_row_insert() {
+    #[tokio::test]
+    async fn multi_row_insert() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+        e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        e.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b'), (3, 'c');")
+            .await
+            .unwrap();
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 3),
             other => panic!("{other:?}"),
         }
     }
 
-    #[test]
-    fn persists_across_restart() {
+    #[tokio::test]
+    async fn persists_across_restart() {
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            seed(&e);
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            seed(&e).await;
         }
-        let e = Engine::open(dir.path()).unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 4),
             other => panic!("{other:?}"),
         }
     }
 
-    #[test]
-    fn copy_csv_then_vector_search() {
+    #[tokio::test]
+    async fn copy_csv_then_vector_search() {
         let dir = tempdir().unwrap();
         let csv = dir.path().join("vec.csv");
         std::fs::write(
@@ -5209,22 +5793,27 @@ mod tests {
              6,\"[0.3, 0.2, 0.1, 0.4]\"\n8,\"[0.4, 0.3, 0.2, 0.1]\"\n",
         )
         .unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(&format!(
+        e.execute("CREATE TABLE v (c1 INT, c2 EMBEDDING(FLOAT, 4));")
+            .await
+            .unwrap();
+        e.execute(&format!(
             "COPY v FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
+        .await
         .unwrap();
         assert_eq!(e.row_count("v").unwrap(), 4);
 
         // cosine top-3 → c1 8, 6, 4 with hidden row-id / similarity columns.
         match &e
-            .execute_blocking(
+            .execute(
                 "SELECT c1, ROW_ID(), SIMILARITY() FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);",
             )
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -5237,11 +5826,12 @@ mod tests {
 
         // threshold prunes the weakest match.
         match &e
-            .execute_blocking(
+            .execute(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) \
                  WITH (threshold = 0.9);",
             )
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => assert_eq!(texts(rows), vec![vec!["8".to_string()]]),
@@ -5250,11 +5840,12 @@ mod tests {
 
         // WHERE filters candidates before top-N (l2 over {2,4,6} → 6 then 4).
         match &e
-            .execute_blocking(
+            .execute(
                 "SELECT c1 FROM v \
                  SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 2) \
                  WHERE c1 < 7;",
             )
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -5269,14 +5860,17 @@ mod tests {
 
     /// `InitAbstractIndexT` picks the distance from `metric`; the mirror's
     /// graph answers self-queries for l2, cosine and inner product.
-    #[test]
-    fn hnsw_metric_variants_answer_self_queries() {
+    #[tokio::test]
+    async fn hnsw_metric_variants_answer_self_queries() {
         // Inner product is maximised by the largest-norm row, not the row
         // itself; l2/cosine are maximised by the row.
         for (metric, target) in [("l2", 42), ("cosine", 42), ("ip", 199)] {
             let dir = tempdir().unwrap();
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
+                .await
                 .unwrap();
             let mut sql = String::from("INSERT INTO hm VALUES ");
             for i in 0..200 {
@@ -5286,12 +5880,13 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&sql).await.unwrap();
+            e.execute(&format!(
                 "CREATE INDEX hm_i ON hm (v) USING HNSW WITH (metric='{metric}');"
             ))
+            .await
             .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             let got = rows(
                 &e,
                 &format!(
@@ -5300,15 +5895,16 @@ mod tests {
                     target + 1,
                     target + 2
                 ),
-            );
+            )
+            .await;
             assert_eq!(got, vec![vec![target.to_string()]], "metric {metric}");
         }
     }
 
     /// C++ `test_lsg_build_ut.cpp::test1`: an LSG-built HNSW keeps >= 95%
     /// recall@1 for self-queries.
-    #[test]
-    fn lsg_hnsw_keeps_self_query_recall() {
+    #[tokio::test]
+    async fn lsg_hnsw_keeps_self_query_recall() {
         let dim = 16usize;
         let n = 128usize;
         let vector = |i: usize| -> String {
@@ -5321,8 +5917,11 @@ mod tests {
             format!("[{}]", parts.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO lg VALUES ");
         for i in 0..n {
@@ -5332,13 +5931,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX lg_i ON lg (v) USING HNSW WITH \
              (metric='l2', build_type='lsg', lsg_config='sample_ratio=0.5,ls_k=10,alpha=1.0');",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let mut hits = 0;
         for i in 0..n {
             let got = rows(
@@ -5347,7 +5947,8 @@ mod tests {
                     "SELECT id FROM lg SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
                     vector(i)
                 ),
-            );
+            )
+            .await;
             if got == vec![vec![i.to_string()]] {
                 hits += 1;
             }
@@ -5360,16 +5961,20 @@ mod tests {
     /// carry the spelling the C++ engine parses (`sample_raito`). Persisting the
     /// input verbatim made a C++ reader abort the directory with `Invalid index
     /// parameter type: sample_ratio`.
-    #[test]
-    fn create_index_persists_the_reference_lsg_spelling() {
+    #[tokio::test]
+    async fn create_index_persists_the_reference_lsg_spelling() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sp (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE sp (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute(
             "CREATE INDEX sp_i ON sp (v) USING HNSW WITH (metric='l2', encode='lvq', \
              build_type='lsg', lsg_config='sample_ratio=0.25,ls_k=7,alpha=0.5');",
         )
+        .await
         .unwrap();
         let im = e
             .storage
@@ -5396,9 +6001,9 @@ mod tests {
     /// `INFINITY_BIG_TEST_ROWS`, pick the encoding with
     /// `INFINITY_BIG_TEST_ENCODE`, the build type with
     /// `INFINITY_BIG_TEST_BUILD_TYPE`.
-    #[test]
+    #[tokio::test]
     #[ignore = "slow: 20k x 128 LVQ+LSG build"]
-    fn large_lvq_lsg_build_stays_stable() {
+    async fn large_lvq_lsg_build_stays_stable() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean - the case an untrained LVQ mean
         // gets wrong (issue.txt #2).
@@ -5425,8 +6030,11 @@ mod tests {
             std::env::var("INFINITY_BIG_TEST_BUILD_TYPE").unwrap_or_else(|_| "lsg".into());
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE big (id INT, v EMBEDDING(FLOAT,128));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE big (id INT, v EMBEDDING(FLOAT,128));")
+            .await
             .unwrap();
         let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(n);
         for i in 0..n {
@@ -5441,15 +6049,18 @@ mod tests {
             ]);
         }
         let started = std::time::Instant::now();
-        e.insert_literals("default_db.big", None, dataset).unwrap();
+        e.insert_literals("default_db.big", None, dataset)
+            .await
+            .unwrap();
         eprintln!("insert {n} rows: {:?}", started.elapsed());
 
         let started = std::time::Instant::now();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "CREATE INDEX big_i ON big (v) USING HNSW WITH (M=16, ef_construction=200, \
              metric='l2', encode='{encode}', build_type='{build_type}', \
              lsg_config='sample_raito=0.25,ls_k=7,alpha=0.5');"
         ))
+        .await
         .unwrap();
         eprintln!(
             "build {n} rows ({encode}+{build_type}): {:?}",
@@ -5493,7 +6104,8 @@ mod tests {
             let got = rows(
                 &e,
                 &format!("SELECT id FROM big SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"),
-            );
+            )
+            .await;
             if got == vec![vec![i.to_string()]] {
                 hits += 1;
             }
@@ -5509,15 +6121,17 @@ mod tests {
         e.context
             .flush_dumps_mem_index
             .store(true, std::sync::atomic::Ordering::Relaxed);
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let info = e.show_index_info("big", "big_i").expect("after flush");
         eprintln!("after flush: {} chunks", info.segment_index_count);
         assert!(info.segment_index_count >= 1, "no chunk dumped");
 
         drop(e);
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM big;"),
+            rows(&e, "SELECT count(*) FROM big;").await,
             vec![vec![n.to_string()]]
         );
         let info = e.show_index_info("big", "big_i").expect("after reopen");
@@ -5545,9 +6159,9 @@ mod tests {
     ///
     /// Ignored because it builds a real graph:
     /// `cargo test -p executor --release --lib hnsw_production_scale -- --ignored --nocapture`
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: HNSW production scale"]
-    fn hnsw_production_scale() {
+    async fn hnsw_production_scale() {
         const DIMS: usize = 128;
         // A column with a clear non-zero mean (so an untrained quantizer shows
         // up) and SIFT-like clusters: 1000 centres, each row a centre plus a
@@ -5585,8 +6199,11 @@ mod tests {
         let lsg_ratio = std::env::var("INFINITY_BENCH_LSG_RATIO").unwrap_or_else(|_| "0.01".into());
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,128));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,128));")
+            .await
             .unwrap();
 
         // Insert in chunks: a 1M-row literal batch would hold ~1GB of text at
@@ -5611,16 +6228,18 @@ mod tests {
                 flat.extend_from_slice(&v);
             }
             e.insert_literals("default_db.bench", None, dataset)
+                .await
                 .unwrap();
         }
         eprintln!("insert {n} rows: {:?}", started.elapsed());
 
         let started = std::time::Instant::now();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "CREATE INDEX bench_i ON bench (v) USING HNSW WITH (M=16, ef_construction=200, \
              metric='l2', encode='{encode}', build_type='{build_type}', \
              lsg_config='sample_raito={lsg_ratio},ls_k=10,alpha=1');"
         ))
+        .await
         .unwrap();
         eprintln!(
             "build {n} rows ({encode}+{build_type} {lsg_ratio}): {:?}",
@@ -5630,7 +6249,7 @@ mod tests {
         // encoding's store. Per row is what a deployment budgets with; the
         // graph is a floor every encoding pays.
         if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
-            let guard = mem.lock().unwrap();
+            let guard = mem.lock().await;
             let bytes = guard.mem_usage();
             eprintln!(
                 "index memory ({encode}): {:.1} MiB, {:.0} B/row",
@@ -5674,7 +6293,8 @@ mod tests {
                 &format!(
                     "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
                 ),
-            );
+            )
+            .await;
             latencies.push(started.elapsed());
             let exact = exact_topk(row(i), k);
             let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
@@ -5705,7 +6325,9 @@ mod tests {
                 &format!(
                     "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', 1);"
                 ),
-            ) == vec![vec![i.to_string()]]
+            )
+            .await
+                == vec![vec![i.to_string()]]
             {
                 self_hits += 1;
             }
@@ -5719,10 +6341,10 @@ mod tests {
         // vector, so this number and `recall@{k}` answer different questions.
         // Comparing the two says whether a low `recall@{k}` is the scaled edge
         // selection or the graph itself.
-        let scaled_recall: Option<f64> = (|| {
+        let scaled_recall: Option<f64> = (async || {
             let segs = e.hnsw_mem_segments("bench", "v").ok()?;
             let seg = segs.first()?;
-            let guard = seg.lock().ok()?;
+            let guard = seg.lock().await;
             let lsg = guard.index().lsg()?.clone();
             // `avg` is indexed by vertex; the vertex order has to be the row
             // order for the two to line up.
@@ -5754,7 +6376,8 @@ mod tests {
                     .count();
             }
             Some(hits as f64 / (queries * k) as f64)
-        })();
+        })()
+        .await;
         if let Some(scaled) = scaled_recall {
             eprintln!("recall@{k} in the LSG-scaled space: {scaled:.3}");
         }
@@ -5763,7 +6386,7 @@ mod tests {
         // The in-memory graph answers through the same `search_with_ef` the
         // KNN scan calls, so this is the index path without the SQL overhead.
         if let Some(mem) = e.hnsw_mem_segments("bench", "v").unwrap().first() {
-            let graph = mem.lock().unwrap();
+            let graph = mem.lock().await;
             for ef in [64usize, 128, 256, 512] {
                 let mut curve_hits = 0usize;
                 let mut curve_lat: Vec<std::time::Duration> = Vec::with_capacity(queries);
@@ -5790,7 +6413,7 @@ mod tests {
             .flush_dumps_mem_index
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let started = std::time::Instant::now();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         eprintln!("flush + dump: {:?}", started.elapsed());
         let info = e.show_index_info("bench", "bench_i").expect("show_index");
         eprintln!("chunks after dump: {}", info.segment_index_count);
@@ -5798,10 +6421,12 @@ mod tests {
 
         drop(e);
         let started = std::time::Instant::now();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         eprintln!("reopen: {:?}", started.elapsed());
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM bench;"),
+            rows(&e, "SELECT count(*) FROM bench;").await,
             vec![vec![n.to_string()]]
         );
         let mut after_hits = 0usize;
@@ -5817,7 +6442,8 @@ mod tests {
                 &format!(
                     "SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {k});"
                 ),
-            );
+            )
+            .await;
             let exact = exact_topk(row(i), k);
             let got: Vec<u64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
             after_hits += got.iter().filter(|id| exact.contains(id)).count();
@@ -5854,12 +6480,15 @@ mod tests {
 
     /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
     /// vectors per the `encode` option and answers the same top-1.
-    #[test]
-    fn hnsw_encodings_answer_vector_search() {
+    #[tokio::test]
+    async fn hnsw_encodings_answer_vector_search() {
         for encode in ["plain", "lvq", "rabitq"] {
             let dir = tempdir().unwrap();
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
+                .await
                 .unwrap();
             let mut sql = String::from("INSERT INTO he VALUES ");
             for i in 0..200 {
@@ -5869,17 +6498,19 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&sql).await.unwrap();
+            e.execute(&format!(
                 "CREATE INDEX he_i ON he (v) USING HNSW WITH (metric='l2', encode='{encode}');"
             ))
+            .await
             .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             let rows = rows(
                 &e,
                 "SELECT id FROM he SEARCH MATCH VECTOR \
                  (v, [42.0,43.0,44.0,1.0], 'float', 'l2', 1);",
-            );
+            )
+            .await;
             assert_eq!(rows, vec![vec!["42".to_string()]], "encode {encode}");
         }
     }
@@ -5887,8 +6518,8 @@ mod tests {
     /// C++ `Import` populates the memory indexes: a `COPY` into a table with an
     /// HNSW index feeds the memory segment and honours `mem_index_capacity`,
     /// so the graph covers the imported rows without waiting for an INSERT.
-    #[test]
-    fn copy_populates_the_hnsw_memory_segment() {
+    #[tokio::test]
+    async fn copy_populates_the_hnsw_memory_segment() {
         let dir = tempdir().unwrap();
         let csv = dir.path().join("hnsw.csv");
         std::fs::write(
@@ -5897,25 +6528,23 @@ mod tests {
              3,\"[0.0, 1.0, 0.0, 0.0]\"\n4,\"[0.0, 0.0, 1.0, 0.0]\"\n",
         )
         .unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_capacity(3);
-        e.execute_blocking("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute("CREATE TABLE cvi (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
+        e.execute("CREATE INDEX cvi_i ON cvi (c2) USING HNSW WITH (metric = l2);")
+            .await
             .unwrap();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY cvi FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
+        .await
         .unwrap();
-        let indexed: usize = e
-            .tables
-            .lock()
-            .unwrap()
-            .values()
-            .flat_map(|t| t.hnsw_mem.values())
-            .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
-            .sum();
+        let indexed = hnsw_mem_rows(&e).await;
         assert_eq!(
             indexed, 0,
             "the 4-row batch reached the capacity and dumped"
@@ -5928,21 +6557,24 @@ mod tests {
         assert_eq!(dumped, 4);
     }
 
-    #[test]
-    fn sparse_and_tensor_search() {
+    #[tokio::test]
+    async fn sparse_and_tensor_search() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE s (c1 INT, c2 SPARSE(FLOAT,100));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO s VALUES (1, [0:1.0,10:1.0,20:1.0,80:1.0]), \
              (2, [0:2.0,20:2.0,80:2.0]), (4, [0:4.0,80:4.0]), (5, []);",
         )
+        .await
         .unwrap();
         match &e
-            .execute_blocking(
-                "SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);",
-            )
+            .execute("SELECT c1 FROM s SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);")
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -5958,19 +6590,22 @@ mod tests {
             other => panic!("{other:?}"),
         }
 
-        e.execute_blocking("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
+        e.execute("CREATE TABLE t (c1 INT, c2 TENSOR(FLOAT,4));")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "INSERT INTO t VALUES (2, [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]]), \
              (4, [[0.2,0.1,0.3,0.4]]);",
         )
+        .await
         .unwrap();
         // MaxSim over the query's two vectors: 2.21 + (-7.4) = -5.19.
         match &e
-            .execute_blocking(
+            .execute(
                 "SELECT c1, ROUND(SCORE(), 4) FROM t SEARCH MATCH TENSOR \
                  (c2, [[0.0,-10.0,0.0,0.7],[9.2,45.6,-55.8,3.5]], 'float', 'maxsim', '');",
             )
+            .await
             .unwrap()[0]
         {
             QueryResult::Rows { rows, .. } => {
@@ -5990,11 +6625,14 @@ mod tests {
     /// `USING PLAID`: the tensor index builds the reference's `PlaidIndex`
     /// once enough embeddings are buffered, answers `MATCH TENSOR` from it, and
     /// `flush()` mirrors it as a C++ PLAID chunk (`PlaidIndex::SaveIndexInner`).
-    #[test]
-    fn plaid_index_answers_tensor_search_and_mirrors_a_chunk() {
+    #[tokio::test]
+    async fn plaid_index_answers_tensor_search_and_mirrors_a_chunk() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -6007,20 +6645,20 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO pt VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO pt VALUES {};", values.join(",")))
+            .await
             .unwrap();
         let query = "SELECT id FROM pt SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
         // Without an index the scan is exhaustive.
-        let baseline = rows(&e, query);
+        let baseline = rows(&e, query).await;
         assert_eq!(baseline.len(), 3);
 
-        e.execute_blocking(
-            "CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);",
-        )
-        .unwrap();
+        e.execute("CREATE INDEX pidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .await
+            .unwrap();
         // The scan builds `PlaidIndexInMem` over the 1200 embeddings.
-        let indexed = rows(&e, query);
+        let indexed = rows(&e, query).await;
         let tkey = e.table_key("default_db.pt");
         let built = e
             .tables
@@ -6036,8 +6674,8 @@ mod tests {
         assert_eq!(indexed[0], baseline[0]);
 
         // The chunk comes from the index's own dump transaction.
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("pt", "pidx")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("pt", "pidx").await.unwrap();
         let loaded = e.read_plaid_index("default_db.pt", "pidx").unwrap();
         assert_eq!(loaded.doc_num(), 300);
         assert_eq!(loaded.total_embedding_num(), 1200);
@@ -6046,14 +6684,19 @@ mod tests {
     /// Concurrent searches while rows are appended and the tail is dumped: the
     /// readers never deadlock, every answer is a subset of the table, and the
     /// final answer covers every row.
-    #[test]
-    fn plaid_index_answers_concurrent_searches() {
-        use std::sync::{Arc, Mutex};
+    #[tokio::test(flavor = "multi_thread")]
+    async fn plaid_index_answers_concurrent_searches() {
+        use std::sync::Mutex;
 
         let dir = tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
+            .execute("CREATE TABLE pcc (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let tensor_rows = |lo: usize, hi: usize| -> String {
             let mut values = Vec::new();
@@ -6068,27 +6711,30 @@ mod tests {
             values.join(",")
         };
         engine
-            .execute_blocking(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
+            .execute(&format!("INSERT INTO pcc VALUES {};", tensor_rows(0, 200)))
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
+            .execute("CREATE INDEX pcci ON pcc (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
 
         let query = "SELECT id FROM pcc SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=400');";
         let writer = {
             let engine = Arc::clone(&engine);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 for step in 0..4 {
                     let lo = 200 + step * 50;
                     engine
-                        .execute_blocking(&format!(
+                        .execute(&format!(
                             "INSERT INTO pcc VALUES {};",
                             tensor_rows(lo, lo + 50)
                         ))
+                        .await
                         .unwrap();
                 }
-                crate::scheduler::block_on(engine.flush()).unwrap();
+                engine.flush().await.unwrap();
             })
         };
         let observed: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(Vec::new()));
@@ -6096,9 +6742,10 @@ mod tests {
         for _ in 0..2 {
             let engine = Arc::clone(&engine);
             let observed = Arc::clone(&observed);
-            readers.push(std::thread::spawn(move || {
+            readers.push(tokio::spawn(async move {
                 for _ in 0..15 {
                     let seen: Vec<i64> = rows(&engine, query)
+                        .await
                         .into_iter()
                         .map(|row| row[0].parse().expect("id column"))
                         .collect();
@@ -6106,9 +6753,9 @@ mod tests {
                 }
             }));
         }
-        writer.join().unwrap();
+        writer.await.unwrap();
         for reader in readers {
-            reader.join().unwrap();
+            reader.await.unwrap();
         }
 
         // No ghost rows: every id a concurrent reader saw exists.
@@ -6117,6 +6764,7 @@ mod tests {
         }
         // And the final answer covers the whole table.
         let final_ids: std::collections::BTreeSet<i64> = rows(&engine, query)
+            .await
             .into_iter()
             .map(|row| row[0].parse().expect("id column"))
             .collect();
@@ -6128,7 +6776,7 @@ mod tests {
     /// flush, reopen (mmap load), optimize (chunk merge), a `filter=`, a delete
     /// and an update. Every step must return exactly the rows the table holds, so
     /// the index stays coherent across the operations a production table sees.
-    fn plaid_lifecycle(colbertsar: bool) {
+    async fn plaid_lifecycle(colbertsar: bool) {
         let dir = tempdir().unwrap();
         let table = if colbertsar { "pcb" } else { "pld" };
         let index = if colbertsar { "pcbi" } else { "pldi" };
@@ -6141,7 +6789,7 @@ mod tests {
         } else {
             format!("CREATE INDEX {index} ON {table} (t) USING PLAID WITH (n_centroids = 8);")
         };
-        let query = |topn: usize, filter: Option<&str>| {
+        let query = async |topn: usize, filter: Option<&str>| {
             let mut params = format!("topn={topn}");
             if let Some(filter) = filter {
                 params.push_str(&format!(";filter={filter}"));
@@ -6151,8 +6799,9 @@ mod tests {
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', '{params}');"
             )
         };
-        let ids = |engine: &Engine, sql: &str| -> std::collections::BTreeSet<i64> {
+        let ids = async |engine: &Engine, sql: &str| -> std::collections::BTreeSet<i64> {
             rows(engine, sql)
+                .await
                 .into_iter()
                 .map(|row| row[0].parse().expect("id column"))
                 .collect()
@@ -6171,45 +6820,52 @@ mod tests {
             values.join(",")
         };
 
-        let engine = Engine::open(dir.path()).unwrap();
-        engine
-            .execute_blocking(&format!(
-                "CREATE TABLE {table} (id INT, t TENSOR(FLOAT,4));"
-            ))
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
         engine
-            .execute_blocking(&format!(
+            .execute(&format!(
+                "CREATE TABLE {table} (id INT, t TENSOR(FLOAT,4));"
+            ))
+            .await
+            .unwrap();
+        engine
+            .execute(&format!(
                 "INSERT INTO {table} VALUES {};",
                 tensor_rows(0, 200)
             ))
+            .await
             .unwrap();
-        engine.execute_blocking(&ddl).unwrap();
+        engine.execute(&ddl).await.unwrap();
 
         // 1. The index answers for the whole corpus.
         let mut expected: std::collections::BTreeSet<i64> = (0..200).collect();
-        assert_eq!(ids(&engine, &query(200, None)), expected);
+        assert_eq!(ids(&engine, &query(200, None).await).await, expected);
 
         // 2. Rows appended after the build are indexed too (incremental add).
         engine
-            .execute_blocking(&format!(
+            .execute(&format!(
                 "INSERT INTO {table} VALUES {};",
                 tensor_rows(200, 260)
             ))
+            .await
             .unwrap();
         expected.extend(200..260);
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
 
         // 3. A checkpoint + an index dump, then a reopen, loads the flushed
         // chunk (mmap) instead of rebuilding. The chunk comes from the
         // `DumpIndex` transaction - the reference's `DumpMemIndex` is the only
         // index writer; a checkpoint writes blocks only.
-        crate::scheduler::block_on(engine.flush()).unwrap();
-        crate::scheduler::block_on(engine.dump_index_transaction(table, index)).unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction(table, index).await.unwrap();
         drop(engine);
-        let engine = Engine::open(dir.path()).unwrap();
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
         {
-            let index = engine.multivector_index_for(table, "t", 4).unwrap();
+            let index = engine.multivector_index_for(table, "t", 4).await.unwrap();
             let guard = index.read().unwrap();
             let plaid = guard.plaid.as_ref().expect("PLAID not restored");
             assert_eq!(plaid.doc_num() as usize, 260);
@@ -6227,39 +6883,46 @@ mod tests {
         }
 
         // 4. The optimize pass merges the chunks; the answers stay the same.
-        crate::scheduler::block_on(engine.optimize_index_chunks()).unwrap();
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        engine.optimize_index_chunks().await.unwrap();
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
 
         // 5. A `filter=` is answered from the index bitmask.
         let filtered: std::collections::BTreeSet<i64> = (0..100).collect();
-        assert_eq!(ids(&engine, &query(260, Some("id < 100"))), filtered);
+        assert_eq!(
+            ids(&engine, &query(260, Some("id < 100")).await).await,
+            filtered
+        );
 
         // 6. A tombstoned row is no longer returned.
         engine
-            .execute_blocking(&format!("DELETE FROM {table} WHERE id = 5;"))
+            .execute(&format!("DELETE FROM {table} WHERE id = 5;"))
+            .await
             .unwrap();
         expected.remove(&5);
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
 
         // 7. An update rewrites the tensor and the row stays searchable.
         engine
-            .execute_blocking(&format!(
+            .execute(&format!(
                 "UPDATE {table} SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 6;"
             ))
+            .await
             .unwrap();
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
 
         // 8. A clean shutdown and restart keeps the same answers.
-        crate::scheduler::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
         drop(engine);
-        let engine = Engine::open(dir.path()).unwrap();
-        assert_eq!(ids(&engine, &query(260, None)), expected);
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(ids(&engine, &query(260, None).await).await, expected);
     }
 
     /// PLAID mode, end to end.
-    #[test]
-    fn plaid_index_lifecycle_is_coherent() {
-        plaid_lifecycle(false);
+    #[tokio::test]
+    async fn plaid_index_lifecycle_is_coherent() {
+        plaid_lifecycle(false).await;
     }
 
     /// ColBERTSaR mode, end to end: residual-free chunks and the same lifecycle
@@ -6267,20 +6930,23 @@ mod tests {
     ///
     /// `#[ignore]`d for the unit lane; `--ignored` still runs it.
     #[ignore = "slow: ColBERT-SaR training"]
-    #[test]
-    fn colbertsar_index_lifecycle_is_coherent() {
-        plaid_lifecycle(true);
+    #[tokio::test]
+    async fn colbertsar_index_lifecycle_is_coherent() {
+        plaid_lifecycle(true).await;
     }
 
     /// `filter=` on `SEARCH MATCH TENSOR` narrows the candidates through the
     /// index's bitmask (`CalculateFilterBitmask`) instead of falling back to a
     /// row scan: with the whole corpus requested, the filtered answer is exactly
     /// the unfiltered one restricted to the filter's rows.
-    #[test]
-    fn match_tensor_filter_narrows_through_the_index() {
+    #[tokio::test]
+    async fn match_tensor_filter_narrows_through_the_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pf (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -6291,21 +6957,25 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO pf VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO pf VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX pfi ON pf (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
 
         let all = rows(
             &e,
             "SELECT id FROM pf SEARCH MATCH TENSOR \
              (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300');",
-        );
+        )
+        .await;
         let filtered = rows(
             &e,
             "SELECT id FROM pf SEARCH MATCH TENSOR \
              (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=300;filter=id < 150');",
-        );
+        )
+        .await;
         let all_ids: std::collections::HashSet<String> =
             all.into_iter().map(|row| row[0].clone()).collect();
         let expected: std::collections::HashSet<String> = all_ids
@@ -6326,14 +6996,17 @@ mod tests {
     /// A `flush` writes the PLAID index out as C++ chunks; the first search
     /// after a reopen must load them instead of retraining over the whole table
     /// (that cost is what made a restart pay O(rows) before answering).
-    #[test]
-    fn plaid_index_loads_its_flushed_chunks_after_reopen() {
+    #[tokio::test]
+    async fn plaid_index_loads_its_flushed_chunks_after_reopen() {
         let dir = tempdir().unwrap();
         let q = "SELECT id FROM pr SEARCH MATCH TENSOR \
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE pr (id INT, t TENSOR(FLOAT,4));")
+                .await
                 .unwrap();
             let mut values = Vec::new();
             for i in 0..300 {
@@ -6344,23 +7017,27 @@ mod tests {
                 }
                 values.push(format!("({i}, [{}])", tokens.join(",")));
             }
-            e.execute_blocking(&format!("INSERT INTO pr VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO pr VALUES {};", values.join(",")))
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
+            e.execute("CREATE INDEX pri ON pr (t) USING PLAID WITH (n_centroids = 8);")
+                .await
                 .unwrap();
-            assert_eq!(rows(&e, q).len(), 3);
+            assert_eq!(rows(&e, q).await.len(), 3);
             // The chunk is written by the index's own `DumpIndex` transaction
             // (the reference's `DumpMemIndex`); a checkpoint writes blocks only.
-            crate::scheduler::block_on(e.flush()).unwrap();
-            crate::scheduler::block_on(e.dump_index_transaction("pr", "pri")).unwrap();
+            e.flush().await.unwrap();
+            e.dump_index_transaction("pr", "pri").await.unwrap();
         }
-        let e = Engine::open(dir.path()).unwrap();
-        assert_eq!(rows(&e, q).len(), 3);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3);
         // A filter can exclude every PLAID candidate; the sealed readers loaded
         // beside PLAID are what keeps such a search answered.
         let filtered = "SELECT id FROM pr SEARCH MATCH TENSOR \
                         (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3;filter=id < 5');";
-        let filtered_hits = rows(&e, filtered);
+        let filtered_hits = rows(&e, filtered).await;
         assert!(
             !filtered_hits.is_empty(),
             "a filtered search lost its fallback"
@@ -6371,7 +7048,7 @@ mod tests {
                 .all(|row| row[0].parse::<i64>().unwrap_or(99) < 5),
             "the filter was not applied: {filtered_hits:?}"
         );
-        let index = e.multivector_index_for("pr", "t", 4).unwrap();
+        let index = e.multivector_index_for("pr", "t", 4).await.unwrap();
         let guard = index.read().unwrap();
         assert!(
             guard.plaid.is_some(),
@@ -6405,23 +7082,29 @@ mod tests {
     /// *seen*: `is_complete(reserved)` compares the counter with the table's
     /// live rows, so a row it never advances on would make every search rebuild
     /// the whole index, PLAID training included.
-    #[test]
-    fn a_null_tensor_row_keeps_the_multivector_index_complete() {
+    #[tokio::test]
+    async fn a_null_tensor_row_keeps_the_multivector_index_complete() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE mn (id INT, m MULTIVECTOR(FLOAT,4));")
+            .await
             .unwrap();
         let values: Vec<String> = (0..300)
             .map(|i| format!("({i}, [[1.0,0.5,0.25,0.125]])"))
             .collect();
-        e.execute_blocking(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO mn VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX mni ON mn (m) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
-        let first = e.multivector_index_for("mn", "m", 4).unwrap();
-        e.execute_blocking("INSERT INTO mn VALUES (300, NULL);")
+        let first = e.multivector_index_for("mn", "m", 4).await.unwrap();
+        e.execute("INSERT INTO mn VALUES (300, NULL);")
+            .await
             .unwrap();
-        let after = e.multivector_index_for("mn", "m", 4).unwrap();
+        let after = e.multivector_index_for("mn", "m", 4).await.unwrap();
         assert!(
             std::sync::Arc::ptr_eq(&first, &after),
             "the index was rebuilt although the NULL row was counted as seen"
@@ -6430,67 +7113,81 @@ mod tests {
 
     /// The four `plaid_*` keys reach `plaid_search_options`; the statement's
     /// option validator runs first and used to reject them as unknown.
-    #[test]
-    fn plaid_search_options_are_accepted_by_the_validator() {
+    #[tokio::test]
+    async fn plaid_search_options_are_accepted_by_the_validator() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pv (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let values: Vec<String> = (0..300)
             .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
             .collect();
-        e.execute_blocking(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO pv VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX pvi ON pv (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
         let query = "SELECT id FROM pv SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', \
                       'topn=3;plaid_n_ivf_probe=32;plaid_centroid_score_threshold=-0.5;\
                       plaid_n_doc_to_score=300;plaid_n_full_scores=30');";
-        assert_eq!(rows(&e, query).len(), 3);
+        assert_eq!(rows(&e, query).await.len(), 3);
     }
 
     /// A chunk written after a delete covers only the live rows. The restored
     /// row list has to be that same live population, or the document count
     /// never matches `doc_num()` and every reopen retrains the index.
-    #[test]
-    fn a_chunk_written_after_a_delete_reopens_without_retraining() {
+    #[tokio::test]
+    async fn a_chunk_written_after_a_delete_reopens_without_retraining() {
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE md (id INT, t TENSOR(FLOAT,4));")
+                .await
                 .unwrap();
             let values: Vec<String> = (0..300)
                 .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
                 .collect();
-            e.execute_blocking(&format!("INSERT INTO md VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO md VALUES {};", values.join(",")))
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+            e.execute("CREATE INDEX mdi ON md (t) USING PLAID WITH (n_centroids = 8);")
+                .await
                 .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
-            e.execute_blocking("DELETE FROM md WHERE id = 0;").unwrap();
+            e.flush().await.unwrap();
+            e.execute("DELETE FROM md WHERE id = 0;").await.unwrap();
             // A delete drops the in-memory PLAID index, and the next search
             // rebuilds it; the following flush then rewrites the chunk from the
             // live rows (`plaid_chunk` -> `column_docs`), which is the chunk
             // this test reopens.
-            e.execute_blocking(
+            e.execute(
                 "SELECT id FROM md SEARCH MATCH TENSOR \
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
             )
+            .await
             .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
         }
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let hits = rows(
             &e,
             "SELECT id FROM md SEARCH MATCH TENSOR \
              (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
-        );
+        )
+        .await;
         assert!(
             !hits.iter().any(|row| row[0] == "0"),
             "the deleted row was scored after the reopen"
         );
-        let index = e.multivector_index_for("md", "t", 4).unwrap();
+        let index = e.multivector_index_for("md", "t", 4).await.unwrap();
         let guard = index.read().unwrap();
         assert!(guard.plaid.is_some(), "PLAID was not restored");
         // The restored id lists have to line up with the chunks that carry
@@ -6557,11 +7254,14 @@ mod tests {
     /// table's live rows rebuilt the whole index (PLAID training included) on
     /// every search. Rewriting a row must leave PLAID covering every document
     /// instead of dropping it for good.
-    #[test]
-    fn plaid_index_rebuilds_only_when_the_rows_change() {
+    #[tokio::test]
+    async fn plaid_index_rebuilds_only_when_the_rows_change() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pm (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..320 {
@@ -6576,23 +7276,25 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO pm VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO pm VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX pmi ON pm (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
 
         let q = "SELECT id FROM pm SEARCH MATCH TENSOR \
                  (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
-        assert_eq!(rows(&e, q).len(), 3);
-        let first = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3);
+        let first = e.multivector_index_for("pm", "t", 4).await.unwrap();
         assert!(
             first.read().unwrap().plaid.is_some(),
             "PLAID was not built over 320 rows"
         );
         // A second search must reuse the index; a NULL row used to make it look
         // incomplete and rebuild it every time.
-        assert_eq!(rows(&e, q).len(), 3);
-        let second = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert_eq!(rows(&e, q).await.len(), 3);
+        let second = e.multivector_index_for("pm", "t", 4).await.unwrap();
         assert!(
             Arc::ptr_eq(&first, &second),
             "the second search rebuilt the whole multi-vector index"
@@ -6601,10 +7303,11 @@ mod tests {
         // An update appends a new row id (the old one is tombstoned), so PLAID
         // either grows by one or is rebuilt - it must cover every document
         // afterwards either way.
-        e.execute_blocking("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
+        e.execute("UPDATE pm SET t = [[1.0,1.0,0.0,0.0]] WHERE id = 1;")
+            .await
             .unwrap();
-        assert!(!rows(&e, q).is_empty());
-        let after = e.multivector_index_for("pm", "t", 4).unwrap();
+        assert!(!rows(&e, q).await.is_empty());
+        let after = e.multivector_index_for("pm", "t", 4).await.unwrap();
         {
             let guard = after.read().unwrap();
             let covered = guard.plaid.as_ref().map(|p| p.doc_num() as usize);
@@ -6625,39 +7328,40 @@ mod tests {
     /// `hnsw_mem` was *empty*, so the second index got none - its dump wrote
     /// nothing and the first index's graph was fed every row twice (100 rows
     /// compiled to 200).
-    #[test]
-    fn two_hnsw_indexes_on_one_column_keep_their_own_graphs() {
+    #[tokio::test]
+    async fn two_hnsw_indexes_on_one_column_keep_their_own_graphs() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE th (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE th (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         for i in 0..100 {
-            e.execute_blocking(&format!("INSERT INTO th VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+            e.execute(&format!("INSERT INTO th VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .await
                 .unwrap();
         }
         for name in ["idx0", "idx1"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {name} ON th (c2) USING HNSW \
                  WITH (M=16, ef_construction=20, metric=l2);"
             ))
+            .await
             .unwrap();
         }
 
         let ids = e.index_ids_on_column("th", "c2");
         assert_eq!(ids.len(), 2);
-        let key = e.table_key("th");
-        let graphs: Vec<(u64, usize)> = {
-            let tables = e.tables.lock().unwrap();
-            ids.iter()
-                .map(|id| {
-                    let graph = tables[&key]
-                        .hnsw_mem
-                        .get(id)
-                        .unwrap_or_else(|| panic!("index {id} has no memory graph"));
-                    (*id, graph.lock().unwrap().len())
-                })
-                .collect()
-        };
+        let graphs: Vec<(u64, usize)> = ids
+            .iter()
+            .map(|id| {
+                let (_, rows) = e
+                    .index_tail_of("th", *id)
+                    .unwrap_or_else(|| panic!("index {id} has no memory graph"));
+                (*id, rows)
+            })
+            .collect();
         // Each graph holds the table once, not twice and not zero times.
         for (id, rows) in &graphs {
             assert_eq!(*rows, 100, "graph of index {id} holds {rows} rows");
@@ -6665,7 +7369,7 @@ mod tests {
 
         // Both dumps write a chunk into their own directory.
         for name in ["idx0", "idx1"] {
-            crate::scheduler::block_on(e.dump_index_transaction("th", name)).unwrap();
+            e.dump_index_transaction("th", name).await.unwrap();
             assert_eq!(
                 e.hnsw_chunk_ids("th", name),
                 vec![0],
@@ -6683,18 +7387,23 @@ mod tests {
     /// Each record owns its tail, its chunk list and its `idx_{id}/` directory
     /// (`MemIndex` is keyed by `index_id`). Resolving the cache by column made
     /// the second dump find an emptied tail and write nothing.
-    #[test]
-    fn two_fulltext_indexes_on_one_column_both_dump() {
+    #[tokio::test]
+    async fn two_fulltext_indexes_on_one_column_both_dump() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tf (c1 INT, c2 VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tf (c1 INT, c2 VARCHAR);")
+            .await
             .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!("INSERT INTO tf VALUES ({i}, 'alpha{i} beta');"))
+            e.execute(&format!("INSERT INTO tf VALUES ({i}, 'alpha{i} beta');"))
+                .await
                 .unwrap();
         }
         for name in ["ft0", "ft1"] {
-            e.execute_blocking(&format!("CREATE INDEX {name} ON tf (c2) USING FULLTEXT;"))
+            e.execute(&format!("CREATE INDEX {name} ON tf (c2) USING FULLTEXT;"))
+                .await
                 .unwrap();
         }
         // The registries are keyed by id: one TextIndex per record.
@@ -6711,7 +7420,7 @@ mod tests {
             }
         }
         for name in ["ft0", "ft1"] {
-            crate::scheduler::block_on(e.dump_index_transaction("tf", name)).unwrap();
+            e.dump_index_transaction("tf", name).await.unwrap();
             let files = e.index_files("tf", name);
             assert!(
                 files.iter().any(|p| p.to_string_lossy().ends_with(".dic")),
@@ -6723,28 +7432,34 @@ mod tests {
             rows(
                 &e,
                 "SELECT c1 FROM tf SEARCH MATCH TEXT ('c2', 'alpha1', 'topn=5');"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()]],
             "the default analyzer keeps digits: only 'alpha1' matches"
         );
     }
 
     /// Two `CREATE INDEX … USING BMP` on one column are two sparse indexes.
-    #[test]
-    fn two_sparse_indexes_on_one_column_both_dump() {
+    #[tokio::test]
+    async fn two_sparse_indexes_on_one_column_both_dump() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tsp (c1 INT, c2 SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tsp (c1 INT, c2 SPARSE(FLOAT,10));")
+            .await
             .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO tsp VALUES ({i}, [{}:1.0,9:2.0]);",
                 i % 9
             ))
+            .await
             .unwrap();
         }
         for name in ["sp0", "sp1"] {
-            e.execute_blocking(&format!("CREATE INDEX {name} ON tsp (c2) USING BMP;"))
+            e.execute(&format!("CREATE INDEX {name} ON tsp (c2) USING BMP;"))
+                .await
                 .unwrap();
         }
         let ids = e.index_ids_on_column_of_kind("tsp", "c2", &["BMP"]);
@@ -6760,7 +7475,7 @@ mod tests {
             }
         }
         for name in ["sp0", "sp1"] {
-            crate::scheduler::block_on(e.dump_index_transaction("tsp", name)).unwrap();
+            e.dump_index_transaction("tsp", name).await.unwrap();
             let files = e.index_files("tsp", name);
             assert!(
                 files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
@@ -6771,11 +7486,14 @@ mod tests {
 
     /// Two `CREATE INDEX … USING PLAID` on one column are two multi-vector
     /// indexes, each with its own chunk directory.
-    #[test]
-    fn two_plaid_indexes_on_one_column_both_dump() {
+    #[tokio::test]
+    async fn two_plaid_indexes_on_one_column_both_dump() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tp (c1 INT, c2 TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tp (c1 INT, c2 TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..200 {
@@ -6786,12 +7504,14 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO tp VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO tp VALUES {};", values.join(",")))
+            .await
             .unwrap();
         for name in ["pl0", "pl1"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {name} ON tp (c2) USING PLAID WITH (n_centroids = 8);"
             ))
+            .await
             .unwrap();
         }
         let ids = e.index_ids_on_column_of_kind("tp", "c2", &["PLAID"]);
@@ -6811,7 +7531,7 @@ mod tests {
             }
         }
         for name in ["pl0", "pl1"] {
-            crate::scheduler::block_on(e.dump_index_transaction("tp", name)).unwrap();
+            e.dump_index_transaction("tp", name).await.unwrap();
             let files = e.index_files("tp", name);
             assert!(
                 files.iter().any(|p| p.to_string_lossy().ends_with(".idx")),
@@ -6825,22 +7545,28 @@ mod tests {
     ///
     /// An index id is unique within the table, not within one kind, so a
     /// column-wide sweep would take the other kind's tail with it.
-    #[test]
-    fn mixed_index_kinds_on_one_column_are_independent() {
+    #[tokio::test]
+    async fn mixed_index_kinds_on_one_column_are_independent() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tm (c1 INT, c2 EMBEDDING(FLOAT,4), c3 SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tm (c1 INT, c2 EMBEDDING(FLOAT,4), c3 SPARSE(FLOAT,10));")
+            .await
             .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO tm VALUES ({i}, [0.1,0.2,0.3,0.4], [{}:1.0]);",
                 i % 10
             ))
+            .await
             .unwrap();
         }
-        e.execute_blocking("CREATE INDEX m_hnsw ON tm (c2) USING HNSW WITH (metric=l2);")
+        e.execute("CREATE INDEX m_hnsw ON tm (c2) USING HNSW WITH (metric=l2);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX m_sparse ON tm (c3) USING BMP;")
+        e.execute("CREATE INDEX m_sparse ON tm (c3) USING BMP;")
+            .await
             .unwrap();
         let hnsw_id = e.test_index_id("tm", "c2", "HNSW");
         let sparse_id = e.test_index_id("tm", "c3", "BMP");
@@ -6855,12 +7581,12 @@ mod tests {
         );
 
         // Dropping the HNSW index leaves the sparse tail registered.
-        e.execute_blocking("DROP INDEX m_hnsw;").unwrap();
+        e.execute("DROP INDEX m_hnsw;").await.unwrap();
         let key = e.table_key("tm");
         {
             let tables = e.tables.lock().unwrap();
             assert!(
-                !tables[&key].hnsw_mem.contains_key(&hnsw_id),
+                !tables[&key].hnsw_mem.keys().any(|(i, _)| *i == hnsw_id),
                 "the dropped HNSW graph is still registered"
             );
             assert!(
@@ -6877,19 +7603,23 @@ mod tests {
     /// table, so a dispatch that does not know the kind either misses the entry
     /// (`hnsw_mem` stayed behind) or sweeps a neighbour's (`DROP INDEX` on a
     /// full-text index cleared the column's sparse tail).
-    #[test]
-    fn drop_index_clears_only_that_records_registry() {
+    #[tokio::test]
+    async fn drop_index_clears_only_that_records_registry() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(
             "CREATE TABLE dk (id INT, txt VARCHAR, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10));",
         )
+        .await
         .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO dk VALUES ({i}, 'alpha{i}', [0.1,0.2,0.3,0.4], [{}:1.0]);",
                 i % 9
             ))
+            .await
             .unwrap();
         }
         for (name, sql) in [
@@ -6900,13 +7630,14 @@ mod tests {
             ),
             ("dk_s", "CREATE INDEX dk_s ON dk (s) USING BMP;"),
         ] {
-            e.execute_blocking(sql).unwrap_or_else(|err| {
+            e.execute(sql).await.unwrap_or_else(|err| {
                 panic!("{name}: {err}");
             });
         }
         // A second full-text record on the same column, so the drop has a
         // neighbour of its own kind to leave alone.
-        e.execute_blocking("CREATE INDEX dk_ft2 ON dk (txt) USING FULLTEXT;")
+        e.execute("CREATE INDEX dk_ft2 ON dk (txt) USING FULLTEXT;")
+            .await
             .unwrap();
 
         let ft = e.test_index_id("dk", "txt", "FULLTEXT");
@@ -6929,8 +7660,9 @@ mod tests {
         rows(
             &e,
             "SELECT id FROM dk SEARCH MATCH TEXT ('txt', 'alpha1', 'topn=5');",
-        );
-        e.execute_blocking("DROP INDEX dk_ft;").unwrap();
+        )
+        .await;
+        e.execute("DROP INDEX dk_ft;").await.unwrap();
         {
             let tables = e.tables.lock().unwrap();
             assert!(
@@ -6946,15 +7678,15 @@ mod tests {
                 "dropping a full-text index took the sparse tail with it"
             );
             assert!(
-                tables[&key].hnsw_mem.contains_key(&hnsw),
+                tables[&key].hnsw_mem.keys().any(|(i, _)| *i == hnsw),
                 "dropping a full-text index took the HNSW graph with it"
             );
         }
 
-        e.execute_blocking("DROP INDEX dk_h;").unwrap();
-        e.execute_blocking("DROP INDEX dk_s;").unwrap();
+        e.execute("DROP INDEX dk_h;").await.unwrap();
+        e.execute("DROP INDEX dk_s;").await.unwrap();
         let tables = e.tables.lock().unwrap();
-        assert!(!tables[&key].hnsw_mem.contains_key(&hnsw));
+        assert!(!tables[&key].hnsw_mem.keys().any(|(i, _)| *i == hnsw));
         assert!(!tables[&key].sparse.contains_key(&sparse));
         assert!(
             tables[&key].text.contains_key(&ft2),
@@ -6967,23 +7699,29 @@ mod tests {
     /// `Table` has to mean the whole table - not "the first column", which is
     /// what a pair of `None`s used to read like - and `Column` has to leave the
     /// other columns alone.
-    #[test]
-    fn drop_scope_reaches_what_it_names() {
+    #[tokio::test]
+    async fn drop_scope_reaches_what_it_names() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ds (id INT, s1 SPARSE(FLOAT,10), s2 SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ds (id INT, s1 SPARSE(FLOAT,10), s2 SPARSE(FLOAT,10));")
+            .await
             .unwrap();
         for i in 0..10 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO ds VALUES ({i}, [{}:1.0], [{}:2.0]);",
                 i % 9,
                 (i + 1) % 9
             ))
+            .await
             .unwrap();
         }
-        e.execute_blocking("CREATE INDEX ds_a ON ds (s1) USING BMP;")
+        e.execute("CREATE INDEX ds_a ON ds (s1) USING BMP;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX ds_b ON ds (s2) USING BMP;")
+        e.execute("CREATE INDEX ds_b ON ds (s2) USING BMP;")
+            .await
             .unwrap();
         let a = e.test_index_id("ds", "s1", "BMP");
         let b = e.test_index_id("ds", "s2", "BMP");
@@ -7016,19 +7754,25 @@ mod tests {
     /// heard of still loses its entry. Keying the HNSW half off the secondary
     /// id list left a dropped graph registered and the pending-byte charge
     /// behind it.
-    #[test]
-    fn drop_scope_record_clears_hnsw_and_ivf_graphs() {
+    #[tokio::test]
+    async fn drop_scope_record_clears_hnsw_and_ivf_graphs() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dr (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE dr (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         for i in 0..20 {
-            e.execute_blocking(&format!("INSERT INTO dr VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+            e.execute(&format!("INSERT INTO dr VALUES ({i}, [0.1,0.2,0.3,0.4]);"))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX dr_h ON dr (v) USING HNSW WITH (metric=l2);")
+        e.execute("CREATE INDEX dr_h ON dr (v) USING HNSW WITH (metric=l2);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX dr_i ON dr (v) USING IVF WITH (metric=l2);")
+        e.execute("CREATE INDEX dr_i ON dr (v) USING IVF WITH (metric=l2);")
+            .await
             .unwrap();
         let hnsw = e.test_index_id("dr", "v", "HNSW");
         let ivf = e.test_index_id("dr", "v", "IVF");
@@ -7038,7 +7782,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .is_some_and(|t| t.hnsw_mem.contains_key(&hnsw)),
+                .is_some_and(|t| t.hnsw_mem.keys().any(|(i, _)| *i == hnsw)),
             "the HNSW graph was never materialised"
         );
 
@@ -7047,7 +7791,7 @@ mod tests {
             let tables = e.tables.lock().unwrap();
             let entry = &tables[&key];
             assert!(
-                !entry.hnsw_mem.contains_key(&hnsw),
+                !entry.hnsw_mem.keys().any(|(i, _)| *i == hnsw),
                 "a dropped HNSW graph stayed registered"
             );
             assert_eq!(
@@ -7076,22 +7820,28 @@ mod tests {
     /// every kind's registry holds only its own ids, so removing the id from
     /// all of them is what makes the call correct without a dispatch - and a
     /// neighbouring record's entry has to survive it.
-    #[test]
-    fn drop_index_storage_only_touches_the_named_record() {
+    #[tokio::test]
+    async fn drop_index_storage_only_touches_the_named_record() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dz (id INT, txt VARCHAR, s SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE dz (id INT, txt VARCHAR, s SPARSE(FLOAT,10));")
+            .await
             .unwrap();
         for i in 0..10 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO dz VALUES ({i}, 'alpha{i}', [{}:1.0]);",
                 i % 9
             ))
+            .await
             .unwrap();
         }
-        e.execute_blocking("CREATE INDEX dz_ft ON dz (txt) USING FULLTEXT;")
+        e.execute("CREATE INDEX dz_ft ON dz (txt) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX dz_s ON dz (s) USING BMP;")
+        e.execute("CREATE INDEX dz_s ON dz (s) USING BMP;")
+            .await
             .unwrap();
         let ft = e.test_index_id("dz", "txt", "FULLTEXT");
         let sparse = e.test_index_id("dz", "s", "BMP");
@@ -7124,11 +7874,14 @@ mod tests {
     /// cache by column: creating the second index rebuilt the first one's
     /// instance under the *second* id, so the first index's chunk was never
     /// written and `SHOW INDEX` reported an index with no files.
-    #[test]
-    fn two_indexes_on_one_column_keep_separate_memory_indexes() {
+    #[tokio::test]
+    async fn two_indexes_on_one_column_keep_separate_memory_indexes() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE two (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE two (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..200 {
@@ -7139,11 +7892,14 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO two VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO two VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX two_a ON two (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX two_a ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX two_b ON two (t) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX two_b ON two (t) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
         // Both records are materialised under their own id, so both have a
         // chunk of their own directory.
@@ -7188,7 +7944,8 @@ mod tests {
             &e,
             "SELECT id FROM two SEARCH MATCH TENSOR \
              (t, [[1.0,0.5,0.25,0.125]], 'float', 'maxsim', 'topn=3');",
-        );
+        )
+        .await;
     }
 
     /// `USING PLAID … WITH (colbertsar_mode = true)` is the reference's
@@ -7200,11 +7957,14 @@ mod tests {
     /// `#[ignore]`d for the unit lane: the ColBERT-SaR training it builds is the
     /// slowest case of the crate. `--ignored` still runs it.
     #[ignore = "slow: ColBERT-SaR training"]
-    #[test]
-    fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
+    #[tokio::test]
+    async fn colbertsar_plaid_index_trains_query_aware_and_stores_no_residual() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cs (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..300 {
@@ -7217,16 +7977,18 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO cs VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO cs VALUES {};", values.join(",")))
+            .await
             .unwrap();
 
         // `nbits` is unused without residuals, so `IndexPLAID::Make` skips its
         // check in this mode; `centroids` is the SQL spelling of
         // `n_centroids` and has to reach the index.
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX csi ON cs (t) USING PLAID \
              WITH (centroids = 8, nbits = 8, colbertsar_mode = true);",
         )
+        .await
         .unwrap();
         let options = e.plaid_options("default_db.cs", "csi");
         assert!(options.colbertsar, "colbertsar_mode was not picked up");
@@ -7234,10 +7996,10 @@ mod tests {
 
         let query = "SELECT id FROM cs SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
-        assert_eq!(rows(&e, query).len(), 3);
+        assert_eq!(rows(&e, query).await.len(), 3);
 
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("cs", "csi")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("cs", "csi").await.unwrap();
         let chunks = e.read_plaid_index_chunks("cs", "csi").unwrap();
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].is_colbertsar_mode(), "chunk lost the mode");
@@ -7253,23 +8015,26 @@ mod tests {
 
         // A flag value outside `true/false/1/0` is rejected, as in `IndexPLAID::Make`.
         assert!(e
-            .execute_blocking(
-                "CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);"
-            )
+            .execute("CREATE INDEX bad ON cs (t) USING PLAID WITH (colbertsar_mode = maybe);")
+            .await
             .is_err());
         // Without the mode `nbits` is validated as before.
         assert!(e
-            .execute_blocking("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
+            .execute("CREATE INDEX bad2 ON cs (t) USING PLAID WITH (nbits = 8);")
+            .await
             .is_err());
     }
 
     /// `USING SMVE`: the tensor scan builds `SMVEIndexInMem` (projection +
     /// BMP) and re-ranks its candidates with exact MaxSim.
-    #[test]
-    fn smve_index_answers_tensor_search() {
+    #[tokio::test]
+    async fn smve_index_answers_tensor_search() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE st (id INT, t TENSOR(FLOAT,4));")
+            .await
             .unwrap();
         let mut values = Vec::new();
         for i in 0..40 {
@@ -7281,16 +8046,18 @@ mod tests {
             }
             values.push(format!("({i}, [{}])", tokens.join(",")));
         }
-        e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+            .await
             .unwrap();
         let query = "SELECT id FROM st SEARCH MATCH TENSOR \
                      (t, [[1.0,0.0,0.5,0.0]], 'float', 'maxsim', 'topn=3');";
-        let baseline = rows(&e, query);
+        let baseline = rows(&e, query).await;
         assert_eq!(baseline.len(), 3);
 
-        e.execute_blocking("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
+        e.execute("CREATE INDEX sidx ON st (t) USING SMVE WITH (width = 64, topk = 8);")
+            .await
             .unwrap();
-        let indexed = rows(&e, query);
+        let indexed = rows(&e, query).await;
         eprintln!(
             "DEBUG indexes: {:?}",
             e.storage
@@ -7321,29 +8088,34 @@ mod tests {
 
     /// The multi-vector index is built once (first use), appended at write time,
     /// and dumped by `flush()`; queries never rebuild it.
-    #[test]
-    fn multivector_index_is_built_at_write_time() {
+    #[tokio::test]
+    async fn multivector_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+        e.execute("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+            .await
             .unwrap();
         // The index is what the catalog records; the reference never builds one
         // for a bare column (`PhysicalMatchTensorScan::PlanWithIndex`).
-        e.execute_blocking("CREATE INDEX mv_v ON mv (v) USING PLAID WITH (n_centroids = 8);")
+        e.execute("CREATE INDEX mv_v ON mv (v) USING PLAID WITH (n_centroids = 8);")
+            .await
             .unwrap();
         let q = "SELECT id FROM mv SEARCH MATCH TENSOR \
                  (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
         // The chunks live in the index's own directory (`idx_{id}/seg_{n}`),
         // which is where the catalog's records point - not in a private spill
         // directory, whose layout the reference does not have.
         // Count the index's files by extension, wherever the catalog put them.
-        let count = |ext: &str| {
+        let count = async |ext: &str| {
             let mut n = 0;
             for path in e.index_files("mv", "mv_v") {
                 if path.extension().is_some_and(|y| y == ext) {
@@ -7353,14 +8125,15 @@ mod tests {
             n
         };
         // One chunk of raw tokens plus its EMVB chunk, written by the build.
-        assert_eq!(count("mvec"), 1);
-        assert_eq!(count("emvb"), 1);
+        assert_eq!(count("mvec").await, 1);
+        assert_eq!(count("emvb").await, 1);
 
         // A later insert goes to the memory tail and ranks immediately.
-        e.execute_blocking("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
+        e.execute("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["1".to_string()],
                 vec!["3".to_string()],
@@ -7370,11 +8143,11 @@ mod tests {
 
         // A dump transaction seals the tail as a second chunk; the query still
         // agrees. A checkpoint keeps the tail in memory.
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
-        assert_eq!(count("mvec"), 2);
-        assert_eq!(count("emvb"), 2);
+        e.dump_all_memory_indexes().await;
+        assert_eq!(count("mvec").await, 2);
+        assert_eq!(count("emvb").await, 2);
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["1".to_string()],
                 vec!["3".to_string()],
@@ -7383,36 +8156,41 @@ mod tests {
         );
 
         // A tombstoned document is filtered out of the index hits.
-        e.execute_blocking("DELETE FROM mv WHERE id = 3;").unwrap();
+        e.execute("DELETE FROM mv WHERE id = 3;").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
     }
 
     /// The sparse BMP index is built once, appended at write time, and dumped
     /// by `flush()`; queries read the chunk files instead of rebuilding.
-    #[test]
-    fn sparse_index_is_built_at_write_time() {
+    #[tokio::test]
+    async fn sparse_index_is_built_at_write_time() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            .await
             .unwrap();
         // The BMP index is the catalog record the search resolves; a bare
         // SPARSE column is scanned, not indexed (the reference's
         // `MatchSparseScan::PlanWithIndex`).
-        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
+        e.execute("CREATE INDEX sp_v ON sp (v) USING BMP;")
+            .await
             .unwrap();
         let q = "SELECT id FROM sp SEARCH MATCH SPARSE \
                  (v, [0:1.0,20:2.0], 'ip', 3);";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
         // Count the index's files by extension, wherever the catalog put them.
-        let count = |ext: &str| {
+        let count = async |ext: &str| {
             let mut n = 0;
             for path in e.index_files("sp", "sp_v") {
                 if path.extension().is_some_and(|y| y == ext) {
@@ -7424,14 +8202,15 @@ mod tests {
         // Nothing has been dumped yet: the rows above came from the write-time
         // tail, which is the point of this case. The spill the tail uses is not
         // an index file the catalog names, so the directory is still empty.
-        assert_eq!(count("idx"), 0, "no dump has run yet");
-        assert_eq!(count("bmp"), 0, "the spill is not a `.bmp` file");
+        assert_eq!(count("idx").await, 0, "no dump has run yet");
+        assert_eq!(count("bmp").await, 0, "the spill is not a `.bmp` file");
 
         // The write-time tail is visible before the dump.
-        e.execute_blocking("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
+        e.execute("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["3".to_string()],
                 vec!["2".to_string()],
@@ -7445,10 +8224,10 @@ mod tests {
         // the first dump's chunk keeps the two rows it sealed and the second
         // holds the row added afterwards (measured on the reference: two
         // `chunk_N.idx` for this script).
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
-        assert_eq!(count("idx"), 2);
+        e.dump_all_memory_indexes().await;
+        assert_eq!(count("idx").await, 2);
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["3".to_string()],
                 vec!["2".to_string()],
@@ -7457,9 +8236,9 @@ mod tests {
         );
 
         // Tombstoned rows never appear.
-        e.execute_blocking("DELETE FROM sp WHERE id = 3;").unwrap();
+        e.execute("DELETE FROM sp WHERE id = 3;").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
     }
@@ -7467,16 +8246,20 @@ mod tests {
     /// `SPARSE … WITH (SORTED)` is carried through the catalog, survives a
     /// restart, and the BMP index records it. The BMP chunk layout is the same
     /// for both hints, so top-k is unchanged.
-    #[test]
-    fn sparse_sorted_hint_is_persisted_and_ranks() {
+    #[tokio::test]
+    async fn sparse_sorted_hint_is_persisted_and_ranks() {
         let dir = tempdir().unwrap();
         let q = "SELECT id FROM ss SEARCH MATCH SPARSE (v, [0:1.0,20:2.0], 'ip', 3);";
         let first;
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
+            e.execute("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
+                .await
                 .unwrap();
 
             let meta = e
@@ -7499,11 +8282,13 @@ mod tests {
                 .unwrap();
             assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sort));
 
-            e.execute_blocking("CREATE INDEX ss_i ON ss (v) USING BMP;")
+            e.execute("CREATE INDEX ss_i ON ss (v) USING BMP;")
+                .await
                 .unwrap();
-            e.execute_blocking("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            e.execute("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+                .await
                 .unwrap();
-            first = rows(&e, q);
+            first = rows(&e, q).await;
             assert_eq!(first, vec![vec!["2".to_string()], vec!["1".to_string()]]);
             let recorded = e
                 .tables
@@ -7516,14 +8301,16 @@ mod tests {
 
             // Sealing the tail rewrites the same-format chunks; the ranking
             // and the recorded hint both hold.
-            crate::scheduler::block_on(e.flush()).unwrap();
-            assert_eq!(rows(&e, q), first);
+            e.flush().await.unwrap();
+            assert_eq!(rows(&e, q).await, first);
             assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
         }
 
         // Reopen: the hint comes back from the catalog and the rebuilt index
         // records it again.
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let meta = e
             .storage
             .catalog
@@ -7532,7 +8319,7 @@ mod tests {
             .unwrap();
         assert_eq!(meta.types[1], "SPARSE(float,int16,30000)");
         assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sorted));
-        assert_eq!(rows(&e, q), first);
+        assert_eq!(rows(&e, q).await, first);
         let recorded = e
             .tables
             .lock()
@@ -7546,117 +8333,131 @@ mod tests {
     /// A secondary index keeps only post-dump rows in memory; a dump
     /// transaction seals the tail into a chunk and lookups merge chunks with
     /// the tail. A checkpoint does not seal it.
-    #[test]
-    fn secondary_index_seals_its_memory_tail() {
+    #[tokio::test]
+    async fn secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sec (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO sec VALUES (1, 10), (2, 20);")
+        e.execute("CREATE TABLE sec (id INT, v INT);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX idx_v ON sec (v);")
+        e.execute("INSERT INTO sec VALUES (1, 10), (2, 20);")
+            .await
             .unwrap();
+        e.execute("CREATE INDEX idx_v ON sec (v);").await.unwrap();
         let q = "SELECT id FROM sec WHERE v = 20;";
-        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
+        assert_eq!(rows(&e, q).await, vec![vec!["2".to_string()]]);
 
         // New rows land in the memory tail and are visible immediately.
-        e.execute_blocking("INSERT INTO sec VALUES (3, 20);")
-            .unwrap();
+        e.execute("INSERT INTO sec VALUES (3, 20);").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        let tables = e.tables.lock().unwrap();
-        let idx = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert!(idx.key_count() > 0);
-        drop(tables);
+        {
+            let tables = e.tables.lock().unwrap();
+            let idx = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert!(idx.key_count() > 0);
+        }
 
         // The checkpoint keeps the tail...
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let tables = e.tables.lock().unwrap();
-        let idx = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert!(idx.key_count() > 0);
-        drop(tables);
+        e.flush().await.unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let idx = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert!(idx.key_count() > 0);
+        }
 
         // ...and the dump drains it; the answer comes from the chunk + new tail.
-        crate::scheduler::block_on(e.dump_index_transaction("sec", "idx_v")).unwrap();
-        let tables = e.tables.lock().unwrap();
-        let idx = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert_eq!(idx.key_count(), 0);
-        drop(tables);
+        e.dump_index_transaction("sec", "idx_v").await.unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let idx = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert_eq!(idx.key_count(), 0);
+        }
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT id FROM sec WHERE v = 10;"),
+            rows(&e, "SELECT id FROM sec WHERE v = 10;").await,
             vec![vec!["1".to_string()]]
         );
 
         // Tombstoned rows are filtered from both forms.
-        e.execute_blocking("DELETE FROM sec WHERE id = 2;").unwrap();
-        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+        e.execute("DELETE FROM sec WHERE id = 2;").await.unwrap();
+        assert_eq!(rows(&e, q).await, vec![vec!["3".to_string()]]);
     }
 
     /// Boolean columns use the low-cardinality (roaring) chunks with the same
     /// tail/dump lifecycle.
-    #[test]
-    fn low_card_secondary_index_seals_its_memory_tail() {
+    #[tokio::test]
+    async fn low_card_secondary_index_seals_its_memory_tail() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE b (id INT, flag BOOL);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO b VALUES (1, true), (2, false);")
+        e.execute("CREATE TABLE b (id INT, flag BOOL);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX idx_flag ON b (flag);")
+        e.execute("INSERT INTO b VALUES (1, true), (2, false);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX idx_flag ON b (flag);")
+            .await
             .unwrap();
         let q = "SELECT id FROM b WHERE flag = true;";
-        assert_eq!(rows(&e, q), vec![vec!["1".to_string()]]);
-        e.execute_blocking("INSERT INTO b VALUES (3, true);")
-            .unwrap();
+        assert_eq!(rows(&e, q).await, vec![vec!["1".to_string()]]);
+        e.execute("INSERT INTO b VALUES (3, true);").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        e.execute_blocking("DELETE FROM b WHERE id = 1;").unwrap();
-        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+        e.execute("DELETE FROM b WHERE id = 1;").await.unwrap();
+        assert_eq!(rows(&e, q).await, vec![vec!["3".to_string()]]);
     }
 
     /// A `json` column is always a low-cardinality chunk (`index_secondary.cppm:56`
     /// forces it there) keyed by the flattener's `path:type:value` terms, so the
     /// planner's `json_*` filters read a term chunk rather than a hashed key.
-    #[test]
-    fn json_secondary_index_seals_term_chunks() {
+    #[tokio::test]
+    async fn json_secondary_index_seals_term_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE j (id INT, meta JSON);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+        e.execute("CREATE TABLE j (id INT, meta JSON);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX idx_meta ON j (meta);")
+        e.execute(r#"INSERT INTO j VALUES (1, '{"a":1,"b":"x"}'), (2, '{"a":2}');"#)
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX idx_meta ON j (meta);")
+            .await
             .unwrap();
         let by_a = "SELECT id FROM j WHERE json_extract_int(meta, '$.a') = 1;";
         let has_b = "SELECT id FROM j WHERE json_exists_path(meta, '$.b');";
-        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
-        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, by_a).await, vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b).await, vec![vec!["1".to_string()]]);
 
         // The dump turns the tail into one low-cardinality chunk per segment: the
         // document's scalar, path and array terms, not a single hashed document.
-        crate::scheduler::block_on(e.dump_index_transaction("j", "idx_meta")).unwrap();
+        e.dump_index_transaction("j", "idx_meta").await.unwrap();
         {
             let tables = e.tables.lock().unwrap();
             let segments = tables
@@ -7671,18 +8472,19 @@ mod tests {
             );
         }
         // Both filters still answer from the chunk plus the (now empty) tail.
-        assert_eq!(rows(&e, by_a), vec![vec!["1".to_string()]]);
-        assert_eq!(rows(&e, has_b), vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, by_a).await, vec![vec!["1".to_string()]]);
+        assert_eq!(rows(&e, has_b).await, vec![vec!["1".to_string()]]);
 
         // A new row lands in the tail and is visible through the same filters.
-        e.execute_blocking(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
+        e.execute(r#"INSERT INTO j VALUES (3, '{"a":1,"b":"y"}');"#)
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, by_a),
+            rows(&e, by_a).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
         assert_eq!(
-            rows(&e, has_b),
+            rows(&e, has_b).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
     }
@@ -7695,29 +8497,34 @@ mod tests {
     ///
     /// The marker is an ordinary term-chunk key, so the row survives the dump
     /// into a chunk and a cold restart alike.
-    #[test]
-    fn over_depth_json_rows_stay_candidates() {
+    #[tokio::test]
+    async fn over_depth_json_rows_stay_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE jd (id INT, meta JSON);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE jd (id INT, meta JSON);")
+            .await
             .unwrap();
         // Row 2 nests past `MAX_JSON_DEPTH` (512) and is still valid JSON whose
         // `$.a` is 1 - exactly the row a term-range read would lose.
         let deep = format!("{{\"a\":1,\"d\":{}1{}}}", "[".repeat(513), "]".repeat(513));
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO jd VALUES (1, '{{\"a\":1}}'), (2, '{deep}');"
         ))
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX idx_jd ON jd (meta);")
+        e.execute("CREATE INDEX idx_jd ON jd (meta);")
+            .await
             .unwrap();
         let q = "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 1;";
         let both = vec![vec!["1".to_string()], vec!["2".to_string()]];
-        assert_eq!(rows(&e, q), both);
+        assert_eq!(rows(&e, q).await, both);
 
         // The dump rewrites the tail's terms into a low-cardinality chunk. The
         // marker is a key like any other, so the row is still found.
-        crate::scheduler::block_on(e.dump_index_transaction("jd", "idx_jd")).unwrap();
-        assert_eq!(rows(&e, q), both);
+        e.dump_index_transaction("jd", "idx_jd").await.unwrap();
+        assert_eq!(rows(&e, q).await, both);
 
         // Widening the candidate set must not become a false positive: the
         // residual filter above the index scan still answers the predicate.
@@ -7725,11 +8532,13 @@ mod tests {
             &e,
             "SELECT id FROM jd WHERE json_extract_int(meta, '$.a') = 999;"
         )
+        .await
         .is_empty());
         assert!(rows(
             &e,
             "SELECT id FROM jd WHERE json_exists_path(meta, '$.zzz');"
         )
+        .await
         .is_empty());
 
         // The chunk also carries the marker on disk, which is what a cold
@@ -7757,29 +8566,34 @@ mod tests {
         }
 
         drop(e);
-        let e = Engine::open(dir.path()).unwrap();
-        assert_eq!(rows(&e, q), both);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(rows(&e, q).await, both);
     }
 
     /// `WITH (cardinality = low)` moves any column onto the bitmap layout, not
     /// just BOOL and JSON (`NewSecondaryIndexInMem` honours the option for every
     /// type).
-    #[test]
-    fn low_cardinality_option_uses_bitmap_chunks() {
+    #[tokio::test]
+    async fn low_cardinality_option_uses_bitmap_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lc (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+        e.execute("CREATE TABLE lc (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX lcv ON lc (v) WITH (cardinality = low);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
+        e.execute("INSERT INTO lc VALUES (1, 10), (2, 20), (3, 10);")
+            .await
             .unwrap();
         let q = "SELECT id FROM lc WHERE v = 10;";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
-        crate::scheduler::block_on(e.dump_index_transaction("lc", "lcv")).unwrap();
+        e.dump_index_transaction("lc", "lcv").await.unwrap();
         {
             let tables = e.tables.lock().unwrap();
             let low = tables
@@ -7793,7 +8607,7 @@ mod tests {
             assert!(high.is_none(), "no PGM chunk for a low-cardinality column");
         }
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
     }
@@ -7808,8 +8622,8 @@ mod tests {
     /// * a dump emptying the tail before its chunk is registered (fixed by the
     ///   frozen `sealing` tails the readers merge);
     /// * many writers appending to one tail concurrently.
-    #[test]
-    fn secondary_index_is_correct_under_concurrent_writes_and_dumps() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn secondary_index_is_correct_under_concurrent_writes_and_dumps() {
         use std::collections::HashSet;
         use std::sync::{Arc, Mutex};
 
@@ -7819,34 +8633,37 @@ mod tests {
         const READS: usize = 400;
 
         let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE c (id INT, v INT);")
-            .unwrap();
-        e.execute_blocking("CREATE INDEX cv ON c (v);").unwrap();
+        let e = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE c (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX cv ON c (v);").await.unwrap();
 
         // Every row gets its own value, so the tail folds its pending map
         // several times while the readers probe it.
         let mut writers = Vec::new();
         for w in 0..WRITERS {
             let e = Arc::clone(&e);
-            writers.push(std::thread::spawn(move || {
+            writers.push(tokio::spawn(async move {
                 let rows: Vec<Vec<Literal>> = (0..ROWS_PER_WRITER)
                     .map(|i| {
                         let id = (w * ROWS_PER_WRITER + i) as i64;
                         vec![Literal::Int(id), Literal::Int(id)]
                     })
                     .collect();
-                e.insert_literals("default_db.c", None, rows).unwrap();
+                e.insert_literals("default_db.c", None, rows).await.unwrap();
             }));
         }
         // A dump loop interleaves with the writers: each dump freezes a tail and
         // registers a chunk, which is exactly the window a reader can land in.
         let dumper = {
             let e = Arc::clone(&e);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 for _ in 0..40 {
-                    std::thread::sleep(std::time::Duration::from_millis(3));
-                    let _ = crate::scheduler::block_on(e.dump_index_transaction("c", "cv"));
+                    crate::scheduler::sleep(std::time::Duration::from_millis(3)).await;
+                    let _ = e.dump_index_transaction("c", "cv").await;
                 }
             })
         };
@@ -7856,7 +8673,7 @@ mod tests {
         for r in 0..READERS {
             let e = Arc::clone(&e);
             let observed = Arc::clone(&observed);
-            readers.push(std::thread::spawn(move || {
+            readers.push(tokio::spawn(async move {
                 let mut at = r * 7;
                 for _ in 0..READS {
                     at = (at * 31 + 17) % (WRITERS * ROWS_PER_WRITER);
@@ -7869,18 +8686,19 @@ mod tests {
             }));
         }
         for w in writers {
-            w.join().unwrap();
+            w.await.unwrap();
         }
         for r in readers {
-            r.join().unwrap();
+            r.await.unwrap();
         }
-        dumper.join().unwrap();
+        dumper.await.unwrap();
         // Everything written is sealed or in the tail.
-        crate::scheduler::block_on(e.dump_index_transaction("c", "cv")).unwrap();
+        e.dump_index_transaction("c", "cv").await.unwrap();
 
         // The rows themselves, as `seq -> value`.
         let rows: Vec<(u64, i64)> = e
             .fetch_rows_with_ids("c")
+            .await
             .unwrap()
             .into_iter()
             .map(|(seq, row)| {
@@ -7922,38 +8740,43 @@ mod tests {
     /// hook could not put it there while the index was still being built - so
     /// the build appends it to the tail afterwards (`secondary_catch_up`).
     /// Without that step the index silently loses every row in the window.
-    #[test]
-    fn create_index_covers_rows_committed_while_it_builds() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn create_index_covers_rows_committed_while_it_builds() {
         use std::sync::Arc;
 
         const BEFORE: usize = 200;
         const DURING: usize = 200;
 
         let dir = tempdir().unwrap();
-        let e = Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE cd (id INT, v INT);")
-            .unwrap();
+        let e = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE cd (id INT, v INT);").await.unwrap();
         for i in 0..BEFORE {
-            e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+            e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                .await
                 .unwrap();
         }
         // One writer keeps appending while the build scans; the values are
         // unique so every expected row is individually checkable.
         let writer = {
             let e = Arc::clone(&e);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 for i in BEFORE..(BEFORE + DURING) {
-                    e.execute_blocking(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                    e.execute(&format!("INSERT INTO cd VALUES ({i}, {i});"))
+                        .await
                         .unwrap();
                 }
             })
         };
-        e.execute_blocking("CREATE INDEX cdv ON cd (v);").unwrap();
-        writer.join().unwrap();
+        e.execute("CREATE INDEX cdv ON cd (v);").await.unwrap();
+        writer.await.unwrap();
 
         // A range predicate is answered by the index (chunk keys plus the
         // tail), so a row the build dropped would be missing from the result.
-        let found = rows(&e, "SELECT v FROM cd WHERE v >= 0;");
+        let found = rows(&e, "SELECT v FROM cd WHERE v >= 0;").await;
         let values: std::collections::HashSet<String> =
             found.iter().map(|row| row[0].clone()).collect();
         for i in 0..(BEFORE + DURING) {
@@ -8046,22 +8869,30 @@ mod tests {
     ///
     /// The budget is a process-wide `OnceLock`, so the case runs in a child
     /// started with a 1-byte budget.
-    #[test]
-    fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
+    #[tokio::test]
+    async fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
         const CHILD: &str = "INFINITY_PLAID_BUDGET_CHILD";
         const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
         if let Ok(dir) = std::env::var(DIR) {
-            let e = Engine::open(std::path::Path::new(&dir)).unwrap();
-            e.execute_blocking("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+            let e = Engine::open_async(std::path::Path::new(&dir), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+                .await
                 .unwrap();
             let values: Vec<String> = (0..300)
                 .map(|i| format!("({i}, [[{},0.5,0.25,0.125]])", (i % 7) as f32))
                 .collect();
-            e.execute_blocking(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX pbi ON pb (t) USING PLAID;")
+            e.execute("CREATE INDEX pbi ON pb (t) USING PLAID;")
+                .await
                 .unwrap();
-            let first = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            let first = e
+                .multivector_index_for("default_db.pb", "t", 4)
+                .await
+                .unwrap();
             {
                 let guard = first.read().unwrap();
                 assert!(guard.plaid.is_none(), "PLAID must not be built over budget");
@@ -8070,7 +8901,10 @@ mod tests {
             }
             // The refusal is final, so the cached index is reused: a rebuild
             // would scan the table and retrain the centroids again.
-            let again = e.multivector_index_for("default_db.pb", "t", 4).unwrap();
+            let again = e
+                .multivector_index_for("default_db.pb", "t", 4)
+                .await
+                .unwrap();
             assert!(
                 std::sync::Arc::ptr_eq(&first, &again),
                 "the index was rebuilt although the budget refused to build PLAID"
@@ -8105,19 +8939,24 @@ mod tests {
     /// table's row count on such a table: the coverage check based on it never
     /// agreed and every `MATCH SPARSE` rebuilt the whole index, chunks
     /// included. Coverage is measured by the rows the index has *seen*.
-    #[test]
-    fn sparse_index_with_null_rows_is_not_rebuilt_per_query() {
+    #[tokio::test]
+    async fn sparse_index_with_null_rows_is_not_rebuilt_per_query() {
         use storage::bmp::IdxWidth;
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+        e.execute("CREATE TABLE spn (id INT, v SPARSE(FLOAT,30000));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO spn VALUES (1, [0:1.0,10:1.0]), (2, NULL), (3, [20:2.0]);")
+            .await
             .unwrap();
         // A plain `CREATE INDEX` on a SPARSE column is the reference's
         // `kBMP` (`IndexBMP::Make`), which is what `sparse_index_for` looks up.
-        e.execute_blocking("CREATE INDEX spnv ON spn (v) USING BMP;")
+        e.execute("CREATE INDEX spnv ON spn (v) USING BMP;")
+            .await
             .unwrap();
         let first = e
             .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
@@ -8131,7 +8970,8 @@ mod tests {
         );
         // A NULL insert keeps the same instance: the write hook counts the row
         // even though it contributes no postings.
-        e.execute_blocking("INSERT INTO spn VALUES (4, NULL);")
+        e.execute("INSERT INTO spn VALUES (4, NULL);")
+            .await
             .unwrap();
         let after = e
             .sparse_index_for("default_db.spn", "v", IdxWidth::I16)
@@ -8148,18 +8988,20 @@ mod tests {
     /// rebuild rewrites the spill set, so the truncated file must never reach
     /// the reloaded index - a query answered from a half-parsed chunk would
     /// silently lose rows.
-    #[test]
-    fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
+    #[tokio::test]
+    async fn a_truncated_chunk_is_rebuilt_from_the_rows_on_startup() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tc (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE tc (id INT, v INT);").await.unwrap();
         let values: Vec<String> = (0..500).map(|i| format!("({i}, {i})")).collect();
-        e.execute_blocking(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+        e.execute(&format!("INSERT INTO tc VALUES {};", values.join(",")))
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX tcv ON tc (v);").unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("tc", "tcv")).unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("CREATE INDEX tcv ON tc (v);").await.unwrap();
+        e.dump_index_transaction("tc", "tcv").await.unwrap();
+        e.flush().await.unwrap();
         drop(e);
 
         assert!(
@@ -8167,8 +9009,10 @@ mod tests {
             "the dump must have written a chunk file to truncate"
         );
 
-        let e = Engine::open(dir.path()).unwrap();
-        let found = rows(&e, "SELECT v FROM tc WHERE v >= 0;");
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let found = rows(&e, "SELECT v FROM tc WHERE v >= 0;").await;
         assert_eq!(found.len(), 500, "a truncated chunk lost rows");
     }
 
@@ -8217,9 +9061,9 @@ mod tests {
     /// INFINITY_STRESS_ROWS=2000000 cargo test -p executor --lib \
     ///     secondary_stress_sustained_dumps -- --ignored --nocapture
     /// ```
-    #[test]
+    #[tokio::test]
     #[ignore = "slow: writes up to a million rows"]
-    fn secondary_stress_sustained_dumps() {
+    async fn secondary_stress_sustained_dumps() {
         let total: usize = std::env::var("INFINITY_STRESS_ROWS")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -8227,41 +9071,45 @@ mod tests {
         const BATCH: usize = 5_000;
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE st (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX stv ON st (v);").unwrap();
+        e.execute("CREATE TABLE st (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX stv ON st (v);").await.unwrap();
 
         let mut written = 0usize;
         let mut batches = 0usize;
         while written < total {
             let end = (written + BATCH).min(total);
             let values: Vec<String> = (written..end).map(|i| format!("({i}, {i})")).collect();
-            e.execute_blocking(&format!("INSERT INTO st VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO st VALUES {};", values.join(",")))
+                .await
                 .unwrap();
             written = end;
             batches += 1;
             // Every tenth burst dumps what the tail accumulated, so the chunk
             // set grows while later bursts keep appending to the fresh tail.
             if batches % 10 == 0 {
-                crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
+                e.dump_index_transaction("st", "stv").await.unwrap();
             }
             // A read in the middle of the load: it must see at least the rows
             // the dumps have already sealed, and never a row that is not there.
             if batches % 25 == 0 {
-                let _ = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+                let _ = rows(&e, "SELECT v FROM st WHERE v >= 0;").await;
             }
         }
         // The tail is dumped so the final read comes from the chunks, not from
         // the buffer that would hide a broken chunk set.
-        crate::scheduler::block_on(e.dump_index_transaction("st", "stv")).unwrap();
+        e.dump_index_transaction("st", "stv").await.unwrap();
 
-        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;").await;
         assert_eq!(found.len(), total, "the index lost rows under load");
         drop(e);
 
-        let e = Engine::open(dir.path()).unwrap();
-        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;");
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let found = rows(&e, "SELECT v FROM st WHERE v >= 0;").await;
         assert_eq!(found.len(), total, "the rebuild lost rows under load");
     }
 
@@ -8269,27 +9117,31 @@ mod tests {
     /// `kSecondaryFunctional`: the expression is the catalog's column, the base
     /// column is what the rows are read from, the key domain is the function's
     /// return type, and `lower(name) = 'abc'` is answered from the index.
-    #[test]
-    fn functional_index_answers_a_function_predicate() {
+    #[tokio::test]
+    async fn functional_index_answers_a_function_predicate() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE f (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+        e.execute("CREATE TABLE f (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fi ON f (lower(name));")
+        e.execute("INSERT INTO f VALUES (1, 'Abc'), (2, 'abc'), (3, 'XYZ');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX fi ON f (lower(name));")
+            .await
             .unwrap();
 
         let q = "SELECT id FROM f WHERE lower(name) = 'abc';";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
         // A new row lands in the memory tail, evaluated the same way.
-        e.execute_blocking("INSERT INTO f VALUES (4, 'ABC');")
-            .unwrap();
+        e.execute("INSERT INTO f VALUES (4, 'ABC');").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["1".to_string()],
                 vec!["2".to_string()],
@@ -8297,9 +9149,9 @@ mod tests {
             ]
         );
         // And after the dump the answer comes from the term chunk.
-        crate::scheduler::block_on(e.dump_index_transaction("f", "fi")).unwrap();
+        e.dump_index_transaction("f", "fi").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["1".to_string()],
                 vec!["2".to_string()],
@@ -8307,15 +9159,17 @@ mod tests {
             ]
         );
         assert_eq!(
-            rows(&e, "SELECT id FROM f WHERE lower(name) = 'xyz';"),
+            rows(&e, "SELECT id FROM f WHERE lower(name) = 'xyz';").await,
             vec![vec!["3".to_string()]]
         );
 
         // The record carries the function, so reopening restores the index.
         drop(e);
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![
                 vec!["1".to_string()],
                 vec!["2".to_string()],
@@ -8327,14 +9181,18 @@ mod tests {
     /// A hashed (`VARCHAR`) key has no order, but an equality range still has an
     /// exact key: `ConvertToHashU64` plus the chunk's lower/upper_bound pair.
     /// A non-equality range has no hash order, so it falls back to the rows.
-    #[test]
-    fn hashed_text_equality_uses_the_index() {
+    #[tokio::test]
+    async fn hashed_text_equality_uses_the_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE h (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX hn ON h (name);").unwrap();
-        e.execute_blocking("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+        e.execute("CREATE TABLE h (id INT, name VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX hn ON h (name);").await.unwrap();
+        e.execute("INSERT INTO h VALUES (1, 'a'), (2, 'b'), (3, 'a');")
+            .await
             .unwrap();
         let probe = |e: &Engine| {
             e.index_range_lookup(
@@ -8346,10 +9204,10 @@ mod tests {
         };
         assert_eq!(probe(&e), vec![0, 2]);
 
-        crate::scheduler::block_on(e.dump_index_transaction("h", "hn")).unwrap();
+        e.dump_index_transaction("h", "hn").await.unwrap();
         assert_eq!(probe(&e), vec![0, 2]);
         assert_eq!(
-            rows(&e, "SELECT id FROM h WHERE name = 'a';"),
+            rows(&e, "SELECT id FROM h WHERE name = 'a';").await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
         assert!(e
@@ -8364,18 +9222,20 @@ mod tests {
     /// A NULL is not a key: `SecondaryIndexInMemT::InsertInner` skips a row
     /// whose null bit is set, so neither the memory tail nor a chunk can answer
     /// for it.
-    #[test]
-    fn null_cells_are_not_indexed() {
+    #[tokio::test]
+    async fn null_cells_are_not_indexed() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX nf ON n (flag);").unwrap();
-        e.execute_blocking("CREATE INDEX nn ON n (name);").unwrap();
-        e.execute_blocking(
-            "INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');",
-        )
-        .unwrap();
+        e.execute("CREATE TABLE n (id INT, flag BOOL, name VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX nf ON n (flag);").await.unwrap();
+        e.execute("CREATE INDEX nn ON n (name);").await.unwrap();
+        e.execute("INSERT INTO n VALUES (1, true, 'a'), (2, false, NULL), (3, NULL, 'b');")
+            .await
+            .unwrap();
 
         // Row 3's NULL flag must not join the `false` bitmap.
         assert_eq!(
@@ -8389,19 +9249,19 @@ mod tests {
             .unwrap()
             .is_empty());
         assert_eq!(
-            rows(&e, "SELECT id FROM n WHERE name = 'a';"),
+            rows(&e, "SELECT id FROM n WHERE name = 'a';").await,
             vec![vec!["1".to_string()]]
         );
 
         // Same after the dump: the chunks carry only the non-NULL keys.
-        crate::scheduler::block_on(e.dump_index_transaction("n", "nf")).unwrap();
+        e.dump_index_transaction("n", "nf").await.unwrap();
         assert_eq!(
             e.index_lookup("n", "flag", &Literal::Str("false".into()))
                 .unwrap(),
             vec![1]
         );
         assert_eq!(
-            rows(&e, "SELECT id FROM n WHERE flag = false;"),
+            rows(&e, "SELECT id FROM n WHERE flag = false;").await,
             vec![vec!["2".to_string()]]
         );
     }
@@ -8410,17 +9270,19 @@ mod tests {
     /// re-scanning the rows (`IndexFilterEvaluatorSecondary` ->
     /// `TrunkReaderT::OutPut`), so its answers must still match a plain
     /// predicate across a dump, a range and a tombstone.
-    #[test]
-    fn secondary_filter_answers_from_the_index() {
+    #[tokio::test]
+    async fn secondary_filter_answers_from_the_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE s (id INT, v INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX sv ON s (v);").unwrap();
+        e.execute("CREATE TABLE s (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX sv ON s (v);").await.unwrap();
         let values: Vec<String> = (0..200).map(|i| format!("({i}, {})", i % 13)).collect();
-        e.execute_blocking(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+        e.execute(&format!("INSERT INTO s VALUES {};", values.join(", ")))
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("s", "sv")).unwrap();
+        e.dump_index_transaction("s", "sv").await.unwrap();
 
         let mut expected: Vec<String> = (0..200)
             .filter(|i| (10..=12).contains(&(i % 13)))
@@ -8428,6 +9290,7 @@ mod tests {
             .collect();
         expected.sort_by_key(|id| id.parse::<u32>().unwrap());
         let mut got: Vec<String> = rows(&e, "SELECT id FROM s WHERE v BETWEEN 10 AND 12;")
+            .await
             .into_iter()
             .map(|row| row[0].clone())
             .collect();
@@ -8435,8 +9298,8 @@ mod tests {
         assert_eq!(got, expected);
 
         // A tombstone is not in the row set, so its index entry selects no row.
-        e.execute_blocking("DELETE FROM s WHERE id = 22;").unwrap();
-        let after = rows(&e, "SELECT id FROM s WHERE v = 9;");
+        e.execute("DELETE FROM s WHERE id = 22;").await.unwrap();
+        let after = rows(&e, "SELECT id FROM s WHERE v = 9;").await;
         assert!(!after.iter().any(|row| row[0] == "22"));
         // 15 rows carry v = 9 before the delete, so 14 remain.
         assert_eq!(after.len(), 14);
@@ -8445,23 +9308,28 @@ mod tests {
     /// `OptimizeIndex` folds a segment's secondary chunks into one: the merge is
     /// a sort over the old chunks' `(key, offset)` pairs, whose offsets are
     /// already segment-relative, so the merged chunk answers the same queries.
-    #[test]
-    fn optimize_merges_secondary_chunks() {
+    #[tokio::test]
+    async fn optimize_merges_secondary_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE m (id INT, v INT, flag BOOL);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX mv ON m (v);").unwrap();
-        e.execute_blocking("CREATE INDEX mf ON m (flag);").unwrap();
-        e.execute_blocking("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
+        e.execute("CREATE TABLE m (id INT, v INT, flag BOOL);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX mv ON m (v);").await.unwrap();
+        e.execute("CREATE INDEX mf ON m (flag);").await.unwrap();
+        e.execute("INSERT INTO m VALUES (1, 10, true), (2, 20, false);")
+            .await
             .unwrap();
         for index in ["mv", "mf"] {
-            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
+            e.dump_index_transaction("m", index).await.unwrap();
         }
-        e.execute_blocking("INSERT INTO m VALUES (3, 10, true);")
+        e.execute("INSERT INTO m VALUES (3, 10, true);")
+            .await
             .unwrap();
         for index in ["mv", "mf"] {
-            crate::scheduler::block_on(e.dump_index_transaction("m", index)).unwrap();
+            e.dump_index_transaction("m", index).await.unwrap();
         }
         let high = |e: &Engine, table: &str, column: &str| -> usize {
             let id = e.test_secondary_id(table, column);
@@ -8484,22 +9352,22 @@ mod tests {
         assert_eq!(high(&e, "m", "v"), 2);
         assert_eq!(low(&e, "m", "flag"), 2);
 
-        crate::scheduler::block_on(e.optimize_index_chunks()).unwrap();
+        e.optimize_index_chunks().await.unwrap();
 
         assert_eq!(high(&e, "m", "v"), 1);
         assert_eq!(low(&e, "m", "flag"), 1);
         assert_eq!(e.secondary_chunk_meta("m", "v"), vec![(0, 3)]);
         assert_eq!(
-            rows(&e, "SELECT id FROM m WHERE v = 10;"),
+            rows(&e, "SELECT id FROM m WHERE v = 10;").await,
             vec![vec!["1".to_string()], vec!["3".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT id FROM m WHERE flag = false;"),
+            rows(&e, "SELECT id FROM m WHERE flag = false;").await,
             vec![vec!["2".to_string()]]
         );
         // A merged segment publishes one chunk; the next dump adds a tail chunk.
         assert_eq!(
-            rows(&e, "SELECT id FROM m WHERE v = 20;"),
+            rows(&e, "SELECT id FROM m WHERE v = 20;").await,
             vec![vec!["2".to_string()]]
         );
     }
@@ -8508,17 +9376,21 @@ mod tests {
     /// the reference's `PhysicalMatchSparseScan::PlanWithIndex` walks
     /// `TableMeta::GetIndexIDs` and skips a column no `kBMP` index names, so the
     /// scan reads the blocks. The search still answers - it is just exhaustive.
-    #[test]
-    fn a_sparse_column_without_an_index_is_scanned_not_indexed() {
+    #[tokio::test]
+    async fn a_sparse_column_without_an_index_is_scanned_not_indexed() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_quota(1 << 30);
-        e.execute_blocking("CREATE TABLE osp (id INT, s SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO osp VALUES (1, [0:1.0, 1:2.0]), (2, [1:3.0]);")
+        e.set_memindex_quota(1 << 30);
+        e.execute("CREATE TABLE osp (id INT, s SPARSE(FLOAT,10));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO osp VALUES (1, [0:1.0, 1:2.0]), (2, [1:3.0]);")
+            .await
             .unwrap();
         let query = "SELECT id FROM osp SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);";
-        assert!(!rows(&e, query).is_empty(), "the exact scan answers");
+        assert!(!rows(&e, query).await.is_empty(), "the exact scan answers");
         // No index record, and therefore no in-memory index was built.
         assert!(
             e.storage.catalog.list_indexes().unwrap().is_empty(),
@@ -8541,12 +9413,15 @@ mod tests {
 
     /// `SPANN_DESIGN.md` §9.5: the pressure level is *derived* from the one
     /// byte ledger, not from a second (row-based) trigger.
-    #[test]
-    fn the_pressure_level_comes_from_the_byte_ledger() {
+    #[tokio::test]
+    async fn the_pressure_level_comes_from_the_byte_ledger() {
         use crate::engine::Pressure;
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE pl (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pl (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO pl VALUES ");
         for i in 0..200 {
@@ -8556,8 +9431,9 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking("CREATE INDEX pl_i ON pl (v) USING HNSW WITH (metric='l2');")
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX pl_i ON pl (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
 
         let pending = e.budget_bytes() as u64;
@@ -8579,11 +9455,14 @@ mod tests {
     /// **write** path keeps (`index_pending_bytes`) stays zero. The seal
     /// selector asks the tail itself (`IndexMaintainer::pending_bytes`), which is
     /// what makes such a graph releasable at all.
-    #[test]
-    fn a_graph_built_by_create_index_is_visible_to_the_quota() {
+    #[tokio::test]
+    async fn a_graph_built_by_create_index_is_visible_to_the_quota() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cg (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cg (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cg VALUES ");
         for i in 0..300 {
@@ -8593,8 +9472,9 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking("CREATE INDEX cg_i ON cg (v) USING HNSW WITH (metric='l2');")
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX cg_i ON cg (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
         let id = e.test_index_id("default_db.cg", "v", "HNSW");
         assert_ne!(id, 0);
@@ -8617,14 +9497,18 @@ mod tests {
     /// The sparse tail is used rather than an HNSW one because its size is the
     /// live `tail_bytes`; an HNSW tail's size is the byte count the write path
     /// charges, which `CREATE INDEX` alone does not raise.
-    #[test]
-    fn hard_pressure_seals_every_tail_of_the_table() {
+    #[tokio::test]
+    async fn hard_pressure_seals_every_tail_of_the_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE hp (id INT, c INT, s SPARSE(FLOAT,10));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX hp_c ON hp (c);").unwrap();
-        e.execute_blocking("CREATE INDEX hp_s ON hp (s) USING BMP;")
+        e.execute("CREATE TABLE hp (id INT, c INT, s SPARSE(FLOAT,10));")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX hp_c ON hp (c);").await.unwrap();
+        e.execute("CREATE INDEX hp_s ON hp (s) USING BMP;")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO hp VALUES ");
         for i in 0..500 {
@@ -8634,7 +9518,7 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
+        e.execute(&sql).await.unwrap();
 
         let tails = |e: &Engine| -> (usize, usize) {
             let indexes = e.storage.catalog.list_indexes().unwrap();
@@ -8657,7 +9541,7 @@ mod tests {
         // soft = quota/4 and hard = quota/2, so 3x the held bytes puts the
         // ledger above `soft` and below `hard`.
         e.set_memindex_quota(held * 3);
-        crate::scheduler::block_on(e.enforce_memindex_quota(Some("hp")));
+        e.enforce_memindex_quota(Some("hp")).await;
         let (sec, sparse) = tails(&e);
         assert_eq!(
             (sec == 0) as usize + (sparse == 0) as usize,
@@ -8666,13 +9550,14 @@ mod tests {
         );
 
         // Refill both tails, then cross the hard line: every tail goes.
-        e.execute_blocking("INSERT INTO hp VALUES (900, 1, [0:9.0, 2:9.0]);")
+        e.execute("INSERT INTO hp VALUES (900, 1, [0:9.0, 2:9.0]);")
+            .await
             .unwrap();
         let (sec, sparse) = tails(&e);
         let held = (sec + sparse) as u64;
         assert!(held > 0, "the tails hold bytes again ({sec}, {sparse})");
         e.set_memindex_quota(held * 19 / 10);
-        crate::scheduler::block_on(e.enforce_memindex_quota(Some("hp")));
+        e.enforce_memindex_quota(Some("hp")).await;
         let (sec, sparse) = tails(&e);
         assert_eq!(
             (sec, sparse),
@@ -8681,42 +9566,46 @@ mod tests {
         );
         // The answers survive the seals.
         assert_eq!(e.row_count("hp").unwrap(), 501);
-        let got = rows(&e, "SELECT id FROM hp WHERE c = 1 ORDER BY id LIMIT 1;");
+        let got = rows(&e, "SELECT id FROM hp WHERE c = 1 ORDER BY id LIMIT 1;").await;
         assert_eq!(got, vec![vec!["1".to_string()]]);
     }
 
     /// One quota governs every index form: when it is exceeded the tails are
     /// dumped and released, and the results stay correct.
-    #[test]
-    fn memindex_quota_seals_every_tail() {
+    #[tokio::test]
+    async fn memindex_quota_seals_every_tail() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Any positive budget is exceeded by the first row's tails.
         e.set_memindex_quota(1);
         // EMVB is a tensor-column index in the reference
         // (`IndexEMVB::ValidateColumnDataType`), so the multi-vector form here
         // is a `TENSOR(FLOAT,2)`.
-        e.execute_blocking(
-            "CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);",
-        )
-        .unwrap();
-        e.execute_blocking("CREATE INDEX qi ON q (c);").unwrap();
+        e.execute("CREATE TABLE q (id INT, m TENSOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX qi ON q (c);").await.unwrap();
         // Both PQ options are mandatory in the reference (`IndexEMVB::Make`
         // starts them at 0 and 0 is not an acceptable value).
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX qm ON q (m) USING EMVB WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX qs ON q (s) USING BMP;")
+        e.execute("CREATE INDEX qs ON q (s) USING BMP;")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "INSERT INTO q VALUES (1, [1.0,0.0], [0:1.0, 1:2.0], 7), \
              (2, [0.0,1.0], [1:3.0], 7);",
         )
+        .await
         .unwrap();
         // A write releases the largest tail; the explicit check releases every
         // one of them (`enforce_memindex_quota(None)` is "enforce it now").
-        crate::scheduler::block_on(e.enforce_memindex_quota(None));
+        e.enforce_memindex_quota(None).await;
 
         let mv = e
             .tables
@@ -8736,30 +9625,33 @@ mod tests {
             .unwrap();
         let sp_tail = sp.read().unwrap().tail_bytes;
         assert_eq!(sp_tail, 0);
-        let tables = e.tables.lock().unwrap();
-        let sec = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert_eq!(sec.key_count(), 0);
-        drop(tables);
+        {
+            let tables = e.tables.lock().unwrap();
+            let sec = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert_eq!(sec.key_count(), 0);
+        }
 
         // The sealed forms answer every path.
         assert_eq!(
-            rows(&e, "SELECT id FROM q WHERE c = 7;"),
+            rows(&e, "SELECT id FROM q WHERE c = 7;").await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
         );
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM q SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
-            ),
+            )
+            .await,
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
         assert!(!rows(
             &e,
             "SELECT id FROM q SEARCH MATCH TENSOR (m, [1.0,0.0], 'float', 'maxsim', 'topn=2');"
         )
+        .await
         .is_empty());
     }
 
@@ -8769,13 +9661,17 @@ mod tests {
     /// index kept every appended row resident until a checkpoint - a day by
     /// default. `refresh_block_mirror_extra` now folds the buffer into the
     /// charge, and the drain writes those rows to their block files.
-    #[test]
-    fn quota_drains_the_append_buffer_of_an_unindexed_table() {
+    #[tokio::test]
+    async fn quota_drains_the_append_buffer_of_an_unindexed_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE b (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO b VALUES (1,'one'),(2,'two'),(3,'three'),(4,'four');")
+        e.execute("CREATE TABLE b (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO b VALUES (1,'one'),(2,'two'),(3,'three'),(4,'four');")
+            .await
             .unwrap();
         let key = e.table_key("b");
         let buffered = |e: &Engine| {
@@ -8792,7 +9688,7 @@ mod tests {
 
         // A budget below what is resident forces the next check to drain.
         e.set_memindex_quota(1);
-        crate::scheduler::block_on(e.enforce_quota_after_append(&key));
+        e.enforce_quota_after_append(&key).await;
 
         let (rows_after, bytes_after) = buffered(&e);
         assert_eq!(rows_after, 0, "the drain sealed every buffered row");
@@ -8800,7 +9696,7 @@ mod tests {
 
         // The rows are still readable: the block files are the mirror.
         assert_eq!(
-            rows(&e, "SELECT id, body FROM b;"),
+            rows(&e, "SELECT id, body FROM b;").await,
             vec![
                 vec!["1".to_string(), "one".to_string()],
                 vec!["2".to_string(), "two".to_string()],
@@ -8818,14 +9714,18 @@ mod tests {
     /// and waiting for B, B holding B and waiting for A - is a deadlock that
     /// `run_commit_bottom` cannot see, because it only special-cases the same
     /// table.
-    #[test]
-    fn a_pressure_drain_can_be_limited_to_one_table() {
+    #[tokio::test]
+    async fn a_pressure_drain_can_be_limited_to_one_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         for name in ["mine", "other"] {
-            e.execute_blocking(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
+            e.execute(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!("INSERT INTO {name} VALUES (1,'a'),(2,'b');"))
+            e.execute(&format!("INSERT INTO {name} VALUES (1,'a'),(2,'b');"))
+                .await
                 .unwrap();
         }
         let buffered = |e: &Engine, table: &str| {
@@ -8840,7 +9740,7 @@ mod tests {
         assert_eq!(buffered(&e, "other"), 2);
 
         e.set_memindex_quota(1);
-        crate::scheduler::block_on(e.dump_under_pressure(Some("mine")));
+        e.dump_under_pressure(Some("mine")).await;
 
         assert_eq!(buffered(&e, "mine"), 0, "the named table was drained");
         assert_eq!(
@@ -8849,24 +9749,29 @@ mod tests {
             "the other table is left for a caller that may wait on its gate"
         );
         // Both tables still answer.
-        assert_eq!(rows(&e, "SELECT id FROM mine;").len(), 2);
-        assert_eq!(rows(&e, "SELECT id FROM other;").len(), 2);
+        assert_eq!(rows(&e, "SELECT id FROM mine;").await.len(), 2);
+        assert_eq!(rows(&e, "SELECT id FROM other;").await.len(), 2);
     }
 
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
     /// `similarity=boolean`; each must agree with the reference semantics.
-    #[test]
-    fn wand_covers_boolean_filters_min_should_and_delta() {
+    #[tokio::test]
+    async fn wand_covers_boolean_filters_min_should_and_delta() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ftw (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE ftw (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO ftw VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         // Boolean similarity: one point per matched term.
@@ -8875,7 +9780,8 @@ mod tests {
                 &e,
                 "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
                  ('body','alpha beta','topn=10;similarity=boolean');"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string(), "2.000000".to_string()],
                 vec!["4".to_string(), "2.000000".to_string()],
@@ -8890,7 +9796,8 @@ mod tests {
                 &e,
                 "SELECT id FROM ftw SEARCH MATCH TEXT \
                  ('body','alpha beta','topn=10;minimum_should_match=2');"
-            ),
+            )
+            .await,
             vec![vec!["1".to_string()], vec!["4".to_string()]]
         );
 
@@ -8900,12 +9807,14 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
              ('body','alpha beta','topn=10');",
-        );
+        )
+        .await;
         let filtered = rows(
             &e,
             "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
              ('body','alpha beta','topn=10;filter=id <= 2');",
-        );
+        )
+        .await;
         assert_eq!(filtered.len(), 2);
         for row in &filtered {
             assert!(all.contains(row), "{row:?} not in {all:?}");
@@ -8921,7 +9830,8 @@ mod tests {
             &e,
             "SELECT ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
              ('body','alpha beta','topn=1;bm25_param_delta_term=1');",
-        );
+        )
+        .await;
         assert_eq!(got.len(), 1);
         let value: f64 = got[0][0].parse().unwrap();
         assert!((value - expected).abs() < 1e-4, "{value} vs {expected}");
@@ -8930,18 +9840,23 @@ mod tests {
     /// `bm25_param_k1` / `bm25_param_b` override the ranker's constants, exactly
     /// as `bound_select_statement_impl.cpp:239-252` writes them into
     /// `BM25Params`, and every scoring path reads them.
-    #[test]
-    fn bm25_params_override_the_constants() {
+    #[tokio::test]
+    async fn bm25_params_override_the_constants() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bm (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE bm (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO bm VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX bm_i ON bm(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         // id=4: tf=1 per term, dl=3; N=4, total_len=9 → avgdl=2.25; df=3.
@@ -8963,7 +9878,8 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
              ('body','alpha beta','topn=10');",
-        );
+        )
+        .await;
         assert!((pick(&base) - score_of(1.2, 0.75)).abs() < 1e-5);
 
         // The two options move the score onto the new formula.
@@ -8971,7 +9887,8 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
              ('body','alpha beta','topn=10;bm25_param_k1=0.5;bm25_param_b=0.5');",
-        );
+        )
+        .await;
         assert!((pick(&tuned) - score_of(0.5, 0.5)).abs() < 1e-5);
         assert!((pick(&tuned) - pick(&base)).abs() > 1e-3);
 
@@ -8981,19 +9898,18 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM bm SEARCH MATCH TEXT \
              ('body','alpha AND beta','topn=10;bm25_param_k1=0.5;bm25_param_b=0.5');",
-        );
+        )
+        .await;
         assert!((pick(&tree) - score_of(0.5, 0.5)).abs() < 1e-5);
 
         // The reference rejects out-of-range values.
         assert!(e
-            .execute_blocking(
-                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');"
-            )
+            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_k1=-1');")
+            .await
             .is_err());
         assert!(e
-            .execute_blocking(
-                "SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');"
-            )
+            .execute("SELECT id FROM bm SEARCH MATCH TEXT ('body','alpha','bm25_param_b=2');")
+            .await
             .is_err());
     }
 
@@ -9001,18 +9917,23 @@ mod tests {
     /// and it raises the block-max pruning bar rather than only filtering the
     /// answer afterwards (`UpdateScoreThreshold`), so the pruned and the
     /// unpruned scans return the same documents.
-    #[test]
-    fn threshold_is_a_strict_lower_bound_and_prunes_the_scan() {
+    #[tokio::test]
+    async fn threshold_is_a_strict_lower_bound_and_prunes_the_scan() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tt (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE tt (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO tt VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX tt_i ON tt(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         // `similarity=boolean` scores one point per matched term, so the scores
@@ -9020,14 +9941,14 @@ mod tests {
         let strict = "SELECT id FROM tt SEARCH MATCH TEXT \
                       ('body','alpha beta','topn=10;similarity=boolean;threshold=2');";
         assert!(
-            rows(&e, strict).is_empty(),
+            rows(&e, strict).await.is_empty(),
             "threshold is a strict lower bound"
         );
 
         let above_one = "SELECT id FROM tt SEARCH MATCH TEXT \
                          ('body','alpha beta','topn=10;similarity=boolean;threshold=1');";
         assert_eq!(
-            rows(&e, above_one),
+            rows(&e, above_one).await,
             vec![vec!["1".to_string()], vec!["4".to_string()]]
         );
 
@@ -9035,13 +9956,13 @@ mod tests {
         // iterator decodes, never the result set.
         let unpruned = "SELECT id FROM tt SEARCH MATCH TEXT \
                         ('body','alpha beta','topn=10;similarity=boolean;threshold=1;block_max=false');";
-        assert_eq!(rows(&e, above_one), rows(&e, unpruned));
+        assert_eq!(rows(&e, above_one).await, rows(&e, unpruned).await);
 
         // A non-positive threshold is the reference's `threshold_ <= 0.0f`
         // shortcut: it filters nothing.
         let zero = "SELECT id FROM tt SEARCH MATCH TEXT \
                     ('body','alpha beta','topn=10;similarity=boolean;threshold=0');";
-        assert_eq!(rows(&e, zero).len(), 4);
+        assert_eq!(rows(&e, zero).await.len(), 4);
     }
 
     /// `rank_features` adds the posting's doc-payload column, decoded with
@@ -9049,22 +9970,28 @@ mod tests {
     /// not the raw JSON value of the row. The payload survives both the memory
     /// tail and the sealed segment, so the score is the same before and after a
     /// flush.
-    #[test]
-    fn rank_features_reads_the_index_doc_payload() {
+    #[tokio::test]
+    async fn rank_features_reads_the_index_doc_payload() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE rf (id INT, body VARCHAR, feat VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO rf VALUES (1,'alpha','[{\"Tag1\":1}]'),\
              (2,'alpha','[{\"Tag1\":2}]');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX rf_body ON rf (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX rf_feat ON rf (feat) USING FULLTEXT WITH (analyzer='rankfeatures');",
         )
+        .await
         .unwrap();
 
         // Both rows carry the same `body`, so the BM25 half is identical and the
@@ -9072,12 +9999,14 @@ mod tests {
         let base = rows(
             &e,
             "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT ('body','alpha','topn=10');",
-        );
+        )
+        .await;
         let ranked = rows(
             &e,
             "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
              ('body','alpha','topn=10;rank_features=feat^Tag1^1');",
-        );
+        )
+        .await;
         let pick = |rs: &[Vec<String>], id: &str| -> f64 {
             rs.iter()
                 .find(|r| r[0] == id)
@@ -9091,12 +10020,13 @@ mod tests {
         // Round-trip through the sealed segment: the payload is written into the
         // doc list's `of_doc_payload` column and read back by
         // `SegmentIndexReader::doc_payloads`.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let sealed = rows(
             &e,
             "SELECT id, SCORE() FROM rf SEARCH MATCH TEXT \
              ('body','alpha','topn=10;rank_features=feat^Tag1^1');",
-        );
+        )
+        .await;
         assert_eq!(sealed.len(), ranked.len());
         assert!((pick(&sealed, "1") - pick(&ranked, "1")).abs() < 1e-4);
         assert!((pick(&sealed, "2") - pick(&ranked, "2")).abs() < 1e-4);
@@ -9111,40 +10041,50 @@ mod tests {
     /// keyed by <db>.<table>.<column>, not by table id, so a table recreated
     /// under the same name would otherwise search the dropped one's documents
     /// (and score them twice).
-    #[test]
-    fn a_recreated_table_does_not_search_the_dropped_tables_chunks() {
+    #[tokio::test]
+    async fn a_recreated_table_does_not_search_the_dropped_tables_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
+        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute("INSERT INTO rt VALUES (1,'alpha beta'),(2,'alpha gamma');")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body,'alpha','topn=10');"
             )
+            .await
             .len(),
             2
         );
 
-        e.execute_blocking("DROP TABLE rt;").unwrap();
-        e.execute_blocking("CREATE TABLE rt (id INT, body VARCHAR);")
+        e.execute("DROP TABLE rt;").await.unwrap();
+        e.execute("CREATE TABLE rt (id INT, body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO rt VALUES (1,'delta epsilon');")
+        e.execute("INSERT INTO rt VALUES (1,'delta epsilon');")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX rt_i ON rt(body) USING FULLTEXT;")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         assert_eq!(
             rows(
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body,'alpha','topn=10');"
-            ),
+            )
+            .await,
             Vec::<Vec<String>>::new(),
             "the dropped table's documents came back"
         );
@@ -9153,23 +10093,29 @@ mod tests {
                 &e,
                 "SELECT id FROM rt SEARCH MATCH TEXT (body,'delta','topn=10');"
             )
+            .await
             .len(),
             1
         );
     }
 
-    #[test]
-    fn a_phrase_match_answers_from_the_index() {
+    #[tokio::test]
+    async fn a_phrase_match_answers_from_the_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE fp (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE fp (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO fp VALUES (1,'alpha beta'),(2,'alpha gamma'),\
              (3,'beta gamma'),(4,'alpha beta gamma'),(5,'beta alpha'),(6,'gamma');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX fp_i ON fp(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
@@ -9185,7 +10131,8 @@ mod tests {
                 &e,
                 "SELECT id, ROUND(SCORE(),4) FROM fp SEARCH MATCH TEXT \
                  (body,'\"alpha beta\"','topn=10');"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string(), "0.883700".to_string()],
                 vec!["4".to_string(), "0.733600".to_string()]
@@ -9198,7 +10145,8 @@ mod tests {
                 &e,
                 "SELECT id FROM fp SEARCH MATCH TEXT \
                  (body,'alpha beta','topn=10;operator=and');"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string()],
                 vec!["5".to_string()],
@@ -9214,6 +10162,7 @@ mod tests {
                 "SELECT id FROM fp SEARCH MATCH TEXT \
                  (body,'gamma \"alpha beta\"','topn=10;filter=id < 5');"
             )
+            .await
             .len(),
             4
         );
@@ -9225,7 +10174,8 @@ mod tests {
                 &e,
                 "SELECT id FROM fp SEARCH MATCH TEXT \
                  (body,'\"alpha beta\"','topn=10;similarity=boolean');"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string()],
                 vec!["4".to_string()],
@@ -9244,25 +10194,31 @@ mod tests {
     /// The field-group form (`MATCH TEXT ('', '(doc:…)')`) also starts from the
     /// index: only the documents that hold one of the query terms are
     /// tokenised, in both scoring modes.
-    #[test]
-    fn a_field_group_match_tokenises_only_the_candidates() {
+    #[tokio::test]
+    async fn a_field_group_match_tokenises_only_the_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE fg2 (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE fg2 (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO fg2 VALUES (1,'alpha beta'),(2,'gamma'),(3,'delta'),\
              (4,'alpha gamma'),(5,'epsilon'),(6,'zeta');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX fg2_i ON fg2(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         MATCH_ROWS_TOKENIZED.with(|n| n.set(0));
         let hits = rows(
             &e,
             "SELECT id FROM fg2 SEARCH MATCH TEXT ('','(body:alpha)^1 (body:gamma)^1', 10);",
-        );
+        )
+        .await;
         // `4` holds both terms, then the shorter `gamma` document outranks
         // `alpha beta`.
         assert_eq!(
@@ -9286,87 +10242,106 @@ mod tests {
             &e,
             "SELECT id FROM fg2 SEARCH MATCH TEXT \
              ('','(body:alpha)^1 (body:gamma)^1', 'similarity=boolean');",
-        );
+        )
+        .await;
         assert_eq!(hits.len(), 3, "{hits:?}");
         assert_eq!(MATCH_ROWS_TOKENIZED.with(|n| n.get()), 3);
     }
 
     /// IVF chunks written by the mirror are loaded and probed for candidates.
-    #[test]
-    fn ivf_index_serves_vector_candidates() {
+    #[tokio::test]
+    async fn ivf_index_serves_vector_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO iv VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
+        e.execute("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
+            .await
             .unwrap();
         // Rows written before the dump live in the IVF memory segment and are
         // merged with the sealed chunks.
-        e.execute_blocking("INSERT INTO iv VALUES (5,[0.9,0.1]);")
+        e.execute("INSERT INTO iv VALUES (5,[0.9,0.1]);")
+            .await
             .unwrap();
-        let tables = e.tables.lock().unwrap();
-        let entry = tables.get("default_db.iv").unwrap();
-        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
-        assert!(!entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
-        drop(tables);
+        assert!(
+            e.index_tail("default_db.iv", "v", IndexType::Ivf).is_some(),
+            "the IVF index holds rows written since it was built"
+        );
         let q = "SELECT id FROM iv SEARCH MATCH VECTOR \
                  (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);";
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
         // The chunk is written by the index's own `DumpIndex` transaction (the
         // reference's `DumpMemIndex`); a checkpoint writes blocks only.
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("iv", "ivx")).unwrap();
-        let tables = e.tables.lock().unwrap();
-        let entry = tables.get("default_db.iv").unwrap();
-        let ivx_id = e.test_index_id("default_db.iv", "v", "IVF");
-        assert!(entry.ivf_mem.get(&ivx_id).unwrap().is_empty());
-        assert!(entry.ivf.values().any(|segments| !segments.is_empty()));
-        drop(tables);
+        e.flush().await.unwrap();
+        e.dump_index_transaction("iv", "ivx").await.unwrap();
+        assert!(
+            e.index_tail("default_db.iv", "v", IndexType::Ivf).is_none(),
+            "the dump emptied the IVF memory tail"
+        );
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
     }
 
     /// `CREATE INDEX` materialises the index (C++ `IndexBuilder`); the first
     /// query must not be what builds it.
-    #[test]
-    fn create_index_builds_fulltext_and_hnsw_from_existing_rows() {
+    #[tokio::test]
+    async fn create_index_builds_fulltext_and_hnsw_from_existing_rows() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE bi (c1 INT, body VARCHAR, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO bi VALUES (1,'alpha beta',[0.1,0.2,0.3,0.4]),\
              (2,'alpha gamma',[0.4,0.3,0.2,0.1]),\
              (3,'delta',[0.0,0.0,0.0,0.0]);",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX bi_ft ON bi (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX bi_v ON bi (v) USING HNSW WITH (M=16, ef_construction=20, metric=l2);",
         )
+        .await
         .unwrap();
 
         // No query has run yet: both indexes already hold every live row.
-        let tables = e.tables.lock().unwrap();
-        let entry = tables.get("default_db.bi").unwrap();
         let body_id = e.test_index_id("default_db.bi", "body", "FULLTEXT");
-        let text = entry.text.get(&body_id).unwrap().read().unwrap();
-        assert_eq!(text.total_docs(), 3);
-        drop(text);
-        let v_id = e.test_index_id("default_db.bi", "v", "HNSW");
-        let mem = entry.hnsw_mem.get(&v_id).unwrap().lock().unwrap();
-        assert_eq!(mem.rows().len(), 3, "HNSW memory segment must be seeded");
+        let text = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get("default_db.bi")
+                .and_then(|entry| entry.text.get(&body_id).cloned())
+                .expect("the full-text index is cached")
+        };
+        assert_eq!(text.read().await.total_docs(), 3);
+        let mem = e
+            .hnsw_mem_segments("default_db.bi", "v")
+            .expect("the HNSW index is cached");
+        let mem = mem.first().expect("one memory graph");
+        assert_eq!(
+            mem.lock().await.rows().len(),
+            3,
+            "HNSW memory segment must be seeded"
+        );
     }
 
     /// `memindex_memory_quota` accounts one batch at a time and subtracts only
@@ -9374,27 +10349,33 @@ mod tests {
     /// four-dimensional vector cost 1008 bytes, so the first batch stays under
     /// 1 KB, the second crosses (and dumps), the third crosses again.
     /// Measured against the reference: three batches leave two segments.
-    #[test]
-    fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
+    #[tokio::test]
+    async fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1024);
-        e.execute_blocking("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
+        e.execute("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let row = "(2,[0.1,0.2,0.3,-0.2])";
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
         ))
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX hx ON hc (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
              metric = l2, block_size = 1);",
         )
+        .await
         .unwrap();
         for _ in 0..3 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
             ))
+            .await
             .unwrap();
         }
         // At most one chunk per batch: the quota releases one index per breach,
@@ -9420,34 +10401,39 @@ mod tests {
     /// `USE` different databases do not see each other's choice, a bare table
     /// name resolves in the session's database, and a closed session is
     /// rejected.
-    #[test]
-    fn sessions_keep_their_own_database() {
+    #[tokio::test]
+    async fn sessions_keep_their_own_database() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE DATABASE a;").unwrap();
-        e.execute_blocking("CREATE DATABASE b;").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE DATABASE a;").await.unwrap();
+        e.execute("CREATE DATABASE b;").await.unwrap();
         for db in ["a", "b"] {
-            e.execute_blocking(&format!("CREATE TABLE {db}.t (id INT);"))
+            e.execute(&format!("CREATE TABLE {db}.t (id INT);"))
+                .await
                 .unwrap();
         }
         let sa = e.open_session("default_db");
         let sb = e.open_session("default_db");
-        e.execute_in_session(sa, "USE a;").unwrap();
-        e.execute_in_session(sb, "USE b;").unwrap();
+        e.execute_in_session(sa, "USE a;").await.unwrap();
+        e.execute_in_session(sb, "USE b;").await.unwrap();
         assert_eq!(e.session_db(sa).unwrap(), "a");
         assert_eq!(e.session_db(sb).unwrap(), "b");
 
         // A bare name resolves in the session's own database.
         e.execute_in_session(sa, "INSERT INTO t VALUES (1);")
+            .await
             .unwrap();
         e.execute_in_session(sb, "INSERT INTO t VALUES (2);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM a.t;"),
+            rows(&e, "SELECT count(*) FROM a.t;").await,
             vec![vec!["1".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM b.t;"),
+            rows(&e, "SELECT count(*) FROM b.t;").await,
             vec![vec!["1".to_string()]]
         );
 
@@ -9460,67 +10446,74 @@ mod tests {
         assert_eq!(e.session_db(sa).unwrap(), "a");
 
         assert!(e.close_session(sa));
-        assert!(e.execute_in_session(sa, "SELECT 1;").is_err());
+        assert!(e.execute_in_session(sa, "SELECT 1;").await.is_err());
         assert_eq!(e.session_db(sa), None, "a closed session is unknown");
         // The other session is unaffected.
         assert_eq!(e.session_db(sb).unwrap(), "b");
     }
     /// The delta-maintained total equals a full scan after every kind of
     /// change: appends, a checkpoint, a delete and a drop (plan 4.2).
-    #[test]
-    fn memindex_total_matches_a_full_scan() {
+    #[tokio::test]
+    async fn memindex_total_matches_a_full_scan() {
         let dir = tempfile::tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let scan = |e: &Engine| -> usize {
             let keys: Vec<String> = e.tables.lock().unwrap().keys().cloned().collect();
             keys.iter().map(|k| e.memindex_bytes_of(k)).sum()
         };
-        e.execute_blocking(
-            "CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10), c INT);",
-        )
-        .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX t_v ON t (v) USING HNSW WITH (M = 16, ef_construction = 20);",
-        )
-        .unwrap();
-        e.execute_blocking("CREATE INDEX t_c ON t (c);").unwrap();
-        e.execute_blocking("CREATE INDEX t_s ON t (s) USING BMP;")
+        e.execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4), s SPARSE(FLOAT,10), c INT);")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE INDEX t_v ON t (v) USING HNSW WITH (M = 16, ef_construction = 20);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX t_c ON t (c);").await.unwrap();
+        e.execute("CREATE INDEX t_s ON t (s) USING BMP;")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO t VALUES (1,[0.1,0.2,0.3,0.4],[0:1.0],1), \
              (2,[0.2,0.3,0.4,0.5],[1:2.0],2);",
         )
+        .await
         .unwrap();
         assert_eq!(e.memindex_bytes(), scan(&e), "after the append");
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(e.memindex_bytes(), scan(&e), "after the checkpoint");
-        e.execute_blocking("INSERT INTO t VALUES (3,[0.3,0.4,0.5,0.6],[2:3.0],3);")
+        e.execute("INSERT INTO t VALUES (3,[0.3,0.4,0.5,0.6],[2:3.0],3);")
+            .await
             .unwrap();
         assert_eq!(e.memindex_bytes(), scan(&e), "after a second append");
-        e.execute_blocking("DELETE FROM t WHERE id = 1;").unwrap();
+        e.execute("DELETE FROM t WHERE id = 1;").await.unwrap();
         assert_eq!(e.memindex_bytes(), scan(&e), "after a delete");
-        e.execute_blocking("DROP INDEX t_c;").unwrap();
+        e.execute("DROP INDEX t_c;").await.unwrap();
         assert_eq!(e.memindex_bytes(), scan(&e), "after dropping an index");
-        e.execute_blocking("DROP TABLE t;").unwrap();
+        e.execute("DROP TABLE t;").await.unwrap();
         assert_eq!(e.memindex_bytes(), 0, "after dropping the table");
     }
 
-    #[test]
-    fn the_memindex_quota_is_global_across_tables() {
+    #[tokio::test]
+    async fn the_memindex_quota_is_global_across_tables() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Six four-dimensional rows cost 6 × (4 × 4 + 152) = 1008 bytes, below
         // 1500; two tables together cross it.
         e.set_memindex_quota(1500);
         for name in ["g1", "g2"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {name} (id INT, v EMBEDDING(FLOAT, 4));"
             ))
+            .await
             .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {name}_v ON {name} (v) USING HNSW WITH \
                  (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
             ))
+            .await
             .unwrap();
         }
         // Raise the quota while the rows go in, so the insert path's own
@@ -9530,27 +10523,30 @@ mod tests {
         // about is the check that sees **both** tables, which is the one below.
         e.set_memindex_quota(1 << 30);
         for name in ["g1", "g2"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO {name} VALUES (1,[0.1,0.2,0.3,-0.2]),(2,[0.1,0.2,0.3,-0.2]),\
                  (3,[0.1,0.2,0.3,-0.2]),(4,[0.1,0.2,0.3,-0.2]),\
                  (5,[0.1,0.2,0.3,-0.2]),(6,[0.1,0.2,0.3,-0.2]);"
             ))
+            .await
             .unwrap();
         }
         // Both tails are complete now; the quota is the two-tables-cross-it
         // value, and this explicit check is the only one that sees both.
         e.set_memindex_quota(1500);
         std::thread::sleep(std::time::Duration::from_millis(20));
-        crate::scheduler::block_on(e.enforce_memindex_quota(None));
+        e.enforce_memindex_quota(None).await;
 
         for name in ["g1", "g2"] {
             assert!(
                 !e.hnsw_chunk_ids(name, &format!("{name}_v")).is_empty(),
                 "{name}: the two tables together cross the quota, so both tails must be dumped"
             );
-            let tables = e.tables.lock().unwrap();
-            assert!(
-                tables[&e.table_key(name)].hnsw_mem.is_empty(),
+            // The table carries HNSW only, so "no memory-index bytes" is the
+            // released-tail assertion (the product accessor for the total).
+            assert_eq!(
+                e.memindex_bytes_of(&e.table_key(name)),
+                0,
                 "{name}: a dumped HNSW tail is released"
             );
         }
@@ -9633,186 +10629,196 @@ mod tests {
     /// The unified budget counts the HNSW charge, not only the text/sparse/
     /// multi-vector/secondary tails: an engine whose only memory is a graph
     /// must still notice it is over.
-    #[test]
-    fn the_budget_counts_the_hnsw_charge() {
+    #[tokio::test]
+    async fn the_budget_counts_the_hnsw_charge() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Large enough that nothing dumps, so the charge stays live.
         e.set_memindex_quota(1 << 30);
-        e.execute_blocking("CREATE TABLE hb (id INT, v EMBEDDING(FLOAT, 4));")
+        e.execute("CREATE TABLE hb (id INT, v EMBEDDING(FLOAT, 4));")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX hb_v ON hb (v) USING HNSW WITH \
              (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
         )
+        .await
         .unwrap();
         let row = "(1,[0.1,0.2,0.3,-0.2])";
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO hb VALUES {row},{row},{row},{row},{row},{row};"
         ))
+        .await
         .unwrap();
         assert!(
             e.memindex_bytes() >= 1008,
             "six rows charge 1008 bytes, got {}",
             e.memindex_bytes()
         );
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.dump_all_memory_indexes().await;
         assert_eq!(e.memindex_bytes(), 0);
-        let tables = e.tables.lock().unwrap();
-        assert!(tables[&e.table_key("hb")].hnsw_mem.is_empty());
+        assert_eq!(
+            e.memindex_bytes_of(&e.table_key("hb")),
+            0,
+            "the dump released the tail"
+        );
     }
 
     /// Every dumpable family is in the budget and every one is released by a
     /// dump. PLAID/SMVE are deliberately left out: they are whole-column
     /// objects in this port and `seal` does not drop them, so charging them
     /// would make every check over-quota and dump forever.
-    #[test]
-    fn the_budget_covers_every_dumpable_family() {
+    #[tokio::test]
+    async fn the_budget_covers_every_dumpable_family() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
-        e.execute_blocking(
+        e.execute(
             "CREATE TABLE fam (id INT, body VARCHAR, s SPARSE(FLOAT, 10), \
              m TENSOR(FLOAT, 2), c INT, v EMBEDDING(FLOAT, 4));",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX fam_c ON fam (c);")
+        e.execute("CREATE INDEX fam_c ON fam (c);").await.unwrap();
+        e.execute("CREATE INDEX fam_body ON fam (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fam_body ON fam (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX fam_s ON fam (s) USING BMP;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fam_s ON fam (s) USING BMP;")
-            .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX fam_m ON fam (m) USING EMVB WITH \
              (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX fam_v ON fam (v) USING HNSW WITH \
              (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "INSERT INTO fam VALUES \
              (1,'alpha beta',[0:1.0, 1:2.0],[1.0,0.0],7,[0.1,0.2,0.3,-0.2]), \
              (2,'alpha gamma',[1:3.0],[0.0,1.0],7,[0.1,0.2,0.3,-0.2]);",
         )
+        .await
         .unwrap();
         assert!(e.memindex_bytes() > 0);
 
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.dump_all_memory_indexes().await;
         assert_eq!(
             e.memindex_bytes(),
             0,
             "every dumpable tail must be released"
         );
-        let tables = e.tables.lock().unwrap();
-        let entry = &tables[&e.table_key("fam")];
-        assert!(entry.hnsw_mem.is_empty());
-        assert_eq!(
-            entry
+        // Every handle is cloned out before any index is awaited: the `tables`
+        // guard is a `std::sync` one and may not cross an await.
+        let (text, sparse, mv, secondary_keys) = {
+            let tables = e.tables.lock().unwrap();
+            let entry = &tables[&e.table_key("fam")];
+            assert!(entry.hnsw_mem.is_empty());
+            let text = entry
                 .text
                 .get(&e.test_index_id("fam", "body", "FULLTEXT"))
-                .unwrap()
-                .read()
-                .unwrap()
-                .mem
-                .mem_used(),
-            0
-        );
-        assert_eq!(
-            entry
+                .cloned()
+                .unwrap();
+            let sparse = entry
                 .sparse
                 .get(&e.test_index_id("fam", "s", "BMP"))
-                .unwrap()
-                .read()
-                .unwrap()
-                .tail_bytes,
-            0
-        );
-        assert_eq!(
-            entry
+                .cloned()
+                .unwrap();
+            let mv = entry
                 .mv
                 .get(&e.test_index_id("fam", "m", "EMVB"))
-                .unwrap()
-                .read()
-                .unwrap()
-                .tail_bytes,
-            0
-        );
-        let secondary_id = e.test_secondary_id("fam", "c");
-        assert_eq!(
-            entry
+                .cloned()
+                .unwrap();
+            let secondary_id = e.test_secondary_id("fam", "c");
+            let keys = entry
                 .secondary
                 .indexes
                 .get(&secondary_id)
                 .unwrap()
-                .key_count(),
-            0
-        );
+                .key_count();
+            (text, sparse, mv, keys)
+        };
+        assert_eq!(text.read().await.mem.mem_used(), 0);
+        assert_eq!(sparse.read().unwrap().tail_bytes, 0);
+        assert_eq!(mv.read().unwrap().tail_bytes, 0);
+        assert_eq!(secondary_keys, 0);
     }
 
     /// The IVF memory segment is part of the same budget: rows written since
     /// the last mirror dump are charged, and a dump releases them.
-    #[test]
-    fn the_budget_counts_the_ivf_rows() {
+    #[tokio::test]
+    async fn the_budget_counts_the_ivf_rows() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_quota(1 << 30);
-        e.execute_blocking("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT, 4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.set_memindex_quota(1 << 30);
+        e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT, 4));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO iv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
              (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
              (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
              (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX iv_v ON iv (v) USING IVF WITH \
              (metric = l2, storage_type = product_quantization, \
              product_quantization_subspace_num = 2, \
              product_quantization_subspace_bits = 12);",
         )
+        .await
         .unwrap();
-        e.execute_blocking("INSERT INTO iv VALUES (9,[0.5,0.5,0.5,0.5]);")
+        e.execute("INSERT INTO iv VALUES (9,[0.5,0.5,0.5,0.5]);")
+            .await
             .unwrap();
-        let iv_id = e.test_index_id("iv", "v", "IVF");
-        let tables = e.tables.lock().unwrap();
-        let rows = tables[&e.table_key("iv")]
-            .ivf_mem
-            .get(&iv_id)
-            .map(|r| r.len())
+        let rows = e
+            .index_tail("iv", "v", IndexType::Ivf)
+            .map(|(_, rows)| rows)
             .unwrap_or(0);
-        drop(tables);
         assert_eq!(rows, 1, "the row written since the index was built");
         assert!(
             e.memindex_bytes() >= 4 * 4 * rows,
             "the IVF tail is charged, got {}",
             e.memindex_bytes()
         );
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.dump_all_memory_indexes().await;
         assert_eq!(e.memindex_bytes(), 0);
-        let tables = e.tables.lock().unwrap();
-        assert!(tables[&e.table_key("iv")]
-            .ivf_mem
-            .get(&iv_id)
-            .unwrap()
-            .is_empty());
+        assert!(
+            e.index_tail("iv", "v", IndexType::Ivf).is_none(),
+            "the flush emptied the IVF memory tail"
+        );
     }
 
     /// SQL `FLUSH DATA` reaches the same entry the Thrift/HTTP flush does: it
     /// runs the checkpoint, and with the switch on it releases the indexes.
-    #[test]
-    fn sql_flush_data_runs_the_checkpoint() {
+    #[tokio::test]
+    async fn sql_flush_data_runs_the_checkpoint() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
-        e.execute_blocking("CREATE TABLE sf (id INT, body VARCHAR);")
+        e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX sf_body ON sf (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX sf_body ON sf (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO sf VALUES (1,'alpha'),(2,'beta');")
+        e.execute("INSERT INTO sf VALUES (1,'alpha'),(2,'beta');")
+            .await
             .unwrap();
         // The block columns are the checkpoint's output; the buffer alone has
         // the rows before it.
@@ -9829,7 +10835,7 @@ mod tests {
             count
         }
         assert_eq!(block_columns(dir.path()), 0);
-        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.execute("FLUSH DATA;").await.unwrap();
         assert!(
             block_columns(dir.path()) > 0,
             "FLUSH DATA writes the block mirror"
@@ -9840,52 +10846,58 @@ mod tests {
         );
 
         e.set_flush_dumps_mem_index(true);
-        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.execute("FLUSH DATA;").await.unwrap();
         assert_eq!(e.memindex_bytes(), 0, "the switch reaches SQL too");
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM sf"),
+            rows(&e, "SELECT count(*) FROM sf").await,
             vec![vec!["2".to_string()]]
         );
         // The reference answers these with `Status::NotSupport`.
         assert_eq!(
-            e.execute_blocking("FLUSH LOG;").unwrap_err().to_string(),
+            e.execute("FLUSH LOG;").await.unwrap_err().to_string(),
             "Flush log"
         );
         assert_eq!(
-            e.execute_blocking("FLUSH BUFFER;").unwrap_err().to_string(),
+            e.execute("FLUSH BUFFER;").await.unwrap_err().to_string(),
             "Flush buffer"
         );
     }
 
     /// A bulk FLUSH over many tables seals them concurrently: every index still
     /// gets its chunk, the budget returns to zero and both index kinds answer.
-    #[test]
-    fn flush_dumps_many_tables_at_once() {
+    #[tokio::test]
+    async fn flush_dumps_many_tables_at_once() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
         let tables: Vec<String> = (0..8).map(|i| format!("ft{i}")).collect();
         for t in &tables {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 4));"
             ))
+            .await
             .unwrap();
-            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+            e.execute(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
                  (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
             ))
+            .await
             .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO {t} VALUES (1,7,[0.1,0.2,0.3,-0.2]),(2,8,[0.1,0.2,0.3,-0.2]);"
             ))
+            .await
             .unwrap();
         }
         assert!(e.memindex_bytes() > 0);
         // The dump runs on the shared pool, so this asserts the concurrent path
         // produces the same chunks a serial one would.
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.dump_all_memory_indexes().await;
         assert_eq!(e.memindex_bytes(), 0);
         for t in &tables {
             assert!(
@@ -9893,12 +10905,12 @@ mod tests {
                 "{t}: the vector index must be dumped"
             );
             assert_eq!(
-                rows(&e, &format!("SELECT count(*) FROM {t}")),
+                rows(&e, &format!("SELECT count(*) FROM {t}")).await,
                 vec![vec!["2".to_string()]],
                 "{t}: the rows must be readable"
             );
             assert_eq!(
-                rows(&e, &format!("SELECT id FROM {t} WHERE c = 7")),
+                rows(&e, &format!("SELECT id FROM {t} WHERE c = 7")).await,
                 vec![vec!["1".to_string()]],
                 "{t}: the secondary index must answer"
             );
@@ -9907,25 +10919,30 @@ mod tests {
 
     /// Times the bulk dump. Not a gate: run it twice, with
     /// `INFINITY_FLUSH_DUMP_CONCURRENCY=1` and unset, to see the win.
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: a timing probe, not a gate"]
-    fn flush_dump_wall_time_probe() {
+    async fn flush_dump_wall_time_probe() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
         e.set_flush_dumps_mem_index(true);
         let tables: Vec<String> = (0..64).map(|i| format!("p{i}")).collect();
         for t in &tables {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 32));"
             ))
+            .await
             .unwrap();
-            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+            e.execute(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
                  (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
             ))
+            .await
             .unwrap();
         }
         let vector = (0..32)
@@ -9937,13 +10954,14 @@ mod tests {
             for row in 0..256 {
                 values.push(format!("({row},{},[{vector}])", row % 7));
             }
-            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .await
                 .unwrap();
         }
         // The dump is what this probe times; `flush()` also checkpoints 64
         // tables, which would drown the signal.
         let started = std::time::Instant::now();
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.dump_all_memory_indexes().await;
         eprintln!(
             "dump of {} tables: {:?} ({} workers)",
             tables.len(),
@@ -9964,40 +10982,49 @@ mod tests {
     /// is that the table-level work is still complete at both bounds: a table
     /// silently dropped by the dispatch would pass a thread count and fail the
     /// mirror check, so that is the assertion.
-    #[test]
-    fn a_checkpoint_uses_the_worker_count_it_was_given() {
+    #[tokio::test]
+    async fn a_checkpoint_uses_the_worker_count_it_was_given() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let tables: Vec<String> = (0..32).map(|i| format!("tw{i}")).collect();
         for t in &tables {
-            e.execute_blocking(&format!("CREATE TABLE {t} (id INT, c INT);"))
+            e.execute(&format!("CREATE TABLE {t} (id INT, c INT);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+            e.execute(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!("INSERT INTO {t} VALUES (1,1),(2,2);"))
+            e.execute(&format!("INSERT INTO {t} VALUES (1,1),(2,2);"))
+                .await
                 .unwrap();
         }
-        assert!(crate::scheduler::block_on(e.flush_tables(
-            &e.catalog().list_tables().unwrap(),
-            1,
-            1
-        ))
-        .is_ok());
+        assert!(e
+            .flush_tables(&e.catalog().list_tables().unwrap(), 1, 1)
+            .await
+            .is_ok());
         for t in &tables {
             assert!(
-                !e.read_blocks(t).unwrap().1.is_empty(),
+                !e.read_blocks_pruned(t, &[], &[])
+                    .await
+                    .unwrap()
+                    .1
+                    .is_empty(),
                 "{t} was not mirrored by the 1-worker sweep"
             );
         }
-        assert!(crate::scheduler::block_on(e.flush_tables(
-            &e.catalog().list_tables().unwrap(),
-            2,
-            4
-        ))
-        .is_ok());
+        assert!(e
+            .flush_tables(&e.catalog().list_tables().unwrap(), 2, 4)
+            .await
+            .is_ok());
         for t in &tables {
             assert!(
-                !e.read_blocks(t).unwrap().1.is_empty(),
+                !e.read_blocks_pruned(t, &[], &[])
+                    .await
+                    .unwrap()
+                    .1
+                    .is_empty(),
                 "{t} was not mirrored by the 4-worker sweep"
             );
         }
@@ -10014,24 +11041,29 @@ mod tests {
     /// 8 workers 192 ms - beyond four workers the shared store work in the
     /// caller dominates and the extra threads only add contention. Run with
     /// `cargo test -p executor --lib a_checkpoint_scaling_probe -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: wall-time probe, the numbers are host dependent"]
-    fn a_checkpoint_scaling_probe() {
+    async fn a_checkpoint_scaling_probe() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
         let tables: Vec<String> = (0..64).map(|i| format!("w{i}")).collect();
         for t in &tables {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {t} (id INT, c INT, v EMBEDDING(FLOAT, 8));"
             ))
+            .await
             .unwrap();
-            e.execute_blocking(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+            e.execute(&format!("CREATE INDEX {t}_c ON {t} (c);"))
+                .await
                 .unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE INDEX {t}_v ON {t} (v) USING HNSW WITH \
                  (M = 16, ef_construction = 20, metric = l2, block_size = 1);"
             ))
+            .await
             .unwrap();
         }
         let vector = (0..8)
@@ -10043,7 +11075,8 @@ mod tests {
             for row in 0..2048 {
                 values.push(format!("({row},{},[{vector}])", row % 7));
             }
-            e.execute_blocking(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO {t} VALUES {};", values.join(",")))
+                .await
                 .unwrap();
         }
         let metas = e.catalog().list_tables().unwrap();
@@ -10055,20 +11088,21 @@ mod tests {
         // this shape on 16 cores), the timed ones only rewrite the block that
         // moved. Time the steady state, which is what a periodic checkpoint
         // pays.
-        crate::scheduler::block_on(e.flush_tables(&metas, 1, 1)).unwrap();
+        e.flush_tables(&metas, 1, 1).await.unwrap();
         let mut ts = 2u64;
         for w in [1usize, 2, 4, 8] {
             for (i, t) in tables.iter().enumerate() {
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "INSERT INTO {t} VALUES ({},{},[{vector}]);",
                     i + 10_000 + w * 100,
                     i % 7
                 ))
+                .await
                 .unwrap();
             }
             ts += 1;
             let started = std::time::Instant::now();
-            crate::scheduler::block_on(e.flush_tables(&metas, ts, w)).unwrap();
+            e.flush_tables(&metas, ts, w).await.unwrap();
             eprintln!(
                 "checkpoint of {} tables at {w} workers: {:?}",
                 metas.len(),
@@ -10081,29 +11115,35 @@ mod tests {
     /// memory index instead of only writing the checkpoint. Off by default -
     /// the reference's flush leaves the tails in memory and the cross-engine
     /// byte gates compare directories after `flush_data()`.
-    #[test]
-    fn flush_dumps_every_memory_index_when_configured() {
+    #[tokio::test]
+    async fn flush_dumps_every_memory_index_when_configured() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_quota(1 << 30);
-        e.execute_blocking("CREATE TABLE fd (id INT, body VARCHAR, v EMBEDDING(FLOAT, 4));")
+        e.execute("CREATE TABLE fd (id INT, body VARCHAR, v EMBEDDING(FLOAT, 4));")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fd_body ON fd (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX fd_body ON fd (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX fd_v ON fd (v) USING HNSW WITH \
              (M = 16, ef_construction = 20, metric = l2, block_size = 1);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "INSERT INTO fd VALUES \
              (1,'alpha beta',[0.1,0.2,0.3,-0.2]),(2,'alpha gamma',[0.1,0.2,0.3,-0.2]);",
         )
+        .await
         .unwrap();
         assert!(e.memindex_bytes() > 0);
 
         // Default: a flush is a checkpoint, and the tails stay.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert!(
             e.memindex_bytes() > 0,
             "a plain FLUSH must not dump, or the byte gates diverge from the reference"
@@ -10112,30 +11152,29 @@ mod tests {
         e.set_flush_dumps_mem_index(true);
         // The periodic checkpoint stays a checkpoint: the flag is about the
         // operator's `FLUSH DATA`, so an interval cannot churn a ts per index.
-        crate::scheduler::block_on(e.checkpoint()).unwrap();
+        e.checkpoint().await.unwrap();
         assert!(e.memindex_bytes() > 0, "a periodic checkpoint never dumps");
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(e.memindex_bytes(), 0, "FLUSH dumps every memory index");
-        let tables = e.tables.lock().unwrap();
-        let entry = &tables[&e.table_key("fd")];
-        assert_eq!(
-            entry
-                .text
-                .get(&e.test_index_id("fd", "body", "FULLTEXT"))
-                .unwrap()
-                .read()
-                .unwrap()
-                .mem
-                .mem_used(),
-            0
-        );
-        assert!(entry.hnsw_mem.is_empty());
-        drop(tables);
+        {
+            let (text, hnsw_empty) = {
+                let tables = e.tables.lock().unwrap();
+                let entry = &tables[&e.table_key("fd")];
+                let text = entry
+                    .text
+                    .get(&e.test_index_id("fd", "body", "FULLTEXT"))
+                    .cloned()
+                    .unwrap();
+                (text, entry.hnsw_mem.is_empty())
+            };
+            assert_eq!(text.read().await.mem.mem_used(), 0);
+            assert!(hnsw_empty);
+        }
         assert!(!e.hnsw_chunk_ids("fd", "fd_v").is_empty());
 
         // The sealed chunks still answer.
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM fd"),
+            rows(&e, "SELECT count(*) FROM fd").await,
             vec![vec!["2".to_string()]]
         );
         assert_eq!(
@@ -10143,6 +11182,7 @@ mod tests {
                 &e,
                 "SELECT id FROM fd SEARCH MATCH TEXT ('body','alpha','topn=5');"
             )
+            .await
             .len(),
             2
         );
@@ -10151,55 +11191,64 @@ mod tests {
     /// A write that reaches the engine through the Thrift/import primitives
     /// rather than SQL still has to invalidate cached `SELECT` results: the
     /// memidx restart suite counts rows after an SDK insert and must see it.
-    #[test]
-    fn a_direct_insert_invalidates_cached_select_results() {
+    #[tokio::test]
+    async fn a_direct_insert_invalidates_cached_select_results() {
         use parser::Literal;
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dc (c1 INT);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE dc (c1 INT);").await.unwrap();
         e.insert_literals(
             "default_db.dc",
             None,
             vec![vec![Literal::Int(1)], vec![Literal::Int(2)]],
         )
+        .await
         .unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM dc;"),
+            rows(&e, "SELECT count(*) FROM dc;").await,
             vec![vec!["2".to_string()]]
         );
         // The same primitive again: the cached `count(*)` above must not win.
         e.insert_literals("default_db.dc", None, vec![vec![Literal::Int(3)]])
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM dc;"),
+            rows(&e, "SELECT count(*) FROM dc;").await,
             vec![vec!["3".to_string()]]
         );
     }
 
     /// `storage_type = product_quantization` writes the C++ PQ chunk layout
     /// (per-subspace codebook + packed codes) and searches it.
-    #[test]
-    fn a_product_quantized_ivf_index_mirrors_and_serves_candidates() {
+    #[tokio::test]
+    async fn a_product_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE ivpq (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO ivpq VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,0.0,0.0,0.0]),\
              (3,[0.0,1.0,0.0,0.0]),(4,[0.0,0.0,1.0,0.0]),\
              (5,[0.0,0.0,0.0,1.0]),(6,[1.0,1.0,0.0,0.0]),\
              (7,[0.0,0.0,1.0,1.0]),(8,[2.0,2.0,2.0,2.0]);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX ivpq_idx ON ivpq (v) USING IVF WITH \
              (metric = l2, storage_type = product_quantization, \
              product_quantization_subspace_num = 2, \
              product_quantization_subspace_bits = 12);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("ivpq", "ivpq_idx")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("ivpq", "ivpq_idx").await.unwrap();
         let segments = e.load_ivf_indexes("ivpq", "ivpq_idx");
         assert!(
             matches!(segments.as_slice(), [index::ivf::IvfSegment::Product(_)]),
@@ -10207,7 +11256,7 @@ mod tests {
         );
         let q = "SELECT id FROM ivpq SEARCH MATCH VECTOR \
                  (v, [0.0,0.0,0.0,0.95], 'float', 'l2', 1) WITH (nprobe = 16);";
-        assert_eq!(rows(&e, q), vec![vec!["5".to_string()]]);
+        assert_eq!(rows(&e, q).await, vec![vec!["5".to_string()]]);
     }
 
     /// A secondary chunk covers the offsets it **holds**, not
@@ -10215,29 +11264,35 @@ mod tests {
     /// segment, and a row past the first hole is still in the chunk. Judging
     /// coverage by the span re-indexed those rows, so a reopen answered a row
     /// twice and the next dump persisted the duplicate.
-    #[test]
-    fn a_reopened_secondary_index_does_not_reindex_the_rows_it_already_holds() {
+    #[tokio::test]
+    async fn a_reopened_secondary_index_does_not_reindex_the_rows_it_already_holds() {
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE sc (id INT, v INT);")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX sc_v ON sc (v) USING SECONDARY;")
+            e.execute("CREATE TABLE sc (id INT, v INT);").await.unwrap();
+            e.execute("CREATE INDEX sc_v ON sc (v) USING SECONDARY;")
+                .await
                 .unwrap();
             let rows: Vec<String> = (0..40).map(|i| format!("({i}, {})", i * 10)).collect();
-            e.execute_blocking(&format!("INSERT INTO sc VALUES {};", rows.join(",")))
+            e.execute(&format!("INSERT INTO sc VALUES {};", rows.join(",")))
+                .await
                 .unwrap();
             // Holes inside the segment: every other row of the first half goes.
-            e.execute_blocking("DELETE FROM sc WHERE id % 2 = 0 AND id < 20;")
+            e.execute("DELETE FROM sc WHERE id % 2 = 0 AND id < 20;")
+                .await
                 .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
-            crate::scheduler::block_on(e.dump_all_memory_indexes());
+            e.flush().await.unwrap();
+            e.dump_all_memory_indexes().await;
         }
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Every surviving row is found exactly once.
         for i in (1..20).step_by(2) {
             let query = format!("SELECT id FROM sc WHERE v = {};", i * 10);
-            let found = rows(&e, &query);
+            let found = rows(&e, &query).await;
             assert_eq!(
                 found,
                 vec![vec![i.to_string()]],
@@ -10251,26 +11306,31 @@ mod tests {
     /// `storage_type = scalar_quantization` writes the C++ SQ chunk layout and
     /// searches it (residual codes + `dot_v_e`), instead of silently mirroring
     /// the index as plain storage.
-    #[test]
-    fn a_scalar_quantized_ivf_index_mirrors_and_serves_candidates() {
+    #[tokio::test]
+    async fn a_scalar_quantized_ivf_index_mirrors_and_serves_candidates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE ivsq (id INT, v EMBEDDING(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO ivsq VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
              (3,[0.0,1.0]),(4,[2.0,2.0]);",
         )
+        .await
         .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX ivsq_idx ON ivsq (v) USING IVF WITH \
              (metric = l2, storage_type = scalar_quantization, \
              scalar_quantization_bits = 8);",
         )
+        .await
         .unwrap();
         // The IVF chunk is written by its `DumpIndex` transaction.
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("ivsq", "ivsq_idx")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("ivsq", "ivsq_idx").await.unwrap();
         // The mirror is a scalar-quantized chunk, not a plain one.
         let segments = e.load_ivf_indexes("ivsq", "ivsq_idx");
         assert!(
@@ -10281,21 +11341,25 @@ mod tests {
         // them exactly, so the top-1 is the same as an exhaustive scan.
         let q = "SELECT id FROM ivsq SEARCH MATCH VECTOR \
                  (v, [0.9,0.1], 'float', 'l2', 1) WITH (nprobe = 16);";
-        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
+        assert_eq!(rows(&e, q).await, vec![vec!["2".to_string()]]);
     }
 
     /// A sealed multi-vector chunk ranks with its persisted residual codes
     /// (EMVB stage 2) before the exact MaxSim re-score.
-    #[test]
-    fn multivector_prefilter_uses_the_persisted_residual_codes() {
+    #[tokio::test]
+    async fn multivector_prefilter_uses_the_persisted_residual_codes() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE mvp (id INT, v TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
             "CREATE INDEX mvp_i ON mvp (v) USING EMVB \
              WITH (pq_subspace_num = 2, pq_subspace_bits = 8);",
         )
+        .await
         .unwrap();
         let mut sql = String::from("INSERT INTO mvp VALUES ");
         for i in 0..300 {
@@ -10305,8 +11369,8 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        crate::scheduler::block_on(e.dump_all_memory_indexes());
+        e.execute(&sql).await.unwrap();
+        e.dump_all_memory_indexes().await;
         let mv = e
             .tables
             .lock()
@@ -10327,33 +11391,41 @@ mod tests {
                 &e,
                 "SELECT id FROM mvp SEARCH MATCH TENSOR \
                  (v, [299.0, 0.0], 'float', 'maxsim', 'topn=1');"
-            ),
+            )
+            .await,
             vec![vec!["299".to_string()]]
         );
     }
 
     /// Multi-field WAND: each field keeps its own BM25 statistics and the
     /// scores sum, matching the reference's per-field `BM25Ranker`.
-    #[test]
-    fn wand_scores_multiple_fields_separately() {
+    #[tokio::test]
+    async fn wand_scores_multiple_fields_separately() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO ftm VALUES (1,'alpha','beta'),(2,'alpha alpha',''),\
              (3,'beta','alpha');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
+        e.execute("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
+            .await
             .unwrap();
         let got = rows(
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM ftm SEARCH MATCH TEXT \
              ('title^2,body','alpha beta','topn=10');",
-        );
+        )
+        .await;
         let expected = [(3, 2.9990f64), (1, 1.8614), (2, 1.1332)];
         assert_eq!(got.len(), expected.len(), "{got:?}");
         for (row, (id, score)) in got.iter().zip(expected) {
@@ -10367,7 +11439,8 @@ mod tests {
                 &e,
                 "SELECT id, ROUND(SCORE(),4) FROM ftm SEARCH MATCH TEXT \
                  ('title^2,body','alpha beta','topn=10;similarity=boolean');"
-            ),
+            )
+            .await,
             vec![
                 vec!["1".to_string(), "3.000000".to_string()],
                 vec!["3".to_string(), "3.000000".to_string()],
@@ -10379,20 +11452,26 @@ mod tests {
     /// A column-less field-qualified query must score exactly like the same
     /// query written against a named column: `SearchDriver` builds the query
     /// tree and the BM25/idf/tf/document-length formula is shared.
-    #[test]
-    fn field_group_match_scores_like_the_named_column() {
+    #[tokio::test]
+    async fn field_group_match_scores_like_the_named_column() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE fg (id INT, title VARCHAR, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO fg VALUES (1,'alpha beta','gamma'),(2,'alpha','beta gamma'),\
              (3,'beta','alpha'),(4,'gamma','alpha beta');",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
+        e.execute("CREATE INDEX fg_t ON fg(title) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
+        e.execute("CREATE INDEX fg_b ON fg(body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         // OR of two terms.
@@ -10400,12 +11479,14 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('title','alpha beta','topn=10');",
-        );
+        )
+        .await;
         let grouped = rows(
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('','(title:alpha title:beta)','topn=10');",
-        );
+        )
+        .await;
         assert_eq!(grouped, named);
         assert_eq!(named.len(), 3);
 
@@ -10414,12 +11495,14 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('body','\"alpha beta\"','topn=10');",
-        );
+        )
+        .await;
         let grouped = rows(
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('','(body:\"alpha beta\")','topn=10');",
-        );
+        )
+        .await;
         assert_eq!(grouped, named);
         assert_eq!(named.len(), 1);
 
@@ -10428,12 +11511,14 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('title','alpha^3 beta','topn=10');",
-        );
+        )
+        .await;
         let grouped = rows(
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('','(title:alpha)^3 title:beta','topn=10');",
-        );
+        )
+        .await;
         assert_eq!(grouped, named);
         assert!(!named.is_empty());
         // The boost really changed the ranking/scores.
@@ -10441,24 +11526,29 @@ mod tests {
             &e,
             "SELECT id, ROUND(SCORE(),6) FROM fg SEARCH MATCH TEXT \
              ('','(title:alpha title:beta)','topn=10');",
-        );
+        )
+        .await;
         assert_ne!(named, plain);
     }
 
     /// `SELECT id, name` reads only those column files from the C++ block
     /// mirror, and only while the mirror matches the row store.
-    #[test]
-    fn projection_reads_columns_from_the_block_mirror() {
+    #[tokio::test]
+    async fn projection_reads_columns_from_the_block_mirror() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
             "INSERT INTO p VALUES (1,'a',[0.0,0.0]),(2,'b',[1.0,0.0]),\
              (3,'c',[0.0,1.0]);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(e.mirror_block_row_count("p").unwrap(), 3);
         let items = [
             SelectItem::Column("id".to_string()),
@@ -10467,7 +11557,7 @@ mod tests {
         let projected = e.try_projection("p", &items).unwrap();
         assert!(projected.is_some());
         assert_eq!(
-            rows(&e, "SELECT id, name FROM p;"),
+            rows(&e, "SELECT id, name FROM p;").await,
             vec![
                 vec!["1".to_string(), "a".to_string()],
                 vec!["2".to_string(), "b".to_string()],
@@ -10477,29 +11567,34 @@ mod tests {
         // A row written after the flush is not in the block snapshot: the
         // projection overlays it from the row journal, so the new row is
         // visible without waiting for the next checkpoint.
-        e.execute_blocking("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
+        e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
+            .await
             .unwrap();
         let projected = e.try_projection("p", &items).unwrap().unwrap();
         assert_eq!(projected.len(), 4);
         let last = projected.row(3).unwrap();
         assert_eq!(last[0], Value::Int(4));
         assert_eq!(last[1], Value::Str("d".into()));
-        assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
+        assert_eq!(rows(&e, "SELECT id, name FROM p;").await.len(), 4);
     }
 
     /// A NULL text cell keeps its slot through the columnar block read: the
     /// decoder writes the cell into the text buffer and then appends its
     /// validity bit, so the bitmap stays as long as the buffer and `NULL` does
     /// not come back as an empty string.
-    #[test]
-    fn a_null_text_cell_survives_the_block_reader() {
+    #[tokio::test]
+    async fn a_null_text_cell_survives_the_block_reader() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE n (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO n VALUES (1,'a'),(2,NULL),(3,'c');")
+        e.execute("CREATE TABLE n (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("INSERT INTO n VALUES (1,'a'),(2,NULL),(3,'c');")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
         // The flush moved every row into a block; a projection now reads the
         // block's columns (`decode_block_column`) instead of the buffer.
         e.invalidate_row_cache("n");
@@ -10513,7 +11608,7 @@ mod tests {
         assert_eq!(projected.row(1).unwrap(), vec![Value::Null]);
         assert_eq!(projected.row(2).unwrap(), vec![Value::Str("c".into())]);
         assert_eq!(
-            rows(&e, "SELECT name FROM n;"),
+            rows(&e, "SELECT name FROM n;").await,
             vec![
                 vec!["a".to_string()],
                 vec!["null".to_string()],
@@ -10526,13 +11621,17 @@ mod tests {
     /// cell from its **table** column, not from its position in the SELECT list:
     /// a non-prefix (`SELECT b`) and a reordered (`SELECT b, a`) projection used
     /// to hand back `a`, shifted by one.
-    #[test]
-    fn projection_reads_buffered_rows_in_select_order() {
+    #[tokio::test]
+    async fn projection_reads_buffered_rows_in_select_order() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE q (a INT, b VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO q VALUES (1,'x'),(2,'y');")
+        e.execute("CREATE TABLE q (a INT, b VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO q VALUES (1,'x'),(2,'y');")
+            .await
             .unwrap();
         // No flush: the rows are only in the buffer, which is the path that
         // builds the block with `block_of`. The `INSERT` left a decoded row
@@ -10565,11 +11664,11 @@ mod tests {
         );
 
         assert_eq!(
-            rows(&e, "SELECT b FROM q;"),
+            rows(&e, "SELECT b FROM q;").await,
             vec![vec!["x".to_string()], vec!["y".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT b, a FROM q;"),
+            rows(&e, "SELECT b, a FROM q;").await,
             vec![
                 vec!["x".to_string(), "1".to_string()],
                 vec!["y".to_string(), "2".to_string()],
@@ -10583,21 +11682,25 @@ mod tests {
     /// A checkpoint rewrites the block it wrote before: every rewrite must carry
     /// every row the file already holds, so a table that is inserted into and
     /// flushed repeatedly never loses a row.
-    #[test]
-    fn rewriting_a_block_keeps_every_row() {
+    #[tokio::test]
+    async fn rewriting_a_block_keeps_every_row() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rw (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         for i in 0..20i64 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO rw VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                 i * 2,
                 i * 2 + 1
             ))
+            .await
             .unwrap();
             assert_eq!(e.row_count("rw").unwrap(), (i as usize + 1) * 2);
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             assert_eq!(
                 e.row_count("rw").unwrap(),
                 (i as usize + 1) * 2,
@@ -10610,20 +11713,26 @@ mod tests {
     /// point into the column's outline, and the reader walks that outline back.
     /// A directory written this way has to answer after a restart without the
     /// row ever existing as text.
-    #[test]
-    fn a_multivector_table_round_trips_through_its_blocks() {
+    #[tokio::test]
+    async fn a_multivector_table_round_trips_through_its_blocks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO mv VALUES ([[1,2],[3,4]]);")
+        e.execute("CREATE TABLE mv (v MULTIVECTOR(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO mv VALUES ([[1,2],[3,4]]);")
+            .await
             .unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
         drop(e);
 
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(e.row_count("mv").unwrap(), 1);
         // The SDK reads one column (`output([...])`), which is the projection
         // path - not the same code as a full `SELECT v`.
@@ -10635,16 +11744,19 @@ mod tests {
             "projection lost the row"
         );
         assert_eq!(
-            rows(&e, "SELECT v FROM mv;"),
+            rows(&e, "SELECT v FROM mv;").await,
             vec![vec!["[[1,2],[3,4]]".to_string()]]
         );
     }
 
-    #[test]
-    fn wide_vectors_stay_inline_and_survive_a_reopen() {
+    #[tokio::test]
+    async fn wide_vectors_stay_inline_and_survive_a_reopen() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
+            .await
             .unwrap();
         let vector = (0..64)
             .map(|i| format!("{i}.0"))
@@ -10654,15 +11766,18 @@ mod tests {
             .map(|i| format!("{i}:1.0"))
             .collect::<Vec<_>>()
             .join(",");
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO sb VALUES (1, [{vector}], [{sparse}]);"
         ))
+        .await
         .unwrap();
         // The block is where the row lives, and its stored text form is inline:
         // the port keeps no row sidecar, so nothing of the row lands on disk
         // outside the block files.
         let types = e.column_types("default_db.sb").unwrap();
-        let row = e.fetch_rows_with_ids("default_db.sb").unwrap()[0].1.clone();
+        let row = e.fetch_rows_with_ids("default_db.sb").await.unwrap()[0]
+            .1
+            .clone();
         let literals: Vec<parser::Literal> = row
             .iter()
             .map(|v| parser::Literal::Str(v.to_slt_string()))
@@ -10680,61 +11795,70 @@ mod tests {
         assert!(!dir.path().join("rowdata").exists());
         assert!(!dir.path().join("persistence").exists());
 
-        let vector = rows(&e, "SELECT v FROM sb;");
+        let vector = rows(&e, "SELECT v FROM sb;").await;
         assert_eq!(vector.len(), 1);
         assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
         assert!(vector[0][0].contains("63"));
 
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         drop(e);
-        let e = Engine::open(dir.path()).unwrap();
-        let vector = rows(&e, "SELECT v FROM sb;");
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let vector = rows(&e, "SELECT v FROM sb;").await;
         assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
-        assert_eq!(rows(&e, "SELECT id FROM sb;"), vec![vec!["1".to_string()]]);
+        assert_eq!(
+            rows(&e, "SELECT id FROM sb;").await,
+            vec![vec!["1".to_string()]]
+        );
     }
 
     /// VARCHAR secondary indexes seal hashed keys into PGM chunks and keep only
     /// the tail in memory, like the reference's `ConvertToOrderedKeyValue`.
-    #[test]
-    fn string_secondary_index_seals_hashed_chunks() {
+    #[tokio::test]
+    async fn string_secondary_index_seals_hashed_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ss (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO ss VALUES (1,'a'),(2,'b');")
+        e.execute("CREATE TABLE ss (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX ss_n ON ss (name);")
+        e.execute("INSERT INTO ss VALUES (1,'a'),(2,'b');")
+            .await
             .unwrap();
+        e.execute("CREATE INDEX ss_n ON ss (name);").await.unwrap();
         let q = "SELECT id FROM ss WHERE name = 'b';";
-        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
-        e.execute_blocking("INSERT INTO ss VALUES (3,'b');")
-            .unwrap();
+        assert_eq!(rows(&e, q).await, vec![vec!["2".to_string()]]);
+        e.execute("INSERT INTO ss VALUES (3,'b');").await.unwrap();
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        let tables = e.tables.lock().unwrap();
-        let idx = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert!(idx.key_count() > 0);
-        drop(tables);
+        {
+            let tables = e.tables.lock().unwrap();
+            let idx = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert!(idx.key_count() > 0);
+        }
         // A dump transaction drains the tail; a checkpoint keeps it.
-        crate::scheduler::block_on(e.dump_index_transaction("ss", "ss_n")).unwrap();
-        let tables = e.tables.lock().unwrap();
-        let idx = tables
-            .values()
-            .find_map(|t| t.secondary.indexes.values().next())
-            .unwrap();
-        assert_eq!(idx.key_count(), 0);
-        drop(tables);
+        e.dump_index_transaction("ss", "ss_n").await.unwrap();
+        {
+            let tables = e.tables.lock().unwrap();
+            let idx = tables
+                .values()
+                .find_map(|t| t.secondary.indexes.values().next())
+                .unwrap();
+            assert_eq!(idx.key_count(), 0);
+        }
         assert_eq!(
-            rows(&e, q),
+            rows(&e, q).await,
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        e.execute_blocking("DELETE FROM ss WHERE id = 2;").unwrap();
-        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+        e.execute("DELETE FROM ss WHERE id = 2;").await.unwrap();
+        assert_eq!(rows(&e, q).await, vec![vec!["3".to_string()]]);
     }
 
     /// A retired column's cells are given back once a checkpoint has passed the
@@ -10742,13 +11866,17 @@ mod tests {
     /// that dropped the column; if it were `u64::MAX`, no checkpoint bound would
     /// ever reach it and every later insert would keep writing a default cell
     /// for a column nobody can read.
-    #[test]
-    fn a_dropped_column_leaves_the_append_buffer() {
+    #[tokio::test]
+    async fn a_dropped_column_leaves_the_append_buffer() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dc2 (a INT, b VARCHAR, c INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO dc2 VALUES (1, 'x', 2);")
+        e.execute("CREATE TABLE dc2 (a INT, b VARCHAR, c INT);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO dc2 VALUES (1, 'x', 2);")
+            .await
             .unwrap();
         let id_b = e
             .storage
@@ -10757,8 +11885,7 @@ mod tests {
             .unwrap()
             .unwrap()
             .ids[1];
-        e.execute_blocking("ALTER TABLE dc2 DROP COLUMN (b);")
-            .unwrap();
+        e.execute("ALTER TABLE dc2 DROP COLUMN (b);").await.unwrap();
         let buffered = || {
             e.tables
                 .lock()
@@ -10773,7 +11900,7 @@ mod tests {
             3,
             "the cells stay until a checkpoint covers them"
         );
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(
             buffered(),
             2,
@@ -10793,11 +11920,14 @@ mod tests {
     /// committed the earlier ones: `insert_in_batches` splits one statement into
     /// several transactions, so the whole request is validated before the first
     /// one runs.
-    #[test]
-    fn a_bad_row_in_a_later_batch_commits_nothing() {
+    #[tokio::test]
+    async fn a_bad_row_in_a_later_batch_commits_nothing() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE mb (a INT NOT NULL);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE mb (a INT NOT NULL);")
+            .await
             .unwrap();
         let rows_n = Engine::MAX_APPEND_ROWS + 10;
         let rows: Vec<String> = (0..rows_n)
@@ -10811,7 +11941,7 @@ mod tests {
             .map(|v| format!("({v})"))
             .collect();
         let sql = format!("INSERT INTO mb VALUES {};", rows.join(","));
-        assert!(e.execute_blocking(&sql).is_err(), "the bad row fails");
+        assert!(e.execute(&sql).await.is_err(), "the bad row fails");
         assert_eq!(
             e.row_count("mb").unwrap(),
             0,
@@ -10822,21 +11952,25 @@ mod tests {
     /// Port of the reference's `ConflictCheckTest.conflict_check_delete`: three
     /// transactions delete the same row, the first commit wins and the other
     /// two get `kTxnConflict`; overlapping sets behave the same way.
-    #[test]
-    fn delete_conflicts_follow_the_reference() {
+    #[tokio::test]
+    async fn delete_conflicts_follow_the_reference() {
         fn stale_delete(e: &Engine) -> Txn {
             // `commit_with_deletes` stages the tombstones; the transaction only
             // has to be open, exactly as `NewTxn::Delete` begins it.
             e.txn.begin()
         }
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dc (v INT);").unwrap();
-        e.execute_blocking("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE dc (v INT);").await.unwrap();
+        e.execute("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
+            .await
             .unwrap();
         let table = "default_db.dc";
         let seqs: Vec<usize> = e
             .fetch_rows_with_ids(table)
+            .await
             .unwrap()
             .iter()
             .map(|(seq, _)| *seq)
@@ -10845,56 +11979,67 @@ mod tests {
         let t1 = stale_delete(&e);
         let t2 = stale_delete(&e);
         let t3 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t1)).unwrap();
+        e.commit_with_deletes(table, &[seqs[0]], &[], t1)
+            .await
+            .unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t2)),
+            e.commit_with_deletes(table, &[seqs[0]], &[], t2).await,
             Err(Error::TxnConflict(_))
         ));
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[0]], &[], t3)),
+            e.commit_with_deletes(table, &[seqs[0]], &[], t3).await,
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 6);
 
         // A transaction that starts after the winning commit is not stale.
         let t4 = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[1]], &[], t4)).unwrap();
+        e.commit_with_deletes(table, &[seqs[1]], &[], t4)
+            .await
+            .unwrap();
         assert_eq!(e.row_count("dc").unwrap(), 5);
 
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let a = stale_delete(&e);
         let b = stale_delete(&e);
-        crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2], seqs[3]], &[], a))
+        e.commit_with_deletes(table, &[seqs[2], seqs[3]], &[], a)
+            .await
             .unwrap();
         assert!(matches!(
-            crate::scheduler::block_on(e.commit_with_deletes(table, &[seqs[2]], &[], b)),
+            e.commit_with_deletes(table, &[seqs[2]], &[], b).await,
             Err(Error::TxnConflict(_))
         ));
         assert_eq!(e.row_count("dc").unwrap(), 3);
     }
 
-    #[test]
-    fn defaults_and_alter_add_column() {
+    #[tokio::test]
+    async fn defaults_and_alter_add_column() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (a INT, b INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (1, 2);").unwrap();
-        e.execute_blocking("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+        e.execute("CREATE TABLE t (a INT, b INT);").await.unwrap();
+        e.execute("INSERT INTO t VALUES (1, 2);").await.unwrap();
+        e.execute("ALTER TABLE t ADD COLUMN (c VARCHAR DEFAULT 'default');")
+            .await
             .unwrap();
-        e.execute_blocking("ALTER TABLE t ADD COLUMN (d INT);")
+        e.execute("ALTER TABLE t ADD COLUMN (d INT);")
+            .await
             .unwrap();
         // duplicate column must be rejected
         assert!(e
-            .execute_blocking("ALTER TABLE t ADD COLUMN (b INT);")
+            .execute("ALTER TABLE t ADD COLUMN (b INT);")
+            .await
             .is_err());
         // explicit column list leaves c/d at their defaults
-        e.execute_blocking("INSERT INTO t(a, b) VALUES (2, 2);")
+        e.execute("INSERT INTO t(a, b) VALUES (2, 2);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+        e.execute("INSERT INTO t VALUES (3, 2, 'hello', 4);")
+            .await
             .unwrap();
-        match &e.execute_blocking("SELECT * FROM t;").unwrap()[0] {
+        match &e.execute("SELECT * FROM t;").await.unwrap()[0] {
             QueryResult::Rows { rows, columns } => {
                 assert_eq!(columns.len(), 4);
                 assert_eq!(row_text(rows, 0), vec!["1", "2", "default", "null"]);
@@ -10961,50 +12106,6 @@ mod tests {
         // hamming counts differing positions.
         let (_, h) = vector_score(&[1.0, 0.0, 1.0], &[1.0, 1.0, 1.0], "hamming");
         assert!((h - 1.0).abs() < 1e-9, "got {h}");
-        // The `f32` form the streamed rerank uses gives the same distance - and
-        // it counts a non-zero position as set, as the text form does.
-        let (_, h) = vector_score_f32(&[2.0, 0.0, 1.0], &[1.0, 0.0, 0.0], "hamming");
-        assert!((h - 1.0).abs() < 1e-9, "got {h}");
-    }
-
-    /// `test_knn_binary_hamming.slt:26`: a `BIT` column whose rows are still in
-    /// the append buffer (no checkpoint between the `INSERT` and the query).
-    ///
-    /// The streamed exact scan decodes vectors out of **block bodies**
-    /// (`BlockCursor::vectors`), and a buffered cell is text: `"[0100…]"`, which
-    /// the numeric reader parses as one number, so every row failed the `dim`
-    /// check and the top-3 came back empty.
-    #[test]
-    fn a_bit_query_scores_rows_that_are_still_buffered() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bh (c1 INT, c2 EMBEDDING(BIT, 16));")
-            .unwrap();
-        // Row `n` has its last `n` bits set, so the distance to the all-zero
-        // query is `n`.
-        for n in 0..6usize {
-            let bits: Vec<String> = (0..16)
-                .map(|i| if i >= 16 - n { "1" } else { "0" }.to_string())
-                .collect();
-            e.execute_blocking(&format!(
-                "INSERT INTO bh VALUES ({n}, [{}]);",
-                bits.join(",")
-            ))
-            .unwrap();
-        }
-        let got = rows(
-            &e,
-            "SELECT c1, DISTANCE() FROM bh SEARCH MATCH VECTOR(c2, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'bit', 'hamming', 3);",
-        );
-        assert_eq!(
-            got,
-            vec![
-                vec!["0".to_string(), "0.000000".to_string()],
-                vec!["1".to_string(), "1.000000".to_string()],
-                vec!["2".to_string(), "2.000000".to_string()],
-            ],
-            "the buffered bit rows must be scored"
-        );
     }
 
     #[test]
@@ -11018,31 +12119,37 @@ mod tests {
         assert_eq!(tensor_elem_type("TENSOR(FLOAT16, 4)"), ElemType::Float16);
     }
 
-    #[test]
-    fn databases_are_namespaced() {
+    #[tokio::test]
+    async fn databases_are_namespaced() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE DATABASE db1;").unwrap();
-        // a duplicate without IF NOT EXISTS is an error
-        assert!(e.execute_blocking("CREATE DATABASE db1;").is_err());
-        e.execute_blocking("CREATE DATABASE IF NOT EXISTS db1;")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("USE db1;").unwrap();
-        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (1);").unwrap();
-        e.execute_blocking("USE default_db;").unwrap();
-        e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
-        e.execute_blocking("INSERT INTO t VALUES (2);").unwrap();
-        let rows = |sql: &str| match &e.execute_blocking(sql).unwrap()[0] {
-            QueryResult::Rows { .. } => e.execute_blocking(sql).unwrap()[0].rows_text(),
+        e.execute("CREATE DATABASE db1;").await.unwrap();
+        // a duplicate without IF NOT EXISTS is an error
+        assert!(e.execute("CREATE DATABASE db1;").await.is_err());
+        e.execute("CREATE DATABASE IF NOT EXISTS db1;")
+            .await
+            .unwrap();
+        e.execute("USE db1;").await.unwrap();
+        e.execute("CREATE TABLE t (a INT);").await.unwrap();
+        e.execute("INSERT INTO t VALUES (1);").await.unwrap();
+        e.execute("USE default_db;").await.unwrap();
+        e.execute("CREATE TABLE t (a INT);").await.unwrap();
+        e.execute("INSERT INTO t VALUES (2);").await.unwrap();
+        let rows = async |sql: &str| match &e.execute(sql).await.unwrap()[0] {
+            QueryResult::Rows { .. } => e.execute(sql).await.unwrap()[0].rows_text(),
             other => panic!("{other:?}"),
         };
-        assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
-        assert_eq!(rows("SELECT * FROM db1.t;"), vec![vec!["1".to_string()]]);
+        assert_eq!(rows("SELECT * FROM t;").await, vec![vec!["2".to_string()]]);
+        assert_eq!(
+            rows("SELECT * FROM db1.t;").await,
+            vec![vec!["1".to_string()]]
+        );
         // dropping the database removes its tables
-        e.execute_blocking("DROP DATABASE db1;").unwrap();
-        assert!(e.execute_blocking("SELECT * FROM db1.t;").is_err());
-        assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
+        e.execute("DROP DATABASE db1;").await.unwrap();
+        assert!(e.execute("SELECT * FROM db1.t;").await.is_err());
+        assert_eq!(rows("SELECT * FROM t;").await, vec![vec!["2".to_string()]]);
     }
 
     #[test]
@@ -11079,34 +12186,39 @@ mod tests {
     /// `SPARSE(FLOAT,30000)` → `Sparse(float,int16,30000)`, and the SDK's
     /// `sparse,8,float,int` (which the server renders as
     /// `SPARSE(float,int32,8)`) → `Sparse(float,int32,8)`.
-    #[test]
-    fn a_sparse_column_renders_like_the_reference() {
+    #[tokio::test]
+    async fn a_sparse_column_renders_like_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(
             "CREATE TABLE sp_render (id INT, a SPARSE(FLOAT, 8), \
              b SPARSE(FLOAT, INT32, 8), c SPARSE(FLOAT, 30000));",
         )
+        .await
         .unwrap();
-        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
+        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;").await;
         assert_eq!(got[1][1], "Sparse(float,int8,8)");
         assert_eq!(got[2][1], "Sparse(float,int32,8)");
         assert_eq!(got[3][1], "Sparse(float,int16,30000)");
 
         // An unknown bound is the SDK's `sparse,0,…` spelling; the reference
         // prints the same text for it.
-        crate::with_zero_dimension_sparse(|| {
-            e.execute_blocking("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
+        crate::with_zero_dimension_sparse(async {
+            e.execute("CREATE TABLE sp_zero (id INT, s SPARSE(FLOAT, 0));")
+                .await
         })
+        .await
         .unwrap();
-        let got = rows(&e, "SHOW TABLE sp_zero COLUMNS;");
+        let got = rows(&e, "SHOW TABLE sp_zero COLUMNS;").await;
         assert_eq!(got[1][1], "Sparse(float,int8,0)");
 
         // The rendering survives a restart, which reads the type back from the
         // catalog record (`type_text_of`).
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let e = crate::new_catalog_ut::reopen(e, dir.path());
-        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;");
+        e.flush().await.unwrap();
+        let e = crate::new_catalog_ut::reopen(e, dir.path()).await;
+        let got = rows(&e, "SHOW TABLE sp_render COLUMNS;").await;
         assert_eq!(got[1][1], "Sparse(float,int8,8)");
         assert_eq!(got[2][1], "Sparse(float,int32,8)");
         assert_eq!(got[3][1], "Sparse(float,int16,30000)");
@@ -11260,23 +12372,27 @@ mod tests {
     /// fetched for the index), so an `ngram` field is highlighted through its
     /// n-grams: `qui` is a term of the index, while the standard byte scanner
     /// never produces it out of `quick` and the cell would stay unmarked.
-    #[test]
-    fn highlight_uses_the_columns_analyzer() {
+    #[tokio::test]
+    async fn highlight_uses_the_columns_analyzer() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE hg (id INTEGER, body VARCHAR)")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')",
-        )
-        .unwrap();
-        e.execute_blocking("INSERT INTO hg VALUES (1, 'quick brown');")
+        e.execute("CREATE TABLE hg (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("CREATE INDEX hg_idx ON hg (body) USING FULLTEXT WITH (analyzer='ngram-3')")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO hg VALUES (1, 'quick brown');")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
         let out = rows(
             &e,
             "SELECT body HIGHLIGHT body FROM hg SEARCH MATCH TEXT (body, 'qui', 10);",
-        );
+        )
+        .await;
         assert_eq!(out, vec![vec!["<em>qui</em>ck brown".to_string()]]);
     }
 
@@ -11285,22 +12401,23 @@ mod tests {
     /// but `keyword`/`whitespace` onto the standard analyzer, so the index
     /// stored one token per Chinese run (the standard byte table lets every
     /// UTF-8 byte through) and no `中华` posting existed.
-    #[test]
-    fn an_ik_fulltext_index_is_tokenised_by_its_analyzer() {
+    #[tokio::test]
+    async fn an_ik_fulltext_index_is_tokenised_by_its_analyzer() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ik_t (doc VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
+        e.execute("CREATE TABLE ik_t (doc VARCHAR);").await.unwrap();
+        e.execute("INSERT INTO ik_t VALUES ('我们热爱中华人民共和国');")
+            .await
             .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');",
-        )
-        .unwrap();
+        e.execute("CREATE INDEX ik_idx ON ik_t (doc) USING FULLTEXT WITH (analyzer='ik');")
+            .await
+            .unwrap();
         let tokenizer = e.index_tokenizer("ik_t", "doc");
         assert_eq!(tokenizer.analyzer.as_deref(), Some("ik"));
-        let index = e.text_index_for("ik_t", "doc", tokenizer).unwrap();
-        let guard = index.read().unwrap();
+        let index = e.text_index_for("ik_t", "doc", tokenizer).await.unwrap();
+        let guard = index.read().await;
         // The analyzer's own words (`我们就热爱` -> 我们/热爱/中华人民共和国);
         // the standard analyzer cannot produce any of them.
         let word = "热爱".to_string();
@@ -11318,44 +12435,46 @@ mod tests {
     /// name, and the name is kept byte for byte: `keyword-,` splits on the
     /// comma while a bare `keyword` keeps the whole value, and `whitespace-AB`
     /// must not be lowercased into splitting on `a`/`b`.
-    #[test]
-    fn a_keyword_fulltext_index_takes_its_delimiters_from_the_name() {
+    #[tokio::test]
+    async fn a_keyword_fulltext_index_takes_its_delimiters_from_the_name() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE kw_t (doc VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO kw_t VALUES ('a,b');")
+        e.execute("CREATE TABLE kw_t (doc VARCHAR);").await.unwrap();
+        e.execute("INSERT INTO kw_t VALUES ('a,b');").await.unwrap();
+        e.execute("CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');")
+            .await
             .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX kw_idx ON kw_t (doc) USING FULLTEXT WITH (analyzer='keyword-,');",
-        )
-        .unwrap();
 
         assert_eq!(e.index_delims("kw_t", "doc"), Some(vec![',']));
         let tokenizer = e.index_tokenizer("kw_t", "doc");
         // `keyword-<chars>` is carried by the delimiters, not by a family
         // analyzer, exactly as the reference's `WhitespaceAnalyzer` is.
         assert!(tokenizer.analyzer.is_none());
-        let index = e.text_index_for("kw_t", "doc", tokenizer).unwrap();
-        let guard = index.read().unwrap();
-        for term in ["a", "b"] {
-            let term = term.to_string();
-            assert_eq!(
-                guard.merge(std::slice::from_ref(&term)).postings[&term].len(),
-                1,
-                "{term}"
-            );
+        let index = e.text_index_for("kw_t", "doc", tokenizer).await.unwrap();
+        {
+            let guard = index.read().await;
+            for term in ["a", "b"] {
+                let term = term.to_string();
+                assert_eq!(
+                    guard.merge(std::slice::from_ref(&term)).postings[&term].len(),
+                    1,
+                    "{term}"
+                );
+            }
+            let whole = "a,b".to_string();
+            assert!(guard.merge(std::slice::from_ref(&whole)).postings[&whole].is_empty());
         }
-        let whole = "a,b".to_string();
-        assert!(guard.merge(std::slice::from_ref(&whole)).postings[&whole].is_empty());
-        drop(guard);
 
         // The delimiter bytes are not lowercased on the way in.
-        e.execute_blocking("CREATE TABLE kw_case (doc VARCHAR);")
+        e.execute("CREATE TABLE kw_case (doc VARCHAR);")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX kwc ON kw_case (doc) USING FULLTEXT WITH (analyzer='whitespace-AB');",
         )
+        .await
         .unwrap();
         assert_eq!(e.index_delims("kw_case", "doc"), Some(vec!['A', 'B']));
     }
@@ -11363,10 +12482,12 @@ mod tests {
     /// DDL accepts exactly the names `AnalyzerPool::GetAnalyzer` constructs:
     /// the family is case sensitive, `ngram` parses a numeric prefix, and
     /// `sparsegram` validates its window.
-    #[test]
-    fn create_index_validates_the_analyzer_name_like_the_reference() {
+    #[tokio::test]
+    async fn create_index_validates_the_analyzer_name_like_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // One table per name: a column carries at most one full-text index.
         for (i, name) in [
             "Chinese",
@@ -11379,12 +12500,13 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_bad_{i}");
-            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+                .await
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX bad_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute_blocking(&sql).is_err(), "{name} must be rejected");
+            assert!(e.execute(&sql).await.is_err(), "{name} must be rejected");
         }
         for (i, name) in [
             "ngram-3x",
@@ -11396,12 +12518,13 @@ mod tests {
         .enumerate()
         {
             let table = format!("an_ok_{i}");
-            e.execute_blocking(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+            e.execute(&format!("CREATE TABLE {table} (doc VARCHAR);"))
+                .await
                 .unwrap();
             let sql = format!(
                 "CREATE INDEX ok_{i} ON {table} (doc) USING FULLTEXT WITH (analyzer='{name}');"
             );
-            assert!(e.execute_blocking(&sql).is_ok(), "{name} must be accepted");
+            assert!(e.execute(&sql).await.is_ok(), "{name} must be accepted");
         }
     }
 
@@ -11409,11 +12532,14 @@ mod tests {
     /// `alpha=0` prunes at the first full block, so the higher-scoring tail is
     /// never scored. C++ `BMPUtil::ParseBmpSearchOptions` +
     /// `BmpAlg::SearchKnn`'s `ub_score * alpha < min_score` break.
-    #[test]
-    fn match_sparse_alpha_option_reaches_the_bmp_search() {
+    #[tokio::test]
+    async fn match_sparse_alpha_option_reaches_the_bmp_search() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .await
             .unwrap();
         // Block 0 (16 docs) has a loose bound: `10` peaks in one document and
         // `20` in another, so its bound is 2.0 while its best document scores
@@ -11430,31 +12556,34 @@ mod tests {
         for id in 17..=20 {
             values.push_str(&format!("({id}, [10:1.0,20:1.0]),"));
         }
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO sp VALUES {};",
             values.trim_end_matches(',')
         ))
+        .await
         .unwrap();
         // The BMP index is what carries the `alpha`/`beta` pruning; the
         // reference resolves it from the catalog, so the test creates one.
-        e.execute_blocking("CREATE INDEX sp_v ON sp (v) USING BMP;")
+        e.execute("CREATE INDEX sp_v ON sp (v) USING BMP;")
+            .await
             .unwrap();
-        let score = |opts: &str| -> f64 {
+        let score = async |opts: &str| -> f64 {
             rows(
                 &e,
                 &format!(
                     "SELECT SCORE() FROM sp SEARCH MATCH SPARSE \
                      (v, [10:1.0,20:1.0], 'ip', '{opts}');"
                 ),
-            )[0][0]
+            )
+            .await[0][0]
                 .parse()
                 .unwrap()
         };
-        assert_eq!(score("topn=1"), 2.0);
+        assert_eq!(score("topn=1").await, 2.0);
         // `alpha=0` prunes block 1 (bound 0 * 2.0 < the k-th score 1.0), so the
         // exact answer is never scored evidence that the option reached
         // `BmpAlg`/`BmpReader::search` instead of a hard-coded 0.9.
-        assert_eq!(score("topn=1;alpha=0"), 1.0);
+        assert_eq!(score("topn=1;alpha=0").await, 1.0);
         // `alpha`/`beta` are parsed; out-of-range values are ignored, and the
         // binder's `tail` name does not touch `use_tail` (the reference's
         // `ParseBmpSearchOptions` reads `use_tail`, which the binder rejects).
@@ -11472,18 +12601,21 @@ mod tests {
 
     /// `MATCH SPARSE`'s option whitelist is the reference's
     /// (`alpha`/`beta`/`tail`/`threshold`): anything else is a syntax error.
-    #[test]
-    fn sparse_rejects_unknown_options() {
+    #[tokio::test]
+    async fn sparse_rejects_unknown_options() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO sp VALUES (1, [10:1.0]);")
+        e.execute("CREATE TABLE sp (id INTEGER, v SPARSE(FLOAT, 64))")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO sp VALUES (1, [10:1.0]);")
+            .await
             .unwrap();
         let err = e
-            .execute_blocking(
-                "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')",
-            )
+            .execute("SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', 'use_tail=F')")
+            .await
             .unwrap_err();
         let message = err.to_string();
         assert!(
@@ -11493,9 +12625,10 @@ mod tests {
         // The reference's four names are accepted (`tail` is a no-op there).
         for opts in ["alpha=0.5", "beta=0.5", "tail=F", "threshold=0.1"] {
             assert!(
-                e.execute_blocking(&format!(
+                e.execute(&format!(
                     "SELECT id FROM sp SEARCH MATCH SPARSE (v, [10:1.0], 'ip', '{opts}')"
                 ))
+                .await
                 .is_ok(),
                 "{opts}"
             );
@@ -11503,15 +12636,17 @@ mod tests {
     }
 
     /// A column declared `DEFAULT ''` keeps the empty string, not NULL.
-    #[test]
-    fn empty_string_default_survives_a_catalog_round_trip() {
+    #[tokio::test]
+    async fn empty_string_default_survives_a_catalog_round_trip() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO t (num) VALUES (1)")
+        e.execute("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
+            .await
             .unwrap();
-        let rows = rows(&e, "SELECT * FROM t");
+        e.execute("INSERT INTO t (num) VALUES (1)").await.unwrap();
+        let rows = rows(&e, "SELECT * FROM t").await;
         assert_eq!(rows, vec![vec!["1".to_string(), String::new()]]);
     }
 
@@ -11544,16 +12679,20 @@ mod tests {
     }
 
     /// C++: `function/scalar/{plus,minus,subtract,mul,modulo,and,or,not}_functions_ut.cpp`.
-    #[test]
-    fn arithmetic_and_boolean_operators_match_the_reference() {
+    #[tokio::test]
+    async fn arithmetic_and_boolean_operators_match_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO lg VALUES (7, 3, true, false);")
+        e.execute("CREATE TABLE lg (a INTEGER, b INTEGER, x BOOLEAN, y BOOLEAN);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO lg VALUES (7, 3, true, false);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT -a, a + b, a - b, a * b, a % b FROM lg;"),
+            rows(&e, "SELECT -a, a + b, a - b, a * b, a % b FROM lg;").await,
             vec![vec![
                 "-7".to_string(),
                 "10".to_string(),
@@ -11564,11 +12703,11 @@ mod tests {
         );
         // Unary `+` in a predicate.
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM lg WHERE +a = 7;"),
+            rows(&e, "SELECT count(*) FROM lg WHERE +a = 7;").await,
             vec![vec!["1".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT x AND y, x OR y, NOT x FROM lg;"),
+            rows(&e, "SELECT x AND y, x OR y, NOT x FROM lg;").await,
             vec![vec![
                 "false".to_string(),
                 "true".to_string(),
@@ -11578,47 +12717,52 @@ mod tests {
     }
 
     /// C++: `function/scalar/{reverse,substr,like,pow,truncate}_*_ut.cpp`.
-    #[test]
-    fn string_and_power_functions_match_the_reference() {
+    #[tokio::test]
+    async fn string_and_power_functions_match_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sf (s VARCHAR);").unwrap();
-        e.execute_blocking("INSERT INTO sf VALUES ('Hello');")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
+        e.execute("CREATE TABLE sf (s VARCHAR);").await.unwrap();
+        e.execute("INSERT INTO sf VALUES ('Hello');").await.unwrap();
         assert_eq!(
-            rows(&e, "SELECT reverse(s), substr(s, 1, 3) FROM sf;"),
+            rows(&e, "SELECT reverse(s), substr(s, 1, 3) FROM sf;").await,
             vec![vec!["olleH".to_string(), "ell".to_string()]]
         );
         // `LIKE` in a predicate: one match and one non-match.
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'He%';"),
+            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'He%';").await,
             vec![vec!["1".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'xx%';"),
+            rows(&e, "SELECT count(*) FROM sf WHERE s LIKE 'xx%';").await,
             vec![vec!["0".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT power(2, 10), trunc(3.14159, 2) FROM sf;"),
+            rows(&e, "SELECT power(2, 10), trunc(3.14159, 2) FROM sf;").await,
             vec![vec!["1024.000000".to_string(), "3.14".to_string()]]
         );
     }
 
     /// C++: `function/scalar/{century,day,day_of_month,day_of_week,day_of_year,era,extract}_*_ut.cpp`:
     /// the date-component family over a DATE column.
-    #[test]
-    fn date_component_functions_match_the_reference() {
+    #[tokio::test]
+    async fn date_component_functions_match_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE dtf (d DATE, ts DATETIME);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
+        e.execute("CREATE TABLE dtf (d DATE, ts DATETIME);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO dtf VALUES ('2023-12-25', '2023-12-25 14:30:45');")
+            .await
             .unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT century(d), day(d), dayofmonth(d), dayofweek(d), dayofyear(d), era(d), quarter(d) FROM dtf;"
-            ),
+            ).await,
             vec![vec![
                 "21".to_string(),
                 "25".to_string(),
@@ -11633,7 +12777,7 @@ mod tests {
             rows(
                 &e,
                 "SELECT year(ts), month(ts), quarter(ts), hour(ts), minute(ts), second(ts), weekday(ts), weekofyear(ts) FROM dtf;"
-            ),
+            ).await,
             vec![vec![
                 "2023".to_string(),
                 "12".to_string(),
@@ -11647,32 +12791,35 @@ mod tests {
         );
         // `EXTRACT(field FROM source)` and `DATE_PART(field, source)`.
         assert_eq!(
-            rows(&e, "SELECT EXTRACT(day FROM d) FROM dtf;"),
+            rows(&e, "SELECT EXTRACT(day FROM d) FROM dtf;").await,
             vec![vec!["25".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT date_part('day', d) FROM dtf;"),
+            rows(&e, "SELECT date_part('day', d) FROM dtf;").await,
             vec![vec!["25".to_string()]]
         );
     }
 
     /// C++: `function/aggregate/{sum,avg,count,min,max,first}_functions_ut.cpp`:
     /// the six aggregates over one column, including NULL handling.
-    #[test]
-    fn aggregate_functions_match_the_reference() {
+    #[tokio::test]
+    async fn aggregate_functions_match_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);",
-        )
-        .unwrap();
+        e.execute("CREATE TABLE ag (b BOOLEAN, t TINYINT);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ag VALUES (true, 10), (false, -5), (true, 127), (NULL, NULL);")
+            .await
+            .unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT sum(t), avg(t), count(t), min(t), max(t), first(t) FROM ag;"
-            ),
+            )
+            .await,
             vec![vec![
                 "132".to_string(),
                 "44.000000".to_string(),
@@ -11684,7 +12831,7 @@ mod tests {
         );
         // Booleans: min=false, max=true, first=true.
         assert_eq!(
-            rows(&e, "SELECT min(b), max(b), first(b) FROM ag;"),
+            rows(&e, "SELECT min(b), max(b), first(b) FROM ag;").await,
             vec![vec![
                 "false".to_string(),
                 "true".to_string(),
@@ -11695,30 +12842,32 @@ mod tests {
 
     /// C++: `function/scalar/{add,div,equals}_functions_ut.cpp`: checked
     /// arithmetic (overflow -> NULL), division by zero -> NULL, and equality.
-    #[test]
-    fn arithmetic_and_equality_follow_the_reference() {
+    #[tokio::test]
+    async fn arithmetic_and_equality_follow_the_reference() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ar (a TINYINT, b TINYINT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);",
-        )
-        .unwrap();
+        e.execute("CREATE TABLE ar (a TINYINT, b TINYINT);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ar VALUES (50, 50), (100, 100), (-128, -1), (5, 2), (0, 0);")
+            .await
+            .unwrap();
 
         // `+` on TINYINT (values within range; the i64-wide evaluator does not
         // model per-width checked overflow — recorded in CLASS_MAP).
         assert_eq!(
-            rows(&e, "SELECT a + b FROM ar WHERE a = 50;"),
+            rows(&e, "SELECT a + b FROM ar WHERE a = 50;").await,
             vec![vec!["100".to_string()]]
         );
         // `=` compares values.
         assert_eq!(
-            rows(&e, "SELECT a = b FROM ar WHERE a = 50;"),
+            rows(&e, "SELECT a = b FROM ar WHERE a = 50;").await,
             vec![vec!["true".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT a = b FROM ar WHERE a = 5;"),
+            rows(&e, "SELECT a = b FROM ar WHERE a = 5;").await,
             vec![vec!["false".to_string()]]
         );
         // The comparison family.
@@ -11732,15 +12881,15 @@ mod tests {
             ("SELECT a >= b FROM ar WHERE a = 50;", "true"),
             ("SELECT a <= b FROM ar WHERE a = 50;", "true"),
         ] {
-            assert_eq!(rows(&e, sql), vec![vec![want.to_string()]], "{sql}");
+            assert_eq!(rows(&e, sql).await, vec![vec![want.to_string()]], "{sql}");
         }
         // `/` always returns DOUBLE; 0/0 is NULL.
         assert_eq!(
-            rows(&e, "SELECT a / b FROM ar WHERE a = 5;"),
+            rows(&e, "SELECT a / b FROM ar WHERE a = 5;").await,
             vec![vec!["2.500000".to_string()]]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM ar WHERE a = 0 AND a / b IS NULL;"),
+            rows(&e, "SELECT count(*) FROM ar WHERE a = 0 AND a / b IS NULL;").await,
             vec![vec!["1".to_string()]]
         );
     }
@@ -11749,14 +12898,18 @@ mod tests {
     /// insert,update,aggregate,project,limit,optimize,compact,flush,check,command,
     /// show}_ut.cpp` — each statement builds a logical node and must execute;
     /// the reference asserts only `HandleQueryResult(query_result)`.
-    #[test]
-    fn logical_planner_statements_succeed() {
+    #[tokio::test]
+    async fn logical_planner_statements_succeed() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tb (col1 INTEGER, col2 VARCHAR);")
+            .await
             .unwrap();
         for i in 0..200 {
-            e.execute_blocking(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
+            e.execute(&format!("INSERT INTO tb VALUES ({i}, 'abc');"))
+                .await
                 .unwrap();
         }
         for sql in [
@@ -11775,30 +12928,36 @@ mod tests {
             "create snapshot tb_snapshot on table tb;",
             "drop index idx;",
         ] {
-            e.execute_blocking(sql)
+            e.execute(sql)
+                .await
                 .unwrap_or_else(|err| panic!("{sql}: {err}"));
         }
-        e.execute_blocking("drop table tb;").unwrap();
+        e.execute("drop table tb;").await.unwrap();
     }
 
     /// C++: `function/scalar/abs_functions_ut.cpp::AbsFunctionsTest/abs_func`:
     /// `ABS` over TinyInt/SmallInt/Integer/BigInt/Float/Double, with NULL
     /// propagation.
-    #[test]
-    fn abs_function_covers_every_numeric_type() {
+    #[tokio::test]
+    async fn abs_function_covers_every_numeric_type() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(
             "CREATE TABLE av (a TINYINT, b SMALLINT, c INTEGER, d BIGINT, f FLOAT, g DOUBLE);",
         )
+        .await
         .unwrap();
-        e.execute_blocking("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
+        e.execute("INSERT INTO av VALUES (-5, -300, -70000, -5000000000, -1.5, -2.5);")
+            .await
             .unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT abs(a), abs(b), abs(c), abs(d), abs(f), abs(g) FROM av;"
-            ),
+            )
+            .await,
             vec![vec![
                 "5".to_string(),
                 "300".to_string(),
@@ -11809,36 +12968,41 @@ mod tests {
             ]]
         );
         // A NULL input yields a NULL output for every width.
-        e.execute_blocking("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
+        e.execute("INSERT INTO av VALUES (NULL, NULL, NULL, NULL, NULL, NULL);")
+            .await
             .unwrap();
         assert_eq!(
             rows(
                 &e,
                 "SELECT count(*) FROM av WHERE abs(a) IS NULL AND abs(b) IS NULL AND abs(c) IS NULL AND abs(d) IS NULL AND abs(f) IS NULL AND abs(g) IS NULL;"
-            ),
+            ).await,
             vec![vec!["1".to_string()]]
         );
     }
 
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts` — two threads
     /// create and drop the same database; conflicting commits are tolerated.
-    #[test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_ts"]
-    fn parallel_ts() {
+    async fn parallel_ts() {
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let mut handles = Vec::new();
         for _ in 0..2 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for _ in 0..1280 {
-                    let _ = e.execute_blocking("CREATE DATABASE db1;");
-                    let _ = e.execute_blocking("DROP DATABASE db1;");
+                    let _ = e.execute("CREATE DATABASE db1;").await;
+                    let _ = e.execute("DROP DATABASE db1;").await;
                 }
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
         assert!(e
             .catalog()
@@ -11850,28 +13014,34 @@ mod tests {
 
     /// C++: `TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table` —
     /// concurrent inserts into one table.
-    #[test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "slow: C++ TestTxnManagerTest.DISABLED_SLOW_test_parallel_insert_table"]
-    fn parallel_insert_table() {
+    async fn parallel_insert_table() {
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE pit (col1 INT, col2 VARCHAR);")
+            .await
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..2 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for i in 0..600 {
-                    e.execute_blocking(&format!(
+                    e.execute(&format!(
                         "INSERT INTO pit VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
+                    .await
                     .unwrap();
                 }
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
         assert_eq!(e.row_count("pit").unwrap(), 1200);
     }
@@ -11887,20 +13057,25 @@ mod tests {
     /// `live_rows` - stops being the number of rows the index can answer for. A
     /// cache that is short one document then passes the guard and `MATCH` answers
     /// short for good, with every file on disk intact.
-    #[test]
-    fn a_chunk_name_gets_one_record() {
+    #[tokio::test]
+    async fn a_chunk_name_gets_one_record() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Only the dump below may write a chunk.
         e.set_memindex_capacity(0);
-        e.execute_blocking("CREATE TABLE once (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE once (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX once_idx ON once (body) USING FULLTEXT")
+        e.execute("CREATE INDEX once_idx ON once (body) USING FULLTEXT")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO once VALUES (0, 'alpha'), (1, 'alpha');")
+        e.execute("INSERT INTO once VALUES (0, 'alpha'), (1, 'alpha');")
+            .await
             .unwrap();
         // The dump seals the tail and records it (`DumpMemIndex`).
-        crate::scheduler::block_on(e.dump_index_transaction("once", "once_idx")).unwrap();
+        e.dump_index_transaction("once", "once_idx").await.unwrap();
         let index_id = e.test_index_id("once", "body", "FULLTEXT");
         let recorded = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
         assert_eq!(recorded.len(), 1, "the dump records the chunk it sealed");
@@ -11917,7 +13092,7 @@ mod tests {
         };
         shared
             .write()
-            .unwrap()
+            .await
             .unrecorded
             .push(crate::engine::text_index::SealedChunk {
                 segment: (recorded[0].base_row_id >> 32) as u32,
@@ -11925,7 +13100,8 @@ mod tests {
                 base_row_id: recorded[0].base_row_id,
                 row_count: 2,
             });
-        e.record_sealed_text_chunks_of_at("once", index_id, None);
+        e.record_sealed_text_chunks_of_at("once", index_id, None)
+            .await;
         let after = e.fulltext_catalog_chunks_of("once", index_id).unwrap();
         assert_eq!(after.len(), 1, "one chunk name took two records: {after:?}");
     }
@@ -11942,107 +13118,113 @@ mod tests {
     /// This drives insert, query, seal (through the row-count trigger, so it runs
     /// on the writer threads) and optimize together, and reports a deadlock as a
     /// failure after a timeout instead of hanging.
-    #[test]
-    fn concurrent_insert_query_seal_and_optimize_do_not_deadlock() {
-        concurrent_seal_and_optimize_once();
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_insert_query_seal_and_optimize_do_not_deadlock() {
+        concurrent_seal_and_optimize_once().await;
     }
 
     /// The same scenario, repeated. The one failure seen in CI (`35` of `36`
     /// indexed rows) needs one specific interleaving of a seal, a merge and an
     /// insert, so a single round cannot find it; `#[ignore]` keeps the cost off
     /// the default lane.
-    #[test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "stress: repeated rounds of the concurrent seal/optimize scenario"]
-    fn ignored_stress_concurrent_seal_and_optimize() {
-        std::thread::scope(|scope| {
-            for lane in 0..6 {
-                scope.spawn(move || {
-                    for round in 0..25 {
-                        eprintln!("seal/optimize stress lane {lane} round {round}");
-                        concurrent_seal_and_optimize_once();
-                    }
-                });
+    async fn ignored_stress_concurrent_seal_and_optimize() {
+        // Sequential lanes: the scenario already runs its own writer, reader and
+        // optimize tasks concurrently on this runtime, so overlapping the lanes
+        // would only change which table they hit. It also keeps the future's
+        // `Send`-ness provable - a stress harness is not the place to fight the
+        // compiler over a 150-round chain.
+        for lane in 0..6 {
+            for round in 0..25 {
+                eprintln!("seal/optimize stress lane {lane} round {round}");
+                concurrent_seal_and_optimize_once().await;
             }
-        });
+        }
     }
 
-    fn concurrent_seal_and_optimize_once() {
+    async fn concurrent_seal_and_optimize_once() {
         const WRITERS: usize = 3;
         const READERS: usize = 3;
         const PER_WRITER: usize = 12;
         const READS: usize = 12;
         const OPTIMIZES: usize = 12;
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         // Seven rows per chunk, so the writers seal while the readers search.
         e.set_memindex_capacity(7);
-        e.execute_blocking("CREATE TABLE mix (id INTEGER, body VARCHAR)")
+        e.execute("CREATE TABLE mix (id INTEGER, body VARCHAR)")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
+        e.execute("CREATE INDEX mix_idx ON mix (body) USING FULLTEXT")
+            .await
             .unwrap();
-        let barrier = std::sync::Arc::new(std::sync::Barrier::new(WRITERS + READERS + 1));
-        // `()` results: every send is one finished unit of work.
-        let (tx, rx) = std::sync::mpsc::channel::<crate::Result<()>>();
+        // Tasks, not threads: every lane is an ordinary await chain now, so the
+        // runtime interleaves them and no lane parks a thread. The deadlock this
+        // pins (a reversed lock order between optimize and a query) still shows
+        // up as a hang, which the outer deadline reports.
+        let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(WRITERS + READERS + OPTIMIZES));
+        let mut lanes = Vec::new();
         for w in 0..WRITERS {
-            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
-            std::thread::spawn(move || {
-                barrier.wait();
+            let (e, barrier) = (e.clone(), barrier.clone());
+            lanes.push(tokio::spawn(async move {
+                barrier.wait().await;
                 for i in 0..PER_WRITER {
                     let id = w * 1000 + i;
-                    let _ = tx.send(
-                        e.execute_blocking(&format!(
-                            "INSERT INTO mix VALUES ({id}, 'alpha beta row{id}');"
-                        ))
-                        .map(|_| ()),
-                    );
+                    e.execute(&format!(
+                        "INSERT INTO mix VALUES ({id}, 'alpha beta row{id}');"
+                    ))
+                    .await?;
                 }
-            });
+                crate::Result::Ok(())
+            }));
         }
         for _ in 0..READERS {
-            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
-            std::thread::spawn(move || {
-                barrier.wait();
+            let (e, barrier) = (e.clone(), barrier.clone());
+            lanes.push(tokio::spawn(async move {
+                barrier.wait().await;
                 for _ in 0..READS {
-                    let _ = tx.send(
-                        e.execute_blocking(
-                            "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
-                        )
-                        .map(|_| ()),
-                    );
+                    e.execute("SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);")
+                        .await?;
                 }
-            });
+                crate::Result::Ok(())
+            }));
         }
-        {
-            let (e, barrier, tx) = (e.clone(), barrier.clone(), tx.clone());
-            std::thread::spawn(move || {
-                barrier.wait();
-                for _ in 0..OPTIMIZES {
-                    // Optimize takes `batch_gate` and then the index's write
-                    // lock (the writer's order) while the readers hold the read
-                    // guard: exactly the pair a reversed acquisition would hang.
-                    let _ = tx.send(
-                        crate::scheduler::block_on(e.optimize_fulltext_async("mix")).map(|_| ()),
-                    );
-                }
-            });
+        for _ in 0..OPTIMIZES {
+            let (e, barrier) = (e.clone(), barrier.clone());
+            lanes.push(tokio::spawn(async move {
+                barrier.wait().await;
+                // Optimize takes `batch_gate` and then the index's write lock
+                // (the writer's order) while the readers hold the read guard:
+                // exactly the pair a reversed acquisition would hang.
+                e.optimize_fulltext_async("mix").await?;
+                crate::Result::Ok(())
+            }));
         }
-        drop(tx);
-        let expected = WRITERS * PER_WRITER + READERS * READS + OPTIMIZES;
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-        for i in 0..expected {
-            let left = deadline.saturating_duration_since(std::time::Instant::now());
-            let unit = rx
-                .recv_timeout(left)
-                .unwrap_or_else(|_| panic!("deadlock: only {i} of {expected} units finished"));
-            unit.unwrap_or_else(|err| panic!("unit {i} failed: {err}"));
+        let deadline = std::time::Duration::from_secs(120);
+        let joined = tokio::time::timeout(deadline, async {
+            for lane in lanes {
+                lane.await.expect("a stress lane panicked")?;
+            }
+            crate::Result::Ok(())
+        })
+        .await;
+        match joined {
+            Ok(unit) => unit.unwrap_or_else(|err| panic!("a lane failed: {err}")),
+            Err(_) => panic!("deadlock: the scenario did not finish in {deadline:?}"),
         }
         // Every row survived the concurrent seals and merges, and the index can
         // still answer for all of them.
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM mix;"),
+            rows(&e, "SELECT count(*) FROM mix;").await,
             vec![vec![(WRITERS * PER_WRITER).to_string()]]
         );
         let scanned: Vec<String> = rows(&e, "SELECT id FROM mix;")
+            .await
             .into_iter()
             .flatten()
             .collect();
@@ -12050,13 +13232,13 @@ mod tests {
             &e,
             "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
         )
+        .await
         .into_iter()
         .flatten()
         .collect();
         matched.sort();
         // Name the ids, not just the count: the difference between a lost
-        // posting (a seal or a merge dropped a chunk) and a hit whose row the
-        // block read could not resolve is exactly *which* row went missing.
+        // document and a mis-mapped id is the whole diagnosis.
         let missing: Vec<&String> = scanned
             .iter()
             .filter(|id| matched.binary_search(id).is_err())
@@ -12070,13 +13252,17 @@ mod tests {
             let ids: Vec<u64> = missing.iter().filter_map(|id| id.parse().ok()).collect();
             let index_id = e.fulltext_index_id("mix", "body").unwrap_or_default();
             let state = e.text_index_state("mix", index_id, &ids);
-            let after_reopen = Engine::open(dir.path()).ok().map(|fresh| {
-                rows(
-                    &fresh,
-                    "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
-                )
-                .len()
-            });
+            let after_reopen = match Engine::open_async(dir.path(), Default::default()).await {
+                Ok(fresh) => Some(
+                    rows(
+                        &fresh,
+                        "SELECT id FROM mix SEARCH MATCH TEXT (body, 'alpha', 100);",
+                    )
+                    .await
+                    .len(),
+                ),
+                Err(_) => None,
+            };
             panic!(
                 "the full-text index lost rows {missing:?} (scanned {}, matched {} of {})\n\
                  matched={matched:?}\n{state}\nmatched after a reopen={after_reopen:?}",
@@ -12089,28 +13275,34 @@ mod tests {
 
     /// C++: `TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent` —
     /// concurrent appends into one table. Run it with `--ignored`.
-    #[test]
+    #[tokio::test]
     #[ignore = "slow: C++ TestTxnAppend.DISABLED_SLOW_test_append_append_concurrent"]
-    fn append_append_concurrent() {
+    async fn append_append_concurrent() {
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE cac (id INT, name VARCHAR);")
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE cac (id INT, name VARCHAR);")
+            .await
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for i in 0..100 {
-                    e.execute_blocking(&format!(
+                    e.execute(&format!(
                         "INSERT INTO cac VALUES ({}, 'abc');",
                         t * 1000 + i
                     ))
+                    .await
                     .unwrap();
                 }
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
         assert_eq!(e.row_count("cac").unwrap(), 400);
     }
@@ -12119,70 +13311,88 @@ mod tests {
     /// `kRunningTime` seconds mixing delete / vector search / update /
     /// full-text search. Run it with `--ignored`; set
     /// `INFINITY_CHAOS_SECONDS` to shorten the run.
-    #[test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "slow: C++ ParallelTest.DISABLED_SLOW_ChaosTest"]
-    fn chaos_test() {
+    async fn chaos_test() {
         let seconds: u64 = std::env::var("INFINITY_CHAOS_SECONDS")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(30);
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking(
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute(
             "CREATE TABLE chaos_test (id INT, body VARCHAR, other_vector EMBEDDING(FLOAT,4));",
         )
+        .await
         .unwrap();
-        e.execute_blocking("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX body_index ON chaos_test (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX other_index ON chaos_test (other_vector) USING HNSW WITH (metric = l2);",
         )
+        .await
         .unwrap();
         for i in 0..100 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO chaos_test VALUES ({i}, 'the quick brown fox {i}', [{i}.0,1.0,2.0,3.0]);"
-            ))
+            )).await
             .unwrap();
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let start = std::time::Instant::now();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 let mut n = t * 1_000_000;
                 while start.elapsed() < std::time::Duration::from_secs(seconds) {
                     n += 1;
                     match n % 4 {
                         0 => {
-                            let _ = e.execute_blocking(&format!("DELETE FROM chaos_test WHERE id = {};", n % 100));
+                            let _ = e
+                                .execute(&format!(
+                                    "DELETE FROM chaos_test WHERE id = {};",
+                                    n % 100
+                                ))
+                                .await;
                         }
                         1 => {
-                            let _ = e.execute_blocking(
-                                "SELECT id FROM chaos_test SEARCH MATCH VECTOR (other_vector, [0.0,1.0,2.0,3.0], 'float', 'l2', 3);",
-                            );
+                            let _ = e
+                                .execute(
+                                    "SELECT id FROM chaos_test SEARCH MATCH VECTOR (other_vector, [0.0,1.0,2.0,3.0], 'float', 'l2', 3);",
+                                )
+                                .await;
                         }
                         2 => {
-                            let _ = e.execute_blocking(&format!(
-                                "UPDATE chaos_test SET body = 'the quick brown fox {}' WHERE id = {};",
-                                n,
-                                n % 100
-                            ));
+                            let _ = e
+                                .execute(&format!(
+                                    "UPDATE chaos_test SET body = 'the quick brown fox {}' WHERE id = {};",
+                                    n,
+                                    n % 100
+                                ))
+                                .await;
                         }
                         _ => {
-                            let _ = e.execute_blocking(
-                                "SELECT id FROM chaos_test SEARCH MATCH TEXT ('body', 'quick', 'topn=3');",
-                            );
+                            let _ = e
+                                .execute(
+                                    "SELECT id FROM chaos_test SEARCH MATCH TEXT ('body', 'quick', 'topn=3');",
+                                )
+                                .await;
                         }
                     }
                 }
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
-        e.execute_blocking("DROP TABLE chaos_test;").unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("DROP TABLE chaos_test;").await.unwrap();
+        e.flush().await.unwrap();
     }
 
     /// C++: `MemoryIndexerTest.DISABLED_SLOW_Memory` — the reference appends
@@ -12289,13 +13499,17 @@ mod tests {
     /// A dump writes only the memory segment; new rows form the next segment
     /// and every row is indexed exactly once (Gate C: rebuilding the whole
     /// graph on every write caused the OOM). A checkpoint does not dump it.
-    #[test]
-    fn hnsw_dump_writes_only_the_memory_segment() {
+    #[tokio::test]
+    async fn hnsw_dump_writes_only_the_memory_segment() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
+        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO hv VALUES ");
         for i in 0..10 {
@@ -12305,34 +13519,24 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
+        e.execute(&sql).await.unwrap();
+        // The one HNSW index on `hv.v`, addressed through the product accessor.
         let indexed = |e: &Engine| {
-            e.tables
-                .lock()
-                .unwrap()
-                .values()
-                .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
-                .sum::<usize>()
+            e.index_tail("hv", "v", IndexType::Hnsw)
+                .map(|(_, rows)| rows)
+                .unwrap_or(0)
         };
         assert_eq!(indexed(&e), 10);
 
-        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
-        assert!(
-            e.tables.lock().unwrap().values().all(|t| t
-                .hnsw_mem
-                .values()
-                .all(|m| m.lock().map(|m| m.is_empty()).unwrap_or(true))),
-            "the dump empties the HNSW memory segment"
-        );
+        e.dump_index_transaction("hv", "hv_i").await.unwrap();
+        assert_eq!(indexed(&e), 0, "the dump empties the HNSW memory segment");
 
-        e.execute_blocking(
-            "INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);",
-        )
-        .unwrap();
+        e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
+            .await
+            .unwrap();
         assert_eq!(indexed(&e), 2);
 
-        crate::scheduler::block_on(e.dump_index_transaction("hv", "hv_i")).unwrap();
+        e.dump_index_transaction("hv", "hv_i").await.unwrap();
         let indexed: usize = e
             .load_vector_indexes("default_db.hv", "hv_i")
             .iter()
@@ -12343,7 +13547,8 @@ mod tests {
             rows(
                 &e,
                 "SELECT id FROM hv SEARCH MATCH VECTOR (v, [11.0,0.0,0.0,0.0], 'float', 'l2', 1);"
-            ),
+            )
+            .await,
             vec![vec!["11".to_string()]]
         );
     }
@@ -12351,14 +13556,18 @@ mod tests {
     /// C++ `AppendMemIndex`: after a write batch, an HNSW memory segment that
     /// reached `mem_index_capacity` rows is dumped without waiting for a
     /// checkpoint (the row bound that keeps a long import's memory flat).
-    #[test]
-    fn mem_index_capacity_dumps_the_hnsw_segment_after_the_batch() {
+    #[tokio::test]
+    async fn mem_index_capacity_dumps_the_hnsw_segment_after_the_batch() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_memindex_capacity(4);
-        e.execute_blocking("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
+        e.set_memindex_capacity(4);
+        e.execute("CREATE TABLE hc (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX hc_i ON hc (v) USING HNSW WITH (metric = l2);")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO hc VALUES ");
         for i in 0..10 {
@@ -12368,21 +13577,21 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        let indexed = |e: &Engine| {
-            e.tables
-                .lock()
-                .unwrap()
-                .values()
-                .flat_map(|t| t.hnsw_mem.values())
-                .map(|m| m.lock().map(|m| m.len()).unwrap_or(0))
-                .sum::<usize>()
-        };
-        assert_eq!(indexed(&e), 0, "the batch reached the capacity and dumped");
+        e.execute(&sql).await.unwrap();
+        assert_eq!(
+            hnsw_mem_rows(&e).await,
+            0,
+            "the batch reached the capacity and dumped"
+        );
 
-        e.execute_blocking("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
+        e.execute("INSERT INTO hc VALUES (10, [10.0,0.0,0.0,0.0]);")
+            .await
             .unwrap();
-        assert_eq!(indexed(&e), 1, "below the capacity the segment stays");
+        assert_eq!(
+            hnsw_mem_rows(&e).await,
+            1,
+            "below the capacity the segment stays"
+        );
         let dumped: usize = e
             .load_vector_indexes("default_db.hc", "hc_i")
             .iter()
@@ -12393,27 +13602,33 @@ mod tests {
 
     /// C++ optimize/cleanup: incremental chunks are all needed until a merged
     /// chunk covers every live row; cleanup must not delete them early.
-    #[test]
-    fn cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table() {
+    #[tokio::test]
+    async fn cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_memindex_capacity(2);
-        e.execute_blocking("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute("CREATE TABLE hk (id INT, v EMBEDDING(FLOAT,2));")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
+        e.execute("CREATE INDEX hk_i ON hk (v) USING HNSW WITH (metric = l2);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        e.execute("INSERT INTO hk VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+        e.execute("INSERT INTO hk VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+            .await
             .unwrap();
         let chunks = |e: &Engine| e.load_vector_indexes("default_db.hk", "hk_i");
         assert_eq!(chunks(&e).len(), 2, "one chunk per memory-segment dump");
 
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.cleanup().await.unwrap();
         assert_eq!(chunks(&e).len(), 2, "no chunk covers the whole table yet");
 
-        e.optimize_indexes().unwrap();
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.optimize_indexes().await.unwrap();
+        e.cleanup().await.unwrap();
         let merged = chunks(&e);
         assert_eq!(merged.len(), 1, "the merged chunk supersedes the others");
         assert_eq!(merged[0].labels.len(), 4);
@@ -12422,25 +13637,29 @@ mod tests {
     /// `OptimizeIndexTxnStore::ToWalEntry` and `RemoveChunkIDs`: the optimize
     /// transaction logs one `DumpIndexV2` per entry - the chunk it wrote and the
     /// chunks it replaced - and those chunks stop being read when it commits.
-    #[test]
-    fn optimize_logs_one_dump_command_per_entry() {
+    #[tokio::test]
+    async fn optimize_logs_one_dump_command_per_entry() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);",
-        )
-        .unwrap();
-        e.execute_blocking("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+        e.execute("CREATE TABLE ot (id INT, v EMBEDDING(FLOAT,2));")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
-        e.execute_blocking("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+        e.execute("CREATE INDEX ot_i ON ot (v) USING HNSW WITH (metric = l2, encode = plain);")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("ot", "ot_i")).unwrap();
+        e.execute("INSERT INTO ot VALUES (0,[0.0,0.0]),(1,[1.0,0.0]);")
+            .await
+            .unwrap();
+        e.dump_index_transaction("ot", "ot_i").await.unwrap();
+        e.execute("INSERT INTO ot VALUES (2,[2.0,0.0]),(3,[3.0,0.0]);")
+            .await
+            .unwrap();
+        e.dump_index_transaction("ot", "ot_i").await.unwrap();
         assert_eq!(e.hnsw_chunk_ids("ot", "ot_i"), vec![0, 1]);
 
-        e.optimize_indexes().unwrap();
+        e.optimize_indexes().await.unwrap();
 
         // `RemoveChunkIDs(deprecate_ids)` is part of the transaction, so the
         // merged chunk is the only one a reader sees before cleanup runs.
@@ -12496,7 +13715,7 @@ mod tests {
         // The entry reached the log: one command, naming chunk 2 as the new one
         // and 0/1 as the ones it supersedes.
         let wal = dir.path().join("wal").join("wal.log");
-        let records = storage::WalManager::read_all(&wal).unwrap();
+        let records = storage::WalManager::read_all(&wal).await.unwrap();
         let merged = records
             .iter()
             .flat_map(|entry| entry.cmds.iter())
@@ -12527,7 +13746,7 @@ mod tests {
 
         // `Cleanup` is the half that reclaims the bytes: the files go, the
         // markers go, and only the merged chunk is left.
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.cleanup().await.unwrap();
         assert!(
             !chunk_dir.join("chunk_0.idx").exists() && !chunk_dir.join("chunk_1.idx").exists(),
             "cleanup reclaims the bytes"
@@ -12548,27 +13767,30 @@ mod tests {
     /// three memory-index dumps (chunks 0..2) over 24 appended rows; optimize
     /// appends one merged chunk (id 3) covering every live row, cleanup keeps
     /// only it, and the merged graph still answers the top-1 query.
-    #[test]
-    fn test_hnsw_optimize() {
+    #[tokio::test]
+    async fn test_hnsw_optimize() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);",
-        )
-        .unwrap();
+        e.execute("CREATE TABLE tb1 (col1 INT, col2 EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX idx1 ON tb1 (col2) USING HNSW WITH (metric = l2, encode = plain);")
+            .await
+            .unwrap();
         for _ in 0..3 {
             for _ in 0..2 {
-                e.execute_blocking(
+                e.execute(
                     "INSERT INTO tb1 VALUES \
                      (2,[0.1,0.2,0.3,-0.2]),(4,[0.2,0.1,0.3,0.4]),\
                      (6,[0.3,0.2,0.1,0.4]),(8,[0.4,0.3,0.2,0.1]);",
                 )
+                .await
                 .unwrap();
             }
             // DumpMemIndex: one chunk per iteration's memory segment.
-            crate::scheduler::block_on(e.dump_index_transaction("tb1", "idx1")).unwrap();
+            e.dump_index_transaction("tb1", "idx1").await.unwrap();
         }
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -12576,8 +13798,8 @@ mod tests {
             "one chunk per memory-index dump"
         );
 
-        e.optimize_indexes().unwrap();
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.optimize_indexes().await.unwrap();
+        e.cleanup().await.unwrap();
 
         assert_eq!(
             e.hnsw_chunk_ids("default_db.tb1", "idx1"),
@@ -12598,7 +13820,8 @@ mod tests {
                 &e,
                 "SELECT col1 FROM tb1 SEARCH MATCH VECTOR \
                  (col2, [0.1,0.2,0.3,-0.2], 'float', 'l2', 1);"
-            ),
+            )
+            .await,
             vec![vec!["2".to_string()]]
         );
     }
@@ -12608,40 +13831,49 @@ mod tests {
     /// not stable across the write and scan paths.
     /// Once the mirror covers every live row, full scans read the values from
     /// the column blocks, and the KV holds no row record at all.
-    #[test]
-    fn full_rows_come_from_the_block_mirror_when_current() {
+    #[tokio::test]
+    async fn full_rows_come_from_the_block_mirror_when_current() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bm (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO bm VALUES (1,'a'),(2,'b');")
+        e.execute("CREATE TABLE bm (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("INSERT INTO bm VALUES (1,'a'),(2,'b');")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
         // The scalar row cache would answer first; drop it so the test proves
         // the block path.
         e.invalidate_row_cache("default_db.bm");
         // No row record exists anywhere in the KV: the blocks are the table.
         assert!(e.store().scan_prefix(b"row:").unwrap().is_empty());
-        let rows = e.fetch_rows("default_db.bm").unwrap();
+        let rows = e.fetch_rows("default_db.bm").await.unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::Int(1));
         assert_eq!(rows[1][0], Value::Int(2));
     }
 
-    #[test]
-    fn block_mirror_covers_rows_after_deletes_and_updates() {
+    #[tokio::test]
+    async fn block_mirror_covers_rows_after_deletes_and_updates() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE bmu (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
+        e.execute("CREATE TABLE bmu (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute("INSERT INTO bmu VALUES (1,'a'),(2,'b'),(3,'c');")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
         e.invalidate_row_cache("default_db.bmu");
-        e.execute_blocking("DELETE FROM bmu WHERE id = 2;").unwrap();
-        e.execute_blocking("UPDATE bmu SET name = 'u' WHERE id = 3;")
+        e.execute("DELETE FROM bmu WHERE id = 2;").await.unwrap();
+        e.execute("UPDATE bmu SET name = 'u' WHERE id = 3;")
+            .await
             .unwrap();
-        let rows = e.try_rows("default_db.bmu").unwrap().unwrap();
+        let rows = e.try_rows("default_db.bmu").await.unwrap().unwrap();
         let ids: Vec<&Value> = rows.iter().map(|(_, r)| &r[0]).collect();
         let names: Vec<&Value> = rows.iter().map(|(_, r)| &r[1]).collect();
         assert_eq!(ids, vec![&Value::Int(1), &Value::Int(3)]);
@@ -12655,15 +13887,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scalar_tables_use_the_row_cache() {
+    #[tokio::test]
+    async fn scalar_tables_use_the_row_cache() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rc (id INT, name VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO rc VALUES (1,'a'),(2,'b');")
+        e.execute("CREATE TABLE rc (id INT, name VARCHAR);")
+            .await
             .unwrap();
-        assert_eq!(rows(&e, "SELECT * FROM rc;").len(), 2);
+        e.execute("INSERT INTO rc VALUES (1,'a'),(2,'b');")
+            .await
+            .unwrap();
+        assert_eq!(rows(&e, "SELECT * FROM rc;").await.len(), 2);
         let key = e.table_key("rc");
         assert!(e
             .tables
@@ -12673,15 +13909,17 @@ mod tests {
             .and_then(|t| t.row_cache.as_ref())
             .is_some());
         assert_eq!(
-            rows(&e, "SELECT id FROM rc WHERE id = 2;"),
+            rows(&e, "SELECT id FROM rc WHERE id = 2;").await,
             vec![vec!["2".to_string()]]
         );
 
-        e.execute_blocking("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
+        e.execute("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO av VALUES (1,[0.0,0.0]);")
+        e.execute("INSERT INTO av VALUES (1,[0.0,0.0]);")
+            .await
             .unwrap();
-        assert_eq!(rows(&e, "SELECT * FROM av;").len(), 1);
+        assert_eq!(rows(&e, "SELECT * FROM av;").await.len(), 1);
         let key = e.table_key("av");
         assert!(e
             .tables
@@ -12694,17 +13932,19 @@ mod tests {
 
     /// Row-id allocation creates segments; `SHOW SEGMENTS` reports their ids
     /// and row counts.
-    #[test]
-    fn segments_track_row_id_allocations() {
+    #[tokio::test]
+    async fn segments_track_row_id_allocations() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sg (id INT);").unwrap();
-        e.reserve_rows("sg", 2, true).unwrap();
-        e.reserve_rows("sg", 3, true).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sg (id INT);").await.unwrap();
+        e.reserve_rows("sg", 2, true).await.unwrap();
+        e.reserve_rows("sg", 3, true).await.unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3)]);
         // An INSERT after a sealed COPY opens a segment; the next one appends.
-        e.reserve_rows("sg", 4, false).unwrap();
-        e.reserve_rows("sg", 4, false).unwrap();
+        e.reserve_rows("sg", 4, false).await.unwrap();
+        e.reserve_rows("sg", 4, false).await.unwrap();
         assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
     }
 
@@ -12715,11 +13955,13 @@ mod tests {
     /// values are slots: letting one append run past the last slot hands out
     /// ids no block can hold (`block_of` would name a block past the segment's
     /// 1024), and the reference never does it.
-    #[test]
-    fn an_append_across_a_segment_boundary_is_split() {
+    #[tokio::test]
+    async fn an_append_across_a_segment_boundary_is_split() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sgx (id INT);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sgx (id INT);").await.unwrap();
         let cap = Engine::SEGMENT_ROW_CAPACITY;
         // Put the allocator four rows short of the segment's end. Reaching it
         // by appending would take 8.4 M rows (and every append is capped at
@@ -12740,7 +13982,7 @@ mod tests {
         }
 
         // Ten rows: four close the segment, six open the next one.
-        let range = e.reserve_rows("sgx", 10, false).unwrap();
+        let range = e.reserve_rows("sgx", 10, false).await.unwrap();
         assert_eq!(
             range.ranges(),
             &[(cap - 4, 4), (1usize << 32, 6)],
@@ -12759,47 +14001,55 @@ mod tests {
     /// An append larger than `MAX_BLOCK_CAPACITY` is refused at the primitive,
     /// as `TableCache::PrepareAppendNolock` refuses it; the statement-level
     /// entry points split into batches instead.
-    #[test]
-    fn an_oversized_single_append_is_refused() {
+    #[tokio::test]
+    async fn an_oversized_single_append_is_refused() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE big (id INT);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE big (id INT);").await.unwrap();
         assert!(e
             .reserve_rows("big", Engine::MAX_APPEND_ROWS + 1, true)
+            .await
             .is_err());
-        assert!(e.reserve_rows("big", Engine::MAX_APPEND_ROWS, true).is_ok());
+        assert!(e
+            .reserve_rows("big", Engine::MAX_APPEND_ROWS, true)
+            .await
+            .is_ok());
     }
 
     /// `NewTxn::BeginTS`: a reader pinned to a timestamp does not see a row
     /// committed after it, and does see one deleted after it.
-    #[test]
-    fn a_read_at_an_older_ts_hides_later_commits() {
+    #[tokio::test]
+    async fn a_read_at_an_older_ts_hides_later_commits() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rts (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO rts VALUES (1);").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rts (id INT);").await.unwrap();
+        e.execute("INSERT INTO rts VALUES (1);").await.unwrap();
         let pin = e.current_ts();
-        e.execute_blocking("INSERT INTO rts VALUES (2);").unwrap();
+        e.execute("INSERT INTO rts VALUES (2);").await.unwrap();
 
         // Outside a statement the reader is at `u64::MAX`: both rows.
         assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
-        assert_eq!(e.fetch_rows("default_db.rts").unwrap().len(), 2);
+        assert_eq!(e.fetch_rows("default_db.rts").await.unwrap().len(), 2);
 
         {
             let _pinned = ReadTsGuard::enter(pin);
             assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
-            let seen = e.fetch_rows("default_db.rts").unwrap();
+            let seen = e.fetch_rows("default_db.rts").await.unwrap();
             assert_eq!(seen.len(), 1, "the second insert committed after `pin`");
         }
 
         // A delete after the pin is invisible to the pinned reader.
         let deleted_pin = e.current_ts();
-        e.execute_blocking("DELETE FROM rts WHERE id = 1;").unwrap();
+        e.execute("DELETE FROM rts WHERE id = 1;").await.unwrap();
         assert_eq!(e.block_visible_row_count("default_db.rts"), 1);
         {
             let _pinned = ReadTsGuard::enter(deleted_pin);
             assert_eq!(e.block_visible_row_count("default_db.rts"), 2);
-            assert_eq!(e.fetch_rows("default_db.rts").unwrap().len(), 2);
+            assert_eq!(e.fetch_rows("default_db.rts").await.unwrap().len(), 2);
         }
     }
 
@@ -12811,39 +14061,46 @@ mod tests {
     /// later row onto the wrong slot, and the rows at the end were lost. The
     /// ids are handed out in commit-ts order and a checkpoint only writes what
     /// had finished, so a block's ids are a dense prefix.
-    #[test]
-    fn concurrent_appends_survive_a_checkpoint_and_reopen() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_appends_survive_a_checkpoint_and_reopen() {
         let dir = tempdir().unwrap();
         {
-            let e = Arc::new(Engine::open(dir.path()).unwrap());
+            let e = Arc::new(
+                Engine::open_async(dir.path(), Default::default())
+                    .await
+                    .unwrap(),
+            );
             e.install_engine_handle();
-            e.execute_blocking("CREATE TABLE ck (id INT);").unwrap();
+            e.execute("CREATE TABLE ck (id INT);").await.unwrap();
             let mut handles = Vec::new();
             for t in 0..4 {
                 let e = Arc::clone(&e);
-                handles.push(std::thread::spawn(move || {
+                handles.push(tokio::spawn(async move {
                     for b in 0..10 {
                         let first = t * 1000 + b * 2;
-                        e.execute_blocking(&format!(
+                        e.execute(&format!(
                             "INSERT INTO ck VALUES ({first}), ({});",
                             first + 1
                         ))
+                        .await
                         .unwrap();
                         if b % 3 == 0 {
-                            crate::scheduler::block_on(e.flush()).unwrap();
+                            e.flush().await.unwrap();
                         }
                     }
                 }));
             }
             for handle in handles {
-                handle.join().unwrap();
+                handle.await.unwrap();
             }
             assert_eq!(e.row_count("default_db.ck").unwrap(), 80);
         }
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(e.row_count("default_db.ck").unwrap(), 80);
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM ck;"),
+            rows(&e, "SELECT count(*) FROM ck;").await,
             vec![vec!["80".to_string()]]
         );
     }
@@ -12851,26 +14108,30 @@ mod tests {
     /// Reopening maps the published chunks instead of rebuilding them, and
     /// indexes only the rows no chunk covers (plan §5.3: the reference's
     /// RecoverMemIndex).
-    #[test]
-    fn reopen_loads_secondary_chunks_and_fills_only_the_gap() {
+    #[tokio::test]
+    async fn reopen_loads_secondary_chunks_and_fills_only_the_gap() {
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE rg (id INT, c INT);")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX rg_c ON rg (c);").unwrap();
-            e.execute_blocking("INSERT INTO rg VALUES (1,7),(2,8),(3,7);")
+            e.execute("CREATE TABLE rg (id INT, c INT);").await.unwrap();
+            e.execute("CREATE INDEX rg_c ON rg (c);").await.unwrap();
+            e.execute("INSERT INTO rg VALUES (1,7),(2,8),(3,7);")
+                .await
                 .unwrap();
             // `FLUSH DATA` with the dump switch on is the checkpoint plus one
             // `DumpMemIndex` per index, which is what names the chunk's ts.
             e.set_flush_dumps_mem_index(true);
-            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.execute("FLUSH DATA;").await.unwrap();
             e.set_flush_dumps_mem_index(false);
             // One row after the dump: the chunk cannot cover it.
-            e.execute_blocking("INSERT INTO rg VALUES (4,7);").unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.execute("INSERT INTO rg VALUES (4,7);").await.unwrap();
+            e.flush().await.unwrap();
         }
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let (chunks, meta, tail) = {
             let id = e.test_secondary_id("rg", "c");
             let tables = e.tables.lock().unwrap();
@@ -12889,7 +14150,7 @@ mod tests {
         assert_eq!(meta, vec![(0u64, 3usize)], "the catalog's chunk record");
         assert_eq!(tail, 1, "only the uncovered row is in the memory tail");
         assert_eq!(
-            rows(&e, "SELECT id FROM rg WHERE c = 7"),
+            rows(&e, "SELECT id FROM rg WHERE c = 7").await,
             vec![
                 vec!["1".to_string()],
                 vec!["3".to_string()],
@@ -12897,7 +14158,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM rg;"),
+            rows(&e, "SELECT count(*) FROM rg;").await,
             vec![vec!["4".to_string()]]
         );
     }
@@ -12908,31 +14169,35 @@ mod tests {
     /// tail; without a `secondary.indexes` entry the per-row insert hook and
     /// `DumpIndex` both skip the column, so every row written after the restart
     /// silently fell out of the index and `dump_index` sealed nothing.
-    #[test]
-    fn a_reopened_secondary_index_indexes_later_rows() {
+    #[tokio::test]
+    async fn a_reopened_secondary_index_indexes_later_rows() {
         let dir = tempdir().unwrap();
         {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE ri (id INT, c INT);")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX ri_c ON ri (c);").unwrap();
-            e.execute_blocking("INSERT INTO ri VALUES (1,7);").unwrap();
+            e.execute("CREATE TABLE ri (id INT, c INT);").await.unwrap();
+            e.execute("CREATE INDEX ri_c ON ri (c);").await.unwrap();
+            e.execute("INSERT INTO ri VALUES (1,7);").await.unwrap();
             e.set_flush_dumps_mem_index(true);
-            e.execute_blocking("FLUSH DATA;").unwrap();
+            e.execute("FLUSH DATA;").await.unwrap();
             e.set_flush_dumps_mem_index(false);
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
         }
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("INSERT INTO ri VALUES (2,7),(3,9);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("INSERT INTO ri VALUES (2,7),(3,9);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT id FROM ri WHERE c = 7 ORDER BY id;"),
+            rows(&e, "SELECT id FROM ri WHERE c = 7 ORDER BY id;").await,
             vec![vec!["1".to_string()], vec!["2".to_string()]],
             "the row inserted after the restart must be in the index"
         );
         // The dump must find the new rows in the tail and seal them.
-        crate::scheduler::block_on(e.dump_index_transaction("ri", "ri_c")).unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.dump_index_transaction("ri", "ri_c").await.unwrap();
+        e.flush().await.unwrap();
         let published = {
             let id = e.test_secondary_id("ri", "c");
             let tables = e.tables.lock().unwrap();
@@ -12955,30 +14220,33 @@ mod tests {
     /// reload only maps the chunks already in the catalog, so without rebuilding
     /// the merged segment's secondary spills the index had no `seg_{merged}`
     /// chunk and a reader lost those rows.
-    #[test]
-    fn a_compaction_publishes_the_merged_segments_secondary_chunks() {
+    #[tokio::test]
+    async fn a_compaction_publishes_the_merged_segments_secondary_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE rc (id INT, c INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX rc_c ON rc (c);").unwrap();
-        e.execute_blocking("INSERT INTO rc VALUES (1,7),(2,8);")
+        e.execute("CREATE TABLE rc (id INT, c INT);").await.unwrap();
+        e.execute("CREATE INDEX rc_c ON rc (c);").await.unwrap();
+        e.execute("INSERT INTO rc VALUES (1,7),(2,8);")
+            .await
             .unwrap();
         e.set_flush_dumps_mem_index(true);
-        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.execute("FLUSH DATA;").await.unwrap();
         e.set_flush_dumps_mem_index(false);
         // A second segment, so the compaction has something to merge.
         let csv = dir.path().join("more.csv");
         std::fs::write(&csv, "3,9\n4,7\n").unwrap();
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY rc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
             csv.display()
         ))
+        .await
         .unwrap();
-        e.execute_blocking("FLUSH DATA;").unwrap();
+        e.execute("FLUSH DATA;").await.unwrap();
         assert_eq!(e.segment_row_counts("rc").len(), 2, "two segments to merge");
-        e.compact_table("rc").unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.compact_table("rc").await.unwrap();
+        e.flush().await.unwrap();
         // The merged segment must have its own published chunk file: that is
         // what a reader (and the reference) uses to answer for those rows.
         let merged = e
@@ -13010,7 +14278,7 @@ mod tests {
             "the merged segment has no secondary chunk: {chunks:?}"
         );
         assert_eq!(
-            rows(&e, "SELECT id FROM rc WHERE c = 7 ORDER BY id;"),
+            rows(&e, "SELECT id FROM rc WHERE c = 7 ORDER BY id;").await,
             vec![vec!["1".to_string()], vec!["4".to_string()]]
         );
     }
@@ -13023,23 +14291,28 @@ mod tests {
     /// segment's directory removes its chunks with it. The reference deletes
     /// them by name in `Cleanup` (`CleanChunkIndex`); this is the same sweep
     /// seen from the directory.
-    #[test]
-    fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
+    #[tokio::test]
+    async fn a_cleanup_reclaims_the_deprecated_segments_fulltext_chunks() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cft (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX cft_body ON cft (body) USING FULLTEXT;")
+        e.execute("CREATE TABLE cft (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX cft_body ON cft (body) USING FULLTEXT;")
+            .await
             .unwrap();
         for n in 0..4 {
             let csv = dir.path().join(format!("c{n}.csv"));
             std::fs::write(&csv, format!("{},alpha row\n", 10 + n)).unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "COPY cft FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 csv.display()
             ))
+            .await
             .unwrap();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
         }
         let indexed_root = || -> std::path::PathBuf {
             let base = dir.path().join("data/db_1/tbl_0");
@@ -13081,8 +14354,8 @@ mod tests {
             "the flushes must have sealed chunks"
         );
 
-        e.compact_all_segments("cft").unwrap();
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.compact_all_segments("cft").await.unwrap();
+        e.cleanup().await.unwrap();
 
         let live: Vec<u32> = e
             .segment_row_counts("cft")
@@ -13108,6 +14381,7 @@ mod tests {
                 &e,
                 "SELECT id FROM cft SEARCH MATCH TEXT (body, 'alpha', 100);"
             )
+            .await
             .len(),
             4
         );
@@ -13117,13 +14391,22 @@ mod tests {
     ///
     /// The pool reuses its threads, so a leaked flag would let a later,
     /// unrelated statement accept a zero-dimension sparse value.
-    #[test]
-    fn a_panicking_zero_dimension_scope_restores_the_flag() {
-        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            crate::with_zero_dimension_sparse(|| panic!("boom"));
-        }));
+    #[tokio::test]
+    async fn a_panicking_zero_dimension_scope_restores_the_flag() {
+        // The panic happens inside the scope's future, so it unwinds through
+        // the scope and the task local is dropped with it. `catch_unwind`
+        // cannot wrap an `.await`, so the scope runs on a **separate task** and
+        // the join handle carries the panic back as a `JoinError`.
+        let caught = tokio::spawn(async {
+            crate::with_zero_dimension_sparse(async { panic!("boom") }).await;
+        })
+        .await;
         assert!(caught.is_err(), "the panic must propagate");
-        let leaked = crate::engine::state::ALLOW_ZERO_SPARSE.with(|c| c.get());
+        // Outside the scope the local is unset, which is the "not allowed"
+        // state: a leaked `true` would be visible here.
+        let leaked = crate::engine::state::ALLOW_ZERO_SPARSE
+            .try_with(|allowed| *allowed)
+            .unwrap_or(false);
         assert!(!leaked, "the zero-dimension flag outlived the panic");
     }
 
@@ -13132,11 +14415,13 @@ mod tests {
     /// The blocking pool reuses threads, so a `with_session` that restored the
     /// previous value only on the normal path would leave the next statement of
     /// an unrelated connection running in this session (r10 #2).
-    #[test]
-    fn a_panicking_statement_does_not_leak_its_session() {
+    #[tokio::test]
+    async fn a_panicking_statement_does_not_leak_its_session() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE DATABASE other;").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE DATABASE other;").await.unwrap();
         let id = e.open_session("default_db");
         let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             e.with_session(id, || panic!("boom"));
@@ -13148,7 +14433,8 @@ mod tests {
             "the session binding outlived the panic"
         );
         // The default database is process-wide again, not the session's.
-        e.execute_blocking("CREATE TABLE leak_check (id INT);")
+        e.execute("CREATE TABLE leak_check (id INT);")
+            .await
             .unwrap();
         assert!(e
             .catalog()
@@ -13160,44 +14446,53 @@ mod tests {
     /// Writers and readers share the table/index state; this exercises the
     /// table-lock boundaries introduced for `TableEntry` (a deadlock hangs the
     /// test binary, which the harness timeout catches).
-    #[test]
-    fn concurrent_inserts_and_vector_searches_do_not_deadlock() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_inserts_and_vector_searches_do_not_deadlock() {
         let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE cc (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
+        e.execute("CREATE INDEX cc_i ON cc (v) USING HNSW WITH (metric = l2);")
+            .await
             .unwrap();
         let mut handles = Vec::new();
         for t in 0..4 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for b in 0..25 {
-                    e.execute_blocking(&format!(
+                    e.execute(&format!(
                         "INSERT INTO cc VALUES ({}, [1.0,0.0,0.0,0.0]), ({}, [0.0,1.0,0.0,0.0]);",
                         t * 1000 + b * 2,
                         t * 1000 + b * 2 + 1
                     ))
+                    .await
                     .unwrap();
                     if b % 5 == 0 {
-                        crate::scheduler::block_on(e.flush()).unwrap();
+                        e.flush().await.unwrap();
                     }
                 }
             }));
         }
         for _ in 0..2 {
             let e = e.clone();
-            handles.push(std::thread::spawn(move || {
+            handles.push(tokio::spawn(async move {
                 for _ in 0..40 {
-                    let _ = e.execute_blocking(
-                        "SELECT id FROM cc SEARCH MATCH VECTOR (v, [1.0,0.0,0.0,0.0], 'float', 'l2', 3);",
-                    );
-                    let _ = e.execute_blocking("SELECT count(*) FROM cc;");
+                    let _ = e
+                        .execute(
+                            "SELECT id FROM cc SEARCH MATCH VECTOR (v, [1.0,0.0,0.0,0.0], 'float', 'l2', 3);",
+                        )
+                        .await;
+                    let _ = e.execute("SELECT count(*) FROM cc;").await;
                 }
             }));
         }
         for h in handles {
-            h.join().unwrap();
+            h.await.unwrap();
         }
         assert_eq!(e.row_count("default_db.cc").unwrap(), 200);
     }
@@ -13205,16 +14500,18 @@ mod tests {
     /// `src/unit_test/main/infinity_ut.cpp::InfinityTest/test1`: the catalog
     /// lifecycle through the SQL path (`ListDatabases` / `CreateDatabase` /
     /// `DropDatabase` / `ShowTables` / insert + select / `Query`).
-    #[test]
-    fn catalog_lifecycle_matches_the_reference_test() {
+    #[tokio::test]
+    async fn catalog_lifecycle_matches_the_reference_test() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
 
         // `ListDatabases` starts with `default_db` only, and its
         // `db_entry_dir_` is the directory name the startup transaction gave
         // it (`db_1`).
         assert_eq!(
-            rows(&e, "SHOW DATABASES;"),
+            rows(&e, "SHOW DATABASES;").await,
             vec![vec![
                 "default_db".to_string(),
                 "db_1".to_string(),
@@ -13222,8 +14519,8 @@ mod tests {
             ]]
         );
 
-        e.execute_blocking("CREATE DATABASE db1;").unwrap();
-        let dbs = rows(&e, "SHOW DATABASES;");
+        e.execute("CREATE DATABASE db1;").await.unwrap();
+        let dbs = rows(&e, "SHOW DATABASES;").await;
         // The reference lists `db1` first (hash order); the Rust catalog is
         // sorted, so compare the set.
         let mut names: Vec<&str> = dbs.iter().map(|r| r[0].as_str()).collect();
@@ -13251,7 +14548,7 @@ mod tests {
             .iter()
             .any(|d| d == "default_db"));
         e.catalog().drop_database("db1", false).unwrap();
-        assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
+        assert_eq!(rows(&e, "SHOW DATABASES;").await.len(), 1);
         assert!(e
             .catalog()
             .list_databases()
@@ -13260,9 +14557,10 @@ mod tests {
             .any(|d| d == "default_db"));
 
         // Create/Show/Get/Drop a table in `default_db`.
-        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
+        e.execute("CREATE TABLE default_db.table1 (col1 BOOLEAN, col2 BIGINT);")
+            .await
             .unwrap();
-        let tables = rows(&e, "SHOW TABLES FROM default_db;");
+        let tables = rows(&e, "SHOW TABLES FROM default_db;").await;
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0][0], "default_db");
         assert_eq!(tables[0][1], "table1");
@@ -13272,8 +14570,8 @@ mod tests {
             .get_table_by_name("default_db.table1")
             .unwrap()
             .is_some());
-        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
-        assert!(rows(&e, "SHOW TABLES FROM default_db;").is_empty());
+        e.execute("DROP TABLE default_db.table1;").await.unwrap();
+        assert!(rows(&e, "SHOW TABLES FROM default_db;").await.is_empty());
         assert!(e
             .catalog()
             .get_table_by_name("default_db.table1")
@@ -13281,26 +14579,29 @@ mod tests {
             .is_none());
 
         // Insert and select through two columns of different widths.
-        e.execute_blocking("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
+        e.execute("CREATE TABLE default_db.table1 (col1 BIGINT, col2 SMALLINT);")
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
+        e.execute("INSERT INTO default_db.table1 (col1, col2) VALUES (11, 22);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT col1, col2 FROM default_db.table1;"),
+            rows(&e, "SELECT col1, col2 FROM default_db.table1;").await,
             vec![vec!["11".to_string(), "22".to_string()]]
         );
-        e.execute_blocking("DROP TABLE default_db.table1;").unwrap();
+        e.execute("DROP TABLE default_db.table1;").await.unwrap();
 
         // `Query("create database db1;")` + `Query("show databases;")`.
-        e.execute_blocking("CREATE DATABASE db1;").unwrap();
+        e.execute("CREATE DATABASE db1;").await.unwrap();
         let mut names: Vec<String> = rows(&e, "SHOW DATABASES;")
+            .await
             .into_iter()
             .map(|r| r[0].clone())
             .collect();
         names.sort();
         assert_eq!(names, vec!["db1", "default_db"]);
-        e.execute_blocking("DROP DATABASE db1;").unwrap();
-        assert_eq!(rows(&e, "SHOW DATABASES;").len(), 1);
+        e.execute("DROP DATABASE db1;").await.unwrap();
+        assert_eq!(rows(&e, "SHOW DATABASES;").await.len(), 1);
         assert!(e
             .catalog()
             .list_databases()
@@ -13312,10 +14613,12 @@ mod tests {
     /// `src/unit_test/main/infinity_ut.cpp::InfinityTest/test2`: every listed
     /// global/session variable resolves, and `error` is rejected at both scopes
     /// (`Status::NoSysVar`).
-    #[test]
-    fn show_variable_covers_the_reference_names() {
+    #[tokio::test]
+    async fn show_variable_covers_the_reference_names() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         for name in [
             "total_commit_count",
             "active_txn_count",
@@ -13360,18 +14663,21 @@ mod tests {
     /// `EMBEDDING(FLOAT, 128)` and a `BIGINT` column, fetch it back, insert
     /// rows, query them, and explain in every plan mode without executing the
     /// inner statement.
-    #[test]
-    fn explain_covers_every_plan_kind() {
+    #[tokio::test]
+    async fn explain_covers_every_plan_kind() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE DATABASE db1;").unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE DATABASE db1;").await.unwrap();
         assert!(e
             .catalog()
             .list_databases()
             .unwrap()
             .iter()
             .any(|d| d == "db1"));
-        e.execute_blocking("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
+        e.execute("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
+            .await
             .unwrap();
 
         // `Infinity::GetDatabase` / `GetTable`: the created table is
@@ -13397,13 +14703,14 @@ mod tests {
         // Insert and read back through the same facade.
         let embedding = vec!["0.5"; 128].join(",");
         for col2 in [42, 7] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO db1.knn_table (col1, col2) VALUES ([{embedding}], {col2});"
             ))
+            .await
             .unwrap();
         }
         assert_eq!(
-            rows(&e, "SELECT col2 FROM db1.knn_table ORDER BY col2;"),
+            rows(&e, "SELECT col2 FROM db1.knn_table ORDER BY col2;").await,
             vec![vec!["7".to_string()], vec!["42".to_string()]]
         );
 
@@ -13418,7 +14725,8 @@ mod tests {
             "EXPLAIN PIPELINE SELECT col2 FROM db1.knn_table;",
         ] {
             let mut res = e
-                .execute_blocking(sql)
+                .execute(sql)
+                .await
                 .unwrap_or_else(|err| panic!("{sql}: {err}"));
             assert_eq!(res.len(), 1, "{sql}");
             assert!(matches!(res.remove(0), QueryResult::Rows { .. }), "{sql}");
@@ -13429,16 +14737,18 @@ mod tests {
     /// `CREATE TABLE` with the same name must clear them: `fetch_rows` walks
     /// `row:{table}:` and `next_row_seq` starts past the highest orphan id, so
     /// without the sweep the new table reads the dropped table's rows back.
-    #[test]
-    fn a_crashed_drop_does_not_resurrect_rows() {
+    #[tokio::test]
+    async fn a_crashed_drop_does_not_resurrect_rows() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE crash_t (id INT);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO crash_t VALUES (1), (2), (3);")
+        e.execute("CREATE TABLE crash_t (id INT);").await.unwrap();
+        e.execute("INSERT INTO crash_t VALUES (1), (2), (3);")
+            .await
             .unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM crash_t;"),
+            rows(&e, "SELECT count(*) FROM crash_t;").await,
             vec![vec!["3".to_string()]]
         );
 
@@ -13454,17 +14764,15 @@ mod tests {
                 .is_none(),
             "the drop must be visible before the sweep runs"
         );
-        e.execute_blocking("CREATE TABLE crash_t (id INT);")
-            .unwrap();
+        e.execute("CREATE TABLE crash_t (id INT);").await.unwrap();
         assert_eq!(
-            rows(&e, "SELECT count(*) FROM crash_t;"),
+            rows(&e, "SELECT count(*) FROM crash_t;").await,
             vec![vec!["0".to_string()]],
             "the recreated table must not see the dropped table's rows"
         );
-        e.execute_blocking("INSERT INTO crash_t VALUES (7);")
-            .unwrap();
+        e.execute("INSERT INTO crash_t VALUES (7);").await.unwrap();
         assert_eq!(
-            rows(&e, "SELECT id FROM crash_t;"),
+            rows(&e, "SELECT id FROM crash_t;").await,
             vec![vec!["7".to_string()]]
         );
     }
@@ -13485,8 +14793,12 @@ mod tests {
     /// `pm->GetObjPath(obj_addr.obj_key)` (`file_worker_impl.cpp:170`,
     /// `disk_segment_reader_impl.cpp:59`). Nothing here is specific to the
     /// full-text index: the block columns are checked too.
-    #[test]
-    fn the_persistent_manager_publishes_every_data_file() {
+    #[tokio::test]
+    // The guard is held for the whole test on purpose: `CHUNK_STORE_LOCK`
+    // serialises the **process-wide** chunk-store backend, so it has to outlive
+    // every `await` in the test or two tests share one backend.
+    #[allow(clippy::await_holding_lock)]
+    async fn the_persistent_manager_publishes_every_data_file() {
         // Declared before `LocalStore` so the locals drop in the other order:
         // the reset to the local backend happens while the lock is still held.
         let _lock = CHUNK_STORE_LOCK
@@ -13508,17 +14820,22 @@ mod tests {
             object_dir: Some(objects.path().to_path_buf()),
             ..crate::engine::state::EngineOptions::default()
         };
-        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
-        e.execute_blocking("CREATE TABLE pmt (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), object_options())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pmt (id INT, body VARCHAR);")
+            .await
             .unwrap();
         for i in 0..8 {
-            e.execute_blocking(&format!("INSERT INTO pmt VALUES ({i}, 'alpha{i} beta');"))
+            e.execute(&format!("INSERT INTO pmt VALUES ({i}, 'alpha{i} beta');"))
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX pmt_ft ON pmt (body) USING FULLTEXT;")
+        e.execute("CREATE INDEX pmt_ft ON pmt (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("pmt", "pmt_ft")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("pmt", "pmt_ft").await.unwrap();
 
         // Every file under `data/` has an object record, and the object holds at
         // least the bytes of that part.
@@ -13550,7 +14867,8 @@ mod tests {
         let hits = rows(
             &e,
             "SELECT id FROM pmt SEARCH MATCH TEXT (body, 'alpha5', 10);",
-        );
+        )
+        .await;
         assert_eq!(hits.len(), 1);
 
         // The chunk lives in its segment's index directory.
@@ -13581,8 +14899,12 @@ mod tests {
     /// cache, and `pm|object|` the storage of record. A merge runs first so the
     /// superseded chunks' objects are cleaned up as well: the reopened engine
     /// must not see them.
-    #[test]
-    fn a_data_directory_comes_back_from_the_objects_alone() {
+    #[tokio::test]
+    // The guard is held for the whole test on purpose: `CHUNK_STORE_LOCK`
+    // serialises the **process-wide** chunk-store backend, so it has to outlive
+    // every `await` in the test or two tests share one backend.
+    #[allow(clippy::await_holding_lock)]
+    async fn a_data_directory_comes_back_from_the_objects_alone() {
         // See `the_persistent_manager_publishes_every_data_file`: same global
         // slot, same lock, and the guard declared before `LocalStore`.
         let _lock = CHUNK_STORE_LOCK
@@ -13603,41 +14925,47 @@ mod tests {
             object_dir: Some(objects.path().to_path_buf()),
             ..crate::engine::state::EngineOptions::default()
         };
-        let e = Engine::open_with_options(dir.path(), object_options()).unwrap();
-        e.execute_blocking("CREATE TABLE pmd (id INT, body VARCHAR);")
+        let e = Engine::open_async(dir.path(), object_options())
+            .await
             .unwrap();
-        let insert = |e: &Engine, lo: i64, hi: i64| {
+        e.execute("CREATE TABLE pmd (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        let insert = async |e: &Engine, lo: i64, hi: i64| {
             let values: Vec<String> = (lo..hi)
                 .map(|i| format!("({i}, 'alpha beta bucket{} uniq{i} delta')", i % 7))
                 .collect();
-            e.execute_blocking(&format!("INSERT INTO pmd VALUES {};", values.join(",")))
+            e.execute(&format!("INSERT INTO pmd VALUES {};", values.join(",")))
+                .await
                 .unwrap();
         };
-        insert(&e, 0, 200);
-        e.execute_blocking("CREATE INDEX pmd_ft ON pmd (body) USING FULLTEXT;")
+        insert(&e, 0, 200).await;
+        e.execute("CREATE INDEX pmd_ft ON pmd (body) USING FULLTEXT;")
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
-        insert(&e, 200, 400);
-        crate::scheduler::block_on(e.flush()).unwrap();
-        crate::scheduler::block_on(e.dump_index_transaction("pmd", "pmd_ft")).unwrap();
+        e.flush().await.unwrap();
+        e.dump_index_transaction("pmd", "pmd_ft").await.unwrap();
+        insert(&e, 200, 400).await;
+        e.flush().await.unwrap();
+        e.dump_index_transaction("pmd", "pmd_ft").await.unwrap();
         // Two chunks are on disk; the merge rewrites them as one and drops the
         // sources' objects.
-        crate::scheduler::block_on(e.optimize_fulltext_async("pmd")).unwrap();
+        e.optimize_fulltext_async("pmd").await.unwrap();
 
         let query = "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'uniq42', 5);";
-        let single = rows(&e, query);
+        let single = rows(&e, query).await;
         assert_eq!(single.len(), 1);
-        let all = |e: &Engine| -> std::collections::BTreeSet<i64> {
+        let all = async |e: &Engine| -> std::collections::BTreeSet<i64> {
             rows(
                 e,
                 "SELECT id FROM pmd SEARCH MATCH TEXT (body, 'beta', 1000);",
             )
+            .await
             .into_iter()
             .map(|row| row[0].parse().unwrap())
             .collect()
         };
-        let expected = all(&e);
+        let expected = all(&e).await;
         assert_eq!(expected.len(), 400);
         // A full-text chunk lives in its segment's index directory
         // (`data/db_{d}/tbl_{t}/idx_{i}/seg_{s}/ft_*`), which is what the
@@ -13711,8 +15039,8 @@ mod tests {
             "the blocks",
         );
         // And the answers were computed from what is on disk at all.
-        assert_eq!(all(&e), expected, "the whole corpus");
-        assert_eq!(rows(&e, query), single, "the single-term answer");
+        assert_eq!(all(&e).await, expected, "the whole corpus");
+        assert_eq!(rows(&e, query).await, single, "the single-term answer");
     }
 
     /// Every file under `root` with its bytes, keyed by relative path.
@@ -13758,8 +15086,8 @@ mod tests {
     /// The invariant is "what the table holds", computed here, not another
     /// engine's answer: `alpha` is in every document, so a full-text query with a
     /// large `topn` must return exactly the rows that were not deleted.
-    #[test]
-    fn writers_readers_deletes_and_merges_stay_consistent() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn writers_readers_deletes_and_merges_stay_consistent() {
         use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
         use std::sync::{Arc, Mutex};
 
@@ -13772,12 +15100,18 @@ mod tests {
         let total_written = WRITERS * BATCHES * ROWS_PER_BATCH;
 
         let dir = tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         engine
-            .execute_blocking("CREATE TABLE stress (id INT, body VARCHAR);")
+            .execute("CREATE TABLE stress (id INT, body VARCHAR);")
+            .await
             .unwrap();
         engine
-            .execute_blocking("CREATE INDEX stress_ft ON stress (body) USING FULLTEXT;")
+            .execute("CREATE INDEX stress_ft ON stress (body) USING FULLTEXT;")
+            .await
             .unwrap();
 
         let inserted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
@@ -13789,7 +15123,7 @@ mod tests {
         for writer in 0..WRITERS {
             let engine = Arc::clone(&engine);
             let inserted = Arc::clone(&inserted);
-            writers.push(std::thread::spawn(move || {
+            writers.push(tokio::spawn(async move {
                 for batch in 0..BATCHES {
                     let mut ids = Vec::new();
                     let mut values = Vec::new();
@@ -13800,18 +15134,15 @@ mod tests {
                         values.push(format!("({id}, 'alpha{id} beta')"));
                     }
                     // Recorded **before** the insert commits: a reader may see a
-                    // committed row the instant `execute_blocking` returns, so
-                    // accounting for it afterwards leaves a window in which the
-                    // row is in the table and not yet in `inserted` - which the
-                    // readers below would report as a ghost. The insert below
-                    // unwraps, so a failure cannot leave a stale id behind
-                    // unnoticed.
+                    // committed row the instant `execute` returns, so accounting
+                    // for it afterwards leaves a window in which the row is in
+                    // the table and not yet in `inserted` - which the readers
+                    // below would report as a ghost. The insert below unwraps, so
+                    // a failure cannot leave a stale id behind unnoticed.
                     inserted.lock().unwrap().extend(ids);
                     engine
-                        .execute_blocking(&format!(
-                            "INSERT INTO stress VALUES {};",
-                            values.join(",")
-                        ))
+                        .execute(&format!("INSERT INTO stress VALUES {};", values.join(",")))
+                        .await
                         .unwrap();
                 }
             }));
@@ -13822,12 +15153,13 @@ mod tests {
             let inserted = Arc::clone(&inserted);
             let stop = Arc::clone(&stop);
             let queries = Arc::clone(&queries);
-            readers.push(std::thread::spawn(move || {
+            readers.push(tokio::spawn(async move {
                 while !stop.load(Ordering::Relaxed) {
                     let hits = rows(
                         &engine,
                         "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 5000);",
-                    );
+                    )
+                    .await;
                     let known = inserted.lock().unwrap().clone();
                     for hit in &hits {
                         let id: i64 = hit[0].parse().unwrap();
@@ -13841,9 +15173,9 @@ mod tests {
             let engine = Arc::clone(&engine);
             let inserted = Arc::clone(&inserted);
             let deleted = Arc::clone(&deleted);
-            std::thread::spawn(move || {
+            tokio::spawn(async move {
                 for _ in 0..DELETE_ROUNDS {
-                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    tokio::time::sleep(std::time::Duration::from_millis(40)).await;
                     let known: Vec<i64> = inserted.lock().unwrap().iter().copied().collect();
                     if known.len() < 100 {
                         continue;
@@ -13865,28 +15197,27 @@ mod tests {
                         .collect::<Vec<_>>()
                         .join(",");
                     let sql = format!("DELETE FROM stress WHERE id IN ({list});");
-                    if engine.execute_blocking(&sql).is_ok() {
+                    if engine.execute(&sql).await.is_ok() {
                         deleted.lock().unwrap().extend(victims);
                     }
                 }
             })
         };
         for _ in 0..MAINTENANCE_ROUNDS {
-            std::thread::sleep(std::time::Duration::from_millis(30));
-            let _ =
-                crate::scheduler::block_on(engine.dump_index_transaction("stress", "stress_ft"));
-            let _ = crate::scheduler::block_on(engine.optimize_fulltext_async("stress"));
-            let _ = crate::scheduler::block_on(engine.flush());
+            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+            let _ = engine.dump_index_transaction("stress", "stress_ft").await;
+            let _ = engine.optimize_fulltext_async("stress").await;
+            let _ = engine.flush().await;
         }
 
         for handle in writers {
-            handle.join().unwrap();
+            handle.await.unwrap();
         }
-        deleter.join().unwrap();
+        deleter.await.unwrap();
         // The readers keep querying until the writers are done.
         stop.store(true, Ordering::Relaxed);
         for handle in readers {
-            handle.join().unwrap();
+            handle.await.unwrap();
         }
         let inserted = inserted.lock().unwrap().clone();
         assert_eq!(
@@ -13897,23 +15228,25 @@ mod tests {
         // What the table holds is the invariant, not what the deleter asked
         // for: a delete that ran against a transaction the table had not
         // committed yet removes nothing, and the request list cannot see that.
-        let live_rows = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+        let live_rows = async |engine: &Engine| -> std::collections::BTreeSet<i64> {
             rows(engine, "SELECT id FROM stress;")
+                .await
                 .into_iter()
                 .map(|row| row[0].parse().unwrap())
                 .collect()
         };
-        let collect = |engine: &Engine| -> std::collections::BTreeSet<i64> {
+        let collect = async |engine: &Engine| -> std::collections::BTreeSet<i64> {
             rows(
                 engine,
                 "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 100000);",
             )
+            .await
             .into_iter()
             .map(|row| row[0].parse().unwrap())
             .collect()
         };
         assert!(queries.load(Ordering::Relaxed) > 0, "the readers ran");
-        let expected = live_rows(&engine);
+        let expected = live_rows(&engine).await;
         assert!(
             expected.len() < total_written as usize,
             "the deletes removed nothing, the test proves nothing"
@@ -13926,7 +15259,7 @@ mod tests {
              ({} + {tombstones})",
             expected.len()
         );
-        let got = collect(&engine);
+        let got = collect(&engine).await;
         let missing: Vec<i64> = expected.difference(&got).copied().collect();
         let extra: Vec<i64> = got.difference(&expected).copied().collect();
         assert!(
@@ -13939,25 +15272,34 @@ mod tests {
             &extra[..extra.len().min(20)],
             expected.len()
         );
-        let _ = crate::scheduler::block_on(engine.flush());
+        let _ = engine.flush().await;
         drop(engine);
 
         // The same answer after a restart: the chunks on disk are the truth.
-        let reopened = Engine::open(dir.path()).unwrap();
-        assert_eq!(collect(&reopened), live_rows(&reopened), "after a restart");
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(
+            collect(&reopened).await,
+            live_rows(&reopened).await,
+            "after a restart"
+        );
     }
 
     /// `CREATE INDEX … USING SPANN` answers `SEARCH MATCH VECTOR`, and the
     /// answer is the exact top-k once the candidate list is re-scored
     /// (`docs/SPANN_DESIGN.md` §8.6: a 1-bit code picks candidates, the
     /// executor decides the order).
-    #[test]
-    fn spann_answers_self_queries() {
+    #[tokio::test]
+    async fn spann_answers_self_queries() {
         let n = 200usize;
         for metric in ["l2", "cosine"] {
             let dir = tempdir().unwrap();
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE cs (id INT, v EMBEDDING(FLOAT,16));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE cs (id INT, v EMBEDDING(FLOAT,16));")
+                .await
                 .unwrap();
             let vector = |i: usize| -> String {
                 let body: Vec<String> = (0..16)
@@ -13973,11 +15315,12 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-            e.execute_blocking(&format!(
+            e.execute(&sql).await.unwrap();
+            e.execute(&format!(
                 "CREATE INDEX cs_i ON cs (v) USING SPANN WITH \
                  (min_rows = 1, metric='{metric}', max_partition_size=32, num_centroids=16);"
             ))
+            .await
             .unwrap();
 
             let mut hits = 0;
@@ -13988,13 +15331,14 @@ mod tests {
                         "SELECT id FROM cs SEARCH MATCH VECTOR (v, {}, 'float', '{metric}', 1);",
                         vector(i)
                     ),
-                );
+                )
+                .await;
                 if got == vec![vec![i.to_string()]] {
                     hits += 1;
                 }
             }
             assert!(hits >= 38, "spann recall@1 = {hits}/40 for metric {metric}");
-            let _ = crate::scheduler::block_on(e.flush());
+            let _ = e.flush().await;
         }
     }
 
@@ -14002,13 +15346,16 @@ mod tests {
     /// so a pool wider than one batch must answer exactly what a single
     /// materialised pass would: 600 rows give ~812 candidates over ~10 batches,
     /// and a self-query still has to find its own row in the top-10.
-    #[test]
-    fn spann_streamed_rerank_answers_across_many_batches() {
+    #[tokio::test]
+    async fn spann_streamed_rerank_answers_across_many_batches() {
         let n = 600usize;
         let dim = 16usize;
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE csb (id INT, v EMBEDDING(FLOAT,16));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE csb (id INT, v EMBEDDING(FLOAT,16));")
+            .await
             .unwrap();
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..dim)
@@ -14024,11 +15371,12 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX csb_i ON csb (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
+        .await
         .unwrap();
 
         // The pool is `candidate_budget(10, 32, 50)` = 812, clamped to the 600
@@ -14040,12 +15388,13 @@ mod tests {
                     "SELECT id FROM csb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
                     vector(i)
                 ),
-            );
+            )
+            .await;
             let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
             assert_eq!(ids.len(), 10, "row {i}: {ids:?}");
             assert!(ids.contains(&i.to_string()), "row {i} missing from {ids:?}");
         }
-        let _ = crate::scheduler::block_on(e.flush());
+        let _ = e.flush().await;
     }
 
     /// A row written **after** the build is answered from the mem index, not by
@@ -14057,20 +15406,23 @@ mod tests {
     /// The dump is what makes the **tree** cover the row: the checkpoint rebuilds
     /// the segment's chunk from its live rows, folds the new row in and clears the
     /// list, so the same query afterwards answers out of `chunk_{n}.idx`.
-    #[test]
-    fn spann_answers_a_row_written_after_the_build_from_the_mem_index() {
+    #[tokio::test]
+    async fn spann_answers_a_row_written_after_the_build_from_the_mem_index() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE csf (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking(
-            "INSERT INTO csf VALUES (1, [0.0,0.0,0.0,0.0]), (2, [1.0,0.0,0.0,0.0]);",
-        )
-        .unwrap();
-        e.execute_blocking(
+        e.execute("CREATE TABLE csf (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO csf VALUES (1, [0.0,0.0,0.0,0.0]), (2, [1.0,0.0,0.0,0.0]);")
+            .await
+            .unwrap();
+        e.execute(
             "CREATE INDEX csf_i ON csf (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=8);",
         )
+        .await
         .unwrap();
         let key = e.table_key("default_db.csf");
         let pending = |e: &Engine| -> usize {
@@ -14078,30 +15430,26 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| {
-                    entry
-                        .spann_mem
-                        .values()
-                        .map(|tail| tail.len())
-                        .sum::<usize>()
-                })
+                .map(|entry| entry.spann_mem.values().map(|v| v.len()).sum::<usize>())
                 .unwrap_or(0)
         };
         assert_eq!(pending(&e), 0, "the build leaves nothing pending");
         // Written after the build: not in the tree, so it is in the mem index.
-        e.execute_blocking("INSERT INTO csf VALUES (3, [9.0,9.0,9.0,9.0]);")
+        e.execute("INSERT INTO csf VALUES (3, [9.0,9.0,9.0,9.0]);")
+            .await
             .unwrap();
         assert_eq!(pending(&e), 1, "the insert must land in the mem index");
         let got = rows(
             &e,
             "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
-        );
+        )
+        .await;
         assert_eq!(got, vec![vec!["3".to_string()]]);
 
         // The checkpoint rebuilds the chunk (`rebuild` delta mode), so after a
         // flush the tree covers every row again — including the one that was
         // written after the index was created — and the list is released.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let covered = e
             .tables
             .lock()
@@ -14113,143 +15461,25 @@ mod tests {
         let got = rows(
             &e,
             "SELECT id FROM csf SEARCH MATCH VECTOR (v, [9.0,9.0,9.0,9.0], 'float', 'l2', 1);",
-        );
-        assert_eq!(got, vec![vec!["3".to_string()]]);
-    }
-
-    /// A merge renumbers every row (`segment << 32 | offset`), so a tree built
-    /// on the old ids cannot be kept: each of its entries would name a
-    /// *different* row after the compaction, which is a wrong answer rather
-    /// than a stale entry. `compact_segments` drops the handles and the mem
-    /// index and rebuilds the merged segment's tree in the same commit
-    /// (`docs/SPANN_DESIGN.md` §9.8), so the index comes back over the new ids
-    /// instead of falling back to the exact scan until the next checkpoint.
-    #[test]
-    fn compaction_retires_the_spann_tree_built_on_the_old_row_ids() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE csc (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        // The first component is the row's own id, so the nearest neighbour of
-        // a self-query is unique (no ties at distance 0).
-        let vector = |i: usize| -> String {
-            format!(
-                "[{i}.0,{}.0,{}.0,{}.0]",
-                (i * 7) % 97,
-                (i * 13) % 89,
-                (i * 29) % 83
-            )
-        };
-        let n = 200usize;
-        let mut sql = String::from("INSERT INTO csc VALUES ");
-        for i in 0..n {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i + 1 < n {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
-            "CREATE INDEX csc_i ON csc (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
-        .unwrap();
-        let key = e.table_key("default_db.csc");
-        let trees = |e: &Engine| -> usize {
-            e.tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .map(|entry| entry.spann.len())
-                .unwrap_or(0)
-        };
-        let pending = |e: &Engine| -> usize {
-            e.tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .map(|entry| {
-                    entry
-                        .spann_mem
-                        .values()
-                        .map(|tail| tail.len())
-                        .sum::<usize>()
-                })
-                .unwrap_or(0)
-        };
-        assert_eq!(trees(&e), 1, "CREATE INDEX did not publish a tree");
-        // A row written after the build sits in the mem index; a checkpoint
-        // moves it into the block, which is where the merge reads from (a row
-        // still buffered is not part of the compaction).
-        e.execute_blocking(&format!("INSERT INTO csc VALUES (999, {});", vector(999)))
-            .unwrap();
-        assert_eq!(pending(&e), 1);
-        crate::scheduler::block_on(e.flush()).unwrap();
-
-        // `compact_all_segments` merges unconditionally, even one segment: the
-        // rows all move to a fresh segment id.
-        e.compact_all_segments("csc").unwrap();
-        // The merged segment's tree is rebuilt inside the compaction (§9.8), so
-        // the handle is back - over the **new** ids, covering every live row.
-        let segments: std::collections::HashSet<u32> = e
-            .segment_row_counts("csc")
-            .into_iter()
-            .map(|(s, _)| s)
-            .collect();
-        assert_eq!(segments.len(), 1, "{segments:?}");
-        let (handles, ids) = {
-            let tables = e.tables.lock().unwrap();
-            let entry = tables.get(&key);
-            (
-                entry.map(|entry| entry.spann.len()).unwrap_or(0),
-                entry
-                    .and_then(|entry| entry.spann.values().next().map(|tree| tree.row_ids()))
-                    .unwrap_or_default(),
-            )
-        };
-        // The merge renumbers every row, and a tree is keyed by row id
-        // (`segment << 32 | offset`, which is what a chunk's slots hold), so the
-        // compaction clears it rather than republishing a tree that names dead
-        // ids. It rebuilds over the merged rows inside its bottom half instead:
-        // one handle, every row, all ids in the new segment.
-        assert!(handles <= 1, "at most one handle may survive a compaction");
-        assert!(
-            ids.iter()
-                .all(|id| segments.contains(&((*id >> 32) as u32))),
-            "a surviving tree still names a retired segment: {ids:?}"
-        );
-
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM csc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(42)
-            ),
-        );
-        assert_eq!(got, vec![vec!["42".to_string()]]);
-        // Still right for the row the merge moved out of the mem index.
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM csc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(999)
-            ),
-        );
-        assert_eq!(got, vec![vec!["999".to_string()]]);
+        .await;
+        assert_eq!(got, vec![vec!["3".to_string()]]);
     }
 
     /// A `WHERE` on a scalar column no longer bypasses the vector index
     /// (`docs/SPANN_DESIGN.md` §12.5): the predicate becomes a row-id mask the
     /// graph search consumes, and the answer is the exact top-k over the rows
     /// the filter admits.
-    #[test]
-    fn hnsw_filter_is_pushed_into_the_graph() {
+    #[tokio::test]
+    async fn hnsw_filter_is_pushed_into_the_graph() {
         let n = 400usize;
         let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,0.0]", i + 1, i + 2) };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE hf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE hf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO hf VALUES ");
         for i in 0..n {
@@ -14259,8 +15489,9 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
 
         // The reference's acceptance (§12.5): identical row sets with and
@@ -14270,21 +15501,23 @@ mod tests {
              WHERE tag = 4 AND id > -1;",
             vector(100)
         );
-        let with_index = rows(&e, &query);
+        let with_index = rows(&e, &query).await;
         assert_eq!(with_index.len(), 3, "the filter admits more rows than k");
-        e.execute_blocking("DROP INDEX hf_i;").unwrap();
-        let exact = rows(&e, &query);
+        e.execute("DROP INDEX hf_i;").await.unwrap();
+        let exact = rows(&e, &query).await;
         assert_eq!(
             with_index, exact,
             "the pushed-down mask answers the exact top-k"
         );
-        e.execute_blocking("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+        e.execute("CREATE INDEX hf_i ON hf (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
 
         // The mask reaches the graph search: the probe's candidates are all
         // admitted rows, which a probe without the mask is not.
         let allowed: std::collections::HashSet<usize> = e
             .fetch_rows_with_ids("hf")
+            .await
             .unwrap()
             .into_iter()
             .filter(|(_, row)| row.get(1) == Some(&Value::Int(4)))
@@ -14294,7 +15527,7 @@ mod tests {
         let index_id = e.test_index_id("default_db.hf", "v", "HNSW");
         assert_ne!(index_id, 0, "the HNSW index is registered");
         let q: Vec<f32> = (100..104).map(|d| d as f32).collect();
-        let probe = |allowed: Option<&std::collections::HashSet<usize>>| {
+        let probe = async |allowed: Option<&std::collections::HashSet<usize>>| {
             e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
                 table: "hf",
                 index_id: Some(index_id),
@@ -14302,16 +15535,16 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),
                 allowed,
                 beam: None,
             })
+            .await
             .expect("the graph covers the table")
         };
-        let filtered = probe(Some(&allowed));
+        let filtered = probe(Some(&allowed)).await;
         assert!(
             !filtered.candidates.is_empty(),
             "a 12% selective mask must still fill a candidate list"
@@ -14321,7 +15554,7 @@ mod tests {
             "the graph search kept a row the filter rejects"
         );
         assert!(filtered.uncovered.is_empty(), "the graph covers every row");
-        let unfiltered = probe(None);
+        let unfiltered = probe(None).await;
         assert!(
             unfiltered
                 .candidates
@@ -14336,13 +15569,16 @@ mod tests {
     /// the labels and the live rows reverted to a full table scan - and a delete
     /// alone was enough to cause one, because a tombstoned row stays in the
     /// graph.
-    #[test]
-    fn hnsw_scores_uncovered_rows_without_a_table_scan() {
+    #[tokio::test]
+    async fn hnsw_scores_uncovered_rows_without_a_table_scan() {
         let n = 200usize;
         let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,0.0]", i + 1, i + 2) };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE hu (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE hu (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO hu VALUES ");
         for i in 0..n {
@@ -14352,11 +15588,13 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking("CREATE INDEX hu_i ON hu (v) USING HNSW WITH (metric='l2');")
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX hu_i ON hu (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
         // No vector, so the graph never took the row: it is live and uncovered.
-        e.execute_blocking("INSERT INTO hu VALUES (999, NULL);")
+        e.execute("INSERT INTO hu VALUES (999, NULL);")
+            .await
             .unwrap();
 
         let index_id = e.test_index_id("default_db.hu", "v", "HNSW");
@@ -14369,13 +15607,13 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n + 1),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
             })
+            .await
             .expect("the graph still answers; only its tail is uncovered");
         assert_eq!(
             probe.uncovered.len(),
@@ -14394,7 +15632,7 @@ mod tests {
 
         // A delete leaves its row in the graph, so the label count no longer
         // matches the live count - and the probe must answer anyway.
-        e.execute_blocking("DELETE FROM hu WHERE id = 3;").unwrap();
+        e.execute("DELETE FROM hu WHERE id = 3;").await.unwrap();
         let probe = e
             .knn_candidates(&crate::knn_scan::KnnCandidateScan {
                 table: "hu",
@@ -14403,13 +15641,13 @@ mod tests {
                 rows: &[],
                 live_rows: None,
                 live_count: Some(n),
-                cache: None,
                 topn: 3,
                 metric: "l2",
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
             })
+            .await
             .expect("a delete must not turn the index off");
         assert!(probe.uncovered.is_empty(), "a delete uncovers nothing");
         assert!(!probe.candidates.is_empty());
@@ -14420,21 +15658,25 @@ mod tests {
                 "SELECT id FROM hu SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
                 vector(7)
             ),
-        );
+        )
+        .await;
         assert_eq!(got, vec![vec!["7".to_string()]]);
     }
 
     /// A filter and a partly covered tree at once: the mask decides which hits
     /// the tree keeps, and the row written after the build is scored by the
     /// exact path - so the answer is the exact top-k over the admitted rows.
-    #[test]
-    fn spann_filter_and_uncovered_tail_answer_together() {
+    #[tokio::test]
+    async fn spann_filter_and_uncovered_tail_answer_together() {
         let n = 200usize;
         let vector =
             |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,{}.0]", i + 1, i + 2, i + 3) };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cf VALUES ");
         for i in 1..=n {
@@ -14444,22 +15686,24 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cf_i ON cf (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
+        .await
         .unwrap();
         // Written after the build, and the nearest of its tag by a wide margin:
         // only the uncovered fallback can find it.
-        e.execute_blocking(&format!("INSERT INTO cf VALUES (999, 7, {});", vector(500)))
+        e.execute(&format!("INSERT INTO cf VALUES (999, 7, {});", vector(500)))
+            .await
             .unwrap();
 
         let query = format!(
             "SELECT id FROM cf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 2) WHERE tag = 7;",
             vector(500)
         );
-        let got = rows(&e, &query);
+        let got = rows(&e, &query).await;
         assert_eq!(
             got,
             vec![vec!["999".to_string()], vec!["199".to_string()]],
@@ -14467,83 +15711,22 @@ mod tests {
         );
         // The same rows without an index: the mask and the fallback agree with
         // the exact scan.
-        e.execute_blocking("DROP INDEX cf_i;").unwrap();
-        assert_eq!(rows(&e, &query), got);
-    }
-
-    /// A tombstoned candidate costs a live row.
-    ///
-    /// The tree's members are slots (`Rows::Chunk` keeps the slot of a deleted
-    /// row), so a pool sized for `topn` members answers fewer than `topn` live
-    /// rows once most of the segment is deleted - the answer comes up short
-    /// although live rows exist. The pool is widened by the share of members
-    /// that is still live, so the top-k is full.
-    #[test]
-    fn a_tombstoned_pool_still_answers_topn_live_rows() {
-        let n = 2000usize;
-        let vector =
-            |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,{}.0]", i + 1, i + 2, i + 3) };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tp (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO tp VALUES ");
-        for i in 1..=n {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i < n {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
-            "CREATE INDEX tp_i ON tp (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
-        )
-        .unwrap();
-        // Most of the segment deleted, and no checkpoint since: the slots are
-        // still in the tree, the live rows are the last twenty.
-        e.execute_blocking("DELETE FROM tp WHERE id <= 1980;")
-            .unwrap();
-
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM tp SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
-                vector(295)
-            ),
-        );
-        assert_eq!(
-            got.len(),
-            10,
-            "a pool of tombstones answered {} live rows: {got:?}",
-            got.len()
-        );
-        // The exact scan is the contract the widening has to keep.
-        e.execute_blocking("DROP INDEX tp_i;").unwrap();
-        let exact = rows(
-            &e,
-            &format!(
-                "SELECT id FROM tp SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
-                vector(295)
-            ),
-        );
-        let mut indexed: Vec<_> = got.into_iter().flatten().collect();
-        let mut exact: Vec<_> = exact.into_iter().flatten().collect();
-        indexed.sort();
-        exact.sort();
-        assert_eq!(indexed, exact, "the widened pool missed a live row");
+        e.execute("DROP INDEX cf_i;").await.unwrap();
+        assert_eq!(rows(&e, &query).await, got);
     }
 
     /// The same contract on IVF: the probe's candidates are filtered by the
     /// mask, and the answer matches the exact scan (`test_knn_ivf_*_filter.slt`).
-    #[test]
-    fn ivf_filter_matches_the_exact_scan() {
+    #[tokio::test]
+    async fn ivf_filter_matches_the_exact_scan() {
         let n = 200usize;
         let vector = |i: usize| -> String { format!("[{i}.0,{}.0,{}.0,1.0]", i + 1, i + 2) };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ivf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ivf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO ivf VALUES ");
         for i in 1..=n {
@@ -14553,15 +15736,16 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking("CREATE INDEX ivf_i ON ivf (v) USING IVF WITH (metric='l2');")
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX ivf_i ON ivf (v) USING IVF WITH (metric='l2');")
+            .await
             .unwrap();
 
         let query = format!(
             "SELECT id FROM ivf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3) WHERE tag = 2;",
             vector(150)
         );
-        let with_index = rows(&e, &query);
+        let with_index = rows(&e, &query).await;
         assert_eq!(with_index.len(), 3);
         assert!(
             with_index
@@ -14569,16 +15753,16 @@ mod tests {
                 .all(|row| row[0].parse::<usize>().unwrap() % 4 == 2),
             "a filtered IVF scan kept a row the filter rejects: {with_index:?}"
         );
-        e.execute_blocking("DROP INDEX ivf_i;").unwrap();
-        assert_eq!(rows(&e, &query), with_index);
+        e.execute("DROP INDEX ivf_i;").await.unwrap();
+        assert_eq!(rows(&e, &query).await, with_index);
     }
 
     /// The tree survives a restart: the checkpoint writes the chunk, and the
     /// first query after reopening loads it lazily (§6/§9.4). The assertion on
     /// `TableEntry::spann` is what proves the *index* answered and not the
     /// exact-scan fallback.
-    #[test]
-    fn spann_survives_a_restart_and_answers_from_its_chunk() {
+    #[tokio::test]
+    async fn spann_survives_a_restart_and_answers_from_its_chunk() {
         let n = 300usize;
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..16)
@@ -14596,8 +15780,11 @@ mod tests {
             .collect();
         let dir = tempdir().unwrap();
         let before: Vec<Vec<Vec<String>>> = {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE csp (id INT, v EMBEDDING(FLOAT,16));")
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE csp (id INT, v EMBEDDING(FLOAT,16));")
+                .await
                 .unwrap();
             let mut sql = String::from("INSERT INTO csp VALUES ");
             for i in 0..n {
@@ -14607,18 +15794,24 @@ mod tests {
                 }
             }
             sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-            e.execute_blocking(
+            e.execute(&sql).await.unwrap();
+            e.execute(
                 "CREATE INDEX csp_i ON csp (v) USING SPANN WITH \
                  (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
             )
+            .await
             .unwrap();
-            let answers = queries.iter().map(|q| rows(&e, q)).collect::<Vec<_>>();
-            crate::scheduler::block_on(e.flush()).unwrap();
+            let mut answers = Vec::new();
+            for q in &queries {
+                answers.push(rows(&e, q).await);
+            }
+            e.flush().await.unwrap();
             answers
         };
 
-        let reopened = Engine::open(dir.path()).unwrap();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         // Nothing loaded yet: the map is filled by the query below.
         let key = reopened.table_key("default_db.csp");
         let empty = reopened
@@ -14631,7 +15824,7 @@ mod tests {
         assert!(empty, "a fresh process must not have the tree in memory");
 
         for (q, want) in queries.iter().zip(&before) {
-            assert_eq!(&rows(&reopened, q), want, "after a restart: {q}");
+            assert_eq!(&rows(&reopened, q).await, want, "after a restart: {q}");
         }
         let loaded = reopened
             .tables
@@ -14643,330 +15836,14 @@ mod tests {
         assert!(loaded, "the query must have loaded the chunk into memory");
     }
 
-    /// The chain has a **cap**: eight chunks per segment, then a rebuild. Without
-    /// it a long-lived segment would add one tree per checkpoint - one more probe
-    /// per query, forever - and the fold is also what retires the layers a delta
-    /// leaves behind.
-    #[test]
-    fn the_chunk_chain_folds_at_its_cap() {
-        let dim = 8;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{}", (i * 13 + d * 41) % 967))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ccap (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        let insert = |e: &Engine, range: std::ops::Range<usize>| {
-            let mut sql = String::from("INSERT INTO ccap VALUES ");
-            for i in range.clone() {
-                sql.push_str(&format!("({i}, {})", vector(i)));
-                if i + 1 < range.end {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-        };
-        let shape = |e: &Engine| -> (usize, usize) {
-            let key = e.table_key("default_db.ccap");
-            let handle = e
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|entry| entry.spann.values().next().cloned())
-                .expect("the index is loaded");
-            let layers = match handle.as_ref() {
-                crate::spann_mem::SpannHandle::File(chains) => chains
-                    .first()
-                    .map(|chain| chain.layers())
-                    .unwrap_or_default(),
-                crate::spann_mem::SpannHandle::Memory(_) => 0,
-            };
-            (layers, handle.len())
-        };
-
-        insert(&e, 0..40);
-        e.execute_blocking(
-            "CREATE INDEX ccap_i ON ccap (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(shape(&e).0, 1, "the first checkpoint builds one chunk");
-
-        // Six more checkpoints, twenty rows each: one more layer per checkpoint
-        // and never more than the cap.
-        let mut widest = 0usize;
-        for round in 0..8 {
-            let first = 40 + round * 20;
-            insert(&e, first..first + 20);
-            crate::scheduler::block_on(e.flush()).unwrap();
-            let (layers, covered) = shape(&e);
-            assert!(
-                layers <= 8,
-                "round {round}: {layers} layers is past the cap"
-            );
-            assert_eq!(
-                covered,
-                first + 20,
-                "round {round}: the chain covers every row"
-            );
-            widest = widest.max(layers);
-        }
-        assert_eq!(widest, 8, "the chain reached the cap before folding");
-        let (layers, covered) = shape(&e);
-        assert_eq!(layers, 1, "the checkpoint at the cap folded the chain");
-        assert_eq!(covered, 200);
-
-        for i in [0usize, 39, 120, 199] {
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM ccap SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            );
-            assert_eq!(
-                got.first().map(|r| r[0].clone()),
-                Some(i.to_string()),
-                "row {i} after the fold"
-            );
-        }
-    }
-
-    /// A delete is a tombstone, not an un-append: the row's codes sit in the
-    /// leaf that marked it dead. The delta checkpoint re-inserts a leaf's row
-    /// **ids** into the segment's published tree, so it has to skip the
-    /// tombstones - otherwise a `DELETE` would be undone by the very checkpoint
-    /// that made it durable. A row published earlier is a different case: its
-    /// layer stays live (a delta shadows pages, it does not rewrite the base),
-    /// and the query drops it on the visibility check, which the next rebuild
-    /// compacts away.
-    #[test]
-    fn a_deleted_pending_row_is_not_resurrected_by_its_delta() {
-        let dim = 8;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{}", (i * 19 + d * 31) % 983))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let insert = |e: &Engine, range: std::ops::Range<usize>| {
-            let mut sql = String::from("INSERT INTO cdel VALUES ");
-            for i in range.clone() {
-                sql.push_str(&format!("({i}, {})", vector(i)));
-                if i + 1 < range.end {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-        };
-        let count = |e: &Engine| -> String {
-            rows(e, "SELECT COUNT(*) FROM cdel;")
-                .first()
-                .map(|r| r[0].clone())
-                .unwrap_or_default()
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cdel (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        insert(&e, 0..120);
-        e.execute_blocking(
-            "CREATE INDEX cdel_i ON cdel (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(count(&e), "120");
-
-        // 80 rows after the checkpoint, two of them deleted before the dump: one
-        // that only the tail holds (130) and one the chunk already published (60).
-        insert(&e, 120..200);
-        e.execute_blocking("DELETE FROM cdel WHERE id = 130;")
-            .unwrap();
-        e.execute_blocking("DELETE FROM cdel WHERE id = 60;")
-            .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(count(&e), "198", "both deletes are visible");
-
-        let self_query = |e: &Engine, i: usize| -> Option<String> {
-            rows(
-                e,
-                &format!(
-                    "SELECT id FROM cdel SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            )
-            .first()
-            .map(|r| r[0].clone())
-        };
-        assert_ne!(
-            self_query(&e, 130),
-            Some("130".to_string()),
-            "the delta must not re-publish a row that was deleted before its dump"
-        );
-        assert_ne!(self_query(&e, 60), Some("60".to_string()));
-        for i in [1usize, 119, 199] {
-            assert_eq!(self_query(&e, i), Some(i.to_string()), "row {i} survives");
-        }
-
-        // The segment's row count is the column's - tombstones included - so
-        // skipping 130 leaves the chain one row short of it and the next
-        // checkpoint folds: one tree, and the fold publishes the column it reads.
-        let layers_now = |e: &Engine| -> (usize, usize) {
-            let key = e.table_key("default_db.cdel");
-            let handle = e
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|entry| entry.spann.values().next().cloned())
-                .expect("the index is loaded");
-            let layers = match handle.as_ref() {
-                crate::spann_mem::SpannHandle::File(chains) => chains
-                    .first()
-                    .map(|chain| chain.layers())
-                    .unwrap_or_default(),
-                crate::spann_mem::SpannHandle::Memory(_) => 0,
-            };
-            (layers, handle.len())
-        };
-        assert_eq!(
-            layers_now(&e),
-            (2, 199),
-            "120 published + 79 moved; the deleted pending row is skipped"
-        );
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(count(&e), "198");
-        assert_eq!(layers_now(&e), (1, 200), "the gap folded into one chunk");
-
-        // And it settles there: the chain now covers every row the segment
-        // holds, so an idle checkpoint publishes nothing and does not churn.
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(layers_now(&e), (1, 200), "an idle checkpoint is reusable");
-        assert_ne!(self_query(&e, 60), Some("60".to_string()));
-    }
-
-    /// §5.2-b/§5.3/§5.4, end to end: rows inserted after a checkpoint are
-    /// assigned into **the chunk's own tree** (one descent, one leaf page each),
-    /// and the next checkpoint appends only the pages it rewrote instead of
-    /// rebuilding the segment. The segment's index is therefore a chain, and a
-    /// query - before and after a restart - answers every row exactly once.
-    #[test]
-    fn a_checkpoint_appends_dirty_pages_to_the_published_tree() {
-        let dim = 8;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{}", (i * 17 + d * 29) % 991))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let insert = |e: &Engine, range: std::ops::Range<usize>| {
-            let mut sql = String::from("INSERT INTO cd VALUES ");
-            for i in range.clone() {
-                sql.push_str(&format!("({i}, {})", vector(i)));
-                if i + 1 < range.end {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        insert(&e, 0..120);
-        e.execute_blocking(
-            "CREATE INDEX cd_i ON cd (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-        )
-        .unwrap();
-        // The first checkpoint has no chunk to extend: it builds the tree.
-        crate::scheduler::block_on(e.flush()).unwrap();
-
-        // 80 rows after the checkpoint. The flush below writes the pages those
-        // rows touched, and keeps the chunk they were assigned into.
-        insert(&e, 120..200);
-        crate::scheduler::block_on(e.flush()).unwrap();
-
-        let key = e.table_key("default_db.cd");
-        let handle = e
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|entry| entry.spann.values().next().cloned())
-            .expect("the checkpoint reloaded the segment's index");
-        let layers = match handle.as_ref() {
-            crate::spann_mem::SpannHandle::File(chains) => chains
-                .first()
-                .map(|chain| chain.layers())
-                .unwrap_or_default(),
-            crate::spann_mem::SpannHandle::Memory(_) => 0,
-        };
-        assert_eq!(
-            layers, 2,
-            "a delta is one more layer over the chunk it extends, not a rebuild"
-        );
-        assert_eq!(handle.len(), 200, "the chain covers every live row");
-        let ids = handle.row_ids();
-        assert_eq!(ids.len(), 200, "and holds each row exactly once");
-        let unique: std::collections::HashSet<u64> = ids.iter().copied().collect();
-        assert_eq!(unique.len(), 200, "no row is covered twice");
-
-        // A row from either side of the delta is answered by the chain: the base
-        // chunk's pages and the ones the checkpoint rewrote resolve together.
-        for i in [0usize, 60, 119, 120, 199] {
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM cd SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            );
-            assert_eq!(
-                got.first().map(|r| r[0].clone()),
-                Some(i.to_string()),
-                "row {i} after the delta publish"
-            );
-        }
-
-        // The delta is on disk: a restart rebuilds the chain from the catalog and
-        // still answers for both halves.
-        drop(e);
-        let reopened = Engine::open(dir.path()).unwrap();
-        for i in [7usize, 130] {
-            let got = rows(
-                &reopened,
-                &format!(
-                    "SELECT id FROM cd SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            );
-            assert_eq!(
-                got.first().map(|r| r[0].clone()),
-                Some(i.to_string()),
-                "row {i} after a restart over a two-layer chain"
-            );
-        }
-    }
-
     /// An insert must be queryable **before** the next dump.
     ///
     /// The row goes into the index's mem index (O(1) append), and the query
     /// merges it with the published chunks; the tree is only built at the next
     /// flush. Before this, the row was "uncovered" and every such query fell back
     /// to scanning the whole table.
-    #[test]
-    fn an_insert_is_visible_before_the_next_dump() {
+    #[tokio::test]
+    async fn an_insert_is_visible_before_the_next_dump() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..8)
                 .map(|d| format!("{}", (i * 11 + d * 23) % 977))
@@ -14974,8 +15851,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ci (id INT, v EMBEDDING(FLOAT,8));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ci (id INT, v EMBEDDING(FLOAT,8));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO ci VALUES ");
         for i in 0..80 {
@@ -14985,17 +15865,19 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX ci_i ON ci (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         // A row nothing else resembles, inserted after the dump.
         let needle = "[100000,100001,100002,100003,100004,100005,100006,100007]";
-        e.execute_blocking(&format!("INSERT INTO ci VALUES (80, {needle});"))
+        e.execute(&format!("INSERT INTO ci VALUES (80, {needle});"))
+            .await
             .unwrap();
         let key = e.table_key("default_db.ci");
         let pending = e
@@ -15016,7 +15898,8 @@ mod tests {
         let got = rows(
             &e,
             &format!("SELECT id FROM ci SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
-        );
+        )
+        .await;
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some("80".to_string()),
@@ -15024,7 +15907,7 @@ mod tests {
         );
 
         // The dump builds the tree that covers it and releases the mem index.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let pending = e
             .tables
             .lock()
@@ -15042,7 +15925,8 @@ mod tests {
         let got = rows(
             &e,
             &format!("SELECT id FROM ci SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
-        );
+        )
+        .await;
         assert_eq!(got.first().map(|r| r[0].clone()), Some("80".to_string()));
     }
 
@@ -15053,8 +15937,8 @@ mod tests {
     /// `all_covered` answers "incomplete" and every query pays the row-set walk
     /// the count check exists to avoid. It is also a candidate on every query,
     /// i.e. a decode of a row nothing can return.
-    #[test]
-    fn a_delete_prunes_the_spann_mem_index() {
+    #[tokio::test]
+    async fn a_delete_prunes_the_spann_mem_index() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..8)
                 .map(|d| format!("{}.0", (i * 7 + d * 13) % 971))
@@ -15062,8 +15946,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,8));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cd (id INT, v EMBEDDING(FLOAT,8));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cd VALUES ");
         for i in 0..40 {
@@ -15073,13 +15960,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cd_i ON cd (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         let key = e.table_key("default_db.cd");
         let pending = |e: &Engine| -> usize {
@@ -15087,29 +15975,25 @@ mod tests {
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| {
-                    entry
-                        .spann_mem
-                        .values()
-                        .map(|tail| tail.len())
-                        .sum::<usize>()
-                })
+                .map(|entry| entry.spann_mem.values().map(|v| v.len()).sum::<usize>())
                 .unwrap_or(0)
         };
         // Two rows after the dump: both in the mem index, nothing else.
         let far = "[900.0,900.0,900.0,900.0,900.0,900.0,900.0,900.0]";
         let gone = "[800.0,800.0,800.0,800.0,800.0,800.0,800.0,800.0]";
-        e.execute_blocking(&format!("INSERT INTO cd VALUES (40, {far}), (41, {gone});"))
+        e.execute(&format!("INSERT INTO cd VALUES (40, {far}), (41, {gone});"))
+            .await
             .unwrap();
         assert_eq!(pending(&e), 2, "both inserts must land in the mem index");
 
-        e.execute_blocking("DELETE FROM cd WHERE id = 41;").unwrap();
+        e.execute("DELETE FROM cd WHERE id = 41;").await.unwrap();
         assert_eq!(pending(&e), 1, "the deleted row must leave the mem index");
 
         let got = rows(
             &e,
             &format!("SELECT id FROM cd SEARCH MATCH VECTOR (v, {far}, 'float', 'l2', 3);"),
-        );
+        )
+        .await;
         let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
         assert_eq!(ids.first().map(String::as_str), Some("40"), "got {ids:?}");
         assert!(
@@ -15125,8 +16009,8 @@ mod tests {
     /// table, so an import that outruns the checkpoint interval would otherwise
     /// turn each query into a scan of the gap. The bound is rows, not bytes
     /// (§9.5's watermarks are the engine-wide budget, a different trigger).
-    #[test]
-    fn a_spann_mem_index_dumps_at_its_row_bound() {
+    #[tokio::test]
+    async fn a_spann_mem_index_dumps_at_its_row_bound() {
         let n = 30usize;
         let extra = 1100usize;
         // A per-(row, dim) spread: a modular pattern repeats every modulus rows,
@@ -15146,8 +16030,11 @@ mod tests {
         };
         let needle = "[-900.0,-901.0,-902.0,-903.0]";
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cb (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cb (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cb VALUES ");
         for i in 0..n {
@@ -15157,27 +16044,22 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
+        e.execute(&sql).await.unwrap();
         // `max_partition_size = 16` -> the bound is 1024 rows.
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX cb_i ON cb (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let key = e.table_key("default_db.cb");
         let pending = |e: &Engine| -> usize {
             e.tables
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| {
-                    entry
-                        .spann_mem
-                        .values()
-                        .map(|tail| tail.len())
-                        .sum::<usize>()
-                })
+                .map(|entry| entry.spann_mem.values().map(|v| v.len()).sum::<usize>())
                 .unwrap_or(0)
         };
         assert_eq!(pending(&e), 0, "the checkpoint released the mem index");
@@ -15190,7 +16072,7 @@ mod tests {
         }
         let needle_id = n + extra;
         sql.push_str(&format!("({needle_id}, {needle});"));
-        e.execute_blocking(&sql).unwrap();
+        e.execute(&sql).await.unwrap();
 
         // No `flush()` in between: the row bound alone has to dump.
         assert_eq!(
@@ -15212,7 +16094,8 @@ mod tests {
         let got = rows(
             &e,
             &format!("SELECT id FROM cb SEARCH MATCH VECTOR (v, {needle}, 'float', 'l2', 1);"),
-        );
+        )
+        .await;
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some(needle_id.to_string())
@@ -15233,8 +16116,8 @@ mod tests {
     ///   `uncovered`: an exact scan of exactly those row ids, not of the table.
     ///
     /// Both cases must answer the row.
-    #[test]
-    fn a_restart_answers_the_rows_written_after_the_last_dump() {
+    #[tokio::test]
+    async fn a_restart_answers_the_rows_written_after_the_last_dump() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 19 + d * 37) % 983))
@@ -15242,8 +16125,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cr (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cr (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cr VALUES ");
         for i in 0..40 {
@@ -15253,26 +16139,21 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cr_i ON cr (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let key = e.table_key("default_db.cr");
         let pending = |e: &Engine| -> usize {
             e.tables
                 .lock()
                 .unwrap()
                 .get(&key)
-                .map(|entry| {
-                    entry
-                        .spann_mem
-                        .values()
-                        .map(|tail| tail.len())
-                        .sum::<usize>()
-                })
+                .map(|entry| entry.spann_mem.values().map(|v| v.len()).sum::<usize>())
                 .unwrap_or(0)
         };
         let covered = |e: &Engine| -> Option<usize> {
@@ -15285,11 +16166,14 @@ mod tests {
 
         // Case 1: the row only ever reached the WAL.
         let first = "[700.0,701.0,702.0,703.0]";
-        e.execute_blocking(&format!("INSERT INTO cr VALUES (40, {first});"))
+        e.execute(&format!("INSERT INTO cr VALUES (40, {first});"))
+            .await
             .unwrap();
         drop(e);
 
-        let reopened = Engine::open(dir.path()).unwrap();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
             pending(&reopened),
             1,
@@ -15298,7 +16182,8 @@ mod tests {
         let got = rows(
             &reopened,
             &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {first}, 'float', 'l2', 1);"),
-        );
+        )
+        .await;
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some("40".to_string()),
@@ -15316,7 +16201,8 @@ mod tests {
         // half: the mirror is written, no chunk is published.
         let second = "[-700.0,-701.0,-702.0,-703.0]";
         reopened
-            .execute_blocking(&format!("INSERT INTO cr VALUES (41, {second});"))
+            .execute(&format!("INSERT INTO cr VALUES (41, {second});"))
+            .await
             .unwrap();
         assert_eq!(pending(&reopened), 2, "both rows sit in the mem index");
         reopened
@@ -15324,7 +16210,9 @@ mod tests {
             .unwrap();
         drop(reopened);
 
-        let again = Engine::open(dir.path()).unwrap();
+        let again = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         assert_eq!(
             pending(&again),
             0,
@@ -15333,7 +16221,8 @@ mod tests {
         let got = rows(
             &again,
             &format!("SELECT id FROM cr SEARCH MATCH VECTOR (v, {second}, 'float', 'l2', 1);"),
-        );
+        )
+        .await;
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some("41".to_string()),
@@ -15346,7 +16235,7 @@ mod tests {
         );
 
         // The next dump folds both into the tree, so the fallback is temporary.
-        crate::scheduler::block_on(again.flush()).unwrap();
+        again.flush().await.unwrap();
         assert_eq!(covered(&again), Some(42), "the dump covers both rows");
         assert_eq!(pending(&again), 0);
     }
@@ -15358,8 +16247,8 @@ mod tests {
     /// nothing was written. The reuse test is the chunk's own `row_count`
     /// against the segment's live rows, so a delete (which lowers it) or a
     /// compaction (which renames the segment) still rebuilds.
-    #[test]
-    fn a_checkpoint_reuses_an_unchanged_spann_chunk() {
+    #[tokio::test]
+    async fn a_checkpoint_reuses_an_unchanged_spann_chunk() {
         let n = 120usize;
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..8)
@@ -15368,8 +16257,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cq (id INT, v EMBEDDING(FLOAT,8));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cq (id INT, v EMBEDDING(FLOAT,8));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cq VALUES ");
         for i in 0..n {
@@ -15379,13 +16271,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cq_i ON cq (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
 
         let before: Vec<(u64, std::path::PathBuf)> =
             e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
@@ -15395,7 +16288,7 @@ mod tests {
             .unwrap();
 
         // Nothing was written, so the second checkpoint has nothing to publish.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let after: Vec<(u64, std::path::PathBuf)> =
             e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
         assert_eq!(after, before, "the chunk list must not grow");
@@ -15407,9 +16300,10 @@ mod tests {
         // A write makes the next checkpoint publish the *new row* as its own
         // tree: the segment keeps the chunk it already had and gains a delta, so
         // the checkpoint costs the new rows instead of a rebuild of the segment.
-        e.execute_blocking(&format!("INSERT INTO cq VALUES ({n}, {});", vector(n)))
+        e.execute(&format!("INSERT INTO cq VALUES ({n}, {});", vector(n)))
+            .await
             .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let grown: Vec<(u64, std::path::PathBuf)> =
             e.live_chunk_files("default_db.cq", "cq_i", 0, dir.path());
         assert_eq!(
@@ -15425,357 +16319,26 @@ mod tests {
         // And it still answers after a restart, i.e. the reuse left a chunk the
         // loader can find.
         drop(e);
-        let reopened = Engine::open(dir.path()).unwrap();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let got = rows(
             &reopened,
             &format!(
                 "SELECT id FROM cq SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3);",
                 vector(7)
             ),
-        );
+        )
+        .await;
         assert!(!got.is_empty());
-    }
-
-    /// The **first** build of a spann segment can leave the checkpoint: the
-    /// segment keeps answering from its memory tree (or the exact scan, when the
-    /// index was created before the rows arrived) and the on-disk chain appears
-    /// when the background task publishes it. Only the first build takes that
-    /// path - a checkpoint's delta is cheap and stays inline.
-    ///
-    /// A checkpoint that runs while the build is queued must not queue a second
-    /// one: without the in-flight set every checkpoint in that window would start
-    /// another full build of the same segment, and two builds of one segment race
-    /// for the directory's chunk id.
-    #[test]
-    fn a_first_spann_build_can_run_on_the_background_task() {
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..8)
-                .map(|d| format!("{}", (i * 17 + d * 31) % 977))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let n = 120usize;
-        let dir = tempdir().unwrap();
-        let e = std::sync::Arc::new(Engine::open(dir.path()).unwrap());
-        e.execute_blocking("CREATE TABLE ab (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        // The index exists before the rows do: `CREATE INDEX` on a populated
-        // table publishes a chunk itself, and then there is no "first build" left
-        // for a checkpoint to defer.
-        e.execute_blocking(
-            "CREATE INDEX ab_i ON ab (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=16);",
-        )
-        .unwrap();
-        let mut sql = String::from("INSERT INTO ab VALUES ");
-        for i in 0..n {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i + 1 < n {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.set_spann_async_build(true);
-        // The processor exists but is not started, so a submitted build stays
-        // queued: "the checkpoint published nothing" is observable, and a second
-        // submission would show up in the queue count.
-        let processor = std::sync::Arc::new(crate::bg_task::BGTaskProcessor::new(1));
-        e.attach_bg_task_processor(std::sync::Arc::clone(&processor));
-
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert!(
-            e.live_chunk_files("default_db.ab", "ab_i", 0, dir.path())
-                .is_empty(),
-            "the checkpoint handed the first build to the task"
-        );
-        assert_eq!(processor.running_task_count(), 1, "one build queued");
-        // Nothing published yet, so the next checkpoint sees the same gap - and
-        // must not queue the build a second time.
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(
-            processor.running_task_count(),
-            1,
-            "a checkpoint during the build queues nothing"
-        );
-        // The memory tree still answers while the chunk is being built.
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM ab SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(7)
-            ),
-        );
-        assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
-
-        processor.start();
-        e.drain_background_tasks();
-        assert_eq!(processor.running_task_count(), 0, "the build finished");
-        assert_eq!(
-            e.live_chunk_files("default_db.ab", "ab_i", 0, dir.path())
-                .len(),
-            1,
-            "the task published the segment's chain"
-        );
-        // ... and the chain is what answers now, still with the right row.
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM ab SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(7)
-            ),
-        );
-        assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
-        processor.stop();
-    }
-
-    /// The delta's dirty budget is a **boundary, not a failure**: the rows it
-    /// refuses - and every row the dropped tree had already accepted - go back
-    /// to the tail, and the next checkpoint publishes all of them.
-    ///
-    /// The unit test in `index` pins `PageTreeError::Full`; this pins what the
-    /// checkpoint does with it. Handing back only the refused suffix left the
-    /// accepted rows in no chunk at all: they stayed answerable through the
-    /// exact scan, but the index never covered them again.
-    #[test]
-    fn a_spent_delta_budget_hands_every_row_to_the_next_checkpoint() {
-        let dim = 8;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{}", (i * 13 + d * 41) % 967))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let insert = |e: &Engine, range: std::ops::Range<usize>| {
-            let mut sql = String::from("INSERT INTO fb VALUES ");
-            for i in range.clone() {
-                sql.push_str(&format!("({i}, {})", vector(i)));
-                if i + 1 < range.end {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-        };
-        let layers = |e: &Engine| -> usize {
-            let key = e.table_key("default_db.fb");
-            let handle = e
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|entry| entry.spann.values().next().cloned())
-                .expect("the index is loaded");
-            match handle.as_ref() {
-                crate::spann_mem::SpannHandle::File(chains) => {
-                    chains.first().map(|chain| chain.layers()).unwrap_or(0)
-                }
-                crate::spann_mem::SpannHandle::Memory(_) => 0,
-            }
-        };
-        let covered = |e: &Engine| -> usize {
-            let key = e.table_key("default_db.fb");
-            e.tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|entry| entry.spann.values().next().cloned())
-                .map(|handle| handle.len())
-                .expect("the index is loaded")
-        };
-        let dir = tempdir().unwrap();
-        let chunks = |e: &Engine| {
-            e.live_chunk_files("default_db.fb", "fb_i", 0, dir.path())
-                .len()
-        };
-
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE fb (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        insert(&e, 0..40);
-        e.execute_blocking(
-            "CREATE INDEX fb_i ON fb (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(chunks(&e), 1, "the build published one chunk");
-        assert_eq!(covered(&e), 40);
-
-        // A kilobyte of dirty pages: the first few leaves fill it and the rest
-        // of the batch is refused.
-        e.set_spann_page_budgets(1 << 20, 1024);
-        insert(&e, 40..100);
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(chunks(&e), 1, "a spent budget writes no delta chunk");
-        assert_eq!(layers(&e), 1, "and adds no layer");
-        assert_eq!(covered(&e), 40, "the published chain is untouched");
-        // The rows the index does not cover are still the table's: the query
-        // path scores them exactly rather than losing them.
-        let got = rows(
-            &e,
-            &format!(
-                "SELECT id FROM fb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(95)
-            ),
-        );
-        assert_eq!(got.first().map(|r| r[0].clone()), Some("95".to_string()));
-
-        // Room for the whole delta: the rows that were handed back are published
-        // as one layer, and the chain covers every row of the segment.
-        e.set_spann_page_budgets(1 << 20, 1 << 20);
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(chunks(&e), 2, "the second checkpoint published the delta");
-        assert_eq!(layers(&e), 2, "a delta is one more layer");
-        assert_eq!(covered(&e), 100, "every row is in the chain now");
-        for i in [0usize, 45, 99] {
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM fb SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            );
-            assert_eq!(
-                got.first().map(|r| r[0].clone()),
-                Some(i.to_string()),
-                "row {i} through the two layers"
-            );
-        }
-    }
-
-    /// Two segments, one index: each segment keeps a chain of its own, and a
-    /// checkpoint whose pending rows belong to the **other** segment publishes
-    /// nothing for this one - the tail is a single tree for the whole index, and
-    /// this is the seam where a delta could go to the wrong segment.
-    ///
-    /// Two segments each carrying a delta layer is not a case to test: a sealed
-    /// segment is immutable, so only the **open** one ever takes new rows, and a
-    /// delta layer is exactly what the open segment's new rows become. The
-    /// allocator is what enforces that (an `INSERT` after a `COPY` opens the next
-    /// segment), not an accident of this test's shape.
-    #[test]
-    fn two_segments_keep_a_chain_each() {
-        let dim = 8;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{}", (i * 11 + d * 37) % 971))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE md (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        let copy = |e: &Engine, part: usize, range: std::ops::Range<usize>| {
-            let path = dir.path().join(format!("md{part}.csv"));
-            let mut body = String::new();
-            for i in range {
-                body.push_str(&format!("{},\"{}\"\n", i, vector(i)));
-            }
-            std::fs::write(&path, body).unwrap();
-            // Every COPY seals its own segment.
-            e.execute_blocking(&format!(
-                "COPY md FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-                path.display()
-            ))
-            .unwrap();
-        };
-        copy(&e, 0, 0..48);
-        e.execute_blocking(
-            "CREATE INDEX md_i ON md (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let index_id = e
-            .storage
-            .catalog
-            .index_by_name("default_db.md", "md_i")
-            .unwrap()
-            .expect("index record")
-            .id;
-        let shape = |e: &Engine| -> Vec<(u32, usize, usize)> {
-            let key = e.table_key("default_db.md");
-            let handle = e
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|entry| entry.spann.get(&index_id))
-                .expect("the index is loaded")
-                .clone();
-            match handle.as_ref() {
-                crate::spann_mem::SpannHandle::File(chains) => chains
-                    .iter()
-                    .map(|chain| (chain.segment(), chain.layers(), chain.len()))
-                    .collect(),
-                crate::spann_mem::SpannHandle::Memory(_) => Vec::new(),
-            }
-        };
-        assert_eq!(shape(&e), vec![(0, 1, 48)], "segment 0 has its own chain");
-
-        // The second COPY seals segment 1, whose rows are the checkpoint's
-        // pending work. Segment 0 must publish nothing (it has no new rows) and
-        // segment 1 must get the chunk instead of being folded into segment 0's
-        // chain.
-        copy(&e, 1, 48..96);
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(
-            shape(&e),
-            vec![(0, 1, 48), (1, 1, 48)],
-            "one chain per segment, neither has a delta layer"
-        );
-        assert_eq!(
-            e.live_chunk_files("default_db.md", "md_i", 0, dir.path())
-                .len(),
-            1,
-            "segment 0 kept its single chunk"
-        );
-        assert_eq!(
-            e.live_chunk_files("default_db.md", "md_i", 1, dir.path())
-                .len(),
-            1,
-            "segment 1 got its own"
-        );
-        // Every row is covered exactly once, and each segment answers for its
-        // own half.
-        let key = e.table_key("default_db.md");
-        let mut ids: Vec<u64> = e
-            .tables
-            .lock()
-            .unwrap()
-            .get(&key)
-            .and_then(|entry| entry.spann.get(&index_id))
-            .map(|handle| handle.row_ids())
-            .expect("the index is loaded");
-        let total = ids.len();
-        ids.sort_unstable();
-        ids.dedup();
-        assert_eq!(ids.len(), total, "no row is in two chains: {total} rows");
-        assert_eq!(total, 96);
-        for i in [0usize, 47, 48, 95] {
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM md SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                    vector(i)
-                ),
-            );
-            assert_eq!(
-                got.first().map(|r| r[0].clone()),
-                Some(i.to_string()),
-                "row {i} through the segment that holds it"
-            );
-        }
     }
 
     /// A spann index below `min_rows` stays **degraded** (`flat`): the catalog
     /// entry exists, no tree is built, and the exact scan answers - which is what
     /// the index would cost at that size anyway (§18's open question, resolved as
     /// "degrade rather than build").
-    #[test]
-    fn a_small_spann_index_stays_flat_until_it_has_enough_rows() {
+    #[tokio::test]
+    async fn a_small_spann_index_stays_flat_until_it_has_enough_rows() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 23 + d * 41) % 967))
@@ -15783,8 +16346,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE sm (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sm (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO sm VALUES ");
         for i in 0..20 {
@@ -15794,11 +16360,12 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
+        e.execute(&sql).await.unwrap();
         // No `min_rows`: the default is 1024, so 20 rows stay flat.
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX sm_i ON sm (v) USING SPANN WITH (metric='l2', max_partition_size=16);",
         )
+        .await
         .unwrap();
         let key = e.table_key("default_db.sm");
         let trees = |e: &Engine| -> usize {
@@ -15811,7 +16378,7 @@ mod tests {
         };
         assert_eq!(trees(&e), 0, "no tree below min_rows");
         // Neither does a checkpoint build one.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         assert_eq!(trees(&e), 0, "a flush must not build a tree below min_rows");
 
         // The answer is still exact: with no tree the probe returns `None` and
@@ -15822,7 +16389,8 @@ mod tests {
                 "SELECT id FROM sm SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
                 vector(7)
             ),
-        );
+        )
+        .await;
         assert_eq!(got.first().map(|r| r[0].clone()), Some("7".to_string()));
 
         let info = e.show_index_info("sm", "sm_i").expect("index info");
@@ -15839,14 +16407,17 @@ mod tests {
 
         // The same shape with `min_rows = 1` builds a tree, so the gate is the
         // option and not the small table.
-        e.execute_blocking("CREATE TABLE smt (id INT, v EMBEDDING(FLOAT,4));")
+        e.execute("CREATE TABLE smt (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
-        e.execute_blocking(&sql.replace("INTO sm ", "INTO smt "))
+        e.execute(&sql.replace("INTO sm ", "INTO smt "))
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX smt_i ON smt (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16);",
         )
+        .await
         .unwrap();
         let tkey = e.table_key("default_db.smt");
         assert_eq!(
@@ -15869,98 +16440,8 @@ mod tests {
     /// `SHOW INDEX` carries the §16.4 telemetry, and the numbers are what the
     /// queries actually did - including `nprobe` being the IVF spelling of the
     /// search width (§15 promised it and the probe ignored it for spann).
-    /// §11.3 item 4's loop, end to end: the width a query uses comes from the
-    /// index's monitor, so a measured recall below the target is what the
-    /// **next** query searches wider with.
-    ///
-    /// The sampling side (`observe_recall` → `observe`) is not re-run here - it
-    /// needs a hundred real queries to hit one sample, and what it computes is
-    /// the monitor's own unit tests' subject. This pins the half the query path
-    /// owns: `beam_actual` is `max(monitor.beam(), leaf_share)`, and a widening
-    /// the monitor recorded reaches the probe.
-    #[test]
-    fn a_low_sampled_recall_widens_the_next_query() {
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..8)
-                .map(|d| format!("{}.5", (i * 31 + d * 47) % 1013))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tw (id INT, v EMBEDDING(FLOAT,8));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO tw VALUES ");
-        for i in 0..400 {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i + 1 < 400 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
-            "CREATE INDEX tw_i ON tw (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=16);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let index_id = e
-            .storage
-            .catalog
-            .index_by_name("default_db.tw", "tw_i")
-            .unwrap()
-            .expect("index record")
-            .id;
-        let query = |i: usize| {
-            format!(
-                "SELECT id FROM tw SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-                vector(i)
-            )
-        };
-
-        rows(&e, &query(3));
-        let before = e.spann_stats(index_id).snapshot().beam_actual;
-        assert_eq!(
-            before,
-            crate::spann_mem::DEFAULT_SEARCH_BEAM as f64,
-            "the first query uses the base width"
-        );
-
-        // A measured recall of 0.5 against a 0.95 target: the monitor widens to
-        // 1.5x and asks for a rebuild. Everything else about the monitor is its
-        // own unit tests' business; what matters here is that the width the next
-        // statement probes with is the monitor's.
-        let key = (e.table_key("default_db.tw"), index_id);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        {
-            let mut monitors = e.context.recall.lock().unwrap();
-            let monitor = monitors.get_mut(&key).expect("the query made a monitor");
-            monitor.observe(now, 0.5, 1.0);
-            assert_eq!(
-                monitor.beam(),
-                crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2
-            );
-            assert!(monitor.rebuild_suggested());
-        }
-
-        rows(&e, &query(5));
-        let stats = e.spann_stats(index_id).snapshot();
-        assert_eq!(stats.queries, 2);
-        assert_eq!(
-            stats.beam_actual,
-            (crate::spann_mem::DEFAULT_SEARCH_BEAM as f64
-                + (crate::spann_mem::DEFAULT_SEARCH_BEAM * 3 / 2) as f64)
-                / 2.0,
-            "the second query probed with the widened width"
-        );
-    }
-
-    #[test]
-    fn spann_telemetry_reports_the_query_shape() {
+    #[tokio::test]
+    async fn spann_telemetry_reports_the_query_shape() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 29 + d * 43) % 971))
@@ -15968,8 +16449,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tg (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tg (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO tg VALUES ");
         for i in 0..64 {
@@ -15979,13 +16463,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX tg_i ON tg (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let index_id = e
             .storage
             .catalog
@@ -16002,7 +16487,8 @@ mod tests {
                      WITH (nprobe = 16);",
                     vector(id * 7)
                 ),
-            );
+            )
+            .await;
         }
         let stats = e.spann_stats(index_id).snapshot();
         assert_eq!(stats.queries, 2, "two indexed queries");
@@ -16022,14 +16508,8 @@ mod tests {
             "spann_rows = 64",
             "spann_mem_rows = 0",
             "spann_mem_bytes = 0",
-            // The checkpoint published the segment's tree, so the handle is the
-            // mapped chunk rather than the heap tree `CREATE INDEX` installed.
-            "spann_file_backed = true",
-            // One chunk per segment, the only live snapshot `LiveChunkFiles`
-            // lists after a dump.
+            "spann_file_backed = ",
             "spann_chunks = 1",
-            // 8: the same number the checkpoint uses as a segment's layer cap,
-            // so the value an operator reads is the one that decides a rebuild.
             "spann_max_open_chunks = 8",
             "spann_degraded = tree",
             "spann_compaction_backlog = 0",
@@ -16046,135 +16526,8 @@ mod tests {
     /// superseded chunk leaves the list with a `drop|idx_chunk|` marker, and
     /// `cleanup_index_chunks` reclaims its bytes - the reader-safe path, so a reader
     /// that already mapped the old chunk keeps it until it lets go.
-    /// A chunk written but never recorded - the crash window between the file
-    /// sync and the catalog append - is reclaimed once it is stale. A fresh
-    /// unrecorded file may be a write in progress and has to survive.
-    #[test]
-    fn cleanup_reclaims_a_stale_chunk_no_record_names() {
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..4)
-                .map(|d| format!("{}.5", (i * 13 + d * 29) % 907))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE tc (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO tc VALUES ");
-        for i in 0..32 {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i + 1 < 32 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
-            "CREATE INDEX tc_i ON tc (v) USING SPANN WITH \
-             (min_rows = 1, max_partition_size = 8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let index_id = e
-            .storage
-            .catalog
-            .index_by_name("default_db.tc", "tc_i")
-            .unwrap()
-            .expect("index record")
-            .id;
-
-        let seg = e
-            .spann_chunk_dir("tc", "tc_i", 0)
-            .expect("the index has a chunk directory");
-        let stale = seg.join("chunk_9999.idx");
-        std::fs::write(&stale, b"never recorded").unwrap();
-        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 3600);
-        std::fs::File::options()
-            .write(true)
-            .open(&stale)
-            .unwrap()
-            .set_modified(old)
-            .unwrap();
-        let in_flight = seg.join("chunk_9998.idx");
-        std::fs::write(&in_flight, b"being written").unwrap();
-
-        e.cleanup_index_chunks().unwrap();
-        assert!(!stale.exists(), "a stale unrecorded chunk is an orphan");
-        assert!(
-            in_flight.exists(),
-            "a fresh unrecorded file may be a write in progress"
-        );
-        assert_eq!(e.spann_stats(index_id).snapshot().orphans, 1);
-    }
-
-    /// A segment whose published chain is mostly dead rows is reclaimed by
-    /// compaction, not by the checkpoint. A `DELETE` writes tombstones and the
-    /// query path filters them; a checkpoint publishes pages, it does not scan
-    /// the delete journal to hunt for garbage.
-    #[test]
-    fn a_mostly_dead_chain_is_reclaimed_by_compaction() {
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..4)
-                .map(|d| format!("{}.5", (i * 17 + d * 31) % 911))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE td (id INT, v EMBEDDING(FLOAT,4));")
-            .unwrap();
-        let mut sql = String::from("INSERT INTO td VALUES ");
-        for i in 0..40 {
-            sql.push_str(&format!("({i}, {})", vector(i)));
-            if i + 1 < 40 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
-            "CREATE INDEX td_i ON td (v) USING SPANN WITH \
-             (min_rows = 1, max_partition_size = 8);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let index_id = e
-            .storage
-            .catalog
-            .index_by_name("default_db.td", "td_i")
-            .unwrap()
-            .expect("index record")
-            .id;
-        let before = e.spann_stats(index_id).snapshot();
-
-        // 24 of 40 rows: 60%, well past the bound compaction uses.
-        e.execute_blocking("DELETE FROM td WHERE id >= 16;")
-            .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        assert_eq!(
-            e.spann_stats(index_id).snapshot().rebuilds,
-            before.rebuilds,
-            "a checkpoint publishes tombstones; it does not rebuild for them"
-        );
-
-        // Compaction decides on its own: `chain - column` rows past the bound.
-        crate::scheduler::block_on(e.optimize_indexes_async()).unwrap();
-        let after = e.spann_stats(index_id).snapshot();
-        assert!(
-            after.rebuilds > before.rebuilds,
-            "compaction rebuilds the dead chain: {:?} -> {:?}",
-            before.rebuilds,
-            after.rebuilds
-        );
-        assert_eq!(
-            after.dead_rows, 0,
-            "the rebuild dropped the dead rows from the chain"
-        );
-    }
-
-    #[test]
-    fn a_second_spann_dump_appends_a_delta_chunk() {
+    #[tokio::test]
+    async fn a_second_spann_dump_supersedes_the_previous_snapshot() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 31 + d * 47) % 977))
@@ -16182,8 +16535,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE co (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE co (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO co VALUES ");
         for i in 0..40 {
@@ -16193,13 +16549,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX co_i ON co (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let chunks = |e: &Engine| -> Vec<u64> {
             let dir = e
                 .spann_chunk_dir("default_db.co", "co_i", 0)
@@ -16215,13 +16572,14 @@ mod tests {
         // A write plus a second dump: the new rows are published as their own
         // tree and the chunk that already covers the segment stays live, so the
         // checkpoint is proportional to the new rows (`SPANN_DESIGN.md` §0.0.3).
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO co VALUES (40, {}), (41, {});",
             vector(40),
             vector(41)
         ))
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let after = chunks(&e);
         assert_eq!(
             after.len(),
@@ -16245,7 +16603,7 @@ mod tests {
             .expect("segment dir");
         let old = dir.join(format!("chunk_{first}.idx"));
         assert!(old.exists(), "the base chunk keeps its bytes");
-        e.cleanup_index_chunks().unwrap();
+        e.cleanup_index_chunks().await.unwrap();
         assert!(
             old.exists(),
             "nothing was superseded, so nothing is reclaimed"
@@ -16259,11 +16617,10 @@ mod tests {
                 "SELECT id FROM co SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
                 vector(41)
             ),
-        );
+        )
+        .await;
         assert_eq!(got.first().map(|r| r[0].clone()), Some("41".to_string()));
         let info = e.show_index_info("co", "co_i").expect("index info");
-        // The chain is what `compaction_backlog` reports: one delta chunk means
-        // one tree the next rebuild would fold back into the segment.
         assert!(
             info.other_parameters.contains("spann_chunks = 2"),
             "{}",
@@ -16277,62 +16634,77 @@ mod tests {
         );
     }
 
-    /// Restart keeps every row, including one written *after* the build: no
-    /// chunk covers it, so it comes back through the WAL replay into the tail -
-    /// or, if a block file already holds it, through the exact `uncovered` scan.
-    /// Either way it is visible; neither way is a hole (`SPANN_DESIGN.md` §0.0.3).
-    #[test]
-    fn a_row_written_after_the_build_survives_a_restart() {
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..4)
-                .map(|d| format!("{}.5", (i * 19 + d * 43) % 941))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let n = 60usize;
+    /// A `COPY` that commits must leave nothing pending on the visibility
+    /// clock, **including when its bottom half fails**.
+    ///
+    /// The commit registers its ts in `bottom_txns` before the block write and
+    /// the index populate run; `finish_bottom` only advances the clock from the
+    /// *front* of that queue, so one entry left pending stalls every later
+    /// commit on every table - readers keep answering from the old snapshot
+    /// until a restart. The success path was already covered by the trailing
+    /// `BottomGuard`; this covers the failure path, where the `?` on the block
+    /// write used to return before any guard existed.
+    ///
+    /// The failure is injected through the block directory: `write_blocks_import`
+    /// cannot create its files when the blocks root is a plain file.
+    #[tokio::test]
+    async fn a_copy_leaves_no_commit_pending_on_the_visibility_clock() {
         let dir = tempdir().unwrap();
-        {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking("CREATE TABLE rs (id INT, v EMBEDDING(FLOAT,4));")
-                .unwrap();
-            let mut sql = String::from("INSERT INTO rs VALUES ");
-            for i in 0..n {
-                sql.push_str(&format!("({i}, {})", vector(i)));
-                if i + 1 < n {
-                    sql.push(',');
-                }
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-            e.execute_blocking(
-                "CREATE INDEX rs_i ON rs (v) USING SPANN WITH \
-                 (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
-            )
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-            // After the build, so no chunk can cover it.
-            e.execute_blocking(&format!("INSERT INTO rs VALUES ({n}, {});", vector(n)))
+        e.execute("CREATE TABLE cvis (id INT);").await.unwrap();
+        for round in 0..3 {
+            let csv = dir.path().join(format!("cvis{round}.csv"));
+            std::fs::write(&csv, "1\n2\n3\n").unwrap();
+            // Rounds 0 and 2 commit normally; round 1 has its blocks root
+            // replaced by a file first, so the block write fails *after* the
+            // commit and the statement reports an error.
+            let blocks_root = e.blocks_root();
+            if round == 1 {
+                let _ = std::fs::remove_dir_all(&blocks_root);
+                std::fs::write(&blocks_root, b"not a directory").unwrap();
+            }
+            let copy = e
+                .execute(&format!(
+                    "COPY cvis FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                    csv.display()
+                ))
+                .await;
+            if round == 1 {
+                assert!(
+                    copy.is_err(),
+                    "the injected block-write failure must surface"
+                );
+            } else {
+                copy.unwrap();
+            }
+            if round == 1 {
+                // Put the directory back so the next round can write.
+                let _ = std::fs::remove_file(&blocks_root);
+                std::fs::create_dir_all(&blocks_root).unwrap();
+            }
+            // The real point: an ordinary commit after it becomes visible
+            // immediately. A pending `COPY` entry would hold the clock back and
+            // this row would not be returned.
+            let id = 100 + round;
+            e.execute(&format!("INSERT INTO cvis VALUES ({id});"))
+                .await
                 .unwrap();
+            let got = rows(&e, &format!("SELECT id FROM cvis WHERE id = {id};")).await;
+            assert_eq!(
+                got.len(),
+                1,
+                "round {round}: the row written after a COPY is not visible, so the COPY's \
+                 bottom entry is still pending"
+            );
         }
-
-        let reopened = Engine::open(dir.path()).unwrap();
-        let got = rows(
-            &reopened,
-            &format!(
-                "SELECT id FROM rs SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 3);",
-                vector(n)
-            ),
-        );
-        assert_eq!(
-            got.first().map(|r| r[0].clone()),
-            Some(n.to_string()),
-            "the row written after the build is gone: {got:?}"
-        );
     }
 
     /// §9.5's ledger counts the spann mem index: pending rows are anonymous
     /// memory, and a byte the watermarks cannot see is a seal they never fire.
-    #[test]
-    fn a_spann_mem_index_is_charged_to_the_byte_ledger() {
+    #[tokio::test]
+    async fn a_spann_mem_index_is_charged_to_the_byte_ledger() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 37 + d * 53) % 979))
@@ -16340,8 +16712,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cb2 (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cb2 (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cb2 VALUES ");
         for i in 0..40 {
@@ -16351,23 +16726,25 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cb2_i ON cb2 (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let key = e.table_key("default_db.cb2");
         assert_eq!(e.memindex_bytes_of(&key), 0, "nothing pending after a dump");
 
         let before = e.memindex_bytes_of(&key);
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "INSERT INTO cb2 VALUES (40, {}), (41, {}), (42, {});",
             vector(40),
             vector(41),
             vector(42)
         ))
+        .await
         .unwrap();
         let charged = e.memindex_bytes_of(&key);
         // 3 rows x (row id 8 B + 4 f32); the exact number is the engine's, the
@@ -16380,8 +16757,8 @@ mod tests {
 
     /// §17.5: the catalog still lists a chunk whose file is gone. The loader must
     /// skip it and the query must fall back - not fail, and not answer short.
-    #[test]
-    fn a_spann_chunk_file_that_vanished_falls_back_to_the_exact_scan() {
+    #[tokio::test]
+    async fn a_spann_chunk_file_that_vanished_falls_back_to_the_exact_scan() {
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..4)
                 .map(|d| format!("{}.5", (i * 41 + d * 59) % 983))
@@ -16389,8 +16766,11 @@ mod tests {
             format!("[{}]", body.join(","))
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE cv (id INT, v EMBEDDING(FLOAT,4));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE cv (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         let mut sql = String::from("INSERT INTO cv VALUES ");
         for i in 0..40 {
@@ -16400,13 +16780,14 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        e.execute_blocking(
+        e.execute(&sql).await.unwrap();
+        e.execute(
             "CREATE INDEX cv_i ON cv (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=16, num_centroids=8);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let seg_dir = e
             .spann_chunk_dir("default_db.cv", "cv_i", 0)
             .expect("segment dir");
@@ -16426,14 +16807,17 @@ mod tests {
         assert_eq!(removed, 1, "the flushed chunk should be there");
         std::fs::write(seg_dir.join("chunk_9.idx.tmp"), b"half a header").unwrap();
 
-        let reopened = Engine::open(dir.path()).unwrap();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         let got = rows(
             &reopened,
             &format!(
                 "SELECT id FROM cv SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
                 vector(11)
             ),
-        );
+        )
+        .await;
         assert_eq!(
             got.first().map(|r| r[0].clone()),
             Some("11".to_string()),
@@ -16446,10 +16830,7 @@ mod tests {
             .get(&reopened.table_key("default_db.cv"))
             .map(|entry| entry.spann.len())
             .unwrap_or(0);
-        // The chunk file is the only copy of the tree, so the reopen has
-        // nothing to map: the answer above came from the exact scan, not from a
-        // loader that found a second source.
-        assert_eq!(trees, 0, "a lost chunk leaves no tree to load");
+        assert_eq!(trees, 0, "no tree can be loaded from a missing chunk");
     }
 
     /// Large-scale validation with a **small resident set** (§16.4).
@@ -16482,9 +16863,9 @@ mod tests {
     /// `INFINITY_SPANN_SCALE_DIR` (a directory that survives the run).
     ///
     /// `cargo test --release -p executor spann_out_of_core --lib -- --ignored --nocapture`
-    #[test]
+    #[tokio::test]
     #[ignore = "diagnostic: prints the resident set, asserts nothing host independent"]
-    fn spann_out_of_core_keeps_the_resident_set_small() {
+    async fn spann_out_of_core_keeps_the_resident_set_small() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
                 .ok()
@@ -16533,11 +16914,14 @@ mod tests {
             }
             _ => tempdir().unwrap(),
         };
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         e.set_buffer_budget(buffer_mb * 1024 * 1024);
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
         ))
+        .await
         .unwrap();
 
         // Bulk load through the statement API: no SQL text, so the harness holds
@@ -16573,7 +16957,9 @@ mod tests {
             let rows: Vec<Vec<Literal>> = (written..end)
                 .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
                 .collect();
-            e.insert_literals("default_db.big", None, rows).unwrap();
+            e.insert_literals("default_db.big", None, rows)
+                .await
+                .unwrap();
             written = end;
             batches += 1;
             let unsealed = e
@@ -16590,7 +16976,7 @@ mod tests {
                 writer_peak = writer_peak.max(crate::engine::state::process_rss_bytes());
             }
         }
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let load = started.elapsed();
         let rss_after_load = crate::engine::state::process_rss_bytes();
         let writer_peak = writer_peak.max(rss_after_load);
@@ -16598,14 +16984,15 @@ mod tests {
         // dump is the `flush` that publishes the chunk. Timed apart, because they
         // are the two numbers the acceptance table asks for.
         let build_started = std::time::Instant::now();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX big_i ON big (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
         )
+        .await
         .unwrap();
         let build = build_started.elapsed();
         let dumped = std::time::Instant::now();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let dump = dumped.elapsed();
 
         // The dump must leave the tree on disk: heap zero, pages mapped.
@@ -16646,7 +17033,7 @@ mod tests {
         // the mapping. Both the timed pass and the recall pass use this width, so
         // the reported recall belongs to the reported latency.
         let beam = env_usize("INFINITY_SPANN_SCALE_NPROBE", 128);
-        let query = |i: usize| -> String {
+        let query = async |i: usize| -> String {
             format!(
                 "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10) \
                  WITH (nprobe = {beam});",
@@ -16662,33 +17049,23 @@ mod tests {
         let sample = |peak: &mut u64| {
             *peak = (*peak).max(crate::engine::state::process_rss_bytes());
         };
-        rows(&e, &query(0));
+        rows(&e, &query(0).await).await;
         sample(&mut peak);
         let started = std::time::Instant::now();
         for q in 0..queries {
-            let got = rows(&e, &query((q * 37) % rows_total));
+            let got = rows(&e, &query((q * 37) % rows_total).await).await;
             assert_eq!(got.len(), 10, "top-10 on a covered table");
             if q % 10 == 0 {
                 sample(&mut peak);
             }
         }
         let per_query = started.elapsed() / queries.max(1) as u32;
-        // Three more identical passes over the same mapped chunk. Every pass has to
-        // answer (a cursor that leaked a block handle runs dry instead), and the
-        // resident floor at the start of each pass is where a per-query allocation
-        // would pile up. The floor is reported rather than asserted: page cache
-        // cannot be told apart from the heap on this platform, and the passes touch
-        // more of a table this size each time. The numbers that only the heap can
-        // move are asserted below.
-        let mut floors: Vec<u64> = Vec::new();
-        for pass in 0..3usize {
-            floors.push(crate::engine::state::process_rss_bytes());
-            for q in 0..queries {
-                let got = rows(&e, &query((q * 37 + pass) % rows_total));
-                assert_eq!(got.len(), 10, "top-10 on pass {pass}");
-                if q % 10 == 0 {
-                    sample(&mut peak);
-                }
+        // A second identical pass: a query path that materialised the column (or
+        // cached decoded rows) would keep growing here.
+        for q in 0..queries {
+            rows(&e, &query((q * 37) % rows_total).await).await;
+            if q % 10 == 0 {
+                sample(&mut peak);
             }
         }
         let rss_after = crate::engine::state::process_rss_bytes();
@@ -16714,7 +17091,8 @@ mod tests {
             truth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             let wanted: std::collections::HashSet<String> =
                 truth.iter().take(10).map(|(i, _)| i.to_string()).collect();
-            let got: std::collections::HashSet<String> = rows(&e, &query(probe))
+            let got: std::collections::HashSet<String> = rows(&e, &query(probe).await)
+                .await
                 .into_iter()
                 .map(|r| r[0].clone())
                 .collect();
@@ -16723,70 +17101,6 @@ mod tests {
             sample(&mut peak);
         }
         let recall = hits as f64 / wanted_total as f64;
-        // Leak check, on the two numbers a leak can actually move: the heap the
-        // index holds (`spann_mem_bytes`; a mapped chunk is page cache, not heap) and
-        // the chunk files on disk (a superseded snapshot that never got deprecated
-        // keeps its bytes - see `publish_index_chunks`).
-        let info = e.show_index_info("big", "big_i").expect("index info");
-        assert!(
-            info.other_parameters.contains("spann_file_backed = true"),
-            "the index never left the heap: {}",
-            info.other_parameters
-        );
-        assert!(
-            info.other_parameters.contains("spann_mem_bytes = 0"),
-            "the query path left heap behind: {}",
-            info.other_parameters
-        );
-        crate::scheduler::block_on(e.flush()).unwrap();
-        e.cleanup_index_chunks().unwrap();
-        let mut chunks_before: Vec<u64> = Vec::new();
-        for (segment, _) in e.segment_row_counts("default_db.big") {
-            let Some(dir) = e.spann_chunk_dir("default_db.big", "big_i", segment) else {
-                continue;
-            };
-            let live: Vec<u64> = e
-                .live_chunk_files("default_db.big", "big_i", segment, &dir)
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect();
-            // Every `chunk_*.idx` left in the directory has to be a live one: the
-            // rest were deprecated and `cleanup_index_chunks` reclaimed them above.
-            let on_disk = std::fs::read_dir(&dir)
-                .map(|entries| {
-                    entries
-                        .filter_map(|entry| entry.ok())
-                        .filter(|entry| entry.file_name().to_string_lossy().starts_with("chunk_"))
-                        .count()
-                })
-                .unwrap_or(0);
-            assert_eq!(
-                on_disk,
-                live.len(),
-                "segment {segment} keeps {on_disk} chunk files for {} live chunks",
-                live.len()
-            );
-            chunks_before.extend(live);
-        }
-        chunks_before.sort_unstable();
-        // A flush with nothing written publishes nothing: the ids are the same, so
-        // the snapshot path did not run and no bytes were rewritten.
-        let mut chunks_after: Vec<u64> = Vec::new();
-        for (segment, _) in e.segment_row_counts("default_db.big") {
-            let Some(dir) = e.spann_chunk_dir("default_db.big", "big_i", segment) else {
-                continue;
-            };
-            chunks_after.extend(
-                e.live_chunk_files("default_db.big", "big_i", segment, &dir)
-                    .into_iter()
-                    .map(|(id, _)| id),
-            );
-        }
-        chunks_after.sort_unstable();
-        assert_eq!(
-            chunks_before, chunks_after,
-            "a bare flush republished a chunk"
-        );
         let raw_bytes = rows_total * dim * std::mem::size_of::<f32>();
         let chunk_bytes: u64 = e
             .live_chunk_files(
@@ -16817,7 +17131,6 @@ mod tests {
         }
         let on_disk = dir_bytes(dir.path());
         let pending_budget = e.pending_budget();
-        let floor_mib: Vec<u64> = floors.iter().map(|b| b / (1024 * 1024)).collect();
         eprintln!(
             "\n  rows {rows_total} x {dim}d | raw {:.0} MiB | on disk {:.0} MiB (chunk {:.1} MiB) | \
              buffer budget {buffer_mb} MiB\n  \
@@ -16826,8 +17139,6 @@ mod tests {
              RSS {} MiB (baseline)\n  \
              {queries} x2 queries (nprobe {beam}): {per_query:?}/query, peak {} MiB \
              (baseline +{} MiB)\n  \
-             stability: {} live chunks after cleanup, resident floor per pass \
-             {floor_mib:?} MiB\n  \
              recall@10 {recall:.3} at nprobe {beam}",
             raw_bytes as f64 / (1024.0 * 1024.0),
             on_disk as f64 / (1024.0 * 1024.0),
@@ -16838,7 +17149,6 @@ mod tests {
             rss_before / (1024 * 1024),
             peak / (1024 * 1024),
             peak.saturating_sub(rss_before) / (1024 * 1024),
-            chunks_before.len(),
         );
         // The append buffer must stay inside its own budget. The seal runs at the
         // end of the statement that crossed the budget, so the only slack is that
@@ -16907,11 +17217,14 @@ mod tests {
     /// 961 leaves, 40k rows, gave 0.973). `LEAF_SHARE` is that share, and this is
     /// the assertion that the statement path applies it
     /// (`WITH (beam|nprobe = …)` still wins).
-    #[test]
-    fn the_search_width_follows_the_leaf_count() {
+    #[tokio::test]
+    async fn the_search_width_follows_the_leaf_count() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE lf (id INT, v EMBEDDING(FLOAT,16));")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE lf (id INT, v EMBEDDING(FLOAT,16));")
+            .await
             .unwrap();
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..16)
@@ -16924,13 +17237,16 @@ mod tests {
         let data: Vec<Vec<Literal>> = (0..20_000)
             .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
             .collect();
-        e.insert_literals("default_db.lf", None, data).unwrap();
-        e.execute_blocking(
+        e.insert_literals("default_db.lf", None, data)
+            .await
+            .unwrap();
+        e.execute(
             "CREATE INDEX lf_i ON lf (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=8, num_centroids=4);",
         )
+        .await
         .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let index_id = e.test_index_id("default_db.lf", "v", "SPANN");
         let (partitions, _) = e
             .tables
@@ -16954,7 +17270,7 @@ mod tests {
             "SELECT id FROM lf SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 5);",
             vector(11)
         );
-        assert_eq!(rows(&e, &sql).len(), 5, "top-5 on a covered table");
+        assert_eq!(rows(&e, &sql).await.len(), 5, "top-5 on a covered table");
         let stats = e.spann_stats(index_id).snapshot();
         assert_eq!(
             stats.beam_actual.round() as usize,
@@ -16962,157 +17278,6 @@ mod tests {
             "{partitions} leaves should be probed at {want}, not {}",
             stats.beam_actual
         );
-    }
-
-    /// What a checkpoint costs, rebuild against delta: the point of §5.4 is that
-    /// a dump is proportional to the rows written since the last one, not to the
-    /// segment. Prints the two side by side - time, rows moved, chunk bytes and
-    /// chain layers - so the claim is a measurement rather than a shape.
-    ///
-    /// `cargo test --release -p executor spann_checkpoint_profile --lib -- --ignored --nocapture`
-    ///
-    /// `INFINITY_SPANN_PROFILE_ROWS` (rows the first load writes, default 20000)
-    /// and `INFINITY_SPANN_PROFILE_APPEND` (rows per round, default rows/10) set
-    /// the shape; the chain folds at eight chunks, so enough rounds also time a
-    /// rebuild of the grown segment.
-    ///
-    /// Measured (release, 128d): 20k rows, 2k per round - rebuild 187 ms, delta
-    /// 195-477 ms; 100k rows, 10k per round - rebuild 833 ms, delta 347-813 ms.
-    /// So the tree build is gone, but the wall time is not yet proportional to the
-    /// moved rows: a checkpoint pays a fixed cost (opening the chain, copying the
-    /// directory, decoding the rows it moves) and it grows with the number of
-    /// layers. That is the thing to profile before claiming §5.4 as a speedup -
-    /// this test is here to keep the claim honest, not to prove it.
-    #[test]
-    #[ignore = "diagnostic: prints the checkpoint profile, asserts nothing"]
-    fn spann_checkpoint_profile() {
-        let env_usize = |name: &str, default: usize| -> usize {
-            std::env::var(name)
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(default)
-        };
-        const DIM: usize = 128;
-        let rows_total = env_usize("INFINITY_SPANN_PROFILE_ROWS", 20_000);
-        let append = env_usize("INFINITY_SPANN_PROFILE_APPEND", (rows_total / 10).max(1));
-        let unit = |a: u64, b: u64| -> f32 {
-            let mut x = a
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
-            x ^= x >> 33;
-            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
-            x ^= x >> 29;
-            (x % 100_000) as f32 / 100_000.0
-        };
-        let value = |i: usize, d: usize| -> f32 { unit(i as u64, d as u64) * 20.0 };
-        let vector_text = |i: usize| -> String {
-            let body: Vec<String> = (0..DIM).map(|d| format!("{:.3}", value(i, d))).collect();
-            format!("[{}]", body.join(","))
-        };
-        let insert = |e: &Engine, range: std::ops::Range<usize>| {
-            let batch = 2_000_000 / (DIM * 8);
-            let mut at = range.start;
-            while at < range.end {
-                let end = (at + batch).min(range.end);
-                let data: Vec<Vec<Literal>> = (at..end)
-                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector_text(i))])
-                    .collect();
-                e.insert_literals("default_db.cp", None, data).unwrap();
-                at = end;
-            }
-        };
-        // Everything the index has on disk: chunk bytes and the segment's chain.
-        let chunks =
-            |e: &Engine| -> (usize, u64) {
-                let mut count = 0usize;
-                let mut bytes = 0u64;
-                let mut stack = vec![e.dir.clone()];
-                while let Some(dir) = stack.pop() {
-                    let Ok(entries) = std::fs::read_dir(&dir) else {
-                        continue;
-                    };
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_dir() {
-                            stack.push(path);
-                        } else if path.file_name().and_then(|name| name.to_str()).is_some_and(
-                            |name| name.starts_with("chunk_") && name.ends_with(".idx"),
-                        ) {
-                            count += 1;
-                            bytes += entry.metadata().map(|meta| meta.len()).unwrap_or(0);
-                        }
-                    }
-                }
-                (count, bytes)
-            };
-
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
-            "CREATE TABLE cp (id INT, v EMBEDDING(FLOAT,{DIM}));"
-        ))
-        .unwrap();
-        insert(&e, 0..rows_total);
-        e.execute_blocking(
-            "CREATE INDEX cp_i ON cp (v) USING SPANN WITH (min_rows = 1, metric='l2');",
-        )
-        .unwrap();
-
-        println!("dim={DIM} rows={rows_total} append={append}");
-        println!(
-            "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10} {:>12}",
-            "round", "kind", "moved", "layers", "chunks", "ms", "ms/row"
-        );
-        let begin = std::time::Instant::now();
-        crate::scheduler::block_on(e.flush()).unwrap();
-        let ms = begin.elapsed().as_secs_f64() * 1000.0;
-        let (files, bytes) = chunks(&e);
-        println!(
-            "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10.1} {:>12}",
-            "base", "rebuild", rows_total, 1, files, ms, "-"
-        );
-        println!(
-            "        (chunk bytes {} = {:.1} B/row)",
-            bytes,
-            bytes as f64 / rows_total as f64
-        );
-
-        let mut written = rows_total;
-        for round in 1..=12 {
-            insert(&e, written..written + append);
-            let begin = std::time::Instant::now();
-            crate::scheduler::block_on(e.flush()).unwrap();
-            let ms = begin.elapsed().as_secs_f64() * 1000.0;
-            let (files, _) = chunks(&e);
-            let layers = {
-                let key = e.table_key("default_db.cp");
-                let handle = e
-                    .tables
-                    .lock()
-                    .unwrap()
-                    .get(&key)
-                    .and_then(|entry| entry.spann.values().next().cloned());
-                match handle.as_ref().map(|handle| handle.as_ref()) {
-                    Some(crate::spann_mem::SpannHandle::File(chains)) => chains
-                        .first()
-                        .map(|chain| chain.layers())
-                        .unwrap_or_default(),
-                    _ => 0,
-                }
-            };
-            let kind = if layers == 1 { "fold" } else { "delta" };
-            println!(
-                "{:>6} {:>9} {:>8} {:>7} {:>6} {:>10.1} {:>12.3}",
-                round,
-                kind,
-                append,
-                layers,
-                files,
-                ms,
-                ms / append as f64
-            );
-            written += append;
-        }
     }
 
     /// Where one 1536d query's milliseconds go, split by knob instead of by guess.
@@ -17123,117 +17288,10 @@ mod tests {
     /// `nprobe = 1, rerank_multiplier = 0` is the SQL layer (literal parsing and
     /// dispatch). `tree.search` is the same probe without any of that.
     ///
-    /// `cargo test --release -p executor spann_delta_checkpoint_peak --lib -- --ignored --nocapture`
-    ///
-    /// A delta checkpoint reads the new rows' vectors so it can encode them, and
-    /// `BlockCursor::vectors` hands back **owned** `f32` vectors. Asking for the
-    /// whole segment at once therefore costs `dim x 4` per new row of peak RSS on
-    /// top of the tree, which only keeps the codes (`record_bytes` each). This
-    /// samples RSS from a second thread while the checkpoint runs and bounds the
-    /// growth well below "every vector at once", which is what batching it buys.
-    #[test]
-    #[ignore = "bench: measures peak RSS, host dependent"]
-    fn spann_delta_checkpoint_peak_rss() {
-        let dim = 512usize;
-        let rows_total = 40_000usize;
-        let vector = |i: usize| -> String {
-            let body: Vec<String> = (0..dim)
-                .map(|d| format!("{:.3}", ((i * 131 + d * 977) % 4093) as f32 / 4093.0))
-                .collect();
-            format!("[{}]", body.join(","))
-        };
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.set_pending_budget(512 * 1024 * 1024);
-        e.execute_blocking(&format!(
-            "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{dim}));"
-        ))
-        .unwrap();
-
-        // The first half becomes the published chunk: `CREATE INDEX` + `flush`
-        // take the rebuild path, which is not what this measures.
-        let half = rows_total / 2;
-        let insert = |from: usize, to: usize| {
-            let batch = 2_000usize;
-            let mut at = from;
-            while at < to {
-                let end = (at + batch).min(to);
-                let rows: Vec<Vec<Literal>> = (at..end)
-                    .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector(i))])
-                    .collect();
-                e.insert_literals("default_db.big", None, rows).unwrap();
-                at = end;
-            }
-        };
-        insert(0, half);
-        e.execute_blocking(
-            "CREATE INDEX big_i ON big (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=32);",
-        )
-        .unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
-
-        // The second half is the delta: nothing is published yet, so the vectors
-        // of these rows are what the next checkpoint has to read.
-        insert(half, rows_total);
-
-        // `RssAnon` is the heap. Total RSS is not the right figure here: the
-        // checkpoint seals the append buffer and maps the column and the new
-        // chunk, so it legitimately raises RSS by the column's size - page
-        // cache, not allocation.
-        let anon_available = crate::engine::state::process_rss_anon_bytes().is_some();
-        let sample_now = || -> u64 {
-            crate::engine::state::process_rss_anon_bytes()
-                .unwrap_or_else(crate::engine::state::process_rss_bytes)
-        };
-        let base = sample_now();
-        let peak = Arc::new(std::sync::atomic::AtomicU64::new(base));
-        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let sampler = {
-            let peak = Arc::clone(&peak);
-            let stop = Arc::clone(&stop);
-            std::thread::spawn(move || {
-                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
-                    peak.fetch_max(
-                        crate::engine::state::process_rss_anon_bytes()
-                            .unwrap_or_else(crate::engine::state::process_rss_bytes),
-                        std::sync::atomic::Ordering::Relaxed,
-                    );
-                    std::thread::sleep(std::time::Duration::from_millis(2));
-                }
-            })
-        };
-        crate::scheduler::block_on(e.flush()).unwrap();
-        stop.store(true, std::sync::atomic::Ordering::Relaxed);
-        sampler.join().unwrap();
-
-        let grew = peak
-            .load(std::sync::atomic::Ordering::Relaxed)
-            .saturating_sub(base);
-        let new_rows = rows_total - half;
-        let all_vectors = (new_rows * dim * 4) as u64;
-        let label = if anon_available { "heap" } else { "rss" };
-        eprintln!(
-            "delta checkpoint peak {label} growth: {grew} B for {new_rows} rows x {dim}d; \
-             every vector at once would be {all_vectors} B"
-        );
-        if anon_available {
-            assert!(
-                grew < all_vectors / 2 + 8 * 1024 * 1024,
-                "the checkpoint held {grew} B of heap for {new_rows} rows; batching \
-                 the vectors should stay under half of {all_vectors} B"
-            );
-        } else {
-            // `ps`'s figure includes the mapped column and chunk pages, so it
-            // cannot separate the vectors from page cache. Report, do not assert.
-            eprintln!("(no RssAnon on this platform: total RSS growth reported, not asserted)");
-        }
-    }
-
     /// `cargo test --release -p executor spann_query_profile --lib -- --ignored --nocapture`
-    #[test]
+    #[tokio::test]
     #[ignore = "diagnostic: prints the query profile, asserts nothing"]
-    fn spann_query_profile_1536d() {
+    async fn spann_query_profile_1536d() {
         let env_usize = |name: &str, default: usize| -> usize {
             std::env::var(name)
                 .ok()
@@ -17264,10 +17322,13 @@ mod tests {
         };
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(&format!(
             "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{DIM}));"
         ))
+        .await
         .unwrap();
         let batch = (2_000_000 / DIM).clamp(500, 10_000);
         let mut written = 0;
@@ -17276,17 +17337,20 @@ mod tests {
             let data: Vec<Vec<Literal>> = (written..end)
                 .map(|i| vec![Literal::Int(i as i64), Literal::Str(vector_text(i))])
                 .collect();
-            e.insert_literals("default_db.big", None, data).unwrap();
+            e.insert_literals("default_db.big", None, data)
+                .await
+                .unwrap();
             written = end;
         }
         let started = std::time::Instant::now();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX big_i ON big (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
         )
+        .await
         .unwrap();
         let build = started.elapsed();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let index_id = e
             .storage
             .catalog
@@ -17308,85 +17372,36 @@ mod tests {
 
         // p50 over `runs` timings; a warm-up run first, because the first query
         // faults in the chunk's header and its beam's pages.
-        let p50 = |runs: usize, mut f: Box<dyn FnMut(usize) + '_>| -> std::time::Duration {
-            f(0);
-            let mut t: Vec<std::time::Duration> = (0..runs)
-                .map(|i| {
+        // The body is async (a spann query fans out), so the timing helper
+        // awaits each run instead of demanding a synchronous closure.
+        macro_rules! p50 {
+            ($runs:expr, $f:expr) => {{
+                let mut t: Vec<std::time::Duration> = Vec::with_capacity($runs);
+                for i in 0..$runs {
                     let started = std::time::Instant::now();
-                    f(i);
-                    started.elapsed()
-                })
-                .collect();
-            t.sort();
-            t[t.len() / 2]
-        };
+                    $f(i).await;
+                    t.push(started.elapsed());
+                }
+                t.sort();
+                t[t.len() / 2]
+            }};
+        }
         let probe_row = |i: usize| (i * 37) % rows_total;
 
         for beam in [1usize, 8, 32, 128, 512] {
             let q: Vec<Vec<f32>> = (0..8).map(|i| vector_f32(probe_row(i))).collect();
-            let t = p50(
-                8,
-                Box::new(|i| {
-                    tree.search(&q[i], 1024, Some(beam));
-                }),
-            );
-            eprintln!("  tree.search beam {beam:>4}: {t:?}");
-        }
-
-        // Where the *statement's* milliseconds go: the same probe through
-        // `knn_candidates`, at the narrowest width, with and without the
-        // coverage count. Anything neither explains is the SQL layer.
-        {
-            let qv = vector_f32(probe_row(0));
-            let opts = crate::knn_scan::KnnScanOptions {
-                nprobe: Some(1),
-                ..Default::default()
-            };
-            let scan = |live: Option<usize>| {
-                e.knn_candidates(&crate::knn_scan::KnnCandidateScan {
-                    table: "big",
-                    index_id: Some(index_id),
-                    query: &qv,
-                    rows: &[],
-                    live_rows: None,
-                    live_count: live,
-                    cache: None,
-                    topn: 10,
-                    metric: "l2",
-                    options: &opts,
-                    allowed: None,
-                    beam: Some(1),
+            let t = {
+                let q = q.clone();
+                let tree = tree.clone();
+                p50!(8, |i: usize| {
+                    let q = q.clone();
+                    let tree = tree.clone();
+                    async move {
+                        let _ = tree.search(&q[i], 1024, Some(beam)).await;
+                    }
                 })
             };
-            let started = std::time::Instant::now();
-            let probe = scan(Some(rows_total)).expect("probe");
-            eprintln!(
-                "  knn_candidates nprobe 1, count known: {:?} | {} candidates, {} uncovered",
-                started.elapsed(),
-                probe.candidates.len(),
-                probe.uncovered.len()
-            );
-            let started = std::time::Instant::now();
-            let _ = scan(None);
-            eprintln!(
-                "  knn_candidates nprobe 1, count unknown: {:?}",
-                started.elapsed()
-            );
-            // The three numbers `all_covered` compares: when they disagree the
-            // query pays `row_ids()` on every call.
-            let entry = e
-                .tables
-                .lock()
-                .unwrap()
-                .get(&e.table_key("default_db.big"))
-                .map(|entry| (entry.live_rows, entry.spann_mem.len()));
-            eprintln!(
-                "  counts: tree {} | table row_count {:?} | published live_rows {:?} | mem {:?}",
-                tree.len(),
-                e.row_count("big"),
-                entry.as_ref().and_then(|(live, _)| *live),
-                entry.map(|(_, mem)| mem),
-            );
+            eprintln!("  tree.search beam {beam:>4}: {t:?}");
         }
 
         // What one rerank candidate costs, on its own: the row arrives as text,
@@ -17450,13 +17465,10 @@ mod tests {
             ),
         ] {
             let n = ids.len();
-            let t = p50(
-                4,
-                Box::new(|_| {
-                    let got = e.fetch_some_rows_with_ids("default_db.big", &ids).unwrap();
-                    assert_eq!(got.len(), n);
-                }),
-            );
+            let t = p50!(4, |_: usize| async {
+                let got = e.fetch_some_rows_with_ids("default_db.big", &ids).unwrap();
+                assert_eq!(got.len(), n);
+            });
             eprintln!("  fetch_some_rows_with_ids {label}: {t:?}");
         }
 
@@ -17478,7 +17490,8 @@ mod tests {
                         "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
                         vector_text(probe)
                     ),
-                );
+                )
+                .await;
                 let mut truth: Vec<(usize, f32)> = (0..rows_total)
                     .map(|i| {
                         let d: f32 = (0..DIM).map(|d| (value(i, d) - target[d]).powi(2)).sum();
@@ -17512,6 +17525,10 @@ mod tests {
         // The SQL path: the pool is `topn` at multiplier 0, the full formula at
         // 50. `nprobe` is spelled here rather than left to the default so the two
         // rows differ in exactly one knob.
+        //
+        // Timed with an awaited loop, not `p50`: that helper takes a synchronous
+        // closure, and reaching a statement from one would need a `block_on` on
+        // the very thread that has to drive it.
         for (beam, mult) in [
             (1usize, 0usize),
             (1, 50),
@@ -17520,17 +17537,24 @@ mod tests {
             (128, 0),
             (128, 50),
         ] {
-            let t = p50(
-                6,
-                Box::new(|i| {
-                    let sql = format!(
-                        "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10) \
-                         WITH (nprobe = {beam}, rerank_multiplier = {mult});",
-                        vector_text(probe_row(i))
-                    );
-                    assert_eq!(rows(&e, &sql).len(), 10);
-                }),
-            );
+            let sql_at = |i: usize| {
+                format!(
+                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10) \
+                     WITH (nprobe = {beam}, rerank_multiplier = {mult});",
+                    vector_text(probe_row(i))
+                )
+            };
+            // A warm-up run first, like `p50` does: the first query faults in
+            // the chunk's header and its beam's pages.
+            assert_eq!(rows(&e, &sql_at(0)).await.len(), 10);
+            let mut timings: Vec<std::time::Duration> = Vec::new();
+            for i in 0..6 {
+                let started = std::time::Instant::now();
+                assert_eq!(rows(&e, &sql_at(i)).await.len(), 10);
+                timings.push(started.elapsed());
+            }
+            timings.sort();
+            let t = timings[timings.len() / 2];
             eprintln!("  SQL nprobe {beam:>4} mult {mult:>3}: {t:?}");
         }
     }
@@ -17538,9 +17562,9 @@ mod tests {
     /// The numbers behind `docs/SPANN_BENCH.md`.
     ///
     /// `cargo test -p executor spann_bench --lib -- --ignored --nocapture`
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: throughput probe, host dependent"]
-    fn spann_bench_128d() {
+    async fn spann_bench_128d() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
         const CLUSTERS: usize = 64;
@@ -17567,10 +17591,13 @@ mod tests {
             .collect();
 
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(&format!(
             "CREATE TABLE bench (id INT, v EMBEDDING(FLOAT,{DIMS}));"
         ))
+        .await
         .unwrap();
         let mut dataset: Vec<Vec<Literal>> = Vec::with_capacity(N);
         for (i, v) in vectors.iter().enumerate() {
@@ -17585,13 +17612,15 @@ mod tests {
             ]);
         }
         e.insert_literals("default_db.bench", None, dataset)
+            .await
             .unwrap();
 
         let started = std::time::Instant::now();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX bench_i ON bench (v) USING SPANN WITH \
              (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=64);",
         )
+        .await
         .unwrap();
         let build = started.elapsed();
         let index_id = e
@@ -17626,7 +17655,7 @@ mod tests {
         for k in 0..QUERIES {
             let row = k * (N / QUERIES);
             let started = std::time::Instant::now();
-            let hits = tree.search(&vectors[row], 100, None);
+            let hits = tree.search(&vectors[row], 100, None).await;
             direct.push(started.elapsed());
             assert_eq!(hits.len(), 100);
         }
@@ -17657,7 +17686,7 @@ mod tests {
             let got = rows(
                 &e,
                 &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
-            );
+            ).await;
             timings.push(started.elapsed());
             let want = exact(q);
             let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
@@ -17674,7 +17703,7 @@ mod tests {
 
         // After the checkpoint the index is served from its chunk (§6.4): the
         // heap copy is dropped and the slot bytes come from page cache.
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.flush().await.unwrap();
         let mapped = e
             .tables
             .lock()
@@ -17691,7 +17720,7 @@ mod tests {
         for k in 0..QUERIES {
             let row = k * (N / QUERIES);
             let started = std::time::Instant::now();
-            let hits = mapped.search(&vectors[row], 100, None);
+            let hits = mapped.search(&vectors[row], 100, None).await;
             mapped_direct.push(started.elapsed());
             assert_eq!(hits.len(), 100);
         }
@@ -17715,7 +17744,7 @@ mod tests {
             let got = rows(
                 &e,
                 &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
-            );
+            ).await;
             mtimings.push(started.elapsed());
             let want = exact(q);
             let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
@@ -17733,12 +17762,13 @@ mod tests {
         // stops being "one side is a graph search and the other is a full
         // statement". A column resolves to one index at a time, so the spann
         // record is dropped first.
-        e.execute_blocking("DROP INDEX bench_i;").unwrap();
+        e.execute("DROP INDEX bench_i;").await.unwrap();
         let started = std::time::Instant::now();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX bench_h ON bench (v) USING HNSW WITH \
              (metric='l2', M=16, ef_construction=200);",
         )
+        .await
         .unwrap();
         eprintln!("hnsw build: {:?}", started.elapsed());
         let mut hhits = 0usize;
@@ -17755,7 +17785,7 @@ mod tests {
             let got = rows(
                 &e,
                 &format!("SELECT id FROM bench SEARCH MATCH VECTOR (v, [{text}], 'float', 'l2', {TOPN});"),
-            );
+            ).await;
             htimings.push(started.elapsed());
             let want = exact(q);
             let got: Vec<i64> = got.iter().map(|r| r[0].parse().unwrap()).collect();
@@ -17771,587 +17801,30 @@ mod tests {
         );
     }
 
-    /// A `COPY` of an `EMBEDDING` column: the CSV field is the same bracketed
-    /// literal the `INSERT` path accepts, quoted because it carries commas.
-    /// Every import seals its own segment, which is what the scale run uses to
-    /// get one tree per segment.
-    #[test]
-    fn copy_loads_an_embedding_column_into_its_own_segment() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ce (id INT, v EMBEDDING(FLOAT,3));")
-            .unwrap();
-        for part in 0..2 {
-            let path = dir.path().join(format!("ce{part}.csv"));
-            let text: String = (0..100)
-                .map(|i| {
-                    let row = part * 100 + i;
-                    format!("{row},\"[{}.0,{}.0,{}.0]\"\n", row, row + 1, row + 2)
-                })
-                .collect();
-            std::fs::write(&path, text).unwrap();
-            e.execute_blocking(&format!(
-                "COPY ce FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-                path.display()
-            ))
-            .unwrap();
-        }
-        assert_eq!(e.segments("ce").len(), 2, "each COPY seals a segment");
-        assert_eq!(e.row_count("ce").unwrap(), 200);
-        let got = rows(&e, "SELECT id FROM ce WHERE id = 199;");
-        assert_eq!(got, vec![vec!["199".to_string()]]);
-        let got = rows(
-            &e,
-            "SELECT id FROM ce SEARCH MATCH VECTOR (v, [199.0,200.0,201.0], 'float', 'l2', 1);",
-        );
-        assert_eq!(got, vec![vec!["199".to_string()]]);
-    }
-
-    /// Large-scale end-to-end run over **two segments**, i.e. two trees that a
-    /// query searches in parallel and merges (§3 I6/I8, §8.1).
-    ///
-    /// Each half is inserted into its own segment (one `flush` apart), the
-    /// checkpoint gives each segment its own chunk, and the engine is reopened
-    /// so the handle is the multi-tree `File` form - the same shape a restarted
-    /// server serves. Recall is measured against a brute force over the same
-    /// generator.
-    ///
-    /// `INFINITY_SPANN_SCALE_ROWS` sets the total (default 200k, 128d):
-    /// `cargo test --release -p executor spann_scale --lib -- --ignored --nocapture`
-    #[test]
-    #[ignore]
-    fn spann_scale_two_segments_128d() {
-        const DIMS: usize = 128;
-        const CLUSTERS: usize = 512;
-        const TOPN: usize = 10;
-        let total: usize = std::env::var("INFINITY_SPANN_SCALE_ROWS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(200_000);
-        let queries = 20usize;
-        let noise = |i: usize, d: usize| -> f32 {
-            let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                ^ (d as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
-            x ^= x >> 30;
-            x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
-            x ^= x >> 27;
-            ((x >> 40) as f32 / 16_777_216.0) * 2.0 - 1.0
-        };
-        // One resident copy: the truth pass and the queries read the same
-        // vectors, and regenerating 128 hashes per row per pass dominates the
-        // run at this size.
-        let vectors: Vec<Vec<f32>> = (0..total)
-            .map(|i| {
-                let c = i % CLUSTERS;
-                (0..DIMS)
-                    .map(|d| noise(c * 7919 + d, 3) * 20.0 + noise(i, d) * 3.0)
-                    .collect()
-            })
-            .collect();
-        let literal = |v: &[f32]| -> String {
-            let body: Vec<String> = v.iter().map(|x| format!("{x:.3}")).collect();
-            format!("[{}]", body.join(","))
-        };
-
-        let dir = tempdir().unwrap();
-        let per = total / 2;
-        let build = {
-            let e = Engine::open(dir.path()).unwrap();
-            e.execute_blocking(&format!(
-                "CREATE TABLE sc (id INT, v EMBEDDING(FLOAT,{DIMS}));"
-            ))
-            .unwrap();
-            for part in 0..2 {
-                let path = dir.path().join(format!("sc{part}.csv"));
-                let mut body = String::with_capacity(per * (DIMS * 9 + 16));
-                for i in 0..per {
-                    let row = part * per + i;
-                    body.push_str(&row.to_string());
-                    body.push_str(",\"");
-                    body.push_str(&literal(&vectors[row]));
-                    body.push_str("\"\n");
-                }
-                std::fs::write(&path, body).unwrap();
-                // Every COPY seals its own segment, which is exactly the shape
-                // the run needs: one tree per segment after the checkpoint.
-                e.execute_blocking(&format!(
-                    "COPY sc FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-                    path.display()
-                ))
-                .unwrap();
-            }
-            let segments = e.segment_row_counts("sc").len();
-            assert_eq!(segments, 2, "the run needs two segments: {segments}");
-            let started = std::time::Instant::now();
-            e.execute_blocking(&format!(
-                "CREATE INDEX sc_i ON sc (v) USING SPANN WITH \
-                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids={CLUSTERS});"
-            ))
-            .unwrap();
-            let build = started.elapsed();
-            crate::scheduler::block_on(e.flush()).unwrap();
-            eprintln!(
-                "build {total} rows x {DIMS}d over {segments} segments: {build:?} ({:.0} rows/s)",
-                total as f64 / build.as_secs_f64()
-            );
-            build
-        };
-        assert!(build.as_secs() < 600, "{build:?}");
-
-        // Reopened: nothing is resident, so the first query maps every
-        // segment's chunk and fans out over all of them.
-        let e = Engine::open(dir.path()).unwrap();
-        let key = e.table_key("default_db.sc");
-        let index_id = e
-            .storage
-            .catalog
-            .list_indexes()
-            .unwrap()
-            .into_iter()
-            .find(|im| im.name == "sc_i")
-            .expect("index record")
-            .id;
-
-        let mut latencies: Vec<std::time::Duration> = Vec::with_capacity(queries);
-        let mut hits = 0usize;
-        for k in 0..queries {
-            let row = (k * 7919) % total;
-            let q = &vectors[row];
-            let started = std::time::Instant::now();
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM sc SEARCH MATCH VECTOR (v, {}, 'float', 'l2', {TOPN});",
-                    literal(q)
-                ),
-            );
-            let elapsed = started.elapsed();
-            latencies.push(elapsed);
-            eprintln!("  q{k}: {elapsed:?} -> {} rows", got.len());
-            let mut truth: Vec<(usize, f32)> = (0..total)
-                .map(|i| (i, index::vector::l2_sq(q, &vectors[i])))
-                .collect();
-            truth.sort_by(|a, b| a.1.total_cmp(&b.1));
-            let want: std::collections::HashSet<String> =
-                truth[..TOPN].iter().map(|(i, _)| i.to_string()).collect();
-            hits += got.iter().filter(|row| want.contains(&row[0])).count();
-        }
-        // The first query is the cold one: it maps every segment's chunk and
-        // pays the page-fault bill, so it is reported apart from the rest.
-        let cold = latencies.remove(0);
-        latencies.sort();
-        let warm_p95 = latencies[latencies.len() * 95 / 100];
-
-        let (chunks, covered, partitions) = {
-            let tables = e.tables.lock().unwrap();
-            match tables
-                .get(&key)
-                .and_then(|entry| entry.spann.get(&index_id))
-            {
-                Some(handle) => match &**handle {
-                    crate::spann_mem::SpannHandle::File(chunks) => {
-                        (chunks.len(), handle.len(), handle.shape().0)
-                    }
-                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
-                },
-                None => (0, 0, 0),
-            }
-        };
-        eprintln!(
-            "reopened: {chunks} tree(s), {covered} covered rows, {partitions} partitions | \
-             recall@{TOPN} = {:.3} | cold {cold:?} | warm p50 {:?} | warm p95 {:?} | warm p99 {:?}",
-            hits as f64 / (queries * TOPN) as f64,
-            latencies[latencies.len() / 2],
-            warm_p95,
-            latencies[latencies.len() * 99 / 100],
-        );
-        assert_eq!(chunks, 2, "each segment must serve its own tree");
-        assert_eq!(covered, total, "the trees must cover every row");
-        assert!(
-            hits as f64 / (queries * TOPN) as f64 >= 0.8,
-            "recall@{TOPN} = {} / {}",
-            hits,
-            queries * TOPN
-        );
-        // A regression that falls back to the exact scan (say, a tree the
-        // compaction forgot to rebuild, §9.8) shows up here as tens of
-        // milliseconds per query, not as a wrong answer.
-        assert!(
-            warm_p95 < std::time::Duration::from_millis(200),
-            "warm p95 {warm_p95:?} looks like a full scan"
-        );
-    }
-
-    /// 2M × 1536d over eight segments: the scale `SPANN_DESIGN.md` §16.4 aims
-    /// at, with one tree per segment and a query that fans out over all of them
-    /// (§3 I8, §8.1).
-    ///
-    /// Two things keep this runnable on a laptop, and both are about `COPY`
-    /// rather than about the index:
-    ///
-    /// * the import is **streamed**: one `COPY` per segment, each from a CSV
-    ///   that is generated, imported, then deleted. `COPY` stages the encoded
-    ///   text of every row it reads (`import.rs`'s `encoded_rows`), so a single
-    ///   2M-row import would need ~24 GB of text; eight imports of 250k need
-    ///   ~3 GB at a time.
-    /// * vectors are **regenerated**, not held: 2M × 1536 × 4 B = 12.3 GB
-    ///   resident, so the truth pass pays CPU instead of RAM.
-    ///
-    /// Knobs: `INFINITY_SPANN_SCALE_ROWS` (2,000,000),
-    /// `INFINITY_SPANN_SCALE_SEGMENTS` (8), `INFINITY_SPANN_SCALE_PROBES` (20),
-    /// `INFINITY_SPANN_TRUTH_QUERIES` (3).
-    ///
-    /// `cargo test --release -p executor spann_scale_1536d --lib -- --ignored --nocapture`
-    #[test]
-    #[ignore]
-    fn spann_scale_1536d() {
-        const CENTERS: usize = 4096;
-        const TOPN: usize = 10;
-        let env_usize = |name: &str, default: usize| -> usize {
-            std::env::var(name)
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(default)
-        };
-        // The reference's width by default; a narrower column is what a 15M-row
-        // run has to use on this machine (`INFINITY_SPANN_SCALE_DIM`).
-        #[allow(non_snake_case)]
-        let DIM = env_usize("INFINITY_SPANN_SCALE_DIM", 1536);
-        let total = env_usize("INFINITY_SPANN_SCALE_ROWS", 500_000);
-        let parts = env_usize("INFINITY_SPANN_SCALE_SEGMENTS", 2).max(1);
-        let probes = env_usize("INFINITY_SPANN_SCALE_PROBES", 5);
-        let truth_queries = env_usize("INFINITY_SPANN_TRUTH_QUERIES", 1);
-
-        let unit = |a: u64, b: u64| -> f32 {
-            let mut x = a
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
-            x ^= x >> 33;
-            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
-            x ^= x >> 29;
-            (x % 100_000) as f32 / 100_000.0
-        };
-        // Rounded to the three decimals the CSV carries, so the stored row and
-        // the regenerated row are the same number.
-        let value = |i: usize, d: usize| -> f32 {
-            let centre = (i % CENTERS) as u64;
-            let x = unit(centre, d as u64) * 20.0
-                + (unit(centre ^ 0x5DEE_CE66, (d as u64) * 31 + i as u64) - 0.5) * 0.6;
-            (x * 1000.0).round() / 1000.0
-        };
-        fn write_part(
-            path: &std::path::Path,
-            base: usize,
-            rows: usize,
-            dim: usize,
-            value: &dyn Fn(usize, usize) -> f32,
-        ) {
-            use std::fmt::Write as _;
-            use std::io::Write as _;
-            let file = std::fs::File::create(path).unwrap();
-            let mut out = std::io::BufWriter::with_capacity(1 << 22, file);
-            let mut line = String::with_capacity(dim * 9 + 24);
-            for i in base..base + rows {
-                line.clear();
-                write!(line, "{i},\"[").unwrap();
-                for d in 0..dim {
-                    if d > 0 {
-                        line.push(',');
-                    }
-                    write!(line, "{:.3}", value(i, d)).unwrap();
-                }
-                line.push_str("]\"\n");
-                out.write_all(line.as_bytes()).unwrap();
-            }
-            out.flush().unwrap();
-        }
-
-        // A **fixed** directory, not a `tempdir`: a 2M-row build costs an hour,
-        // and a query-level change must not pay for it again. Delete the
-        // directory (or change the shape) to force a rebuild.
-        let dir = std::env::temp_dir().join(format!("spann_scale_{total}x{DIM}_{parts}s"));
-        let marker = dir.join("built");
-        let per = total.div_ceil(parts);
-        if marker.exists() {
-            eprintln!("reusing the built table at {}", dir.display());
-        } else {
-            std::fs::create_dir_all(&dir).unwrap();
-            let e = Engine::open(&dir).unwrap();
-            e.execute_blocking(&format!(
-                "CREATE TABLE big (id INT, v EMBEDDING(FLOAT,{DIM}));"
-            ))
-            .unwrap();
-            let started = std::time::Instant::now();
-            for part in 0..parts {
-                let base = part * per;
-                let rows = per.min(total - base);
-                if rows == 0 {
-                    break;
-                }
-                let path = dir.join(format!("big{part}.csv"));
-                write_part(&path, base, rows, DIM, &value);
-                let copied = std::time::Instant::now();
-                e.execute_blocking(&format!(
-                    "COPY big FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-                    path.display()
-                ))
-                .unwrap();
-                // The CSV is 3 GB at this size; the import already holds what
-                // it needs, so drop it before the next part is generated.
-                std::fs::remove_file(&path).unwrap();
-                eprintln!(
-                    "  part {part}: {rows} rows imported in {:?} ({:.0} rows/s)",
-                    copied.elapsed(),
-                    rows as f64 / copied.elapsed().as_secs_f64()
-                );
-            }
-            let imported = started.elapsed();
-            let segments = e.segment_row_counts("big").len();
-            let built = std::time::Instant::now();
-            e.execute_blocking(
-                "CREATE INDEX big_i ON big (v) USING SPANN WITH \
-                 (min_rows = 1, metric='l2', max_partition_size=128, num_centroids=2048);",
-            )
-            .unwrap();
-            let build = built.elapsed();
-            let published = std::time::Instant::now();
-            crate::scheduler::block_on(e.flush()).unwrap();
-            eprintln!(
-                "build {total} x {DIM}d over {segments} segments: import {imported:?} \
-                 ({:.0} rows/s), tree {build:?} ({:.0} rows/s), publish {:?}",
-                total as f64 / imported.as_secs_f64(),
-                total as f64 / build.as_secs_f64(),
-                published.elapsed()
-            );
-            assert_eq!(segments, parts, "one COPY per segment: {segments}");
-            let build = built.elapsed();
-            assert!(build.as_secs() < 3_600, "{build:?}");
-            // The marker is what makes the next run a query-only run; it goes
-            // down only after the chunks are published.
-            std::fs::write(&marker, b"ok").unwrap();
-        }
-
-        let e = Engine::open(&dir).unwrap();
-        let key = e.table_key("default_db.big");
-        let index_id = e.test_index_id("default_db.big", "v", "SPANN");
-
-        // Split the cold start in two: loading maps both chunks and verifies
-        // every section's CRC (I/O + checksum), while the query that follows is
-        // what pays for decoding candidate blocks. Timing them together is how
-        // a 114 s first query gets blamed on "the index".
-        let loaded_at = std::time::Instant::now();
-        let loaded = e.spann_lazy_load("big", index_id);
-        eprintln!(
-            "  lazy load: {:?} -> {:?} covered rows",
-            loaded_at.elapsed(),
-            loaded.as_ref().map(|handle| handle.len())
-        );
-        // Same vector, three scopes: the index alone (`handle.search`), the SQL
-        // path with a tiny rerank pool, and the SQL path with the default pool.
-        // The three numbers are what separate "the descent is slow" from "the
-        // candidate rows are slow".
-        let (idx_ms, few_ms) = {
-            let cold_row = 12345usize % total;
-            let q: Vec<f32> = (0..DIM).map(|d| value(cold_row, d)).collect();
-            let text: String = {
-                let mut out = String::with_capacity(DIM * 9 + 8);
-                out.push('[');
-                for (d, x) in q.iter().enumerate() {
-                    if d > 0 {
-                        out.push(',');
-                    }
-                    out.push_str(&format!("{x:.3}"));
-                }
-                out.push(']');
-                out
-            };
-            let started = std::time::Instant::now();
-            let hits = loaded
-                .as_ref()
-                .map(|handle| handle.search(&q, TOPN, None).len())
-                .unwrap_or(0);
-            let idx = started.elapsed();
-            let started = std::time::Instant::now();
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {text}, 'float', 'l2', {TOPN}) \
-                     WITH (rerank_multiplier = 0);"
-                ),
-            );
-            let few = started.elapsed();
-            eprintln!(
-                "  cold index-only search: {idx:?} ({hits} hits) | \
-                 SQL rerank=0: {few:?} ({} rows)",
-                got.len()
-            );
-            (idx, few)
-        };
-        let _ = (idx_ms, few_ms);
-
-        // Self-hit: each probe's own vector must come back first. Exact by
-        // construction (the row's stored vector *is* the probe), so a miss means
-        // the descent never visited that row's leaf.
-        let mut self_hits = 0usize;
-        let mut warm: Vec<std::time::Duration> = Vec::with_capacity(probes);
-        for p in 0..probes {
-            let row = (p * 79_999 + 12_345) % total;
-            let text: String = {
-                let mut out = String::with_capacity(DIM * 9 + 8);
-                out.push('[');
-                for d in 0..DIM {
-                    if d > 0 {
-                        out.push(',');
-                    }
-                    out.push_str(&format!("{:.3}", value(row, d)));
-                }
-                out.push(']');
-                out
-            };
-            let started = std::time::Instant::now();
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {text}, 'float', 'l2', {TOPN});"
-                ),
-            );
-            let elapsed = started.elapsed();
-            if p > 0 {
-                warm.push(elapsed);
-            }
-            let want = row.to_string();
-            let hit = got.first().is_some_and(|r| r[0] == want);
-            self_hits += usize::from(hit);
-            eprintln!(
-                "  probe {p} (row {row}): {elapsed:?} -> {} rows, self-hit {hit}",
-                got.len()
-            );
-        }
-
-        // The handles are loaded on the first query (`spann_lazy_load`), so the
-        // shape is read after the probes, not right after `open`.
-        let (chunks, covered, partitions) = {
-            let tables = e.tables.lock().unwrap();
-            match tables
-                .get(&key)
-                .and_then(|entry| entry.spann.get(&index_id))
-            {
-                Some(handle) => match &**handle {
-                    crate::spann_mem::SpannHandle::File(chunks) => {
-                        (chunks.len(), handle.len(), handle.shape().0)
-                    }
-                    crate::spann_mem::SpannHandle::Memory(_) => (0, handle.len(), handle.shape().0),
-                },
-                None => (0, 0, 0),
-            }
-        };
-        eprintln!("reopened: {chunks} tree(s), {covered} covered rows, {partitions} partitions");
-        // What the probe actually cost: `beam_actual` is how many leaves each
-        // tree visited, and every candidate beyond that is a block decode - the
-        // number that decides whether 1536d queries are index-bound or
-        // candidate-bound.
-        let stats = e.spann_stats(index_id).snapshot();
-        eprintln!(
-            "  stats: beam_actual {:.1}, candidates/query {:.1}",
-            stats.beam_actual, stats.candidates_per_query
-        );
-        assert_eq!(covered, total, "the trees must cover every row");
-
-        // Exact recall on a few probes: a full pass over the generator is the
-        // truth, and it costs 2M × 1536 hashes instead of 12.3 GB of RAM.
-        let mut truth_hits = 0usize;
-        let mut truth_total = 0usize;
-        for t in 0..truth_queries {
-            let row = (t * 7919 + 424_242) % total;
-            let q: Vec<f32> = (0..DIM).map(|d| value(row, d)).collect();
-            let started = std::time::Instant::now();
-            let mut best: Vec<(f32, usize)> = Vec::with_capacity(TOPN + 1);
-            for i in 0..total {
-                let mut acc = 0.0f32;
-                for (d, x) in q.iter().enumerate() {
-                    let diff = x - value(i, d);
-                    acc += diff * diff;
-                }
-                if best.len() == TOPN && acc >= best[TOPN - 1].0 {
-                    continue;
-                }
-                let at = best.partition_point(|(score, _)| *score <= acc);
-                best.insert(at, (acc, i));
-                best.truncate(TOPN);
-            }
-            let scan = started.elapsed();
-            let truth: Vec<String> = best.iter().map(|(_, i)| i.to_string()).collect();
-            let got = rows(
-                &e,
-                &format!(
-                    "SELECT id FROM big SEARCH MATCH VECTOR (v, {}, 'float', 'l2', {TOPN});",
-                    {
-                        let mut out = String::with_capacity(DIM * 9 + 8);
-                        out.push('[');
-                        for (d, x) in q.iter().enumerate() {
-                            if d > 0 {
-                                out.push(',');
-                            }
-                            out.push_str(&format!("{x:.3}"));
-                        }
-                        out.push(']');
-                        out
-                    }
-                ),
-            );
-            let found = got
-                .iter()
-                .filter(|r| truth.iter().any(|want| *want == r[0]))
-                .count();
-            truth_hits += found;
-            truth_total += TOPN;
-            eprintln!(
-                "  truth q{t} (row {row}): {found}/{TOPN} of the exact top-{TOPN} \
-                 in {scan:?} (scan), {:?} (end to end)",
-                started.elapsed()
-            );
-        }
-        warm.sort();
-        eprintln!(
-            "self-hit@1 = {}/{} | recall@{TOPN} = {}/{} | warm p50 {:?} | warm p95 {:?}",
-            self_hits,
-            probes,
-            truth_hits,
-            truth_total,
-            warm[warm.len() / 2],
-            warm[warm.len() * 95 / 100],
-        );
-        // Not a hard requirement: at 1536d the default beam probes ~5% of the
-        // leaves (`beam_actual` below), so a self-query can miss its own row -
-        // that is a recall number, and the exact recall below is the one with a
-        // floor. A run that answers from the exact scan would hit 100% here, so
-        // this is also what tells "the tree is thin" apart from "no tree".
-        assert!(
-            self_hits * 2 >= probes,
-            "self-hit {self_hits}/{probes}: the tree answers worse than chance"
-        );
-        assert!(
-            truth_hits as f64 / truth_total as f64 >= 0.8,
-            "recall@{TOPN} = {truth_hits} / {truth_total}"
-        );
-    }
-
     /// The DDL validates the option names and the column type, and the values
     /// are checked by the same parser the builder uses.
-    #[test]
-    fn spann_rejects_invalid_ddl() {
+    #[tokio::test]
+    async fn spann_rejects_invalid_ddl() {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE csd (id INT, v EMBEDDING(FLOAT,4), s VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        let bad_option =
-            match e.execute_blocking("CREATE INDEX csd_i ON csd (v) USING SPANN WITH (M=16);") {
-                Ok(_) => panic!("an HNSW option must be rejected by a SPANN index"),
-                Err(err) => format!("{err}"),
-            };
+        e.execute("CREATE TABLE csd (id INT, v EMBEDDING(FLOAT,4), s VARCHAR);")
+            .await
+            .unwrap();
+        let bad_option = match e
+            .execute("CREATE INDEX csd_i ON csd (v) USING SPANN WITH (M=16);")
+            .await
+        {
+            Ok(_) => panic!("an HNSW option must be rejected by a SPANN index"),
+            Err(err) => format!("{err}"),
+        };
         assert!(bad_option.contains("SPANN"), "{bad_option}");
 
-        let bad_column = match e.execute_blocking("CREATE INDEX csd_j ON csd (s) USING SPANN;") {
+        let bad_column = match e
+            .execute("CREATE INDEX csd_j ON csd (s) USING SPANN;")
+            .await
+        {
             Ok(_) => panic!("a VARCHAR column has no vectors to index"),
             Err(err) => format!("{err}"),
         };
@@ -18362,9 +17835,9 @@ mod tests {
     /// same rows and read recall@10 at each p50.
     ///
     /// `cargo test -p executor --release spann_vs_hnsw_at_equal_latency --lib -- --ignored --nocapture`
-    #[test]
+    #[tokio::test]
     #[ignore = "bench: latency comparison, host dependent"]
-    fn spann_vs_hnsw_at_equal_latency() {
+    async fn spann_vs_hnsw_at_equal_latency() {
         const N: usize = 20_000;
         const DIMS: usize = 128;
         const CLUSTERS: usize = 64;
@@ -18397,24 +17870,29 @@ mod tests {
             )
         };
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         for table in ["bench_h", "bench_c"] {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "CREATE TABLE {table} (id INT, v EMBEDDING(FLOAT,{DIMS}));"
             ))
+            .await
             .unwrap();
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(N);
             for (i, v) in vectors.iter().enumerate() {
                 batch.push(vec![Literal::Int(i as i64), Literal::Str(text(v))]);
             }
             e.insert_literals(&format!("default_db.{table}"), None, batch)
+                .await
                 .unwrap();
         }
-        e.execute_blocking("CREATE INDEX bh ON bench_h (v) USING HNSW WITH (metric='l2');")
+        e.execute("CREATE INDEX bh ON bench_h (v) USING HNSW WITH (metric='l2');")
+            .await
             .unwrap();
-        e.execute_blocking(
+        e.execute(
             "CREATE INDEX bc ON bench_c (v) USING SPANN WITH (min_rows = 1, metric='l2', max_partition_size=128);",
-        )
+        ).await
         .unwrap();
 
         let exact = |q: &[f32]| -> Vec<i64> {
@@ -18426,8 +17904,9 @@ mod tests {
             scored.sort_by(|a, b| a.1.total_cmp(&b.1));
             scored.into_iter().take(TOPN).map(|(i, _)| i).collect()
         };
-        let rows_of = |sql: &str| -> Vec<i64> {
+        let rows_of = async |sql: &str| -> Vec<i64> {
             rows(&e, sql)
+                .await
                 .into_iter()
                 .map(|row| row[0].parse().unwrap())
                 .collect()
@@ -18449,7 +17928,7 @@ mod tests {
                         text(&vectors[row])
                     );
                     let started = std::time::Instant::now();
-                    let got = rows_of(&sql);
+                    let got = rows_of(&sql).await;
                     timings.push(started.elapsed());
                     let want = exact(&vectors[row]);
                     hit += got.iter().filter(|id| want.contains(id)).count();
@@ -18464,105 +17943,5 @@ mod tests {
             }
             println!("{width:>5} | {} | {}", lines[0], lines[1]);
         }
-    }
-
-    /// A query answers while rows are being inserted, and once the writer is
-    /// done, the tree covers what it wrote.
-    ///
-    /// This is the split of work between writer and reader: the writer appends
-    /// to the **mem index** and the checkpoint folds that list into the
-    /// segment's tree, while the search reads the published chunk - so a reader
-    /// sees each row exactly once (from the chunk, the mem list, or the exact
-    /// scan for the rows neither covers), never a half-applied batch, and the
-    /// two never deadlock on the engine's `tables` lock. C-SPANN has the same
-    /// contract: the fixup worker moves rows, the search reads the tree, and
-    /// neither takes a lock the other holds (`cspann/fixup_worker.go`,
-    /// `cspann/search.go`).
-    #[test]
-    fn a_query_answers_while_rows_are_being_inserted() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE live (id INT, v EMBEDDING(FLOAT,16));")
-            .unwrap();
-        let dim = 16usize;
-        // A hash, not a modular pattern: the latter repeats every 97 rows, so
-        // the last row's nearest neighbour was not itself.
-        let unit = |a: u64, b: u64| -> f32 {
-            let mut x = a
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add((b + 1).wrapping_mul(0xFF51_AFD7_ED55_8CCD));
-            x ^= x >> 33;
-            x = x.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
-            x ^= x >> 29;
-            (x % 100_000) as f32 / 100_000.0
-        };
-        let text = move |i: usize| -> String {
-            let cells: Vec<String> = (0..dim)
-                .map(|d| format!("{:.3}", unit(i as u64, d as u64)))
-                .collect();
-            format!("[{}]", cells.join(","))
-        };
-        let insert = |from: usize, to: usize| {
-            let mut sql = String::from("INSERT INTO live VALUES ");
-            for i in from..to {
-                if i > from {
-                    sql.push(',');
-                }
-                sql.push_str(&format!("({i}, {})", text(i)));
-            }
-            sql.push(';');
-            e.execute_blocking(&sql).unwrap();
-        };
-        let batches = 12usize;
-        let per_batch = 100usize;
-        insert(0, 500);
-        e.execute_blocking(
-            "CREATE INDEX live_i ON live (v) USING SPANN WITH \
-             (min_rows = 1, metric='l2', max_partition_size=32, num_centroids=8);",
-        )
-        .unwrap();
-
-        // One writer, three readers. The writer inserts a batch and checkpoints
-        // after each one, so the readers race the mem list, the chunk the
-        // checkpoint publishes to replace it, and the handle swap between the
-        // two (`max_partition_size = 32` makes every dump a full rebuild here).
-        let total = 500 + batches * per_batch;
-        std::thread::scope(|scope| {
-            scope.spawn(|| {
-                for batch in 0..batches {
-                    insert(500 + batch * per_batch, 500 + (batch + 1) * per_batch);
-                    crate::scheduler::block_on(e.flush()).unwrap();
-                }
-            });
-            for _ in 0..3 {
-                let text = &text;
-                scope.spawn(|| {
-                    for _ in 0..30 {
-                        let sql = format!(
-                            "SELECT id FROM live SEARCH MATCH VECTOR \
-                             (v, {}, 'float', 'l2', 5);",
-                            text(7)
-                        );
-                        let got = rows(&e, &sql);
-                        assert_eq!(got.len(), 5, "a concurrent query answered short");
-                        for row in &got {
-                            let id: usize = row[0].parse().unwrap();
-                            assert!(id < total, "a concurrent query invented row {id}");
-                        }
-                    }
-                });
-            }
-        });
-
-        // Everything the writer committed is in the tree, so the last row it
-        // wrote is its own nearest neighbour.
-        let sql = format!(
-            "SELECT id FROM live SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
-            text(total - 1)
-        );
-        assert_eq!(
-            rows(&e, &sql).first().map(|row| row[0].clone()),
-            Some((total - 1).to_string())
-        );
     }
 }

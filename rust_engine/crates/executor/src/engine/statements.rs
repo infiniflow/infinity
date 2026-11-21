@@ -59,35 +59,53 @@ impl QueryResult {
     }
 }
 
-thread_local! {
-    /// Tables whose commit bottom this thread is running right now
-    /// (see Engine::run_commit_bottom).
-    static BOTTOM_HELD: std::cell::RefCell<std::collections::HashSet<String>> =
-        std::cell::RefCell::new(std::collections::HashSet::new());
+tokio::task_local! {
+    /// Tables whose commit bottom the current **task** is running right now
+    /// (see `Engine::run_commit_bottom`).
+    ///
+    /// A task local, not a thread local: the bottom half is a task now, so it
+    /// can be resumed on a different runtime worker mid-flight. A thread local
+    /// would lose the mark across such a hop and the re-entrance check would
+    /// take the table's gate a second time - the self-lock
+    /// `docs/THREADS_TO_TOKIO.md` §5.8 records.
+    static BOTTOM_HELD: std::cell::RefCell<std::collections::HashSet<String>>;
 }
 
+#[cfg(test)]
+type TextBuildHook =
+    Box<dyn FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send>;
+
+#[cfg(test)]
 thread_local! {
     /// Runs inside a full-text build, right after the rows are read and before
     /// the index is published. The tests use it to land a compaction in exactly
     /// that window: the schedule that breaks a build is otherwise a race, and a
-    /// compaction cannot be driven from the thread that is building.
-    static TEXT_BUILD_HOOK: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+    /// compaction cannot be driven from the same task that is building.
+    ///
+    /// **Returns a future.** The hook's job is to run a whole statement
+    /// (a compaction), which is async; a synchronous hook could only reach it
+    /// through `block_on`, which parks the building task's thread - and the
+    /// compaction it waits for needs a worker to make progress. Awaiting it
+    /// here keeps the window open across the hook without parking anything.
+    static TEXT_BUILD_HOOK: std::cell::RefCell<Option<TextBuildHook>> =
         const { std::cell::RefCell::new(None) };
 }
 
 /// Installs [`TEXT_BUILD_HOOK`] for this thread; `None` removes it.
 #[cfg(test)]
-pub(crate) fn set_text_build_hook(hook: Option<Box<dyn FnMut()>>) {
+pub(crate) fn set_text_build_hook(hook: Option<TextBuildHook>) {
     TEXT_BUILD_HOOK.with(|slot| *slot.borrow_mut() = hook);
 }
 
 #[cfg(test)]
-fn run_text_build_hook() {
-    TEXT_BUILD_HOOK.with(|slot| {
-        if let Some(hook) = slot.borrow_mut().as_mut() {
-            hook();
-        }
-    });
+async fn run_text_build_hook() {
+    // Taken out while it runs: a hook that reaches a second build would
+    // otherwise re-enter the `RefCell` borrow below.
+    let hook = TEXT_BUILD_HOOK.with(|slot| slot.borrow_mut().take());
+    if let Some(mut hook) = hook {
+        hook().await;
+        TEXT_BUILD_HOOK.with(|slot| *slot.borrow_mut() = Some(hook));
+    }
 }
 
 /// A hook parked at one of the named points inside a compaction's commit: the
@@ -138,28 +156,85 @@ pub(crate) enum TextPublish {
     Superseded,
 }
 
-/// Marks one table's bottom as running on this thread for as long as it lives.
-pub(crate) struct HeldBottom(String);
+thread_local! {
+    /// Tables whose bottom this **thread** is running for a synchronous span.
+    ///
+    /// The synchronous counterpart of [`BOTTOM_HELD`]: a commit's `before_wal`
+    /// callback is a plain `FnOnce` (it runs on a runtime worker that already
+    /// holds the commit turn, so it must not await), and it publishes rows and
+    /// rewrites blocks - all synchronous. Such a span cannot open a
+    /// `task_local` scope, and does not need to: it never yields, so the thread
+    /// it starts on is the thread it ends on.
+    static BOTTOM_HELD_SYNC: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
+/// A `SELECT`'s result, as a boxed `Send` future that borrows the engine.
+///
+/// Named because the chain is recursive (`WITH` nests) and therefore boxed, and
+/// because the same shape is spelled at several call sites.
+type SelectFuture<'a> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<(Vec<String>, Batch)>> + Send + 'a>>;
+
+/// Marks one table's bottom as running for as long as it lives.
+///
+/// Two forms, because the bottom has two callers:
+///
+/// * [`Self::scope`] for the **async** bottom (the drain task): the mark is a
+///   task local, so it survives the task being resumed on another worker;
+/// * [`Self::enter`] for a **synchronous** span that holds the gate and never
+///   awaits (`ALTER`/`compact` commit callbacks): a thread local guard.
+///
+/// `holds` consults both, so a synchronous helper reached from either shape
+/// sees the mark and does not take the gate a second time.
+pub(crate) struct HeldBottom(Option<String>);
 
 impl HeldBottom {
-    /// Whether this thread already runs the table's bottom half.
+    /// Whether this thread or task already runs the table's bottom half.
+    ///
+    /// Both lookups are `try_`-shaped: outside a `BOTTOM_HELD` scope and off a
+    /// marked thread the answer is "no", which is what every caller that is
+    /// not the bottom must get.
     pub(crate) fn holds(table: &str) -> bool {
-        BOTTOM_HELD.with(|held| held.borrow().contains(table))
+        if BOTTOM_HELD
+            .try_with(|held| held.borrow().contains(table))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        BOTTOM_HELD_SYNC.with(|held| held.borrow().contains(table))
     }
 
+    /// Marks `table` for the rest of this synchronous span; cleared on drop.
     pub(crate) fn enter(table: &str) -> Self {
-        BOTTOM_HELD.with(|held| {
+        BOTTOM_HELD_SYNC.with(|held| {
             held.borrow_mut().insert(table.to_string());
         });
-        Self(table.to_string())
+        Self(Some(table.to_string()))
+    }
+
+    /// Runs `body` as the table's bottom, marking the table for its duration.
+    ///
+    /// The scope is entered here and exits with the future, so an early return
+    /// or a cancelled task still clears the mark - a guard's `Drop` cannot do
+    /// that across an `.await`.
+    pub(crate) async fn scope<F, T>(table: &str, body: F) -> T
+    where
+        F: std::future::Future<Output = T>,
+    {
+        let mut held = std::collections::HashSet::new();
+        held.insert(table.to_string());
+        BOTTOM_HELD.scope(std::cell::RefCell::new(held), body).await
     }
 }
 
 impl Drop for HeldBottom {
     fn drop(&mut self) {
-        BOTTOM_HELD.with(|held| {
-            held.borrow_mut().remove(&self.0);
-        });
+        if let Some(table) = &self.0 {
+            BOTTOM_HELD_SYNC.with(|held| {
+                held.borrow_mut().remove(table);
+            });
+        }
     }
 }
 
@@ -185,6 +260,21 @@ thread_local! {
     /// task-local into this thread-local before running such a job, so a decode
     /// that resolves `db()` still sees the statement's database.
     static POOL_SESSION: std::cell::Cell<Option<i64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Sets the session for the duration of `future`, as a **task local**.
+///
+/// The bottom half is a task now, so the session has to travel as a task-local:
+/// a thread-local write before an `.await` would be lost the moment the task is
+/// resumed on another worker. `POOL_SESSION` stays as the fallback for a
+/// blocking-pool job (a decode), which has no task context at all.
+pub(crate) async fn with_pool_session_async<F: std::future::Future>(
+    session: Option<i64>,
+    future: F,
+) -> F::Output {
+    // `ACTIVE_SESSION` is already a task local, so pinning the value there is
+    // exactly what the statement's own `execute` does.
+    ACTIVE_SESSION.scope(session, future).await
 }
 
 /// Sets the pool thread's session for the duration of `f`.
@@ -223,12 +313,6 @@ where
     ACTIVE_SESSION.scope(Some(id), f).await
 }
 
-/// Runs a **synchronous** `f` with `id` as the task's session, for the
-/// `block_on` adapters and the tests.
-pub fn with_session_sync<T>(id: i64, f: impl FnOnce() -> T) -> T {
-    crate::scheduler::block_on(with_session_scope(id, async { f() }))
-}
-
 /// Takes back the chunk-store registration when `open` fails after installing it.
 ///
 /// The registration happens before the WAL directory is created and before
@@ -264,34 +348,64 @@ impl Drop for StoreRegistration {
     }
 }
 
-impl Engine {
-    pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_options(dir, EngineOptions::default())
-    }
+/// One `MatchClause`'s search, boxed at its call site: the future is one of the
+/// engine's largest (it holds a whole scan and a rerank), and inlining it into
+/// the fusing loop put several copies on one stack frame.
+type BoxedMatch<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<(Vec<Vec<Value>>, Vec<String>)>> + Send + 'a>,
+>;
 
+impl Engine {
     /// Opens without a WAL: catalog writes are buffered behind an undo journal
     /// and survive a reopen only if a checkpoint ran after they committed.
-    pub fn open_without_wal(dir: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_options(
+    pub async fn open_without_wal_async(dir: impl AsRef<Path>) -> Result<Self> {
+        Self::open_async(
             dir,
             EngineOptions {
                 wal_enabled: false,
                 ..EngineOptions::default()
             },
         )
+        .await
     }
 
-    pub fn open_with_capacity(dir: impl AsRef<Path>, exchange_capacity: usize) -> Result<Self> {
-        Self::open_with_options(
+    pub async fn open_with_capacity_async(
+        dir: impl AsRef<Path>,
+        exchange_capacity: usize,
+    ) -> Result<Self> {
+        Self::open_async(
             dir,
             EngineOptions {
                 exchange_capacity,
                 ..EngineOptions::default()
             },
         )
+        .await
     }
 
-    pub fn open_with_options(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
+    /// [`Self::open_async`] with the default options.
+    pub async fn open_default_async(dir: impl AsRef<Path>) -> Result<Self> {
+        Self::open_async(dir, EngineOptions::default()).await
+    }
+
+    /// The synchronous open, for a caller that has no runtime to await on -
+    /// the external `sqllogictest::DB` trait's `run` and a `fn main` that has
+    /// not entered one yet. Everything else awaits [`Self::open_async`].
+    ///
+    /// It is legal only where the caller owns its thread: `block_on_runtime`
+    /// asserts it is off the runtime, so a task cannot reach this by accident.
+    pub fn open_blocking(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
+        crate::scheduler::scheduler().block_on_runtime(Self::open_async(dir, options))
+    }
+
+    /// The **synchronous** open, for a caller with no runtime to await on.
+    ///
+    /// Opens the engine, awaiting the startup recovery.
+    ///
+    /// The body the synchronous [`Self::open`] bridges; moving the
+    /// awaits here is what lets a server open an engine **on the runtime** it
+    /// will serve from, instead of parking a thread for the whole replay.
+    pub async fn open_async(dir: impl AsRef<Path>, options: EngineOptions) -> Result<Self> {
         // The engine's runtime, created before any engine work. Every fan-out
         // below (a rebuild's tables, a segment's term batches, an HNSW build's
         // buckets) spawns on the runtime installed here, and `index::parallel`
@@ -377,7 +491,8 @@ impl Engine {
             path: wal_dir.clone(),
             source: e,
         })?;
-        let txn = TxnManager::open(wal_dir.join("wal.log"), catalog.store().clone())?
+        let txn = TxnManager::open(wal_dir.join("wal.log"), catalog.store().clone())
+            .await?
             .with_catalog_store(catalog.store().clone());
         let engine = Self {
             storage: Storage {
@@ -457,7 +572,6 @@ impl Engine {
             allocator: Mutex::new(None),
             allocator_jobs: std::sync::atomic::AtomicUsize::new(0),
             batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
-            vector_cache: Mutex::new(HashMap::new()),
             cpu_sample: Mutex::new(None),
             queries: Mutex::new(diagnostics::QueryRegistry::default()),
             profile_enabled: std::sync::atomic::AtomicBool::new(false),
@@ -490,11 +604,19 @@ impl Engine {
         // the log put those DDLs and rows back would contradict the mode (the
         // reference replays only records up to its last checkpoint ts).
         let wal_enabled = options.wal_enabled;
-        let applied = engine.txn.applied_ts()?;
+        let applied = engine.txn.applied_ts().await?;
         if wal_enabled {
-            engine.txn.replay_commands(applied, |cmd, ts| {
-                crate::wal_bridge::replay(&engine, cmd, ts)
-            })?;
+            // The async replay: a replayed restore awaits the DDL turn and an
+            // index publish awaits its chunk write, so the loop is a future.
+            // The handler borrows `engine` immutably while `replay_commands`
+            // borrows `engine.txn` - two disjoint immutable borrows, which is
+            // why this needs no clone of the engine.
+            engine
+                .txn
+                .replay_commands(applied, async |cmd: &storage::WalCmd, ts| {
+                    crate::wal_bridge::replay_async(&engine, cmd, ts).await
+                })
+                .await?;
         }
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
@@ -508,12 +630,15 @@ impl Engine {
         if wal_enabled {
             let mut replayed_appends = Vec::new();
             let mut replayed_deletes = Vec::new();
-            engine.txn.recover_into(
-                applied,
-                hydrated,
-                &mut replayed_appends,
-                &mut replayed_deletes,
-            )?;
+            engine
+                .txn
+                .recover_into(
+                    applied,
+                    hydrated,
+                    &mut replayed_appends,
+                    &mut replayed_deletes,
+                )
+                .await?;
             engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
         }
         engine.rebuild_indexes()?;
@@ -557,21 +682,25 @@ impl Engine {
         // records how far the SST goes (`synced`), which is what a WAL-only
         // checkpoint frame is allowed to claim.
         engine.txn.flush()?;
-        crate::scheduler::block_on(engine.txn.append_checkpoint_flushed())?;
+        engine.txn.append_checkpoint_flushed().await?;
         // The frame is appended unsynced (the commit path syncs in batches, as
         // NewFlush does); the startup checkpoint is its own batch, so sync it
         // here. Without this a directory whose only frame is this one would
         // reopen at an older position - or not at all once that segment is
         // pruned - after a power loss.
-        crate::scheduler::block_on(engine.txn.sync_wal())?;
+        engine.txn.sync_wal().await?;
         if !engine.storage.catalog.has_database_record("default_db")? {
-            crate::scheduler::block_on(engine.ddl_commit_typed(
-                TxnOp::CreateDatabase {
-                    db: "default_db".to_string(),
-                },
-                || engine.storage.catalog.create_database("default_db", false),
-                |batch| crate::wal_bridge::create_database_command_from_batch(batch, "default_db"),
-            ))?;
+            engine
+                .ddl_commit_typed(
+                    TxnOp::CreateDatabase {
+                        db: "default_db".to_string(),
+                    },
+                    || engine.storage.catalog.create_database("default_db", false),
+                    |batch| {
+                        crate::wal_bridge::create_database_command_from_batch(batch, "default_db")
+                    },
+                )
+                .await?;
         }
         // The reference stamps `db_id`/`table_id` into every row command; a
         // directory opened here has to name its tables the same way.
@@ -581,7 +710,7 @@ impl Engine {
         // `NewTxn::RecoverMemIndex`: a checkpoint does not dump a memory index,
         // so the rows its chunks do not cover are re-indexed into the tail
         // here, once the blocks, the WAL and the segment map are all in place.
-        engine.recover_mem_index()?;
+        engine.recover_mem_index().await?;
         // The in-memory indexes were just rebuilt; the quota reads this total.
         engine.recompute_memindex_total();
         // The engine is complete: its `Drop` releases the registration, and the
@@ -842,17 +971,17 @@ impl Engine {
     /// update, never across the exact pass: that pass can take milliseconds, and
     /// holding the map would serialise every other index's queries behind it.
     #[allow(clippy::too_many_arguments)]
-    fn observe_recall(
+    async fn observe_recall(
         &self,
         key: &crate::engine::recall::RecallKey,
         scan: knn_scan::PhysicalKnnScan<'_>,
-        keep: &dyn Fn(&[Value]) -> bool,
+        keep: &(dyn Fn(&[Value]) -> bool + Sync),
         bmp_scores: &HashMap<usize, f64>,
         mv_scores: &HashMap<usize, f64>,
         scored: &[(usize, f64, f64)],
         elapsed: std::time::Duration,
     ) {
-        if scan.cache.is_none() || scored.is_empty() {
+        if scored.is_empty() {
             return;
         }
         {
@@ -868,7 +997,7 @@ impl Engine {
             vector_candidates: None,
             ..scan
         };
-        let Ok(state) = exact_scan.execute(keep, bmp_scores, mv_scores) else {
+        let Ok(state) = exact_scan.execute(keep, bmp_scores, mv_scores).await else {
             return;
         };
         let exact = exact_scan.finish(state).scored;
@@ -995,11 +1124,11 @@ impl Engine {
 
     /// Runs one statement for `id`, so `USE` and unqualified table names see
     /// that session's database instead of the process-wide default.
-    pub fn execute_in_session(&self, id: i64, sql: &str) -> Result<Vec<QueryResult>> {
+    pub async fn execute_in_session(&self, id: i64, sql: &str) -> Result<Vec<QueryResult>> {
         if self.session_db(id).is_none() {
             return Err(Error::NotFound(format!("session {id}")));
         }
-        self.with_session(id, || self.execute_blocking(sql))
+        self.with_session_async(id, self.execute(sql)).await
     }
 
     /// Runs `f` with `id` as the active session.
@@ -1011,7 +1140,7 @@ impl Engine {
     pub fn with_session<T>(&self, id: i64, f: impl FnOnce() -> T) -> T {
         // The scope restores the binding when it completes, panic included, so
         // a failed statement cannot leave its session on a reused task.
-        with_session_sync(id, f)
+        ACTIVE_SESSION.sync_scope(Some(id), f)
     }
 
     /// The form the wire handler awaits: the scope wraps the whole statement,
@@ -1027,9 +1156,6 @@ impl Engine {
     /// multi-vector) is maintained in memory. An insert into a table with none
     /// skips the per-row index hook entirely.
     pub(crate) fn any_in_memory_index(&self) -> bool {
-        if !self.vector_cache.lock().unwrap().is_empty() {
-            return true;
-        }
         self.tables.lock().unwrap().values().any(|e| {
             !e.text.is_empty()
                 || !e.hnsw_mem.is_empty()
@@ -1047,16 +1173,6 @@ impl Engine {
     /// thread - queued behind every other table.
     pub(crate) fn table_has_memory_index(&self, table: &str) -> bool {
         let key = self.table_key(table);
-        let prefix = format!("{key}.");
-        if self
-            .vector_cache
-            .lock()
-            .unwrap()
-            .keys()
-            .any(|cache| cache.starts_with(&prefix))
-        {
-            return true;
-        }
         self.tables.lock().unwrap().get(&key).is_some_and(|entry| {
             !entry.text.is_empty()
                 || !entry.hnsw_mem.is_empty()
@@ -1112,7 +1228,7 @@ impl Engine {
     /// queued job when the previous one finishes, so a table's bottoms keep
     /// their commit order without bounding the *number* of tables that can be
     /// in flight (the reference's `crc32(table_id) % n` routing does).
-    pub(crate) fn submit_bottom(&self, task: Arc<BottomWork>) -> bool {
+    pub(crate) async fn submit_bottom(&self, task: Arc<BottomWork>) -> bool {
         let Some(engine) = self.engine_handle() else {
             return false;
         };
@@ -1131,27 +1247,34 @@ impl Engine {
                 return true; // a job of this table is already draining
             }
         }
-        // One task on the pool per burst: it drains this table's queue and
-        // returns, so an idle table holds no thread.
-        crate::scheduler::scheduler().submit(Box::new(move || loop {
-            let next = {
-                let mut queues = engine.bottom_queues.lock().unwrap();
-                match queues
-                    .pending
-                    .get_mut(&table)
-                    .and_then(|queue| queue.pop_front())
-                {
-                    Some(task) => task,
-                    None => {
-                        queues.running.remove(&table);
-                        return;
+        // One **task** per burst: it drains this table's queue and returns, so
+        // an idle table costs a future, not a pool thread. A bottom half awaits
+        // its own index writes, which is why it cannot be a blocking-pool job.
+        crate::scheduler::scheduler().spawn_task(async move {
+            loop {
+                let next = {
+                    let mut queues = engine.bottom_queues.lock().unwrap();
+                    match queues
+                        .pending
+                        .get_mut(&table)
+                        .and_then(|queue| queue.pop_front())
+                    {
+                        Some(task) => task,
+                        None => {
+                            queues.running.remove(&table);
+                            return;
+                        }
                     }
+                };
+                if storage::wal::bottom_executor::BottomTask::is_committing(&*next) {
+                    // The table's mark lives for exactly this job, so a nested
+                    // dump from inside the bottom sees it and does not re-take
+                    // the gate.
+                    let job = storage::wal::bottom_executor::BottomTask::commit_bottom(&*next);
+                    HeldBottom::scope(&table, job).await;
                 }
-            };
-            if storage::wal::bottom_executor::BottomTask::is_committing(&*next) {
-                storage::wal::bottom_executor::BottomTask::commit_bottom(&*next);
             }
-        }));
+        });
         true
     }
 
@@ -1160,7 +1283,15 @@ impl Engine {
     /// the caller waiting for it, or inline when no pool is attached.
     pub(crate) async fn run_commit_bottom<F>(&self, table: &str, work: F) -> Result<()>
     where
-        F: FnOnce(&Engine) -> Result<()> + Send + 'static,
+        // Higher-ranked: the body may borrow the engine for as long as its own
+        // future lives, which is what lets the pool path build a `'static` job
+        // around a handle it owns.
+        F: for<'x> FnOnce(
+                &'x Engine,
+            ) -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<()>> + Send + 'x>,
+            > + Send
+            + 'static,
     {
         // The bottom half of one table's commit is serialised by its gate, but a
         // step inside a bottom can run another: the memindex quota check dumps an
@@ -1170,43 +1301,53 @@ impl Engine {
         // inner call runs its work directly - the gate protects the table from
         // *other* threads, and this one already holds it.
         let key = self.table_key(table);
-        if BOTTOM_HELD.with(|held| held.borrow().contains(&key)) {
-            return work(self);
+        if HeldBottom::holds(&key) {
+            // Re-entered from inside this table's own bottom: run the work in
+            // place, under the mark this task already carries.
+            return work(self).await;
         }
         if self.engine_handle().is_none() || !self.bottom_pool_attached() {
             let gate = self.bottom_gate(table);
             let _turn = gate.lock().await;
-            let _held = HeldBottom::enter(&key);
-            return work(self);
+            return HeldBottom::scope(&key, work(self)).await;
         }
         let engine = self.engine_handle().expect("checked above");
-        let work_key = key.clone();
-        // The bottom may run on another thread, so the session travels with it
-        // (the `HeldBottom` thread-local does the same for the gate).
+        // The bottom may run on another task, so the session travels with it
+        // (the `HeldBottom` task-local does the same for the gate).
         let session = active_session();
         // The read timestamp travels with it for the same reason: the pool
-        // thread has no task context, so `read_ts()` there would otherwise read
-        // whatever the previous job left in the thread-local.
+        // task has no statement context, so `read_ts()` there would otherwise
+        // read whatever the previous job left behind.
         let read_ts = crate::engine::state::read_ts();
-        let wrapped = move |engine: &Engine| {
-            let _held = HeldBottom::enter(&work_key);
-            // The bottom runs on a pool thread: carry the session across.
-            with_pool_session(session, || {
-                crate::engine::state::with_pool_read_ts(read_ts, || work(engine))
+        // The work closes over its own engine handle: a pool job is `'static`,
+        // so it cannot borrow the statement's engine.
+        let work_engine = Arc::clone(&engine);
+        let job: BottomJob = Box::new(move || {
+            // The future owns its own handle, so it outlives this call.
+            let engine = Arc::clone(&work_engine);
+            Box::pin(async move {
+                let work = work(&engine);
+                // The bottom runs as its own task: carry the session across.
+                // The table's mark is installed by the drain
+                // (`HeldBottom::scope`), so the nested `run_commit_bottom`
+                // calls inside `work` see it.
+                with_pool_session_async(session, async move {
+                    crate::engine::state::with_pool_read_ts_async(read_ts, work).await
+                })
+                .await
             })
-        };
+                as std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        });
         let (done, finished) = tokio::sync::oneshot::channel();
         let task = Arc::new(BottomWork {
             engine,
             table_id: key.clone(),
             gates: vec![self.bottom_gate(table)],
-            work: std::sync::Mutex::new(Some(
-                Box::new(wrapped) as Box<dyn FnOnce(&Engine) -> Result<()> + Send>
-            )),
+            work: std::sync::Mutex::new(Some(job)),
             done: std::sync::Mutex::new(Some(done)),
             finished: std::sync::Mutex::new(Some(finished)),
         });
-        self.submit_bottom(task.clone());
+        self.submit_bottom(task.clone()).await;
         task.wait().await
     }
 
@@ -1232,23 +1373,15 @@ impl Engine {
         // async; today both ends are blocking threads.
         let (jobs, mut queue) = tokio::sync::mpsc::channel::<AllocJob>(ALLOC_QUEUE_CAPACITY);
         let weak = Arc::downgrade(&engine);
-        // The consumer is a **task**, not a blocking-pool thread. Every job is
-        // pure memory: it reads/writes the in-memory row counter (the one
-        // `next_row_seq` path that touches the filesystem only runs on an empty
-        // table, where `BlockIndex::open` finds no directory and returns
-        // immediately).
-        //
-        // **A dedicated blocking thread, not a runtime task.** The allocator is
-        // called from a commit's `before_wal` callback, which the commit chain
-        // invokes **synchronously** while it holds the commit-ts turn; the
-        // caller bridges that with `block_on`. If the consumer were a task, that
-        // `block_on` would park the very runtime worker the task needs to be
-        // polled on - every INSERT/IMPORT would deadlock the first time it
-        // allocated (measured: 19 executor tests hung past 60 s). A blocking
-        // thread makes the reply independent of the runtime, so the bridge
-        // always completes.
-        crate::scheduler::scheduler().spawn_worker(Box::new(move || {
-            while let Some(job) = queue.blocking_recv() {
+        // The consumer is a **task**, not a blocking thread. Both ends of the
+        // queue are async now (`send().await` here and in the committers, the
+        // reply is a `oneshot`), and a job body only touches the in-memory row
+        // counter, so draining with `recv().await` costs a future and no
+        // thread. It used to be a blocking thread because the committers
+        // reached it through `block_on`; they no longer do, so the parked
+        // thread the note here used to justify has nothing left to wait for.
+        crate::scheduler::scheduler().spawn_task(async move {
+            while let Some(job) = queue.recv().await {
                 match weak.upgrade() {
                     Some(engine) => {
                         engine
@@ -1259,7 +1392,7 @@ impl Engine {
                     None => break,
                 }
             }
-        }));
+        });
         let allocator = Arc::new(Allocator { jobs });
         *self.allocator.lock().unwrap() = Some(allocator.clone());
         Some(allocator)
@@ -1478,13 +1611,32 @@ impl Engine {
         // reads the table's metadata from the store, and a scan asks for the
         // index once per block, so a lookup that never used the cache made a
         // ten-row result pay for a catalog read per block it touched.
-        {
-            let tables = self.tables.lock().unwrap();
-            if let Some(index) = tables.get(&key).and_then(|e| e.block_index.clone()) {
+        //
+        // The cached index names the table id it was opened for, and the
+        // catalogue is consulted only when that id may have moved.
+        let cached = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.block_index.clone());
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        // A name can outlive the table it pointed at: a `DROP` followed by a
+        // restore (or a re-create) hands the name to a new id **in the same
+        // process**. The cached index still names the old id, and every
+        // `BlockId` it yields resolves to the dropped table's directory - a
+        // restored table would read the rows written after the snapshot.
+        if let Some(index) = cached {
+            if index.lock().unwrap().table_id() == meta.id {
                 return Some(index);
             }
         }
-        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key.clone())
+            .or_default()
+            .block_index = None;
         let db_id = self.database_id_of(&table);
         let index =
             storage::block_index::BlockIndex::open(self.blocks_root(), db_id, meta.id).ok()?;
@@ -1802,13 +1954,16 @@ impl Engine {
         tables.entry(tkey).or_default().delete_ts = Some(log);
     }
 
-    pub(crate) fn reserve_rows(
+    /// Test-only: the production paths call [`Self::reserve_rows_from`].
+    #[cfg(test)]
+    pub(crate) async fn reserve_rows(
         &self,
         table: &str,
         n: usize,
         new_segment: bool,
     ) -> Result<RowRange> {
         self.reserve_rows_from(table, n, new_segment, new_segment, None)
+            .await
     }
 
     /// [`Self::reserve_rows`] for a statement that allocates inside its own
@@ -1844,14 +1999,15 @@ impl Engine {
         self.reserve_rows_inline(table, n, new_segment, new_segment, None)
     }
 
-    /// [`Self::reserve_rows_from`] in its **async** form, for the write paths
-    /// that are already async.
+    /// [`Self::reserve_rows`] with the append's provenance stated separately:
+    /// `copy` is true for `COPY`/`IMPORT` (which may also continue a segment
+    /// it already opened, so it is not the same question as `new_segment`).
     ///
-    /// The allocator hands out row ids in commit order, so the request is a job
-    /// on one FIFO and the reply is a `oneshot`. Both ends of that are tokio;
-    /// the synchronous wrapper below exists only for the tests and for
-    /// `EngineTxn::append`, whose callers are not async.
-    pub(crate) async fn reserve_rows_from_async(
+    /// This is the **only** form. It used to have a synchronous twin that
+    /// bridged the allocator reply with `block_on`; the allocator is a task on
+    /// the engine's runtime, so that bridge parked the worker the reply needed
+    /// and deadlocked the caller (`docs/THREADS_TO_TOKIO.md` §1.2).
+    pub(crate) async fn reserve_rows_from(
         &self,
         table: &str,
         n: usize,
@@ -1877,20 +2033,6 @@ impl Engine {
         answer
             .await
             .map_err(|_| Error::Txn("the row allocator stopped".into()))?
-    }
-
-    /// [`Self::reserve_rows`] with the append's provenance stated separately:
-    /// `copy` is true for `COPY`/`IMPORT` (which may also continue a segment
-    /// it already opened, so it is not the same question as `new_segment`).
-    pub(crate) fn reserve_rows_from(
-        &self,
-        table: &str,
-        n: usize,
-        new_segment: bool,
-        copy: bool,
-        ts: Option<u64>,
-    ) -> Result<RowRange> {
-        crate::scheduler::block_on(self.reserve_rows_from_async(table, n, new_segment, copy, ts))
     }
 
     /// The allocation itself, run on the allocator thread (`TxnAllocator::
@@ -2060,9 +2202,7 @@ impl Engine {
         // `ApplySegmentIDs`: the statement claims a fresh segment and owns every
         // offset in it. No append record is written yet - the whole import is
         // one transaction, and its records are only created when it commits.
-        let range = self
-            .reserve_rows_from_async(table, 0, true, true, None)
-            .await?;
+        let range = self.reserve_rows_from(table, 0, true, true, None).await?;
         Ok(ImportCursor {
             segment: (range.base >> 32) as u32,
             offset: 0,
@@ -2240,7 +2380,11 @@ impl Engine {
     }
 
     /// Begins a multi-statement transaction (`NewTxn`). Its writes are staged
-    /// until [`EngineTxn::commit`].
+    /// until `EngineTxn::commit`.
+    ///
+    /// **Test-only**, like [`EngineTxn`] itself: production statements stage
+    /// and commit in one chain and never hold a transaction open across calls.
+    #[cfg(test)]
     pub fn begin_txn(&self) -> EngineTxn<'_> {
         EngineTxn {
             engine: self,
@@ -2610,487 +2754,612 @@ impl Engine {
     /// [`QueryResult`] renders cells as text, but `INSERT … SELECT` and
     /// `CREATE TABLE … AS SELECT` must preserve values (and NULLs) before
     /// casting them to the target schema.
-    pub(crate) fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Batch)> {
-        self.run_select_with_ctes(stmt, &HashMap::new())
+    pub(crate) fn run_select<'a>(&'a self, stmt: &'a Statement) -> SelectFuture<'a> {
+        // `WITH` makes this mutually recursive with `run_select_with_ctes`, so
+        // the future is boxed rather than named.
+        Box::pin(async move { self.run_select_with_ctes(stmt, &HashMap::new()).await })
     }
 
     /// [`Self::run_select`] with the CTEs bound by an enclosing `WITH` clause.
     /// Each binding is materialised in order, so a later CTE (and the outer
     /// query) can scan an earlier one.
-    pub(crate) fn run_select_with_ctes(
+    pub(crate) async fn run_select_with_ctes(
         &self,
         stmt: &Statement,
         outer_ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
     ) -> Result<(Vec<String>, Batch)> {
-        let mut cte_scope = outer_ctes.clone();
-        if let Statement::Select { ctes, .. } = stmt {
-            for cte in ctes {
-                // Only the bindings that precede this CTE are visible inside
-                // it, plus anything inherited from an enclosing query.
-                let visible: Vec<String> = cte_scope.keys().cloned().collect();
-                let query = self.qualify_tables_in(cte.query.as_ref(), &visible);
-                let (mut columns, rows) = self.run_select_with_ctes(&query, &cte_scope)?;
-                if !cte.columns.is_empty() {
-                    if cte.columns.len() != columns.len() {
-                        return Err(Error::Invalid(format!(
-                            "WITH query '{}' has {} column(s) available but {} specified",
-                            cte.alias,
-                            columns.len(),
-                            cte.columns.len()
-                        )));
-                    }
-                    columns = cte.columns.clone();
-                }
-                // A CTE is a relation the operators scan, so it is kept as rows.
-                cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows.rows()));
-            }
-        }
-        let Statement::Select {
-            items,
-            from,
-            join,
-            where_pred,
-            group_by,
-            aliases,
-            having,
-            order_by,
-            limit,
-            offset,
-            limit_expr,
-            offset_expr,
-            search,
-            distinct,
-            ..
-        } = stmt
-        else {
-            return Err(Error::Invalid("run_select requires a SELECT".into()));
-        };
-        // A non-literal LIMIT/OFFSET is evaluated here, before the fast paths
-        // below inspect the resolved values.
-        let limit_value: Option<u64> = match (limit, limit_expr) {
-            (Some(n), _) => Some(*n),
-            (None, Some(e)) => Some(self.eval_limit_expr(e)?),
-            _ => None,
-        };
-        let offset_value: Option<u64> = match (offset, offset_expr) {
-            (Some(n), _) => Some(*n),
-            (None, Some(e)) => Some(self.eval_limit_expr(e)?),
-            _ => None,
-        };
-        // `SELECT count(*)` with no other clause is answered from the key
-        // counts alone; the generic path materialises every row.
-        if join.is_none()
-            && where_pred.is_none()
-            && group_by.is_empty()
-            && having.is_none()
-            && order_by.is_empty()
-            && limit_value.is_none()
-            && offset_value.is_none()
-            && search.is_none()
-            && !*distinct
-            && items.len() == 1
-            && aliases.len() <= 1
-        {
-            if let parser::SelectItem::Aggregate(a) = &items[0] {
-                // `AggFunc` is not re-exported; the debug name is stable.
-                if format!("{:?}", a.func) == "Count" && a.args.is_empty() && !a.distinct {
-                    if let Some(t) = from.as_ref() {
-                        let n = self.row_count(t)?;
-                        let name = aliases
-                            .first()
-                            .cloned()
-                            .flatten()
-                            .unwrap_or_else(|| "count(star)".to_string());
-                        return Ok((
-                            vec![name],
-                            Batch::from_rows(vec![vec![Value::Int(n as i64)]]),
-                        ));
-                    }
-                }
-            }
-        }
-        // `FROM (SELECT …)`: run the subquery first and scan its result. A
-        // `FROM <cte>` uses the rows materialised above the same way.
-        let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
-            Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
-                Some(self.derived_table(f.trim())?)
-            }
-            Some(f) => cte_scope.get(&f.to_ascii_lowercase()).cloned(),
-            None => None,
-        };
-        // Scalar/EXISTS subqueries are rewritten before planning: the planner
-        // has no access to the storage engine. The enclosing relation's columns
-        // are the scope a nested query may correlate with - a derived table's
-        // or a CTE's columns, else the base table's.
-        let outer_columns = match (&derived, from.as_ref()) {
-            (Some((columns, _)), _) => columns.clone(),
-            (None, Some(table)) => self
-                .table_schema(&self.table_key(table))
-                .unwrap_or_default(),
-            (None, None) => Vec::new(),
-        };
-        // A correlated subquery becomes a dependent join: every nested query
-        // that reads this relation's columns is rewritten into a hidden scan
-        // column, filled in below once the outer rows are materialised (see
-        // `dependent.rs`). Uncorrelated nested queries keep going through the
-        // constant folder.
-        let dependent = crate::dependent::plan(self, stmt, &outer_columns, &cte_scope)?;
-        let stmt: &Statement = dependent.as_ref().map(|d| &d.stmt).unwrap_or(stmt);
-        let resolved = self.resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)?;
-        let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
-        // The rewritten statement is the one that gets planned; its clauses
-        // shadow the parsed ones (only the nested queries changed).
-        let Statement::Select {
-            items,
-            where_pred,
-            group_by,
-            having,
-            order_by,
-            ..
-        } = stmt
-        else {
-            unreachable!("run_select checked the statement is a SELECT");
-        };
-        // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
-        // row per element, then let the normal planner handle WHERE,
-        // GROUP BY and aggregates over the expanded relation.
-        let mut where_pred = where_pred.clone();
-        let mut group_by = group_by.to_vec();
-        let mut having = having.clone();
-        let mut items_owned: Vec<SelectItem> = items.to_vec();
-        let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
-        let unnest_idx = items_owned.iter().position(|it| {
-            matches!(it, SelectItem::Func { name, .. }
-                if name.eq_ignore_ascii_case("UNNEST"))
-        });
-        if let (Some(t), Some(ui)) = (from.as_ref(), unnest_idx) {
-            let (arg_col, alias) = match &items_owned[ui] {
-                SelectItem::Func { args, .. } => (
-                    match args.first() {
-                        Some(ExprAst::Column(c)) => Some(c.clone()),
-                        _ => None,
-                    },
-                    aliases.get(ui).cloned().flatten(),
-                ),
-                _ => (None, None),
-            };
-            if let Some(col) = arg_col {
-                let schema = self.table_schema(t)?;
-                if let Some(ci) = schema.iter().position(|c| c == &col) {
-                    let col_ty = self.column_types(t)?.get(ci).cloned().unwrap_or_default();
-                    let float_elems = array_elem_is_float(&col_ty);
-                    let is_json_col = is_json_type(&col_ty);
-                    let new_name = alias.unwrap_or_else(|| format!("__unnest_{col}"));
-                    let mut out: Vec<Vec<Value>> = Vec::new();
-                    for (_seq, row) in self.fetch_rows_with_ids(t)? {
-                        let mut elements: Vec<Value> = Vec::new();
-                        // a JSON column's stored text may have been read as
-                        // a number, so re-render it before parsing
-                        let cell: Option<String> = match row.get(ci) {
-                            Some(Value::Str(c)) => Some(c.clone()),
-                            Some(other) if is_json_col => Some(other.to_slt_string()),
-                            _ => None,
-                        };
-                        if let Some(cell) = cell {
-                            if !is_json_col {
-                                if let Some(elems) = brace_array_elems(&cell) {
-                                    for e in elems {
-                                        let text = if float_elems { fmt_float6(&e) } else { e };
-                                        elements.push(parse_value(&text));
-                                    }
-                                }
-                            } else {
-                                // JSON elements keep their textual form
-                                match expression::json::parse(&cell) {
-                                    Some(expression::json::Json::Arr(items)) => {
-                                        for v in items {
-                                            elements.push(Value::Str(v.compact()));
-                                        }
-                                    }
-                                    Some(other) => elements.push(Value::Str(other.compact())),
-                                    None => {}
-                                }
-                            }
+        self.run_select_with_ctes_boxed(stmt, outer_ctes).await
+    }
+
+    /// [`Self::run_select_with_ctes`], with the future boxed and `Send`.
+    ///
+    /// The function is recursive (`WITH` nests), and a self-referential
+    /// `async fn` cannot prove its own `Send`ness: the auto-trait check sees
+    /// itself through the box and gives up. Naming the recursive call's type as
+    /// `dyn Future + Send` breaks that cycle, which is what lets a SELECT run
+    /// on a runtime worker and its fan-out be spawned there.
+    fn run_select_with_ctes_boxed<'a>(
+        &'a self,
+        stmt: &'a Statement,
+        outer_ctes: &'a HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+    ) -> SelectFuture<'a> {
+        Box::pin(async move {
+            let mut cte_scope = outer_ctes.clone();
+            if let Statement::Select { ctes, .. } = stmt {
+                for cte in ctes {
+                    // Only the bindings that precede this CTE are visible inside
+                    // it, plus anything inherited from an enclosing query.
+                    let visible: Vec<String> = cte_scope.keys().cloned().collect();
+                    let query = self.qualify_tables_in(cte.query.as_ref(), &visible);
+                    // `WITH` nests, so the recursive call is boxed: an `async fn`
+                    // cannot name its own future type.
+                    let (mut columns, rows) =
+                        self.run_select_with_ctes_boxed(&query, &cte_scope).await?;
+                    if !cte.columns.is_empty() {
+                        if cte.columns.len() != columns.len() {
+                            return Err(Error::Invalid(format!(
+                                "WITH query '{}' has {} column(s) available but {} specified",
+                                cte.alias,
+                                columns.len(),
+                                cte.columns.len()
+                            )));
                         }
-                        for v in elements {
-                            let mut r = row.clone();
-                            r.push(v);
-                            out.push(r);
+                        columns = cte.columns.clone();
+                    }
+                    // A CTE is a relation the operators scan, so it is kept as rows.
+                    cte_scope.insert(cte.alias.to_ascii_lowercase(), (columns, rows.rows()));
+                }
+            }
+            let Statement::Select {
+                items,
+                from,
+                join,
+                where_pred,
+                group_by,
+                aliases,
+                having,
+                order_by,
+                limit,
+                offset,
+                limit_expr,
+                offset_expr,
+                search,
+                distinct,
+                ..
+            } = stmt
+            else {
+                return Err(Error::Invalid("run_select requires a SELECT".into()));
+            };
+            // A non-literal LIMIT/OFFSET is evaluated here, before the fast paths
+            // below inspect the resolved values.
+            let limit_value: Option<u64> = match (limit, limit_expr) {
+                (Some(n), _) => Some(*n),
+                (None, Some(e)) => Some(self.eval_limit_expr(e)?),
+                _ => None,
+            };
+            let offset_value: Option<u64> = match (offset, offset_expr) {
+                (Some(n), _) => Some(*n),
+                (None, Some(e)) => Some(self.eval_limit_expr(e)?),
+                _ => None,
+            };
+            // `SELECT count(*)` with no other clause is answered from the key
+            // counts alone; the generic path materialises every row.
+            if join.is_none()
+                && where_pred.is_none()
+                && group_by.is_empty()
+                && having.is_none()
+                && order_by.is_empty()
+                && limit_value.is_none()
+                && offset_value.is_none()
+                && search.is_none()
+                && !*distinct
+                && items.len() == 1
+                && aliases.len() <= 1
+            {
+                if let parser::SelectItem::Aggregate(a) = &items[0] {
+                    // `AggFunc` is not re-exported; the debug name is stable.
+                    if format!("{:?}", a.func) == "Count" && a.args.is_empty() && !a.distinct {
+                        if let Some(t) = from.as_ref() {
+                            let n = self.row_count(t)?;
+                            let name = aliases
+                                .first()
+                                .cloned()
+                                .flatten()
+                                .unwrap_or_else(|| "count(star)".to_string());
+                            return Ok((
+                                vec![name],
+                                Batch::from_rows(vec![vec![Value::Int(n as i64)]]),
+                            ));
                         }
                     }
-                    // Filters written against the output expression
-                    // (`uc2 > 1` is sent as `unnest(c2) > 1`) must see
-                    // the expanded column.
-                    if let Some(p) = where_pred.as_ref() {
-                        where_pred = Some(rewrite_unnest_pred(p, &col, &new_name));
-                    }
-                    if let Some(p) = having.as_ref() {
-                        having = Some(Box::new(rewrite_unnest_pred(p, &col, &new_name)));
-                    }
-                    group_by = group_by
-                        .iter()
-                        .map(|g| rewrite_unnest_expr(g, &col, &new_name))
-                        .collect();
-                    items_owned[ui] = SelectItem::Column(new_name.clone());
-                    unnest_expansion = Some((new_name, out));
                 }
             }
-        }
-        let items: &[SelectItem] = &items_owned;
-        // `FROM (SELECT …)`: run the subquery first and scan its result.
-        // Its columns become a synthetic table so names resolve. A `FROM <cte>`
-        // uses the rows materialised above the same way.
-        let from_derived: Option<String> = if derived.is_some() {
-            Some("__derived".to_string())
-        } else {
-            from.clone()
-        };
-        // The name a nested query uses for this relation: the CTE alias or the
-        // base table (the derived-table alias is not in the AST, so a derived
-        // table's columns are referenced unqualified).
-        let outer_table_name = from.clone().unwrap_or_default();
-        let from = &from_derived;
-        // A WHERE clause must be a predicate: `WHERE c1` on a
-        // non-boolean column is rejected by the reference.
-        if let (Some(t), Some(p), None) = (from.as_ref(), where_pred.as_ref(), derived.as_ref()) {
-            self.validate_where_predicate(t, p)?;
-        }
-        // SUM/AVG require a numeric argument.
-        if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
-            self.validate_aggregate_args(t, items)?;
-        }
-        // `AND`/`OR`/`NOT` take boolean operands: a projected
-        // arithmetic expression such as `c1 + 0.1 and c2 - 1.0` is
-        // invalid (the reference rejects it).
-        for it in items {
-            match it {
-                SelectItem::Expr(e) => validate_boolean_expr(e)?,
-                SelectItem::Func { args, .. } => {
-                    for a in args {
-                        validate_boolean_expr(a)?;
-                    }
+            // `FROM (SELECT …)`: run the subquery first and scan its result. A
+            // `FROM <cte>` uses the rows materialised above the same way.
+            let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
+                Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
+                    Some(self.derived_table(f.trim()).await?)
                 }
-                _ => {}
-            }
-        }
-        if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
-            validate_search_pseudo_columns(s, items)?;
-            // an outer WHERE cannot be combined with an in-subsearch filter
-            if where_pred.is_some() && s.matches.iter().any(|m| m.filter.is_some()) {
-                return Err(Error::Invalid(
-                    "cannot have both a where clause and a subsearch filter".into(),
-                ));
-            }
-        }
-        let mut tables: Vec<(String, Vec<String>)> = Vec::new();
-        if let Some(t) = from {
-            let cols = match &derived {
-                Some((cols, _)) => cols.clone(),
-                None => self.table_schema(t)?,
-            };
-            tables.push((t.clone(), cols));
-        }
-        let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
-        if let Some((name, rows)) = unnest_expansion {
-            if let Some(entry) = tables.first_mut() {
-                entry.1.push(name);
-            }
-            unnest_rows = Some(rows);
-        }
-        if let Some(JoinClause { table, .. }) = join {
-            tables.push((table.clone(), self.table_schema(table)?));
-        }
-        // SEARCH MATCH: run the search first, then expose its result rows
-        // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
-        // A derived table's rows are the scan source from the start.
-        let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
-        // A plain projection answered by the block mirror arrives as a block, not
-        // as rows: `direct_projection` hands it over untouched.
-        let mut override_block: Option<Batch> = None;
-        if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
-            let pred = match where_pred.as_ref() {
-                Some(p) => Some(planner::predicate_expr(p, &tables[0].1)?),
+                Some(f) => cte_scope.get(&f.to_ascii_lowercase()).cloned(),
                 None => None,
             };
-            let (rows, hidden) = self.run_search(t, s, pred.as_ref())?;
-            if !hidden.is_empty() {
-                if let Some(entry) = tables.first_mut() {
-                    entry.1.extend(hidden);
-                }
-            }
-            override_rows = Some(rows);
-        }
-        // Projection-only scan: read just the selected columns from the
-        // C++ block mirror when that mirror is as fresh as the row
-        // store (plan #87). `SELECT id, name` then avoids decoding the
-        // wide columns (embeddings, text) altogether.
-        // The projection-only scan reads just the selected columns, so a row it
-        // returns has neither the dependent join's hidden columns nor the
-        // width the hidden-value pass expects.
-        if override_rows.is_none()
-            && dependent.is_none()
-            && join.is_none()
-            && search.is_none()
-            && where_pred.is_none()
-            && group_by.is_empty()
-            && having.is_none()
-            && order_by.is_empty()
-            && limit_value.is_none()
-            && offset_value.is_none()
-            && !*distinct
-        {
-            if let Some(t) = from.as_ref() {
-                override_block = self.try_projection(t, items)?;
-            }
-        }
-        // `ROW_ID()` outside a SEARCH exposes the row's sequence number
-        // as a hidden scan column.
-        let mut rowid_col = false;
-        if search.is_none() {
-            if let Some(t) = from.as_ref() {
-                if unnest_rows.is_none() && uses_row_id(items) {
-                    if let Some(entry) = tables.first_mut() {
-                        entry.1.push("#_row_id".into());
-                    }
-                    let rows: Vec<Vec<Value>> = self
-                        .fetch_rows_with_ids(t)?
-                        .into_iter()
-                        .map(|(seq, mut r)| {
-                            r.push(Value::Int(seq as i64));
-                            r
-                        })
-                        .collect();
-                    override_rows = Some(rows);
-                    rowid_col = true;
-                }
-            }
-        }
-        let _ = rowid_col;
-        // An ORDER BY key that names a select alias is rewritten to the
-        // corresponding output label.
-        let order_keys: Vec<parser::OrderKey> = order_by
-            .iter()
-            .map(|ok| {
-                let mut ok = ok.clone();
-                if let Some(i) = aliases
-                    .iter()
-                    .position(|a| a.as_deref() == Some(ok.column.as_str()))
-                {
-                    if let Some(item) = items.get(i) {
-                        ok.column = planner::item_label(item);
-                    }
-                }
-                ok
-            })
-            .collect();
-        if unnest_rows.is_some() {
-            override_rows = unnest_rows;
-        }
-        // The dependent join's value columns belong to the scanned relation, so
-        // the statements rewritten by `dependent.rs` resolve them like any
-        // other column (the same way `#_row_id` and the search columns work).
-        if let Some(dep) = dependent.as_ref() {
-            if let Some(entry) = tables.first_mut() {
-                entry.1.extend(dep.column_names());
-            }
-        }
-        // C++ `QueryBinder::BindSelect` is the entry point that turns a parsed
-        // `SELECT` into a bound plan; it owns the clause ordering.
-        let mut plan = planner::binder::QueryBinder::new()
-            .bind_select(
+            // Scalar/EXISTS subqueries are rewritten before planning: the planner
+            // has no access to the storage engine. The enclosing relation's columns
+            // are the scope a nested query may correlate with - a derived table's
+            // or a CTE's columns, else the base table's.
+            let outer_columns = match (&derived, from.as_ref()) {
+                (Some((columns, _)), _) => columns.clone(),
+                (None, Some(table)) => self
+                    .table_schema(&self.table_key(table))
+                    .unwrap_or_default(),
+                (None, None) => Vec::new(),
+            };
+            // A correlated subquery becomes a dependent join: every nested query
+            // that reads this relation's columns is rewritten into a hidden scan
+            // column, filled in below once the outer rows are materialised (see
+            // `dependent.rs`). Uncorrelated nested queries keep going through the
+            // constant folder.
+            let dependent = crate::dependent::plan(self, stmt, &outer_columns, &cte_scope)?;
+            let stmt: &Statement = dependent.as_ref().map(|d| &d.stmt).unwrap_or(stmt);
+            let resolved = self
+                .resolve_stmt_subqueries(stmt, &cte_scope, &outer_columns)
+                .await?;
+            let stmt: &Statement = resolved.as_ref().unwrap_or(stmt);
+            // The rewritten statement is the one that gets planned; its clauses
+            // shadow the parsed ones (only the nested queries changed).
+            let Statement::Select {
                 items,
-                &tables,
-                join.as_ref(),
-                where_pred.as_ref(),
-                &group_by,
-                having.as_deref(),
-                &order_keys,
-                limit_value,
-                offset_value,
-            )?
-            .plan;
-        // `SELECT sum(c1) AS s` names the output column `s`.
-        apply_select_aliases(&mut plan, aliases);
-        // A full-text `threshold=` filter is answered by the index: the
-        // score needs corpus statistics a row-local predicate cannot see,
-        // so resolve the qualifying rows once and feed them down.
-        if override_rows.is_none() && join.is_none() {
-            if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
-                if let Some((col, query, packed)) = fulltext_index_call(p) {
-                    let (opts, hint) = packed.split_once('\u{1}').unwrap_or((&packed, ""));
-                    // Only a `threshold=` filter (needs corpus stats) or a
-                    // query targeted at a gram index (needs substring
-                    // semantics) departs from the row-local term match.
-                    let sparsegram = !hint.is_empty()
-                        && self
-                            .analyzer_of_index(t, hint)
-                            .map(|a| a.to_ascii_lowercase().starts_with("sparsegram"))
-                            .unwrap_or(false);
-                    let has_threshold = opts
-                        .split(';')
-                        .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="));
-                    if !sparsegram && !has_threshold {
-                        override_rows = None;
-                    } else if sparsegram {
-                        let schema = self.table_schema(t)?;
-                        let needle = query.trim().trim_matches('"').to_lowercase();
-                        let keep: Vec<u64> = match schema.iter().position(|c| c == &col) {
-                            None => Vec::new(),
-                            Some(ci) => self
-                                .fetch_rows_with_ids(t)?
-                                .into_iter()
-                                .filter(|(_, r)| match r.get(ci) {
-                                    Some(Value::Str(s)) => s.to_lowercase().contains(&needle),
-                                    Some(v) => v.to_slt_string().to_lowercase().contains(&needle),
-                                    None => false,
-                                })
-                                .map(|(id, _)| id as u64)
-                                .collect(),
-                        };
-                        let mut out = self.fetch_rows_by_ids(t, &keep)?;
-                        if rowid_col {
-                            for (r, id) in out.iter_mut().zip(keep.iter()) {
-                                r.push(Value::Int(*id as i64));
+                where_pred,
+                group_by,
+                having,
+                order_by,
+                ..
+            } = stmt
+            else {
+                unreachable!("run_select checked the statement is a SELECT");
+            };
+            // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
+            // row per element, then let the normal planner handle WHERE,
+            // GROUP BY and aggregates over the expanded relation.
+            let mut where_pred = where_pred.clone();
+            let mut group_by = group_by.to_vec();
+            let mut having = having.clone();
+            let mut items_owned: Vec<SelectItem> = items.to_vec();
+            let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
+            let unnest_idx = items_owned.iter().position(|it| {
+                matches!(it, SelectItem::Func { name, .. }
+                if name.eq_ignore_ascii_case("UNNEST"))
+            });
+            if let (Some(t), Some(ui)) = (from.as_ref(), unnest_idx) {
+                let (arg_col, alias) = match &items_owned[ui] {
+                    SelectItem::Func { args, .. } => (
+                        match args.first() {
+                            Some(ExprAst::Column(c)) => Some(c.clone()),
+                            _ => None,
+                        },
+                        aliases.get(ui).cloned().flatten(),
+                    ),
+                    _ => (None, None),
+                };
+                if let Some(col) = arg_col {
+                    let schema = self.table_schema(t)?;
+                    if let Some(ci) = schema.iter().position(|c| c == &col) {
+                        let col_ty = self.column_types(t)?.get(ci).cloned().unwrap_or_default();
+                        let float_elems = array_elem_is_float(&col_ty);
+                        let is_json_col = is_json_type(&col_ty);
+                        let new_name = alias.unwrap_or_else(|| format!("__unnest_{col}"));
+                        let mut out: Vec<Vec<Value>> = Vec::new();
+                        for (_seq, row) in self.fetch_rows_with_ids(t).await? {
+                            let mut elements: Vec<Value> = Vec::new();
+                            // a JSON column's stored text may have been read as
+                            // a number, so re-render it before parsing
+                            let cell: Option<String> = match row.get(ci) {
+                                Some(Value::Str(c)) => Some(c.clone()),
+                                Some(other) if is_json_col => Some(other.to_slt_string()),
+                                _ => None,
+                            };
+                            if let Some(cell) = cell {
+                                if !is_json_col {
+                                    if let Some(elems) = brace_array_elems(&cell) {
+                                        for e in elems {
+                                            let text = if float_elems { fmt_float6(&e) } else { e };
+                                            elements.push(parse_value(&text));
+                                        }
+                                    }
+                                } else {
+                                    // JSON elements keep their textual form
+                                    match expression::json::parse(&cell) {
+                                        Some(expression::json::Json::Arr(items)) => {
+                                            for v in items {
+                                                elements.push(Value::Str(v.compact()));
+                                            }
+                                        }
+                                        Some(other) => elements.push(Value::Str(other.compact())),
+                                        None => {}
+                                    }
+                                }
+                            }
+                            for v in elements {
+                                let mut r = row.clone();
+                                r.push(v);
+                                out.push(r);
                             }
                         }
-                        override_rows = Some(out);
-                    } else {
-                        let m = MatchClause {
-                            kind: "TEXT".into(),
-                            column: col,
-                            args: vec![
-                                ExprAst::Literal(Literal::Str(query)),
-                                ExprAst::Literal(Literal::Str(opts.to_string())),
-                            ],
-                            filter: None,
-                        };
-                        let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
-                        let mut ids: Vec<u64> = rows
+                        // Filters written against the output expression
+                        // (`uc2 > 1` is sent as `unnest(c2) > 1`) must see
+                        // the expanded column.
+                        if let Some(p) = where_pred.as_ref() {
+                            where_pred = Some(rewrite_unnest_pred(p, &col, &new_name));
+                        }
+                        if let Some(p) = having.as_ref() {
+                            having = Some(Box::new(rewrite_unnest_pred(p, &col, &new_name)));
+                        }
+                        group_by = group_by
                             .iter()
-                            .filter_map(|r| match r.iter().rev().nth(3) {
-                                Some(Value::Int(i)) => Some(*i as u64),
-                                _ => None,
+                            .map(|g| rewrite_unnest_expr(g, &col, &new_name))
+                            .collect();
+                        items_owned[ui] = SelectItem::Column(new_name.clone());
+                        unnest_expansion = Some((new_name, out));
+                    }
+                }
+            }
+            let items: &[SelectItem] = &items_owned;
+            // `FROM (SELECT …)`: run the subquery first and scan its result.
+            // Its columns become a synthetic table so names resolve. A `FROM <cte>`
+            // uses the rows materialised above the same way.
+            let from_derived: Option<String> = if derived.is_some() {
+                Some("__derived".to_string())
+            } else {
+                from.clone()
+            };
+            // The name a nested query uses for this relation: the CTE alias or the
+            // base table (the derived-table alias is not in the AST, so a derived
+            // table's columns are referenced unqualified).
+            let outer_table_name = from.clone().unwrap_or_default();
+            let from = &from_derived;
+            // A WHERE clause must be a predicate: `WHERE c1` on a
+            // non-boolean column is rejected by the reference.
+            if let (Some(t), Some(p), None) = (from.as_ref(), where_pred.as_ref(), derived.as_ref())
+            {
+                self.validate_where_predicate(t, p)?;
+            }
+            // SUM/AVG require a numeric argument.
+            if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
+                self.validate_aggregate_args(t, items)?;
+            }
+            // `AND`/`OR`/`NOT` take boolean operands: a projected
+            // arithmetic expression such as `c1 + 0.1 and c2 - 1.0` is
+            // invalid (the reference rejects it).
+            for it in items {
+                match it {
+                    SelectItem::Expr(e) => validate_boolean_expr(e)?,
+                    SelectItem::Func { args, .. } => {
+                        for a in args {
+                            validate_boolean_expr(a)?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
+                validate_search_pseudo_columns(s, items)?;
+                // an outer WHERE cannot be combined with an in-subsearch filter
+                if where_pred.is_some() && s.matches.iter().any(|m| m.filter.is_some()) {
+                    return Err(Error::Invalid(
+                        "cannot have both a where clause and a subsearch filter".into(),
+                    ));
+                }
+            }
+            let mut tables: Vec<(String, Vec<String>)> = Vec::new();
+            if let Some(t) = from {
+                let cols = match &derived {
+                    Some((cols, _)) => cols.clone(),
+                    None => self.table_schema(t)?,
+                };
+                tables.push((t.clone(), cols));
+            }
+            let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
+            if let Some((name, rows)) = unnest_expansion {
+                if let Some(entry) = tables.first_mut() {
+                    entry.1.push(name);
+                }
+                unnest_rows = Some(rows);
+            }
+            if let Some(JoinClause { table, .. }) = join {
+                tables.push((table.clone(), self.table_schema(table)?));
+            }
+            // SEARCH MATCH: run the search first, then expose its result rows
+            // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
+            // A derived table's rows are the scan source from the start.
+            let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
+            // A plain projection answered by the block mirror arrives as a block, not
+            // as rows: `direct_projection` hands it over untouched.
+            let mut override_block: Option<Batch> = None;
+            // The search is **deferred** to `run_plan`, which runs it once the
+            // optimizer has pruned the scan's column list. That is what lets
+            // `SELECT ROW_ID()` keep none of the table's columns and skip
+            // reading the ranked rows, without a second copy of the pruner's
+            // decision here. The scan's schema still carries the four hidden
+            // columns, so the binder resolves `SCORE()`/`ROW_ID()` against them.
+            let mut search_pred: Option<Expr> = None;
+            let mut is_search = false;
+            if let (Some(_t), Some(_s)) = (from.as_ref(), search.as_deref()) {
+                if let Some(p) = where_pred.as_ref() {
+                    search_pred = Some(planner::predicate_expr(p, &tables[0].1)?);
+                }
+                if let Some(entry) = tables.first_mut() {
+                    entry
+                        .1
+                        .extend(planner::SEARCH_HIDDEN_NAMES.iter().map(|x| x.to_string()));
+                    is_search = true;
+                }
+            }
+            // Projection-only scan: read just the selected columns from the
+            // C++ block mirror when that mirror is as fresh as the row
+            // store (plan #87). `SELECT id, name` then avoids decoding the
+            // wide columns (embeddings, text) altogether.
+            // The projection-only scan reads just the selected columns, so a row it
+            // returns has neither the dependent join's hidden columns nor the
+            // width the hidden-value pass expects.
+            if override_rows.is_none()
+                && dependent.is_none()
+                && join.is_none()
+                && search.is_none()
+                && where_pred.is_none()
+                && group_by.is_empty()
+                && having.is_none()
+                && order_by.is_empty()
+                && limit_value.is_none()
+                && offset_value.is_none()
+                && !*distinct
+            {
+                if let Some(t) = from.as_ref() {
+                    override_block = self.try_projection(t, items)?;
+                }
+            }
+            // `ROW_ID()` outside a SEARCH exposes the row's sequence number
+            // as a hidden scan column.
+            let mut rowid_col = false;
+            if search.is_none() {
+                if let Some(t) = from.as_ref() {
+                    if unnest_rows.is_none() && uses_row_id(items) {
+                        if let Some(entry) = tables.first_mut() {
+                            entry.1.push("#_row_id".into());
+                        }
+                        let rows: Vec<Vec<Value>> = self
+                            .fetch_rows_with_ids(t)
+                            .await?
+                            .into_iter()
+                            .map(|(seq, mut r)| {
+                                r.push(Value::Int(seq as i64));
+                                r
                             })
                             .collect();
-                        // Table order, not score order: this is a WHERE filter.
-                        ids.sort_unstable();
-                        let mut out = self.fetch_rows_by_ids(t, &ids)?;
-                        if rowid_col {
-                            for (r, id) in out.iter_mut().zip(ids.iter()) {
-                                r.push(Value::Int(*id as i64));
-                            }
-                        }
-                        override_rows = Some(out);
+                        override_rows = Some(rows);
+                        rowid_col = true;
                     }
                 }
             }
-        }
-        // index scan: an equality predicate on an indexed single-table
-        // column fetches only the matching rows.
-        if override_rows.is_none() && join.is_none() {
-            if let (Some(t), Some(pred)) = (from.as_ref(), where_pred.as_ref()) {
-                if let Some((col, CmpOp::Eq, val)) = pred.as_column_literal() {
-                    if let Some(ids) = self.index_lookup(t, col, val) {
+            let _ = rowid_col;
+            // An ORDER BY key that names a select alias is rewritten to the
+            // corresponding output label.
+            let order_keys: Vec<parser::OrderKey> = order_by
+                .iter()
+                .map(|ok| {
+                    let mut ok = ok.clone();
+                    if let Some(i) = aliases
+                        .iter()
+                        .position(|a| a.as_deref() == Some(ok.column.as_str()))
+                    {
+                        if let Some(item) = items.get(i) {
+                            ok.column = planner::item_label(item);
+                        }
+                    }
+                    ok
+                })
+                .collect();
+            if unnest_rows.is_some() {
+                override_rows = unnest_rows;
+            }
+            // The dependent join's value columns belong to the scanned relation, so
+            // the statements rewritten by `dependent.rs` resolve them like any
+            // other column (the same way `#_row_id` and the search columns work).
+            if let Some(dep) = dependent.as_ref() {
+                if let Some(entry) = tables.first_mut() {
+                    entry.1.extend(dep.column_names());
+                }
+            }
+            // C++ `QueryBinder::BindSelect` is the entry point that turns a parsed
+            // `SELECT` into a bound plan; it owns the clause ordering.
+            let mut plan = planner::binder::QueryBinder::new()
+                .bind_select(
+                    items,
+                    &tables,
+                    join.as_ref(),
+                    where_pred.as_ref(),
+                    &group_by,
+                    having.as_deref(),
+                    &order_keys,
+                    limit_value,
+                    offset_value,
+                )?
+                .plan;
+            // `SELECT sum(c1) AS s` names the output column `s`.
+            apply_select_aliases(&mut plan, aliases);
+            // A full-text `threshold=` filter is answered by the index: the
+            // score needs corpus statistics a row-local predicate cannot see,
+            // so resolve the qualifying rows once and feed them down.
+            if override_rows.is_none() && join.is_none() {
+                if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
+                    if let Some((col, query, packed)) = fulltext_index_call(p) {
+                        let (opts, hint) = packed.split_once('\u{1}').unwrap_or((&packed, ""));
+                        // Only a `threshold=` filter (needs corpus stats) or a
+                        // query targeted at a gram index (needs substring
+                        // semantics) departs from the row-local term match.
+                        let sparsegram = !hint.is_empty()
+                            && self
+                                .analyzer_of_index(t, hint)
+                                .map(|a| a.to_ascii_lowercase().starts_with("sparsegram"))
+                                .unwrap_or(false);
+                        let has_threshold = opts
+                            .split(';')
+                            .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="));
+                        if !sparsegram && !has_threshold {
+                            override_rows = None;
+                        } else if sparsegram {
+                            let schema = self.table_schema(t)?;
+                            let needle = query.trim().trim_matches('"').to_lowercase();
+                            let keep: Vec<u64> = match schema.iter().position(|c| c == &col) {
+                                None => Vec::new(),
+                                Some(ci) => self
+                                    .fetch_rows_with_ids(t)
+                                    .await?
+                                    .into_iter()
+                                    .filter(|(_, r)| match r.get(ci) {
+                                        Some(Value::Str(s)) => s.to_lowercase().contains(&needle),
+                                        Some(v) => {
+                                            v.to_slt_string().to_lowercase().contains(&needle)
+                                        }
+                                        None => false,
+                                    })
+                                    .map(|(id, _)| id as u64)
+                                    .collect(),
+                            };
+                            let mut out = self.fetch_rows_by_ids(t, &keep)?;
+                            if rowid_col {
+                                for (r, id) in out.iter_mut().zip(keep.iter()) {
+                                    r.push(Value::Int(*id as i64));
+                                }
+                            }
+                            override_rows = Some(out);
+                        } else {
+                            let m = MatchClause {
+                                kind: "TEXT".into(),
+                                column: col,
+                                args: vec![
+                                    ExprAst::Literal(Literal::Str(query)),
+                                    ExprAst::Literal(Literal::Str(opts.to_string())),
+                                ],
+                                filter: None,
+                            };
+                            // Only the row id is read here, so that is the whole
+                            // column list the search has to produce.
+                            let row_id_only = ["#_row_id".to_string()];
+                            let (rows, _) = self
+                                .search_text_terms(t, &m, None, &[], &row_id_only)
+                                .await?;
+                            let mut ids: Vec<u64> = rows
+                                .iter()
+                                // The row id is the **last** hidden column, as in
+                                // the reference (`column_cnt_ - 1`).
+                                .filter_map(|r| match r.last() {
+                                    Some(Value::Int(i)) => Some(*i as u64),
+                                    _ => None,
+                                })
+                                .collect();
+                            // Table order, not score order: this is a WHERE filter.
+                            ids.sort_unstable();
+                            let mut out = self.fetch_rows_by_ids(t, &ids)?;
+                            if rowid_col {
+                                for (r, id) in out.iter_mut().zip(ids.iter()) {
+                                    r.push(Value::Int(*id as i64));
+                                }
+                            }
+                            override_rows = Some(out);
+                        }
+                    }
+                }
+            }
+            // index scan: an equality predicate on an indexed single-table
+            // column fetches only the matching rows.
+            if override_rows.is_none() && join.is_none() {
+                if let (Some(t), Some(pred)) = (from.as_ref(), where_pred.as_ref()) {
+                    if let Some((col, CmpOp::Eq, val)) = pred.as_column_literal() {
+                        if let Some(ids) = self.index_lookup(t, col, val) {
+                            let mut rows = self.fetch_rows_by_ids(t, &ids)?;
+                            if rowid_col {
+                                for (r, id) in rows.iter_mut().zip(ids.iter()) {
+                                    r.push(Value::Int(*id as i64));
+                                }
+                            }
+                            override_rows = Some(rows);
+                        }
+                    }
+                }
+            }
+            // C++ `ApplyFastRoughFilter` then `IndexScanBuilder`, the first two
+            // optimizer rules. Both need the table's index catalog, which the
+            // planner does not own, so the executor binds it to this scan.
+            let mut candidate = None;
+            let mut unmatchable = false;
+            let mut fulltext_substring = false;
+            let mut rough_filter_done = false;
+            // The scan's catalog, kept so the production optimizer can run the
+            // reference's `ApplyFastRoughFilter` rule against the real indexes
+            // instead of the empty one `FastRoughFilterRule::default()` carries.
+            let mut scan_catalog: Option<planner::index_scan::IndexCatalog> = None;
+            let scan_source = plan_scan_of(&plan);
+            if join.is_none() && override_rows.is_none() {
+                if let (Some(t), Some((_, scan_columns))) = (from.as_ref(), scan_source.as_ref()) {
+                    let mut catalog = self.index_catalog(t, scan_columns);
+                    // The analyzed form of every `filter_fulltext` query, so the
+                    // planner asks the index for the same terms the index holds
+                    // (C++ builds a `SearchDriver` from the column's analyzer).
+                    if let Some(pred) = where_pred.as_ref() {
+                        let bound = planner::predicate_expr(pred, scan_columns)?;
+                        catalog.fulltext_terms = self.fulltext_query_terms(t, scan_columns, &bound);
+                    }
+                    scan_catalog = Some(catalog.clone());
+                    unmatchable = planner::index_scan::ApplyFastRoughFilter::build(&plan, &catalog)
+                        .iter()
+                        .any(|binding| {
+                            binding.evaluator.tag()
+                                == planner::index_scan::FastRoughFilterTag::AlwaysFalse
+                        });
+                    if !unmatchable {
+                        // The reference's first two rules, in its order
+                        // (`optimizer_impl.cpp:40-41`): the rough filter, then the
+                        // index scan. The rule rewrites the plan into an
+                        // `IndexScan` node that owns the evaluator; the executor
+                        // reads it back from there.
+                        let regex = self.regex_index_catalog(t, scan_columns);
+                        let mut index_optimizer = planner::optimize::Optimizer::new();
+                        index_optimizer.add_rule(Box::new(
+                            planner::optimize::FastRoughFilterRule::new(catalog.clone()),
+                        ));
+                        index_optimizer.add_rule(Box::new(
+                            planner::index_scan::IndexScanRule::new(
+                                catalog.clone(),
+                                Some(regex.clone()),
+                            ),
+                        ));
+                        plan = index_optimizer.optimize(plan)?;
+                        rough_filter_done = true;
+                        if let Some(pushed) = plan_index_candidate(&plan) {
+                            // A sparse-gram index answers a literal run by
+                            // substring; a term index answers by token.
+                            fulltext_substring = fulltext_options(&pushed.index_filter)
+                                .is_some_and(|opts| opts.to_ascii_lowercase().contains("index="))
+                                && fulltext_column(&pushed.index_filter)
+                                    .is_some_and(|i| regex.columns.contains_key(&i));
+                            candidate = Some((*pushed).clone());
+                        }
+                    }
+                }
+            }
+            // index scan: the planner already merged the predicate into per-column
+            // intervals (`Secondary { ranges }`), so an integer range is answered
+            // from the sealed chunks and the tail instead of materialising the
+            // whole table. This has to run after `IndexScanBuilder` (the candidate
+            // only exists from here on) and before `run_plan`; `=` never gets here
+            // (see `index_scan_range_rows`).
+            if override_rows.is_none() && join.is_none() {
+                if let (Some(t), Some((_, scan_columns)), Some(candidate)) =
+                    (from.as_ref(), scan_source.as_ref(), candidate.as_ref())
+                {
+                    if let Some(ids) =
+                        self.index_scan_range_rows(t, &candidate.evaluator, scan_columns)
+                    {
                         let mut rows = self.fetch_rows_by_ids(t, &ids)?;
                         if rowid_col {
                             for (r, id) in rows.iter_mut().zip(ids.iter()) {
@@ -3101,140 +3370,79 @@ impl Engine {
                     }
                 }
             }
-        }
-        // C++ `ApplyFastRoughFilter` then `IndexScanBuilder`, the first two
-        // optimizer rules. Both need the table's index catalog, which the
-        // planner does not own, so the executor binds it to this scan.
-        let mut candidate = None;
-        let mut unmatchable = false;
-        let mut fulltext_substring = false;
-        let mut rough_filter_done = false;
-        // The scan's catalog, kept so the production optimizer can run the
-        // reference's `ApplyFastRoughFilter` rule against the real indexes
-        // instead of the empty one `FastRoughFilterRule::default()` carries.
-        let mut scan_catalog: Option<planner::index_scan::IndexCatalog> = None;
-        let scan_source = plan_scan_of(&plan);
-        if join.is_none() && override_rows.is_none() {
-            if let (Some(t), Some((_, scan_columns))) = (from.as_ref(), scan_source.as_ref()) {
-                let catalog = self.index_catalog(t, scan_columns);
-                scan_catalog = Some(catalog.clone());
-                unmatchable = planner::index_scan::ApplyFastRoughFilter::build(&plan, &catalog)
-                    .iter()
-                    .any(|binding| {
-                        binding.evaluator.tag()
-                            == planner::index_scan::FastRoughFilterTag::AlwaysFalse
-                    });
-                if !unmatchable {
-                    // The reference's first two rules, in its order
-                    // (`optimizer_impl.cpp:40-41`): the rough filter, then the
-                    // index scan. The rule rewrites the plan into an
-                    // `IndexScan` node that owns the evaluator; the executor
-                    // reads it back from there.
-                    let regex = self.regex_index_catalog(t, scan_columns);
-                    let mut index_optimizer = planner::optimize::Optimizer::new();
-                    index_optimizer.add_rule(Box::new(
-                        planner::optimize::FastRoughFilterRule::new(catalog.clone()),
+            // The inner side of the dependent join runs once per distinct key over
+            // the materialised outer relation; each row then carries the result as
+            // an ordinary column, so `WHERE`, `HAVING`, `ORDER BY` and the
+            // projection see it through the regular path.
+            if let Some(dep) = dependent.as_ref() {
+                // With a join the hidden columns belong to the FROM side, which is
+                // what the join source consumes as its left input.
+                let Some(table) = from.as_ref() else {
+                    return Err(Error::Invalid(
+                        "correlated subquery needs a source relation".into(),
                     ));
-                    index_optimizer.add_rule(Box::new(planner::index_scan::IndexScanRule::new(
-                        catalog.clone(),
-                        Some(regex.clone()),
-                    )));
-                    plan = index_optimizer.optimize(plan)?;
-                    rough_filter_done = true;
-                    if let Some(pushed) = plan_index_candidate(&plan) {
-                        // A sparse-gram index answers a literal run by
-                        // substring; a term index answers by token.
-                        fulltext_substring = fulltext_options(&pushed.index_filter)
-                            .is_some_and(|opts| opts.to_ascii_lowercase().contains("index="))
-                            && fulltext_column(&pushed.index_filter)
-                                .is_some_and(|i| regex.columns.contains_key(&i));
-                        candidate = Some((*pushed).clone());
-                    }
-                }
+                };
+                // `tables` already carries the enclosing relation's columns (a CTE
+                // or a derived table has no catalog entry), and a derived table's
+                // rows are the scan source from the start. The dependent join's
+                // hidden names were appended last: the rows do not have them yet.
+                let mut schema = tables
+                    .first()
+                    .map(|(_, columns)| columns.clone())
+                    .unwrap_or_default();
+                schema.truncate(schema.len().saturating_sub(dep.column_names().len()));
+                let mut rows = match override_rows.take() {
+                    Some(rows) => rows,
+                    None => self.fetch_rows(table).await?,
+                };
+                dep.apply(self, &cte_scope, &outer_table_name, &schema, &mut rows)
+                    .await?;
+                override_rows = Some(rows);
             }
-        }
-        // index scan: the planner already merged the predicate into per-column
-        // intervals (`Secondary { ranges }`), so an integer range is answered
-        // from the sealed chunks and the tail instead of materialising the
-        // whole table. This has to run after `IndexScanBuilder` (the candidate
-        // only exists from here on) and before `run_plan`; `=` never gets here
-        // (see `index_scan_range_rows`).
-        if override_rows.is_none() && join.is_none() {
-            if let (Some(t), Some((_, scan_columns)), Some(candidate)) =
-                (from.as_ref(), scan_source.as_ref(), candidate.as_ref())
-            {
-                if let Some(ids) = self.index_scan_range_rows(t, &candidate.evaluator, scan_columns)
-                {
-                    let mut rows = self.fetch_rows_by_ids(t, &ids)?;
-                    if rowid_col {
-                        for (r, id) in rows.iter_mut().zip(ids.iter()) {
-                            r.push(Value::Int(*id as i64));
-                        }
-                    }
-                    override_rows = Some(rows);
-                }
+            // A `SEARCH` materialised its rows in the scan's **pruned** layout,
+            // not the table's: `None` tells the operators the rows already match
+            // `Scan.columns`, so nothing remaps them (a remap would read the
+            // table's offsets out of a row that only carries the kept columns).
+            let source_columns = if is_search {
+                None
+            } else {
+                tables.first().map(|(_, columns)| columns.clone())
+            };
+            let (columns, mut rows) = self
+                .run_plan(
+                    plan,
+                    override_rows,
+                    override_block,
+                    source_columns,
+                    candidate,
+                    unmatchable,
+                    fulltext_substring,
+                    scan_catalog,
+                    rough_filter_done,
+                    search.as_deref().map(|s| (s.clone(), search_pred.clone())),
+                )
+                .await?;
+            if *distinct {
+                // `DISTINCT` is the one step here that wants whole rows: the
+                // samples are compared on their text form, and the surviving rows
+                // are compacted out of the buffers by mask.
+                let mut seen = std::collections::HashSet::new();
+                let keep: Vec<bool> = rows
+                    .rows()
+                    .iter()
+                    .map(|r| {
+                        seen.insert(
+                            r.iter()
+                                .map(|v| v.to_slt_string())
+                                .collect::<Vec<_>>()
+                                .join("\u{1f}"),
+                        )
+                    })
+                    .collect();
+                rows.retain(&keep);
             }
-        }
-        // The inner side of the dependent join runs once per distinct key over
-        // the materialised outer relation; each row then carries the result as
-        // an ordinary column, so `WHERE`, `HAVING`, `ORDER BY` and the
-        // projection see it through the regular path.
-        if let Some(dep) = dependent.as_ref() {
-            // With a join the hidden columns belong to the FROM side, which is
-            // what the join source consumes as its left input.
-            let Some(table) = from.as_ref() else {
-                return Err(Error::Invalid(
-                    "correlated subquery needs a source relation".into(),
-                ));
-            };
-            // `tables` already carries the enclosing relation's columns (a CTE
-            // or a derived table has no catalog entry), and a derived table's
-            // rows are the scan source from the start. The dependent join's
-            // hidden names were appended last: the rows do not have them yet.
-            let mut schema = tables
-                .first()
-                .map(|(_, columns)| columns.clone())
-                .unwrap_or_default();
-            schema.truncate(schema.len().saturating_sub(dep.column_names().len()));
-            let mut rows = match override_rows.take() {
-                Some(rows) => rows,
-                None => self.fetch_rows(table)?,
-            };
-            dep.apply(self, &cte_scope, &outer_table_name, &schema, &mut rows)?;
-            override_rows = Some(rows);
-        }
-        let source_columns = tables.first().map(|(_, columns)| columns.clone());
-        let (columns, mut rows) = self.run_plan(
-            plan,
-            override_rows,
-            override_block,
-            source_columns,
-            candidate,
-            unmatchable,
-            fulltext_substring,
-            scan_catalog,
-            rough_filter_done,
-        )?;
-        if *distinct {
-            // `DISTINCT` is the one step here that wants whole rows: the
-            // samples are compared on their text form, and the surviving rows
-            // are compacted out of the buffers by mask.
-            let mut seen = std::collections::HashSet::new();
-            let keep: Vec<bool> = rows
-                .rows()
-                .iter()
-                .map(|r| {
-                    seen.insert(
-                        r.iter()
-                            .map(|v| v.to_slt_string())
-                            .collect::<Vec<_>>()
-                            .join("\u{1f}"),
-                    )
-                })
-                .collect();
-            rows.retain(&keep);
-        }
-        Ok((columns, rows))
+            Ok((columns, rows))
+        })
     }
 
     /// Answers `Projection(Scan)` and `Projection(Filter(Scan))` from the
@@ -3249,7 +3457,7 @@ impl Engine {
     ///
     /// `None` leaves the plan to the operators (an expression in the select
     /// list, an aggregate, a sort, an index scan, ...).
-    pub(crate) fn direct_projection(
+    pub(crate) async fn direct_projection(
         &self,
         plan: &LogicalPlan,
         rows: &mut Option<Vec<Vec<Value>>>,
@@ -3322,14 +3530,15 @@ impl Engine {
         // does not read). Map one onto the other, and - when they differ -
         // compact each row to the scan layout once, so the projection and the
         // predicate index the same list.
+        // A name that `source_columns` does not hold means the rows are already
+        // in the scan's layout (a `SEARCH` appends hidden columns the table
+        // schema has no name for), so no remapping is needed.
         let pos: Vec<usize> = match source_columns {
-            Some(full) if full != scan_columns => {
-                let mut pos = Vec::with_capacity(scan_columns.len());
-                for name in scan_columns {
-                    pos.push(full.iter().position(|c| c == name)?);
-                }
-                pos
-            }
+            Some(full) if full != scan_columns => scan_columns
+                .iter()
+                .map(|name| full.iter().position(|c| c == name))
+                .collect::<Option<Vec<usize>>>()
+                .unwrap_or_else(|| (0..scan_columns.len()).collect()),
             _ => (0..scan_columns.len()).collect(),
         };
         let (table, columns, predicate) = match &**input {
@@ -3408,11 +3617,14 @@ impl Engine {
                         .read_blocks_filtered_values(table, &needed, &prune, &|row: &[Value]| {
                             predicate.eval_predicate(row)
                         })
+                        .await
                         .ok();
                     filtered = read.is_some();
                     read
                 } else {
-                    self.read_blocks_pruned_values(table, &needed, &prune).ok()
+                    self.read_blocks_pruned_values(table, &needed, &prune)
+                        .await
+                        .ok()
                 };
                 match narrowed {
                     Some((_, rows)) => {
@@ -3430,7 +3642,7 @@ impl Engine {
                             .map(|(_, cells)| cells)
                             .collect()
                     }
-                    None => self.fetch_rows_pruned(table, &prune).ok()?,
+                    None => self.fetch_rows_pruned(table, &prune).await.ok()?,
                 }
             }
         };
@@ -3470,30 +3682,32 @@ impl Engine {
         Some((names.clone(), batch))
     }
 
-    pub(crate) fn fetch_rows(&self, table: &str) -> Result<Vec<Vec<Value>>> {
+    pub(crate) async fn fetch_rows(&self, table: &str) -> Result<Vec<Vec<Value>>> {
         Ok(self
-            .fetch_rows_with_ids(table)?
+            .fetch_rows_with_ids(table)
+            .await?
             .into_iter()
             .map(|(_, r)| r)
             .collect())
     }
 
-    /// [`Self::fetch_rows`] with block pruning: the scan hands over the    /// predicate's range/equality comparisons, and a block whose
+    /// [`Self::fetch_rows`] with block pruning: the scan hands over the
+    /// predicate's range/equality comparisons, and a block whose
     /// `blk|…|fast_rough_filter` record proves none of them can hold is not
     /// decoded at all. Falls back to the plain scan (which is always correct)
     /// when the mirror is absent.
-    pub(crate) fn fetch_rows_pruned(
+    pub(crate) async fn fetch_rows_pruned(
         &self,
         table: &str,
         prune: &[crate::fast_rough_filter::PruneCond],
     ) -> Result<Vec<Vec<Value>>> {
         if prune.is_empty() {
-            return self.fetch_rows(table);
+            return self.fetch_rows(table).await;
         }
-        if let Some(rows) = self.try_rows_pruned(table, prune)? {
+        if let Some(rows) = self.try_rows_pruned(table, prune).await? {
             return Ok(rows.into_iter().map(|(_, r)| r).collect());
         }
-        self.fetch_rows(table)
+        self.fetch_rows(table).await
     }
 
     /// Next storage sequence id for `table` (max existing + 1).
@@ -3551,7 +3765,10 @@ impl Engine {
     /// Non-deleted rows with their storage sequence ids (tombstones are skipped).
     /// Rows shorter than the schema (e.g. after `ALTER TABLE ADD COLUMN`) are
     /// padded with their column defaults.
-    pub(crate) fn fetch_rows_with_ids(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+    pub(crate) async fn fetch_rows_with_ids(
+        &self,
+        table: &str,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
         let key = self.table_key(table);
         let (cached, live) = {
             let tables = self.tables.lock().unwrap();
@@ -3577,7 +3794,7 @@ impl Engine {
                 }
             }
         }
-        let rows = self.row_set_from(table)?;
+        let rows = self.row_set_from(table).await?;
         if crate::read_ts() == u64::MAX {
             self.cache_row_set(table, key, &rows);
         }
@@ -3590,10 +3807,10 @@ impl Engine {
     /// buffer for the tail above the last checkpoint - so the scan, the count
     /// and the compaction answer from the same set. A table no block can hold
     /// has only the buffer: the port keeps no row journal.
-    pub(crate) fn row_set_from(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+    pub(crate) async fn row_set_from(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         // The block mirror is the authoritative value source once it covers every
         // live row; the buffer then only supplies the rows appended since.
-        if let Some(rows) = self.try_rows(table)? {
+        if let Some(rows) = self.try_rows(table).await? {
             return Ok(rows);
         }
         let deleted = self.tombstone_set_at(table, crate::read_ts())?;
@@ -3667,6 +3884,18 @@ impl Engine {
         Ok(rows)
     }
 
+    /// Every row id the table holds, tombstoned slots included, ascending.
+    ///
+    /// The ids alone: a recovery that only needs to know which rows an index
+    /// is missing must not decode the rows to find out.
+    pub(crate) fn row_ids_including_deleted(&self, table: &str) -> Result<Vec<usize>> {
+        Ok(self
+            .read_blocks_including_deleted_from(&self.qualified_table(table), 0)
+            .into_iter()
+            .map(|(seq, _)| seq)
+            .collect())
+    }
+
     /// Full rows from the C++ block mirror.
     ///
     /// The mirror is a snapshot of the rows that existed when it was written,
@@ -3677,13 +3906,13 @@ impl Engine {
     ///
     /// Returns `None` when the table has no block mirror or the mirror does not
     /// match its recorded row ids, so the caller falls back to the KV row store.
-    pub(crate) fn try_rows(&self, table: &str) -> Result<Option<TableRows>> {
-        self.try_rows_pruned(table, &[])
+    pub(crate) async fn try_rows(&self, table: &str) -> Result<Option<TableRows>> {
+        self.try_rows_pruned(table, &[]).await
     }
 
     /// [`Self::try_rows`] with block pruning: a block whose prefilter rules
     /// out the predicate is never decoded.
-    pub(crate) fn try_rows_pruned(
+    pub(crate) async fn try_rows_pruned(
         &self,
         table: &str,
         prune: &[crate::fast_rough_filter::PruneCond],
@@ -3725,7 +3954,7 @@ impl Engine {
                 return Ok(Some(rows));
             }
         }
-        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, prune) else {
+        let Ok((_, rows)) = self.read_blocks_pruned_values(table, &wanted, prune).await else {
             return Ok(None);
         };
         // The snapshot and the scan both list the rows the mirror makes
@@ -3989,154 +4218,20 @@ impl Engine {
         Ok(out)
     }
 
-    /// The cached vector column, when one was already built for the table's
-    /// current row count. Never decodes anything.
-    ///
-    /// Building the cache reads and parses the whole column (1M x 128 `f32`
-    /// held in memory), so the query path only *peeks* here: when an index
-    /// answers, the candidate rows are decoded instead and the cache is never
-    /// needed.
-    ///
-    /// The freshness test is the table's published row count, which every write
-    /// path maintains (`note_live_rows`/`set_live_rows`). Counting rows from
-    /// scratch (`block_visible_row_count`) walks every block's version file and
-    /// every slot - 15 ms per query on a 20k-row table - so it must not run
-    /// here.
-    pub(crate) fn vector_cache_peek(&self, table: &str, column: &str) -> Option<SharedVectorCache> {
-        let key = index_key(table, column);
-        let map = self.vector_cache.lock().unwrap();
-        let cache = map.get(&key)?;
-        let published = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&self.table_key(table))
-            .and_then(|e| e.live_rows);
-        let live = cache.read().map(|g| g.live.len()).unwrap_or(0);
-        published
-            .filter(|rows| *rows == live)
-            .map(|_| cache.clone())
-    }
-
-    /// Builds the whole-column vector cache, unless the column is too large for
-    /// the share it is allowed.
-    ///
-    /// The cache is a heap copy of every vector in the column - 1M x 128 `f32`
-    /// is 512 MB, and a table an order of magnitude bigger would be tens of
-    /// gigabytes held at once, which no reclaim pass can take back mid-scan.
-    /// It is capped at a quarter of the buffer budget; past that this returns an
-    /// error and the caller streams the scan in batches instead (the exact-scan
-    /// path treats a missing cache as "stream", so the query still answers -
-    /// only the repeat-query optimization is lost).
-    pub(crate) fn vector_cache_for(
-        &self,
-        table: &str,
-        column: &str,
-        dims: usize,
-    ) -> Result<SharedVectorCache> {
-        if let Some(cache) = self.vector_cache_peek(table, column) {
-            return Ok(cache);
-        }
-        let key = index_key(table, column);
-        let schema = self.table_schema(table)?;
-        let col = schema
-            .iter()
-            .position(|c| c == column)
-            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let cap = self
-            .context
-            .buffer_budget
-            .load(std::sync::atomic::Ordering::Relaxed)
-            .max(1)
-            / 4;
-        // What the cache retains, tracked as it grows: the `f64` payload at the
-        // capacity `push` left behind (`VectorCache::rows` is
-        // `Vec<(usize, Vec<f64>)>` - charging four bytes per element, as this
-        // did, counted half of it), the row's slot in that `Vec`, and its entry
-        // in the live set (a key plus the hash table's slack). Growth of `rows`
-        // is charged when the allocation moves, not per row.
-        const LIVE_SET_ENTRY: usize = 2 * std::mem::size_of::<usize>();
-        let mut charge = 0usize;
-        let mut slots = 0usize;
-        let mut cache = VectorCache {
-            dims,
-            rows: Vec::new(),
-            live: Default::default(),
-        };
-        // Bounded batches: the row ids first (the walk the coverage check does
-        // anyway), then one batch of rows at a time. The projected read this
-        // replaces built every row of the column - a full-width `Vec<Value>` per
-        // row - before pushing the first vector, so the peak was the column's
-        // Values *plus* the cache; here it is one batch, and the loop stops at
-        // the cap without decoding the rest.
-        const CACHE_BUILD_BATCH: usize = 4096;
-        let mut ids: Vec<u64> = self
-            .live_row_ids(table)
-            .into_iter()
-            .map(|seq| seq as u64)
-            .collect();
-        ids.sort_unstable();
-        for batch in ids.chunks(CACHE_BUILD_BATCH) {
-            for (seq, cells) in self.fetch_some_rows_with_ids(table, batch)? {
-                let Some(Value::Str(text)) = cells.get(col) else {
-                    continue;
-                };
-                let v = parse_vec_str(text);
-                if v.len() != dims {
-                    continue;
-                }
-                let payload =
-                    v.capacity() * std::mem::size_of::<f64>() + std::mem::size_of::<Vec<f64>>();
-                cache.rows.push((seq, v));
-                cache.live.insert(seq);
-                charge = charge
-                    .saturating_add(payload)
-                    .saturating_add(LIVE_SET_ENTRY);
-                let grown = cache.rows.capacity();
-                if grown != slots {
-                    charge = charge.saturating_add(
-                        grown.saturating_sub(slots) * std::mem::size_of::<(usize, Vec<f64>)>(),
-                    );
-                    slots = grown;
-                }
-                if charge > cap {
-                    return Err(Error::Invalid(format!(
-                        "the vector cache for {table}.{column} would exceed {cap} bytes \
-                         (a quarter of the buffer budget); the scan streams instead"
-                    )));
-                }
-            }
-        }
-        // The scan sweeps the candidates against `rows` in one pass, which needs
-        // ascending ids; a batch read groups by block and appends the buffer
-        // last, so the order is restored here.
-        cache.rows.sort_unstable_by_key(|(seq, _)| *seq);
-        let built = cache.live.len();
-        let shared = Arc::new(std::sync::RwLock::new(cache));
-        self.vector_cache
-            .lock()
-            .unwrap()
-            .insert(key, shared.clone());
-        // Record what the cache now holds, so the next lookup can compare
-        // against the published count without recounting the blocks.
-        let table_key = self.table_key(table);
-        let mut tables = self.tables.lock().unwrap();
-        if tables.get(&table_key).and_then(|e| e.live_rows).is_none() {
-            tables.entry(table_key).or_default().live_rows = Some(built);
-        }
-        Ok(shared)
-    }
-
     /// `IndexBuilder`: builds the HNSW index of `column` from every live row.
     /// The rows go through the same append hook as an insert, so the graph is
     /// the reference's in-memory segment; the next dump seals it into a chunk.
-    pub(crate) fn build_hnsw_index(&self, table: &str, column: &str) -> Result<()> {
-        self.build_hnsw_index_of(table, column, None)
+    pub(crate) async fn build_hnsw_index(&self, table: &str, column: &str) -> Result<()> {
+        self.build_hnsw_index_of(table, column, None).await
     }
 
-    /// [`Self::build_hnsw_index`] for one catalog record (see
+    /// `IndexBuilder` for one catalog record (see
     /// [`Self::hnsw_mem_segments_of`]).
-    pub(crate) fn build_hnsw_index_of(
+    ///
+    /// Async because the build itself fans out: one tokio task per segment.
+    /// The rows go through the same append hook an insert does, so the graph is
+    /// the reference's in-memory segment; the next dump seals it into a chunk.
+    pub(crate) async fn build_hnsw_index_of(
         &self,
         table: &str,
         column: &str,
@@ -4152,37 +4247,143 @@ impl Engine {
         // reference's `IndexBuilder` calls `InsertVecs` once for the table, and
         // `InsertVecs` builds it in parallel buckets. Feeding the rows one at a
         // time made `CREATE INDEX` a serial point-by-point build.
-        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
-        for (seq, text) in self.read_block_column_including_deleted(table, ci) {
-            rows.push((seq as u64, parse_vec_f32(&text)));
-        }
-        let read = t_read.elapsed();
-        // The graph of **this** record only: a column may carry several HNSW
-        // indexes and each owns its rows once (the reference's per-`MemIndex`
-        // object), so feeding every graph on the column would double-count the
-        // rows in the others.
-        let segments = match only {
+        // Decoded straight out of the blocks as `f32`, not through the stored
+        // text: `read_block_column_including_deleted` renders every cell with
+        // `to_slt_string` and `parse_vec_f32` parses it back, which on SIFT 1M
+        // (128d) cost ~2.5 s of the build and allocated 128 strings per row on
+        // the way. The block already holds exactly these `f32`s.
+        let declared = self
+            .storage
+            .catalog
+            .get_table_by_name(&self.table_key(table))
+            .ok()
+            .flatten()
+            .and_then(|meta| meta.types.get(ci).cloned())
+            .unwrap_or_default();
+        let shape = crate::blocks::embedding_shape(&declared);
+        // The graphs this record's rows go into: one per `(index, segment)`.
+        let graphs = match only {
             Some(id) => self.hnsw_mem_segments_of(table, column, Some(id))?,
             None => self.hnsw_mem_segments(table, column)?,
         };
+        // A `CREATE INDEX` builds every segment's graph **concurrently**, one
+        // tokio task each, which is what the reference's per-segment
+        // `PopulateIndex` produces once its segments are dispatched. Each task
+        // reads only its own segment's rows: the graphs are independent, and a
+        // task that read the whole column would multiply the work by the
+        // segment count.
+        //
+        // Within a task the rows are fed one **block** at a time, and
+        // `insert_batch` splits that block into per-bucket tasks of its own
+        // (`for_each_cpu_bound`), so the build is parallel on both axes.
+        let mut inserted = 0usize;
         let t_build = std::time::Instant::now();
-        for mem in segments {
-            if let Ok(mut mem) = mem.lock() {
-                let batch: Vec<(u64, &Vec<f32>)> = rows
-                    .iter()
-                    .filter(|(_, v)| v.len() == mem.dims)
-                    .map(|(seq, v)| (*seq, v))
-                    .collect();
-                if !batch.is_empty() {
-                    mem.insert_batch(&batch, self.hnsw_build_workers());
+        let workers = self.hnsw_build_workers();
+        let mut by_segment: std::collections::BTreeMap<
+            u32,
+            Vec<std::sync::Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+        > = Default::default();
+        for graph in graphs {
+            let segment = { graph.lock().await.segment };
+            by_segment.entry(segment).or_default().push(graph);
+        }
+        if shape.is_some() {
+            // One **tokio task per segment**, as the reference's per-segment
+            // `PopulateIndex` is dispatched. Each task builds only its own
+            // segment's graph, and inside it `insert_batch` splits each block
+            // into per-bucket tasks of its own - so the two axes nest in the
+            // reference's order (segments across, buckets within).
+            //
+            // A task needs an owned engine handle; a bare `Engine` (a unit test
+            // that opened a directory itself) has none, and takes the serial
+            // pass below, which does the same work.
+            let segments: Vec<(u32, Vec<_>)> = by_segment.into_iter().collect();
+            // `workers` is the bucket fan-out **inside** a segment, not the
+            // number of segments. Clamping it to `segments.len()` made a
+            // one-segment build (SIFT 1M fits in one `SEGMENT_ROW_CAPACITY`
+            // segment) a single-core graph build - the shape issue #3573
+            // reports as "Rust HNSW build is 6x slower".
+            let workers = self.hnsw_build_workers();
+            let handle = self.engine_handle();
+            match handle {
+                Some(engine) => {
+                    // The task needs owned names: the statement's borrowed ones
+                    // cannot outlive it.
+                    let table = table.to_string();
+                    let column = column.to_string();
+                    let total = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+                    let counter = std::sync::Arc::clone(&total);
+                    crate::fanout::for_each_async(segments, workers, move |(segment, mems)| {
+                        let engine = engine.clone();
+                        let total = std::sync::Arc::clone(&counter);
+                        let table = table.clone();
+                        let column = column.clone();
+                        async move {
+                            let n = engine
+                                .build_hnsw_segment(
+                                    &table, &column, ci, shape, segment, mems, workers,
+                                )
+                                .await?;
+                            total.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+                            Ok(())
+                        }
+                    })
+                    .await?;
+                    inserted = total.load(std::sync::atomic::Ordering::Relaxed);
                 }
+                _ => {
+                    // No engine handle (an engine not held in an `Arc`):
+                    // still one segment at a time, but each segment's own
+                    // buckets fan out.
+                    let mut counts = Vec::new();
+                    for (segment, mems) in segments {
+                        counts.push(
+                            self.build_hnsw_segment(
+                                table, column, ci, shape, segment, mems, workers,
+                            )
+                            .await?,
+                        );
+                    }
+                    inserted = counts.into_iter().sum();
+                }
+            }
+        } else {
+            // A column whose declaration carries no dimension (a `TENSOR`
+            // family the vector path does not cover) keeps the text route.
+            let mut pending: Vec<(u64, Vec<f32>)> = Vec::new();
+            for (seq, text) in self.read_block_column_including_deleted(table, ci) {
+                pending.push((seq as u64, parse_vec_f32(&text)));
+                if pending.len() >= Self::COPY_BATCH_ROWS {
+                    let segment = (pending[0].0 >> 32) as u32;
+                    if let Some(mems) = by_segment.get(&segment) {
+                        for mem in mems {
+                            let rows: Vec<(u64, &Vec<f32>)> =
+                                pending.iter().map(|(s, v)| (*s, v)).collect();
+                            crate::hnsw_mem::HnswIndexInMem::insert_batch(mem, &rows, workers)
+                                .await;
+                        }
+                    }
+                    inserted += pending.len();
+                    pending.clear();
+                }
+            }
+            if !pending.is_empty() {
+                let segment = (pending[0].0 >> 32) as u32;
+                if let Some(mems) = by_segment.get(&segment) {
+                    for mem in mems {
+                        let rows: Vec<(u64, &Vec<f32>)> =
+                            pending.iter().map(|(s, v)| (*s, v)).collect();
+                        crate::hnsw_mem::HnswIndexInMem::insert_batch(mem, &rows, workers).await;
+                    }
+                }
+                inserted += pending.len();
             }
         }
         if profile {
             eprintln!(
-                "hnsw build profile: read {read:?} ({} rows) build {:?}",
-                rows.len(),
-                t_build.elapsed()
+                "hnsw build profile: {:?} for {inserted} rows (since statement start {:?})",
+                t_build.elapsed(),
+                t_read.elapsed()
             );
         }
         // The graph is heap and `memindex_bytes_of` now takes it from `mem_usage`,
@@ -4190,6 +4391,68 @@ impl Engine {
         // `CREATE INDEX` built.
         self.refresh_memindex_charge(table);
         Ok(())
+    }
+
+    /// Builds one segment's HNSW graphs, reading only that segment's rows.
+    ///
+    /// The unit a `CREATE INDEX`'s per-segment task runs. `mems` is every graph
+    /// the segment owns (one per HNSW index on the column), because they all
+    /// read the same rows.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn build_hnsw_segment(
+        &self,
+        table: &str,
+        _column: &str,
+        ci: usize,
+        shape: Option<(usize, i32)>,
+        segment: u32,
+        mems: Vec<Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>>,
+        workers: usize,
+    ) -> Result<usize> {
+        let Some((dim, element_type)) = shape else {
+            return Ok(0);
+        };
+        let mut count = 0usize;
+        // One `insert_batch` per block: the block is the reference's batching
+        // unit (`InsertVecs(block_offset, ColumnVector &, offset, row_count)`),
+        // and `insert_batch` splits it into per-bucket tasks.
+        //
+        // The batches are collected first and inserted afterwards: the cursor
+        // hands them out through a **synchronous** callback, and the insert is
+        // an `await` now (its per-bucket fan-out is a task fan-out). A block is
+        // at most `DEFAULT_BLOCK_CAPACITY` rows, so holding the segment's
+        // batches does not change the peak beyond the copy the insert makes.
+        // The whole segment goes to `insert_batch` in **one** call, not one
+        // call per block.
+        //
+        // A block is 8192 rows, which at 8 threads is 8 buckets of 1024 rows -
+        // each finishes in milliseconds, so the fan-out spends more time in
+        // task setup than in graph construction, and the 122 blocks of a 1M-row
+        // segment run strictly one after another (`insert_batch` is awaited).
+        // The reference hands `InsertVecs` the whole batch and lets
+        // `kBuildBucketSize` decide the split, so a 1M-row build is 8 buckets
+        // of 125k, not 122 rounds of 8 x 1024.
+        let mut rows: Vec<(u64, Vec<f32>)> = Vec::new();
+        {
+            let mut cursor = self.block_cursor(table)?;
+            cursor.vectors_by_block_of(ci, dim, element_type, Some(segment), &mut |batch| {
+                count += batch.len();
+                rows.extend(batch.iter().cloned());
+                true
+            })?;
+        }
+        for mem in &mems {
+            let dims = { mem.lock().await.dims };
+            let fit: Vec<(u64, &Vec<f32>)> = rows
+                .iter()
+                .filter(|(_, v)| v.len() == dims)
+                .map(|(seq, v)| (*seq, v))
+                .collect();
+            if !fit.is_empty() {
+                crate::hnsw_mem::HnswIndexInMem::insert_batch(mem, &fit, workers).await;
+            }
+        }
+        Ok(count)
     }
 
     /// The memory graphs of `table`'s HNSW indexes, topped up from the catalog.
@@ -4203,27 +4466,24 @@ impl Engine {
         table: &str,
         column: &str,
         only: Option<u64>,
-    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
+    ) -> Result<Vec<Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
         let key = self.table_key(table);
         let schema = self.table_schema(table)?;
+        // Read before the table lock: `segment_row_counts` takes it too, and
+        // calling it under the guard self-locked the engine.
+        let segments: Vec<(u32, u64)> = self.segment_row_counts(table);
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
-        // Every HNSW **record** on the table owns a graph, so the registry is
-        // topped up from the catalog on every call rather than only while it is
-        // empty. The reference's `MemIndex` map is keyed by
-        // `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so a second
-        // `CREATE INDEX … USING HNSW` on a column the first one already covers
-        // gets a graph of its own - gating on `hnsw_mem.is_empty()` left the
-        // new index without one, and its dump then wrote nothing while the
-        // first index's graph was fed by both build paths.
+        // One graph per `(index, segment)`, materialised from the catalog's
+        // index records and the table's segments. The reference's `MemIndex`
+        // map is keyed `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index`, so a
+        // second `CREATE INDEX … USING HNSW` on a column the first one covers
+        // gets graphs of its own, and every segment of a table gets its own.
         {
             let indexes = self.storage.catalog.indexes_of_table(table)?;
             let types = self.column_types(table)?;
             for im in indexes {
                 if !im.index_type.eq_ignore_ascii_case("HNSW") {
-                    continue;
-                }
-                if entry.hnsw_mem.contains_key(&im.id) {
                     continue;
                 }
                 let Some(ci) = schema.iter().position(|c| c == &im.column) else {
@@ -4233,23 +4493,33 @@ impl Engine {
                     continue;
                 };
                 let options = crate::blocks::index_chunk::HnswOptions::from_options(&im.options);
-                entry.hnsw_mem.insert(
-                    im.id,
-                    Arc::new(Mutex::new(crate::hnsw_mem::HnswIndexInMem::new_with(
-                        dims, &options,
-                    ))),
-                );
+                entry.hnsw_options.insert(im.id, (dims, options));
+                for (segment, _) in &segments {
+                    entry.hnsw_mem.entry((im.id, *segment)).or_insert_with(|| {
+                        Arc::new(tokio::sync::Mutex::new(
+                            crate::hnsw_mem::HnswIndexInMem::new_with(
+                                dims,
+                                &options,
+                                *segment,
+                                (*segment as u64) << 32,
+                            ),
+                        ))
+                    });
+                }
             }
             entry.hnsw_probed = true;
         }
-        // Every HNSW index on `column` owns its own graph.
         let ids: Vec<u64> = match only {
             Some(id) => vec![id],
             None => self.index_ids_on_column(table, column),
         };
-        Ok(ids
-            .into_iter()
-            .filter_map(|id| entry.hnsw_mem.get(&id).cloned())
+        // Every segment's graph for each requested index, ascending by segment
+        // so a caller's iteration order is stable.
+        Ok(entry
+            .hnsw_mem
+            .iter()
+            .filter(|((id, _), _)| ids.contains(id))
+            .map(|(_, m)| Arc::clone(m))
             .collect())
     }
 
@@ -4258,7 +4528,7 @@ impl Engine {
         &self,
         table: &str,
         column: &str,
-    ) -> Result<Vec<Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
+    ) -> Result<Vec<Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>>> {
         self.hnsw_mem_segments_of(table, column, None)
     }
 
@@ -4274,13 +4544,16 @@ impl Engine {
     /// moved, `fetch_some_rows_with_ids` drops those, and `MATCH` answers
     /// nothing on a table full of matches (`TestParallelFulltextIndexReadWrite`,
     /// on the query that runs after its writers stopped).
-    pub(crate) fn text_index_for(
+    pub(crate) async fn text_index_for(
         &self,
         table: &str,
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        Ok(self.text_index_with_tokenizer(table, column, tokenizer)?.0)
+        Ok(self
+            .text_index_with_tokenizer(table, column, tokenizer)
+            .await?
+            .0)
     }
 
     /// [`Self::text_index_for`] **and** the tokeniser the returned index's
@@ -4294,7 +4567,7 @@ impl Engine {
     /// and `filter_fulltext` then keeps every row instead of narrowing. The
     /// caller passes the tokeniser only as the fallback for a record that names
     /// none.
-    pub(crate) fn text_index_with_tokenizer(
+    pub(crate) async fn text_index_with_tokenizer(
         &self,
         table: &str,
         column: &str,
@@ -4308,7 +4581,9 @@ impl Engine {
         let tokenizer = self
             .index_tokenizer_of(table, &index_name)
             .unwrap_or(tokenizer);
-        let index = self.text_index_for_id(table, index_id, column, tokenizer.clone())?;
+        let index = self
+            .text_index_for_id(table, index_id, column, tokenizer.clone())
+            .await?;
         Ok((index, tokenizer))
     }
 
@@ -4383,14 +4658,21 @@ impl Engine {
     }
 
     /// [`Self::text_index_build`] for one specific index id.
-    pub(crate) fn text_index_for_id(
+    pub(crate) async fn text_index_for_id(
         &self,
         table: &str,
         index_id: u64,
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<SharedTextIndex> {
-        self.text_index_build(table, index_id, column, tokenizer)
+        // Boxed and stated `Send`: the build holds a `std::sync::MutexGuard`
+        // in nested scopes, and an auto-inferred `async fn` body cannot prove
+        // its own `Send`ness across those (the same cycle `run_select` has).
+        // Naming the type as `dyn Future + Send` breaks it.
+        let built: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<SharedTextIndex>> + Send + '_>,
+        > = Box::pin(self.text_index_build(table, index_id, column, tokenizer));
+        built.await
     }
 
     /// Where the documents of `probe` live in the cached index of `index_id`,
@@ -4421,7 +4703,10 @@ impl Engine {
         let Some(shared) = shared else {
             return format!("{table}#{index_id}: nothing cached (live_rows={live_rows:?})");
         };
-        let index = shared.read().unwrap_or_else(|e| e.into_inner());
+        // `try_read`: this is the synchronous debug dump.
+        let Ok(index) = shared.try_read() else {
+            return format!("{table}#{index_id}: index locked");
+        };
         let mut out = format!(
             "{table}#{index_id} epoch={epoch} built={built:?} live_rows={live_rows:?} \
              total_docs={} overridden={} pending_publish={:?} inflight={}",
@@ -4470,7 +4755,7 @@ impl Engine {
     /// Split out of [`Self::text_index_build`] because the build asks twice: on
     /// the fast path, and again under the directory's write gate, where another
     /// build may have published while this one waited for it.
-    fn usable_text_index(
+    async fn usable_text_index(
         &self,
         key: &str,
         tkey: &str,
@@ -4513,7 +4798,7 @@ impl Engine {
             return (None, epoch);
         };
         let (complete, segments, tail, overridden) = {
-            let g = idx.read().unwrap_or_else(|e| e.into_inner());
+            let g = idx.read().await;
             (
                 g.total_docs(),
                 g.reader.segments.len(),
@@ -4542,7 +4827,7 @@ impl Engine {
     /// The build reads once, so its postings describe exactly the snapshot the
     /// statement sees; a merge that commits while it runs therefore invalidates
     /// the *cache*, never the answer - see [`TextPublish`].
-    fn text_index_build(
+    async fn text_index_build(
         &self,
         table: &str,
         index_id: u64,
@@ -4602,7 +4887,9 @@ impl Engine {
                 published
             }
         };
-        let (cached, epoch) = self.usable_text_index(&key, &tkey, index_id, reserved);
+        let (cached, epoch) = self
+            .usable_text_index(&key, &tkey, index_id, reserved)
+            .await;
         if let Some(idx) = cached {
             return Ok(idx);
         }
@@ -4664,11 +4951,13 @@ impl Engine {
         // exists, so no index lock is held while waiting, and released before the
         // publish takes `tables`.
         let gate = crate::engine::text_index::dir_gate(&dir);
-        let serial = gate.lock().unwrap_or_else(|poison| poison.into_inner());
+        let serial = gate.lock().await;
         // A build that lost the race for the gate would otherwise rebuild the
         // same column from scratch right after the winner published - six
         // readers that all missed the cache meant six sequential rebuilds.
-        let (cached, _) = self.usable_text_index(&key, &tkey, index_id, reserved);
+        let (cached, _) = self
+            .usable_text_index(&key, &tkey, index_id, reserved)
+            .await;
         if let Some(idx) = cached {
             return Ok(idx);
         }
@@ -4713,23 +5002,30 @@ impl Engine {
                 first = hole as usize;
             }
         }
+        // The build's `TextIndex` is not shared yet, so its rows go in
+        // directly: `index_row_prepared`'s spill-await needs the handle, and
+        // this loop still holds `index` by value.
         for (seq, cells) in self.fetch_rows_with_ids_projected_from(table, col, first)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
                 None => String::new(),
             };
-            index_row(&mut index, seq as u64, &text);
-            index.maybe_seal(self.memindex_capacity());
+            let doc = crate::engine::text_index::prepare_doc(seq as u64, &text, &index.tokenizer);
+            crate::engine::state::index_row_direct(&mut index, &doc);
+            index.maybe_seal(self.memindex_capacity()).await;
         }
         // The chunks on disk are consistent and complete now; only the publish
         // touches shared state, and it must not run with the gate held (it takes
         // `tables`, which the gate may not nest inside).
         drop(serial);
-        let shared = Arc::new(std::sync::RwLock::new(index));
+        let shared = Arc::new(tokio::sync::RwLock::new(index));
         #[cfg(test)]
-        run_text_build_hook();
-        match self.publish_text_index(&tkey, index_id, epoch, shared.clone()) {
+        run_text_build_hook().await;
+        match self
+            .publish_text_index(&tkey, index_id, epoch, shared.clone())
+            .await
+        {
             TextPublish::Cached => Ok(shared),
             // A compaction committed after the build's read. The build still
             // describes exactly the rows this statement sees (one read, one
@@ -4764,7 +5060,7 @@ impl Engine {
     /// Publishes a freshly built full-text index for `column`, unless the table's
     /// cached indexes were dropped (or a merge committed after the build's read)
     /// while it ran. See [`TextPublish`] for what the caller may do with it.
-    pub(crate) fn publish_text_index(
+    pub(crate) async fn publish_text_index(
         &self,
         tkey: &str,
         index_id: u64,
@@ -4774,11 +5070,13 @@ impl Engine {
         // The `ROW_ID` segments the build indexed, read before the table lock:
         // a query holds the index's read guard while it fetches rows, and that
         // fetch needs `tables`, so the reverse order is the deadlocking one.
-        let covered = index
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .covered_row_segments();
-        let built_docs = index.read().unwrap_or_else(|e| e.into_inner()).total_docs();
+        //
+        // The await happens **before** `tables` is locked, and the lock is
+        // taken in a nested non-async block: a `std::sync::MutexGuard` alive
+        // inside an async fn makes the whole future non-`Send` even when no
+        // await follows it.
+        let covered = index.read().await.covered_row_segments();
+        let built_docs = index.read().await.total_docs();
         // The count the cache holds right now, taken **between** two short
         // `tables` guards: the index lock may not be taken under `tables` (a
         // reader holds the index while it fetches rows, and that fetch needs
@@ -4791,14 +5089,40 @@ impl Engine {
                     .get(tkey)
                     .and_then(|entry| entry.text.get(&index_id).cloned())
             };
-            let docs = cached.as_ref().map(|cached| {
-                cached
-                    .read()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .total_docs()
-            });
+            let docs = match cached.as_ref() {
+                Some(cached) => Some(cached.read().await.total_docs()),
+                None => None,
+            };
             (cached, docs)
         };
+        // The publish itself is synchronous: it takes `tables` and decides
+        // against the catalog state. Split out so the guard lives in a plain
+        // fn - a `std::sync::MutexGuard` inside the async fn would keep the
+        // whole future non-`Send`, even with no await after it.
+        self.publish_text_index_locked(
+            tkey,
+            index_id,
+            epoch,
+            index,
+            &covered,
+            built_docs,
+            &cached_before,
+            cached_docs,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn publish_text_index_locked(
+        &self,
+        tkey: &str,
+        index_id: u64,
+        epoch: u64,
+        index: SharedTextIndex,
+        covered: &std::collections::BTreeSet<u32>,
+        built_docs: usize,
+        cached_before: &Option<SharedTextIndex>,
+        cached_docs: Option<usize>,
+    ) -> TextPublish {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey.to_string()).or_default();
         // The layout changed under the build: `TableEntry::text_epoch` is bumped
@@ -4888,7 +5212,7 @@ impl Engine {
     ///
     /// `built_ts` is the merge's commit ts: the caller raises
     /// `TableEntry::text_min_ts` to it, so the cache has to claim it.
-    pub(crate) fn reindex_compacted_text(
+    pub(crate) async fn reindex_compacted_text(
         &self,
         table: &str,
         rows: &[(usize, Vec<u8>)],
@@ -4939,7 +5263,11 @@ impl Engine {
             // Tokenise with no lock held: the analyzer is the expensive half of a
             // write (the DML path is split the same way).
             let prepared: Vec<PreparedDoc> = {
-                let tokenizer = shared.read().unwrap().tokenizer.clone();
+                // `try_read`: this runs inside a synchronous commit callback
+                // (no `.await` is allowed there).
+                let Ok(tokenizer) = shared.try_read().map(|g| g.tokenizer.clone()) else {
+                    continue;
+                };
                 // Every merged row is re-indexed, an unreadable one as an empty
                 // document. Skipping it would leave the cache one document short
                 // of `live_rows`, `text_index_build` would see a cache that never
@@ -4965,25 +5293,27 @@ impl Engine {
             if rows.is_empty()
                 || shared
                     .read()
-                    .unwrap()
+                    .await
                     .unsealed_segment()
                     .is_some_and(|held| held != segment)
             {
-                Self::with_text_dir_gate(shared, || {
-                    crate::engine::state::seal_text_index_gated(shared);
+                Self::with_text_dir_gate(shared, async {
+                    crate::engine::state::seal_text_index_gated(shared).await;
                     // `built_ts` is the merge's commit ts, and the chunks this
                     // seal writes belong to that transaction
                     // (`PopulateIndex(…, kCompact)`): recording them under
                     // `current_ts()` (the previous commit) made the merged
                     // segment's chunk claim a ts the reference never uses.
-                    crate::engine::with_chunk_ts(built_ts, || {
-                        self.record_sealed_text_chunks(table, column);
-                    });
-                });
+                    crate::engine::with_chunk_ts(built_ts, async {
+                        self.record_sealed_text_chunks(table, column).await;
+                    })
+                    .await;
+                })
+                .await;
             }
+            crate::engine::state::index_rows_prepared(shared, &prepared).await;
             {
-                let mut index = shared.write().unwrap();
-                crate::engine::state::index_rows_prepared(&mut index, &prepared);
+                let mut index = shared.write().await;
                 // Every id this merge left behind is retired: nothing names it any
                 // more, and the row it described now lives under `base + i`.
                 //
@@ -5018,12 +5348,13 @@ impl Engine {
             // the retired segments are gone from the catalog. Files and record
             // under one gate, or a build loading the list in between re-indexes
             // and rewrites the same chunk name (`Engine::with_text_dir_gate`).
-            Self::with_text_dir_gate(shared, || {
-                crate::engine::state::seal_text_index_gated(shared);
-                self.record_sealed_text_chunks(table, column);
-            });
+            Self::with_text_dir_gate(shared, async {
+                crate::engine::state::seal_text_index_gated(shared).await;
+                self.record_sealed_text_chunks(table, column).await;
+            })
+            .await;
             if ft_trace_enabled(&self.table_key(table)) {
-                let g = shared.read().unwrap_or_else(|e| e.into_inner());
+                let g = shared.read().await;
                 // The failure this trace exists for: a row is in the tail (so it
                 // counts towards `total_docs`, which is what lets the cache be
                 // reused) **and** marked overridden (so `merge` filters it out
@@ -5192,7 +5523,7 @@ impl Engine {
     /// column's first `PLAID`/`SMVE`/`EMVB` record, or an error when it has
     /// none (`PhysicalMatchTensorScan::PlanWithIndex` leaves such a column to
     /// the block scan).
-    pub(crate) fn multivector_index_for(
+    pub(crate) async fn multivector_index_for(
         &self,
         table: &str,
         column: &str,
@@ -5202,6 +5533,7 @@ impl Engine {
             .multivector_index_id(table, column)
             .ok_or_else(|| Error::NotFound(format!("no multi-vector index on '{column}'")))?;
         self.multivector_index_by_id(table, column, index_id, dims)
+            .await
     }
 
     /// [`Self::multivector_index_for`] for one specific catalog record.
@@ -5211,7 +5543,7 @@ impl Engine {
     /// options. The index's identity is its record - the reference's `MemIndex`
     /// is keyed by `idx_seg|{db}|{tbl}|{index_id}|{seg}|mem_index` - so a
     /// second `CREATE INDEX` on the same column must not rebuild the first.
-    pub(crate) fn multivector_index_by_id(
+    pub(crate) async fn multivector_index_by_id(
         &self,
         table: &str,
         column: &str,
@@ -5279,7 +5611,7 @@ impl Engine {
         // so a light column scan recovers the row ids.
         if record.index_type.eq_ignore_ascii_case("PLAID") {
             if let Ok(loaded) = self.read_plaid_index(table, &index_name) {
-                let seqs = self.multivector_row_ids(table, ci, dims)?;
+                let seqs = self.multivector_row_ids(table, ci, dims).await?;
                 if !seqs.is_empty() && loaded.doc_num() as usize == seqs.len() {
                     let mut index = MultiVectorIndex::new(
                         dir.clone(),
@@ -5371,7 +5703,7 @@ impl Engine {
     /// The rows a `SEARCH MATCH …` filter admits. The reference computes a
     /// per-block bitmask (`CalculateFilterBitmask`) and passes it to the index;
     /// this evaluates the same predicates once over the rows.
-    fn match_filter_rows(
+    async fn match_filter_rows(
         &self,
         table: &str,
         filters: &[&Expr],
@@ -5380,7 +5712,7 @@ impl Engine {
         if filters.is_empty() {
             return Ok(out);
         }
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
+        for (seq, row) in self.fetch_rows_with_ids(table).await? {
             if filters.iter().all(|filter| filter.eval_predicate(&row)) {
                 out.insert(seq as u64);
             }
@@ -5399,7 +5731,7 @@ impl Engine {
     ///
     /// `None` is not "no rows" - it is "use the exact scan", which is the only
     /// safe answer for a shape this module does not evaluate.
-    fn columnar_mask_rows(
+    async fn columnar_mask_rows(
         &self,
         table: &str,
         filters: &[&Expr],
@@ -5430,6 +5762,7 @@ impl Engine {
         }
         let rows = self
             .fetch_rows_with_ids_projected_some(table, &wanted)
+            .await
             .ok()?;
         let seqs: Vec<usize> = rows.iter().map(|(seq, _)| *seq).collect();
         let batch =
@@ -5461,9 +5794,9 @@ impl Engine {
     /// writer reads: a tombstoned row is not in a chunk, so listing it here
     /// would make the count disagree with `doc_num()` and every reopen would
     /// retrain the index instead of mapping it.
-    fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
+    async fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
         let mut out = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
+        for (seq, row) in self.fetch_rows_with_ids(table).await? {
             let text = match row.get(ci) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
@@ -5999,7 +6332,7 @@ impl Engine {
     /// would turn the string `null` into NULL and make the mask reject a row the
     /// row path keeps). Everything outside `idxs` is NULL: the result is a mask
     /// input, never a result row.
-    pub(crate) fn fetch_rows_with_ids_projected_some(
+    pub(crate) async fn fetch_rows_with_ids_projected_some(
         &self,
         table: &str,
         idxs: &[usize],
@@ -6019,7 +6352,7 @@ impl Engine {
             out
         };
         if !self.mirror_dirty(table) {
-            if let Ok((_, rows)) = self.read_blocks_pruned(table, idxs, &[]) {
+            if let Ok((_, rows)) = self.read_blocks_pruned(table, idxs, &[]).await {
                 let mut out = Vec::with_capacity(rows.len());
                 for (seq, cells) in rows {
                     let mut row = vec![Value::Null; width];
@@ -6034,13 +6367,14 @@ impl Engine {
             }
         }
         Ok(self
-            .row_set_from(table)?
+            .row_set_from(table)
+            .await?
             .into_iter()
             .map(|(seq, cells)| (seq, project(&cells)))
             .collect())
     }
 
-    /// Like `fetch_rows_with_ids_projected`, but including tombstoned rows.
+    /// Like `fetch_rows_with_ids_projected_some`, but including tombstoned rows.
     /// Corpus statistics keep counting deleted documents (as the reference's
     /// segments do until compaction), so the index must see them too.
     pub(crate) fn fetch_rows_with_ids_projected_all(
@@ -6073,7 +6407,7 @@ impl Engine {
     /// Rows matched by an equality on an indexed column, or the whole table
     /// when no such index applies. Point deletes/updates over a big table must
     /// not materialise every row.
-    pub(crate) fn rows_for_predicate(
+    pub(crate) async fn rows_for_predicate(
         &self,
         table: &str,
         where_pred: Option<&Predicate>,
@@ -6096,7 +6430,7 @@ impl Engine {
                 return self.fetch_some_rows_with_ids(table, &ids);
             }
         }
-        self.fetch_rows_with_ids(table)
+        self.fetch_rows_with_ids(table).await
     }
 
     /// Parses a stored row, padding trailing cells from the column defaults.
@@ -6262,7 +6596,7 @@ impl Engine {
     /// The allocator's registry is authoritative after a write; a table that
     /// was restored from a snapshot has no allocator history, so its segment
     /// ids are derived from the stored row ids (`segment_id << 32 | offset`).
-    pub fn segment_ids(&self, table: &str) -> Vec<u32> {
+    pub async fn segment_ids(&self, table: &str) -> Vec<u32> {
         let key = self.table_key(table);
         // A table the catalog no longer knows has no segments: the allocator's
         // in-memory counters outlive a `DROP`, so asking them would report the
@@ -6289,6 +6623,7 @@ impl Engine {
         }
         let mut ids: Vec<u32> = self
             .fetch_rows_with_ids(&key)
+            .await
             .unwrap_or_default()
             .iter()
             .map(|(seq, _)| (seq >> 32) as u32)
@@ -6485,11 +6820,21 @@ impl Engine {
             .map(|im| im.id)?;
         // The handle is cloned and `tables` released before it is locked (see
         // `text_index_for`).
-        let mem = {
+        // Every segment of the index contributes its own labels.
+        let mems: Vec<_> = {
             let tables = self.tables.lock().unwrap();
-            tables.get(&key)?.hnsw_mem.get(&index_id)?.clone()
+            let entry = tables.get(&key)?;
+            entry
+                .hnsw_mem
+                .iter()
+                .filter(|((id, _), _)| *id == index_id)
+                .map(|(_, m)| Arc::clone(m))
+                .collect()
         };
-        let len = mem.lock().unwrap().len();
+        let len: usize = mems
+            .iter()
+            .filter_map(|m| m.try_lock().ok().map(|m| m.len()))
+            .sum();
         Some(len)
     }
 
@@ -6550,7 +6895,7 @@ impl Engine {
     ///    /// The reference lists the tables in a read transaction and then compacts
     /// each one in its own compact transaction; here the catalog read is the
     /// listing and [`Self::compact_table`] opens the compaction.
-    pub fn notify_compact(&self) -> usize {
+    pub async fn notify_compact(&self) -> usize {
         let databases = self.storage.catalog.list_databases().unwrap_or_default();
         let tables = self.storage.catalog.list_tables().unwrap_or_default();
         let mut compacted = 0;
@@ -6574,7 +6919,7 @@ impl Engine {
             if self.compaction_candidates(&target).is_empty() {
                 continue;
             }
-            if self.compact_table(&target).is_ok() {
+            if self.compact_table(&target).await.is_ok() {
                 compacted += 1;
             }
         }
@@ -7459,7 +7804,7 @@ impl Engine {
     /// closure because both of them **seek** with it: the block-max WAND moves
     /// every cursor past a rejected row and the streaming path advances every
     /// merge cursor, instead of scoring/fetching the row and dropping it.
-    fn allowed_rows(
+    async fn allowed_rows(
         &self,
         table: &str,
         pred: Option<&Expr>,
@@ -7471,7 +7816,7 @@ impl Engine {
             return Ok(None);
         }
         let mut rows: Vec<u64> = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
+        for (seq, row) in self.fetch_rows_with_ids(table).await? {
             let row_id = seq as u64;
             // A tombstone can never be scored, so it is not an admitted row
             // either: leaving it out makes the seek skip deletes too.
@@ -7496,17 +7841,23 @@ impl Engine {
     /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
     /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
     /// `threshold` yields no rows rather than wrong ones.
-    pub(crate) fn search_text_terms(
+    pub(crate) async fn search_text_terms(
         &self,
         table: &str,
         m: &MatchClause,
         pred: Option<&Expr>,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         // A full-text scan holds the whole table's token data; bound how many
         // run at once so a handful of concurrent readers cannot exhaust memory.
-        let _scan = self.context.scan_gate.enter();
-        let out = self.search_text_terms_with_slot(table, m, pred, hidden)?;
+        // Taking the slot is an `await`: a reader that has to wait yields its
+        // task, so it never parks the thread that would poll the scan's own
+        // fan-out.
+        let _scan = self.context.scan_gate.enter().await;
+        let out = self
+            .search_text_terms_with_slot(table, m, pred, hidden, columns)
+            .await?;
         // An empty answer on a table full of matches is the failure this trace
         // exists for: record what the index held when it answered.
         if out.0.is_empty() {
@@ -7526,7 +7877,7 @@ impl Engine {
                     .and_then(|e| e.text.get(&index_id).cloned());
                 match shared {
                     Some(shared) => {
-                        let g = shared.read().unwrap_or_else(|e| e.into_inner());
+                        let g = shared.read().await;
                         eprintln!(
                             "[FT] {tkey}.{} MATCH {:?} -> 0 rows; docs={} segs={} tail={} overridden={}",
                             m.column,
@@ -7549,12 +7900,13 @@ impl Engine {
     /// field filled in, and taking a second slot on one thread is a deadlock:
     /// the gate admits two scans, so two concurrent statements doing that
     /// would each wait for the slot the other is holding.
-    fn search_text_terms_with_slot(
+    async fn search_text_terms_with_slot(
         &self,
         table: &str,
         m: &MatchClause,
         pred: Option<&Expr>,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         // A full-text search runs through an index; without one the C++ engine
@@ -7659,7 +8011,9 @@ impl Engine {
         if cols.is_empty() {
             // A column-less clause may still name fields inside the query.
             if let Some(groups) = parse_field_query(&query) {
-                return self.search_field_query(table, &groups, &query, pred, &params, hidden);
+                return self
+                    .search_field_query(table, &groups, &query, pred, &params, hidden, columns)
+                    .await;
             }
             // ...and otherwise falls back to `default_field=<col>`, which is
             // what the SDK's `match_text("", q, n, {"default_field": "body"})`
@@ -7675,7 +8029,11 @@ impl Engine {
                     // Carries this call's scan slot rather than taking another.
                     let mut m2 = m.clone();
                     m2.column = name;
-                    return self.search_text_terms_with_slot(table, &m2, pred, hidden);
+                    // The re-dispatch is recursive, so the future is boxed.
+                    return Box::pin(
+                        self.search_text_terms_with_slot(table, &m2, pred, hidden, columns),
+                    )
+                    .await;
                 }
                 None => return Ok((Vec::new(), hidden.to_vec())),
             }
@@ -7834,19 +8192,23 @@ impl Engine {
             // The predicate / `filter=` / `IN (…)` narrow the candidates before
             // the tree ranks and truncates, exactly like the WAND path.
             let dead = self.tombstone_set(table)?;
-            let allowed =
-                self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
-            if let Some(hits) = self.search_text_query_tree(
-                table,
-                &m.column,
-                &query,
-                topn,
-                delta_term,
-                delta_phrase,
-                threshold,
-                (bm25_k1, bm25_b),
-                allowed.as_ref(),
-            )? {
+            let allowed = self
+                .allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)
+                .await?;
+            if let Some(hits) = self
+                .search_text_query_tree(
+                    table,
+                    &m.column,
+                    &query,
+                    topn,
+                    delta_term,
+                    delta_phrase,
+                    threshold,
+                    (bm25_k1, bm25_b),
+                    allowed.as_ref(),
+                )
+                .await?
+            {
                 let wanted: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
                 let mut by_id: HashMap<usize, Vec<Value>> = self
                     .fetch_some_rows_with_ids(table, &wanted)?
@@ -7854,13 +8216,11 @@ impl Engine {
                     .collect();
                 let mut out = Vec::new();
                 for (seq, score) in hits {
-                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                    let Some(row) = by_id.remove(&(seq as usize)) else {
                         continue;
                     };
-                    row.push(Value::Int(seq as i64));
-                    row.push(Value::Float(score));
-                    row.push(Value::Float(0.0));
-                    row.push(Value::Float(score));
+                    let mut row = Self::project_search_row(row, columns, &schema);
+                    Self::layout_search_row(&mut row, columns, seq as usize, score, 0.0, true);
                     out.push(row);
                 }
                 // An empty tree result is the answer: falling through to the
@@ -7924,6 +8284,20 @@ impl Engine {
             && !field_specs.is_empty()
             && units.iter().all(|(_, toks, _, _)| !toks.is_empty())
         {
+            // The one `await` of this branch, taken **before** any index guard:
+            // the guards below are `RwLockReadGuard`s (not `Send`), so an
+            // `.await` after them would make this future non-`Send`.
+            //
+            // Tombstones still feed the corpus statistics (as the reference's
+            // segments do until compaction) but never rank.
+            let dead = self.tombstone_set(table)?;
+            // A filter removes documents before ranking. Its answer is a row list
+            // the iterator can seek with (`DocFilter`), which is what turns a
+            // rejected candidate from "decode the block bound, score, drop" into
+            // "hop every cursor past it".
+            let filter = self
+                .allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)
+                .await?;
             // One lazy posting stream per (field, term): nothing is materialised,
             // so the WAND cursors pay only for the documents they visit. The
             // guards stay alive for the whole scan because the streams borrow
@@ -7931,12 +8305,12 @@ impl Engine {
             let mut indexes = Vec::with_capacity(field_specs.len());
             for (ci, boost, d) in &field_specs {
                 let name = schema[*ci].clone();
-                indexes.push((*boost, self.text_index_for(table, &name, d.clone())?));
+                indexes.push((*boost, self.text_index_for(table, &name, d.clone()).await?));
             }
             // The guards borrow the arcs, so both stay alive for the scan.
             let mut held = Vec::with_capacity(indexes.len());
             for (boost, index) in &indexes {
-                held.push((*boost, index.read().unwrap()));
+                held.push((*boost, index.read().await));
             }
             let mut fields: Vec<WandField<'_>> = Vec::with_capacity(held.len());
             for (boost, guard) in &held {
@@ -8005,15 +8379,6 @@ impl Engine {
                     units: wand_units,
                 });
             }
-            // Tombstones still feed the corpus statistics (as the reference's
-            // segments do until compaction) but never rank.
-            let dead = self.tombstone_set(table)?;
-            // A filter removes documents before ranking. Its answer is a row list
-            // the iterator can seek with (`DocFilter`), which is what turns a
-            // rejected candidate from "decode the block bound, score, drop" into
-            // "hop every cursor past it".
-            let filter =
-                self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
             let mode = if boolean {
                 wand::WandMode::Boolean
             } else {
@@ -8098,13 +8463,11 @@ impl Engine {
                 }
                 let mut out = Vec::new();
                 for (seq, score) in scored {
-                    let Some(mut row) = by_id.remove(&seq) else {
+                    let Some(row) = by_id.remove(&seq) else {
                         continue;
                     };
-                    row.push(Value::Int(seq as i64));
-                    row.push(Value::Float(score));
-                    row.push(Value::Float(0.0));
-                    row.push(Value::Float(score));
+                    let mut row = Self::project_search_row(row, columns, &schema);
+                    Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
                     out.push(row);
                 }
                 // An empty tree result is the answer: falling through to the
@@ -8129,6 +8492,20 @@ impl Engine {
             }
             out
         };
+        // Deleted rows keep contributing to the corpus statistics (as the
+        // reference's segments do until compaction) but never rank.
+        let dead = self.tombstone_set(table)?;
+        // The filters are evaluated once, into the row list the cursors seek
+        // with; only `rank_features` still needs a row per candidate.
+        //
+        // This is the **only** `await` left in this function, and it has to
+        // happen here: the index read guards taken below are `RwLockReadGuard`s,
+        // which are not `Send`, so holding one across an `.await` would make the
+        // whole future non-`Send` and a SELECT could not run on a runtime
+        // worker.
+        let filter = self
+            .allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)
+            .await?;
         // Streaming scoring: one merge cursor per (field, query term). A
         // cursor walks its term's postings in document order and serves the
         // positions of the document it is parked on, so neither the posting
@@ -8136,11 +8513,11 @@ impl Engine {
         let mut indexes = Vec::with_capacity(field_specs.len());
         for (ci, boost, d) in &field_specs {
             let name = schema[*ci].clone();
-            indexes.push((*boost, self.text_index_for(table, &name, d.clone())?));
+            indexes.push((*boost, self.text_index_for(table, &name, d.clone()).await?));
         }
         let mut held = Vec::with_capacity(indexes.len());
         for (boost, index) in &indexes {
-            held.push((*boost, index.read().unwrap()));
+            held.push((*boost, index.read().await));
         }
         let mut field_texts: Vec<&TextIndex> = Vec::with_capacity(held.len());
         let mut field_cursors: Vec<Vec<MergeCursor<'_>>> = Vec::with_capacity(held.len());
@@ -8171,13 +8548,6 @@ impl Engine {
         // A `keyword`/`whitespace` field scores constantly: one field-boost
         // point per matching document (not per query term).
         let keyword_field = tokenizer.keyword();
-        // Deleted rows keep contributing to the corpus statistics (as the
-        // reference's segments do until compaction) but never rank.
-        let dead = self.tombstone_set(table)?;
-        // The filters are evaluated once, into the row list the cursors seek
-        // with; only `rank_features` still needs a row per candidate.
-        let filter =
-            self.allowed_rows(table, pred, in_filter.as_ref(), opt_filter.as_ref(), &dead)?;
         // `rank_features`: each listed tag's weight is the posting's doc-payload
         // column, written by the `rankfeatures` analyzer as
         // `SmallFloat::Float122ToUInt16`. Reading it from the index is what
@@ -8192,8 +8562,8 @@ impl Engine {
             if let Some((_, _, decoded)) = field_specs.first() {
                 for (ci, tags) in &rank_features {
                     let name = schema[*ci].clone();
-                    let index = self.text_index_for(table, &name, decoded.clone())?;
-                    let guard = index.read().unwrap();
+                    let index = self.text_index_for(table, &name, decoded.clone()).await?;
+                    let guard = index.read().await;
                     let per_tag = tags
                         .iter()
                         .map(|(tag, weight)| (tag.clone(), *weight, guard.doc_payloads(tag)))
@@ -8430,11 +8800,9 @@ impl Engine {
             .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -8454,7 +8822,7 @@ impl Engine {
     /// field qualifier, an empty analysis), in which case the caller keeps its
     /// plain-term fast path.
     #[allow(clippy::too_many_arguments)]
-    fn search_text_query_tree(
+    async fn search_text_query_tree(
         &self,
         table: &str,
         columns: &str,
@@ -8487,7 +8855,7 @@ impl Engine {
                 continue;
             }
             let tokenizer = self.index_tokenizer(table, name);
-            let _ = self.text_index_for(table, name, tokenizer)?;
+            let _ = self.text_index_for(table, name, tokenizer).await?;
         }
         // The registry is keyed by index id; the query names columns, so build
         // the `column -> shared index` view once from the catalog.
@@ -8585,7 +8953,8 @@ impl Engine {
         Ok(Some(hits))
     }
 
-    pub(crate) fn search_field_query(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn search_field_query(
         &self,
         table: &str,
         groups: &[(f64, Vec<(String, String)>)],
@@ -8593,6 +8962,7 @@ impl Engine {
         pred: Option<&Expr>,
         params: &str,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let boolean = params.split(';').any(|p| {
             p.split_once('=')
@@ -8603,7 +8973,9 @@ impl Engine {
                 .unwrap_or(false)
         });
         if !boolean {
-            return self.search_field_query_bm25(table, query, pred, params, hidden);
+            return self
+                .search_field_query_bm25(table, query, pred, params, hidden, columns)
+                .await;
         }
         let schema = self.table_schema(table)?;
         let mut fields: Vec<(String, usize, TextTokenizer)> = Vec::new();
@@ -8647,8 +9019,8 @@ impl Engine {
                 if toks.is_empty() {
                     continue;
                 }
-                let index = self.text_index_for(table, field_name, d.clone())?;
-                let guard = index.read().unwrap();
+                let index = self.text_index_for(table, field_name, d.clone()).await?;
+                let guard = index.read().await;
                 let merged = guard.merge(&toks);
                 for list in merged.postings.values() {
                     candidates.extend(list.iter().map(|(doc, _)| *doc));
@@ -8735,14 +9107,12 @@ impl Engine {
         });
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
-            self.fetch_rows_with_ids(table)?.into_iter().collect();
+            self.fetch_rows_with_ids(table).await?.into_iter().collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -8755,13 +9125,14 @@ impl Engine {
     /// counts, per-term document frequency) and per-document term frequency
     /// and length, `k1 = 1.2`, `b = 0.75`, and the leaf's `^boost` weight.
     #[allow(clippy::type_complexity)]
-    pub(crate) fn search_field_query_bm25(
+    pub(crate) async fn search_field_query_bm25(
         &self,
         table: &str,
         query: &str,
         pred: Option<&Expr>,
         params: &str,
         hidden: &[String],
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         // `column2analyzer`: the driver only needs the column's analyzer name.
@@ -8793,9 +9164,9 @@ impl Engine {
         let tree = SearchDriver::new(field2analyzer, default_field)
             .parse_single(query)
             .map_err(|error| Error::Invalid(format!("{error}")))?;
-        let mut columns: Vec<String> = Vec::new();
-        collect_query_columns(&tree, &mut columns);
-        let mut fields: Vec<FieldGroupField> = columns
+        let mut query_columns: Vec<String> = Vec::new();
+        collect_query_columns(&tree, &mut query_columns);
+        let mut fields: Vec<FieldGroupField> = query_columns
             .iter()
             .filter_map(|name| {
                 Some(FieldGroupField {
@@ -8826,8 +9197,10 @@ impl Engine {
                         .collect()
                 })
                 .unwrap_or_default();
-            let index = self.text_index_for(table, &field.name, field.tokenizer.clone())?;
-            let guard = index.read().unwrap();
+            let index = self
+                .text_index_for(table, &field.name, field.tokenizer.clone())
+                .await?;
+            let guard = index.read().await;
             let merged = guard.merge(&terms);
             n_docs = n_docs.max(merged.n_docs);
             field.avg_len = if merged.n_docs == 0 {
@@ -8964,11 +9337,9 @@ impl Engine {
             .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
-            row.push(Value::Int(seq as i64));
-            row.push(Value::Float(score));
-            row.push(Value::Float(0.0));
-            row.push(Value::Float(score));
+            let row = by_id.remove(&seq).unwrap_or_default();
+            let mut row = Self::project_search_row(row, columns, &schema);
+            Self::layout_search_row(&mut row, columns, seq, score, 0.0, true);
             out.push(row);
         }
         Ok((out, hidden.to_vec()))
@@ -9105,7 +9476,7 @@ impl Engine {
     /// The postings the in-memory full-text segment of `column` holds — what
     /// `ChunkIndexMetaInfo::term_count_` reports for a dump of it (it counts
     /// `(term, row)` pairs, not distinct terms: 100 rows of `aaa bbb` is 200).
-    pub(crate) fn text_term_count(&self, table: &str, column: &str) -> u32 {
+    pub(crate) async fn text_term_count(&self, table: &str, column: &str) -> u32 {
         let key = self.table_key(table);
         let Some(index_id) = self.fulltext_index_id(table, column) else {
             return 0;
@@ -9119,7 +9490,7 @@ impl Engine {
         let Some(shared) = shared else {
             return 0;
         };
-        let text = shared.read().unwrap();
+        let text = shared.read().await;
         // Spilled runs keep their postings on disk; their term dictionary is
         // loaded with the reader, so `postings` covers the memory tail only.
         text.mem
@@ -9131,13 +9502,21 @@ impl Engine {
 
     /// Runs `SEARCH …`. A single `MATCH` clause ranks its own column; several
     /// clauses combined with `FUSION(…)` return the union of the sub-searches.
-    pub(crate) fn run_search(
+    /// Returns the rows plus the hidden column names the search appends.
+    ///
+    /// `columns` is the scan's column list after the pruner narrowed it: the
+    /// table columns the plan reads plus whichever hidden columns it reads, in
+    /// scan order. The rows are laid out in exactly that order, so they line up
+    /// with the `Scan` node. When no table column is named the search skips
+    /// reading the ranked rows out of the blocks altogether.
+    pub(crate) async fn run_search(
         &self,
         table: &str,
         s: &SearchClause,
         pred: Option<&Expr>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
-        let hidden: Vec<String> = ["#_row_id", "#_similarity", "#_distance", "#_score"]
+        let hidden: Vec<String> = planner::SEARCH_HIDDEN_NAMES
             .iter()
             .map(|x| x.to_string())
             .collect();
@@ -9145,16 +9524,20 @@ impl Engine {
         // when it has a single child (e.g. `FUSION('match_tensor', …)` re-ranks
         // the one sub-search's candidates).
         if s.matches.len() > 1 || s.fusion.is_some() {
-            return self.fuse_matches(table, s, pred, hidden);
+            return self.fuse_matches(table, s, pred, hidden, columns).await;
         }
         match s.matches.first() {
-            Some(m) => self.run_one_match(
-                table,
-                m,
-                s.using_index.as_deref(),
-                s.with_opts.as_deref(),
-                pred,
-            ),
+            Some(m) => {
+                self.run_one_match(
+                    table,
+                    m,
+                    s.using_index.as_deref(),
+                    s.with_opts.as_deref(),
+                    pred,
+                    columns,
+                )
+                .await
+            }
             None => Ok((Vec::new(), hidden)),
         }
     }
@@ -9164,12 +9547,13 @@ impl Engine {
     /// (`physical_fusion_impl.cpp`): `rrf` is rank-based with a rank constant of
     /// 60, `weighted_sum`/`max` combine scores normalised by `none` (default for
     /// ...), `minmax` (the default), `l2` or `atan`, with per-child weights.
-    pub(crate) fn fuse_matches(
+    pub(crate) async fn fuse_matches(
         &self,
         table: &str,
         s: &SearchClause,
         pred: Option<&Expr>,
         hidden: Vec<String>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let method = s
             .fusion
@@ -9186,25 +9570,54 @@ impl Engine {
                 .map(|(_, v)| v.trim().to_string())
         };
         let num_children = s.matches.len();
+        // `match_tensor` reranks by a tensor column that the projection need not
+        // name: the sub-searches have to carry it, so their rows are read in
+        // `columns` plus that column and cut back afterwards.
+        let tensor_column = (method == "match_tensor")
+            .then(|| opt("column_name"))
+            .flatten()
+            .filter(|c| !columns.iter().any(|x| x == c));
+        // Fusion writes its combined score into `#_score` and dedups on
+        // `#_row_id`, so the children always carry both, even when the
+        // projection reads neither. `match_tensor` also needs its scoring
+        // column. The result is cut back to `columns` before it is returned.
+        let child_columns: Vec<String> = {
+            let mut cols: Vec<String> = columns.to_vec();
+            if let Some(column) = &tensor_column {
+                if !cols.contains(column) {
+                    cols.push(column.clone());
+                }
+            }
+            for extra in ["#_score", "#_row_id"] {
+                if !cols.iter().any(|c| c == extra) {
+                    cols.push(extra.to_string());
+                }
+            }
+            cols
+        };
         // Run each sub-search (best-first) and note whether its score is a
         // similarity (higher is better) or a distance (lower is better).
         let mut children: Vec<Vec<Vec<Value>>> = Vec::with_capacity(num_children);
         let mut min_heap: Vec<bool> = Vec::with_capacity(num_children);
         for m in &s.matches {
-            let (rows, _) = self.run_one_match(
+            let built: BoxedMatch = Box::pin(self.run_one_match(
                 table,
                 m,
                 s.using_index.as_deref(),
                 s.with_opts.as_deref(),
                 pred,
-            )?;
+                &child_columns,
+            ));
+            let (rows, _) = built.await?;
             min_heap.push(match_is_min_heap(m));
             children.push(rows);
         }
         // `match_tensor` ignores the children's scores entirely: it reranks the
         // union of the rows by a tensor similarity.
         if method == "match_tensor" {
-            return self.fuse_match_tensor(table, &opt, children, hidden);
+            // The children's rows are in `child_columns` order; the rerank reads
+            // the tensor column by name out of that list.
+            return self.fuse_match_tensor(table, &opt, children, hidden, columns, &child_columns);
         }
         // Per-document child scores, in first-seen order (fragment 0 first, then
         // each document in rank order).
@@ -9217,11 +9630,11 @@ impl Engine {
         let mut index: HashMap<i64, usize> = HashMap::new();
         for (ci, rows) in children.iter().enumerate() {
             for (rank, row) in rows.iter().enumerate() {
-                let id = match row.iter().rev().nth(3) {
+                let id = match row.last() {
                     Some(Value::Int(i)) => *i,
                     _ => continue,
                 };
-                let score = match row.last() {
+                let score = match row.iter().rev().nth(1) {
                     Some(Value::Float(f)) => *f,
                     Some(Value::Int(i)) => *i as f64,
                     _ => 0.0,
@@ -9293,7 +9706,11 @@ impl Engine {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
             docs.truncate(topn);
-            return Ok((docs.into_iter().map(|d| d.row).collect(), hidden));
+            let rows: Vec<Vec<Value>> = docs
+                .into_iter()
+                .map(|doc| Self::reshape_fusion_row(doc.row, columns, &child_columns))
+                .collect();
+            return Ok((rows, hidden));
         }
         if method == "rrf" {
             let rank_constant: f64 = opt("rank_constant")
@@ -9392,7 +9809,50 @@ impl Engine {
             y.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal)
         });
         docs.truncate(topn);
-        Ok((docs.into_iter().map(|d| d.row).collect(), hidden))
+        // The children's rows are in `child_columns` order; the result has the
+        // shape the scan declared.
+        let rows: Vec<Vec<Value>> = docs
+            .into_iter()
+            .map(|doc| Self::reshape_fusion_row(doc.row, columns, &child_columns))
+            .collect();
+        Ok((rows, hidden))
+    }
+
+    /// Cuts a fusion row back to the scan's column list.
+    ///
+    /// The children were read in `child_columns` (which carries the score and
+    /// row id the fusion itself needs); a row is laid out table columns first,
+    /// then the hidden ones, and both lists name their table columns in the
+    /// same order.
+    fn reshape_fusion_row(
+        row: Vec<Value>,
+        columns: &[String],
+        child_columns: &[String],
+    ) -> Vec<Value> {
+        let child_table: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .collect();
+        let child_hidden: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| crate::is_search_hidden(c))
+            .collect();
+        let mut out: Vec<Value> = Vec::with_capacity(columns.len());
+        for column in columns {
+            let value = if crate::is_search_hidden(column) {
+                child_hidden
+                    .iter()
+                    .position(|c| *c == column)
+                    .and_then(|i| row.get(child_table.len() + i))
+            } else {
+                child_table
+                    .iter()
+                    .position(|c| *c == column)
+                    .and_then(|i| row.get(i))
+            };
+            out.push(value.cloned().unwrap_or(Value::Null));
+        }
+        out
     }
 
     /// `FUSION('match_tensor', …)`: reranks the **union** of the sub-search rows
@@ -9405,6 +9865,8 @@ impl Engine {
         opt: &impl Fn(&str) -> Option<String>,
         children: Vec<Vec<Vec<Value>>>,
         hidden: Vec<String>,
+        columns: &[String],
+        child_columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let column = opt("column_name").unwrap_or_default();
         let search_tensor = opt("search_tensor").unwrap_or_default();
@@ -9434,7 +9896,7 @@ impl Engine {
         let mut candidates: Vec<(i64, Vec<Value>)> = Vec::new();
         for child in children {
             for row in child {
-                let id = match row.iter().rev().nth(3) {
+                let id = match row.last() {
                     Some(Value::Int(i)) => *i,
                     _ => continue,
                 };
@@ -9443,9 +9905,24 @@ impl Engine {
                 }
             }
         }
+        // The children's rows are laid out as the scan's pruned column list, not
+        // the table's: the tensor column is wherever that list puts it (and it
+        // may be absent - then this rerank has nothing to score).
+        // A row is laid out table columns first, then the hidden ones, so the
+        // tensor column's index is its position among the **table** columns the
+        // children read (not its position in `child_columns`, which interleaves
+        // the hidden ones).
+        let child_table_columns: Vec<&String> = child_columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .collect();
+        let cell_index = child_table_columns
+            .iter()
+            .position(|c| **c == column)
+            .unwrap_or(col_idx);
         let mut scored: Vec<(i64, f64, Vec<Value>)> = Vec::new();
         for (id, row) in candidates {
-            let cell = match row.get(col_idx) {
+            let cell = match row.get(cell_index) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(v) => v.to_slt_string(),
                 None => continue,
@@ -9468,12 +9945,25 @@ impl Engine {
                 .then(a.0.cmp(&b.0))
         });
         scored.truncate(topn);
+        // The result carries the shape the scan declared: the table columns the
+        // projection kept, then the hidden ones. The extra scoring column the
+        // children needed is dropped here.
+        let table_columns: Vec<usize> = columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .filter_map(|c| schema.iter().position(|s| s == c))
+            .collect();
+        let is_sim = true;
         Ok((
             scored
                 .into_iter()
-                .map(|(_, score, mut row)| {
-                    set_score(&mut row, score);
-                    row
+                .map(|(id, score, row)| {
+                    let mut out: Vec<Value> = table_columns
+                        .iter()
+                        .map(|i| row.get(*i).cloned().unwrap_or(Value::Null))
+                        .collect();
+                    Self::layout_search_row(&mut out, columns, id as usize, score, -score, is_sim);
+                    out
                 })
                 .collect(),
             hidden,
@@ -9482,22 +9972,78 @@ impl Engine {
 
     /// Runs a single `MATCH` clause by brute force, returning the matching rows
     /// with hidden `ROW_ID/SIMILARITY/DISTANCE/SCORE` columns.
-    pub(crate) fn run_one_match(
+    /// Lays a search hit's row out the way the plan's scan declares it: the
+    /// table columns first (already in `row`, in the scan's order), then
+    /// whichever hidden columns the scan names.
+    ///
+    /// The pruner narrows the scan's column list, so a projection that reads
+    /// only `SCORE()` gets a row of one cell - the other hidden values are not
+    /// computed at all. `is_sim` says whether `sim` is the score (a similarity)
+    /// or `dist` is (`SCORE()` returns the similarity for a similarity metric,
+    /// the distance otherwise).
+    ///
+    /// Cuts a stored row down to the table columns the scan names, in the scan's
+    /// order. `fetch_some_rows_with_ids` returns the table's whole row; a
+    /// `SEARCH` row is laid out as the pruned scan list, so the unread columns
+    /// have to go before the hidden values are appended.
+    ///
+    /// `schema` is the table's column list, which is the order the stored row is
+    /// in.
+    fn project_search_row(row: Vec<Value>, columns: &[String], schema: &[String]) -> Vec<Value> {
+        let positions: Vec<Option<usize>> = columns
+            .iter()
+            .filter(|c| !crate::is_search_hidden(c))
+            .map(|c| schema.iter().position(|s| s == c))
+            .collect();
+        if positions.iter().any(Option::is_none) {
+            // The row is already in the scan's layout (the caller materialised
+            // it that way); leave it.
+            return row;
+        }
+        positions
+            .iter()
+            .map(|i| row.get(i.expect("checked")).cloned().unwrap_or(Value::Null))
+            .collect()
+    }
+
+    fn layout_search_row(
+        row: &mut Vec<Value>,
+        columns: &[String],
+        seq: usize,
+        sim: f64,
+        dist: f64,
+        is_sim: bool,
+    ) {
+        for column in columns.iter().filter(|c| crate::is_search_hidden(c)) {
+            match column.as_str() {
+                "#_row_id" => row.push(Value::Int(seq as i64)),
+                "#_similarity" => row.push(Value::Float(sim)),
+                "#_distance" => row.push(Value::Float(dist)),
+                "#_score" => row.push(Value::Float(if is_sim { sim } else { dist })),
+                _ => {}
+            }
+        }
+    }
+
+    pub(crate) async fn run_one_match(
         &self,
         table: &str,
         m: &MatchClause,
         using_index: Option<&str>,
         with_opts: Option<&str>,
         pred: Option<&Expr>,
+        columns: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
-        let hidden: Vec<String> = ["#_row_id", "#_similarity", "#_distance", "#_score"]
+        let hidden: Vec<String> = planner::SEARCH_HIDDEN_NAMES
             .iter()
             .map(|x| x.to_string())
             .collect();
         let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
         if m.kind.eq_ignore_ascii_case("TEXT") {
-            return self.search_text_terms(table, m, pred, &hidden);
+            return self
+                .search_text_terms(table, m, pred, &hidden, columns)
+                .await;
         }
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
@@ -9505,7 +10051,7 @@ impl Engine {
         // A vector/sparse/tensor scan also reads most of the table; share the
         // same bound as full-text scans (acquired after the TEXT early return,
         // which takes the slot itself).
-        let _scan = self.context.scan_gate.enter();
+        let _scan = self.context.scan_gate.enter().await;
         // A trailing index name in `MATCH VECTOR (col, vec, 'float', 'l2', k,
         // 'idx')` must reference an existing index.
         if !is_tensor && !is_sparse {
@@ -9885,7 +10431,7 @@ impl Engine {
                         // `PlanWithIndex` simply leaves the index out and the
                         // scan reads the blocks, so a missing record falls
                         // through to the exact scan below.
-                        let index = self.multivector_index_for(table, &column, dims).ok();
+                        let index = self.multivector_index_for(table, &column, dims).await.ok();
                         if let Some(index) = index {
                             let dead = self.tombstone_set(table)?;
                             let rank = |seq: u64| {
@@ -9903,7 +10449,7 @@ impl Engine {
                                 if filters.is_empty() {
                                     None
                                 } else {
-                                    Some(self.match_filter_rows(table, &filters)?)
+                                    Some(self.match_filter_rows(table, &filters).await?)
                                 };
                             let hits = index.read().unwrap().search(
                                 &query,
@@ -9925,13 +10471,20 @@ impl Engine {
                                 .collect();
                             let mut out = Vec::new();
                             for (seq, score) in scored {
-                                let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                                let Some(row) = by_id.remove(&(seq as usize)) else {
                                     continue;
                                 };
-                                row.push(Value::Int(seq as i64));
-                                row.push(Value::Float(score));
-                                row.push(Value::Float(-score));
-                                row.push(Value::Float(score));
+                                // The stored row is the table's whole row; the
+                                // scan names only some of it.
+                                let mut row = Self::project_search_row(row, columns, &schema);
+                                Self::layout_search_row(
+                                    &mut row,
+                                    columns,
+                                    seq as usize,
+                                    score,
+                                    -score,
+                                    true,
+                                );
                                 out.push(row);
                             }
                             return Ok((out, hidden));
@@ -9979,16 +10532,21 @@ impl Engine {
                     let mut by_id: HashMap<usize, Vec<Value>> = self
                         .fetch_some_rows_with_ids(table, &wanted)?
                         .into_iter()
+                        .map(|(seq, row)| (seq, Self::project_search_row(row, columns, &schema)))
                         .collect();
                     let mut out = Vec::new();
                     for (seq, score) in scored {
                         let Some(mut row) = by_id.remove(&(seq as usize)) else {
                             continue;
                         };
-                        row.push(Value::Int(seq as i64));
-                        row.push(Value::Float(score));
-                        row.push(Value::Float(-score));
-                        row.push(Value::Float(score));
+                        Self::layout_search_row(
+                            &mut row,
+                            columns,
+                            seq as usize,
+                            score,
+                            -score,
+                            true,
+                        );
                         out.push(row);
                     }
                     return Ok((out, hidden));
@@ -10045,7 +10603,7 @@ impl Engine {
                         {
                             None
                         } else {
-                            Some(self.match_filter_rows(table, &filters)?)
+                            Some(self.match_filter_rows(table, &filters).await?)
                         };
                         let hits: Vec<(u64, f32)> = index
                             .read()
@@ -10070,14 +10628,21 @@ impl Engine {
                             .collect();
                         let mut out = Vec::new();
                         for (seq, score) in hits {
-                            let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                            let Some(row) = by_id.remove(&(seq as usize)) else {
                                 continue;
                             };
                             let score = f64::from(score);
-                            row.push(Value::Int(seq as i64));
-                            row.push(Value::Float(score));
-                            row.push(Value::Float(-score));
-                            row.push(Value::Float(score));
+                            // The stored row is the table's whole row; the scan
+                            // names only some of it.
+                            let mut row = Self::project_search_row(row, columns, &schema);
+                            Self::layout_search_row(
+                                &mut row,
+                                columns,
+                                seq as usize,
+                                score,
+                                -score,
+                                true,
+                            );
                             out.push(row);
                         }
                         return Ok((out, hidden));
@@ -10086,36 +10651,6 @@ impl Engine {
             }
         }
 
-        // A *warm* cache only. Building one decodes the whole column, which an
-        // indexed query never needs: the graph names its candidates and those
-        // rows are decoded below. Asking for the cache here built one per cold
-        // process - 500 ms at 200k rows, seconds at 1M - for ten result rows.
-        // The exact scan below still builds it, once, because there it saves
-        // parsing the whole column on every repeat query.
-        let cache_eligible: Option<(String, usize)> = (|| {
-            if is_sparse || is_tensor {
-                return None;
-            }
-            if pred.is_some() || in_filter.is_some() || search_filter.is_some() {
-                return None;
-            }
-            let decl = types.get(col_idx)?.to_ascii_uppercase();
-            if decl.contains("MULTI") || !decl.contains("FLOAT") || decl.contains("INT") {
-                return None;
-            }
-            if !matches!(metric.as_str(), "l2" | "cosine" | "ip") {
-                return None;
-            }
-            let dims = type_dim(types.get(col_idx)?)?;
-            if dims == 0 {
-                return None;
-            }
-            let col = match_columns(&m.column).first()?.clone();
-            Some((col, dims))
-        })();
-        let cache_warm: Option<SharedVectorCache> = cache_eligible
-            .as_ref()
-            .and_then(|(col, _)| self.vector_cache_peek(table, col));
         // Rows come from whichever consumer needs them: an index answers with a
         // candidate set and only those rows are decoded; the exact scan needs
         // the table. `rows` therefore starts empty and is filled once the
@@ -10148,7 +10683,7 @@ impl Engine {
                 .chain(in_filter.as_ref())
                 .chain(search_filter.as_ref())
                 .collect();
-            self.columnar_mask_rows(table, &filters)
+            self.columnar_mask_rows(table, &filters).await
         } else {
             None
         };
@@ -10164,7 +10699,10 @@ impl Engine {
             .iter()
             .filter_map(|x| x.parse::<f32>().ok())
             .collect();
-        let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
+        // An `async` block: the probe awaits its spann fan-out. Everything it
+        // touches before the first `await` is synchronous, so the readers'
+        // locks are released before the future can be parked (§7.6).
+        let vector_candidates: Option<std::collections::HashSet<usize>> = (async {
             if is_sparse || is_tensor {
                 return None;
             }
@@ -10305,30 +10843,23 @@ impl Engine {
             // `Some(usize)` here avoids (an indexed query must never fall back
             // to the table just because nothing was cached yet).
             let live_count = index_id.and_then(|_| {
-                cache_warm
-                    .as_ref()
-                    .and_then(|c| c.read().ok().map(|g| g.live.len()))
-                    // A cache that exists but holds no row is **unknown**, not
-                    // "the table is empty": taking its `0` as the count made
-                    // `all_covered` false for every indexed query on a table
-                    // with rows, and the coverage fallback then walked every
-                    // row->partition mapping - 138 ms of a 112 ms query at 200k
-                    // rows x 1536d, and 1.1 s of it at 2M.
-                    .filter(|live| *live > 0)
-                    .or_else(|| {
-                        self.tables
-                            .lock()
-                            .unwrap()
-                            .get(&self.table_key(table))
-                            .and_then(|e| e.live_rows)
-                    })
-                    // Nothing published the count yet: a table that was only ever
-                    // written to keeps `live_rows` at `None` (`note_live_rows` adds
-                    // to an existing count), so the first vector query used to
-                    // declare the graph incomplete and decode the whole table. The
-                    // count walks the block versions (and publishes itself), which
-                    // is bounded work done once per table.
-                    .or_else(|| self.row_count(table).ok().filter(|rows| *rows > 0))
+                // The count the write paths publish; without one the first
+                // query walks the block versions (bounded, done once per
+                // table) rather than guessing at the coverage.
+                //
+                // The guard must be dropped **before** `row_count` runs: it
+                // locks `tables` itself, and a temporary `MutexGuard` in this
+                // chain would live to the end of the statement - a
+                // self-deadlock on a non-reentrant lock.
+                let published = self
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&self.table_key(table))
+                    .and_then(|e| e.live_rows);
+                published
+                    .or_else(|| self.row_count(table).ok())
+                    .filter(|rows| *rows > 0)
             });
             // `candidates ∪ uncovered`: the rows the index can win plus the rows
             // it does not cover (`§9.7`). Both are scored exactly, so a partly
@@ -10340,24 +10871,20 @@ impl Engine {
                 rows: &rows,
                 live_rows: None,
                 live_count,
-                cache: cache_warm.as_ref(),
                 topn,
                 metric: &metric,
                 options: &knn_opts,
                 allowed: allowed.as_ref(),
                 beam,
             })
+            .await
             .map(|probe| probe.rows())
-        })();
+        })
+        .await;
         // An index answered: its candidates carry the vectors to score, so the
         // column is never read whole. Without one the exact scan wants the
         // parsed column, and building the cache is what makes a repeated exact
         // query cheap.
-        let cache: Option<SharedVectorCache> = match (&vector_candidates, &cache_eligible) {
-            (Some(_), _) => cache_warm,
-            (None, Some((col, dims))) => self.vector_cache_for(table, col, *dims).ok(),
-            (None, None) => None,
-        };
         // The scan's own metadata, needed by the streamed per-batch scans below.
         let column_decl = types
             .get(col_idx)
@@ -10377,15 +10904,19 @@ impl Engine {
         // per-query working set stops mattering next to the index itself.
         const RERANK_BATCH: usize = 64;
         // The candidate set is known: decode only the rows it kept, or the whole
-        // table when no index answered.
-        if cache.is_none() {
-            // No index answered and the cache was refused its budget: there is no
-            // candidate list to decode, and materializing the table (a full-width
-            // `Vec<Value>` per row) is exactly the allocation the cap refused. Score
-            // the visible vectors one batch at a time and keep each batch's top-n;
-            // the output rows are fetched afterwards, for the final hits only.
-            // Sparse and tensor scans still take the whole column: their scores are
-            // built from it before ranking (the BMP index and MaxSim read `rows`).
+        // table when no index answered. There is no vector cache to consult -
+        // the mapped blocks are the cache (the pages stay in the OS page cache
+        // and the mapping is shared), and a heap copy of the column would only
+        // duplicate what the mapping already hands out.
+        {
+            // No index answered: there is no candidate list to decode, and
+            // materializing the table (a full-width `Vec<Value>` per row) is
+            // exactly the allocation the old cache made. Score the visible
+            // vectors one batch at a time and keep each batch's top-n; the
+            // output rows are fetched afterwards, for the final hits only.
+            // Sparse and tensor scans still take the whole column: their scores
+            // are built from it before ranking (the BMP index and MaxSim read
+            // `rows`).
             rows = match &vector_candidates {
                 // The fast path: an unfiltered dense embedding whose declared
                 // shape matches the query. The row is decoded as `f32` out of its
@@ -10399,8 +10930,13 @@ impl Engine {
                         && !has_filter
                         && !is_sparse
                         && !is_tensor
+                        // `f32` only: `cursor.vectors` below decodes the block
+                        // as `f32`, so an integer or double column has to take
+                        // the row path.
                         && crate::blocks::embedding_shape(&column_decl)
-                            .is_some_and(|(dim, _)| dim == query_f32.len()) =>
+                            .is_some_and(|(dim, element_type)| {
+                                dim == query_f32.len() && element_type == 6
+                            }) =>
                 {
                     let (dim, element_type) =
                         crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
@@ -10443,10 +10979,13 @@ impl Engine {
                             metric: &metric,
                             threshold,
                             rows: &got,
-                            cache: None,
                             vector_candidates: None,
                         };
-                        merged.extend(batch.finish(batch.execute(&keep, &none, &none)?).scored);
+                        merged.extend(
+                            batch
+                                .finish(batch.execute(&keep, &none, &none).await?)
+                                .scored,
+                        );
                     }
                     streamed = Some(merged);
                     Vec::new()
@@ -10477,18 +11016,34 @@ impl Engine {
                     // query and the column's declared element agree on it; a
                     // filtered query needs the whole row, so it takes the row
                     // batches below.
+                    //
+                    // The element has to be `f32` (code 6): `for_each_block_f32`
+                    // walks the block's bytes as `f32` and returns immediately
+                    // for anything else, so a `TINYINT`/`UINT8`/`DOUBLE` column
+                    // would take the dense branch and produce no rows at all -
+                    // `test_knn_hnsw_u8` read that as an empty result.
                     let dense = if has_filter {
                         None
                     } else {
-                        crate::blocks::embedding_shape(&column_decl)
-                            .filter(|(dim, _)| *dim == query_f32.len())
+                        crate::blocks::embedding_shape(&column_decl).filter(
+                            |(dim, element_type)| *dim == query_f32.len() && *element_type == 6,
+                        )
                     };
-                    let mut ids: Vec<u64> = self
-                        .live_row_ids(table)
-                        .into_iter()
-                        .map(|seq| seq as u64)
-                        .collect();
-                    ids.sort_unstable();
+                    // The row-id list is only for the fallback that decodes
+                    // rows; the dense path walks the blocks themselves. Building
+                    // it costs a `HashSet` of every row, which the profile put at
+                    // ~45% of a SIFT 1M scan.
+                    let ids: Vec<u64> = if dense.is_some() {
+                        Vec::new()
+                    } else {
+                        let mut ids: Vec<u64> = self
+                            .live_row_ids(table)
+                            .into_iter()
+                            .map(|seq| seq as u64)
+                            .collect();
+                        ids.sort_unstable();
+                        ids
+                    };
                     let mut cursor = match dense {
                         Some(_) => Some(self.block_cursor(table)?),
                         None => None,
@@ -10507,65 +11062,88 @@ impl Engine {
                         metric: &metric,
                         threshold,
                         rows: &[],
-                        cache: None,
                         vector_candidates: None,
                     };
                     let none: HashMap<usize, f64> = HashMap::new();
                     let mut merged: Vec<(usize, f64, f64)> = Vec::new();
-                    for chunk in ids.chunks(RERANK_BATCH) {
-                        let scored: Vec<(usize, f64, f64)> = match (dense, cursor.as_mut()) {
-                            (Some((dim, element_type)), Some(cursor)) => cursor
-                                .vectors(col_idx, dim, element_type, chunk)?
-                                .into_iter()
-                                .map(|(seq, stored)| {
+                    if let (Some((dim, element_type)), Some(cursor)) = (dense, cursor.as_mut()) {
+                        // The dense full scan reads the mapped `f32` bytes and
+                        // scores straight out of them - no `Vec<f32>` per row
+                        // (that copy was 64% of this query on SIFT 1M), no
+                        // per-batch set, no sort.
+                        // The reference keeps a top-k heap and reduces it as it
+                        // scans; this reduces per block instead of collecting
+                        // every row, so the working set is `topn` per block
+                        // rather than 1M `(id, sim, dist)` triples.
+                        // One running top-n for the whole scan: each row is
+                        // compared against the set's current cutoff, so the
+                        // 122 per-block `select_nth_unstable_by` calls (16% of
+                        // this query) are gone.
+                        let mut top = truncate.topn_collector();
+                        cursor.for_each_block_f32(
+                            col_idx,
+                            dim,
+                            element_type,
+                            // The whole block at once: one call per block, and
+                            // the row slices come straight out of the mapping.
+                            &mut |base, floats, slots| {
+                                for slot in slots.iter().copied() {
+                                    let at = slot * dim;
+                                    let Some(row) = floats.get(at..at + dim) else {
+                                        continue;
+                                    };
                                     let (sim, dist) =
-                                        crate::vector_score_f32(&query_f32, &stored, &metric);
-                                    (seq, sim, dist)
-                                })
-                                .collect(),
-                            _ => {
-                                let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
-                                if !has_filter {
-                                    for (_, row) in got.iter_mut() {
-                                        let value =
-                                            row.get(col_idx).cloned().unwrap_or(Value::Null);
-                                        *row = vec![Value::Null; col_idx + 1];
-                                        row[col_idx] = value;
-                                    }
+                                        crate::vector_score_f32(&query_f32, row, &metric);
+                                    top.push((base + slot, sim, dist));
                                 }
-                                let batch = knn_scan::PhysicalKnnScan {
-                                    column_index: col_idx,
-                                    column_type: &column_decl,
-                                    is_sparse,
-                                    is_tensor,
-                                    is_bit_sparse: bit_sparse,
-                                    query_items: &query_items,
-                                    query_elem_type: query_elem_arg.as_deref(),
-                                    topn,
-                                    metric: &metric,
-                                    threshold,
-                                    rows: &got,
-                                    cache: None,
-                                    vector_candidates: None,
-                                };
-                                batch.execute(&keep, &none, &none)?.scored
+                                true
+                            },
+                        )?;
+                        merged.extend(top.into_rows());
+                    } else {
+                        // Sparse, tensor or filtered: the row path, one batch at
+                        // a time, because the score is built from other columns
+                        // too.
+                        for chunk in ids.chunks(RERANK_BATCH) {
+                            let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
+                            if !has_filter {
+                                for (_, row) in got.iter_mut() {
+                                    let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                    *row = vec![Value::Null; col_idx + 1];
+                                    row[col_idx] = value;
+                                }
                             }
-                        };
-                        // The union of per-batch top-n is a superset of the
-                        // global top-n for a monotone ranking key.
-                        merged.extend(
-                            truncate
-                                .finish(knn_scan::KnnScanOperatorState {
-                                    scored,
-                                    use_sim: truncate.is_knn_min_heap(),
-                                })
-                                .scored,
-                        );
+                            let batch = knn_scan::PhysicalKnnScan {
+                                column_index: col_idx,
+                                column_type: &column_decl,
+                                is_sparse,
+                                is_tensor,
+                                is_bit_sparse: bit_sparse,
+                                query_items: &query_items,
+                                query_elem_type: query_elem_arg.as_deref(),
+                                topn,
+                                metric: &metric,
+                                threshold,
+                                rows: &got,
+                                vector_candidates: None,
+                            };
+                            let scored = batch.execute(&keep, &none, &none).await?.scored;
+                            // The union of per-batch top-n is a superset of the
+                            // global top-n for a monotone ranking key.
+                            merged.extend(
+                                truncate
+                                    .finish(knn_scan::KnnScanOperatorState {
+                                        scored,
+                                        use_sim: truncate.is_knn_min_heap(),
+                                    })
+                                    .scored,
+                            );
+                        }
                     }
                     streamed = Some(merged);
                     Vec::new()
                 }
-                None => self.fetch_rows_with_ids(table)?,
+                None => self.fetch_rows_with_ids(table).await?,
             };
         }
         // One BMP index per query over the scanned rows: sparse vectors use the
@@ -10711,7 +11289,6 @@ impl Engine {
             metric: &metric,
             threshold,
             rows: &rows,
-            cache: cache.as_ref(),
             vector_candidates,
         };
         // Scoring only ever reads the vector column, so the rows it decoded are
@@ -10726,7 +11303,7 @@ impl Engine {
                 scored,
                 use_sim: scan.is_knn_min_heap(),
             }),
-            None => scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?),
+            None => scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores).await?),
         };
         let use_sim = state.use_sim;
         let scored = state.scored;
@@ -10742,7 +11319,8 @@ impl Engine {
                 &mv_scores,
                 &scored,
                 query_started.elapsed(),
-            );
+            )
+            .await;
         }
 
         // The result rows are read from the blocks in one pass. The scoring pass
@@ -10750,20 +11328,55 @@ impl Engine {
         // them, and a point read per row took the journal/KV path at ~3 ms a
         // row - ten result rows spent 28 ms after the query had finished in
         // 0.2 ms.
-        let mut by_id: HashMap<usize, Vec<Value>> = HashMap::new();
-        let missing: Vec<u64> = scored
+        // The table columns the scan names, in scan order. The hidden columns
+        // are appended by this function, so they are not read here.
+        let table_columns: Vec<&String> = columns
             .iter()
-            .map(|(seq, _, _)| *seq as u64)
-            .filter(|seq| !by_id.contains_key(&(*seq as usize)))
+            .filter(|c| !crate::is_search_hidden(c))
             .collect();
+        let mut by_id: HashMap<usize, Vec<Value>> = HashMap::new();
+        // No table column is named: the projection reads only the hidden ones,
+        // so the ranked rows are never read out of the blocks. That is the whole
+        // point of letting the pruner decide the shape - `SELECT ROW_ID()` pays
+        // for the ranking and nothing else.
+        let missing: Vec<u64> = if table_columns.is_empty() {
+            Vec::new()
+        } else {
+            scored.iter().map(|(seq, _, _)| *seq as u64).collect()
+        };
         if !missing.is_empty() {
             let set: std::collections::HashSet<usize> =
                 missing.iter().map(|seq| *seq as usize).collect();
+            // The columns the plan reads, plus the scored one: the tensor and
+            // sparse paths score from the row itself (`scan.execute`), so
+            // dropping it would leave every score at zero. The extra column is
+            // cut off below.
+            let schema = self.table_schema(table).unwrap_or_default();
+            let mut read: Vec<usize> = table_columns
+                .iter()
+                .filter_map(|c| schema.iter().position(|s| *s == **c))
+                .collect();
+            if !read.contains(&col_idx) {
+                read.push(col_idx);
+            }
             // One pass over the blocks that hold any of the wanted rows, not a
             // point read per row: a point read took the journal/KV path and cost
             // ~3 ms per row on this table, so ten result rows spent 28 ms after
             // the query itself had finished in 0.2 ms.
-            by_id.extend(self.read_blocks_candidates_values(table, &[], &set)?.1);
+            // The reader returns a full-width row with the columns it did not
+            // decode as `Null`, so each row is projected down to `read` here.
+            for (seq, cells) in self
+                .read_blocks_candidates_values(table, &read, &set)
+                .await?
+                .1
+            {
+                let row: Vec<Value> = read
+                    .iter()
+                    .take(table_columns.len())
+                    .map(|i| cells.get(*i).cloned().unwrap_or(Value::Null))
+                    .collect();
+                by_id.insert(seq, row);
+            }
         }
         let num = |f: f64| {
             if bit_sparse {
@@ -10776,13 +11389,30 @@ impl Engine {
         for (seq, sim, dist) in scored {
             // A stale sequence id (a row re-keyed by DROP COLUMN or compacted)
             // has no stored row; emitting an empty row would add a phantom hit.
-            let Some(mut row) = by_id.remove(&seq) else {
+            let Some(mut row) = by_id.remove(&seq).or_else(|| {
+                // Hidden-only projections never read the stored row, but the
+                // row still has to exist: a stale id must not become a hit.
+                if table_columns.is_empty() {
+                    Some(Vec::new())
+                } else {
+                    None
+                }
+            }) else {
                 continue;
             };
-            row.push(Value::Int(seq as i64));
-            row.push(num(sim));
-            row.push(Value::Float(dist));
-            row.push(num(if use_sim { sim } else { dist }));
+            let score = num(if use_sim { sim } else { dist });
+            let sim_value = num(sim);
+            // `#_score` is `num(..)`: a bit sparse column renders as an integer.
+            let mut row = std::mem::take(&mut row);
+            for column in columns.iter().filter(|c| crate::is_search_hidden(c)) {
+                match column.as_str() {
+                    "#_row_id" => row.push(Value::Int(seq as i64)),
+                    "#_similarity" => row.push(sim_value.clone()),
+                    "#_distance" => row.push(Value::Float(dist)),
+                    "#_score" => row.push(score.clone()),
+                    _ => {}
+                }
+            }
             out.push(row);
         }
         Ok((out, hidden))
@@ -10953,11 +11583,32 @@ impl Engine {
     }
 
     /// Waits for every queued background dump to finish.
-    pub fn drain_background_tasks(&self) {
+    pub async fn drain_background_tasks(&self) {
         let processor = self.bg_processor.lock().unwrap().clone();
         if let Some(processor) = processor {
-            processor.drain();
+            processor.drain().await;
         }
+    }
+
+    /// Shuts the engine down: stops the background processor after the tasks it
+    /// already queued have run, then checkpoints.
+    ///
+    /// This is the **explicit** shutdown, and the only place that waits for
+    /// background work to finish. `Drop` cannot do it - it cannot await, and a
+    /// destructor that parks a runtime worker to wait is exactly what §7.2
+    /// forbids - so dropping an `Engine` closes the processor's queue without
+    /// waiting for the tasks already running (see `BGTaskProcessor::drop`).
+    /// A caller that needs those tasks complete - a test that inspects their
+    /// result, a binary on its way out - awaits this instead.
+    ///
+    /// Idempotent: a second call finds the processor already stopped and only
+    /// re-runs the checkpoint.
+    pub async fn close(&self) -> Result<()> {
+        let processor = self.bg_processor.lock().unwrap().clone();
+        if let Some(processor) = processor {
+            processor.stop().await;
+        }
+        self.flush_storage().await
     }
 
     /// Queues a [`CleanupTask`]. Returns `false` when no processor is attached
@@ -11043,14 +11694,14 @@ impl Engine {
     /// every second and fires each trigger whose interval has elapsed
     /// (`periodic_trigger_thread_impl.cpp:49-74`).
     ///
-    /// Only the CLI calls this: [`Engine::open_with_options`] stays
+    /// Only the CLI calls this: the synchronous [`Self::open`] stays
     /// deterministic for tests and embedded callers.
     ///
     /// `compact_interval` drives [`Self::notify_compact`], the reference's
     /// periodic compaction (`compaction_process_impl.cpp:86`): every database
     /// and table is visited, and the segments `NewCompactionAlg` picks are
     /// merged. `Duration::ZERO` disables a trigger.
-    pub fn start_background_tasks(
+    pub async fn start_background_tasks(
         self: &Arc<Self>,
         checkpoint_interval: std::time::Duration,
         cleanup_interval: std::time::Duration,
@@ -11058,7 +11709,7 @@ impl Engine {
         optimize_interval: std::time::Duration,
     ) {
         let processor = Arc::new(BGTaskProcessor::new(1));
-        processor.start();
+        processor.start().await;
         self.attach_bg_task_processor(processor);
         self.attach_bottom_pool();
         // The bottom halves run on the shared blocking pool, one job per table
@@ -11377,7 +12028,7 @@ impl Engine {
         /// read once the table lock is released (a scan holds one of these
         /// guards while it waits for `tables`).
         enum Handle {
-            Hnsw(Arc<Mutex<crate::hnsw_mem::HnswIndexInMem>>),
+            Hnsw(Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>),
             Text(SharedTextIndex),
             Sparse(Arc<std::sync::RwLock<SparseIndex>>),
             Mv(Arc<std::sync::RwLock<MultiVectorIndex>>),
@@ -11394,8 +12045,9 @@ impl Engine {
                 match kind.as_str() {
                     "HNSW" => entry
                         .hnsw_mem
-                        .get(&meta.id)
-                        .map(|h| Handle::Hnsw(h.clone())),
+                        .iter()
+                        .find(|((id, _), _)| *id == meta.id)
+                        .map(|(_, h)| Handle::Hnsw(Arc::clone(h))),
                     "FULLTEXT" => entry.text.get(&meta.id).map(|t| Handle::Text(t.clone())),
                     "SPARSE" | "BMP" => entry
                         .sparse
@@ -11411,11 +12063,16 @@ impl Engine {
             };
             let (row_count, mem_used) = match handle {
                 Some(Handle::Hnsw(h)) => {
-                    let h = h.lock().unwrap();
+                    // `try_lock`: this is the synchronous `SHOW INDEX` report.
+                    // A graph a build is filling reads as empty here, which is
+                    // the state its charge has not been published for yet.
+                    let Ok(h) = h.try_lock() else {
+                        continue;
+                    };
                     (h.len(), h.mem_usage())
                 }
                 Some(Handle::Text(t)) => {
-                    let t = t.read().unwrap();
+                    let Ok(t) = t.try_read() else { continue };
                     // The rows still unsealed: the resident tail plus the one a
                     // seal is writing right now (it keeps answering from memory,
                     // so it must not disappear from the report mid-seal).
@@ -11461,7 +12118,7 @@ impl Engine {
     /// This is the data a slow full-text query is diagnosed with. It reads the
     /// column under its **read** guard, which a seal never holds while writing,
     /// so asking for stats cannot be blocked behind an fsync.
-    pub fn fulltext_stats(&self, table: &str) -> Vec<diagnostics::FulltextStats> {
+    pub async fn fulltext_stats(&self, table: &str) -> Vec<diagnostics::FulltextStats> {
         let key = self.table_key(table);
         // Clone the handles out of `tables`, then drop the guard: the index lock
         // is taken after it everywhere (see `dml::batch_gate`).
@@ -11486,33 +12143,33 @@ impl Engine {
                 None => Vec::new(),
             }
         };
-        let mut out: Vec<diagnostics::FulltextStats> = handles
-            .into_iter()
-            .map(|(column, shared)| {
-                let index = shared.read().unwrap();
-                diagnostics::FulltextStats {
-                    table: table.to_string(),
-                    index: column,
-                    chunks: index.reader.segments.len(),
-                    chunk_rows: index
-                        .reader
-                        .segments
-                        .iter()
-                        .map(|segment| segment.docs as usize)
-                        .sum(),
-                    tail_rows: index.mem.pending_docs(),
-                    spill_runs: index.mem.runs.len(),
-                    inflight_rows: index
-                        .inflight
-                        .as_ref()
-                        .map(|inflight| inflight.mem.pending_docs())
-                        .unwrap_or(0),
-                    overridden_rows: index.overridden.len(),
-                    tail_bytes: index.mem.mem_used(),
-                    last_seal_us: index.last_seal_us,
-                }
-            })
-            .collect();
+        // A loop, not `map`: the body awaits the index's read lock, and a
+        // closure cannot.
+        let mut out: Vec<diagnostics::FulltextStats> = Vec::with_capacity(handles.len());
+        for (column, shared) in handles {
+            let index = shared.read().await;
+            out.push(diagnostics::FulltextStats {
+                table: table.to_string(),
+                index: column,
+                chunks: index.reader.segments.len(),
+                chunk_rows: index
+                    .reader
+                    .segments
+                    .iter()
+                    .map(|segment| segment.docs as usize)
+                    .sum(),
+                tail_rows: index.mem.pending_docs(),
+                spill_runs: index.mem.runs.len(),
+                inflight_rows: index
+                    .inflight
+                    .as_ref()
+                    .map(|inflight| inflight.mem.pending_docs())
+                    .unwrap_or(0),
+                overridden_rows: index.overridden.len(),
+                tail_bytes: index.mem.mem_used(),
+                last_seal_us: index.last_seal_us,
+            });
+        }
         out.sort_by(|a, b| a.index.cmp(&b.index));
         out
     }
@@ -11570,7 +12227,7 @@ impl Engine {
         self.ensure_cleanup_allowed()?;
         // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
         // records the KV store holds are reclaimed here, not at a checkpoint.
-        if let Ok(applied) = self.txn.applied_ts() {
+        if let Ok(applied) = self.txn.applied_ts().await {
             let _ = self.txn.drop_sealed_wal_up_to(applied);
         }
         self.reclaim_deprecated_segments()?;
@@ -11578,7 +12235,7 @@ impl Engine {
         // drop writes a marker per block and `Cleanup` removes the file, the
         // way the reference does (its marker stays).
         let _ = self.reclaim_dropped_block_columns();
-        let cleaned = self.cleanup_index_chunks();
+        let cleaned = self.cleanup_index_chunks().await;
         // `BGTaskProcessor` records the cleanup timestamp so the trigger can
         // skip ticks with nothing new to reclaim
         // (`background_process_impl.cpp:126-138`, `last_cleanup_ts_`).

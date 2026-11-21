@@ -43,6 +43,52 @@ env:
   RUST_DESELECT: |
     python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
 
+  # The level `rust_engine/.cargo/config.toml` leaves at `native` is wrong for a
+  # binary that has to run elsewhere, so every lane pins its own here.
+  #
+  # These are the *target-scoped* variables, not `RUSTFLAGS`: cargo appends them
+  # to the section's list, so the `link-arg=-fuse-ld=mold` in `config.toml`
+  # survives and the later `-C target-cpu=` wins. `RUSTFLAGS` would replace the
+  # list wholesale and drop mold. The loom and sanitizer steps set `RUSTFLAGS`
+  # deliberately - they want a clean slate - and pass the linker flag themselves
+  # where it matters.
+  #
+  # AVX2 baseline (Haswell, 2013). The binary carries no AVX-512: `crc32fast`
+  # was the only source of it, and it is patched to a slicing-by-8 stand-in
+  # (`crates/crc32fast-shim`, see `[patch.crates-io]`). Without that patch the
+  # crate emits 52 `zmm` instructions whatever `target-cpu` says, and on this
+  # runner pool some CPUs advertise `avx512f` in CPUID and then reject it - the
+  # engine died with SIGILL before it could log a line.
+  #
+  # The C flags repeat the level for a different reason: rustc's flag does not
+  # reach RocksDB. `librocksdb-sys`'s build script reads
+  # `CARGO_ENCODED_RUSTFLAGS` and takes the *first* `target-cpu` it finds
+  # (`rustflags::from_env().find_map()`), which is the `native` in
+  # `rust_engine/.cargo/config.toml` - the override above only wins for rustc,
+  # which takes the last. So the C++ side was always `-march=native`: built on
+  # an AMD runner it carried `insertq` (SSE4a, AMD-only), and an Intel Xeon
+  # 6975P-C died in `rocksdb::ImmutableDBOptions` with SIGILL while an EPYC ran
+  # the same artifact fine. `cc` appends `CFLAGS`/`CXXFLAGS` after every flag
+  # the build script sets, so repeating the level here is what pins RocksDB.
+  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
+    -C target-cpu=x86-64-v3
+  CFLAGS_x86_64_unknown_linux_gnu: -march=x86-64-v3 -mpclmul
+  CXXFLAGS_x86_64_unknown_linux_gnu: -march=x86-64-v3 -mpclmul
+  # ARMv9-A with SVE2, which is what `ubuntu-24.04-arm` (Azure Cobalt 100) is.
+  # The default `generic` has NEON only, so `f32x8` would split across two
+  # 128-bit registers. macOS lanes are `aarch64-apple-darwin` and read neither
+  # variable - Apple Silicon has no SVE and must not inherit this.
+  #
+  # `CFLAGS`/`CXXFLAGS` repeat the level for the same reason as on x86_64: the
+  # RocksDB build script takes the first `target-cpu`, which is the `native`
+  # in `rust_engine/.cargo/config.toml`. On this triple `native` and
+  # `neoverse-n2` describe the same hardware, so the repeat changes nothing
+  # today; it keeps the two sides from drifting if the pin ever moves.
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: >-
+    -C target-cpu=neoverse-n2
+  CFLAGS_aarch64_unknown_linux_gnu: -mcpu=neoverse-n2
+  CXXFLAGS_aarch64_unknown_linux_gnu: -mcpu=neoverse-n2
+
 jobs:
   quality:
     # Gate F: formatting, lints, licenses / advisories.
@@ -660,6 +706,8 @@ jobs:
         # `/var/infinity/test_data`; this is the same generate-and-copy step
         # the other Go jobs run.
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         # `ulimit -n` is for the many-client case: it holds 5 000 sockets and
         # the server, started here with the same limit, holds the 5 000 it
@@ -721,6 +769,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Install the SDK and the test dependencies
         run: uv sync --python 3.13 --extra test --index-url https://pypi.org/simple/
+      - name: Check the binary can run on this CPU
+        # The binary is built on one runner and executed on another, so a
+        # `target-cpu` the executor lacks shows up as a bare SIGILL with an
+        # empty log - which is what "unhealthy in 60s" looked like when this was
+        # first pinned to a level.
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
@@ -792,6 +846,8 @@ jobs:
         # generate-and-copy step the reference's jobs run (`-jc` copies without
         # running the .slt suite).
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
@@ -845,6 +901,8 @@ jobs:
         # The HTTP suite runs the same PySDK cases (`--http`), imports
         # included, so it reads `/var/infinity/test_data/*` too.
         run: uv run --python 3.13 python3 tools/sqllogictest.py -jc=1
+      - name: Check the binary can run on this CPU
+        run: ./scripts/check_engine_binary.sh ./bin/infinity conf/infinity_conf.toml
       - name: Start the engine
         run: |
           nohup ./bin/infinity --config=conf/infinity_conf.toml > infinity.log 2>&1 &
@@ -935,9 +993,12 @@ jobs:
           command -v bwrap >/dev/null 2>&1 ||
             { sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap; }
 
-      - name: loom (commit-ts ordering model)
+      - name: loom (commit-ts allocation model)
         working-directory: rust_engine
-        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib
+        # Exhaustive interleavings of the `prepare_commit_ts_ += 2` protocol
+        # `TxnManager::reserve_commit_ts` / `turn_done` implement, including the
+        # "smallest unfinished ts never runs ahead" rule. Takes ~15 s.
+        run: RUSTFLAGS="--cfg loom" cargo test -p txn --lib loom
       - name: Miri (pure-Rust front end)
         working-directory: rust_engine
         run: |

@@ -11,7 +11,8 @@ reference and the rewrite can be compared on the same machine.
 force); `--build-type lsg` builds the current LSP/LSG HNSW variant.
 
 Usage: perf_sift.py <cpp|rust> [--dataset sift|gist] [--no-index]
-                    [--build-type plain|lsg] [--rows N] [--queries N]
+                    [--build-type plain|lsg] [--encode plain|lvq]
+                    [--rows N] [--queries N]
                     [--ef N] [--times N] [--port N] [--data-dir DIR]
 """
 
@@ -138,6 +139,34 @@ def wait_ready(port, proc, log, seconds=300):
     raise SystemExit("engine did not come up")
 
 
+def sql_batch(port, stmts, timeout=None):
+    """Runs `stmts` in one psql session with `\timing on`, returning the
+    per-statement `Time: x ms` figures and each statement's row ids."""
+    script = ["\\timing on"]
+    script.extend(stmts)
+    return subprocess.run(
+        [
+            "psql",
+            "-h",
+            "127.0.0.1",
+            "-p",
+            str(port),
+            "-U",
+            "admin",
+            "-d",
+            "default_db",
+            "-A",
+            "-t",
+            "-f",
+            "-",
+        ],
+        input="\n".join(script) + "\n",
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
 def knn_sql(table, vec, topk, ef, use_index):
     stmt = (
         f"SELECT ROW_ID() FROM {table} SEARCH MATCH VECTOR "
@@ -156,12 +185,31 @@ def main():
         "--no-index", action="store_true", help="brute force: skip CREATE INDEX"
     )
     ap.add_argument("--build-type", choices=["plain", "lsg"], default="plain")
+    # `lvq` is this port's default and the CI job's setting, but the reference
+    # does not train an LVQ codebook at build time, so a build-time comparison
+    # against it has to use `plain` on this side too.
+    ap.add_argument("--encode", choices=["plain", "lvq"], default="lvq")
     ap.add_argument("--data-dir", default="", help="override the dataset directory")
     ap.add_argument("--rows", type=int, default=0, help="0 = the whole base")
     ap.add_argument("--queries", type=int, default=100)
+    # HNSW build workers. 0 keeps the engine's own default (half the logical
+    # cores), which is what the reference uses too (`dense_index_building_worker
+    # = hardware_concurrency() / 2`). Set it to compare at a fixed width, e.g.
+    # all cores, on both sides.
+    ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--ef", type=int, default=200)
     ap.add_argument("--times", type=int, default=1)
     ap.add_argument("--port", type=int, default=0)
+    # One `psql` session for the whole timed loop instead of one process per
+    # query. The per-query form measures the client's startup and connection
+    # along with the engine; this form measures the engine (plus the wire and
+    # parse) and is what a long-lived client sees.
+    ap.add_argument(
+        "--batch",
+        action="store_true",
+        help="send every timed query down one psql session (\timing) "
+        "instead of starting psql per query",
+    )
     args = ap.parse_args()
 
     spec = DATASETS[args.dataset]
@@ -190,11 +238,14 @@ def main():
         else "rust_engine/scripts/infinity_rust_shim.sh"
     )
     log = os.path.join(root, "engine.log")
+    child_env = dict(os.environ, INFINITY_DATA=root)
+    if args.workers:
+        child_env["INFINITY_HNSW_BUILD_WORKERS"] = str(args.workers)
     proc = subprocess.Popen(
         [binary, f"--config={root}/engine.toml"],
         stdout=open(log, "w"),
         stderr=subprocess.STDOUT,
-        env=dict(os.environ, INFINITY_DATA=root),
+        env=child_env,
         start_new_session=True,
     )
 
@@ -212,10 +263,13 @@ def main():
         "dataset": args.dataset,
         "index": "none" if args.no_index else "hnsw",
         "build_type": None if args.no_index else args.build_type,
+        "workers": args.workers or None,
+        "encode": None if args.no_index else args.encode,
         "rows": args.rows or 1_000_000,
         "ef": args.ef,
         "queries": args.queries,
         "times": args.times,
+        "batch": args.batch,
     }
     try:
         wait_ready(port, proc, log)
@@ -242,7 +296,9 @@ def main():
         if args.no_index:
             result["index_s"] = 0.0
         else:
-            params = "M = 16, ef_construction = 200, metric = l2, encode = lvq"
+            params = (
+                f"M = 16, ef_construction = 200, metric = l2, encode = {args.encode}"
+            )
             if args.build_type == "lsg":
                 params += ", build_type = 'lsg'"
             t0 = time.time()
@@ -266,24 +322,59 @@ def main():
         for q in warmup:
             vec = "[" + ",".join(f"{x:.6f}" for x in q) + "]"
             sql(port, knn_sql(table, vec, 100, args.ef, use_index))
-        for _ in range(args.times):
-            for qi, q in enumerate(queries):
-                vec = "[" + ",".join(f"{x:.6f}" for x in q) + "]"
-                t0 = time.time()
-                r = sql(port, knn_sql(table, vec, 100, args.ef, use_index))
-                latencies.append(time.time() - t0)
-                if r.returncode != 0:
-                    raise SystemExit(f"query: {r.stderr[-1000:]}")
+        if args.batch:
+            # One session for every timed query: the per-query form pays psql's
+            # startup and a fresh connection each time, which is client cost, not
+            # engine cost. `\timing on` reports each statement's server-side
+            # elapsed time, which is the number a long-lived client sees.
+            import re as _re
+
+            vecs = ["[" + ",".join(f"{x:.6f}" for x in q) + "]" for q in queries]
+            stmts = [
+                knn_sql(table, vec, 100, args.ef, use_index) for vec in vecs
+            ] * args.times
+            r = sql_batch(port, stmts, timeout=args.queries * 60 + 60)
+            if r.returncode != 0:
+                raise SystemExit(f"batch query: {r.stderr[-2000:]}")
+            # psql prints the rows of a statement, then `Time: x ms`. Split the
+            # output on those markers to attribute rows to statements.
+            chunks = _re.split(r"^Time: ([0-9.]+) ms$", r.stdout, flags=_re.MULTILINE)
+            # chunks = [rows0, t0, rows1, t1, ...]; the last element is the
+            # trailing text after the final marker.
+            times = [float(x) for x in chunks[1::2]]
+            bodies = chunks[0::2]
+            latencies.extend(t / 1000.0 for t in times)
+            for i in range(min(len(truth) * args.times, len(bodies))):
                 got = set()
-                for line in r.stdout.splitlines():
+                for line in bodies[i].splitlines():
                     line = line.strip()
                     if line:
                         try:
                             got.add(int(line))
                         except ValueError:
                             pass
+                qi = i % len(truth)
                 total += len(truth[qi])
                 hits += len(got & set(truth[qi]))
+        else:
+            for _ in range(args.times):
+                for qi, q in enumerate(queries):
+                    vec = "[" + ",".join(f"{x:.6f}" for x in q) + "]"
+                    t0 = time.time()
+                    r = sql(port, knn_sql(table, vec, 100, args.ef, use_index))
+                    latencies.append(time.time() - t0)
+                    if r.returncode != 0:
+                        raise SystemExit(f"query: {r.stderr[-1000:]}")
+                    got = set()
+                    for line in r.stdout.splitlines():
+                        line = line.strip()
+                        if line:
+                            try:
+                                got.add(int(line))
+                            except ValueError:
+                                pass
+                    total += len(truth[qi])
+                    hits += len(got & set(truth[qi]))
 
         latencies.sort()
         result["qps"] = round(len(latencies) / sum(latencies), 2) if latencies else 0

@@ -6,8 +6,82 @@
 CC = "clang"
 CXX = "clang++"
 
-# Link with mold. A full link of this workspace is dominated by the ~40 MB
-# binary plus the static RocksDB, and mold does that several times faster than
-# the system `ld` without changing the output.
+# One section per target triple, so each architecture gets its own baseline and
+# neither can affect the other. `cargo` only reads the section whose triple it
+# is building for: an `aarch64-unknown-linux-gnu` build never sees the x86_64
+# flags, and the macOS lanes (`aarch64-apple-darwin`) match no section here at
+# all - Apple Silicon has no SVE, so it must not inherit the Linux ARMv9 one.
+#
+# `target-cpu=native` is the local default: a developer's build uses whatever
+# the machine has, which is the right answer when the binary only runs there.
+# A release cannot use it - the output would depend on whichever runner the job
+# landed on, and a machine with AVX-512 would emit `zmm` the users' CPUs fault
+# on. The release and test lanes override it with
+# `CARGO_TARGET_<TRIPLE>_RUSTFLAGS`, which **appends** to this list rather than
+# replacing it: the later `-C target-cpu=...` wins, and the `link-arg` below
+# survives. (Setting `RUSTFLAGS` instead would replace the list wholesale and
+# drop mold, so the CI must use the target-scoped variable.)
+#
+# `link-arg=-fuse-ld=mold` stays in each section for that reason: a full link of
+# this workspace is dominated by the ~40 MB binary plus the static RocksDB, and
+# mold does that several times faster than the system `ld` without changing the
+# output.
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "target-cpu=native",
+]
+
+# The CI override for this triple is
+#   -C target-cpu=x86-64-v3
+# plus `CFLAGS`/`CXXFLAGS_x86_64_unknown_linux_gnu="-march=x86-64-v3 -mpclmul"`
+# for the C side.
+#
+# The C flags need the level spelled out, and not only `-mpclmul`: this file's
+# `native` still reaches `librocksdb-sys`, whose build script takes the *first*
+# `target-cpu` in `CARGO_ENCODED_RUSTFLAGS` while rustc takes the last. A
+# `-march=native` build on an AMD host therefore emits SSE4a (`insertq`) into
+# RocksDB, which faults on any Intel CPU.
+#
+# `crc32fast` is patched to a SIMD-free stand-in, so nothing here pulls in an
+# AVX-512 path that a hypervisor might advertise and then reject.
+#
+# `x86-64-v3` is the AVX2 baseline (Haswell, 2013). Without it the default
+# `x86-64` target has only SSE2, and `std::simd`'s `f32x8` is split into two
+# 128-bit halves: the exact scan's `l2_sq` came out as `subps`/`mulps`/`addps`
+# with no `ymm` register at all. With v3 the same kernel is one
+# `vsubps`/`vmulps`/`vaddps` over 256 bits, which took the SIFT 1M brute-force
+# scan from 39.4 to 34.9 ms p50.
+#
+# RocksDB's `crc32c.cc` calls `_mm_clmulepi64_si128`, and no x86-64-vN level
+# defines `__PCLMUL__` (v3 and v4 both leave it undefined), so the C compiler
+# needs `-mpclmul` or the build dies with
+# `'__builtin_ia32_pclmulqdq128' needs target feature pclmul`.
+#
+# That flag belongs on `CFLAGS`, **not** on `-C target-feature=+pclmulqdq`.
+# Giving it to rustc makes LLVM emit 52 AVX-512 instructions elsewhere in the
+# binary - measured: `zmm` goes 0 -> 52 with the target feature, 0 without.
+# `native` implies `pclmul` anyway, which is why the local default needs no
+# separate flag.
+
+# aarch64 Linux. The CI override for this triple is
+#   -C target-cpu=neoverse-n2
+#
+# `neoverse-n2` is the CPU in `ubuntu-24.04-arm` (Azure Cobalt 100) and the
+# smallest named ARMv9 profile `rustc` knows: it enables `v9a` plus `sve2`, so
+# `std::simd`'s `f32x8` can use 256-bit SVE registers instead of being split
+# across two 128-bit NEON ones. The default `generic` target has `neon` only.
+#
+# This is a bigger commitment than the x86 side: `sve2` is absent from ARMv8
+# parts, and a binary built this way faults on them. It is pinned because the
+# release lane and the arm64 test lane both run on that hardware; a build meant
+# for older ARM servers needs the override changed to `generic`.
+#
+# The CI also sets `CFLAGS`/`CXXFLAGS_aarch64_unknown_linux_gnu=-mcpu=neoverse-n2`,
+# for the same reason as on x86_64: the RocksDB build script sees the `native`
+# above, not this override.
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "target-cpu=native",
+]

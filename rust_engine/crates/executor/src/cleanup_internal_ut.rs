@@ -40,8 +40,8 @@ use parser::Literal;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -49,25 +49,26 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     Vec::new()
 }
 
-fn count(engine: &Engine, table: &str) -> usize {
-    rows(engine, &format!("SELECT count(*) FROM {table};"))[0][0]
+async fn count(engine: &Engine, table: &str) -> usize {
+    rows(engine, &format!("SELECT count(*) FROM {table};")).await[0][0]
         .parse()
         .unwrap()
 }
 
-fn columns(engine: &Engine, table: &str) -> Vec<String> {
+async fn columns(engine: &Engine, table: &str) -> Vec<String> {
     rows(engine, &format!("SHOW TABLE {table} COLUMNS;"))
+        .await
         .into_iter()
         .map(|row| row[0].clone())
         .collect()
 }
 
 /// `MakeInputBlock(v1, v2, 8192)`: one 8192-row batch.
-fn import(engine: &Engine, table: &str, value: i64, text: &str) {
+async fn import(engine: &Engine, table: &str, value: i64, text: &str) {
     let batch: Vec<Vec<Literal>> = (0..8192)
         .map(|_| vec![Literal::Int(value), Literal::Str(text.to_string())])
         .collect();
-    engine.insert_literals(table, None, batch).unwrap();
+    engine.insert_literals(table, None, batch).await.unwrap();
 }
 
 /// `CheckFilePaths`: deleted files must be absent, existing files present.
@@ -88,116 +89,131 @@ fn check_files(deleted: &[PathBuf], existing: &[PathBuf]) {
     }
 }
 
-fn reopen(engine: Engine, dir: &Path) -> Engine {
-    crate::scheduler::block_on(engine.flush()).unwrap();
+async fn reopen(engine: Engine, dir: &Path) -> Engine {
+    engine.flush().await.unwrap();
     drop(engine);
-    Engine::open(dir).unwrap()
+    Engine::open_async(dir, Default::default()).await.unwrap()
 }
 
 const TEXT: &str = "abcdefghijklmnoprstuvwxyz";
 
 /// C++ `cleanup_internal_ut.cpp:139` (`test_cleanup_db`).
-#[test]
-fn test_cleanup_db() {
+#[tokio::test]
+async fn test_cleanup_db() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
     // First database: dropped, checkpointed, cleaned up.
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "db1.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "db1.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let delete_file_paths = e.db_files("db1");
     assert!(!delete_file_paths.is_empty());
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &[]);
 
     // Second database: the dropped generation is gone, a re-created one
     // survives cleanup.
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "db1.tb1", 1, TEXT);
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    import(&e, "db1.tb1", 1, TEXT).await;
+    e.execute("DROP DATABASE db1;").await.unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "db1.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "db1.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let exist_file_paths = e.table_files("db1.tb1");
     assert!(!exist_file_paths.is_empty());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &exist_file_paths);
-    assert_eq!(count(&e, "db1.tb1"), 8192);
+    assert_eq!(count(&e, "db1.tb1").await, 8192);
 
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&exist_file_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:293` (`test_cleanup_table`).
-#[test]
-fn test_cleanup_table() {
+#[tokio::test]
+async fn test_cleanup_table() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
     // First table: dropped, checkpointed, cleaned up.
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let delete_file_paths = e.table_files("default_db.tb1");
     assert!(!delete_file_paths.is_empty());
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &[]);
 
     // Second table: the dropped generation is gone, the re-created one
     // survives cleanup.
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let exist_file_paths = e.table_files("default_db.tb1");
     assert!(!exist_file_paths.is_empty());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &exist_file_paths);
-    assert_eq!(count(&e, "default_db.tb1"), 8192);
+    assert_eq!(count(&e, "default_db.tb1").await, 8192);
 
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&exist_file_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:420` (`test_cleanup_index`).
-#[test]
-fn test_cleanup_index() {
+#[tokio::test]
+async fn test_cleanup_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    e.execute_blocking("CREATE INDEX index1 ON tb1(col1);")
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.execute("CREATE INDEX index1 ON tb1(col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+    e.execute("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     // The full-text chunk (and so its `idx_{id}` mirror) comes from the index's
     // own dump transaction; a checkpoint writes blocks only.
-    crate::scheduler::block_on(e.dump_index_transaction("tb1", "index2")).unwrap();
+    e.dump_index_transaction("tb1", "index2").await.unwrap();
 
     // A secondary index has no `idx_{id}` mirror in this engine (its chunks
     // live under `<data>/secondary`), so the reference's four captured files
@@ -206,77 +222,87 @@ fn test_cleanup_index() {
     let surviving_index_files = e.index_files("default_db.tb1", "index2");
     assert!(!surviving_index_files.is_empty());
 
-    e.execute_blocking("DROP INDEX index1 ON tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP INDEX index1 ON tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &surviving_index_files);
-    assert!(e.execute_blocking("SHOW TABLE tb1 INDEX index1;").is_err());
-    e.execute_blocking("SHOW TABLE tb1 INDEX index2;").unwrap();
-    assert_eq!(count(&e, "default_db.tb1"), 8192);
+    assert!(e.execute("SHOW TABLE tb1 INDEX index1;").await.is_err());
+    e.execute("SHOW TABLE tb1 INDEX index2;").await.unwrap();
+    assert_eq!(count(&e, "default_db.tb1").await, 8192);
 
     // Dropping the table removes its whole mirror.
     let table_paths = e.table_files("default_db.tb1");
     assert!(!table_paths.is_empty());
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&table_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:579` (`test_cleanup_compact`).
-#[test]
-fn test_cleanup_compact() {
+#[tokio::test]
+async fn test_cleanup_compact() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON tb1(col1);")
+    e.execute("CREATE INDEX index1 ON tb1(col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+    e.execute("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    import(&e, "default_db.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let source_paths = e.table_files("default_db.tb1");
     assert!(!source_paths.is_empty());
 
-    e.compact_all_segments("default_db.tb1").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.compact_all_segments("default_db.tb1").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
 
     // Compaction merges the two source segments into a new segment id, so the
     // mirror rewrites the blocks under `seg_{merged}` and the cleanup removes
     // the source segment's files - the reference deletes the merged-away
     // segments too. What must survive is the rewritten block.
-    assert_eq!(count(&e, "default_db.tb1"), 16384);
-    assert_eq!(e.segment_ids("default_db.tb1"), vec![1]);
+    assert_eq!(count(&e, "default_db.tb1").await, 16384);
+    assert_eq!(e.segment_ids("default_db.tb1").await, vec![1]);
     assert_eq!(e.block_row_count("default_db.tb1", 1, 0), Some(8192));
     let compacted_paths = e.table_files("default_db.tb1");
     check_files(&source_paths, &compacted_paths);
 
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&compacted_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:686` (`test_cleanup_optimize`).
-#[test]
-fn test_cleanup_optimize() {
+#[tokio::test]
+async fn test_cleanup_optimize() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index1 ON tb1(col1);")
+    e.execute("CREATE INDEX index1 ON tb1(col1);")
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+    e.execute("CREATE INDEX index2 ON tb1(col2) USING fulltext;")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
-    import(&e, "default_db.tb1", 1, TEXT);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
+    import(&e, "default_db.tb1", 1, TEXT).await;
+    e.flush().await.unwrap();
     let index_paths = e.index_files("default_db.tb1", "index2");
     let table_paths = e.table_files("default_db.tb1");
     assert!(!table_paths.is_empty());
@@ -284,32 +310,35 @@ fn test_cleanup_optimize() {
     // The reference merges the secondary/fulltext chunks here. The Rust
     // optimizer rewrites HNSW chunks only, so the merge leaves the surviving
     // table/index files in place; the visible result is asserted instead.
-    e.optimize_indexes().unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.optimize_indexes().await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&[], &table_paths);
     check_files(&[], &index_paths);
-    assert_eq!(count(&e, "default_db.tb1"), 16384);
-    e.execute_blocking("SHOW TABLE tb1 INDEX index1;").unwrap();
-    e.execute_blocking("SHOW TABLE tb1 INDEX index2;").unwrap();
+    assert_eq!(count(&e, "default_db.tb1").await, 16384);
+    e.execute("SHOW TABLE tb1 INDEX index1;").await.unwrap();
+    e.execute("SHOW TABLE tb1 INDEX index2;").await.unwrap();
 
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&table_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:807` (`test_cleanup_drop_column`).
-#[test]
-fn test_cleanup_drop_column() {
+#[tokio::test]
+async fn test_cleanup_drop_column() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz");
-    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz");
-    crate::scheduler::block_on(e.flush()).unwrap();
+
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
+        .unwrap();
+    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz").await;
+    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz").await;
+    e.flush().await.unwrap();
     let delete_file_paths = e.column_files("default_db.tb1", "col2");
     let table_paths = e.table_files("default_db.tb1");
     assert!(!table_paths.is_empty());
@@ -350,43 +379,48 @@ fn test_cleanup_drop_column() {
     assert!(!dropped_column_files.is_empty());
     assert!(!surviving_paths.is_empty());
 
-    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (col2);")
+    e.execute("ALTER TABLE tb1 DROP COLUMN (col2);")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
 
     // The dropped column's `1.col` files are gone; the remaining column's
     // files survive and the schema lost the column.
     check_files(&delete_file_paths, &[]);
     check_files(&dropped_column_files, &surviving_paths);
     check_files(&dropped_index_paths, &[]);
-    assert_eq!(columns(&e, "tb1"), vec!["col1"]);
-    assert_eq!(count(&e, "default_db.tb1"), 16384);
-    for row in rows(&e, "SELECT col1 FROM tb1;") {
+    assert_eq!(columns(&e, "tb1").await, vec!["col1"]);
+    assert_eq!(count(&e, "default_db.tb1").await, 16384);
+    for row in rows(&e, "SELECT col1 FROM tb1;").await {
         assert_eq!(row, vec!["1".to_string()]);
     }
 
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&table_paths, &[]);
 }
 
 /// C++ `cleanup_internal_ut.cpp:903`
 /// (`test_cleanup_drop_index_and_checkpoint_and_restart`).
-#[test]
-fn test_cleanup_drop_index_and_checkpoint_and_restart() {
+#[tokio::test]
+async fn test_cleanup_drop_index_and_checkpoint_and_restart() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
 
-    e.execute_blocking("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+    e.execute("CREATE TABLE tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
-    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz");
-    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz");
-    e.execute_blocking("CREATE INDEX index1 ON tb1(col1);")
+    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz").await;
+    import(&e, "default_db.tb1", 1, "abcdefghijklmnopqrstuvwxyz").await;
+    e.execute("CREATE INDEX index1 ON tb1(col1);")
+        .await
         .unwrap();
-    e.execute_blocking("DROP INDEX index1 ON tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.execute("DROP INDEX index1 ON tb1;").await.unwrap();
+    e.flush().await.unwrap();
     let delete_file_paths = e.column_files("default_db.tb1", "col2");
     let table_paths = e.table_files("default_db.tb1");
     let dropped_column_files: Vec<PathBuf> = table_paths
@@ -416,26 +450,27 @@ fn test_cleanup_drop_index_and_checkpoint_and_restart() {
         .filter(|p| !p.to_string_lossy().contains("/idx_"))
         .collect();
     assert!(!dropped_column_files.is_empty());
-    e.execute_blocking("ALTER TABLE tb1 DROP COLUMN (col2);")
+    e.execute("ALTER TABLE tb1 DROP COLUMN (col2);")
+        .await
         .unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
-    let e = reopen(e, dir.path());
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    let e = reopen(e, dir.path()).await;
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
     check_files(&delete_file_paths, &[]);
     check_files(&dropped_column_files, &surviving_paths);
     check_files(&dropped_index_paths, &[]);
-    assert_eq!(columns(&e, "tb1"), vec!["col1"]);
-    assert!(e.execute_blocking("SHOW TABLE tb1 INDEX index1;").is_err());
-    assert_eq!(count(&e, "default_db.tb1"), 16384);
+    assert_eq!(columns(&e, "tb1").await, vec!["col1"]);
+    assert!(e.execute("SHOW TABLE tb1 INDEX index1;").await.is_err());
+    assert_eq!(count(&e, "default_db.tb1").await, 16384);
 
-    e.execute_blocking("DROP TABLE tb1;").unwrap();
-    crate::scheduler::block_on(e.flush()).unwrap();
-    crate::scheduler::block_on(e.cleanup()).unwrap();
+    e.execute("DROP TABLE tb1;").await.unwrap();
+    e.flush().await.unwrap();
+    e.cleanup().await.unwrap();
 
-    let e = reopen(e, dir.path());
+    let e = reopen(e, dir.path()).await;
     check_files(&table_paths, &[]);
     assert!(!e.table_exists("default_db.tb1"));
-    assert_eq!(count(&e, "default_db.tb1"), 0);
+    assert_eq!(count(&e, "default_db.tb1").await, 0);
 }

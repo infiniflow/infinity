@@ -23,41 +23,48 @@
 use crate::{Engine, QueryResult};
 use tempfile::tempdir;
 
-fn open() -> (tempfile::TempDir, Engine) {
+async fn open() -> (tempfile::TempDir, Engine) {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     (dir, engine)
 }
 
 /// C++ `ExplainBasicTest.test1` (`explain_basic_ut.cpp`): every `EXPLAIN`
 /// flavour succeeds for selects over a real table and for the DDL/DML/SHOW
 /// statements in the reference list.
-#[test]
-fn explain_basic_test1() {
-    let (_dir, engine) = open();
-    engine.execute_blocking("create database db1").unwrap();
+#[tokio::test]
+async fn explain_basic_test1() {
+    let (_dir, engine) = open().await;
+    engine.execute("create database db1").await.unwrap();
     engine
-        .execute_blocking("create collection collection1")
+        .execute("create collection collection1")
+        .await
         .unwrap();
     engine
-        .execute_blocking("create table tb(col1 int, col2 varchar)")
+        .execute("create table tb(col1 int, col2 varchar)")
+        .await
         .unwrap();
     for i in 0..200 {
         engine
-            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
+            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .await
             .unwrap();
     }
     engine
-        .execute_blocking("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .execute("create table tb_embedding(col1 int, col2 embedding(float, 4))")
+        .await
         .unwrap();
     engine
-        .execute_blocking(
+        .execute(
             "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), \
              (2, [0.2, 0.2, 0.2, 0.2])",
         )
+        .await
         .unwrap();
 
-    let explain = |engine: &Engine, sql: &str, read_only: bool| {
+    let explain = async |engine: &Engine, sql: &str, read_only: bool| {
         let mut variants = vec![
             format!("explain ast {sql}"),
             format!("explain raw {sql}"),
@@ -72,7 +79,8 @@ fn explain_basic_test1() {
         }
         for variant in variants {
             let mut result = engine
-                .execute_blocking(&variant)
+                .execute(&variant)
+                .await
                 .unwrap_or_else(|err| panic!("{variant}: {err}"));
             assert_eq!(result.len(), 1, "{variant}");
             assert!(
@@ -83,61 +91,68 @@ fn explain_basic_test1() {
     };
 
     // Selects.
-    explain(&engine, "select * from tb where col1 > 100 and 1 = 1", true);
-    explain(&engine, "select * from tb order by col1", true);
-    explain(&engine, "select * from tb limit 100", true);
+    explain(&engine, "select * from tb where col1 > 100 and 1 = 1", true).await;
+    explain(&engine, "select * from tb order by col1", true).await;
+    explain(&engine, "select * from tb limit 100", true).await;
     explain(
         &engine,
         "select min(col1), max(col1), avg(col1) from tb where 1 = 1 group by col1",
         true,
-    );
+    )
+    .await;
     explain(
         &engine,
         "select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100",
         true,
-    );
+    )
+    .await;
     explain(
         &engine,
         "select * from tb where col1 in (100, 150, 200)",
         true,
-    );
+    )
+    .await;
     explain(
         &engine,
         "select * from tb where col1 between 100 and 200",
         true,
-    );
+    )
+    .await;
     explain(
         &engine,
         "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)",
         true,
-    );
+    ).await;
 
     // Create.
     explain(
         &engine,
         "create index idx on tb(col1) using secondary",
         false,
-    );
+    )
+    .await;
     explain(
         &engine,
         "create index idx on tb(col2) using fulltext",
         false,
-    );
-    explain(&engine, "create table tb1(c1 int, c2 varchar)", false);
-    explain(&engine, "create database db1", false);
-    explain(&engine, "create collection c1", false);
+    )
+    .await;
+    explain(&engine, "create table tb1(c1 int, c2 varchar)", false).await;
+    explain(&engine, "create database db1", false).await;
+    explain(&engine, "create collection c1", false).await;
 
     // Insert / update / drop.
-    explain(&engine, "insert into tb values(1000, 'xyz')", false);
-    explain(&engine, "update tb set col1 = 999 where col1 > 100", false);
+    explain(&engine, "insert into tb values(1000, 'xyz')", false).await;
+    explain(&engine, "update tb set col1 = 999 where col1 > 100", false).await;
     explain(
         &engine,
         "update tb set col1 = 999 where col1 between 100 and 200",
         false,
-    );
-    explain(&engine, "drop table tb", false);
-    explain(&engine, "drop database db1", false);
-    explain(&engine, "drop collection collection1", false);
+    )
+    .await;
+    explain(&engine, "drop table tb", false).await;
+    explain(&engine, "drop database db1", false).await;
+    explain(&engine, "drop collection collection1", false).await;
 
     // Show.
     for sql in [
@@ -165,30 +180,33 @@ fn explain_basic_test1() {
         "show session variable query_count",
         "show snapshots",
     ] {
-        explain(&engine, sql, true);
+        explain(&engine, sql, true).await;
     }
 
-    explain(&engine, "flush catalog", true);
+    explain(&engine, "flush catalog", true).await;
 }
 
 /// C++ `LogicalCreateCollectionTest.test1`: create a table, index and rows,
 /// then `CREATE COLLECTION` acknowledges with `OK` (the physical operator is a
 /// writable-mode no-op).
-#[test]
-fn logical_create_collection_test1() {
-    let (_dir, engine) = open();
+#[tokio::test]
+async fn logical_create_collection_test1() {
+    let (_dir, engine) = open().await;
     engine
-        .execute_blocking("create table tb(col1 int, col2 varchar)")
+        .execute("create table tb(col1 int, col2 varchar)")
+        .await
         .unwrap();
     engine
-        .execute_blocking("create index idx on tb(col1)")
+        .execute("create index idx on tb(col1)")
+        .await
         .unwrap();
     for i in 0..200 {
         engine
-            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
+            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .await
             .unwrap();
     }
-    let result = engine.execute_blocking("create collection tb").unwrap();
+    let result = engine.execute("create collection tb").await.unwrap();
     assert_eq!(result.len(), 1);
     let QueryResult::Rows { columns, rows } = &result[0] else {
         panic!("expected an OK row, got {:?}", result[0]);
@@ -199,31 +217,34 @@ fn logical_create_collection_test1() {
 
 /// C++ `LogicalDropCollectionTest.test1`: `CREATE COLLECTION` followed by
 /// `DROP COLLECTION` both acknowledge with `OK`.
-#[test]
-fn logical_drop_collection_test1() {
-    let (_dir, engine) = open();
-    let created = engine.execute_blocking("create collection tb").unwrap();
+#[tokio::test]
+async fn logical_drop_collection_test1() {
+    let (_dir, engine) = open().await;
+    let created = engine.execute("create collection tb").await.unwrap();
     assert!(matches!(created[0], QueryResult::Rows { .. }));
-    let dropped = engine.execute_blocking("drop collection tb").unwrap();
+    let dropped = engine.execute("drop collection tb").await.unwrap();
     assert!(matches!(dropped[0], QueryResult::Rows { .. }));
 }
 
 /// C++ `PlanFragmentTest.test1` (`plan_fragment_ut.cpp`): a filtered select
 /// yields a fragment plan. The reference only logs the text; the port asserts
 /// the fragment plan exists and describes the table.
-#[test]
-fn plan_fragment_test1() {
-    let (_dir, engine) = open();
+#[tokio::test]
+async fn plan_fragment_test1() {
+    let (_dir, engine) = open().await;
     engine
-        .execute_blocking("create table tb(col1 int, col2 varchar)")
+        .execute("create table tb(col1 int, col2 varchar)")
+        .await
         .unwrap();
     for i in 0..200 {
         engine
-            .execute_blocking(&format!("insert into tb values({i}, 'abc')"))
+            .execute(&format!("insert into tb values({i}, 'abc')"))
+            .await
             .unwrap();
     }
     let result = engine
-        .execute_blocking("explain fragment select * from tb where col1 < 100")
+        .execute("explain fragment select * from tb where col1 < 100")
+        .await
         .unwrap();
     let QueryResult::Rows { rows, .. } = &result[0] else {
         panic!("expected fragment rows");
@@ -248,9 +269,9 @@ fn plan_fragment_test1() {
 /// C++ `FragmentTest.test_build_fragment` (`fragment_ut.cpp`): DDL and SHOW
 /// over a fresh engine; `SHOW TABLES` has eight columns and `SHOW TABLE t2`
 /// has two.
-#[test]
-fn fragment_test_build_fragment() {
-    let (_dir, engine) = open();
+#[tokio::test]
+async fn fragment_test_build_fragment() {
+    let (_dir, engine) = open().await;
     for sql in [
         "create table t1(a bigint)",
         "create database db1",
@@ -259,28 +280,29 @@ fn fragment_test_build_fragment() {
         "create table t3(c1 embedding(bit,10))",
     ] {
         let result = engine
-            .execute_blocking(sql)
+            .execute(sql)
+            .await
             .unwrap_or_else(|e| panic!("{sql}: {e}"));
         assert_eq!(result.len(), 1, "{sql}");
     }
     // Drop database and table.
     assert!(matches!(
-        engine.execute_blocking("drop database db1").unwrap()[0],
+        engine.execute("drop database db1").await.unwrap()[0],
         QueryResult::DroppedDatabase { .. }
     ));
     assert!(matches!(
-        engine.execute_blocking("drop table t1").unwrap()[0],
+        engine.execute("drop table t1").await.unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
 
     // Show.
-    let show_tables = engine.execute_blocking("show tables").unwrap();
+    let show_tables = engine.execute("show tables").await.unwrap();
     let QueryResult::Rows { columns, .. } = &show_tables[0] else {
         panic!("expected SHOW TABLES rows");
     };
     assert_eq!(columns.len(), 8);
 
-    let show_table = engine.execute_blocking("show table t2").unwrap();
+    let show_table = engine.execute("show table t2").await.unwrap();
     let QueryResult::Rows { columns, rows } = &show_table[0] else {
         panic!("expected SHOW TABLE rows");
     };
@@ -295,11 +317,11 @@ fn fragment_test_build_fragment() {
     assert_eq!(shown[4], vec!["column_count".to_string(), "1".to_string()]);
 
     assert!(matches!(
-        engine.execute_blocking("drop table t3").unwrap()[0],
+        engine.execute("drop table t3").await.unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
     assert!(matches!(
-        engine.execute_blocking("drop table t2").unwrap()[0],
+        engine.execute("drop table t2").await.unwrap()[0],
         QueryResult::DroppedTable { existed: true, .. }
     ));
 }

@@ -375,6 +375,7 @@ fn initial(variant: u8) -> (Bound, Bound) {
 ///
 /// Built incrementally so a segment's filter does not hold its rows: the block
 /// loop adds each block and merges it into the segment's.
+#[derive(Clone)]
 pub struct Filters {
     columns: Vec<Option<(u8, Bound, Bound)>>,
     types: usize,
@@ -394,6 +395,20 @@ impl Filters {
                 .collect(),
             types: types.len(),
         }
+    }
+
+    /// True when no column of this filter tracks a value.
+    ///
+    /// A table whose columns are all `EMBEDDING`/`TENSOR`/`BIT` has nothing for
+    /// the filter to bound (`variant_of` answers `None` for each), so a caller
+    /// that would otherwise decode rows only to feed `add_row` can skip it.
+    pub fn tracks_nothing(&self) -> bool {
+        self.columns.iter().all(|c| c.is_none())
+    }
+
+    /// Whether `column` is one this filter bounds.
+    pub fn tracks(&self, column: usize) -> bool {
+        self.columns.get(column).is_some_and(|c| c.is_some())
     }
 
     pub fn add_row(&mut self, cells: &[Value]) {

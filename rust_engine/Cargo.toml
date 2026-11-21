@@ -31,8 +31,6 @@ warnings = "deny"
 
 [workspace.dependencies]
 rust-stemmers = "1.2"
-# block_on for the synchronous Engine::execute adapter (tests / cli / bin tools)
-futures-executor = "0.3"
 tokio = { version = "1", default-features = false, features = [
     "rt",
     "rt-multi-thread",
@@ -40,6 +38,13 @@ tokio = { version = "1", default-features = false, features = [
     "sync",
     "time",
     "io-util",
+    # `#[tokio::test]`: the engine's writes are async now, so a test that
+    # compacts or checkpoints drives them with `.await` instead of a
+    # synchronous bridge.
+    "macros",
+    # `tokio::fs::*`: the server's `SHOW` handlers stat the block mirror; the
+    # async form keeps the reactor thread out of the syscall.
+    "fs",
 ] }
 common = { path = "crates/common" }
 storage = { path = "crates/storage" }
@@ -62,7 +67,6 @@ hmac = "0.12"
 sha2 = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-native-certs = "0.8"
-crc32fast = "1"
 memmap2 = "0.9"
 thiserror = "1"
 tempfile = "3"
@@ -76,3 +80,19 @@ serde_json = "1"
 [patch.crates-io]
 pilota = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }
 pilota-thrift-parser = { git = "https://github.com/yuzhichang/pilota", branch = "fix/thrift-reference-field" }
+
+# `crc32fast` compiles an AVX-512 path (`calculate_avx512`) behind
+# `#[target_feature(enable = "avx512f")]`, which lands in the binary whatever
+# `target-cpu` says: measured, 52 `zmm` instructions when building for
+# `x86-64-v3` and 26 for `x86-64-v2`. A binary that carries instructions its CPU
+# rejects dies with SIGILL before it can log anything, and a crate-level flag
+# cannot remove a `#[target_feature]` function.
+#
+# It arrives through `parquet -> flate2` as well as directly, so patching is the
+# only way to keep AVX2 in the rest of the build without carrying that path. The
+# stand-in is the same slicing-by-8 CRC with no SIMD.
+#
+# This is not what the Xeon SIGILL turned out to be - that was an `insertq` in
+# RocksDB built with `-march=native`, fixed by the CI's `CXXFLAGS`. The patch
+# stays because the hazard it removes is real on its own.
+crc32fast = { path = "crates/crc32fast-shim" }

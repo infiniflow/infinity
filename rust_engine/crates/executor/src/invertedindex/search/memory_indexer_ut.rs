@@ -32,8 +32,8 @@ use storage::invertedindex::format::{FULLTEXT_SPILL_SUFFIX, OPTION_FLAG_ALL};
 use tempfile::tempdir;
 
 /// `MemoryIndexerTest::SpillLoadTest`.
-#[test]
-fn spill_load_test() {
+#[tokio::test]
+async fn spill_load_test() {
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     let paragraphs = [
         "A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.",
@@ -55,7 +55,7 @@ fn spill_load_test() {
     for (row, paragraph) in paragraphs.iter().enumerate() {
         assert!(indexer.insert(row as u64, paragraph, &TextTokenizer::default(), usize::MAX));
     }
-    assert!(indexer.dump(dir_str, "chunk1"));
+    assert!(indexer.dump(dir_str, "chunk1").await);
 
     let mut loaded = MemoryIndexer::new();
     // C++: `Dump(false, true)` spills, then a fresh indexer `Load()`s it.
@@ -97,8 +97,8 @@ fn segment_bytes(dir: &Path) -> BTreeMap<String, Vec<u8>> {
 }
 
 /// The rows of a `SELECT count(*)`.
-fn count_rows(e: &Engine, sql: &str) -> usize {
-    for r in e.execute_blocking(sql).unwrap() {
+async fn count_rows(e: &Engine, sql: &str) -> usize {
+    for r in e.execute(sql).await.unwrap() {
         if let QueryResult::Rows { rows, .. } = r {
             return rows.row(0).unwrap()[0].to_slt_string().parse().unwrap();
         }
@@ -110,15 +110,15 @@ fn count_rows(e: &Engine, sql: &str) -> usize {
 /// and set `disabled`, so the column stopped being indexed for the rest of the
 /// process and every later query fell back to re-tokenising rows. The tail is
 /// now spilled to a sorted run and the budget resets.
-#[test]
-fn an_index_that_exceeds_its_budget_keeps_indexing() {
+#[tokio::test]
+async fn an_index_that_exceeds_its_budget_keeps_indexing() {
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_string_lossy().into_owned();
     let mut index = TextIndex::new(dir_str, TextTokenizer::default());
     // A budget a couple of documents wide, so the column crosses it repeatedly.
     index.budget = 256;
     for row in 0..40u64 {
-        index_row(&mut index, row, "alpha beta gamma delta epsilon");
+        index_row(&mut index, row, "alpha beta gamma delta epsilon").await;
     }
     assert!(
         !index.mem.runs.is_empty(),
@@ -126,7 +126,7 @@ fn an_index_that_exceeds_its_budget_keeps_indexing() {
     );
 
     // A term that only appears after the budget was crossed.
-    index_row(&mut index, 100, "zebrafish");
+    index_row(&mut index, 100, "zebrafish").await;
     let merged = index.merge(&["zebrafish".to_string(), "alpha".to_string()]);
     assert_eq!(merged.postings["zebrafish"], vec![(100, 1)]);
     assert_eq!(merged.postings["alpha"].len(), 40);
@@ -144,8 +144,8 @@ fn an_index_that_exceeds_its_budget_keeps_indexing() {
 /// Two spills, then a seal: the runs are merged into one posting stream in
 /// doc-id order, with each document's tf and positions. The sealed segment is
 /// byte for byte what a single big budget produces.
-#[test]
-fn spilled_runs_merge_in_doc_id_order() {
+#[tokio::test]
+async fn spilled_runs_merge_in_doc_id_order() {
     let texts: Vec<String> = (0..40u64)
         .map(|row| match row % 3 {
             0 => "shared alpha shared beta".to_string(),
@@ -161,14 +161,14 @@ fn spilled_runs_merge_in_doc_id_order() {
     );
     spilled.budget = 160;
     for (row, text) in texts.iter().enumerate() {
-        index_row(&mut spilled, row as u64, text);
+        index_row(&mut spilled, row as u64, text).await;
     }
     assert!(
         spilled.mem.runs.len() >= 2,
         "expected at least two spills, got {}",
         spilled.mem.runs.len()
     );
-    assert!(spilled.seal());
+    assert!(spilled.seal().await);
 
     let whole_dir = tempdir().unwrap();
     let mut whole = TextIndex::new(
@@ -177,10 +177,10 @@ fn spilled_runs_merge_in_doc_id_order() {
     );
     whole.budget = usize::MAX;
     for (row, text) in texts.iter().enumerate() {
-        index_row(&mut whole, row as u64, text);
+        index_row(&mut whole, row as u64, text).await;
     }
     assert!(whole.mem.runs.is_empty());
-    assert!(whole.seal());
+    assert!(whole.seal().await);
 
     assert_eq!(
         segment_bytes(spill_dir.path()),
@@ -220,20 +220,20 @@ fn spilled_runs_merge_in_doc_id_order() {
 
 /// The `InsertGap` case: a document id at or below the run's maximum arrives
 /// again. The seal must reflect the *new* text only, not the copy the run holds.
-#[test]
-fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
+#[tokio::test]
+async fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
     let dir = tempdir().unwrap();
     let dir_str = dir.path().to_string_lossy().into_owned();
     let mut index = TextIndex::new(dir_str.clone(), TextTokenizer::default());
     index.budget = usize::MAX; // spill by hand, so the run is deterministic
-    index_row(&mut index, 5, "alpha beta");
-    index_row(&mut index, 6, "filler text");
+    index_row(&mut index, 5, "alpha beta").await;
+    index_row(&mut index, 6, "filler text").await;
     let seg0 = storage::invertedindex::format::segment_chunk_dir(&dir_str, 0);
     std::fs::create_dir_all(&seg0).unwrap();
-    assert!(index.mem.spill(&seg0));
+    assert!(index.mem.spill(&seg0).await);
     assert_eq!(index.mem.runs.len(), 1);
-    index_row(&mut index, 5, "gamma delta");
-    assert!(index.seal());
+    index_row(&mut index, 5, "gamma delta").await;
+    assert!(index.seal().await);
 
     let reader =
         SegmentIndexReader::open(&seg0, "ft_0000000000000005", 5, OPTION_FLAG_ALL).unwrap();
@@ -260,9 +260,9 @@ fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
         TextTokenizer::default(),
     );
     reference.budget = usize::MAX;
-    index_row(&mut reference, 6, "filler text");
-    index_row(&mut reference, 5, "gamma delta");
-    assert!(reference.seal());
+    index_row(&mut reference, 6, "filler text").await;
+    index_row(&mut reference, 5, "gamma delta").await;
+    assert!(reference.seal().await);
     assert_eq!(
         segment_bytes(dir.path()),
         segment_bytes(reference_dir.path())
@@ -271,39 +271,46 @@ fn a_reinserted_doc_does_not_corrupt_a_spilled_run() {
 
 /// A restart: the seal merged the runs into the sealed segment, so the spill
 /// files are gone and a fresh engine still finds the terms.
-#[test]
-fn terms_from_spilled_runs_survive_a_restart() {
+#[tokio::test]
+async fn terms_from_spilled_runs_survive_a_restart() {
     let dir = tempdir().unwrap();
     let index_dir;
     {
-        let e = Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE ft_restart (doc VARCHAR);")
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("CREATE INDEX ft_restart_idx ON ft_restart (doc) USING FULLTEXT;")
+        e.execute("CREATE TABLE ft_restart (doc VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX ft_restart_idx ON ft_restart (doc) USING FULLTEXT;")
+            .await
             .unwrap();
         let shared = e
             .text_index_for("ft_restart", "doc", e.index_tokenizer("ft_restart", "doc"))
+            .await
             .unwrap();
         index_dir = {
-            let mut guard = shared.write().unwrap();
+            let mut guard = shared.write().await;
             guard.budget = 256;
             guard.dir.clone()
         };
         for row in 0..40 {
-            e.execute_blocking(&format!(
+            e.execute(&format!(
                 "INSERT INTO ft_restart VALUES ('alpha beta gamma {row}');"
             ))
+            .await
             .unwrap();
         }
         // A term that only appears after the budget was crossed.
-        e.execute_blocking("INSERT INTO ft_restart VALUES ('zebrafish');")
+        e.execute("INSERT INTO ft_restart VALUES ('zebrafish');")
+            .await
             .unwrap();
-        let mut guard = shared.write().unwrap();
+        let mut guard = shared.write().await;
         assert!(
             !guard.mem.runs.is_empty(),
             "the inserts must have spilled the tail"
         );
-        assert!(guard.seal());
+        assert!(guard.seal().await);
     }
 
     // The spill files are transient: the sealed segment holds the postings.
@@ -331,19 +338,23 @@ fn terms_from_spilled_runs_survive_a_restart() {
     assert!(reader.lookup("zebrafish").unwrap().is_some());
 
     // A fresh process finds the terms of the spilled runs again.
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert_eq!(
         count_rows(
             &e,
             "SELECT count(*) FROM ft_restart WHERE filter_fulltext('doc', 'zebrafish');"
-        ),
+        )
+        .await,
         1
     );
     assert_eq!(
         count_rows(
             &e,
             "SELECT count(*) FROM ft_restart WHERE filter_fulltext('doc', 'alpha');"
-        ),
+        )
+        .await,
         40
     );
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gate D — concurrency & stability (plan §6 Gate D).
-#   python/parallel_test; bounded loom models (capacity=1, early stop, error,
-#   cancel); miri on FFI-free core tests; native TSAN/ASAN where FFI/SIMD exist.
+#   python/parallel_test; the loom commit-ts allocation model; miri on FFI-free
+#   core tests; native TSAN/ASAN where FFI/SIMD exist.
 #
 #   ./scripts/run_gate_d.sh
 set -uo pipefail
@@ -12,7 +12,7 @@ status=0
 echo "== Gate D =="
 cd "$here/.." || exit 1
 
-# 1. loom: core scheduler/channel state machines
+# 1. loom: the commit-ts allocation protocol (exhaustive interleavings)
 RUSTFLAGS="--cfg loom" cargo test -q -p txn --lib loom || status=1
 
 # 2. miri on the FFI-free core (parser/expression/planner are pure Rust)

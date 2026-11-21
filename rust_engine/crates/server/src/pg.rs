@@ -349,30 +349,6 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
         self.write_frame(&error_response_frame(fields))
     }
 
-    /// Runs one simple query and writes its whole response, ending with
-    /// `ReadyForQuery`.
-    pub fn execute_simple_query(&mut self, engine: &Engine, sql: &str) -> Result<()> {
-        let out = simple_query_response(engine, sql);
-        self.write_frame(&out)
-    }
-
-    /// Startup handshake followed by the command loop.
-    pub fn handle_connection(&mut self, engine: &Engine) -> Result<()> {
-        let body_size = self.read_startup_header()?;
-        self.read_startup_body(body_size)?;
-        self.send_startup_ok()?;
-        while let Some(command) = self.read_command()? {
-            match command {
-                PgCommand::SimpleQuery(sql) => self.execute_simple_query(engine, &sql)?,
-                PgCommand::Terminate => return Ok(()),
-                // The extended protocol, copy sub-protocol and unknown
-                // messages are framed but not executed by this stub.
-                _ => self.send_ready_for_query()?,
-            }
-        }
-        Ok(())
-    }
-
     fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
         self.writer
             .write_all(frame)
@@ -385,16 +361,11 @@ impl<R: Read, W: Write> PGProtocolHandler<R, W> {
 /// The bytes a simple query answers with: row descriptions, data rows, the
 /// command tag and `ReadyForQuery`, or an `ErrorResponse` in their place.
 ///
-/// Separate from the handler so the sync harness and the async front end can
-/// share the framing while each drives the statement in its own context
-/// (plan §6.3 / §6.12.4 step 3).
-pub fn simple_query_response(engine: &Engine, sql: &str) -> Vec<u8> {
-    encode_simple_query(executor::block_on(engine.execute(sql)).map_err(|e| e.to_string()))
-}
-
-/// The async front end's counterpart of [`simple_query_response`]: the
-/// statement is awaited through `Engine::execute_async`, so the handler has
-/// no `spawn_blocking` wrapper around it.
+/// The statement is awaited through the engine's async entry, so no
+/// `spawn_blocking` wraps it (plan §6.3 / §6.12.4 step 3). A synchronous twin
+/// used to exist for a "sync harness" that drove `PGProtocolHandler` directly;
+/// it had no callers once the front end moved to `handle_connection_async`, and
+/// its `block_on` was the last one in this file.
 pub async fn simple_query_response_async(engine: &Arc<Engine>, sql: &str) -> Vec<u8> {
     encode_simple_query(engine.execute(sql).await.map_err(|e| e.to_string()))
 }
@@ -619,7 +590,6 @@ impl PgServer {
 mod tests {
     use super::*;
     use std::io::Cursor;
-    use std::net::TcpStream;
     use tempfile::tempdir;
 
     /// `len | protocol | key\0value\0…\0` startup message. An empty parameter
@@ -704,18 +674,22 @@ mod tests {
     /// A panicking statement answers with an `E` frame, and the next query on
     /// the same engine still answers: the connection is not dropped and nothing
     /// exits the process.
-    #[test]
-    fn a_panicking_query_answers_with_an_error_frame() {
+    #[tokio::test]
+    async fn a_panicking_query_answers_with_an_error_frame() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
 
         engine.arm_injected_panic();
-        let failed = executor::block_on(simple_query_response_async(&engine, "SELECT 1;"));
+        let failed = simple_query_response_async(&engine, "SELECT 1;").await;
         assert_eq!(failed[0], b'E', "an error frame, not a dropped connection");
         let text = String::from_utf8_lossy(&failed);
         assert!(text.contains("injected panic"), "{text}");
 
-        let ok = executor::block_on(simple_query_response_async(&engine, "SELECT 1;"));
+        let ok = simple_query_response_async(&engine, "SELECT 1;").await;
         assert_eq!(ok[0], b'T', "the next query gets its row description");
     }
 
@@ -807,35 +781,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pg_simple_query_over_socket() {
+    #[tokio::test]
+    async fn pg_simple_query_over_socket() {
         use std::time::Duration;
         let dir = tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (42);")
-            .unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (42);").await.unwrap();
         let server = PgServer::bind("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
-        let mut stream = TcpStream::connect(&addr).unwrap();
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         stream
             .write_all(&startup_message(
                 196608,
                 &["user", "postgres", "database", "db"],
             ))
+            .await
             .unwrap();
 
         // simple query
@@ -844,18 +814,16 @@ mod tests {
         msg.extend_from_slice(&be_i32((q.len() + 1 + 4) as i32));
         msg.extend_from_slice(q);
         msg.push(0);
-        stream.write_all(&msg).unwrap();
+        stream.write_all(&msg).await.unwrap();
 
-        // read the response until the socket would block
-        stream
-            .set_read_timeout(Some(Duration::from_millis(500)))
-            .unwrap();
+        // The simple query protocol keeps the connection open, so the reply is
+        // read until it goes quiet rather than until EOF.
         let mut resp = Vec::new();
         let mut buf = [0u8; 4096];
         loop {
-            match stream.read(&mut buf) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => resp.extend_from_slice(&buf[..n]),
+            match tokio::time::timeout(Duration::from_millis(500), stream.read(&mut buf)).await {
+                Ok(Ok(0)) | Ok(Err(_)) | Err(_) => break,
+                Ok(Ok(n)) => resp.extend_from_slice(&buf[..n]),
             }
         }
         let text = String::from_utf8_lossy(&resp);

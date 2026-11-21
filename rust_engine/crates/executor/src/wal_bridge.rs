@@ -732,7 +732,12 @@ fn qualified(db_name: &str, name: &str) -> String {
 /// the command's own transaction - the ids come from the catalog counters, which
 /// the checkpoint flushed at the same point the command's transaction saw them,
 /// and the commit ts is stamped from the frame.
-pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()> {
+///
+/// **Async**: two of the commands wait - a replayed restore takes the DDL turn,
+/// and an index publish waits for its chunk write. `Engine::open_async` drives
+/// this through `TxnManager::replay_commands`; the synchronous `open`
+/// bridges that one call, so no `block_on` remains at this level.
+pub async fn replay_async(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()> {
     let catalog = engine.catalog();
     // A restore recreates a table (or a whole database) from the snapshot it
     // names and copies its files back. Its catalog writes are in the memtable
@@ -743,15 +748,15 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
     // be worse.
     match cmd {
         WalCmd::RestoreTableSnapshot { snapshot_name, .. } => {
-            let _ = engine.apply_table_snapshot(snapshot_name, true);
+            let _ = engine.apply_table_snapshot(snapshot_name, true).await;
             return Ok(());
         }
         WalCmd::RestoreDatabaseSnapshot { snapshot_name, .. } => {
-            let _ = engine.apply_database_snapshot(snapshot_name, true);
+            let _ = engine.apply_database_snapshot(snapshot_name, true).await;
             return Ok(());
         }
         WalCmd::RestoreSystemSnapshot { snapshot_name, .. } => {
-            let _ = engine.apply_system_snapshot(snapshot_name, true);
+            let _ = engine.apply_system_snapshot(snapshot_name, true).await;
             return Ok(());
         }
         _ => {}
@@ -954,7 +959,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             // `PrepareCommitAddColumns` also fills the new column in every
             // existing block (`AddColumnsData`), so a crash between the
             // catalog commit and the file write is repaired by the replay.
-            engine.add_column_files(&full, first, &blocks)?;
+            engine.add_column_files_async(&full, first, &blocks).await?;
             // Rows the replay put in the append buffer are not in a block yet;
             // they get the default cell the schema now has (the mirror writes
             // it when the block is).
@@ -1122,8 +1127,13 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
             .is_empty()
         {
             if let Ok(Some(meta)) = catalog.get_table_by_name(&full) {
-                let _ =
-                    engine.publish_index_chunks(&full, meta.id, Some((name.as_str(), commit_ts)));
+                // Awaited like every other step of the replay: the publish's
+                // suspension point is the PLAID chunk write, and the replay is
+                // a future of its own now (`replay_commands`), so there is
+                // nothing to park.
+                let _ = engine
+                    .publish_index_chunks(&full, meta.id, Some((name.as_str(), commit_ts)))
+                    .await;
             }
         }
     }
@@ -1131,7 +1141,7 @@ pub fn replay(engine: &Engine, cmd: &WalCmd, commit_ts: u64) -> CommonResult<()>
 }
 
 /// The catalog's index-kind spelling for an IndexType.
-fn index_type_text(t: storage::wal::index_def::IndexType) -> &'static str {
+pub(crate) fn index_type_text(t: storage::wal::index_def::IndexType) -> &'static str {
     use storage::wal::index_def::IndexType;
     match t {
         IndexType::Hnsw => "HNSW",

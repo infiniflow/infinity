@@ -288,6 +288,34 @@ impl AsRef<[u8]> for MappedFile {
     }
 }
 
+/// The bytes of a **read-only** mapping as `&[f32]`, without copying, when the
+/// slice is 4-byte aligned and a whole number of `f32`.
+///
+/// A block stores an `EMBEDDING(FLOAT, d)` row as `d` little-endian `f32`, and
+/// a mapping starts on a page boundary, so the row's bytes are already the
+/// numbers a scan scores. `from_le_bytes` per element copies them into a `Vec`
+/// first - 1M allocations and 512 MB moved on SIFT 1M, 64% of the query. This
+/// hands back the same memory typed as `f32`.
+///
+/// SAFETY (of the transmute): the mapping is read-only over an immutable file
+/// (a publisher renames a new file over the old one, never writes in place), so
+/// no byte changes while the borrow lives; the alignment and length are checked
+/// before the cast, and the lifetime is tied to `bytes`.
+#[allow(unsafe_code)]
+pub fn f32_slice(bytes: &[u8]) -> Option<&[f32]> {
+    // SAFETY: `align_to` splits into the prefix/suffix that are not
+    // `f32`-aligned; requiring both empty means every byte is in `mid`, whose
+    // length is a whole number of `f32`. The source is a `&[u8]` over an
+    // immutable read-only mapping, so the aliased `&[f32]` sees the same bytes
+    // for its whole lifetime.
+    let (head, mid, tail) = unsafe { bytes.align_to::<f32>() };
+    if head.is_empty() && tail.is_empty() {
+        Some(mid)
+    } else {
+        None
+    }
+}
+
 impl Deref for MappedFile {
     type Target = [u8];
 

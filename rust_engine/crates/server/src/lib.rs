@@ -47,7 +47,8 @@ pub use generated::volo_gen;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -367,6 +368,13 @@ impl Server {
 
     /// Binds a server that serves DDL/DML/DQL against the given engine.
     pub fn bind_with_engine(addr: &str, engine: Arc<Engine>) -> Result<Self> {
+        // Record the engine's own handle before the first statement runs. A
+        // SELECT then reaches `Engine::engine_handle` and is dispatched to the
+        // blocking pool as a whole, instead of running inline on a runtime
+        // worker - where its scan-gate wait would park that worker for the
+        // length of the scan, and enough concurrent readers would leave nothing
+        // to poll the fan-out they themselves need.
+        engine.install_engine_handle();
         let mut s = Self::bind(addr)?;
         s.engine = Some(engine);
         Ok(s)
@@ -1304,7 +1312,7 @@ async fn dispatch_arm(
             // `block_on`, which parks this worker for the whole merge. Same
             // reason as `insert_literals_inner` above.
             let resp = match engine.as_ref() {
-                Some(eng) => match eng.compact_table_async(&full).await {
+                Some(eng) => match eng.compact_table(&full).await {
                     Ok(()) => CommonResponse {
                         error_code: OK,
                         error_msg: "OK".into(),
@@ -1761,14 +1769,7 @@ async fn dispatch_arm(
             // Same reason as `ListDatabase`: the segment layer is a catalog
             // read.
             let rows = match engine {
-                Some(e) => {
-                    let table = table.clone();
-                    text_cells(
-                        executor::scheduler()
-                            .spawn_blocking(move || show_segments_rows(&e, &table))
-                            .await,
-                    )
-                }
+                Some(e) => text_cells(show_segments_rows(e, table.clone()).await),
                 None => text_cells(Vec::new()),
             };
             let columns: Vec<String> = SHOW_SEGMENTS_COLUMNS
@@ -1788,14 +1789,7 @@ async fn dispatch_arm(
             // Same reason as `ListDatabase`.
             let rows = match engine {
                 Some(e) => {
-                    let table = table.clone();
-                    text_cells(
-                        executor::scheduler()
-                            .spawn_blocking(move || {
-                                show_blocks_rows(&e, &table, segment.max(0) as u32)
-                            })
-                            .await,
-                    )
+                    text_cells(show_blocks_rows(e, table.clone(), segment.max(0) as u32).await)
                 }
                 None => text_cells(Vec::new()),
             };
@@ -2376,29 +2370,62 @@ pub async fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> 
     }
 }
 
+/// Sends one encoded CALL and decodes its reply.
+///
+/// The whole exchange is **synchronous**: the thrift codec reads a reply up to
+/// the message's own end, and an unframed binary message has no length prefix,
+/// so the read cannot be "everything until EOF" - the Thrift server keeps the
+/// connection open for the next CALL. A synchronous codec therefore needs a
+/// synchronous socket, and the call runs on the blocking pool so a runtime
+/// worker is never parked on it.
+async fn call_once<T, W, F>(addr: &str, write: W, read: F) -> Result<T>
+where
+    T: Send + 'static,
+    W: FnOnce(&mut Vec<u8>) -> Result<()> + Send + 'static,
+    F: FnOnce(&mut std::net::TcpStream) -> Result<T> + Send + 'static,
+{
+    let addr = addr.to_string();
+    executor::scheduler()
+        .spawn_blocking(move || {
+            let mut stream =
+                std::net::TcpStream::connect(&addr).map_err(|e| Error::io(&addr, e))?;
+            let mut buf = Vec::new();
+            write(&mut buf)?;
+            stream.write_all(&buf).map_err(io)?;
+            read(&mut stream)
+        })
+        .await
+}
+
 /// A client-side helper used by tests (and, later, by an SDK path).
-pub fn connect(addr: &str, client_version: i64) -> Result<CommonResponse> {
-    let mut stream = TcpStream::connect(addr).map_err(|e| Error::io(addr, e))?;
-    write_connect_call(&mut stream, 1, client_version)?;
-    let mut reader = stream.try_clone().map_err(io)?;
-    read_connect_reply(&mut reader)
+pub async fn connect(addr: &str, client_version: i64) -> Result<CommonResponse> {
+    call_once(
+        addr,
+        move |buf| write_connect_call(buf, 1, client_version),
+        read_connect_reply,
+    )
+    .await
 }
 
 /// A client-side `Disconnect` for the given session.
-pub fn disconnect(addr: &str, session_id: i64) -> Result<CommonResponse> {
-    let mut stream = TcpStream::connect(addr).map_err(|e| Error::io(addr, e))?;
-    write_common_call(&mut stream, "Disconnect", 2, session_id)?;
-    let mut reader = stream.try_clone().map_err(io)?;
-    read_connect_reply(&mut reader)
+pub async fn disconnect(addr: &str, session_id: i64) -> Result<CommonResponse> {
+    call_once(
+        addr,
+        move |buf| write_common_call(buf, "Disconnect", 2, session_id),
+        read_connect_reply,
+    )
+    .await
 }
 
 /// A client-side `ShowCurrentNode`.
-pub fn show_current_node(addr: &str, session_id: i64) -> Result<ShowCurrentNodeResponse> {
-    let mut stream = TcpStream::connect(addr).map_err(|e| Error::io(addr, e))?;
+pub async fn show_current_node(addr: &str, session_id: i64) -> Result<ShowCurrentNodeResponse> {
     // `ShowCurrentNodeRequest { 1: session_id }` has the `CommonRequest` shape.
-    write_common_call(&mut stream, "ShowCurrentNode", 3, session_id)?;
-    let mut reader = stream.try_clone().map_err(io)?;
-    read_show_current_node_reply(&mut reader)
+    call_once(
+        addr,
+        move |buf| write_common_call(buf, "ShowCurrentNode", 3, session_id),
+        read_show_current_node_reply,
+    )
+    .await
 }
 
 /// Reads a `ShowCurrentNode` REPLY.
@@ -2431,11 +2458,14 @@ pub fn read_show_current_node_reply(r: &mut impl Read) -> Result<ShowCurrentNode
 }
 
 /// A client-side `CreateTable`.
-pub fn create_table(addr: &str, req: &CreateTableReq) -> Result<CommonResponse> {
-    let mut stream = TcpStream::connect(addr).map_err(|e| Error::io(addr, e))?;
-    write_create_table_call(&mut stream, 1, req)?;
-    let mut reader = stream.try_clone().map_err(io)?;
-    read_connect_reply(&mut reader)
+pub async fn create_table(addr: &str, req: &CreateTableReq) -> Result<CommonResponse> {
+    let req = req.clone();
+    call_once(
+        addr,
+        move |buf| write_create_table_call(buf, 1, &req),
+        read_connect_reply,
+    )
+    .await
 }
 
 // -------- columnar result encoding (SelectResponse `column_fields`) --------
@@ -6253,14 +6283,58 @@ pub fn format_byte_size(byte_size: u64) -> String {
 ///
 /// The reference sums the sizes of the files a `SegmentInfo`/`BlockInfo`
 /// carries (`physical_show_blocks_impl.cpp:60`, `Utility::FormatByteSize`).
-pub fn segment_block_bytes(
-    engine: &Engine,
-    table: &str,
+///
+/// **The I/O only** - walking the mirror tree and stat-ing each file - is
+/// [`Self::segment_block_bytes_io`], which the caller dispatches. Everything
+/// below is pure arithmetic over `(path, size)` pairs, so it stays on the
+/// async side instead of burning a blocking-pool slot for a hash insert.
+pub async fn segment_block_bytes(
+    engine: Arc<Engine>,
+    table: String,
+) -> (HashMap<u32, u64>, HashMap<(u32, u32), u64>) {
+    // Two different kinds of blocking, handled differently:
+    //
+    // * the mirror **walk** is a recursive `read_dir` with an `is_dir`/`is_file`
+    //   per entry, and it also reads the catalog (RocksDB) for the table id -
+    //   that whole step goes to the blocking pool as one job;
+    // * each file's **size** is a single `stat`, which `tokio::fs` issues on the
+    //   blocking pool too but keeps behind an `await`, so the loop does not
+    //   need a thread of its own.
+    let paths = executor::scheduler()
+        .spawn_blocking(move || engine.table_files(&table))
+        .await;
+    let mut files = Vec::with_capacity(paths.len());
+    for path in paths {
+        // `tokio::fs` needs a reactor, and a caller may drive this from a plain
+        // thread (a `#[test]` that uses `block_on` on `route`). Falling back to
+        // the synchronous `stat` keeps the function usable off the runtime
+        // instead of panicking with "there is no reactor running".
+        let bytes = file_len(&path).await;
+        files.push((path, bytes));
+    }
+    segment_block_bytes_from(files)
+}
+
+/// One file's size, through `tokio::fs` when a reactor is running and with a
+/// plain `stat` otherwise.
+async fn file_len(path: &std::path::Path) -> u64 {
+    if tokio::runtime::Handle::try_current().is_ok() {
+        tokio::fs::metadata(path)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0)
+    } else {
+        std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+    }
+}
+
+/// [`segment_block_bytes`]'s aggregation: no I/O, no locks.
+pub fn segment_block_bytes_from(
+    files: Vec<(PathBuf, u64)>,
 ) -> (HashMap<u32, u64>, HashMap<(u32, u32), u64>) {
     let mut segments: HashMap<u32, u64> = HashMap::new();
     let mut blocks: HashMap<(u32, u32), u64> = HashMap::new();
-    for path in engine.table_files(table) {
-        let bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    for (path, bytes) in files {
         let parts: Vec<String> = path
             .components()
             .map(|c| c.as_os_str().to_string_lossy().into_owned())
@@ -6299,10 +6373,10 @@ pub const SHOW_BLOCKS_TYPES: [&str; 3] = ["bigint", "varchar", "bigint"];
 
 /// Rows of `SHOW SEGMENTS`: one row per live segment, with its real row count
 /// and the bytes its directory occupies.
-pub fn show_segments_rows(engine: &Engine, table: &str) -> Vec<Vec<String>> {
-    let (segment_bytes, _) = segment_block_bytes(engine, table);
+pub async fn show_segments_rows(engine: Arc<Engine>, table: String) -> Vec<Vec<String>> {
+    let (segment_bytes, _) = segment_block_bytes(engine.clone(), table.clone()).await;
     engine
-        .segments(table)
+        .segments(&table)
         .into_iter()
         .map(|(segment_id, rows)| {
             vec![
@@ -6325,14 +6399,18 @@ pub fn show_segments_rows(engine: &Engine, table: &str) -> Vec<Vec<String>> {
 ///
 /// Blocks exist once the C++-format mirror has been written (a flush or
 /// checkpoint), exactly as in the reference where blocks appear at dump time.
-pub fn show_blocks_rows(engine: &Engine, table: &str, segment: u32) -> Vec<Vec<String>> {
-    let (_, block_bytes) = segment_block_bytes(engine, table);
+pub async fn show_blocks_rows(
+    engine: Arc<Engine>,
+    table: String,
+    segment: u32,
+) -> Vec<Vec<String>> {
+    let (_, block_bytes) = segment_block_bytes(engine.clone(), table.clone()).await;
     engine
-        .block_ids(table, segment)
+        .block_ids(&table, segment)
         .into_iter()
         .map(|block_id| {
             let rows = engine
-                .block_row_count(table, segment, block_id as u16)
+                .block_row_count(&table, segment, block_id as u16)
                 .unwrap_or(0);
             vec![
                 block_id.to_string(),
@@ -8945,36 +9023,35 @@ mod tests {
     }
 
     /// A header that never ends must not grow the server's buffer (plan 6.2.1).
-    #[test]
-    fn an_endless_header_is_rejected() {
-        use std::io::{Read, Write};
+    #[tokio::test]
+    async fn an_endless_header_is_rejected() {
         let dir = std::env::temp_dir().join(format!("inf_http_431_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let engine = Engine::open(&dir).unwrap();
+        let engine = Engine::open_async(&dir, Default::default()).await.unwrap();
         let server = crate::http::HttpServer::bind("127.0.0.1:0", Arc::new(engine)).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
+        // The listener is already bound by `bind`, so a connect after the
+        // spawn is enough; no sleep to wait for the accept loop.
 
-        let mut sock = std::net::TcpStream::connect(&addr).unwrap();
-        sock.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        // Async, like the server's own serve loop on this runtime: a blocking
+        // read here would starve the task that has to answer it.
+        let mut sock = tokio::net::TcpStream::connect(addr).await.unwrap();
+        sock.writable().await.unwrap();
+        sock.write_all(b"GET / HTTP/1.1\r\nHost: x\r\n")
+            .await
             .unwrap();
-        sock.write_all(b"GET / HTTP/1.1\r\nHost: x\r\n").unwrap();
         // 96 KiB of header bytes with no terminator.
-        sock.write_all(&vec![b'a'; 96 * 1024]).unwrap();
+        sock.write_all(&vec![b'a'; 96 * 1024]).await.unwrap();
         let mut buf = [0u8; 128];
-        let n = sock.read(&mut buf).unwrap();
+        let n = tokio::time::timeout(std::time::Duration::from_secs(5), sock.read(&mut buf))
+            .await
+            .expect("the server answers 431 instead of waiting for the terminator")
+            .unwrap();
         let head = String::from_utf8_lossy(&buf[..n]);
         assert!(
             head.starts_with("HTTP/1.1 431"),
@@ -9053,30 +9130,22 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tcp_connect_success_and_mismatch() {
+    #[tokio::test]
+    async fn tcp_connect_success_and_mismatch() {
         let server = Server::bind("127.0.0.1:0").unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
-        let ok = connect(&addr, CURRENT_VERSION_INDEX).unwrap();
+        let ok = connect(&addr, CURRENT_VERSION_INDEX).await.unwrap();
         assert_eq!(ok.error_code, OK);
         assert!(ok.session_id >= 1);
 
-        let bad = connect(&addr, 1).unwrap();
+        let bad = connect(&addr, 1).await.unwrap();
         assert_eq!(bad.error_code, VERSION_MISMATCH);
 
-        let dc = disconnect(&addr, ok.session_id).unwrap();
+        let dc = disconnect(&addr, ok.session_id).await.unwrap();
         assert_eq!(dc.error_code, OK);
         assert_eq!(dc.session_id, ok.session_id);
     }
@@ -9084,26 +9153,18 @@ mod tests {
     /// The peer manager owns the node `SHOW CURRENT NODE` reports: register,
     /// heartbeat and change-role all go through the manager `Server` holds, and
     /// every mutation is visible either on the wire or in the registry.
-    #[test]
-    fn show_current_node_reflects_the_peer_manager() {
+    #[tokio::test]
+    async fn show_current_node_reflects_the_peer_manager() {
         use crate::peer::{NodeRole, NodeStatus};
 
         let server = Server::bind("127.0.0.1:0").unwrap();
         let addr = server.local_addr().unwrap();
         let peer = server.peer();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
-        let node = show_current_node(&addr, 1).unwrap();
+        let node = show_current_node(&addr, 1).await.unwrap();
         assert_eq!(node.error_code, OK);
         assert_eq!(node.node_role, "leader");
         assert_eq!(node.server_status, "alive");
@@ -9134,13 +9195,13 @@ mod tests {
             .unwrap();
         assert_eq!(follower.txn_ts(), 20);
         assert_eq!(follower.heartbeat_count(), 1);
-        let node = show_current_node(&addr, 1).unwrap();
+        let node = show_current_node(&addr, 1).await.unwrap();
         assert_eq!(node.node_role, "leader");
         assert_eq!(node.server_status, "alive");
 
         // The role transition reaches the client through the same NodeInfo.
         peer.change_role(NodeRole::Admin).unwrap();
-        let node = show_current_node(&addr, 1).unwrap();
+        let node = show_current_node(&addr, 1).await.unwrap();
         assert_eq!(node.node_role, "admin");
         assert_eq!(node.server_status, "alive");
         assert_eq!(
@@ -9227,27 +9288,26 @@ mod tests {
         assert_eq!(peer.events().last().unwrap(), "terminate@leader");
     }
 
-    #[test]
-    fn tcp_create_table_round_trip_with_engine() {
+    #[tokio::test]
+    async fn tcp_create_table_round_trip_with_engine() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let server = Server::bind_with_engine("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
         // A real session: the server rejects an id it never handed out
         // (`SessionNotFound`), so the test connects first like any client.
-        let session_id = connect(&addr, CURRENT_VERSION_INDEX).unwrap().session_id;
+        let session_id = connect(&addr, CURRENT_VERSION_INDEX)
+            .await
+            .unwrap()
+            .session_id;
         assert!(session_id > 0);
         let req = CreateTableReq {
             db_name: "default_db".into(),
@@ -9266,16 +9326,16 @@ mod tests {
             session_id,
             conflict: 1,
         };
-        assert_eq!(create_table(&addr, &req).unwrap().error_code, OK);
+        assert_eq!(create_table(&addr, &req).await.unwrap().error_code, OK);
         // creating the same table again must fail: the engine kept the state
-        assert_ne!(create_table(&addr, &req).unwrap().error_code, OK);
+        assert_ne!(create_table(&addr, &req).await.unwrap().error_code, OK);
 
         // The reference refuses `HugeInt` at DDL time; the RPC reports its
         // `NOT_SUPPORTED` code instead of quietly creating a `VARCHAR`.
         let mut huge = req.clone();
         huge.table_name = "h".into();
         huge.columns[0].logic_type = 5;
-        assert_eq!(create_table(&addr, &huge).unwrap().error_code, 3032);
+        assert_eq!(create_table(&addr, &huge).await.unwrap().error_code, 3032);
     }
 
     /// Regression: every `read_*_args` must consume the *enclosing*
@@ -9681,16 +9741,31 @@ mod tests {
 
     /// Writes a `Show*Request { session_id, db_name, table_name, segment_id? }`
     /// CALL and returns the decoded reply.
-    fn show_call(
+    async fn show_call(
         addr: &str,
         method: &str,
         table: &str,
         segment: Option<i64>,
     ) -> Result<Vec<(String, Vec<String>)>> {
-        use std::net::TcpStream;
         // A real session: the server rejects an id it never handed out.
-        let session_id = connect(addr, CURRENT_VERSION_INDEX)?.session_id;
-        let mut stream = TcpStream::connect(addr).unwrap();
+        let session_id = connect(addr, CURRENT_VERSION_INDEX).await?.session_id;
+        let (addr, method, table) = (addr.to_string(), method.to_string(), table.to_string());
+        // The exchange is synchronous - the thrift reply has no length prefix,
+        // so it is read up to the message's own end - hence the blocking pool.
+        executor::scheduler()
+            .spawn_blocking(move || show_call_blocking(&addr, &method, &table, session_id, segment))
+            .await
+    }
+
+    fn show_call_blocking(
+        addr: &str,
+        method: &str,
+        table: &str,
+        session_id: i64,
+        segment: Option<i64>,
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        use std::io::Write;
+        let mut stream = std::net::TcpStream::connect(addr).unwrap();
         let mut buf = Vec::new();
         {
             let mut o = TBinaryOutputProtocol::new(&mut buf, true);
@@ -9739,30 +9814,35 @@ mod tests {
     /// A session id the server never handed out is `SessionNotFound` (3034),
     /// and `Disconnect` really removes one - the reference keeps sessions in a
     /// static map keyed by id, so a stale id must stop working.
-    #[test]
-    fn an_unknown_session_is_rejected() {
+    #[tokio::test]
+    async fn an_unknown_session_is_rejected() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let server = Server::bind_with_engine("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
         // `ListDatabase` is a business RPC: it takes the session id and its
         // reply carries `error_code`, so a rejected session is observable here
         // (unlike `Disconnect`, which is idempotent by design).
-        let call_with = |session_id: i64| -> Result<(i64, String)> {
-            use std::net::TcpStream;
-            let mut stream = TcpStream::connect(&addr).map_err(io)?;
+        let call_with = async |session_id: i64| -> Result<(i64, String)> {
+            // The exchange is synchronous (a thrift reply is read to the
+            // message's own end), so it runs on the blocking pool.
+            let addr = addr.clone();
+            executor::scheduler()
+                .spawn_blocking(move || list_database_call(&addr, session_id))
+                .await
+        };
+        #[allow(clippy::items_after_statements)]
+        fn list_database_call(addr: &str, session_id: i64) -> Result<(i64, String)> {
+            use std::io::Write;
+            let mut stream = std::net::TcpStream::connect(addr).map_err(io)?;
             let mut buf = Vec::new();
             {
                 let mut o = TBinaryOutputProtocol::new(&mut buf, true);
@@ -9788,7 +9868,6 @@ mod tests {
                 o.write_field_stop().map_err(tw)?;
                 o.write_struct_end().map_err(tw)?;
             }
-            use std::io::Write;
             stream.write_all(&buf).map_err(io)?;
             let mut i = TBinaryInputProtocol::new(&mut stream, true);
             i.read_message_begin().map_err(tw)?;
@@ -9812,50 +9891,56 @@ mod tests {
                 i.read_field_end().map_err(tw)?;
             }
             Ok((code, msg))
-        };
+        }
 
         // An id nobody opened.
-        let (code, msg) = call_with(999_999).unwrap();
+        let (code, msg) = call_with(999_999).await.unwrap();
         assert_eq!(code, 3034);
         assert!(msg.contains("isn't found"), "{msg}");
 
         // A session that exists answers ...
-        let session_id = connect(&addr, CURRENT_VERSION_INDEX).unwrap().session_id;
-        assert_ne!(call_with(session_id).unwrap().0, 3034);
+        let session_id = connect(&addr, CURRENT_VERSION_INDEX)
+            .await
+            .unwrap()
+            .session_id;
+        assert_ne!(call_with(session_id).await.unwrap().0, 3034);
 
         // ... and stops answering once it is disconnected.
-        let _ = disconnect(&addr, session_id);
-        assert_eq!(call_with(session_id).unwrap().0, 3034);
+        let _ = disconnect(&addr, session_id).await;
+        assert_eq!(call_with(session_id).await.unwrap().0, 3034);
     }
 
     /// `ShowSegments`/`ShowBlocks` report the real segment and block metadata
     /// (`physical_show_segments_impl.cpp`, `physical_show_blocks_impl.cpp`):
     /// one row per live segment with its row count, and one row per block of
     /// that segment with the block's row count — not `rows / 8192`.
-    #[test]
-    fn thrift_show_segments_and_blocks_report_real_metadata() {
+    #[tokio::test]
+    async fn thrift_show_segments_and_blocks_report_real_metadata() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
         // An `INSERT` appends to the open segment; a `COPY` seals the segment
         // it writes, so `INSERT` + `COPY` leaves two segments of one row each
         // (the C++ row-id allocator behaves the same way).
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
-            .unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
         let csv = dir.path().join("one_row.csv");
         std::fs::write(&csv, "2\n").unwrap();
         engine
-            .execute_blocking(&format!(
+            .execute(&format!(
                 "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 csv.display()
             ))
+            .await
             .unwrap();
         let segments = engine.segments("t");
         assert_eq!(segments.len(), 2, "{segments:?}");
         // Blocks are materialised by the C++-format mirror (a flush or
         // checkpoint), as in the reference.
-        executor::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
         let segment0 = segments[0].0;
         let blocks = engine.block_ids("t", segment0);
         assert!(!blocks.is_empty(), "flush must create blocks");
@@ -9863,19 +9948,11 @@ mod tests {
 
         let server = Server::bind_with_engine("127.0.0.1:0", engine.clone()).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
-        let cols = show_call(&addr, "ShowSegments", "t", None).unwrap();
+        let cols = show_call(&addr, "ShowSegments", "t", None).await.unwrap();
         let names: Vec<&str> = cols.iter().map(|(n, _)| n.as_str()).collect();
         assert_eq!(
             names,
@@ -9893,7 +9970,9 @@ mod tests {
         // The reference's status cell is the removed `SegmentEntry::status_`.
         assert_eq!(status, &vec!["No value".to_string(); 2]);
 
-        let cols = show_call(&addr, "ShowBlocks", "t", Some(i64::from(segment0))).unwrap();
+        let cols = show_call(&addr, "ShowBlocks", "t", Some(i64::from(segment0)))
+            .await
+            .unwrap();
         let names: Vec<&str> = cols.iter().map(|(n, _)| n.as_str()).collect();
         assert_eq!(
             names,

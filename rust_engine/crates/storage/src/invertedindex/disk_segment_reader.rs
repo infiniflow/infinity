@@ -99,7 +99,7 @@ pub type TermPositions = Vec<(u64, Vec<u32>)>;
 /// This is the reference's single-source case: one `PostingWriter` per term,
 /// exactly the objects [`crate::invertedindex::index_merger::ColumnIndexMerger`]
 /// drives for a multi-source merge, so both paths write the same bytes.
-pub fn write_segment_index(
+pub async fn write_segment_index(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
@@ -116,6 +116,7 @@ pub fn write_segment_index(
         flags,
         &|_, _| 0,
     )
+    .await
 }
 
 /// Same as [`write_segment_index`], with the per-`(term, row)` **doc payload**
@@ -125,7 +126,7 @@ pub fn write_segment_index(
 /// `rankfeatures` index uses it to carry the feature weight. The merge copies it
 /// per `(term, document)`, so this entry point is what makes that dimension
 /// testable against the reference's bytes.
-pub fn write_segment_index_with_payloads(
+pub async fn write_segment_index_with_payloads(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
@@ -150,16 +151,17 @@ pub fn write_segment_index_with_payloads(
         flags,
         &payload_of,
     )
+    .await
 }
 
-fn write_segment_index_inner(
+async fn write_segment_index_inner(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
     docs: &[(u64, u32)],
     postings: &BTreeMap<String, Vec<PostingEntry>>,
     flags: TermMetaFlags,
-    payload_of: &dyn Fn(&str, u64) -> u16,
+    payload_of: &(dyn Fn(&str, u64) -> u16 + Send + Sync),
 ) -> Result<(), FormatError> {
     write_segment_index_streaming(
         index_dir,
@@ -174,6 +176,7 @@ fn write_segment_index_inner(
             }
         },
     )
+    .await
 }
 
 /// Writes the three files of a segment while the caller produces one term at a
@@ -217,7 +220,7 @@ struct TermBatch {
 /// slice layout identical to the serial writer's - only who did the encoding
 /// changes (plan 6.13.3).
 #[allow(clippy::too_many_arguments)] // one argument per piece of the segment being built
-fn flush_term_batch(
+async fn flush_term_batch(
     batch: &mut Vec<TermBatch>,
     flags: TermMetaFlags,
     base_row_id: u64,
@@ -232,7 +235,13 @@ fn flush_term_batch(
     }
     // Pure encoding: each term is independent and writes only its own frame, so
     // a term is the CPU leaf. Each becomes a tokio task under the core bound and
-    // runs on the blocking pool; the writer stays a single sequential append.
+    // runs on the CPU-bound dispatch; the writer stays a single sequential
+    // append.
+    //
+    // `map_cpu_bound`, not `map_blocking`: the encode waits on nothing, so it
+    // must not share the blocking pool with work that does. That pool is where
+    // a scan parks while it waits for its scan-gate slot, and a leaf that took
+    // a thread from it was enough to starve the fan-out underneath the seal.
     //
     // The closure owns everything it reads (the term comes with the item, the
     // doc lengths are shared by `Arc`), so each body is `'static` and a decode
@@ -285,7 +294,8 @@ fn flush_term_batch(
         Ok((item.term, frame, meta))
     };
     let encoded: Vec<(String, Vec<u8>, TermMeta)> =
-        index::parallel::map_blocking(items, workers, encode)
+        index::parallel::map_cpu_bound(items, workers, encode)
+            .await
             .map_err(|e| FormatError::Invalid(e.to_string()))?;
     for (term, frame, mut meta) in encoded {
         let base = pos.len() as u64;
@@ -299,13 +309,13 @@ fn flush_term_batch(
     Ok(())
 }
 
-pub fn write_segment_index_streaming(
+pub async fn write_segment_index_streaming(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
     docs: &[(u64, u32)],
     flags: TermMetaFlags,
-    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+    for_each_term: &mut (dyn FnMut(&mut TermSink<'_>) + Send),
 ) -> Result<(), FormatError> {
     write_segment_index_streaming_live(
         index_dir,
@@ -316,6 +326,7 @@ pub fn write_segment_index_streaming(
         None,
         for_each_term,
     )
+    .await
 }
 
 /// [`write_segment_index_streaming`] with the chunk's live statistics stated.
@@ -326,14 +337,14 @@ pub fn write_segment_index_streaming(
 /// caller kept (`sum(dl)`) and how many of them there are (BM25 `N`). `None`
 /// means the chunk holds every document it lists, which is the seal path's
 /// answer once deleted rows are filtered out of `docs`.
-pub fn write_segment_index_streaming_live(
+pub async fn write_segment_index_streaming_live(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
     docs: &[(u64, u32)],
     flags: TermMetaFlags,
     live: Option<LiveStats>,
-    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+    for_each_term: &mut (dyn FnMut(&mut TermSink<'_>) + Send),
 ) -> Result<(), FormatError> {
     write_segment_index_streaming_with_live(
         index_dir,
@@ -345,6 +356,7 @@ pub fn write_segment_index_streaming_live(
         live,
         for_each_term,
     )
+    .await
 }
 
 /// [`write_segment_index_streaming`] with the encode batch size stated.
@@ -353,14 +365,14 @@ pub fn write_segment_index_streaming_live(
 /// the same for any value, which is what `batching_does_not_change_the_bytes`
 /// pins. It exists so a test can drive the extremes (one term per batch, one
 /// batch for the whole segment) without a build-time knob.
-pub fn write_segment_index_streaming_with(
+pub async fn write_segment_index_streaming_with(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
     docs: &[(u64, u32)],
     flags: TermMetaFlags,
     batch_terms: usize,
-    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+    for_each_term: &mut (dyn FnMut(&mut TermSink<'_>) + Send),
 ) -> Result<(), FormatError> {
     write_segment_index_streaming_with_live(
         index_dir,
@@ -372,12 +384,13 @@ pub fn write_segment_index_streaming_with(
         None,
         for_each_term,
     )
+    .await
 }
 
 /// [`write_segment_index_streaming_with`] with the live statistics and the
 /// publish marker of the chunk.
 #[allow(clippy::too_many_arguments)] // one argument per piece of the chunk being built, as `write_segment_index`
-pub fn write_segment_index_streaming_with_live(
+pub async fn write_segment_index_streaming_with_live(
     index_dir: &str,
     base_name: &str,
     base_row_id: u64,
@@ -385,7 +398,7 @@ pub fn write_segment_index_streaming_with_live(
     flags: TermMetaFlags,
     batch_terms: usize,
     live: Option<LiveStats>,
-    for_each_term: &mut dyn FnMut(&mut TermSink<'_>),
+    for_each_term: &mut (dyn FnMut(&mut TermSink<'_>) + Send),
 ) -> Result<(), FormatError> {
     let batch_terms = batch_terms.max(1);
     fs::create_dir_all(index_dir).map_err(|e| FormatError::Io(e.to_string()))?;
@@ -462,40 +475,39 @@ pub fn write_segment_index_streaming_with_live(
     // its time on, while the writer itself must stay a single sequential
     // append. A batch bounds the memory at `batch_terms` terms' postings,
     // which is the same bound the streaming shape was introduced for.
-    let mut batch: Vec<TermBatch> = Vec::new();
-    let mut failure: Option<FormatError> = None;
+    // `for_each_term` is a synchronous sink (the seal reads the caller's tail
+    // through it), so it only **collects** here; the encode runs afterwards, in
+    // one fan-out per `batch_terms` chunk. Encoding inside the sink would need
+    // an `await` in a `FnMut`, and blocking on it there is what put a blocking
+    // thread inside a fan-out that another blocking thread was waiting for.
+    let mut batches: Vec<Vec<TermBatch>> = vec![Vec::new()];
     {
         let mut emit = |term: &str, list: &[PostingEntry], payload_of: &dyn Fn(u64) -> u16| {
-            if failure.is_some() || list.is_empty() {
+            if list.is_empty() {
                 return;
             }
             // The payload closure borrows the caller's storage, so the values
             // are taken now; encoding later must not touch it.
             let payloads: Vec<u16> = list.iter().map(|(row, _, _)| payload_of(*row)).collect();
-            batch.push(TermBatch {
+            let current = batches.last_mut().expect("one batch is always open");
+            current.push(TermBatch {
                 term: term.to_string(),
                 list: list.to_vec(),
                 payloads,
             });
-            if batch.len() >= batch_terms {
-                if let Err(error) = flush_term_batch(
-                    &mut batch,
-                    flags,
-                    base_row_id,
-                    doc_count,
-                    std::sync::Arc::clone(&doc_len),
-                    &mut pos,
-                    &mut metas,
-                    &mut terms,
-                ) {
-                    failure = Some(error);
-                }
+            // Close the batch at the caller's bound so the memory the postings
+            // occupy stays bounded while the sink runs.
+            if current.len() >= batch_terms {
+                batches.push(Vec::new());
             }
         };
         for_each_term(&mut emit);
     }
-    if failure.is_none() {
-        if let Err(error) = flush_term_batch(
+    for mut batch in batches {
+        if batch.is_empty() {
+            continue;
+        }
+        flush_term_batch(
             &mut batch,
             flags,
             base_row_id,
@@ -504,12 +516,8 @@ pub fn write_segment_index_streaming_with_live(
             &mut pos,
             &mut metas,
             &mut terms,
-        ) {
-            failure = Some(error);
-        }
-    }
-    if let Some(failure) = failure {
-        return Err(failure);
+        )
+        .await?;
     }
 
     let (meta_region, offsets) = encode_term_meta_region_with_offsets(&metas, flags);
@@ -1626,8 +1634,8 @@ mod tests {
     /// reset the block cursor (`at`) but not the position accounting
     /// (`consumed`), so every document of the new block got the previous block's
     /// last positions; phrase / `~N` queries read exactly this.
-    #[test]
-    fn positions_survive_a_natural_block_boundary() {
+    #[tokio::test]
+    async fn positions_survive_a_natural_block_boundary() {
         let dir = tempfile::tempdir().unwrap();
         let dir_str = dir.path().to_str().unwrap();
         let docs: Vec<(u64, u32)> = (0..400u64).map(|row| (row, 5)).collect();
@@ -1638,7 +1646,9 @@ mod tests {
                 .collect::<Vec<_>>(),
         )]);
         let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
-        write_segment_index(dir_str, "bnd", 0, &docs, &postings, flags).unwrap();
+        write_segment_index(dir_str, "bnd", 0, &docs, &postings, flags)
+            .await
+            .unwrap();
         let reader = SegmentIndexReader::open(dir_str, "bnd", 0, flags).unwrap();
         let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
         while let Some(doc) = cursor.doc() {
@@ -1656,8 +1666,8 @@ mod tests {
     /// phrase went from 10 s (five chunks) to 40 s (one chunk) with identical
     /// scores. Here one hop to the last document of a 2000-document list (46
     /// position records) must decode a handful of records, not the list.
-    #[test]
-    fn a_hop_lands_on_the_position_record_it_needs() {
+    #[tokio::test]
+    async fn a_hop_lands_on_the_position_record_it_needs() {
         let dir = tempfile::tempdir().unwrap();
         let dir_str = dir.path().to_str().unwrap();
         let docs: Vec<(u64, u32)> = (0..2000u64).map(|row| (row, 9)).collect();
@@ -1668,7 +1678,9 @@ mod tests {
                 .collect::<Vec<_>>(),
         )]);
         let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
-        write_segment_index(dir_str, "hop", 0, &docs, &postings, flags).unwrap();
+        write_segment_index(dir_str, "hop", 0, &docs, &postings, flags)
+            .await
+            .unwrap();
         let reader = SegmentIndexReader::open(dir_str, "hop", 0, flags).unwrap();
         let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
         cursor.advance(1999);
@@ -1711,8 +1723,8 @@ mod tests {
         (docs, postings)
     }
 
-    #[test]
-    fn roundtrips_through_disk() {
+    #[tokio::test]
+    async fn roundtrips_through_disk() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let (docs, postings) = sample();
@@ -1727,6 +1739,7 @@ mod tests {
             &postings,
             tf_flags(),
         )
+        .await
         .unwrap();
 
         let reader =
@@ -1765,8 +1778,8 @@ mod tests {
     /// three files' lengths and the chunk's live statistics - and it lives in a
     /// sibling tree (`ChunkManifest::path`), because `data/` has to list exactly
     /// what the reference writes.
-    #[test]
-    fn a_segment_is_exactly_the_reference_file_family() {
+    #[tokio::test]
+    async fn a_segment_is_exactly_the_reference_file_family() {
         let dir = tempfile::tempdir().unwrap();
         // An engine's chunk directory sits under `data/`, which is the tree that
         // must list exactly the reference's files.
@@ -1784,6 +1797,7 @@ mod tests {
             &postings,
             TermMetaFlags::default(),
         )
+        .await
         .unwrap();
         let mut names: Vec<String> = std::fs::read_dir(index_dir)
             .unwrap()
@@ -1844,8 +1858,8 @@ mod tests {
     /// A row with no text (the reference's `InsertGap`) keeps its `docid_t`: the
     /// segment covers `base_row_id..base_row_id + doc_count`, the hole has no
     /// posting and length 0, and every later row keeps `row - base_row_id`.
-    #[test]
-    fn a_gap_row_is_a_zero_length_document() {
+    #[tokio::test]
+    async fn a_gap_row_is_a_zero_length_document() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         // Rows 0 and 2 carry text, row 1 is a gap.
@@ -1860,6 +1874,7 @@ mod tests {
             &postings,
             TermMetaFlags::default(),
         )
+        .await
         .unwrap();
         let reader = SegmentIndexReader::open(
             index_dir,
@@ -1881,8 +1896,8 @@ mod tests {
     /// The block bound the WAND reads is the writer's own `block_max_tf` /
     /// `block_max_percentage` (`DocListEncoder::add_skip_list_item`), carried in
     /// the doc skip list - not a value recomputed from the decoded postings.
-    #[test]
-    fn block_max_comes_from_the_doc_skip_list() {
+    #[tokio::test]
+    async fn block_max_comes_from_the_doc_skip_list() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let docs: Vec<(u64, u32)> = (0..300u64).map(|row| (row, 10)).collect();
@@ -1893,7 +1908,9 @@ mod tests {
                 .collect::<Vec<_>>(),
         )]);
         let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
-        write_segment_index(index_dir, "ft_0000000000000000", 0, &docs, &postings, flags).unwrap();
+        write_segment_index(index_dir, "ft_0000000000000000", 0, &docs, &postings, flags)
+            .await
+            .unwrap();
         let reader = SegmentIndexReader::open(index_dir, "ft_0000000000000000", 0, flags).unwrap();
         let mut cursor = reader.term_doc_cursor("t").unwrap().unwrap();
         let mut blocks = 0;
@@ -1918,8 +1935,8 @@ mod tests {
         assert_eq!(blocks, 3, "300 postings are three 128-document blocks");
     }
 
-    #[test]
-    fn lengths_file_is_bare_u32() {
+    #[tokio::test]
+    async fn lengths_file_is_bare_u32() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let docs = vec![(0u64, 7u32), (1, 9)];
@@ -1932,6 +1949,7 @@ mod tests {
             &postings,
             TermMetaFlags::default(),
         )
+        .await
         .unwrap();
         let bytes = std::fs::read(format!("{index_dir}/ft_0000000000000000.len")).unwrap();
         assert_eq!(bytes, vec![7, 0, 0, 0, 9, 0, 0, 0]);
@@ -1953,8 +1971,8 @@ mod tests {
     /// (a) Seal and reopen: the occurrence offsets a `PostingWriter` recorded
     /// come back unchanged, including a document whose positions straddle the
     /// 128-position block boundary and a document that repeats the term.
-    #[test]
-    fn positions_survive_seal_and_reopen() {
+    #[tokio::test]
+    async fn positions_survive_seal_and_reopen() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let base = 1u64 << 32;
@@ -1998,6 +2016,7 @@ mod tests {
             &postings,
             tf_flags(),
         )
+        .await
         .unwrap();
 
         let reader =
@@ -2029,8 +2048,8 @@ mod tests {
     }
 
     /// (b) A phrase must match on consecutive occurrences only.
-    #[test]
-    fn phrase_matches_only_consecutive_positions() {
+    #[tokio::test]
+    async fn phrase_matches_only_consecutive_positions() {
         fn phrase_rows(reader: &SegmentIndexReader, terms: &[&str]) -> Vec<u64> {
             let lists: Vec<TermPositions> = terms
                 .iter()
@@ -2073,6 +2092,7 @@ mod tests {
             &postings,
             TermMetaFlags::default(),
         )
+        .await
         .unwrap();
         let reader =
             SegmentIndexReader::open(index_dir, "ft_phrase", 0, TermMetaFlags::default()).unwrap();
@@ -2118,14 +2138,16 @@ mod tests {
     ///   `2`, then `00 00 00 00 81 82 82 00`.
     /// * position skip list: one item `(total_pos = 3, block bytes = 9)`, i.e.
     ///   keys `[3]` and offsets `[9]`, each as its own `IntEncoder<u32>` frame.
-    #[test]
-    fn pos_file_matches_the_reference_layout() {
+    #[tokio::test]
+    async fn pos_file_matches_the_reference_layout() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let docs: Vec<(u64, u32)> = vec![(0, 4), (1, 3)];
         let mut postings: BTreeMap<String, Vec<PostingEntry>> = BTreeMap::new();
         postings.insert("a".into(), vec![(0, 2, vec![1, 3]), (1, 1, vec![2])]);
-        write_segment_index(index_dir, "ft_bytes", 0, &docs, &postings, tf_flags()).unwrap();
+        write_segment_index(index_dir, "ft_bytes", 0, &docs, &postings, tf_flags())
+            .await
+            .unwrap();
 
         #[rustfmt::skip]
         let want: Vec<u8> = vec![
@@ -2171,8 +2193,8 @@ mod tests {
     /// so the reference's contract applies: one occurrence per document, i.e.
     /// every recorded frequency is 1 (`DocListEncoder::AddDocument` only writes
     /// the column when `of_term_frequency` is set).
-    #[test]
-    fn segment_without_positions_has_empty_streams() {
+    #[tokio::test]
+    async fn segment_without_positions_has_empty_streams() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let docs: Vec<(u64, u32)> = vec![(0, 3), (1, 3)];
@@ -2186,6 +2208,7 @@ mod tests {
             &postings,
             TermMetaFlags::default(),
         )
+        .await
         .unwrap();
         let reader =
             SegmentIndexReader::open(index_dir, "ft_nopos", 0, TermMetaFlags::default()).unwrap();
@@ -2199,8 +2222,8 @@ mod tests {
     /// A set that mixes two `ROW_ID` segments would therefore pad ~4 G entries of
     /// a hole that holds no row: the caller has to split at the boundary, and the
     /// writer refuses instead of allocating it.
-    #[test]
-    fn a_writer_refuses_rows_from_two_row_id_segments() {
+    #[tokio::test]
+    async fn a_writer_refuses_rows_from_two_row_id_segments() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
         let docs = vec![(0u64, 1u32), ((1u64 << 32) + 5, 1u32)];
@@ -2217,6 +2240,7 @@ mod tests {
             &postings,
             crate::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap_err();
         let message = format!("{error}");
         assert!(
@@ -2247,7 +2271,7 @@ mod tests {
         (docs, postings)
     }
 
-    fn open_every_document(index_dir: &str, base: u64, n: u64) -> SegmentIndexReader {
+    async fn open_every_document(index_dir: &str, base: u64, n: u64) -> SegmentIndexReader {
         let (docs, postings) = every_document(base, n);
         write_segment_index(
             index_dir,
@@ -2257,6 +2281,7 @@ mod tests {
             &postings,
             crate::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
         SegmentIndexReader::open(
             index_dir,
@@ -2285,7 +2310,7 @@ mod tests {
         (docs, postings)
     }
 
-    fn open_strided_document(
+    async fn open_strided_document(
         index_dir: &str,
         base: u64,
         n: u64,
@@ -2300,6 +2325,7 @@ mod tests {
             &postings,
             crate::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
         SegmentIndexReader::open(
             index_dir,
@@ -2312,10 +2338,10 @@ mod tests {
 
     /// `advance` past the loaded block hops through the skip list instead of
     /// decoding every block in between: five blocks, two decodes.
-    #[test]
-    fn advance_hops_blocks_with_the_skip_list() {
+    #[tokio::test]
+    async fn advance_hops_blocks_with_the_skip_list() {
         let dir = tempfile::tempdir().unwrap();
-        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 600);
+        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 600).await;
         let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
         assert_eq!(cursor.doc(), Some(0));
         assert_eq!(cursor.blocks_decoded, 1, "the first block");
@@ -2334,12 +2360,12 @@ mod tests {
     /// The ordinal the skip list is keyed by is not `row - base_row_id` in
     /// general; deriving it from the stored rows is what keeps the cursor from
     /// hopping past a posting that the target precedes.
-    #[test]
-    fn advance_lands_on_the_next_stored_row_in_a_gapped_segment() {
+    #[tokio::test]
+    async fn advance_lands_on_the_next_stored_row_in_a_gapped_segment() {
         let dir = tempfile::tempdir().unwrap();
         let base = 1000u64;
         // 600 stored rows, every second row id: 1000, 1002, ... 2198.
-        let reader = open_strided_document(dir.path().to_str().unwrap(), base, 600, 2);
+        let reader = open_strided_document(dir.path().to_str().unwrap(), base, 600, 2).await;
         assert_eq!(reader.doc_count(), 1199, "the span, holes included");
         assert_eq!(reader.ordinal_at_or_after(base), Some(0));
         // Inside a hole the ordinal is the hole's own offset - the cursor then
@@ -2381,11 +2407,11 @@ mod tests {
 
     /// The skip list is keyed by the segment's own doc id, so a segment whose
     /// rows start above 0 has to rebase the target before seeking.
-    #[test]
-    fn advance_rebases_the_target_on_a_sparse_segment() {
+    #[tokio::test]
+    async fn advance_rebases_the_target_on_a_sparse_segment() {
         let dir = tempfile::tempdir().unwrap();
         let base = 1u64 << 32;
-        let reader = open_every_document(dir.path().to_str().unwrap(), base, 400);
+        let reader = open_every_document(dir.path().to_str().unwrap(), base, 400).await;
         let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
         cursor.advance(base + 300);
         assert_eq!(cursor.doc(), Some(base + 300));
@@ -2394,10 +2420,10 @@ mod tests {
 
     /// Every target lands on the same document a linear walk would, and costs at
     /// most the initial block plus the one the skip list hopped to.
-    #[test]
-    fn advance_lands_where_a_linear_walk_does() {
+    #[tokio::test]
+    async fn advance_lands_where_a_linear_walk_does() {
         let dir = tempfile::tempdir().unwrap();
-        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 700);
+        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 700).await;
         for target in 0..700u64 {
             let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
             cursor.advance(target);
@@ -2425,8 +2451,8 @@ mod tests {
     /// between must not drop a posting that sits between the cursor and the
     /// target. The skip list is keyed by those ordinals, so this is also what
     /// makes a gapped chunk seekable at all.
-    #[test]
-    fn advance_over_a_gapped_segment_keeps_every_posting_between() {
+    #[tokio::test]
+    async fn advance_over_a_gapped_segment_keeps_every_posting_between() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         // Every third row carries text: 300 documents over the 898-row span
@@ -2443,6 +2469,7 @@ mod tests {
             &postings,
             crate::invertedindex::format::OPTION_FLAG_ALL,
         )
+        .await
         .unwrap();
         let reader = SegmentIndexReader::open(
             index_dir,
@@ -2486,10 +2513,10 @@ mod tests {
     /// The position stream is sequential, so a hop has to drop the occurrences of
     /// the blocks it skipped: `positions()` after a seek must still be the
     /// document's own offsets.
-    #[test]
-    fn positions_survive_a_block_hop() {
+    #[tokio::test]
+    async fn positions_survive_a_block_hop() {
         let dir = tempfile::tempdir().unwrap();
-        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 500);
+        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 500).await;
         let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
         cursor.advance(301);
         assert_eq!(cursor.doc(), Some(301));
@@ -2505,10 +2532,10 @@ mod tests {
     /// A list shorter than one block still gets a single skip-list item (the
     /// encoder flushes its partial block at `Dump`), and a seek inside that one
     /// block never hops.
-    #[test]
-    fn a_short_list_still_advances() {
+    #[tokio::test]
+    async fn a_short_list_still_advances() {
         let dir = tempfile::tempdir().unwrap();
-        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 50);
+        let reader = open_every_document(dir.path().to_str().unwrap(), 0, 50).await;
         let mut cursor = reader.term_doc_cursor("alpha").unwrap().unwrap();
         assert!(cursor.skiplist.is_some(), "the partial block is flushed");
         cursor.advance(49);
@@ -2524,28 +2551,39 @@ mod tests {
     ///
     /// This is the guarantee the byte gates rely on - a parallel encoder that
     /// reordered or mis-offset the `.pos` slices would show up here first.
-    #[test]
-    fn batching_does_not_change_the_bytes() {
+    #[tokio::test]
+    async fn batching_does_not_change_the_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let index_dir = dir.path().to_str().unwrap();
         let (docs, postings) = many_term_sample();
         let flags = tf_flags();
 
-        let write = |base_name: &str, batch_terms: usize| {
+        // A helper rather than a closure: `write_segment_index_streaming_with`
+        // now awaits its encode fan-out, and a closure returning `async move`
+        // needs the borrows spelled out.
+        async fn write_one(
+            index_dir: &str,
+            base_name: &str,
+            docs: &[(u64, u32)],
+            postings: &BTreeMap<String, Vec<PostingEntry>>,
+            flags: TermMetaFlags,
+            batch_terms: usize,
+        ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
             write_segment_index_streaming_with(
                 index_dir,
                 base_name,
                 0,
-                &docs,
+                docs,
                 flags,
                 batch_terms,
                 &mut |emit| {
-                    for (term, list) in &postings {
+                    for (term, list) in postings {
                         let payload = |_row: u64| 0u16;
                         emit(term, list, &payload);
                     }
                 },
             )
+            .await
             .unwrap();
             let read =
                 |suffix: &str| std::fs::read(format!("{index_dir}/{base_name}{suffix}")).unwrap();
@@ -2554,11 +2592,20 @@ mod tests {
                 read(FULLTEXT_POSTING_SUFFIX),
                 read(FULLTEXT_LENGTH_SUFFIX),
             )
-        };
+        }
 
-        let one_at_a_time = write("ft_one", 1);
-        let production = write("ft_batch", SEAL_BATCH_TERMS);
-        let all_at_once = write("ft_all", postings.len());
+        let one_at_a_time = write_one(index_dir, "ft_one", &docs, &postings, flags, 1).await;
+        let production = write_one(
+            index_dir,
+            "ft_batch",
+            &docs,
+            &postings,
+            flags,
+            SEAL_BATCH_TERMS,
+        )
+        .await;
+        let all_at_once =
+            write_one(index_dir, "ft_all", &docs, &postings, flags, postings.len()).await;
         assert_eq!(one_at_a_time.0, production.0, "the dictionary moved");
         assert_eq!(one_at_a_time.1, production.1, "the postings moved");
         assert_eq!(one_at_a_time.2, production.2, "the lengths moved");

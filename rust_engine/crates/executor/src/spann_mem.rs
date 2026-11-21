@@ -447,22 +447,29 @@ impl SpannHandle {
         }
     }
 
-    pub(crate) fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
+    pub(crate) async fn search(&self, q: &[f32], k: usize, beam: Option<usize>) -> Vec<(u64, f32)> {
         match self {
             SpannHandle::Memory(index) => index.search(q, k, beam),
             SpannHandle::File(chains) => {
                 // One tree per segment (§3 I6) and the trees share nothing, so a
                 // query is N independent descents (§8.1). A single segment keeps
                 // the serial loop - a fan-out for one item buys no parallelism.
-                let per_chunk: Vec<Vec<(u64, f32)>> = if chains.len() > 1
-                    && !crate::fanout::on_a_runtime_worker()
-                {
+                //
+                // The fan-out is a pure-CPU descent (the trees are memory-mapped
+                // and a probe takes no lock), so it goes to the blocking pool
+                // through `map_cpu_bound` rather than parking a runtime worker -
+                // `AGENTS.md` §7.8. This is an `async fn` for exactly that
+                // reason; the callers that used to drive it synchronously now
+                // await it.
+                let per_chunk: Vec<Vec<(u64, f32)>> = if chains.len() > 1 {
                     let items: Vec<Arc<storage::knn_index::spann::ChunkChain>> = chains.to_vec();
                     let shared_query: Arc<[f32]> = Arc::from(q);
                     let workers = chains.len();
-                    match crate::fanout::map_blocking(items, workers, move |chain| {
+                    match index::parallel::map_cpu_bound(items, workers, move |chain| {
                         Ok(chain.search(shared_query.as_ref(), k, beam))
-                    }) {
+                    })
+                    .await
+                    {
                         Ok(answers) => answers,
                         // A fan-out that cannot spawn falls back to this
                         // thread: a missing segment is a wrong answer, not a
@@ -504,7 +511,7 @@ impl SpannHandle {
     /// candidate list first and keeps the admitted rows, which is the same
     /// answer for a filter whose selectivity is not tiny, and the caller's
     /// `uncovered` fallback covers the rest.
-    pub(crate) fn search_filtered(
+    pub(crate) async fn search_filtered(
         &self,
         q: &[f32],
         k: usize,
@@ -528,33 +535,34 @@ impl SpannHandle {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
                 SpannHandle::File(chains) => {
-                    let per_chunk: Vec<Vec<(u64, f32)>> =
-                        if chains.len() > 1 && !crate::fanout::on_a_runtime_worker() {
-                            let items: Vec<Arc<storage::knn_index::spann::ChunkChain>> =
-                                chains.to_vec();
-                            let shared_query: Arc<[f32]> = Arc::from(q);
-                            let shared_ids = Arc::clone(&ids);
-                            let workers = chains.len();
-                            match crate::fanout::map_blocking(items, workers, move |chain| {
-                                Ok(chain.search_filtered(
-                                    shared_query.as_ref(),
-                                    k,
-                                    Some(width),
-                                    &shared_ids,
-                                ))
-                            }) {
-                                Ok(answers) => answers,
-                                Err(_) => chains
-                                    .iter()
-                                    .map(|c| c.search_filtered(q, k, Some(width), &ids))
-                                    .collect(),
-                            }
-                        } else {
-                            chains
+                    let per_chunk: Vec<Vec<(u64, f32)>> = if chains.len() > 1 {
+                        let items: Vec<Arc<storage::knn_index::spann::ChunkChain>> =
+                            chains.to_vec();
+                        let shared_query: Arc<[f32]> = Arc::from(q);
+                        let shared_ids = Arc::clone(&ids);
+                        let workers = chains.len();
+                        match index::parallel::map_cpu_bound(items, workers, move |chain| {
+                            Ok(chain.search_filtered(
+                                shared_query.as_ref(),
+                                k,
+                                Some(width),
+                                &shared_ids,
+                            ))
+                        })
+                        .await
+                        {
+                            Ok(answers) => answers,
+                            Err(_) => chains
                                 .iter()
                                 .map(|c| c.search_filtered(q, k, Some(width), &ids))
-                                .collect()
-                        };
+                                .collect(),
+                        }
+                    } else {
+                        chains
+                            .iter()
+                            .map(|c| c.search_filtered(q, k, Some(width), &ids))
+                            .collect()
+                    };
                     let mut merged: Vec<(u64, f32)> = per_chunk.into_iter().flatten().collect();
                     merge_chunks(&mut merged);
                     merged.truncate(k);
@@ -1213,8 +1221,8 @@ mod tests {
     /// Each chunk only covers its own rows, so a handle that looked at one chunk
     /// would miss half the table - which is what a segment-scoped dump makes
     /// possible in the first place.
-    #[test]
-    fn a_file_handle_merges_every_segment_chunk() {
+    #[tokio::test]
+    async fn a_file_handle_merges_every_segment_chunk() {
         let dir = std::env::temp_dir().join(format!("spann-merge-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let options = options_from(&pairs(&[("max_partition_size", "32")])).unwrap();
@@ -1245,7 +1253,7 @@ mod tests {
         // The origin is between the two clusters, so the six nearest rows are
         // three from each side: a merge that stopped at one chunk would answer
         // with a single sign.
-        let hits = handle.search(&vec![0.0f32; dim], 6, Some(8));
+        let hits = handle.search(&vec![0.0f32; dim], 6, Some(8)).await;
         assert_eq!(hits.len(), 6);
         let first = hits.iter().filter(|(id, _)| *id >> 32 == 0).count();
         let second = hits.iter().filter(|(id, _)| *id >> 32 == 1).count();

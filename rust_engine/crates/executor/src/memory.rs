@@ -551,7 +551,6 @@ impl super::Engine {
             // Pure copies: a query that needs them recomputes them.
             self.result_cache.lock().unwrap().clear();
             self.plan_cache.clear();
-            self.vector_cache.lock().unwrap().clear();
         }
         // The page advice reports the mappings' length, which is an upper bound
         // on what was actually resident (and a cgroup keeps charging a page
@@ -688,11 +687,13 @@ mod tests {
     /// A ceiling below the working set is the one case the levers cannot fix, so
     /// it is the one that decides the process's fate: writes are refused (the
     /// front end renders that as an error) while reads keep working.
-    #[test]
-    fn a_write_is_refused_when_the_ceiling_is_below_the_working_set() {
+    #[tokio::test]
+    async fn a_write_is_refused_when_the_ceiling_is_below_the_working_set() {
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE meml (id INT);").unwrap();
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE meml (id INT);").await.unwrap();
         // One byte: every pass runs the levers and still cannot get under it,
         // which is exactly the state that must not take the process down.
         e.set_memory_limit(1);
@@ -704,12 +705,13 @@ mod tests {
             "the tick ran a pass"
         );
         let err = e
-            .execute_blocking("INSERT INTO meml VALUES (1);")
+            .execute("INSERT INTO meml VALUES (1);")
+            .await
             .unwrap_err()
             .to_string();
         assert!(err.contains("memory limit exceeded"), "{err}");
         // Reads allocate nothing new and stay available under the same ceiling.
-        e.execute_blocking("SELECT COUNT(*) FROM meml;").unwrap();
+        e.execute("SELECT COUNT(*) FROM meml;").await.unwrap();
     }
 
     /// A pass that cannot release enough by advising pages has to drop the
@@ -717,13 +719,15 @@ mod tests {
     /// address space) in place, and a table larger than the budget would keep
     /// one mapping per block ever read. Dropping the entry unmaps the block;
     /// the next scan maps it again from a page cache that is still warm.
-    #[test]
-    fn a_reclaim_pass_unmaps_blocks_when_dropping_pages_is_not_enough() {
+    #[tokio::test]
+    async fn a_reclaim_pass_unmaps_blocks_when_dropping_pages_is_not_enough() {
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE memu (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO memu VALUES (1);").unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE memu (id INT);").await.unwrap();
+        e.execute("INSERT INTO memu VALUES (1);").await.unwrap();
+        e.flush().await.unwrap();
         let root = e.blocks_root();
         let id = e.visible_block_ids("default_db.memu")[0];
         let _ = e.block_map("default_db.memu", &root, id).unwrap();
@@ -740,9 +744,7 @@ mod tests {
 
         // The rows are untouched: the next read maps the block again.
         assert_eq!(
-            e.execute_blocking("SELECT COUNT(*) FROM memu;")
-                .unwrap()
-                .len(),
+            e.execute("SELECT COUNT(*) FROM memu;").await.unwrap().len(),
             1
         );
     }
@@ -750,13 +752,15 @@ mod tests {
     /// The periodic tick is the path a read-only server relies on: with the
     /// process over its ceiling it gives the block mappings back even though no
     /// transaction committed since the last pass.
-    #[test]
-    fn a_tick_over_the_ceiling_gives_the_block_mappings_back() {
+    #[tokio::test]
+    async fn a_tick_over_the_ceiling_gives_the_block_mappings_back() {
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE memt (id INT);").unwrap();
-        e.execute_blocking("INSERT INTO memt VALUES (1);").unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE memt (id INT);").await.unwrap();
+        e.execute("INSERT INTO memt VALUES (1);").await.unwrap();
+        e.flush().await.unwrap();
         let root = e.blocks_root();
         let id = e.visible_block_ids("default_db.memt")[0];
         let _ = e.block_map("default_db.memt", &root, id).unwrap();
@@ -773,34 +777,31 @@ mod tests {
         assert!(e.context.memory_reclaim_passes.load(Ordering::Relaxed) >= 1);
     }
 
-    /// The whole-column vector cache is a heap copy of every vector in the
-    /// column, so it is capped at a share of the buffer budget: past that the
-    /// exact scan streams instead of building it, and the query still answers.
-    #[test]
-    fn a_vector_cache_beyond_its_share_is_not_built() {
+    /// The exact scan no longer builds a heap copy of the column: it reads the
+    /// mapped blocks one batch at a time, so there is no budget to refuse and
+    /// no cache to keep. What must still hold is the answer.
+    #[tokio::test]
+    async fn an_exact_scan_answers_without_building_a_cache() {
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking("CREATE TABLE memv (id INT, v EMBEDDING(FLOAT,4));")
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
-        e.execute_blocking("INSERT INTO memv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,1.0,1.0,1.0]);")
+        e.execute("CREATE TABLE memv (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
-        // A quarter of 64 bytes is smaller than one cached row.
+        e.execute("INSERT INTO memv VALUES (1,[0.0,0.0,0.0,0.0]),(2,[1.0,1.0,1.0,1.0]);")
+            .await
+            .unwrap();
+        // A quarter of 64 bytes would refuse any heap cache; the scan must
+        // still answer from the mapped blocks.
         e.set_buffer_budget(64);
-        assert!(
-            e.vector_cache_for("default_db.memv", "v", 4).is_err(),
-            "the column does not fit the cache's share"
-        );
-        assert!(
-            e.vector_cache.lock().unwrap().is_empty(),
-            "a refused build keeps nothing"
-        );
-        // The exact scan falls back to streaming and still answers.
         let mut out = Vec::new();
         for r in e
-            .execute_blocking(
+            .execute(
                 "SELECT id FROM memv SEARCH MATCH VECTOR \
                  (v, [1.0,1.0,1.0,1.0], 'float', 'l2', 1);",
             )
+            .await
             .unwrap()
         {
             if let crate::QueryResult::Rows { .. } = r {
@@ -821,16 +822,19 @@ mod tests {
     /// set: the pass would then run every second and every query would pay it.
     ///
     /// Run with `cargo test --release -p executor --lib experiment_a_reclaim_pass -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test]
     #[ignore = "measurement, run with --ignored --nocapture"]
-    fn experiment_a_reclaim_pass_costs_the_next_query() {
+    async fn experiment_a_reclaim_pass_costs_the_next_query() {
         let dim = 128usize;
         let rows = 20_000usize;
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(&format!(
             "CREATE TABLE rq (id INT, v EMBEDDING(FLOAT,{dim}));"
         ))
+        .await
         .unwrap();
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..dim)
@@ -846,22 +850,27 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute(&sql).await.unwrap();
+        e.flush().await.unwrap();
         let q = format!(
             "SELECT id FROM rq SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
             vector(rows / 2)
         );
-        let time = |e: &super::super::Engine| -> f64 {
-            let t0 = std::time::Instant::now();
-            e.execute_blocking(&q).unwrap();
-            t0.elapsed().as_secs_f64() * 1000.0
-        };
+        // One query, timed. It is an `async` closure body inlined at each call
+        // site: a closure cannot be `async`, and the query it measures must be
+        // awaited.
+        macro_rules! time {
+            () => {{
+                let t0 = std::time::Instant::now();
+                e.execute(&q).await.unwrap();
+                t0.elapsed().as_secs_f64() * 1000.0
+            }};
+        }
 
         // Warm: every block mapped, every page resident.
         let mut warm = Vec::new();
         for _ in 0..8 {
-            warm.push(time(&e));
+            warm.push(time!());
         }
         warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
         println!(
@@ -882,7 +891,7 @@ mod tests {
         // The first query has to read the blocks back; the rest re-warm.
         let mut cold = Vec::new();
         for _ in 0..8 {
-            cold.push(time(&e));
+            cold.push(time!());
         }
         println!("first after:     {:.3} ms", cold[0]);
         let mut rest = cold[1..].to_vec();
@@ -899,16 +908,19 @@ mod tests {
     /// the re-read once per tick.
     ///
     /// Run with `cargo test --release -p executor --lib experiment_a_tick_under -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test]
     #[ignore = "measurement, run with --ignored --nocapture"]
-    fn experiment_a_tick_under_a_tight_ceiling_costs_every_cycle() {
+    async fn experiment_a_tick_under_a_tight_ceiling_costs_every_cycle() {
         let dim = 128usize;
         let rows = 20_000usize;
         let dir = tempfile::tempdir().unwrap();
-        let e = super::super::Engine::open(dir.path()).unwrap();
-        e.execute_blocking(&format!(
+        let e = super::super::Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(&format!(
             "CREATE TABLE rt (id INT, v EMBEDDING(FLOAT,{dim}));"
         ))
+        .await
         .unwrap();
         let vector = |i: usize| -> String {
             let body: Vec<String> = (0..dim)
@@ -924,15 +936,15 @@ mod tests {
             }
         }
         sql.push(';');
-        e.execute_blocking(&sql).unwrap();
-        crate::scheduler::block_on(e.flush()).unwrap();
+        e.execute(&sql).await.unwrap();
+        e.flush().await.unwrap();
         let q = format!(
             "SELECT id FROM rt SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 10);",
             vector(rows / 2)
         );
         // Warm, so the first measured query is not paying for a cold file.
         for _ in 0..3 {
-            e.execute_blocking(&q).unwrap();
+            e.execute(&q).await.unwrap();
         }
         e.set_memory_limit(1);
         let mut lat = Vec::new();
@@ -943,7 +955,7 @@ mod tests {
                 e.memory_tick();
             }
             let t0 = std::time::Instant::now();
-            e.execute_blocking(&q).unwrap();
+            e.execute(&q).await.unwrap();
             lat.push(t0.elapsed().as_secs_f64() * 1000.0);
         }
         let mut sorted = lat.clone();

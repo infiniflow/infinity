@@ -29,7 +29,7 @@ fn all_flags() -> TermMetaFlags {
     OPTION_FLAG_ALL
 }
 
-fn segment<S: AsRef<str>>(
+async fn segment<S: AsRef<str>>(
     dir: &str,
     base_name: &str,
     base_row_id: u64,
@@ -41,7 +41,9 @@ fn segment<S: AsRef<str>>(
         .iter()
         .map(|(term, list)| (term.as_ref().to_string(), list.clone()))
         .collect();
-    write_segment_index(dir, base_name, base_row_id, docs, &map, flags).unwrap();
+    write_segment_index(dir, base_name, base_row_id, docs, &map, flags)
+        .await
+        .unwrap();
 }
 
 fn source(base_name: &str, base_row_id: u64) -> ColumnSource {
@@ -56,8 +58,8 @@ fn source(base_name: &str, base_row_id: u64) -> ColumnSource {
 ///
 /// The expectations are the reference's: `GetDF() == 2`, `GetTotalTF() == 3`,
 /// positions `{0}` and `{0, 1}`, and the merged column lengths `[1, 2]`.
-#[test]
-fn merges_two_single_document_chunks_like_the_reference() {
+#[tokio::test]
+async fn merges_two_single_document_chunks_like_the_reference() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -68,7 +70,8 @@ fn merges_two_single_document_chunks_like_the_reference() {
         &[(0, 1)],
         &[("a", vec![(0, 1, vec![0])])],
         flags,
-    );
+    )
+    .await;
     segment(
         d,
         "chunk2",
@@ -76,7 +79,8 @@ fn merges_two_single_document_chunks_like_the_reference() {
         &[(1, 2)],
         &[("a", vec![(1, 2, vec![0, 1])])],
         flags,
-    );
+    )
+    .await;
 
     let merger = ColumnIndexMerger::new(d, flags);
     merger
@@ -101,8 +105,8 @@ fn merges_two_single_document_chunks_like_the_reference() {
 /// A merge must produce the bytes a single write of the same rows would:
 /// rebasing by `base_row_id - merge_base_rowid` is the identity when the
 /// merged base is the first chunk's base, so the two paths coincide.
-#[test]
-fn merge_matches_a_single_write() {
+#[tokio::test]
+async fn merge_matches_a_single_write() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -110,14 +114,16 @@ fn merge_matches_a_single_write() {
     let split = 137;
 
     let whole: BTreeMap<String, Vec<PostingEntry>> = postings.iter().cloned().collect();
-    write_segment_index(d, "whole", 0, &docs, &whole, flags).unwrap();
+    write_segment_index(d, "whole", 0, &docs, &whole, flags)
+        .await
+        .unwrap();
 
     let head = &docs[..split];
     let tail = &docs[split..];
     let head_postings = slice_postings(&postings, 0, split);
     let tail_postings = slice_postings(&postings, split, docs.len());
-    segment(d, "chunk1", 0, head, &head_postings, flags);
-    segment(d, "chunk2", split as u64, tail, &tail_postings, flags);
+    segment(d, "chunk1", 0, head, &head_postings, flags).await;
+    segment(d, "chunk2", split as u64, tail, &tail_postings, flags).await;
 
     ColumnIndexMerger::new(d, flags)
         .merge(
@@ -140,8 +146,8 @@ fn merge_matches_a_single_write() {
 /// The merged segment's base is the **smallest** source base, so doc ids are
 /// rebased by `base_row_id - merge_base_rowid` and stay `u32`
 /// (`posting_merger_impl.cpp:178-192`).
-#[test]
-fn rebases_doc_ids_by_the_smallest_base_row_id() {
+#[tokio::test]
+async fn rebases_doc_ids_by_the_smallest_base_row_id() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -153,7 +159,8 @@ fn rebases_doc_ids_by_the_smallest_base_row_id() {
         &[(base + 10, 1), (base + 11, 1)],
         &[("t", vec![(base + 11, 1, vec![3])])],
         flags,
-    );
+    )
+    .await;
     segment(
         d,
         "first",
@@ -161,7 +168,8 @@ fn rebases_doc_ids_by_the_smallest_base_row_id() {
         &[(base, 1)],
         &[("t", vec![(base, 1, vec![7])])],
         flags,
-    );
+    )
+    .await;
 
     ColumnIndexMerger::new(d, flags)
         .merge(
@@ -187,8 +195,8 @@ fn rebases_doc_ids_by_the_smallest_base_row_id() {
 
 /// A merged list longer than one mini-block is re-blocked from scratch: the
 /// 128-document boundaries of the merged list are not the sources'.
-#[test]
-fn merges_across_document_blocks() {
+#[tokio::test]
+async fn merges_across_document_blocks() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -196,8 +204,8 @@ fn merges_across_document_blocks() {
     let list: Vec<PostingEntry> = (0..400).map(|row| (row, 1, vec![0])).collect();
     let head: Vec<PostingEntry> = list[..200].to_vec();
     let tail: Vec<PostingEntry> = list[200..].to_vec();
-    segment(d, "chunk1", 0, &docs[..200], &[("t", head)], flags);
-    segment(d, "chunk2", 200, &docs[200..], &[("t", tail)], flags);
+    segment(d, "chunk1", 0, &docs[..200], &[("t", head)], flags).await;
+    segment(d, "chunk2", 200, &docs[200..], &[("t", tail)], flags).await;
 
     ColumnIndexMerger::new(d, flags)
         .merge(&[source("chunk1", 0), source("chunk2", 200)], "merged")
@@ -221,8 +229,8 @@ fn merges_across_document_blocks() {
 
 /// `SegmentTermPostingQueue` groups the equal terms of every source, ordered by
 /// `(term, base_row_id)` (`segment_term_posting.cppm:23-31`).
-#[test]
-fn queue_groups_equal_terms_in_base_order() {
+#[tokio::test]
+async fn queue_groups_equal_terms_in_base_order() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -233,7 +241,8 @@ fn queue_groups_equal_terms_in_base_order() {
         &[(0, 1)],
         &[("a", vec![(0, 1, vec![0])]), ("c", vec![(0, 1, vec![1])])],
         flags,
-    );
+    )
+    .await;
     segment(
         d,
         "chunk2",
@@ -241,7 +250,8 @@ fn queue_groups_equal_terms_in_base_order() {
         &[(1, 1)],
         &[("b", vec![(1, 1, vec![0])]), ("c", vec![(1, 1, vec![1])])],
         flags,
-    );
+    )
+    .await;
 
     let mut queue = SegmentTermPostingQueue::new(
         d,
@@ -272,12 +282,12 @@ fn queue_groups_equal_terms_in_base_order() {
 
 /// A source without any term contributes nothing, like the reference's
 /// constructor, which drops it (`segment_term_posting_impl.cpp:31-37`).
-#[test]
-fn source_without_terms_is_skipped() {
+#[tokio::test]
+async fn source_without_terms_is_skipped() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
-    segment::<&str>(d, "empty", 0, &[(0, 1)], &[], flags);
+    segment::<&str>(d, "empty", 0, &[(0, 1)], &[], flags).await;
     segment(
         d,
         "chunk2",
@@ -285,7 +295,8 @@ fn source_without_terms_is_skipped() {
         &[(1, 1)],
         &[("t", vec![(1, 1, vec![0])])],
         flags,
-    );
+    )
+    .await;
 
     ColumnIndexMerger::new(d, flags)
         .merge(&[source("empty", 0), source("chunk2", 1)], "merged")
@@ -299,8 +310,8 @@ fn source_without_terms_is_skipped() {
 /// Without a position list the frequencies cannot be recounted, so they come
 /// from the source's doc list (`SetCurrentTF`,
 /// `posting_merger_impl.cpp:60-62`).
-#[test]
-fn frequencies_survive_a_merge_without_positions() {
+#[tokio::test]
+async fn frequencies_survive_a_merge_without_positions() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = all_flags();
@@ -311,7 +322,8 @@ fn frequencies_survive_a_merge_without_positions() {
         &[(0, 3)],
         &[("t", vec![(0, 3, Vec::new())])],
         flags,
-    );
+    )
+    .await;
     segment(
         d,
         "chunk2",
@@ -319,7 +331,8 @@ fn frequencies_survive_a_merge_without_positions() {
         &[(1, 5)],
         &[("t", vec![(1, 2, Vec::new())])],
         flags,
-    );
+    )
+    .await;
 
     ColumnIndexMerger::new(d, flags)
         .merge(&[source("chunk1", 0), source("chunk2", 1)], "merged")
@@ -339,8 +352,8 @@ type Corpus = (Vec<(u64, u32)>, Vec<(String, Vec<PostingEntry>)>);
 /// A position list without a frequency column has no per-document boundary
 /// (`DocMerger::MergePosition` has no `HasTfList()` stop then), so such an index
 /// is refused rather than silently collapsed to one occurrence per document.
-#[test]
-fn a_position_list_without_frequencies_is_refused() {
+#[tokio::test]
+async fn a_position_list_without_frequencies_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path().to_str().unwrap();
     let flags = TermMetaFlags {

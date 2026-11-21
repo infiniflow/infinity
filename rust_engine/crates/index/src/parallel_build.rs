@@ -41,18 +41,29 @@ pub(crate) type LockedLinks = Vec<Vec<RwLock<Vec<usize>>>>;
 /// A vertex is searched for by its own stored vector, so the graph's own copy
 /// can stand in for it. Stores that derive a query from a code (LVQ, RaBitQ)
 /// keep the owned form, because their query is not the stored bytes.
-enum QueryRef {
+enum QueryRef<'a> {
     Owned(crate::vector::HnswQuery),
-    Node(usize),
+    /// The query is the vertex's own stored row, already resolved.
+    ///
+    /// Holding the slice rather than the node id is the difference between one
+    /// bounds check per `build()` and one per distance: a 1M-row build scores
+    /// ~200 candidates per vertex, and each of those used to re-derive the
+    /// row's offset (`i * dims`) and re-check the slice.
+    Row {
+        row: &'a [f32],
+        metric: crate::vector::Metric,
+    },
 }
 
-impl QueryRef {
+impl<'a> QueryRef<'a> {
     /// The query a build searches with, in the cheapest form the store allows.
-    fn for_node(store: &crate::vector::Store, node: usize) -> QueryRef {
-        if store.queries_are_stored_vectors() {
-            QueryRef::Node(node)
-        } else {
-            QueryRef::Owned(store.make_query_at(node))
+    fn for_node(store: &'a crate::vector::Store, node: usize) -> QueryRef<'a> {
+        match (store.plain_row(node), store.plain_metric()) {
+            (Some(row), Some(metric)) => QueryRef::Row { row, metric },
+            // A quantized store derives its query from the code, and a plain
+            // store asked for a node past its end has nothing to search with;
+            // `Owned` carries a default vector that scores as `f32::MAX` below.
+            _ => QueryRef::Owned(store.make_query_at(node)),
         }
     }
 }
@@ -148,6 +159,51 @@ impl<'a> Builder<'a> {
         }
     }
 
+    /// Touches the rows that the distance loop is about to read, so their
+    /// cache lines are in flight before it gets there.
+    ///
+    /// The reference does the same in its `SearchLayer`
+    /// (`hnsw_alg.cppm:181`), keeping `prefetch_step_` rows ahead of the one
+    /// being scored:
+    ///
+    /// ```cpp
+    /// for (i32 i = 0; i < neighbor_size; ++i) {
+    ///     for (size_t j = prefetch_step_; prefetch_start < neighbor_size && j > 0; --j) {
+    ///         data_store_.PrefetchVec(neighbors_p[prefetch_start++]);
+    ///     }
+    ///     ... distance_(query, n_idx) ...
+    /// }
+    /// ```
+    ///
+    /// Measured on 300k x 128 rows without it: IPC 1.01 and a 60% LLC
+    /// load-miss rate. The candidates are scattered over a 154 MB vector
+    /// table, so each `vsubps -0xe0(%rax,%r10,1)` in the kernel stalled on a
+    /// line nobody had asked for, and `perf` put 34% of the build on that one
+    /// instruction. Bringing the line in a few iterations early overlaps the
+    /// latency with the arithmetic instead of stalling on it.
+    ///
+    /// This reads the first element of each row rather than issuing
+    /// `_mm_prefetch`: the crate forbids `unsafe`, and a real load through
+    /// `black_box` cannot be elided, whereas a hint LLVM decides is dead
+    /// would simply disappear.
+    ///
+    /// One line per row, not all eight. Touching every cache line of the
+    /// 512-byte row measured **slower** (15.4-15.6 s against 14.4 s for one
+    /// line on 300k): eight loads per candidate cost more than the misses they
+    /// hide, and the hardware prefetcher already follows the stride within a
+    /// row once the first line is in. The reference's `PrefetchVec` likewise
+    /// touches one line (`cache_prefetch`, one hint per vector).
+    #[inline(always)]
+    fn prefetch_rows(&self, nodes: &[usize], from: usize, count: usize) {
+        for &node in nodes.iter().take(from + count).skip(from) {
+            if let Some(row) = self.store.plain_row(node) {
+                // `black_box` keeps the load alive without letting the value
+                // reach the distance loop's own expression.
+                let _ = std::hint::black_box(row.first().copied());
+            }
+        }
+    }
+
     fn adjust(&self, d: f32, a: Option<usize>, b: usize) -> f32 {
         match (a, self.lsg) {
             (Some(a), Some(lsg)) => lsg.adjust(d, a, b),
@@ -155,13 +211,13 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn distance_to(&self, q: &QueryRef, self_id: Option<usize>, i: usize) -> f32 {
+    fn distance_to(&self, q: &QueryRef<'_>, self_id: Option<usize>, i: usize) -> f32 {
         let d = match q {
             QueryRef::Owned(q) => self.store.distance_query(q, i),
-            // The query of a build is the vertex's own stored vector, so
-            // scoring against it is a node-to-node distance. Copying it into
-            // an `HnswQuery` first costs one allocation per vertex built.
-            QueryRef::Node(node) => self.store.distance_nodes(*node, i),
+            QueryRef::Row { row, metric } => match self.store.plain_row(i) {
+                Some(other) => crate::vector::Store::distance_rows(row, other, *metric),
+                None => f32::MAX,
+            },
         };
         self.adjust(d, self_id, i)
     }
@@ -379,7 +435,13 @@ impl<'a> Builder<'a> {
             // build. The closure takes no other lock, so a writer waiting on
             // this vertex cannot block the holder.
             self.with_neighbors(layer, c, |list| {
-                for &nb in list {
+                // Keep `PREFETCH_AHEAD` rows in flight, as the reference does
+                // (`hnsw_alg.cppm:181`). Touching them up front is what stops
+                // the kernel's first `vsubps` from stalling on a cold line.
+                for (at, &nb) in list.iter().enumerate() {
+                    if at.is_multiple_of(PREFETCH_AHEAD) {
+                        self.prefetch_rows(list, at, PREFETCH_AHEAD);
+                    }
                     if nb >= nodes || nb == self_id || !visited.visit(nb) {
                         continue;
                     }
@@ -422,6 +484,13 @@ impl<'a> Builder<'a> {
 /// bucket — serially — exactly as the reference does, which also keeps a small
 /// index's graph reproducible.
 const MIN_BUCKET_SIZE: usize = 1024;
+
+/// How many candidate rows to keep in flight ahead of the distance loop.
+///
+/// The reference's `DEFAULT_PREFETCH_SIZE` (`default_values.cppm:181`). It is
+/// the number of rows whose lines are touched before the next distance is
+/// taken; four is enough to cover a load-to-L1 latency at this loop's rate.
+const PREFETCH_AHEAD: usize = 4;
 
 /// Splits `[from, to)` into buckets of at least [`MIN_BUCKET_SIZE`].
 pub(crate) fn buckets_of(from: usize, to: usize, threads: usize) -> Vec<(usize, usize)> {

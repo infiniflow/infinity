@@ -12,7 +12,6 @@ hmac.workspace = true
 sha2.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
-crc32fast.workspace = true
 roaring.workspace = true
 memmap2.workspace = true
 serde.workspace = true
@@ -23,6 +22,11 @@ serde_json = { workspace = true, features = ["unbounded_depth"] }
 # The catalog / row KV: RocksDB, the substrate the C++ engine uses, so a
 # directory either engine wrote reads back byte-for-byte.
 rocksdb = { version = "0.25", default-features = false }
+# `tokio::fs`: the WAL writes, syncs and rotates asynchronously - the rotation
+# syncs the old log, renames it and syncs the directory, and those must not run
+# on a runtime worker (`AGENTS.md` §7.8). The segment writer's tests also await
+# their encode fan-out.
+tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

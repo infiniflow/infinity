@@ -29,8 +29,11 @@ use parser::Literal;
 use std::path::Path;
 
 /// Rows of the first `Rows` result of `sql`.
-pub(crate) fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+///
+/// Async: the engine's statements are tasks, and a `#[tokio::test]` must not
+/// park its own worker with a synchronous adapter.
+pub(crate) async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -38,10 +41,11 @@ pub(crate) fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     panic!("query returned no rows: {sql}");
 }
 
-/// `SELECT count(*)` for a possibly-qualified table.
-pub(crate) fn count(engine: &Engine, table: &str) -> usize {
+/// `SELECT count(*)`, as the visible row count the reference reads through
+/// `NewTxnGetVisibleRangeState`.
+pub(crate) async fn count(engine: &Engine, table: &str) -> usize {
     let table = qualified(table);
-    rows(engine, &format!("SELECT count(*) FROM {table};"))[0][0]
+    rows(engine, &format!("SELECT count(*) FROM {table};")).await[0][0]
         .parse()
         .unwrap()
 }
@@ -66,9 +70,10 @@ pub(crate) fn segment_rows(engine: &Engine, table: &str) -> usize {
 }
 
 /// Appends literal rows in one write batch (`NewTxn::Append`).
-pub(crate) fn append(engine: &Engine, table: &str, rows: Vec<Vec<Literal>>) -> usize {
+pub(crate) async fn append(engine: &Engine, table: &str, rows: Vec<Vec<Literal>>) -> usize {
     match engine
         .insert_literals(&qualified(table), None, rows)
+        .await
         .unwrap()
     {
         QueryResult::Inserted { count } => count,
@@ -85,33 +90,34 @@ pub(crate) fn repeated_rows(value: i64, text: &str, row_cnt: usize) -> Vec<Vec<L
 }
 
 /// Appends `row_cnt` rows carrying the same two values.
-pub(crate) fn append_repeated(
+pub(crate) async fn append_repeated(
     engine: &Engine,
     table: &str,
     value: i64,
     text: &str,
     row_cnt: usize,
 ) -> usize {
-    append(engine, table, repeated_rows(value, text, row_cnt))
+    append(engine, table, repeated_rows(value, text, row_cnt)).await
 }
 
 /// Flushes the WAL/KV and reopens the engine at `dir` — the reference's
 /// `RestartTxnMgr` (`replay_test.cppm`).
-pub(crate) fn reopen(engine: Engine, dir: &Path) -> Engine {
-    crate::scheduler::block_on(engine.flush()).unwrap();
+pub(crate) async fn reopen(engine: Engine, dir: &Path) -> Engine {
+    engine.flush().await.unwrap();
     drop(engine);
-    Engine::open(dir).unwrap()
+    Engine::open_async(dir, Default::default()).await.unwrap()
 }
 
 /// `Status::ok()` for a statement the reference expects to commit.
-pub(crate) fn ok(engine: &Engine, sql: &str) {
+pub(crate) async fn ok(engine: &Engine, sql: &str) {
     engine
-        .execute_blocking(sql)
+        .execute(sql)
+        .await
         .unwrap_or_else(|e| panic!("expected `{sql}` to succeed: {e}"));
 }
 
 /// Result of executing `sql`, for assertions on `QueryResult::{Deleted,
 /// Updated, Inserted}`.
-pub(crate) fn result(engine: &Engine, sql: &str) -> QueryResult {
-    engine.execute_blocking(sql).unwrap().remove(0)
+pub(crate) async fn result(engine: &Engine, sql: &str) -> QueryResult {
+    engine.execute(sql).await.unwrap().remove(0)
 }

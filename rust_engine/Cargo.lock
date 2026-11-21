@@ -629,11 +629,6 @@ dependencies = [
 [[package]]
 name = "crc32fast"
 version = "1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
-dependencies = [
- "cfg-if",
-]
 
 [[package]]
 name = "crossbeam-deque"
@@ -3231,7 +3226,6 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "common",
- "crc32fast",
  "hmac",
  "index",
  "lz4_flex 0.13.1",
@@ -3244,6 +3238,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -3626,7 +3621,6 @@ name = "txn"
 version = "0.1.0"
 dependencies = [
  "common",
- "futures-executor",
  "loom",
  "storage",
  "tempfile",

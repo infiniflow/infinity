@@ -159,6 +159,13 @@ pub use columnar::{Batch, ColumnData};
 
 pub use parser::Literal;
 
+/// True for a `SEARCH` scan's hidden columns (`#_row_id`, `#_similarity`,
+/// `#_distance`, `#_score`). The search appends their values to every row it
+/// returns; they are never stored in the table.
+pub(crate) fn is_search_hidden(column: &str) -> bool {
+    planner::SEARCH_HIDDEN_NAMES.contains(&column)
+}
+
 mod engine;
-pub use engine::statements::{with_session_scope, with_session_sync};
+pub use engine::statements::with_session_scope;
 pub use engine::*;

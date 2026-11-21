@@ -47,18 +47,29 @@ fn wal_path(dir: &Path) -> PathBuf {
     dir.join("wal").join("wal.log")
 }
 
-fn open_catalog(dir: &Path) -> common::Result<Catalog> {
-    Catalog::open(catalog_dir(dir))
+/// Opens the catalog's RocksDB.
+///
+/// Blocking on purpose - it opens files and replays a log - so it runs on the
+/// blocking pool instead of a runtime worker (§7.8).
+async fn open_catalog(dir: PathBuf) -> common::Result<Catalog> {
+    executor::scheduler()
+        .spawn_blocking(move || Catalog::open(catalog_dir(&dir)))
+        .await
 }
 
-fn open_txn(dir: &Path) -> common::Result<(TxnManager, Arc<dyn MetaStore>)> {
-    // One RocksDB, like the engine: the catalog and every other record share it.
-    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(catalog_dir(dir))?);
+/// Opens the transaction manager: one RocksDB for the catalog and every other
+/// record, like the engine. Blocking for the same reason as [`open_catalog`].
+async fn open_txn(dir: PathBuf) -> common::Result<(TxnManager, Arc<dyn MetaStore>)> {
+    // No `spawn_blocking`: the WAL open is async now, so there is no long
+    // blocking call left to move. The catalog's RocksDB open and one
+    // `create_dir_all` stay synchronous - both are the reference's own
+    // `KVInstance::Init`, and a `mkdir` is a single syscall.
+    let store: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(catalog_dir(&dir))?);
     std::fs::create_dir_all(dir.join("wal")).map_err(|e| common::Error::Io {
         path: dir.join("wal"),
         source: e,
     })?;
-    let m = TxnManager::open(wal_path(dir), store.clone())?;
+    let m = TxnManager::open(wal_path(&dir), store.clone()).await?;
     Ok((m, store))
 }
 
@@ -105,7 +116,13 @@ fn toml_value(text: &str, key: &str) -> Option<String> {
 /// The reference's default invocation: `infinity [-f <config>] [-m]` starts the
 /// Thrift and HTTP front ends on one engine. The data root is the parent of
 /// `persistence_dir`; with no config the reference's built-in defaults apply.
-fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()> {
+/// Starts the three front ends on the engine's runtime.
+///
+/// **Async**, like everything the CLI runs. The engine is opened through
+/// `open_async`, so the startup recovery (WAL replay, block hydration, the
+/// startup checkpoint) awaits instead of parking a thread, and the Thrift front
+/// end is awaited in place rather than entered through a `block_on_runtime`.
+async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()> {
     let text = match path {
         Some(path) => std::fs::read_to_string(path).map_err(|e| common::Error::Io {
             path: PathBuf::from(path),
@@ -197,7 +214,7 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
         snapshot_dir,
         ..Default::default()
     };
-    let engine = Arc::new(Engine::open_with_options(&root, options)?);
+    let engine = Arc::new(Engine::open_async(&root, options).await?);
     if let Some(client) = object_store {
         engine.set_object_store(client);
     }
@@ -290,12 +307,14 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
     if !maintenance {
-        engine.start_background_tasks(
-            std::time::Duration::from_secs(secs),
-            std::time::Duration::from_secs(cleanup),
-            std::time::Duration::from_secs(compact),
-            std::time::Duration::from_secs(optimize),
-        );
+        engine
+            .start_background_tasks(
+                std::time::Duration::from_secs(secs),
+                std::time::Duration::from_secs(cleanup),
+                std::time::Duration::from_secs(compact),
+                std::time::Duration::from_secs(optimize),
+            )
+            .await;
     }
     // The reference starts both front ends on the same storage
     // (`infinity_main.cpp`: `http_server.Start(...)` next to `StartThriftServer()`).
@@ -320,12 +339,13 @@ fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Result<()
     }
     let server = server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
-    // The Thrift front end parks this (main) thread; it is still a task on the
-    // shared runtime, so its accept loop and the other two share the workers.
-    executor::scheduler().block_on_runtime(server.serve());
-    // Volo stops accepting on SIGINT/SIGTERM and waits for the live
-    // connections; there is nothing left to serve after that.
-    std::process::exit(0);
+    // The Thrift front end is awaited **in place**: this future is the main
+    // task, so its accept loop and the other two front ends share the workers
+    // without a second entry into the runtime.
+    server.serve().await;
+    // `serve` returns only after SIGINT/SIGTERM stopped the accept loop and the
+    // live connections finished; there is nothing left to serve.
+    Ok(())
 }
 
 /// Releases free heap pages back to the OS, on every target.
@@ -439,29 +459,36 @@ fn parse_size_bytes(text: &str) -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    // `infinity [-f <config>] [-m]` is the reference's surface: no subcommand,
-    // the servers start. A known subcommand selects the rewrite's extension.
-    match args.first().map(String::as_str) {
-        Some(first) if SUBCOMMANDS.contains(&first) => {
-            if let Err(e) = run(&args) {
-                eprintln!("error: {e}");
-                std::process::exit(1);
+    // The process enters its runtime **exactly once**, here, and every command
+    // below is a future driven by it. Nothing inside awaits a `block_on`: the
+    // engine's runtime is the process's only one, and a nested `block_on` on it
+    // panics ("Cannot start a runtime from within a runtime").
+    //
+    // `block_on_runtime` rather than `Runtime::block_on`: it enables the reactor
+    // and the timer, which the protocol front ends need (`TcpListener::from_std`
+    // and `tokio::time`).
+    let code = executor::scheduler().block_on_runtime(async move {
+        // `infinity [-f <config>] [-m]` is the reference's surface: no
+        // subcommand, the servers start. A known subcommand selects the
+        // rewrite's extension.
+        match args.first().map(String::as_str) {
+            Some(first) if SUBCOMMANDS.contains(&first) => run(&args).await,
+            Some(first) if !first.starts_with('-') => usage(),
+            _ => {
+                let (config, maintenance) = match parse_serve_args(&args) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        usage();
+                    }
+                };
+                serve_from_config(config.as_deref(), maintenance).await
             }
         }
-        Some(first) if !first.starts_with('-') => usage(),
-        _ => {
-            let (config, maintenance) = match parse_serve_args(&args) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    usage();
-                }
-            };
-            if let Err(e) = serve_from_config(config.as_deref(), maintenance) {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
-        }
+    });
+    if let Err(e) = code {
+        eprintln!("error: {e}");
+        std::process::exit(1);
     }
 }
 
@@ -496,7 +523,7 @@ fn parse_serve_args(args: &[String]) -> Result<(Option<String>, bool), String> {
     Ok((config, maintenance))
 }
 
-fn run(args: &[String]) -> common::Result<()> {
+async fn run(args: &[String]) -> common::Result<()> {
     let cmd = args[0].as_str();
     let dir = PathBuf::from(&args[1]);
     match cmd {
@@ -508,7 +535,7 @@ fn run(args: &[String]) -> common::Result<()> {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            let c = open_catalog(&dir)?;
+            let c = open_catalog(dir.clone()).await?;
             let t = c.create_table(&name, &columns)?;
             c.flush()?;
             println!(
@@ -518,7 +545,7 @@ fn run(args: &[String]) -> common::Result<()> {
             Ok(())
         }
         "list-tables" => {
-            let c = open_catalog(&dir)?;
+            let c = open_catalog(dir.clone()).await?;
             for t in c.list_tables()? {
                 println!("{} {} {:?}", t.id, t.name, t.columns);
             }
@@ -527,17 +554,17 @@ fn run(args: &[String]) -> common::Result<()> {
         "put" => {
             let k = args.get(2).cloned().unwrap_or_else(|| "k".into());
             let v = args.get(3).cloned().unwrap_or_else(|| "v".into());
-            let (m, _) = open_txn(&dir)?;
+            let (m, _) = open_txn(dir.clone()).await?;
             let mut t = m.begin();
             t.put(k.clone().into_bytes(), v.clone().into_bytes());
-            let ts = executor::block_on(m.commit(t))?;
+            let ts = m.commit(t).await?;
             m.flush()?;
             println!("committed {k}={v} at ts={ts}");
             Ok(())
         }
         "get" => {
             let k = args.get(2).cloned().unwrap_or_else(|| "k".into());
-            let (_, store) = open_txn(&dir)?;
+            let (_, store) = open_txn(dir.clone()).await?;
             match store.get(k.as_bytes())? {
                 Some(v) => println!("{k}={}", String::from_utf8_lossy(&v)),
                 None => println!("{k}=(none)"),
@@ -545,8 +572,8 @@ fn run(args: &[String]) -> common::Result<()> {
             Ok(())
         }
         "recover" => {
-            let (m, store) = open_txn(&dir)?;
-            let n = m.recover(0)?;
+            let (m, store) = open_txn(dir.clone()).await?;
+            let n = m.recover(0).await?;
             println!("replayed {n} WAL record(s)");
             for (k, v) in store.scan_prefix(b"")? {
                 println!(
@@ -583,12 +610,12 @@ fn run(args: &[String]) -> common::Result<()> {
         }
         "query" => {
             let sql = args[2..].join(" ");
-            let e = Engine::open(&dir)?;
-            for r in e.execute_blocking(&sql)? {
+            let e = Engine::open_async(&dir, Default::default()).await?;
+            for r in e.execute(&sql).await? {
                 print_result(&r);
             }
             let t_flush = Instant::now();
-            executor::block_on(e.flush())?;
+            e.flush().await?;
             if std::env::var_os("INFINITY_PROFILE_IMPORT").is_some() {
                 eprintln!("flush profile: {:?}", t_flush.elapsed());
             }
@@ -605,7 +632,7 @@ fn run(args: &[String]) -> common::Result<()> {
             let http_addr =
                 std::env::var("INFINITY_HTTP_BIND").unwrap_or_else(|_| "0.0.0.0:23820".into());
             let options = executor::EngineOptions::default();
-            let engine = std::sync::Arc::new(executor::Engine::open_with_options(&dir, options)?);
+            let engine = std::sync::Arc::new(executor::Engine::open_async(&dir, options).await?);
             let http = server::http::HttpServer::bind(&http_addr, engine.clone())?;
             println!("http listening on {}", http.local_addr()?);
             executor::scheduler().spawn_task(http.serve());
@@ -630,17 +657,17 @@ fn run(args: &[String]) -> common::Result<()> {
 
             let server = server::Server::bind_with_engine(&addr, engine)?;
             println!("serving on {}", server.local_addr()?);
-            executor::scheduler().block_on_runtime(server.serve());
+            server.serve().await;
             std::process::exit(0);
         }
         "bench" => {
             let n: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(2000);
-            let e = Engine::open(&dir)?;
+            let e = Engine::open_async(&dir, Default::default()).await?;
             // Gate E runs the driver twice over the same directory and compares
             // the two runs, so each one must start from an empty table: without
             // the drop, the second run selects twice as many rows.
-            let _ = e.execute_blocking("DROP TABLE IF EXISTS t;");
-            let _ = e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);");
+            let _ = e.execute("DROP TABLE IF EXISTS t;").await;
+            let _ = e.execute("CREATE TABLE t (id INT, name VARCHAR);").await;
             let t0 = Instant::now();
             let mut i = 0;
             while i < n {
@@ -651,14 +678,15 @@ fn run(args: &[String]) -> common::Result<()> {
                         format!("({id}, 'v{id}')")
                     })
                     .collect();
-                e.execute_blocking(&format!("INSERT INTO t VALUES {};", vals.join(", ")))?;
+                e.execute(&format!("INSERT INTO t VALUES {};", vals.join(", ")))
+                    .await?;
                 i += batch;
             }
             let ins = t0.elapsed();
             let t1 = Instant::now();
-            let r = e.execute_blocking("SELECT * FROM t;")?;
+            let r = e.execute("SELECT * FROM t;").await?;
             let sel = t1.elapsed();
-            executor::block_on(e.flush())?;
+            e.flush().await?;
             let rows = match &r[0] {
                 QueryResult::Rows { rows, .. } => rows.len(),
                 _ => 0,
@@ -694,18 +722,18 @@ fn run(args: &[String]) -> common::Result<()> {
             } else {
                 read_ivecs(&truth_path)?
             };
-            let e = Engine::open(&dir)?;
+            let e = Engine::open_async(&dir, Default::default()).await?;
             // `knn_query_benchmark` runs two warm-up loops before it times.
             let warm = queries.iter().take(5);
             for q in warm {
-                let _ = e.execute_blocking(&knn_sql(table, q, topk, ef))?;
+                let _ = e.execute(&knn_sql(table, q, topk, ef)).await?;
             }
             let mut latencies = Vec::with_capacity(queries.len());
             let mut hits = 0usize;
             let mut total = 0usize;
             for (qi, q) in queries.iter().enumerate() {
                 let t0 = Instant::now();
-                let out = e.execute_blocking(&knn_sql(table, q, topk, ef))?;
+                let out = e.execute(&knn_sql(table, q, topk, ef)).await?;
                 latencies.push(t0.elapsed().as_secs_f64());
                 if let Some(want) = truth.get(qi) {
                     let mut got: Vec<u64> = Vec::new();
@@ -759,20 +787,23 @@ fn run(args: &[String]) -> common::Result<()> {
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .collect();
-            let e = Engine::open(&dir)?;
+            let e = Engine::open_async(&dir, Default::default()).await?;
             // create the table if it does not exist (all columns VARCHAR)
             let cols: Vec<String> = header.iter().map(|c| format!("{c} VARCHAR")).collect();
-            let _ = e.execute_blocking(&format!("CREATE TABLE {table} ({});", cols.join(", ")));
+            let _ = e
+                .execute(&format!("CREATE TABLE {table} ({});", cols.join(", ")))
+                .await;
 
             let mut total = 0usize;
             let mut batch: Vec<String> = Vec::new();
-            let flush = |e: &Engine, batch: &mut Vec<String>| -> common::Result<usize> {
+            // An async closure: every batch is a statement the engine awaits.
+            let flush = async |e: &Engine, batch: &mut Vec<String>| -> common::Result<usize> {
                 if batch.is_empty() {
                     return Ok(0);
                 }
                 let sql = format!("INSERT INTO {table} VALUES {};", batch.join(", "));
                 let n = batch.len();
-                e.execute_blocking(&sql)?;
+                e.execute(&sql).await?;
                 batch.clear();
                 Ok(n)
             };
@@ -783,11 +814,11 @@ fn run(args: &[String]) -> common::Result<()> {
                     .collect();
                 batch.push(format!("({})", vals.join(", ")));
                 if batch.len() >= 100 {
-                    total += flush(&e, &mut batch)?;
+                    total += flush(&e, &mut batch).await?;
                 }
             }
-            total += flush(&e, &mut batch)?;
-            executor::block_on(e.flush())?;
+            total += flush(&e, &mut batch).await?;
+            e.flush().await?;
             println!("imported {total} row(s) into {table} from {file}");
             Ok(())
         }
@@ -802,13 +833,13 @@ fn run(args: &[String]) -> common::Result<()> {
                 ));
             }
             let batch: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(500);
-            fulltext_bench::run(&dir, &mode, &corpus, batch)
+            fulltext_bench::run(&dir, &mode, &corpus, batch).await
         }
         "conformance" => {
             let slt_dir = dir.to_string_lossy().to_string();
-            run_conformance(&slt_dir)
+            run_conformance(&slt_dir).await
         }
-        "smoke" => run_smoke(&dir),
+        "smoke" => run_smoke(&dir).await,
         _ => usage(),
     }
 }
@@ -847,34 +878,34 @@ fn print_result(r: &QueryResult) {
     }
 }
 
-fn run_smoke(dir: &Path) -> common::Result<()> {
+async fn run_smoke(dir: &Path) -> common::Result<()> {
     // 1. create tables
     {
-        let c = open_catalog(dir)?;
+        let c = open_catalog(dir.to_path_buf()).await?;
         c.create_table("my_table", &["id".to_string(), "name".to_string()])?;
         c.flush()?;
     }
     // 2. commit some kv through the txn pipeline
     {
-        let (m, _) = open_txn(dir)?;
+        let (m, _) = open_txn(dir.to_path_buf()).await?;
         for i in 0..3u64 {
             let mut t = m.begin();
             t.put(
                 format!("row{i}").into_bytes(),
                 format!("val{i}").into_bytes(),
             );
-            executor::block_on(m.commit(t))?;
+            m.commit(t).await?;
         }
         m.flush()?;
     }
     // 3. "restart": reopen catalog and replay WAL into a *fresh* kv to prove recovery
-    let c = open_catalog(dir)?;
+    let c = open_catalog(dir.to_path_buf()).await?;
     let tables = c.list_tables()?;
     println!("[smoke] tables after restart: {tables:?}");
 
     let fresh: Arc<dyn MetaStore> = Arc::new(RocksMetaStore::open(dir.join("kv_recovered"))?);
-    let m = TxnManager::open(wal_path(dir), fresh.clone())?;
-    let n = m.recover(0)?;
+    let m = TxnManager::open(wal_path(dir), fresh.clone()).await?;
+    let n = m.recover(0).await?;
     println!("[smoke] replayed {n} WAL record(s) into fresh store");
     let rows = fresh.scan_prefix(b"row")?;
     for (k, v) in &rows {
@@ -938,11 +969,17 @@ impl sqllogictest::DB for SltDb {
     type Error = common::Error;
     type ColumnType = sqllogictest::DefaultColumnType;
 
+    /// `sqllogictest::DB::run` is a **synchronous** trait method - the crate
+    /// calls it from its own loop, so there is no `async` form to implement.
+    /// The engine's statement chain is async, so this enters the engine's
+    /// runtime for the one statement; [`run_conformance`] already dispatches the
+    /// whole suite to the blocking pool, so the parked thread is a pool thread
+    /// and never a runtime worker (AGENTS.md §7.3, item 4).
     fn run(
         &mut self,
         sql: &str,
     ) -> Result<sqllogictest::DBOutput<Self::ColumnType>, common::Error> {
-        let results = self.engine.execute_blocking(sql)?;
+        let results = executor::scheduler().block_on_runtime(self.engine.execute(sql))?;
         let Some(last) = results.into_iter().last() else {
             return Ok(sqllogictest::DBOutput::StatementComplete(0));
         };
@@ -990,7 +1027,21 @@ impl sqllogictest::DB for SltDb {
 /// sqllogictest-rs, the crate the reference's own runner is built from, so
 /// there is one implementation of the format. Each file gets a fresh engine in
 /// its own temporary directory; any failure makes the command exit non-zero.
-fn run_conformance(slt_dir: &str) -> common::Result<()> {
+/// Runs the `.slt` suite.
+///
+/// The suite driver is synchronous (`sqllogictest::Runner::run_file` calls
+/// `DB::run` in its own loop), so the whole run is dispatched to the **blocking
+/// pool**: a plain thread there is off the runtime's task context, which is
+/// what makes the `block_on` inside `SltDb::run` a plain call instead of a
+/// panic.
+async fn run_conformance(slt_dir: &str) -> common::Result<()> {
+    let slt_dir = slt_dir.to_string();
+    executor::scheduler()
+        .spawn_blocking(move || run_conformance_blocking(&slt_dir))
+        .await
+}
+
+fn run_conformance_blocking(slt_dir: &str) -> common::Result<()> {
     // Fixture data (/var/infinity/test_data/...) resolves under test/data.
     // Walk parent directories so a single-file run still finds the fixtures.
     let mut probe = Path::new(slt_dir).parent();
@@ -1013,7 +1064,7 @@ fn run_conformance(slt_dir: &str) -> common::Result<()> {
     for (index, file) in files.iter().enumerate() {
         let dir = std::env::temp_dir().join(format!("infconf-{}-{index}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let engine = match Engine::open(&dir) {
+        let engine = match Engine::open_blocking(&dir, Default::default()) {
             Ok(engine) => engine,
             Err(e) => {
                 failures.push(format!("{}: open failed: {e}", file.display()));

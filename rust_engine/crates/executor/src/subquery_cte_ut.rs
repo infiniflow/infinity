@@ -21,18 +21,22 @@
 use crate::{Engine, QueryResult};
 use tempfile::tempdir;
 
-fn engine() -> (tempfile::TempDir, Engine) {
+async fn engine() -> (tempfile::TempDir, Engine) {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (a INT);").unwrap();
-    e.execute_blocking("INSERT INTO t VALUES (1), (2), (3);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE TABLE t (a INT);").await.unwrap();
+    e.execute("INSERT INTO t VALUES (1), (2), (3);")
+        .await
         .unwrap();
     (dir, e)
 }
 
-fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+async fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
     let r = e
-        .execute_blocking(sql)
+        .execute(sql)
+        .await
         .unwrap()
         .into_iter()
         .next()
@@ -51,41 +55,43 @@ fn string_rows(values: &[&str]) -> Vec<Vec<String>> {
 // Scalar subqueries
 // ---------------------------------------------------------------------------
 
-#[test]
-fn scalar_subquery_returns_its_only_value() {
-    let (_d, e) = engine();
-    assert_eq!(rows(&e, "SELECT (SELECT 1);"), string_rows(&["1"]));
+#[tokio::test]
+async fn scalar_subquery_returns_its_only_value() {
+    let (_d, e) = engine().await;
+    assert_eq!(rows(&e, "SELECT (SELECT 1);").await, string_rows(&["1"]));
     assert_eq!(
-        rows(&e, "SELECT (SELECT a FROM t WHERE a = 2);"),
+        rows(&e, "SELECT (SELECT a FROM t WHERE a = 2);").await,
         string_rows(&["2"])
     );
     // A subquery used as a comparison operand resolves before the filter runs.
     assert_eq!(
-        rows(&e, "SELECT a FROM t WHERE a = (SELECT 2);"),
+        rows(&e, "SELECT a FROM t WHERE a = (SELECT 2);").await,
         string_rows(&["2"])
     );
 }
 
-#[test]
-fn scalar_subquery_is_null_when_empty() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn scalar_subquery_is_null_when_empty() {
+    let (_d, e) = engine().await;
     assert_eq!(
-        rows(&e, "SELECT (SELECT a FROM t WHERE a = 99);"),
+        rows(&e, "SELECT (SELECT a FROM t WHERE a = 99);").await,
         string_rows(&["null"])
     );
 }
 
-#[test]
-fn scalar_subquery_rejects_multiple_rows_or_columns() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn scalar_subquery_rejects_multiple_rows_or_columns() {
+    let (_d, e) = engine().await;
     let err = e
-        .execute_blocking("SELECT (SELECT a FROM t);")
+        .execute("SELECT (SELECT a FROM t);")
+        .await
         .unwrap_err()
         .to_string();
     assert!(err.contains("more than one row"), "unexpected error: {err}");
 
     let err = e
-        .execute_blocking("SELECT (SELECT a, a FROM t WHERE a = 1);")
+        .execute("SELECT (SELECT a, a FROM t WHERE a = 1);")
+        .await
         .unwrap_err()
         .to_string();
     assert!(err.contains("one column"), "unexpected error: {err}");
@@ -95,33 +101,38 @@ fn scalar_subquery_rejects_multiple_rows_or_columns() {
 // EXISTS / NOT EXISTS
 // ---------------------------------------------------------------------------
 
-#[test]
-fn exists_filters_on_subquery_cardinality() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn exists_filters_on_subquery_cardinality() {
+    let (_d, e) = engine().await;
     assert_eq!(
-        rows(&e, "SELECT a FROM t WHERE EXISTS (SELECT 1) ORDER BY a;"),
+        rows(&e, "SELECT a FROM t WHERE EXISTS (SELECT 1) ORDER BY a;").await,
         string_rows(&["1", "2", "3"])
     );
-    assert!(rows(&e, "SELECT a FROM t WHERE NOT EXISTS (SELECT 1);").is_empty());
+    assert!(rows(&e, "SELECT a FROM t WHERE NOT EXISTS (SELECT 1);")
+        .await
+        .is_empty());
 
     // A correlated-looking literal filter decides the subquery's emptiness.
     assert_eq!(
         rows(
             &e,
             "SELECT a FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 2) ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["1", "2", "3"])
     );
     assert!(rows(
         &e,
         "SELECT a FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 99);"
     )
+    .await
     .is_empty());
     assert_eq!(
         rows(
             &e,
             "SELECT a FROM t WHERE NOT EXISTS (SELECT 1 FROM t WHERE a = 99) ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["1", "2", "3"])
     );
 }
@@ -130,14 +141,15 @@ fn exists_filters_on_subquery_cardinality() {
 // Common table expressions
 // ---------------------------------------------------------------------------
 
-#[test]
-fn single_cte_binds_as_a_table() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn single_cte_binds_as_a_table() {
+    let (_d, e) = engine().await;
     assert_eq!(
         rows(
             &e,
             "WITH x AS (SELECT a FROM t WHERE a >= 2) SELECT * FROM x ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["2", "3"])
     );
     // Projection/filtering against the CTE's columns also works.
@@ -145,20 +157,22 @@ fn single_cte_binds_as_a_table() {
         rows(
             &e,
             "WITH x AS (SELECT a FROM t) SELECT a FROM x WHERE a > 2;"
-        ),
+        )
+        .await,
         string_rows(&["3"])
     );
 }
 
-#[test]
-fn chained_ctes_can_reference_earlier_bindings() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn chained_ctes_can_reference_earlier_bindings() {
+    let (_d, e) = engine().await;
     assert_eq!(
         rows(
             &e,
             "WITH x AS (SELECT a FROM t), y AS (SELECT a FROM x WHERE a > 1)
              SELECT a FROM y ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["2", "3"])
     );
     // A later CTE may reference an earlier one even when the outer query uses
@@ -168,31 +182,35 @@ fn chained_ctes_can_reference_earlier_bindings() {
             &e,
             "WITH x AS (SELECT a FROM t WHERE a > 1), y AS (SELECT a FROM x)
              SELECT a FROM y ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["2", "3"])
     );
 }
 
-#[test]
-fn cte_alias_list_renames_output_columns() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn cte_alias_list_renames_output_columns() {
+    let (_d, e) = engine().await;
     assert_eq!(
         rows(
             &e,
             "WITH x (b) AS (SELECT a FROM t) SELECT b FROM x WHERE b = 1;"
-        ),
+        )
+        .await,
         string_rows(&["1"])
     );
     assert_eq!(
         rows(
             &e,
             "WITH x (b) AS (SELECT a FROM t) SELECT * FROM x ORDER BY b;"
-        ),
+        )
+        .await,
         string_rows(&["1", "2", "3"])
     );
 
     let err = e
-        .execute_blocking("WITH x (b, c) AS (SELECT a FROM t) SELECT * FROM x;")
+        .execute("WITH x (b, c) AS (SELECT a FROM t) SELECT * FROM x;")
+        .await
         .unwrap_err()
         .to_string();
     assert!(
@@ -201,38 +219,40 @@ fn cte_alias_list_renames_output_columns() {
     );
 }
 
-#[test]
-fn delete_and_update_filters_accept_subqueries() {
+#[tokio::test]
+async fn delete_and_update_filters_accept_subqueries() {
     use crate::QueryResult;
 
-    let (_d, e) = engine();
+    let (_d, e) = engine().await;
     assert_eq!(
-        e.execute_blocking("UPDATE t SET a = 10 WHERE a = (SELECT 1);")
+        e.execute("UPDATE t SET a = 10 WHERE a = (SELECT 1);")
+            .await
             .unwrap()
             .into_iter()
             .next(),
         Some(QueryResult::Updated { count: 1 })
     );
     assert_eq!(
-        rows(&e, "SELECT a FROM t ORDER BY a;"),
+        rows(&e, "SELECT a FROM t ORDER BY a;").await,
         string_rows(&["2", "3", "10"])
     );
 
     assert_eq!(
-        e.execute_blocking("DELETE FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 10);")
+        e.execute("DELETE FROM t WHERE EXISTS (SELECT 1 FROM t WHERE a = 10);")
+            .await
             .unwrap()
             .into_iter()
             .next(),
         Some(QueryResult::Deleted { count: 3 })
     );
-    assert!(rows(&e, "SELECT a FROM t;").is_empty());
+    assert!(rows(&e, "SELECT a FROM t;").await.is_empty());
 }
 
-#[test]
-fn cte_bindings_are_visible_inside_subqueries() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn cte_bindings_are_visible_inside_subqueries() {
+    let (_d, e) = engine().await;
     assert_eq!(
-        rows(&e, "WITH x (b) AS (SELECT 2) SELECT (SELECT b FROM x);"),
+        rows(&e, "WITH x (b) AS (SELECT 2) SELECT (SELECT b FROM x);").await,
         string_rows(&["2"])
     );
     assert_eq!(
@@ -240,7 +260,8 @@ fn cte_bindings_are_visible_inside_subqueries() {
             &e,
             "WITH x AS (SELECT a FROM t WHERE a = 2)
              SELECT a FROM t WHERE EXISTS (SELECT * FROM x) ORDER BY a;"
-        ),
+        )
+        .await,
         string_rows(&["1", "2", "3"])
     );
     assert!(rows(
@@ -248,6 +269,7 @@ fn cte_bindings_are_visible_inside_subqueries() {
         "WITH x AS (SELECT a FROM t WHERE a = 99)
          SELECT a FROM t WHERE EXISTS (SELECT * FROM x);"
     )
+    .await
     .is_empty());
 }
 
@@ -255,29 +277,30 @@ fn cte_bindings_are_visible_inside_subqueries() {
 // Non-literal LIMIT / OFFSET
 // ---------------------------------------------------------------------------
 
-#[test]
-fn constant_limit_and_offset_expressions_apply() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn constant_limit_and_offset_expressions_apply() {
+    let (_d, e) = engine().await;
     assert_eq!(
-        rows(&e, "SELECT a FROM t ORDER BY a LIMIT 1+1;"),
+        rows(&e, "SELECT a FROM t ORDER BY a LIMIT 1+1;").await,
         string_rows(&["1", "2"])
     );
     assert_eq!(
-        rows(&e, "SELECT a FROM t ORDER BY a LIMIT 2 OFFSET 0+1;"),
+        rows(&e, "SELECT a FROM t ORDER BY a LIMIT 2 OFFSET 0+1;").await,
         string_rows(&["2", "3"])
     );
     // The count fast path must still honour a computed limit.
     assert_eq!(
-        rows(&e, "SELECT count(*) FROM t LIMIT 1+1;"),
+        rows(&e, "SELECT count(*) FROM t LIMIT 1+1;").await,
         string_rows(&["3"])
     );
 }
 
-#[test]
-fn non_constant_limit_is_an_explicit_error() {
-    let (_d, e) = engine();
+#[tokio::test]
+async fn non_constant_limit_is_an_explicit_error() {
+    let (_d, e) = engine().await;
     let err = e
-        .execute_blocking("SELECT a FROM t LIMIT (SELECT 1);")
+        .execute("SELECT a FROM t LIMIT (SELECT 1);")
+        .await
         .unwrap_err()
         .to_string();
     assert!(
@@ -286,7 +309,8 @@ fn non_constant_limit_is_an_explicit_error() {
     );
 
     let err = e
-        .execute_blocking("SELECT a FROM t LIMIT 0-1;")
+        .execute("SELECT a FROM t LIMIT 0-1;")
+        .await
         .unwrap_err()
         .to_string();
     assert!(

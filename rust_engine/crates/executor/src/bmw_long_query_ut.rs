@@ -139,12 +139,13 @@ impl Corpus {
 
 /// Creates the table, the full-text index and loads `corpus` segment by
 /// segment (`PrepareIndex`).
-fn prepare(engine: &Engine, corpus: &Corpus) {
-    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
+async fn prepare(engine: &Engine, corpus: &Corpus) {
+    engine.execute("CREATE DATABASE db1;").await.unwrap();
     engine
-        .execute_blocking(&format!(
+        .execute(&format!(
             "CREATE TABLE db1.{TABLE} (id VARCHAR, title VARCHAR, text VARCHAR);"
         ))
+        .await
         .unwrap();
     // `IMPORT` is the reference's "one segment per import": loading segment by
     // segment is what makes the index cover more than one posting family.
@@ -161,12 +162,14 @@ fn prepare(engine: &Engine, corpus: &Corpus) {
             .collect();
         engine
             .import_literals(&format!("db1.{TABLE}"), None, docs)
+            .await
             .unwrap();
     }
     engine
-        .execute_blocking(&format!(
+        .execute(&format!(
             "CREATE INDEX {INDEX} ON db1.{TABLE} (text) USING FULLTEXT WITH (analyzer='standard');"
         ))
+        .await
         .unwrap();
 }
 
@@ -190,12 +193,13 @@ struct RunResult {
 
 /// Runs one query against the live index. The `TextIndex` borrows the engine's
 /// registry, so the guard stays alive for the whole scan.
-fn run(engine: &Engine, query: &str, config: RunConfig) -> RunResult {
+async fn run(engine: &Engine, query: &str, config: RunConfig) -> RunResult {
     let tokenizer = engine.index_tokenizer(&format!("db1.{TABLE}"), "text");
     let index = engine
         .text_index_for(&format!("db1.{TABLE}"), "text", tokenizer)
+        .await
         .unwrap();
-    let guard = index.read().unwrap();
+    let guard = index.read().await;
 
     let n_docs = guard.total_docs();
     let n = n_docs.max(1) as f64;
@@ -286,13 +290,15 @@ fn sorted_by_score(docs: &[(u64, f64)]) -> Vec<(u64, f64)> {
 
 /// `LongQueryFullScanParity`: with no threshold, the naive OR and the pruned
 /// scan must agree on the document set, order and every score.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryFullScanParity"]
-fn long_query_full_scan_parity() {
+async fn long_query_full_scan_parity() {
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
 
     for terms in [64u32, 200, 400] {
         let query = make_query(terms, 1000 + u64::from(terms), corpus.vocab);
@@ -304,7 +310,8 @@ fn long_query_full_scan_parity() {
                 min_should: 1,
                 naive: true,
             },
-        );
+        )
+        .await;
         let bmw = run(
             &engine,
             &query,
@@ -313,7 +320,8 @@ fn long_query_full_scan_parity() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert!(!naive.docs.is_empty(), "terms={terms}: no hits");
         assert_same_scan(&naive.docs, &bmw.docs, &format!("terms={terms}"));
         eprintln!(
@@ -332,13 +340,15 @@ fn long_query_full_scan_parity() {
 /// `LongQueryTopKAndPruningEffectiveness`: top-k must equal "full scan, sort,
 /// take k", be deterministic, and the pruning counters must show that the scan
 /// did not visit every document.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryTopKAndPruningEffectiveness"]
-fn long_query_top_k_and_pruning_effectiveness() {
+async fn long_query_top_k_and_pruning_effectiveness() {
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
     let total_docs = corpus.total_docs();
 
     let query = make_query(200, 424242, corpus.vocab);
@@ -350,7 +360,8 @@ fn long_query_top_k_and_pruning_effectiveness() {
             min_should: 1,
             naive: true,
         },
-    );
+    )
+    .await;
     assert!(!reference.docs.is_empty());
     let reference_scores: HashMap<u64, f64> = reference.docs.iter().copied().collect();
     let reference_sorted = sorted_by_score(&reference.docs);
@@ -367,7 +378,8 @@ fn long_query_top_k_and_pruning_effectiveness() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(
             bmw.docs.len(),
             topn.min(reference.docs.len()),
@@ -411,7 +423,8 @@ fn long_query_top_k_and_pruning_effectiveness() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(repeat.docs, bmw.docs, "topn={topn}: not deterministic");
         // (4) pruning happened: the scan visited fewer documents than the table
         // holds, and top-10 needed far fewer exact scores than rounds.
@@ -459,13 +472,15 @@ fn long_query_top_k_and_pruning_effectiveness() {
 /// `LongQueryDenseVocabulary`: a tiny vocabulary makes almost every document
 /// match almost every query term, which is the worst case for block-max
 /// pruning. The answers must stay correct under it.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryDenseVocabulary"]
-fn long_query_dense_vocabulary() {
+async fn long_query_dense_vocabulary() {
     let corpus = Corpus::from_env().with_vocab(200);
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
     let total_docs = corpus.total_docs();
 
     let query = make_query(200, 555, corpus.vocab);
@@ -477,7 +492,8 @@ fn long_query_dense_vocabulary() {
             min_should: 1,
             naive: true,
         },
-    );
+    )
+    .await;
     let full_scan = run(
         &engine,
         &query,
@@ -486,7 +502,8 @@ fn long_query_dense_vocabulary() {
             min_should: 1,
             naive: false,
         },
-    );
+    )
+    .await;
     assert!(!reference.docs.is_empty());
     assert_same_scan(&reference.docs, &full_scan.docs, "dense");
 
@@ -501,7 +518,8 @@ fn long_query_dense_vocabulary() {
             min_should: 1,
             naive: false,
         },
-    );
+    )
+    .await;
     assert_eq!(top10.docs.len(), 10);
     for (rank, (doc, score)) in top10.docs.iter().enumerate() {
         let want = expected[rank];
@@ -528,9 +546,9 @@ fn long_query_dense_vocabulary() {
 /// `INFINITY_BMW_IT_SCALE=1` enables it; the size comes from the same
 /// environment variables as the other cases (the reference documents 20
 /// segments × 500k documents × 20000 vocabulary).
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryAtScale"]
-fn long_query_at_scale() {
+async fn long_query_at_scale() {
     if std::env::var_os("INFINITY_BMW_IT_SCALE").is_none() {
         eprintln!(
             "skipped: set INFINITY_BMW_IT_SCALE=1 (with INFINITY_BMW_IT_SEGMENTS/DOCS/VOCAB) to run \
@@ -540,8 +558,10 @@ fn long_query_at_scale() {
     }
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
     let total_docs = corpus.total_docs();
     eprintln!(
         "[BMW-IT] scale corpus: {total_docs} docs ({} seg x {}), vocab={}, words/doc={}",
@@ -559,7 +579,8 @@ fn long_query_at_scale() {
                 min_should: 1,
                 naive: true,
             },
-        );
+        )
+        .await;
         let bmw = run(
             &engine,
             &query,
@@ -568,7 +589,8 @@ fn long_query_at_scale() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert!(!naive.docs.is_empty(), "terms={terms}: no hits");
         assert_same_scan(&naive.docs, &bmw.docs, &format!("scale terms={terms}"));
 
@@ -582,7 +604,8 @@ fn long_query_at_scale() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(top.docs.len(), 10, "terms={terms}");
         for (rank, (doc, score)) in top.docs.iter().enumerate() {
             let (expected_doc, expected_score) = exhaustive[rank];
@@ -601,7 +624,8 @@ fn long_query_at_scale() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(repeat.docs, top.docs, "terms={terms}: not deterministic");
         assert!(
             top.stats.iterations < total_docs,
@@ -623,13 +647,15 @@ fn long_query_at_scale() {
 
 /// `LongQueryStability`: `Next(target)` jump semantics, repeated early give-up,
 /// `minimum_should_match`, and long queries from several threads.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryStability"]
-fn long_query_stability() {
+async fn long_query_stability() {
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
 
     let query = make_query(200, 777, corpus.vocab);
     let reference = run(
@@ -640,7 +666,8 @@ fn long_query_stability() {
             min_should: 1,
             naive: true,
         },
-    );
+    )
+    .await;
     assert!(reference.docs.len() > 10, "the query must match many rows");
 
     // (a) `Next(target)` must land on the first reference document >= target.
@@ -648,8 +675,9 @@ fn long_query_stability() {
         let tokenizer = engine.index_tokenizer(&format!("db1.{TABLE}"), "text");
         let index = engine
             .text_index_for(&format!("db1.{TABLE}"), "text", tokenizer)
+            .await
             .unwrap();
-        let guard = index.read().unwrap();
+        let guard = index.read().await;
         let n = guard.total_docs().max(1) as f64;
         let mut units: Vec<WandUnit<'_>> = Vec::new();
         for term in query.split_whitespace() {
@@ -715,7 +743,8 @@ fn long_query_stability() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert!(partial.docs.len() <= 10);
     }
 
@@ -729,7 +758,8 @@ fn long_query_stability() {
                 min_should: 2,
                 naive: true,
             },
-        );
+        )
+        .await;
         let bmw = run(
             &engine,
             &query,
@@ -738,7 +768,8 @@ fn long_query_stability() {
                 min_should: 2,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(naive.docs.len(), bmw.docs.len(), "msm=2: result size");
         assert!(!naive.docs.is_empty(), "msm=2 matched nothing");
         for (rank, ((_, expected), (_, actual))) in
@@ -761,8 +792,14 @@ fn long_query_stability() {
         std::thread::scope(|scope| {
             for _ in 0..THREADS {
                 scope.spawn(|| {
+                    // The query path is async; each scoped OS thread drives its
+                    // own runtime for the scans it owns.
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
                     for _ in 0..ROUNDS {
-                        let result = run(
+                        let result = runtime.block_on(run(
                             &engine,
                             &query,
                             RunConfig {
@@ -770,7 +807,7 @@ fn long_query_stability() {
                                 min_should: 1,
                                 naive: false,
                             },
-                        );
+                        ));
                         if result.docs.len() != 10 {
                             failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         }
@@ -791,9 +828,9 @@ fn long_query_stability() {
 /// The reference also measures its legacy sort-based BMW and records the
 /// difference; the port has one block-max iterator, so the comparison is naive
 /// against pruned, which is what `block_max=false` exercises.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryPerfComparison"]
-fn long_query_perf_comparison() {
+async fn long_query_perf_comparison() {
     if std::env::var_os("INFINITY_BMW_IT_PERF").is_none() {
         eprintln!(
             "skipped: set INFINITY_BMW_IT_PERF=1 (with INFINITY_BMW_IT_SEGMENTS/DOCS/VOCAB) to run \
@@ -803,8 +840,10 @@ fn long_query_perf_comparison() {
     }
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
     let total_docs = corpus.total_docs();
     let repeats = env_u32("INFINITY_BMW_IT_REPEAT", 5).max(1);
 
@@ -819,11 +858,11 @@ fn long_query_perf_comparison() {
         .unwrap_or_else(|| vec![100, 200]);
     assert!(!terms.is_empty(), "INFINITY_BMW_IT_PERF_TERMS parsed empty");
 
-    let best = |query: &str, config: RunConfig| -> (RunResult, f64) {
+    let best = async |query: &str, config: RunConfig| -> (RunResult, f64) {
         let mut best: Option<(RunResult, f64)> = None;
         for _ in 0..repeats {
             let started = std::time::Instant::now();
-            let result = run(&engine, query, config);
+            let result = run(&engine, query, config).await;
             let elapsed = started.elapsed().as_secs_f64() * 1e3;
             if best
                 .as_ref()
@@ -844,7 +883,8 @@ fn long_query_perf_comparison() {
                 min_should: 1,
                 naive: true,
             },
-        );
+        )
+        .await;
         assert!(!naive.docs.is_empty(), "terms={count}: no hits");
         for topn in [10usize, 100, 1000] {
             let (pruned, pruned_ms) = best(
@@ -854,7 +894,8 @@ fn long_query_perf_comparison() {
                     min_should: 1,
                     naive: false,
                 },
-            );
+            )
+            .await;
             assert_eq!(
                 pruned.docs.len(),
                 topn.min(naive.docs.len()),
@@ -883,7 +924,8 @@ fn long_query_perf_comparison() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(
             pruned_full.docs.len(),
             naive.docs.len(),
@@ -912,9 +954,9 @@ fn long_query_perf_comparison() {
 ///
 /// `INFINITY_BMW_IT_RANDOM=1` enables it; `INFINITY_BMW_IT_RANDOM_ROUNDS`
 /// (default 12) sets the number of rounds.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ BmwLongQueryTest.DISABLED_SLOW_LongQueryRandomizedDifferential"]
-fn long_query_randomized_differential() {
+async fn long_query_randomized_differential() {
     if std::env::var_os("INFINITY_BMW_IT_RANDOM").is_none() {
         eprintln!(
             "skipped: set INFINITY_BMW_IT_RANDOM=1 (with INFINITY_BMW_IT_SEGMENTS/DOCS/VOCAB) to run \
@@ -924,8 +966,10 @@ fn long_query_randomized_differential() {
     }
     let corpus = Corpus::from_env();
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    prepare(&engine, &corpus);
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    prepare(&engine, &corpus).await;
 
     let rounds = env_u32("INFINITY_BMW_IT_RANDOM_ROUNDS", 12).max(1);
     let mut rng = 0x2026_1116_dead_beefu64;
@@ -950,7 +994,8 @@ fn long_query_randomized_differential() {
                 min_should,
                 naive: true,
             },
-        );
+        )
+        .await;
         let pruned = run(
             &engine,
             &query,
@@ -959,7 +1004,8 @@ fn long_query_randomized_differential() {
                 min_should,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(
             naive.docs.len(),
             pruned.docs.len(),
@@ -989,13 +1035,15 @@ fn long_query_randomized_differential() {
                 min_should,
                 naive: true,
             },
-        );
+        )
+        .await;
         if !reference.docs.is_empty() {
             let tokenizer = engine.index_tokenizer(&format!("db1.{TABLE}"), "text");
             let index = engine
                 .text_index_for(&format!("db1.{TABLE}"), "text", tokenizer)
+                .await
                 .unwrap();
-            let guard = index.read().unwrap();
+            let guard = index.read().await;
             let n = guard.total_docs().max(1) as f64;
             let mut units: Vec<WandUnit<'_>> = Vec::new();
             for term in query.split_whitespace() {
@@ -1059,16 +1107,19 @@ fn long_query_randomized_differential() {
 /// (`query_match_ut.cpp:215`): two segments of 800 rows each, a 200-term and a
 /// 40-term query, full scan and top-10 - the naive OR and the pruned scan must
 /// return the same documents and scores.
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ QueryMatchTest.bmw_heap_differential"]
-fn bmw_heap_differential() {
+async fn bmw_heap_differential() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    engine.execute("CREATE DATABASE db1;").await.unwrap();
     engine
-        .execute_blocking(&format!(
+        .execute(&format!(
             "CREATE TABLE db1.{TABLE} (id VARCHAR, title VARCHAR, text VARCHAR);"
         ))
+        .await
         .unwrap();
     // Two imports = two segments; every row is 40 words drawn from a
     // 1..120-wide vocabulary, which is what makes the query lists dense enough
@@ -1100,12 +1151,14 @@ fn bmw_heap_differential() {
             .collect();
         engine
             .import_literals(&format!("db1.{TABLE}"), None, docs)
+            .await
             .unwrap();
     }
     engine
-        .execute_blocking(&format!(
+        .execute(&format!(
             "CREATE INDEX {INDEX} ON db1.{TABLE} (text) USING FULLTEXT WITH (analyzer='standard');"
         ))
+        .await
         .unwrap();
 
     // The queries draw from the same vocabulary the corpus uses.
@@ -1132,7 +1185,8 @@ fn bmw_heap_differential() {
                 min_should: 1,
                 naive: true,
             },
-        );
+        )
+        .await;
         let pruned = run(
             &engine,
             query,
@@ -1141,7 +1195,8 @@ fn bmw_heap_differential() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert!(!naive.docs.is_empty(), "{label}: no hits");
         assert_same_scan(&naive.docs, &pruned.docs, label);
 
@@ -1153,7 +1208,8 @@ fn bmw_heap_differential() {
                 min_should: 1,
                 naive: true,
             },
-        );
+        )
+        .await;
         let pruned_top = run(
             &engine,
             query,
@@ -1162,7 +1218,8 @@ fn bmw_heap_differential() {
                 min_should: 1,
                 naive: false,
             },
-        );
+        )
+        .await;
         assert_eq!(
             naive_top.docs.len(),
             pruned_top.docs.len(),

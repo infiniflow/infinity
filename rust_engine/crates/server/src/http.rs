@@ -36,9 +36,7 @@ use parser::{
 };
 
 use crate::peer::{NodeRole, PeerManager};
-use crate::{
-    show_blocks_rows, show_segments_rows, Error, Result, SHOW_BLOCKS_COLUMNS, SHOW_SEGMENTS_COLUMNS,
-};
+use crate::{Error, Result, SHOW_BLOCKS_COLUMNS, SHOW_SEGMENTS_COLUMNS};
 
 /// A tiny HTTP server that runs SQL against an [`Engine`].
 pub struct HttpServer {
@@ -1444,7 +1442,7 @@ fn count_of(results: Vec<QueryResult>) -> i64 {
 
 /// Routes a request to `(status, body)`.
 pub async fn route(
-    engine: &Engine,
+    engine: &Arc<Engine>,
     peer: &PeerManager,
     method: &str,
     path: &str,
@@ -1734,7 +1732,10 @@ pub async fn route(
                     let rows = engine.row_count(&full).unwrap_or(0);
                     // A table that has not been written to has no segment yet
                     // (the reference reports 0 here too).
-                    let segments = crate::show_segments_rows(engine, &full).len();
+                    // Only the count is reported, so the in-memory segment map
+                    // answers it: `show_segments_rows` would walk the mirror
+                    // tree and stat every file just to build cells this drops.
+                    let segments = engine.segments(&full).len();
                     (
                         200,
                         format!(
@@ -2305,7 +2306,7 @@ pub async fn route(
             // `COMPACT TABLE …` parses to the no-op `Statement::Utility`; the
             // Thrift `Compact` request calls the engine entry point instead, and
             // the REST front end has to do the same.
-            match engine.compact_table_async(&format!("{db}.{table}")).await {
+            match engine.compact_table(&format!("{db}.{table}")).await {
                 Ok(()) => (200, ok_json()),
                 Err(e) => engine_err(&e),
             }
@@ -2326,7 +2327,9 @@ pub async fn route(
             };
             // `ShowSegmentsListHandler`: the `SHOW SEGMENTS` rows, plus the
             // table name.
-            let rows = show_segments_rows(engine, &format!("{db}.{table}"));
+            let rows =
+                crate::show_segments_rows(std::sync::Arc::clone(engine), format!("{db}.{table}"))
+                    .await;
             let items = rows
                 .iter()
                 .map(|row| {
@@ -2362,7 +2365,12 @@ pub async fn route(
                 return err_response(3037, "invalid segment id");
             };
             // `ShowBlocksListHandler`.
-            let rows = show_blocks_rows(engine, &format!("{db}.{table}"), segment);
+            let rows = crate::show_blocks_rows(
+                std::sync::Arc::clone(engine),
+                format!("{db}.{table}"),
+                segment,
+            )
+            .await;
             let items = rows
                 .iter()
                 .map(|row| {
@@ -3390,8 +3398,6 @@ fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
     use tempfile::tempdir;
 
     /// A standalone node, the same registry `Server::bind` installs.
@@ -3399,108 +3405,110 @@ mod tests {
         PeerManager::new("leader", "127.0.0.1", 23820)
     }
 
-    #[test]
-    fn route_query_and_health() {
+    #[tokio::test]
+    async fn route_query_and_health() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
         engine
-            .execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+            .execute("CREATE TABLE t (id INT, name VARCHAR);")
+            .await
             .unwrap();
         engine
-            .execute_blocking("INSERT INTO t VALUES (1, 'a');")
+            .execute("INSERT INTO t VALUES (1, 'a');")
+            .await
             .unwrap();
 
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/query",
             "{\"sql\":\"SELECT * FROM t;\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200);
         assert!(b.contains("\"columns\":[\"id\",\"name\"]"), "{b}");
         assert!(b.contains("[\"1\",\"a\"]"), "{b}");
 
         assert_eq!(
-            executor::block_on(route(&engine, &peer, "GET", "/health", "")),
+            (route(&engine, &peer, "GET", "/health", "")).await,
             (200, "ok".to_string())
         );
-        assert_eq!(
-            executor::block_on(route(&engine, &peer, "POST", "/query", "{}")).0,
-            400
-        );
-        assert_eq!(
-            executor::block_on(route(&engine, &peer, "GET", "/nope", "")).0,
-            404
-        );
+        assert_eq!((route(&engine, &peer, "POST", "/query", "{}")).await.0, 400);
+        assert_eq!((route(&engine, &peer, "GET", "/nope", "")).await.0, 404);
     }
 
     /// A panicking statement answers as an error envelope for that request, and
     /// the next request on the same engine still succeeds (`/query` is the only
     /// route that runs caller-supplied SQL text).
-    #[test]
-    fn a_panicking_query_answers_and_the_front_end_keeps_serving() {
+    #[tokio::test]
+    async fn a_panicking_query_answers_and_the_front_end_keeps_serving() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
-            .unwrap();
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
         let body = "{\"sql\":\"SELECT * FROM t;\"}";
 
         engine.arm_injected_panic();
-        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/query", body));
+        let (s, b) = (route(&engine, &peer, "POST", "/query", body)).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("injected panic"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/query", body));
+        let (s, b) = (route(&engine, &peer, "POST", "/query", body)).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"rows\""), "{b}");
     }
 
     /// `/configs` (`ShowConfigsHandler`, `ShowConfigHandler`,
     /// `SetConfigHandler` in `src/network/http_server_impl.cpp`).
-    #[test]
-    fn http_config_routes() {
+    #[tokio::test]
+    async fn http_config_routes() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/configs", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"cache_result_capacity\":"), "{b}");
         assert!(b.contains("\"log_level\":\"info\""), "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/log_level", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/configs/log_level", "")).await;
         assert_eq!(s, 200, "{b}");
         assert_eq!(b, "{\"log_level\":\"info\",\"error_code\":0}");
 
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/configs",
             "{\"log_level\":\"debug\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
-        let (_, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/log_level", ""));
+        let (_, b) = (route(&engine, &peer, "GET", "/configs/log_level", "")).await;
         assert!(b.contains("\"debug\""), "{b}");
 
         // Unknown knob: the reference's InvalidConfig (1008).
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/configs/nope", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/configs/nope", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":1008"), "{b}");
         // Two fields is "No config will be set" (3076).
-        let (s, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "POST",
-            "/configs",
-            "{\"a\":1,\"b\":2}",
-        ));
+        let (s, b) = (route(&engine, &peer, "POST", "/configs", "{\"a\":1,\"b\":2}")).await;
         assert!(s != 200, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
     }
@@ -3508,100 +3516,108 @@ mod tests {
     /// `/snapshots*` (`ListSnapshotsHandler`, `ShowSnapshotHandler`,
     /// `CreateTableSnapshotHandler`, `RestoreTableSnapshotHandler`,
     /// `DropSnapshotHandler`).
-    #[test]
-    fn http_snapshot_routes() {
+    #[tokio::test]
+    async fn http_snapshot_routes() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
-            .unwrap();
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/snapshots", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"snapshots\":[]"), "{b}");
 
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/snapshots",
             "{\"db_name\":\"default_db\",\"table_name\":\"t\",\"snapshot_name\":\"snap0\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/snapshots", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("{\"name\":\"snap0\"}"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots/snap0", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/snapshots/snap0", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"snapshot\":{\"name\":\"snap0\"}"), "{b}");
 
         // Restoring into an existing table fails (DROP TABLE first), so the
         // restore path is exercised after dropping it.
-        engine.execute_blocking("DROP TABLE t;").unwrap();
-        let (s, b) = executor::block_on(route(
+        engine.execute("DROP TABLE t;").await.unwrap();
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/snapshots/restore",
             "{\"snapshot_name\":\"snap0\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
         assert_eq!(
-            engine.execute_blocking("SELECT * FROM t;").unwrap().len(),
+            engine.execute("SELECT * FROM t;").await.unwrap().len(),
             1,
             "the restored table serves its rows"
         );
 
         // Database and system snapshots share the engine's snapshot store.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/snapshots/database",
             "{\"db_name\":\"default_db\",\"snapshot_name\":\"dbsnap\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/snapshots/system",
             "{\"snapshot_name\":\"sysnap\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "DELETE", "/snapshots/snap0", ""));
+        let (s, b) = (route(&engine, &peer, "DELETE", "/snapshots/snap0", "")).await;
         assert_eq!(s, 200, "{b}");
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/snapshots/snap0", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/snapshots/snap0", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("does not exist"), "{b}");
     }
 
     /// `/instance/*`: every route the engine can answer serves real rows.
-    #[test]
-    fn http_instance_routes() {
+    #[tokio::test]
+    async fn http_instance_routes() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
-            .unwrap();
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/instance/flush", ""));
+        let (s, b) = (route(&engine, &peer, "POST", "/instance/flush", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
 
         // The checkpoint wrote the block mirror; reading it back maps the
         // block, so the buffer/objects routes must list the mapping the test
         // itself touched.
-        engine.read_blocks("t").unwrap();
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/buffer", ""));
+        (engine.read_blocks_pruned("t", &[], &[])).await.unwrap();
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/buffer", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"error_code\":0"), "{b}");
         assert!(b.contains("\"buffer\":[{\"path\":\""), "{b}");
@@ -3611,35 +3627,30 @@ mod tests {
         assert!(b.contains("\"type\":\"data\""), "{b}");
         assert!(!b.contains("\"size\":0,"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/objects", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/objects", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"objects\":[{\"path\":\""), "{b}");
         assert!(b.contains("/seg_0/blk_0\""), "{b}");
 
         // The object is addressable by its path suffix (the C++ route takes one
         // path segment, a block path has several).
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "GET",
             "/instance/objects/data/db_1/tbl_0/seg_0/blk_0",
             "",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"object\":{\"path\":\""), "{b}");
         assert!(b.contains("\"status\":\"Loaded\""), "{b}");
-        let (s, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "GET",
-            "/instance/objects/data/nope",
-            "",
-        ));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/objects/data/nope", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
 
         // Files: the block mirror and the catalog are on disk, with sizes.
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/files", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/files", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"files\":["), "{b}");
         assert!(b.contains("/blk_0/"), "{b}");
@@ -3652,23 +3663,24 @@ mod tests {
             ("/instance/transactions", "transactions"),
             ("/instance/profiles", "profiles"),
         ] {
-            let (s, b) = executor::block_on(route(&engine, &peer, "GET", path, ""));
+            let (s, b) = (route(&engine, &peer, "GET", path, "")).await;
             assert_eq!(s, 200, "{path}: {b}");
             assert!(b.contains(&format!("\"{key}\":[")), "{path}: {b}");
         }
 
         // With profiling on, a finished statement is in the history and is
         // addressable through `SHOW QUERY <id>`.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"profile\":true}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
-        engine.execute_blocking("SELECT 1;").unwrap();
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/profiles", ""));
+        engine.execute("SELECT 1;").await.unwrap();
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/profiles", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
         assert!(b.contains("\"query_text\":\"SELECT 1;\""), "{b}");
@@ -3678,26 +3690,26 @@ mod tests {
             .find(|p| p.query_kind == "SELECT")
             .expect("the SELECT is in the profile history")
             .query_id;
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "GET",
             &format!("/instance/queries/{select_id}"),
             "",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains(&format!("\"query_id\":{select_id}")), "{b}");
         assert!(b.contains("\"query_kind\":\"SELECT\""), "{b}");
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/queries/999", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/queries/999", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
-        let (s, b) =
-            executor::block_on(route(&engine, &peer, "GET", "/instance/transactions/1", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/transactions/1", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3088"), "{b}");
 
         // Memory: the port's two real counters.
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/instance/memory", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/instance/memory", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"memory_objects\":\""), "{b}");
         assert!(b.contains("\"memory_allocation\":\""), "{b}");
@@ -3709,7 +3721,7 @@ mod tests {
             "/instance/memory/objects",
             "/instance/memory/allocations",
         ] {
-            let (s, b) = executor::block_on(route(&engine, &peer, "GET", path, ""));
+            let (s, b) = (route(&engine, &peer, "GET", path, "")).await;
             assert_eq!(s, 501, "{path}: {b}");
             assert!(b.contains("\"error_code\":3032"), "{path}: {b}");
             assert!(b.contains("not supported in this build"), "{path}: {b}");
@@ -3719,13 +3731,17 @@ mod tests {
 
     /// `/variables/*`: the listing is the reference's flat object, one name is
     /// its own `{"<name>":"<value>"}` body, and SET follows the engine's rules.
-    #[test]
-    fn http_variable_routes_serve_the_engine_table() {
+    #[tokio::test]
+    async fn http_variable_routes_serve_the_engine_table() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/global", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/variables/global", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
@@ -3737,80 +3753,66 @@ mod tests {
         assert!(!b.contains("\"system_memory_usage\":\"0\""), "{b}");
         assert!(!b.contains("\"open_file_count\":\"0\""), "{b}");
 
-        let (s, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "GET",
-            "/variables/global/query_count",
-            "",
-        ));
+        let (s, b) = (route(&engine, &peer, "GET", "/variables/global/query_count", "")).await;
         assert_eq!(s, 200, "{b}");
         assert_eq!(b.matches("query_count").count(), 1, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/session", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/variables/session", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"connected_timestamp\":\""), "{b}");
 
-        let (s, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "GET",
-            "/variables/session/query_count",
-            "",
-        ));
+        let (s, b) = (route(&engine, &peer, "GET", "/variables/session/query_count", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
 
         // An unknown name is the reference's "No system variable" error.
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/variables/global/nope", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/variables/global/nope", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No system variable: nope"), "{b}");
 
         // SET profile works, SET a read-only variable is 3076.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"profile\":true}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
-        let (_, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "GET",
-            "/variables/global/profile",
-            "",
-        ));
+        let (_, b) = (route(&engine, &peer, "GET", "/variables/global/profile", "")).await;
         assert!(b.contains("\"profile\":\"true\""), "{b}");
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"query_count\":9}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
         // Two fields is "No variable will be set".
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "SET",
             "/variables/global",
             "{\"a\":1,\"b\":2}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No variable will be set"), "{b}");
         // Session variables are read-only.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "SET",
             "/variables/session",
             "{\"query_count\":1}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("\"error_code\":3076"), "{b}");
     }
@@ -3818,13 +3820,17 @@ mod tests {
     /// `/admin/*` (`AdminShowCurrentNodeHandler`, `AdminListAllNodesHandler`,
     /// `AdminShowNodeByNameHandler`, `AdminSetNodeRoleHandler`,
     /// `AdminRemoveNodeHandler`, `AdminShowNodeConfigsHandler`).
-    #[test]
-    fn http_admin_routes() {
+    #[tokio::test]
+    async fn http_admin_routes() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/nodes", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/nodes", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"nodes\":[{"), "{b}");
         assert!(b.contains("\"name\":\"leader\""), "{b}");
@@ -3832,49 +3838,51 @@ mod tests {
         assert!(b.contains("\"status\":\"alive\""), "{b}");
         assert!(b.contains("\"address\":\"127.0.0.1:23820\""), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/current", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/node/current", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"node\":{"), "{b}");
         assert!(b.contains("\"role\":\"leader\""), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/leader", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/node/leader", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"name\":\"leader\""), "{b}");
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/ghost", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/node/ghost", "")).await;
         assert_eq!(s, 500, "{b}");
 
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/admin/node/current",
             "{\"role\":\"admin\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 200, "{b}");
-        let (_, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/node/current", ""));
+        let (_, b) = (route(&engine, &peer, "GET", "/admin/node/current", "")).await;
         assert!(b.contains("\"role\":\"admin\""), "{b}");
-        let (s, b) = executor::block_on(route(
+        let (s, b) = (route(
             &engine,
             &peer,
             "POST",
             "/admin/node/current",
             "{\"role\":\"nope\"}",
-        ));
+        ))
+        .await;
         assert_eq!(s, 500, "{b}");
-        let (s, b) = executor::block_on(route(&engine, &peer, "POST", "/admin/node/current", "{}"));
+        let (s, b) = (route(&engine, &peer, "POST", "/admin/node/current", "{}")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("Field 'role' is required"), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/configs", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/configs", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"log_level\""), "{b}");
 
-        let (s, b) = executor::block_on(route(&engine, &peer, "DELETE", "/admin/node/leader", ""));
+        let (s, b) = (route(&engine, &peer, "DELETE", "/admin/node/leader", "")).await;
         assert!(s == 200 || s == 500, "{b}");
         assert!(b.contains("\"error_code\":"), "{b}");
 
         // The node's variables are the engine's global table.
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/variables", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/variables", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"active_txn_count\":\"0\""),
@@ -3882,21 +3890,15 @@ mod tests {
         );
         assert!(b.contains("\"schedule_policy\":\"round robin\""), "{b}");
 
-        let (s, b) = executor::block_on(route(
-            &engine,
-            &peer,
-            "GET",
-            "/admin/variables/query_count",
-            "",
-        ));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/variables/query_count", "")).await;
         assert_eq!(s, 200, "{b}");
         assert!(b.starts_with("{\"error_code\":0,\"query_count\":\""), "{b}");
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/variables/nope", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/variables/nope", "")).await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("No system variable: nope"), "{b}");
 
         // No log-file directory exists, so the log listing keeps 3032.
-        let (s, b) = executor::block_on(route(&engine, &peer, "GET", "/admin/logs", ""));
+        let (s, b) = (route(&engine, &peer, "GET", "/admin/logs", "")).await;
         assert_eq!(s, 501, "{b}");
         assert!(b.contains("\"error_code\":3032"), "{b}");
         assert!(b.contains("needs "), "{b}");
@@ -3911,18 +3913,24 @@ mod tests {
     /// These routes used to render the request to SQL text and hand it to
     /// `Engine::execute`, which parses `;`-separated statements: `filter` was
     /// `c1 = 1; DROP TABLE victim;` and the drop ran.
-    #[test]
-    fn a_request_fragment_cannot_run_a_second_statement() {
+    #[tokio::test]
+    async fn a_request_fragment_cannot_run_a_second_statement() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
         for t in ["host", "victim"] {
             engine
-                .execute_blocking(&format!("CREATE TABLE {t} (c1 INT, c2 VARCHAR);"))
+                .execute(&format!("CREATE TABLE {t} (c1 INT, c2 VARCHAR);"))
+                .await
                 .unwrap();
         }
         engine
-            .execute_blocking("INSERT INTO host VALUES (1, 'a'), (2, 'b');")
+            .execute("INSERT INTO host VALUES (1, 'a'), (2, 'b');")
+            .await
             .unwrap();
 
         let victim_alive = |engine: &Engine| {
@@ -3967,7 +3975,7 @@ mod tests {
                 "{\"output\":[\"c1\"],\"filter\":\"c1 = 1; DROP TABLE victim;\"}",
             ),
         ] {
-            let (status, body) = executor::block_on(route(&engine, &peer, method, path, body));
+            let (status, body) = (route(&engine, &peer, method, path, body)).await;
             assert_ne!(
                 status, 200,
                 "{method} {path} accepted the injection: {body}"
@@ -3979,24 +3987,26 @@ mod tests {
         }
 
         // A plain filter still works.
-        let (status, body) = executor::block_on(route(
+        let (status, body) = (route(
             &engine,
             &peer,
             "GET",
             "/databases/default_db/tables/host/docs",
             "{\"output\":[\"c1\"],\"filter\":\"c1 = 2\"}",
-        ));
+        ))
+        .await;
         assert_eq!(status, 200, "{body}");
         assert!(body.contains("\"c1\":2"), "{body}");
 
         // A table name carrying a `;` is a name, not statement text.
-        let (status, _) = executor::block_on(route(
+        let (status, _) = (route(
             &engine,
             &peer,
             "POST",
             "/databases/default_db/tables/host%3B%20DROP%20TABLE%20victim/docs",
             "[{\"c1\":1}]",
-        ));
+        ))
+        .await;
         assert_ne!(status, 200);
         assert!(victim_alive(&engine), "an insert dropped the other table");
 
@@ -4047,7 +4057,7 @@ mod tests {
                 export_body.as_str(),
             ),
         ] {
-            let (status, body) = executor::block_on(route(&engine, &peer, method, path, body));
+            let (status, body) = (route(&engine, &peer, method, path, body)).await;
             assert!(
                 victim_alive(&engine),
                 "{method} {path} dropped the other table ({status}): {body}"
@@ -4059,23 +4069,29 @@ mod tests {
     /// text gave it: an empty filter is "all rows" but a blank one is an error,
     /// a literal that looks like a pseudo-column stays a literal, and an offset
     /// without a limit still returns the rows after it.
-    #[test]
-    fn rest_dsl_keeps_the_text_path_semantics() {
+    #[tokio::test]
+    async fn rest_dsl_keeps_the_text_path_semantics() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        let route_of = |method: &str, path: &str, body: &str| {
-            executor::block_on(route(&engine, &peer, method, path, body))
+        let route_of = async |method: &str, path: &str, body: &str| {
+            route(&engine, &peer, method, path, body).await
         };
         engine
-            .execute_blocking(
+            .execute(
                 "CREATE TABLE dsl (c1 INT, label VARCHAR); \
                  INSERT INTO dsl VALUES (1, '_score'), (2, 'score()'), (3, 'plain');",
             )
+            .await
             .unwrap();
-        let rows = |sql: &str| -> Vec<Vec<String>> {
+        let rows = async |sql: &str| -> Vec<Vec<String>> {
             engine
-                .execute_blocking(sql)
+                .execute(sql)
+                .await
                 .unwrap()
                 .into_iter()
                 .find_map(|r| match r {
@@ -4090,9 +4106,14 @@ mod tests {
             "DELETE",
             "/databases/default_db/tables/dsl/docs",
             "{\"filter\":\"   \"}",
-        );
+        )
+        .await;
         assert_ne!(s, 200, "a blank filter must not delete every row: {b}");
-        assert_eq!(rows("SELECT c1 FROM dsl;").len(), 3, "rows were deleted");
+        assert_eq!(
+            rows("SELECT c1 FROM dsl;").await.len(),
+            3,
+            "rows were deleted"
+        );
 
         // A string literal that spells a pseudo-column keeps its value:
         // rewriting the text before parsing would turn `'_score'` into
@@ -4101,10 +4122,11 @@ mod tests {
             "DELETE",
             "/databases/default_db/tables/dsl/docs",
             "{\"filter\":\"label = '_score'\"}",
-        );
+        )
+        .await;
         assert_eq!(s, 200, "{b}");
         assert_eq!(
-            rows("SELECT c1 FROM dsl;"),
+            rows("SELECT c1 FROM dsl;").await,
             vec![vec!["2".to_string()], vec!["3".to_string()]],
             "the wrong row was deleted"
         );
@@ -4115,7 +4137,8 @@ mod tests {
             "GET",
             "/databases/default_db/tables/dsl/docs",
             "{\"output\":[\"c1\"],\"offset\":1}",
-        );
+        )
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(b.contains("\"c1\":3"), "the row after the offset: {b}");
         assert!(!b.contains("\"c1\":2"), "the skipped row came back: {b}");
@@ -4125,30 +4148,34 @@ mod tests {
     /// checks the SQL lexer used to apply: column names are case-insensitive,
     /// a u64 above `i64::MAX` is not silently wrapped to `-1`, and a malformed
     /// column type is rejected instead of reaching a `parts[1]` index.
-    #[test]
-    fn rest_insert_and_ddl_keep_the_parser_checks() {
+    #[tokio::test]
+    async fn rest_insert_and_ddl_keep_the_parser_checks() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        let insert = |table: &str, body: &str| {
-            executor::block_on(route(
+        let insert = async |table: &str, body: &str| {
+            route(
                 &engine,
                 &peer,
                 "POST",
                 &format!("/databases/default_db/tables/{table}/docs"),
                 body,
-            ))
+            )
+            .await
         };
 
         // 1. An upper-cased column names the same column (the reference
         //    lower-cases every key before it builds the row).
-        engine
-            .execute_blocking("CREATE TABLE up (c1 INT);")
-            .unwrap();
-        let (s, b) = insert("up", "[{\"C1\":1}]");
+        engine.execute("CREATE TABLE up (c1 INT);").await.unwrap();
+        let (s, b) = insert("up", "[{\"C1\":1}]").await;
         assert_eq!(s, 200, "{b}");
         let rows = engine
-            .execute_blocking("SELECT c1 FROM up;")
+            .execute("SELECT c1 FROM up;")
+            .await
             .unwrap()
             .into_iter()
             .find_map(|r| match r {
@@ -4159,62 +4186,69 @@ mod tests {
         assert_eq!(rows.len(), 1, "the row was stored under the canonical name");
 
         // A repeat that only appears after folding is a duplicate column.
-        let (s, b) = insert("up", "[{\"c1\":1,\"C1\":2}]");
+        let (s, b) = insert("up", "[{\"c1\":1,\"C1\":2}]").await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("Duplicated column name"), "{b}");
 
         // 2. A u64 beyond `i64::MAX` keeps its value on a DOUBLE column and is
         //    refused on an integer one (the text path reported `bad int`).
         engine
-            .execute_blocking("CREATE TABLE big (d DOUBLE, i BIGINT);")
+            .execute("CREATE TABLE big (d DOUBLE, i BIGINT);")
+            .await
             .unwrap();
-        let (s, b) = insert("big", "[{\"d\":18446744073709551615}]");
+        let (s, b) = insert("big", "[{\"d\":18446744073709551615}]").await;
         assert_eq!(s, 200, "{b}");
         engine
-            .execute_blocking("CREATE TABLE bigi (i BIGINT);")
+            .execute("CREATE TABLE bigi (i BIGINT);")
+            .await
             .unwrap();
-        let (s, b) = insert("bigi", "[{\"i\":18446744073709551615}]");
+        let (s, b) = insert("bigi", "[{\"i\":18446744073709551615}]").await;
         assert_ne!(s, 200, "an out-of-range integer must not be stored: {b}");
 
         // 3. A malformed type is a request error, never a panic.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = route(
             &engine,
             &peer,
             "POST",
             "/databases/default_db/tables/sp",
             "{\"fields\":[{\"name\":\"c1\",\"type\":\"SPARSE(\"}]}",
-        ));
+        )
+        .await;
         assert_eq!(s, 500, "{b}");
         assert!(b.contains("isn't supported"), "{b}");
     }
 
-    #[test]
-    fn http_segment_and_block_routes_report_real_metadata() {
+    #[tokio::test]
+    async fn http_segment_and_block_routes_report_real_metadata() {
         let dir = tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
         let peer = leader();
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (1);")
-            .unwrap();
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (1);").await.unwrap();
         // A `COPY` seals its segment, so the table ends up with two segments.
         let csv = dir.path().join("one_row.csv");
         std::fs::write(&csv, "2\n").unwrap();
         engine
-            .execute_blocking(&format!(
+            .execute(&format!(
                 "COPY t FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
                 csv.display()
             ))
+            .await
             .unwrap();
-        executor::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
 
-        let (s, b) = executor::block_on(route(
+        let (s, b) = route(
             &engine,
             &peer,
             "GET",
             "/databases/default_db/tables/t/segments",
             "",
-        ));
+        )
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"table_name\":\"t\",\"segments\":[{"),
@@ -4226,13 +4260,14 @@ mod tests {
 
         // The mirror writes each segment into its own directory, so the two
         // one-row segments have one block each.
-        let (s, b) = executor::block_on(route(
+        let (s, b) = route(
             &engine,
             &peer,
             "GET",
             "/databases/default_db/tables/t/segments/1/blocks",
             "",
-        ));
+        )
+        .await;
         assert_eq!(s, 200, "{b}");
         assert!(
             b.starts_with("{\"error_code\":0,\"segment_id\":1,\"blocks\":[{"),
@@ -4242,38 +4277,37 @@ mod tests {
         assert!(b.contains("\"size\":\""), "{b}");
     }
 
-    #[test]
-    fn http_over_socket() {
+    #[tokio::test]
+    async fn http_over_socket() {
         let dir = tempdir().unwrap();
-        let engine = Arc::new(Engine::open(dir.path()).unwrap());
-        engine.execute_blocking("CREATE TABLE t (id INT);").unwrap();
-        engine
-            .execute_blocking("INSERT INTO t VALUES (42);")
-            .unwrap();
+        let engine = Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        engine.execute("CREATE TABLE t (id INT);").await.unwrap();
+        engine.execute("INSERT INTO t VALUES (42);").await.unwrap();
         let server = HttpServer::bind("127.0.0.1:0", engine).unwrap();
         let addr = server.local_addr().unwrap();
-        std::thread::spawn(move || {
-            // Each fixture gets its own runtime: the front end is a task on
-            // whichever runtime spawns it, and a test that shared the engine's
-            // would shut it down when the thread returned.
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_stack_size(8 * 1024 * 1024)
-                .build()
-                .expect("build the test runtime")
-                .block_on(server.serve());
-        });
+        // A task on this test's runtime: it owns the listener, so it is
+        // `Send + 'static`, and the test outlives it.
+        tokio::spawn(server.serve());
 
-        let mut stream = TcpStream::connect(&addr).unwrap();
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        // An async client: the server's serve loop is a task on this same
+        // runtime, so a blocking read here would leave it nothing to be polled
+        // on. `read_to_string` finishes when the server closes after one
+        // response.
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         let body = "{\"sql\":\"SELECT * FROM t;\"}";
         let req = format!(
             "POST /query HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\n{}",
             body.len(),
             body
         );
-        stream.write_all(req.as_bytes()).unwrap();
+        stream.write_all(req.as_bytes()).await.unwrap();
         let mut resp = String::new();
-        stream.read_to_string(&mut resp).unwrap();
+        stream.read_to_string(&mut resp).await.unwrap();
         assert!(resp.starts_with("HTTP/1.1 200"), "{resp}");
         assert!(resp.contains("[\"42\"]"), "{resp}");
     }

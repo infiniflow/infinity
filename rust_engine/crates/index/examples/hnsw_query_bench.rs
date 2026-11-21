@@ -30,18 +30,8 @@ fn dataset(rows: usize, dims: usize) -> Vec<Vec<f32>> {
         .collect()
 }
 
-/// The runtime a bucket-parallel build spawns on. A standalone binary brings
-/// its own: the index crate never creates a pool.
-fn runtime(workers: usize) -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(workers.max(1))
-        .enable_all()
-        .thread_name("hnsw-bench")
-        .build()
-        .expect("build the bench runtime")
-}
-
-fn main() {
+#[tokio::main]
+async fn main() {
     let rows = 20_000usize;
     let dims = 4usize;
     let data = dataset(rows, dims);
@@ -49,9 +39,8 @@ fn main() {
         for ef in [10usize, 200] {
             let mut index =
                 HnswIndex::with_encoding(dims, 16, 200, 64, Metric::L2, HnswEncoding::Plain);
-            let rt = runtime(threads);
             let t = Instant::now();
-            rt.block_on(async { index.add_batch(&data, threads) });
+            index.add_batch(&data, threads).await;
             let build = t.elapsed().as_secs_f64();
             // The bench driver's query: k=10 with no `ef`, i.e. ef = k.
             let t = Instant::now();

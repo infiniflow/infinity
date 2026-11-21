@@ -132,59 +132,62 @@ mod tests {
         vec![Value::Int(id), Value::Int(rank)]
     }
 
-    fn run(top: Top, input: Vec<Vec<Value>>, batch: usize) -> Vec<Vec<Value>> {
+    async fn run(top: Top, input: Vec<Vec<Value>>, batch: usize) -> Vec<Vec<Value>> {
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(top)];
         let mut ctx = OperatorContext {
             block_capacity: batch,
         };
         let mut states = OperatorStates::new(&operators);
         let mut source = super::super::RowsSource::new(input, 2, batch);
-        super::super::run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        let mut operators = operators;
+        { super::super::run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         std::mem::take(&mut states.state_mut(0).data_blocks)
             .into_iter()
             .flat_map(DataChunk::into_rows)
             .collect()
     }
 
-    #[test]
-    fn sorts_and_keeps_the_first_rows() {
+    #[tokio::test]
+    async fn sorts_and_keeps_the_first_rows() {
         let input = vec![row(1, 30), row(2, 10), row(3, 20)];
-        let out = run(Top::new(vec![key(1)], 2, 0), input, 2);
+        let out = run(Top::new(vec![key(1)], 2, 0), input, 2).await;
         assert_eq!(out, vec![row(2, 10), row(3, 20)]);
     }
 
-    #[test]
-    fn offset_drops_the_head_of_the_sorted_result() {
+    #[tokio::test]
+    async fn offset_drops_the_head_of_the_sorted_result() {
         let input = vec![row(1, 30), row(2, 10), row(3, 20)];
-        let out = run(Top::new(vec![key(1)], 5, 1), input, 2);
+        let out = run(Top::new(vec![key(1)], 5, 1), input, 2).await;
         assert_eq!(out, vec![row(3, 20), row(1, 30)]);
     }
 
-    #[test]
-    fn ties_keep_the_insertion_order() {
+    #[tokio::test]
+    async fn ties_keep_the_insertion_order() {
         // All ranks equal: a stable sort must keep ids in insertion order.
         let input = vec![row(3, 7), row(1, 7), row(2, 7)];
-        let out = run(Top::new(vec![key(1)], 2, 0), input, 2);
+        let out = run(Top::new(vec![key(1)], 2, 0), input, 2).await;
         assert_eq!(out, vec![row(3, 7), row(1, 7)]);
     }
 
-    #[test]
-    fn a_descending_key_reverses_the_order() {
+    #[tokio::test]
+    async fn a_descending_key_reverses_the_order() {
         let input = vec![row(1, 30), row(2, 10), row(3, 20)];
-        let out = run(Top::new(vec![(Expr::Column(1), false)], 10, 0), input, 2);
+        let out = run(Top::new(vec![(Expr::Column(1), false)], 10, 0), input, 2).await;
         assert_eq!(out, vec![row(1, 30), row(3, 20), row(2, 10)]);
     }
 
-    #[test]
-    fn nulls_sort_first() {
+    #[tokio::test]
+    async fn nulls_sort_first() {
         let input = vec![row(1, 30), vec![Value::Int(2), Value::Null], row(3, 10)];
-        let out = run(Top::new(vec![key(1)], 10, 0), input, 2);
+        let out = run(Top::new(vec![key(1)], 10, 0), input, 2).await;
         assert_eq!(out[0], vec![Value::Int(2), Value::Null]);
     }
 
-    #[test]
-    fn an_empty_input_still_completes() {
-        let out = run(Top::new(vec![key(1)], 2, 0), Vec::new(), 2);
+    #[tokio::test]
+    async fn an_empty_input_still_completes() {
+        let out = run(Top::new(vec![key(1)], 2, 0), Vec::new(), 2).await;
         assert!(out.is_empty());
     }
 

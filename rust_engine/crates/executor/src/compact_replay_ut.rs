@@ -46,9 +46,9 @@ fn walkdir(root: &std::path::Path) -> Vec<String> {
     out
 }
 
-fn create_table(e: &Engine) {
-    h::ok(e, "CREATE DATABASE db1;");
-    h::ok(e, "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);");
+async fn create_table(e: &Engine) {
+    h::ok(e, "CREATE DATABASE db1;").await;
+    h::ok(e, "CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);").await;
 }
 
 /// `MakeInputBlock(v, text, 8192)`: one homogeneous 8192-row block.
@@ -75,24 +75,24 @@ fn alternating_block() -> Vec<Vec<Literal>> {
 }
 
 /// One `NewTxn::Import` call: two blocks (16384 rows).
-fn import_two_blocks(e: &Engine) -> usize {
-    h::append(e, "db1.tb1", const_block(1, "abc"))
-        + h::append(e, "db1.tb1", const_block(2, "abcdefghijklmnopqrstuvwxyz"))
+async fn import_two_blocks(e: &Engine) -> usize {
+    h::append(e, "db1.tb1", const_block(1, "abc")).await
+        + h::append(e, "db1.tb1", const_block(2, "abcdefghijklmnopqrstuvwxyz")).await
 }
 
 /// Two imports: four 8192-row blocks.
-fn import_four_blocks(e: &Engine) {
+async fn import_four_blocks(e: &Engine) {
     for _ in 0..2 {
-        assert_eq!(import_two_blocks(e), 16384);
+        assert_eq!(import_two_blocks(e).await, 16384);
     }
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
 }
 
-fn assert_compacted(e: &Engine, segment: u32) {
+async fn assert_compacted(e: &Engine, segment: u32) {
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
-    assert_eq!(h::count(e, "db1.tb1"), 32768);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![segment]);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    assert_eq!(h::count(e, "db1.tb1").await, 32768);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![segment]);
+    e.flush().await.unwrap();
     assert_eq!(e.block_ids("db1.tb1", segment), vec![0, 1, 2, 3]);
     for block in 0..4u16 {
         assert_eq!(e.block_row_count("db1.tb1", segment, block), Some(8192));
@@ -104,14 +104,15 @@ fn assert_compacted(e: &Engine, segment: u32) {
     // Count through the unindexed column: the reference reads the merged
     // segment's row count, not a duplicate-key index lookup.
     assert_eq!(
-        h::rows(e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
         h::rows(
             e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
-        ),
+        )
+        .await,
         vec![vec!["16384"]]
     );
 }
@@ -119,34 +120,38 @@ fn assert_compacted(e: &Engine, segment: u32) {
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:384`
 /// (`TestTxnCompact.compact_with_index_commit`): a committed merge keeps every
 /// row and the secondary index answers the same queries.
-#[test]
-fn compact_with_index_commit() {
+#[tokio::test]
+async fn compact_with_index_commit() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    import_four_blocks(&e).await;
 
-    e.compact_all_segments("db1.tb1").unwrap();
-    assert_compacted(&e, 1);
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    assert_compacted(&e, 1).await;
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:428`
 /// (`TestTxnCompact.compact_with_index_rollback`): a rolled-back merge leaves
 /// the pre-merge rows and index intact.
-#[test]
-fn compact_with_index_rollback() {
+#[tokio::test]
+async fn compact_with_index_rollback() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    import_four_blocks(&e).await;
 
     // `RollBackTxn` discards the merge: no compact_table call.
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 32768);
@@ -154,51 +159,58 @@ fn compact_with_index_rollback() {
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:467`
 /// (`TestTxnCompact.compact_and_drop_db`): a compacted database drops cleanly.
-#[test]
-fn compact_then_drop_database() {
+#[tokio::test]
+async fn compact_then_drop_database() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "DROP DATABASE db1;");
-    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    h::ok(&e, "DROP DATABASE db1;").await;
+    assert!(e.execute("SELECT * FROM db1.tb1;").await.is_err());
     assert!(e
-        .execute_blocking("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .execute("INSERT INTO db1.tb1 VALUES (1, 'x');")
+        .await
         .is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:602`
 /// (`TestTxnCompact.compact_and_drop_table`).
-#[test]
-fn compact_then_drop_table() {
+#[tokio::test]
+async fn compact_then_drop_table() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "DROP TABLE db1.tb1;");
+    h::ok(&e, "DROP TABLE db1.tb1;").await;
     assert!(!e.table_exists("db1.tb1"));
-    assert!(e.execute_blocking("SELECT * FROM db1.tb1;").is_err());
+    assert!(e.execute("SELECT * FROM db1.tb1;").await.is_err());
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:749`
 /// (`TestTxnCompact.compact_and_add_columns`): the compacted rows read the new
 /// column's default.
-#[test]
-fn compact_then_add_columns() {
+#[tokio::test]
+async fn compact_then_add_columns() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 3);");
+    h::ok(&e, "ALTER TABLE db1.tb1 ADD COLUMN (col3 INT DEFAULT 3);").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 3;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col3 = 3;").await,
         vec![vec!["32768"]]
     );
     // The reference checks each of the four blocks after the column add; the
@@ -208,7 +220,8 @@ fn compact_then_add_columns() {
             h::rows(
                 &e,
                 &format!("SELECT count(*) FROM db1.tb1 WHERE col1 = {col1} AND col3 = 3;")
-            ),
+            )
+            .await,
             vec![vec!["16384"]]
         );
     }
@@ -217,36 +230,40 @@ fn compact_then_add_columns() {
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1024`
 /// (`TestTxnCompact.compact_and_drop_columns`): the surviving column keeps the
 /// compacted values.
-#[test]
-fn compact_then_drop_columns() {
+#[tokio::test]
+async fn compact_then_drop_columns() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);");
+    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
         vec![vec!["16384"]]
     );
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1229`
 /// (`TestTxnCompact.compact_and_rename_table`).
-#[test]
-fn compact_then_rename_table() {
+#[tokio::test]
+async fn compact_then_rename_table() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;");
+    h::ok(&e, "ALTER TABLE db1.tb1 RENAME TO db1.tb2;").await;
     assert_eq!(e.row_count("db1.tb2").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb2 WHERE col1 = 1;"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb2 WHERE col1 = 1;").await,
         vec![vec!["16384"]]
     );
 }
@@ -259,19 +276,22 @@ fn compact_then_rename_table() {
 /// `test_a_compaction_with_one_segment_is_a_no_op` covers the one-segment case
 /// end to end. Four 8192-row segments all land in layer 0 (`row_cnt / 8192 ==
 /// 1`), so the fourth import makes them compactable.
-#[test]
-fn compaction_needs_four_segments_in_one_layer() {
+#[tokio::test]
+async fn compaction_needs_four_segments_in_one_layer() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     for _ in 0..3 {
         e.import_literals("db1.tb1", None, const_block(1, "abc"))
+            .await
             .unwrap();
     }
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2]);
-    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1, 2]);
+    e.compact_table("db1.tb1").await.unwrap();
     assert_eq!(
-        e.segment_ids("db1.tb1"),
+        e.segment_ids("db1.tb1").await,
         vec![0, 1, 2],
         "three segments are not a compaction candidate"
     );
@@ -281,16 +301,17 @@ fn compaction_needs_four_segments_in_one_layer() {
         None,
         const_block(2, "abcdefghijklmnopqrstuvwxyz"),
     )
+    .await
     .unwrap();
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1, 2, 3]);
     // The mirror is what a compaction leaves behind on disk, so write it first.
-    crate::scheduler::block_on(e.flush()).unwrap();
-    e.compact_table("db1.tb1").unwrap();
-    assert_eq!(e.segment_ids("db1.tb1"), vec![4]);
-    assert_eq!(h::count(&e, "db1.tb1"), 4 * 8192);
+    e.flush().await.unwrap();
+    e.compact_table("db1.tb1").await.unwrap();
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![4]);
+    assert_eq!(h::count(&e, "db1.tb1").await, 4 * 8192);
     // The source segments stay on disk, deprecated: a reader at a later ts
     // ignores them, and `Cleanup` is what reclaims them.
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     let mut dirs: Vec<String> = Vec::new();
     for entry in walkdir(&dir.path().join("data")) {
         if entry.starts_with("seg_") {
@@ -314,26 +335,29 @@ fn compaction_needs_four_segments_in_one_layer() {
 /// that holds `DBT_COMPACTION_M` (4) of them, not every live segment: with six
 /// segments the remaining two stay where they are, and the merged segment takes
 /// the id after *every* segment (6), not after the four that were merged.
-#[test]
-fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
+#[tokio::test]
+async fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     for value in 0..6 {
         e.import_literals("db1.tb1", None, const_block(value, "abc"))
+            .await
             .unwrap();
     }
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3, 4, 5]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1, 2, 3, 4, 5]);
     // The mirror is what a compaction leaves behind on disk, so write it first.
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
 
-    e.compact_table("db1.tb1").unwrap();
+    e.compact_table("db1.tb1").await.unwrap();
     assert_eq!(
-        e.segment_ids("db1.tb1"),
+        e.segment_ids("db1.tb1").await,
         vec![4, 5, 6],
         "the four candidates merge into 6, the other two keep their ids"
     );
-    assert_eq!(h::count(&e, "db1.tb1"), 6 * 8192);
+    assert_eq!(h::count(&e, "db1.tb1").await, 6 * 8192);
     // Every imported value survives exactly once, in whichever segment holds
     // it now: the merged four moved, the untouched two did not.
     for value in 0..6 {
@@ -341,7 +365,8 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
             h::rows(
                 &e,
                 &format!("SELECT count(*) FROM db1.tb1 WHERE col1 = {value};")
-            ),
+            )
+            .await,
             vec![vec!["8192".to_string()]],
             "value {value}"
         );
@@ -350,7 +375,7 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     // merged segment holds the four source blocks, the two it did not pick keep
     // their single block each, and the four deprecated segments keep their
     // files until `Cleanup`).
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     let table_dir = {
         let mut found = None;
         for db in std::fs::read_dir(dir.path().join("data"))
@@ -382,30 +407,34 @@ fn a_compaction_of_more_than_four_segments_keeps_the_rest() {
     assert_eq!(blocks(6), 4, "the merged segment holds the four sources");
 
     // Three segments left, so a second COMPACT picks nothing.
-    e.compact_table("db1.tb1").unwrap();
-    assert_eq!(e.segment_ids("db1.tb1"), vec![4, 5, 6]);
+    e.compact_table("db1.tb1").await.unwrap();
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![4, 5, 6]);
 }
 
 /// The segment an `INSERT` is still appending to is **unsealed**, and
 /// `CompactionProcessor` removes it from the candidate list before asking
 /// `NewCompactionAlg` (`compaction_process_impl.cpp:176`), so three imports plus
 /// one insert are three candidates, not four.
-#[test]
-fn an_unsealed_segment_is_not_a_compaction_candidate() {
+#[tokio::test]
+async fn an_unsealed_segment_is_not_a_compaction_candidate() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     for _ in 0..3 {
         e.import_literals("db1.tb1", None, const_block(1, "abc"))
+            .await
             .unwrap();
     }
     // An `INSERT` after a `COPY` opens a new segment and leaves it unsealed.
     e.insert_literals("db1.tb1", None, const_block(2, "abc"))
+        .await
         .unwrap();
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2, 3]);
-    e.compact_table("db1.tb1").unwrap();
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1, 2, 3]);
+    e.compact_table("db1.tb1").await.unwrap();
     assert_eq!(
-        e.segment_ids("db1.tb1"),
+        e.segment_ids("db1.tb1").await,
         vec![0, 1, 2, 3],
         "the open segment does not count towards the four"
     );
@@ -413,54 +442,60 @@ fn an_unsealed_segment_is_not_a_compaction_candidate() {
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1448`
 /// (`TestTxnCompact.compact_and_compact`): a second merge is a no-op.
-#[test]
-fn compact_and_compact() {
+#[tokio::test]
+async fn compact_and_compact() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
 
-    e.compact_all_segments("db1.tb1").unwrap();
-    assert_compacted(&e, 1);
-    e.compact_all_segments("db1.tb1").unwrap();
-    assert_compacted(&e, 2);
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    assert_compacted(&e, 1).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    assert_compacted(&e, 2).await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1570`
 /// (`TestTxnCompact.compact_and_create_index`): an index created after the
 /// merge covers the compacted rows.
-#[test]
-fn compact_then_create_index() {
+#[tokio::test]
+async fn compact_then_create_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/compact_ut.cpp:1784`
 /// (`TestTxnCompact.compact_and_drop_index`).
-#[test]
-fn compact_then_drop_index() {
+#[tokio::test]
+async fn compact_then_drop_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    h::ok(&e, "DROP INDEX index1 ON db1.tb1;");
+    h::ok(&e, "DROP INDEX index1 ON db1.tb1;").await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
 }
@@ -469,14 +504,16 @@ fn compact_then_drop_index() {
 /// (`TestTxnCompactInternal.test_compact`): deleting every second offset of
 /// the first block and merging the two source segments leaves four blocks with
 /// the reference's surviving values.
-#[test]
-fn internal_compact_skips_deleted_offsets() {
+#[tokio::test]
+async fn internal_compact_skips_deleted_offsets() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
     for _ in 0..2 {
-        assert_eq!(h::append(&e, "db1.tb1", alternating_block()), 8192);
-        assert_eq!(h::append(&e, "db1.tb1", alternating_block()), 8192);
+        assert_eq!(h::append(&e, "db1.tb1", alternating_block()).await, 8192);
+        assert_eq!(h::append(&e, "db1.tb1", alternating_block()).await, 8192);
     }
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
 
@@ -484,12 +521,12 @@ fn internal_compact_skips_deleted_offsets() {
     let ids: Vec<(u32, u32)> = (1..8192).step_by(2).map(|i| (0, i as u32)).collect();
     let mut t = e.begin_txn();
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
-    t.commit().unwrap();
+    t.commit().await.unwrap();
 
-    e.compact_all_segments("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").await.unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768 - 4096);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
+    e.flush().await.unwrap();
     assert_eq!(e.block_ids("db1.tb1", 1), vec![0, 1, 2, 3]);
     // The reference keeps the block's stored row count (8192) and hides the
     // tombstones from the visible range; the engine reports the same stored
@@ -501,14 +538,15 @@ fn internal_compact_skips_deleted_offsets() {
     // Odd offsets in the first block were `col1 = 2`; the other three blocks
     // still alternate 4096/4096.
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
-        ),
+        )
+        .await,
         vec![vec!["12288"]]
     );
 }
@@ -516,51 +554,56 @@ fn internal_compact_skips_deleted_offsets() {
 /// C++ `src/unit_test/storage/new_catalog/compact_internal_ut.cpp:265`
 /// (`TestTxnCompactInternal.test_compact_with_index`): the merge rebuilds the
 /// secondary index over the surviving rows.
-#[test]
-fn internal_compact_with_index() {
+#[tokio::test]
+async fn internal_compact_with_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
     for _ in 0..2 {
-        h::append(&e, "db1.tb1", alternating_block());
-        h::append(&e, "db1.tb1", alternating_block());
+        h::append(&e, "db1.tb1", alternating_block()).await;
+        h::append(&e, "db1.tb1", alternating_block()).await;
     }
     let ids: Vec<(u32, u32)> = (1..8192).step_by(2).map(|i| (0, i as u32)).collect();
     let mut t = e.begin_txn();
     assert_eq!(t.delete_row_ids("db1.tb1", &ids).unwrap(), 4096);
-    t.commit().unwrap();
+    t.commit().await.unwrap();
 
-    e.compact_all_segments("db1.tb1").unwrap();
+    e.compact_all_segments("db1.tb1").await.unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 28672);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
     assert_eq!(
         h::rows(
             &e,
             "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abcdefghijklmnopqrstuvwxyz';"
-        ),
+        )
+        .await,
         vec![vec!["12288"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:283`
 /// (`TestTxnReplayCompact.test_compact_commit`): a committed merge survives a
 /// restart.
-#[test]
-fn replay_compact_commit() {
+#[tokio::test]
+async fn replay_compact_commit() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
-    let e = h::reopen(e, dir.path());
-    assert_compacted(&e, 1);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    let e = h::reopen(e, dir.path()).await;
+    assert_compacted(&e, 1).await;
 
-    h::ok(&e, "DROP TABLE db1.tb1;");
+    h::ok(&e, "DROP TABLE db1.tb1;").await;
     assert!(!e.table_exists("db1.tb1"));
 }
 
@@ -568,27 +611,30 @@ fn replay_compact_commit() {
 /// (`TestTxnReplayCompact.test_compact_rollback`): the failed merge (the
 /// concurrent DROP COLUMN commits first) leaves the two source segments and
 /// all rows after a restart.
-#[test]
-fn replay_compact_rollback() {
+#[tokio::test]
+async fn replay_compact_rollback() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
 
     // The winning request drops col1; the merge is rolled back.
-    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col1);");
-    let e = h::reopen(e, dir.path());
+    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col1);").await;
+    let e = h::reopen(e, dir.path()).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 32768);
-    crate::scheduler::block_on(e.flush()).unwrap();
+    e.flush().await.unwrap();
     let blocks: usize = e
         .segment_ids("db1.tb1")
+        .await
         .into_iter()
         .map(|s| e.block_ids("db1.tb1", s).len())
         .sum();
     assert_eq!(blocks, 4);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
 }
@@ -596,89 +642,99 @@ fn replay_compact_rollback() {
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:374`
 /// (`TestTxnReplayCompact.test_replay_compact_flush_gap`): a checkpoint between
 /// the merge and the restart does not lose rows.
-#[test]
-fn replay_compact_flush_gap() {
+#[tokio::test]
+async fn replay_compact_flush_gap() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    import_four_blocks(&e);
-    e.checkpoint_wal();
-    e.compact_all_segments("db1.tb1").unwrap();
-    e.checkpoint_wal();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    import_four_blocks(&e).await;
+    e.checkpoint_wal().await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
+    e.checkpoint_wal().await;
 
-    let e = h::reopen(e, dir.path());
-    assert_compacted(&e, 1);
+    let e = h::reopen(e, dir.path()).await;
+    assert_compacted(&e, 1).await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:429`
 /// (`TestTxnReplayCompact.test_compact_interrupt`): an uncommitted merge leaves
 /// the source segments after a restart.
-#[test]
-fn replay_compact_interrupt() {
+#[tokio::test]
+async fn replay_compact_interrupt() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    import_four_blocks(&e).await;
     // No compact_table: the merge transaction is interrupted.
 
     // Reopen without a flush to exercise WAL replay of the committed imports.
     drop(e);
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
     assert_eq!(h::segment_rows(&e, "db1.tb1"), 32768);
-    h::ok(&e, "DROP TABLE db1.tb1;");
+    h::ok(&e, "DROP TABLE db1.tb1;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:468`
 /// (`TestTxnReplayCompact.DISABLED_SLOW_test_compact_with_index`).
-#[test]
+#[tokio::test]
 #[ignore = "slow: C++ TestTxnReplayCompact.DISABLED_SLOW_test_compact_with_index"]
-fn replay_compact_with_index() {
+async fn replay_compact_with_index() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col2) USING fulltext;");
-    import_four_blocks(&e);
-    e.compact_all_segments("db1.tb1").unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    h::ok(&e, "CREATE INDEX index2 ON db1.tb1 (col2) USING fulltext;").await;
+    import_four_blocks(&e).await;
+    e.compact_all_segments("db1.tb1").await.unwrap();
 
-    let e = h::reopen(e, dir.path());
-    assert_compacted(&e, 1);
-    assert_eq!(h::count(&e, "db1.tb1"), 32768);
+    let e = h::reopen(e, dir.path()).await;
+    assert_compacted(&e, 1).await;
+    assert_eq!(h::count(&e, "db1.tb1").await, 32768);
     assert_eq!(
-        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';"),
+        h::rows(&e, "SELECT count(*) FROM db1.tb1 WHERE col2 = 'abc';").await,
         vec![vec!["16384"]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index2;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index2;").await;
 }
 
 /// C++ `src/unit_test/storage/new_catalog/replay_compact_ut.cpp:522`
 /// (`TestTxnReplayCompact.test_compact1_rollback`): dropping `col2` wins and
 /// the merge is discarded; after a restart the index still serves `col1` and
 /// the surviving column's rows are intact.
-#[test]
-fn replay_compact1_rollback() {
+#[tokio::test]
+async fn replay_compact1_rollback() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    create_table(&e);
-    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);");
-    import_four_blocks(&e);
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    create_table(&e).await;
+    h::ok(&e, "CREATE INDEX index1 ON db1.tb1 (col1);").await;
+    import_four_blocks(&e).await;
 
-    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);");
-    let e = h::reopen(e, dir.path());
+    h::ok(&e, "ALTER TABLE db1.tb1 DROP COLUMN (col2);").await;
+    let e = h::reopen(e, dir.path()).await;
     assert_eq!(e.row_count("db1.tb1").unwrap(), 32768);
-    assert_eq!(h::count(&e, "db1.tb1"), 32768);
-    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").len(), 1);
+    assert_eq!(h::count(&e, "db1.tb1").await, 32768);
+    assert_eq!(h::rows(&e, "SHOW TABLE db1.tb1 COLUMNS;").await.len(), 1);
     // The merge is discarded; `col1`'s values are unchanged.
     assert_eq!(
-        h::rows(&e, "SELECT col1 FROM db1.tb1 ORDER BY col1 LIMIT 1;"),
+        h::rows(&e, "SELECT col1 FROM db1.tb1 ORDER BY col1 LIMIT 1;").await,
         vec![vec!["1".to_string()]]
     );
     assert_eq!(
-        h::rows(&e, "SELECT col1 FROM db1.tb1 ORDER BY col1 DESC LIMIT 1;"),
+        h::rows(&e, "SELECT col1 FROM db1.tb1 ORDER BY col1 DESC LIMIT 1;").await,
         vec![vec!["2".to_string()]]
     );
-    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;");
+    h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }

@@ -66,7 +66,7 @@ use std::path::{Path, PathBuf};
 
 use ::common::{Error, LogicalType, Result, TxnTimeStamp};
 
-use crate::crc::crc32_ieee;
+use crate::crc::{crc32_ieee, Crc32};
 use crate::data_block::{BlockValue, Column, ColumnVector, DataBlock};
 
 /// `WalEntryHeader` (`wal_entry.cppm:879`) is 24 bytes on the wire.
@@ -644,7 +644,7 @@ impl WalEntry {
         if trailing as usize != size {
             return None;
         }
-        let mut hasher = crc32fast::Hasher::new();
+        let mut hasher = Crc32::new();
         hasher.update(&buf[..4]);
         hasher.update(&[0u8; 4]);
         hasher.update(&buf[8..size]);
@@ -690,9 +690,11 @@ pub struct WalEntryIterator {
 
 impl WalEntryIterator {
     /// C++: `WalEntryIterator::Make` (`wal_entry_impl.cpp:2433`).
-    pub fn make(wal_path: impl AsRef<Path>, is_backward: bool) -> Result<Self> {
+    pub async fn make(wal_path: impl AsRef<Path>, is_backward: bool) -> Result<Self> {
         let file_name = wal_path.as_ref().to_path_buf();
-        let buf = std::fs::read(&file_name).map_err(|e| Error::io(&file_name, e))?;
+        let buf = tokio::fs::read(&file_name)
+            .await
+            .map_err(|e| Error::io(&file_name, e))?;
         let off = if is_backward { buf.len() } else { 0 };
         Ok(Self {
             file_name,
@@ -792,21 +794,21 @@ pub struct WalListIterator {
 
 impl WalListIterator {
     /// C++: `WalListIterator::WalListIterator` (`wal_entry_impl.cpp:2520`).
-    pub fn new(wal_list: &[PathBuf]) -> Result<Self> {
+    pub async fn new(wal_list: &[PathBuf]) -> Result<Self> {
         let mut iterator = Self {
             wal_list: wal_list.iter().cloned().collect(),
             iter: None,
         };
-        iterator.purge_bad_entries_after_latest_checkpoint();
+        iterator.purge_bad_entries_after_latest_checkpoint().await;
         if let Some(front) = iterator.wal_list.front() {
-            iterator.iter = Some(WalEntryIterator::make(front, true)?);
+            iterator.iter = Some(WalEntryIterator::make(front, true).await?);
         }
         Ok(iterator)
     }
 
     /// C++: `WalListIterator::PurgeBadEntriesAfterLatestCheckpoint`
     /// (`wal_entry_impl.cpp:2532`).
-    fn purge_bad_entries_after_latest_checkpoint(&mut self) {
+    async fn purge_bad_entries_after_latest_checkpoint(&mut self) {
         let mut found_checkpoint = false;
         let mut file_num = 0usize;
         let mut cur = 0usize;
@@ -815,7 +817,7 @@ impl WalListIterator {
             let path = self.wal_list[cur].clone();
             let mut bad_offset: Option<usize> = None;
 
-            let mut iter = match WalEntryIterator::make(&path, false) {
+            let mut iter = match WalEntryIterator::make(&path, false).await {
                 Ok(iter) => iter,
                 Err(_) => {
                     // A file that cannot be read holds nothing.
@@ -849,7 +851,7 @@ impl WalListIterator {
             // Damage in front of a checkpoint is covered by that checkpoint:
             // peek backward, which walks the intact tail first.
             let mut ignore_bad_entry = false;
-            if let Ok(mut backward_iter) = WalEntryIterator::make(&path, true) {
+            if let Ok(mut backward_iter) = WalEntryIterator::make(&path, true).await {
                 while backward_iter.has_next() {
                     match backward_iter.next() {
                         Some(entry) => {
@@ -887,7 +889,7 @@ impl WalListIterator {
     }
 
     /// C++: `WalListIterator::HasNext` (`wal_entry_impl.cpp:2615`).
-    pub fn has_next(&mut self) -> bool {
+    pub async fn has_next(&mut self) -> bool {
         let Some(iter) = self.iter.as_ref() else {
             return false;
         };
@@ -900,7 +902,7 @@ impl WalListIterator {
             }
             self.wal_list.pop_front();
             let front = self.wal_list.front().expect("non-empty").clone();
-            match WalEntryIterator::make(front, true) {
+            match WalEntryIterator::make(front, true).await {
                 Ok(next_iter) => {
                     let has = next_iter.has_next();
                     self.iter = Some(next_iter);
@@ -2275,9 +2277,9 @@ mod tests {
         .unwrap();
     }
 
-    fn wal_entry_offsets(path: &Path) -> Vec<usize> {
+    async fn wal_entry_offsets(path: &Path) -> Vec<usize> {
         let mut offsets = Vec::new();
-        let mut iter = WalEntryIterator::make(path, false).unwrap();
+        let mut iter = WalEntryIterator::make(path, false).await.unwrap();
         while iter.has_next() {
             offsets.push(iter.get_offset());
             if iter.next().is_none() {
@@ -2294,9 +2296,9 @@ mod tests {
         std::fs::write(path, buf).unwrap();
     }
 
-    fn mock_wal_file_without_checkpoint(path: &Path) -> Vec<usize> {
+    async fn mock_wal_file_without_checkpoint(path: &Path) -> Vec<usize> {
         mock_wal_file(path);
-        let offsets = wal_entry_offsets(path);
+        let offsets = wal_entry_offsets(path).await;
         assert!(
             offsets.len() >= 5,
             "mock WAL produced {} entries",
@@ -2307,14 +2309,14 @@ mod tests {
         offsets[..4].to_vec()
     }
 
-    fn mock_wal_pair(newer: &Path, older: &Path) -> Vec<usize> {
+    async fn mock_wal_pair(newer: &Path, older: &Path) -> Vec<usize> {
         mock_wal_file(older);
-        mock_wal_file_without_checkpoint(newer)
+        mock_wal_file_without_checkpoint(newer).await
     }
 
-    fn replay_to_first_checkpoint(iterator: &mut WalListIterator) -> TxnTimeStamp {
+    async fn replay_to_first_checkpoint(iterator: &mut WalListIterator) -> TxnTimeStamp {
         let mut max_commit_ts = 0;
-        while iterator.has_next() {
+        while iterator.has_next().await {
             let Some(entry) = iterator.next() else {
                 break;
             };
@@ -2326,9 +2328,9 @@ mod tests {
         max_commit_ts
     }
 
-    fn drain_wal_list(iterator: &mut WalListIterator) -> Vec<TxnTimeStamp> {
+    async fn drain_wal_list(iterator: &mut WalListIterator) -> Vec<TxnTimeStamp> {
         let mut commit_tss = Vec::new();
-        while iterator.has_next() {
+        while iterator.has_next().await {
             let Some(entry) = iterator.next() else {
                 break;
             };
@@ -2345,8 +2347,8 @@ mod tests {
     /// `[segment_id][segment_offset][size]` — and the checksum is filled in
     /// with the shared CRC-32/IEEE (`crc32_ieee`), which is what
     /// `CRC32IEEE::makeCRC` computes with the checksum field zeroed.
-    #[test]
-    fn delete_entry_matches_the_cpp_writer_byte_for_byte() {
+    #[tokio::test]
+    async fn delete_entry_matches_the_cpp_writer_byte_for_byte() {
         let entry = WalEntry::new(
             3,
             7,
@@ -2390,8 +2392,8 @@ mod tests {
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:212` (`ReadWriteV2`).
-    #[test]
-    fn read_write_v2_roundtrips_every_command() {
+    #[tokio::test]
+    async fn read_write_v2_roundtrips_every_command() {
         let entry = WalEntry::new(
             0,
             0,
@@ -2676,8 +2678,8 @@ mod tests {
     /// `WalCmdCreateSystemSnapshot::WriteAdv` (`:1304`): the type byte, then
     /// each string as `[i32 length][bytes]`, then the `max_commit_ts` as a
     /// little-endian `u64`.
-    #[test]
-    fn create_snapshot_commands_write_the_reference_layout() {
+    #[tokio::test]
+    async fn create_snapshot_commands_write_the_reference_layout() {
         fn string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as i32).to_le_bytes());
             bytes.extend_from_slice(value.as_bytes());
@@ -2731,18 +2733,18 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:339`
     /// (`WalEntryIterator`).
-    #[test]
-    fn wal_entry_iterator_replay_stops_at_checkpoint() {
+    #[tokio::test]
+    async fn wal_entry_iterator_replay_stops_at_checkpoint() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
 
-        let mut iterator = WalEntryIterator::make(&wal_file, true).unwrap();
+        let mut iterator = WalEntryIterator::make(&wal_file, true).await.unwrap();
         assert_eq!(iterator.get_all_entries().len(), 6);
 
         let mut replay_entries = Vec::new();
         let mut max_commit_ts = 0;
-        let mut iterator = WalEntryIterator::make(&wal_file, true).unwrap();
+        let mut iterator = WalEntryIterator::make(&wal_file, true).await.unwrap();
         while iterator.has_next() {
             let Some(entry) = iterator.next() else {
                 break;
@@ -2768,21 +2770,23 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:409`
     /// (`WalListIterator`).
-    #[test]
-    fn wal_list_iterator_replay_stops_at_checkpoint() {
+    #[tokio::test]
+    async fn wal_list_iterator_replay_stops_at_checkpoint() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
         mock_wal_file(&wal_file1);
         mock_wal_file(&wal_file2);
 
-        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()]).unwrap();
-        assert_eq!(drain_wal_list(&mut iterator).len(), 12);
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()])
+            .await
+            .unwrap();
+        assert_eq!(drain_wal_list(&mut iterator).await.len(), 12);
 
-        let mut iterator = WalListIterator::new(&[wal_file1, wal_file2]).unwrap();
+        let mut iterator = WalListIterator::new(&[wal_file1, wal_file2]).await.unwrap();
         let mut replay_entries = Vec::new();
         let mut max_commit_ts = 0;
-        while iterator.has_next() {
+        while iterator.has_next().await {
             let Some(entry) = iterator.next() else {
                 break;
             };
@@ -2792,7 +2796,7 @@ mod tests {
             }
             replay_entries.push(entry);
         }
-        while iterator.has_next() {
+        while iterator.has_next().await {
             let Some(entry) = iterator.next() else {
                 break;
             };
@@ -2806,33 +2810,37 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:564`
     /// (`DamagedEntryBeforeCheckpointIsIgnored`).
-    #[test]
-    fn damaged_entry_before_checkpoint_is_ignored() {
+    #[tokio::test]
+    async fn damaged_entry_before_checkpoint_is_ignored() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
-        let offsets = wal_entry_offsets(&wal_file);
+        let offsets = wal_entry_offsets(&wal_file).await;
         assert!(!offsets.is_empty());
         let size_before = std::fs::metadata(&wal_file).unwrap().len();
         corrupt_entry(&wal_file, offsets[0]);
 
-        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file)).unwrap();
-        assert_eq!(replay_to_first_checkpoint(&mut iterator), 123);
+        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file))
+            .await
+            .unwrap();
+        assert_eq!(replay_to_first_checkpoint(&mut iterator).await, 123);
         assert_eq!(std::fs::metadata(&wal_file).unwrap().len(), size_before);
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:582`
     /// (`DamagedEntryTruncatesWalFile`).
-    #[test]
-    fn damaged_entry_truncates_wal_file() {
+    #[tokio::test]
+    async fn damaged_entry_truncates_wal_file() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
-        let offsets = mock_wal_pair(&wal_file1, &wal_file2);
+        let offsets = mock_wal_pair(&wal_file1, &wal_file2).await;
         corrupt_entry(&wal_file1, offsets[2]);
 
-        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2]).unwrap();
-        assert_eq!(replay_to_first_checkpoint(&mut iterator), 123);
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2])
+            .await
+            .unwrap();
+        assert_eq!(replay_to_first_checkpoint(&mut iterator).await, 123);
         assert_eq!(
             std::fs::metadata(&wal_file1).unwrap().len(),
             offsets[2] as u64
@@ -2841,33 +2849,37 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:597`
     /// (`DamagedFirstEntryDropsWalFile`).
-    #[test]
-    fn damaged_first_entry_drops_wal_file() {
+    #[tokio::test]
+    async fn damaged_first_entry_drops_wal_file() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
-        let offsets = mock_wal_pair(&wal_file1, &wal_file2);
+        let offsets = mock_wal_pair(&wal_file1, &wal_file2).await;
         corrupt_entry(&wal_file1, offsets[0]);
 
-        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()]).unwrap();
-        assert_eq!(replay_to_first_checkpoint(&mut iterator), 123);
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()])
+            .await
+            .unwrap();
+        assert_eq!(replay_to_first_checkpoint(&mut iterator).await, 123);
         assert!(!wal_file1.exists());
         assert!(wal_file2.exists());
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:614`
     /// (`DamagedTailAfterCheckpointIsTruncated`).
-    #[test]
-    fn damaged_tail_after_checkpoint_is_truncated() {
+    #[tokio::test]
+    async fn damaged_tail_after_checkpoint_is_truncated() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
-        let offsets = wal_entry_offsets(&wal_file);
+        let offsets = wal_entry_offsets(&wal_file).await;
         assert_eq!(offsets.len(), 6);
         corrupt_entry(&wal_file, offsets[5]);
 
-        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file)).unwrap();
-        let drained = drain_wal_list(&mut iterator);
+        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file))
+            .await
+            .unwrap();
+        let drained = drain_wal_list(&mut iterator).await;
         assert_eq!(
             std::fs::metadata(&wal_file).unwrap().len(),
             offsets[5] as u64
@@ -2877,22 +2889,23 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:634`
     /// (`DamagedOlderFileDropsNewerOnes`).
-    #[test]
-    fn damaged_older_file_drops_newer_ones() {
+    #[tokio::test]
+    async fn damaged_older_file_drops_newer_ones() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
         let wal_file3 = dir.path().join("wal3.log");
-        let offsets = mock_wal_pair(&wal_file1, &wal_file3);
-        mock_wal_file_without_checkpoint(&wal_file2);
+        let offsets = mock_wal_pair(&wal_file1, &wal_file3).await;
+        mock_wal_file_without_checkpoint(&wal_file2).await;
         assert_eq!(offsets.len(), 4);
 
         corrupt_entry(&wal_file1, offsets[2]);
         corrupt_entry(&wal_file2, offsets[0]);
 
-        let mut iterator =
-            WalListIterator::new(&[wal_file1.clone(), wal_file2.clone(), wal_file3]).unwrap();
-        let drained = drain_wal_list(&mut iterator);
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone(), wal_file3])
+            .await
+            .unwrap();
+        let drained = drain_wal_list(&mut iterator).await;
         assert_eq!(
             std::fs::metadata(&wal_file1).unwrap().len(),
             offsets[2] as u64
@@ -2903,18 +2916,20 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:657`
     /// (`NoCheckpointStillPurgesDamage`).
-    #[test]
-    fn no_checkpoint_still_purges_damage() {
+    #[tokio::test]
+    async fn no_checkpoint_still_purges_damage() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
-        let offsets = mock_wal_file_without_checkpoint(&wal_file1);
-        mock_wal_file_without_checkpoint(&wal_file2);
+        let offsets = mock_wal_file_without_checkpoint(&wal_file1).await;
+        mock_wal_file_without_checkpoint(&wal_file2).await;
         assert_eq!(offsets.len(), 4);
         corrupt_entry(&wal_file1, offsets[1]);
 
-        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2]).unwrap();
-        let drained = drain_wal_list(&mut iterator);
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2])
+            .await
+            .unwrap();
+        let drained = drain_wal_list(&mut iterator).await;
         assert_eq!(
             std::fs::metadata(&wal_file1).unwrap().len(),
             offsets[1] as u64
@@ -2924,17 +2939,17 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:676`
     /// (`TornTailStopsIteration`).
-    #[test]
-    fn torn_tail_stops_iteration() {
+    #[tokio::test]
+    async fn torn_tail_stops_iteration() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
-        let offsets = wal_entry_offsets(&wal_file);
+        let offsets = wal_entry_offsets(&wal_file).await;
         assert!(offsets.len() >= 6);
         let file = OpenOptions::new().write(true).open(&wal_file).unwrap();
         file.set_len(offsets[5] as u64 + 5).unwrap();
 
-        let mut iter = WalEntryIterator::make(&wal_file, false).unwrap();
+        let mut iter = WalEntryIterator::make(&wal_file, false).await.unwrap();
         let entries = iter.get_all_entries();
         assert_eq!(entries.len(), 5);
         assert!(!iter.is_good());
@@ -2942,12 +2957,12 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:713`
     /// (`CorruptedTrailingSizeIsRecoveredByForwardScan`).
-    #[test]
-    fn corrupted_trailing_size_is_recovered_by_forward_scan() {
+    #[tokio::test]
+    async fn corrupted_trailing_size_is_recovered_by_forward_scan() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
-        let offsets = wal_entry_offsets(&wal_file);
+        let offsets = wal_entry_offsets(&wal_file).await;
         assert!(offsets.len() >= 6);
 
         let mut buf = std::fs::read(&wal_file).unwrap();
@@ -2957,8 +2972,10 @@ mod tests {
         buf[trail_pos..trail_pos + 4].copy_from_slice(&1024i32.to_le_bytes());
         std::fs::write(&wal_file, buf).unwrap();
 
-        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file)).unwrap();
-        let drained = drain_wal_list(&mut iterator);
+        let mut iterator = WalListIterator::new(std::slice::from_ref(&wal_file))
+            .await
+            .unwrap();
+        let drained = drain_wal_list(&mut iterator).await;
         assert_eq!(
             std::fs::metadata(&wal_file).unwrap().len(),
             offsets[5] as u64
@@ -2968,70 +2985,72 @@ mod tests {
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:735`
     /// (`EmptyWalFileIsNotAnError`).
-    #[test]
-    fn empty_wal_file_is_not_an_error() {
+    #[tokio::test]
+    async fn empty_wal_file_is_not_an_error() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         std::fs::write(&wal_file, []).unwrap();
 
-        let mut iter = WalEntryIterator::make(&wal_file, false).unwrap();
+        let mut iter = WalEntryIterator::make(&wal_file, false).await.unwrap();
         assert!(iter.get_all_entries().is_empty());
         assert!(iter.is_good());
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:749`
     /// (`FileShorterThanEntrySize`).
-    #[test]
-    fn file_shorter_than_entry_size_is_empty() {
+    #[tokio::test]
+    async fn file_shorter_than_entry_size_is_empty() {
         let dir = tempdir().unwrap();
         let wal_file = dir.path().join("wal.log");
         mock_wal_file(&wal_file);
         let file = OpenOptions::new().write(true).open(&wal_file).unwrap();
         file.set_len(2).unwrap();
 
-        let mut forward = WalEntryIterator::make(&wal_file, false).unwrap();
+        let mut forward = WalEntryIterator::make(&wal_file, false).await.unwrap();
         assert!(forward.get_all_entries().is_empty());
         assert!(!forward.is_good());
 
-        let mut backward = WalEntryIterator::make(&wal_file, true).unwrap();
+        let mut backward = WalEntryIterator::make(&wal_file, true).await.unwrap();
         assert!(backward.get_all_entries().is_empty());
         assert!(!backward.is_good());
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:768`
     /// (`AllFilesPurgedLeavesEmptyList`).
-    #[test]
-    fn all_files_purged_leaves_empty_list() {
+    #[tokio::test]
+    async fn all_files_purged_leaves_empty_list() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
-        let offsets1 = mock_wal_file_without_checkpoint(&wal_file1);
-        let offsets2 = mock_wal_file_without_checkpoint(&wal_file2);
+        let offsets1 = mock_wal_file_without_checkpoint(&wal_file1).await;
+        let offsets2 = mock_wal_file_without_checkpoint(&wal_file2).await;
         assert_eq!(offsets1.len(), 4);
         assert_eq!(offsets2.len(), 4);
 
         corrupt_entry(&wal_file1, offsets1[0]);
         corrupt_entry(&wal_file2, offsets2[0]);
 
-        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()]).unwrap();
+        let mut iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()])
+            .await
+            .unwrap();
         assert!(!wal_file1.exists());
         assert!(!wal_file2.exists());
-        assert!(!iterator.has_next());
+        assert!(!iterator.has_next().await);
         assert!(iterator.next().is_none());
     }
 
     /// C++: `src/unit_test/storage/wal/wal_entry_ut.cpp:793`
     /// (`DamageAccumulatesToCheckpointFile`).
-    #[test]
-    fn damage_accumulates_to_checkpoint_file() {
+    #[tokio::test]
+    async fn damage_accumulates_to_checkpoint_file() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
         let wal_file3 = dir.path().join("wal3.log");
         let wal_file4 = dir.path().join("wal4.log");
-        let offsets1 = mock_wal_file_without_checkpoint(&wal_file1);
-        mock_wal_file_without_checkpoint(&wal_file2);
-        let offsets3 = mock_wal_file_without_checkpoint(&wal_file3);
+        let offsets1 = mock_wal_file_without_checkpoint(&wal_file1).await;
+        mock_wal_file_without_checkpoint(&wal_file2).await;
+        let offsets3 = mock_wal_file_without_checkpoint(&wal_file3).await;
         mock_wal_file(&wal_file4);
         assert_eq!(offsets1.len(), 4);
         assert_eq!(offsets3.len(), 4);
@@ -3045,6 +3064,7 @@ mod tests {
             wal_file3.clone(),
             wal_file4.clone(),
         ])
+        .await
         .unwrap();
         assert_eq!(
             std::fs::metadata(&wal_file1).unwrap().len(),
@@ -3053,20 +3073,22 @@ mod tests {
         assert!(wal_file2.exists());
         assert!(!wal_file3.exists());
         assert!(wal_file4.exists());
-        assert_eq!(replay_to_first_checkpoint(&mut iterator), 123);
+        assert_eq!(replay_to_first_checkpoint(&mut iterator).await, 123);
     }
 
     /// The purge drops only files it has to; the retained list starts at the
     /// checkpoint file. C++: `wal_entry_impl.cpp:2532`.
-    #[test]
-    fn purge_keeps_the_checkpoint_file_at_the_front() {
+    #[tokio::test]
+    async fn purge_keeps_the_checkpoint_file_at_the_front() {
         let dir = tempdir().unwrap();
         let wal_file1 = dir.path().join("wal.log");
         let wal_file2 = dir.path().join("wal2.log");
-        let offsets = mock_wal_pair(&wal_file1, &wal_file2);
+        let offsets = mock_wal_pair(&wal_file1, &wal_file2).await;
         corrupt_entry(&wal_file1, offsets[0]);
 
-        let iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()]).unwrap();
+        let iterator = WalListIterator::new(&[wal_file1.clone(), wal_file2.clone()])
+            .await
+            .unwrap();
         assert_eq!(iterator.files().len(), 1);
         assert_eq!(iterator.files()[0], wal_file2);
     }

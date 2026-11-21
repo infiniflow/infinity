@@ -53,6 +53,7 @@ pub(crate) fn hnsw_record_size(dims: usize, encoding: index::vector::HnswEncodin
 }
 
 /// HNSW build options read from the catalog (`IndexHnsw`).
+#[derive(Clone, Copy)]
 pub(crate) struct HnswOptions {
     /// `IndexHnsw::M_`.
     pub(crate) m: usize,

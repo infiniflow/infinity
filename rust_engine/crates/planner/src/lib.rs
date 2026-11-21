@@ -40,6 +40,17 @@ use common::{Error, Result};
 use expression::{Expr, Value};
 use parser::{AggFunc, BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem};
 
+/// The hidden columns a `SEARCH` scan appends after the table's own, in output
+/// order.
+///
+/// The reference puts the row id **last**: `BindingRemapper` maps `ROW_ID` to
+/// `column_cnt_ - 1` and the score/similarity/distance family to
+/// `column_cnt_ - 2` (`column_remapper_impl.cpp`), and `LogicalMatch`'s output
+/// names end `…, SCORE, ROW_ID`. The order here has to match, because a caller
+/// that reads the row by position (`row.last()` for the score, the last-but-one
+/// for the id) assumes it.
+pub const SEARCH_HIDDEN_NAMES: [&str; 4] = ["#_similarity", "#_distance", "#_score", "#_row_id"];
+
 /// The column names produced by `plan`.
 pub fn output_schema(plan: &LogicalPlan) -> Vec<String> {
     match plan {

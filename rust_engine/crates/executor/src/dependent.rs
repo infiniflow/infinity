@@ -97,7 +97,7 @@ impl DependentJoin {
     /// are appended); `keys` in each column index into it. The inner query is
     /// executed once per distinct key tuple and the rows are reused, which is
     /// what makes this a dependent join rather than a per-row re-execution.
-    pub(crate) fn apply(
+    pub(crate) async fn apply(
         &self,
         engine: &crate::Engine,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
@@ -111,8 +111,14 @@ impl DependentJoin {
             vec![Vec::with_capacity(rows.len()); self.columns.len()];
         for row in rows.iter() {
             for (index, column) in self.columns.iter().enumerate() {
+                let mut cache = std::mem::take(&mut caches[index]);
+                // The inner query is a SELECT, which may itself contain a
+                // dependent join, so this edge of the cycle is boxed.
                 let value =
-                    column.value(engine, ctes, outer_table, schema, row, &mut caches[index])?;
+                    Box::pin(column.value(engine, ctes, outer_table, schema, row, &mut cache))
+                        .await;
+                caches[index] = cache;
+                let value = value?;
                 appended[index].push(value);
             }
         }
@@ -126,7 +132,7 @@ impl DependentJoin {
 }
 
 impl DependentColumn {
-    fn value(
+    async fn value(
         &self,
         engine: &crate::Engine,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
@@ -153,7 +159,10 @@ impl DependentColumn {
             let sql = substitute_outer_row(&self.sql, &self.keys, &key_row, outer_table);
             #[cfg(test)]
             note_inner_run();
-            let result = engine.run_subquery(&sql, ctes, &[]).map(|(_, rows)| rows);
+            let result = engine
+                .run_subquery(&sql, ctes, &[])
+                .await
+                .map(|(_, rows)| rows);
             cache.insert(key.clone(), result);
         }
         let rows = cache

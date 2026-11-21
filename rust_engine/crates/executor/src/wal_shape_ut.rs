@@ -20,13 +20,10 @@
 //! segment's info (`ImportTxnStore::ToWalEntry`, `:378`). Neither carries any
 //! row: the rows live in the blocks the transaction wrote. The byte fixtures
 //! below were taken from the reference's own `wal.log` for the same statements.
-
-use std::path::{Path, PathBuf};
-
 use crate::Engine;
+use std::path::{Path, PathBuf};
 use storage::wal_entry::{WalCmd, WalEntry, WalEntryIterator, WalRowId};
 use tempfile::tempdir;
-
 fn write_csv(dir: &Path, name: &str, rows: usize) -> PathBuf {
     let path = dir.join(name);
     let mut text = String::new();
@@ -36,10 +33,9 @@ fn write_csv(dir: &Path, name: &str, rows: usize) -> PathBuf {
     std::fs::write(&path, text).unwrap();
     path
 }
-
 /// Every WAL entry the directory holds, in log order (a checkpoint rotates the
 /// file, so all of them are read).
-fn wal_entries(dir: &Path) -> Vec<WalEntry> {
+async fn wal_entries(dir: &Path) -> Vec<WalEntry> {
     let wal_dir = dir.join("wal");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&wal_dir)
         .unwrap()
@@ -51,7 +47,6 @@ fn wal_entries(dir: &Path) -> Vec<WalEntry> {
                 .unwrap_or(false)
         })
         .collect();
-    // `wal.log.<seal_ts>` names the file by the ts it was sealed at.
     files.sort_by_key(|p| {
         p.file_name()
             .and_then(|n| n.to_str())
@@ -61,7 +56,7 @@ fn wal_entries(dir: &Path) -> Vec<WalEntry> {
     });
     let mut out = Vec::new();
     for file in files {
-        let Ok(mut it) = WalEntryIterator::make(&file, false) else {
+        let Ok(mut it) = WalEntryIterator::make(&file, false).await else {
             continue;
         };
         while it.has_next() {
@@ -71,49 +66,47 @@ fn wal_entries(dir: &Path) -> Vec<WalEntry> {
     }
     out
 }
-
 /// The frames that carry a command matching `predicate`.
-fn frames_with(dir: &Path, predicate: impl Fn(&WalCmd) -> bool) -> Vec<Vec<WalCmd>> {
+async fn frames_with(dir: &Path, predicate: impl Fn(&WalCmd) -> bool) -> Vec<Vec<WalCmd>> {
     wal_entries(dir)
+        .await
         .into_iter()
         .filter(|e| e.cmds.iter().any(&predicate))
         .map(|e| e.cmds)
         .collect()
 }
-
 /// The command as it goes on the wire: an entry is `[24-byte header][cmds]
 /// [i32 trailing size]`, so the command is everything between them.
 fn command_bytes(cmd: &WalCmd) -> String {
     let entry = WalEntry::new(0, 0, vec![cmd.clone()]);
     let mut buf = Vec::new();
     entry.write_adv(&mut buf);
-    // `[size i32][crc u32][txn_id i64][commit_ts u64][cmd_count i32]` is the
-    // 28-byte header; the trailing size closes the frame.
     buf[28..buf.len() - 4]
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
 }
-
-#[test]
-fn a_compaction_logs_one_compact_command() {
+#[tokio::test]
+async fn a_compaction_logs_one_compact_command() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    // Four imported segments: `NewCompactionAlg` needs four in one layer.
+    e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+        .await
+        .unwrap();
     for (i, rows) in [100usize, 60, 40, 30].iter().enumerate() {
         let csv = write_csv(dir.path(), &format!("s{i}.csv"), *rows);
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
             csv.display()
         ))
+        .await
         .unwrap();
     }
-    assert_eq!(e.segment_ids("default_db.t"), vec![0, 1, 2, 3]);
-    e.compact_all_segments("default_db.t").unwrap();
-
-    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Compact { .. }));
+    assert_eq!(e.segment_ids("default_db.t").await, vec![0, 1, 2, 3]);
+    e.compact_all_segments("default_db.t").await.unwrap();
+    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Compact { .. })).await;
     assert_eq!(frames.len(), 1, "one compaction, one frame");
     let cmds = &frames[0];
     assert_eq!(cmds.len(), 1, "the frame carries only the compact command");
@@ -141,22 +134,16 @@ fn a_compaction_logs_one_compact_command() {
     assert_eq!(merged.block_infos.len(), 1);
     assert_eq!(merged.block_infos[0].block_id, 0);
     assert_eq!(merged.block_infos[0].row_capacity, 8192);
-    // `WalSegmentInfo(SegmentMeta, ts)` writes one `(1, 0)` outline per column.
     assert_eq!(merged.block_infos[0].outline_infos, vec![(1, 0), (1, 0)]);
-    // `CompactTxnStore::ToWalEntry` copies the segment infos *before* the row
-    // counts are filled in (`new_txn_data_impl.cpp:758` vs `:766`), so the
-    // reference's command carries 0 there; replay ignores the field.
     assert_eq!(merged.row_count, 0);
     assert_eq!(merged.block_infos[0].row_count, 0);
-
     assert_eq!(
-        command_bytes(&cmds[0]),
+        command_bytes(& cmds[0]),
         "690a00000064656661756c745f646201000000310100000074010000003000000000000000000100000004000000020000000000000000000000000000000000000000000000000080000000000001000000000000000020020000000100000000000000000000000100000000000000000000000400000000000000010000000200000003000000",
         "the compact command must stay byte-identical to the reference's"
     );
-
-    // No row command rides along: the rows are in the blocks.
     let rows_in_wal = wal_entries(dir.path())
+        .await
         .iter()
         .flat_map(|e| e.cmds.iter())
         .filter(|c| matches!(c, WalCmd::Append { .. } | WalCmd::Delete { .. }))
@@ -164,21 +151,23 @@ fn a_compaction_logs_one_compact_command() {
     assert_eq!(rows_in_wal, 0, "no AppendV2/DeleteV2 frames");
     assert_eq!(e.row_count("default_db.t").unwrap(), 230);
 }
-
-#[test]
-fn an_import_logs_import_commands() {
+#[tokio::test]
+async fn an_import_logs_import_commands() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+        .await
         .unwrap();
     let csv = write_csv(dir.path(), "only.csv", 100);
-    e.execute_blocking(&format!(
+    e.execute(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
+    .await
     .unwrap();
-
-    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. }));
+    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. })).await;
     assert_eq!(frames.len(), 1, "a 100-row import is one transaction");
     let cmds = &frames[0];
     assert_eq!(cmds.len(), 1);
@@ -200,32 +189,32 @@ fn an_import_logs_import_commands() {
     assert_eq!(segment_info.block_infos.len(), 1);
     assert_eq!(segment_info.block_infos[0].row_count, 100);
     assert_eq!(segment_info.block_infos[0].row_capacity, 8192);
-    // Unlike the compact, the import's counts are filled in before
-    // `ImportTxnStore::ToWalEntry` copies them (`new_txn_data_impl.cpp:340`).
     assert_eq!(
-        command_bytes(&cmds[0]),
+        command_bytes(& cmds[0]),
         "170a00000064656661756c745f64620100000031010000007401000000300000000002000000000000006400000000000000000000000000000000008000000000000100000000006400002002000000010000000000000000000000010000000000000000000000",
         "the import command must stay byte-identical to the reference's"
     );
     assert_eq!(e.row_count("default_db.t").unwrap(), 100);
 }
-
 /// A `COPY` that spans several parse batches is still **one** transaction and
 /// therefore one frame, as in the reference (`NewTxn::Import`).
-#[test]
-fn a_long_import_is_still_one_frame() {
+#[tokio::test]
+async fn a_long_import_is_still_one_frame() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+        .await
         .unwrap();
     let csv = write_csv(dir.path(), "big.csv", 20_000);
-    e.execute_blocking(&format!(
+    e.execute(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
+    .await
     .unwrap();
-
-    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. }));
+    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. })).await;
     assert_eq!(frames.len(), 1, "one import, one transaction");
     let cmds = &frames[0];
     assert_eq!(cmds.len(), 1);
@@ -234,7 +223,6 @@ fn a_long_import_is_still_one_frame() {
     };
     assert_eq!(segment_info.segment_id, 0);
     assert_eq!(segment_info.row_count, 20_000);
-    // 20000 rows over `DEFAULT_BLOCK_CAPACITY` = 8192: 8192 + 8192 + 3616.
     assert_eq!(
         segment_info
             .block_infos
@@ -245,27 +233,30 @@ fn a_long_import_is_still_one_frame() {
     );
     assert_eq!(e.row_count("default_db.t").unwrap(), 20_000);
 }
-
 /// The dump that runs inside an import puts its `DumpIndexV2` in the **same**
 /// frame (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:387`), one per
 /// index, after the `ImportV2`.
-#[test]
-fn an_indexed_import_logs_the_dump_in_the_same_frame() {
+#[tokio::test]
+async fn an_indexed_import_logs_the_dump_in_the_same_frame() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX idx ON t(id);").unwrap();
-    e.execute_blocking("CREATE INDEX ft ON t(name) USING fulltext;")
+    e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+        .await
+        .unwrap();
+    e.execute("CREATE INDEX idx ON t(id);").await.unwrap();
+    e.execute("CREATE INDEX ft ON t(name) USING fulltext;")
+        .await
         .unwrap();
     let csv = write_csv(dir.path(), "idx.csv", 100);
-    e.execute_blocking(&format!(
+    e.execute(&format!(
         "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
         csv.display()
     ))
+    .await
     .unwrap();
-
-    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. }));
+    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Import { .. })).await;
     assert_eq!(frames.len(), 1);
     let cmds = &frames[0];
     assert_eq!(
@@ -298,7 +289,6 @@ fn an_indexed_import_logs_the_dump_in_the_same_frame() {
         })
         .collect();
     assert_eq!(dumps.len(), 2);
-    // `idx` (secondary): the reference leaves the chunk's `base_name` empty.
     assert_eq!(dumps[0].0, "idx");
     assert_eq!(dumps[0].1, 0);
     assert_eq!(dumps[0].4, key);
@@ -310,8 +300,6 @@ fn an_indexed_import_logs_the_dump_in_the_same_frame() {
     assert_eq!(chunk.index_size, 0);
     assert_eq!(chunk.deprecate_ts, u64::MAX);
     assert!(dumps[0].3.is_empty());
-    // `ft` (full text): the chunk names its `ft_<base>` file and counts the
-    // `(term, row)` postings it holds.
     assert_eq!(dumps[1].0, "ft");
     let chunk = &dumps[1].2[0];
     assert_eq!(chunk.base_name, "ft_0000000000000000");
@@ -319,27 +307,29 @@ fn an_indexed_import_logs_the_dump_in_the_same_frame() {
     assert_eq!(chunk.term_count, 100);
     assert_eq!(e.row_count("default_db.t").unwrap(), 100);
 }
-
 /// A compaction appends the merged segment's dump to its own frame, with an
 /// empty `table_key` (`CompactTxnStore` never sets it).
-#[test]
-fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
+#[tokio::test]
+async fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (id INT, name VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE INDEX idxc ON t(id);").unwrap();
+    e.execute("CREATE TABLE t (id INT, name VARCHAR);")
+        .await
+        .unwrap();
+    e.execute("CREATE INDEX idxc ON t(id);").await.unwrap();
     for (i, rows) in [100usize, 60, 40, 30].iter().enumerate() {
         let csv = write_csv(dir.path(), &format!("c{i}.csv"), *rows);
-        e.execute_blocking(&format!(
+        e.execute(&format!(
             "COPY t FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );",
             csv.display()
         ))
+        .await
         .unwrap();
     }
-    e.compact_all_segments("default_db.t").unwrap();
-
-    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Compact { .. }));
+    e.compact_all_segments("default_db.t").await.unwrap();
+    let frames = frames_with(dir.path(), |c| matches!(c, WalCmd::Compact { .. })).await;
     assert_eq!(frames.len(), 1);
     let cmds = &frames[0];
     assert_eq!(cmds.len(), 2);
@@ -361,21 +351,22 @@ fn an_indexed_compaction_logs_the_dump_in_the_same_frame() {
     assert_eq!(chunk_infos[0].row_count, 230);
     assert_eq!(chunk_infos[0].deprecate_ts, u64::MAX);
 }
-
 /// `CREATE TABLE … WITH (bloom_filter_columns = '…')` puts the flag into the
 /// `CreateTableV2` command's column defs (`TableDef::WriteAdv` ->
 /// `ColumnDef::WriteAdv`), which is the only place the reference records it:
 /// `ColumnDef::ToJson` omits it, so the catalog's `tbl|col|…` record does not
 /// carry it and a reader of that key space sees every flag as false.
-#[test]
-fn a_create_table_logs_the_bloom_flag() {
+#[tokio::test]
+async fn a_create_table_logs_the_bloom_flag() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE bf (b BOOLEAN, i INT) WITH (bloom_filter_columns = 'b');")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    // The WAL writer buffers a frame until a checkpoint flushes it.
-    crate::scheduler::block_on(e.flush()).unwrap();
-    for entry in wal_entries(dir.path()) {
+    e.execute("CREATE TABLE bf (b BOOLEAN, i INT) WITH (bloom_filter_columns = 'b');")
+        .await
+        .unwrap();
+    e.flush().await.unwrap();
+    for entry in wal_entries(dir.path()).await {
         eprintln!(
             "ENTRY {} ts={} cmds={:?}",
             entry.txn_id,
@@ -388,6 +379,7 @@ fn a_create_table_logs_the_bloom_flag() {
         );
     }
     let table_def = wal_entries(dir.path())
+        .await
         .iter()
         .flat_map(|entry| entry.cmds.iter())
         .find_map(|cmd| match cmd {
@@ -406,26 +398,27 @@ fn a_create_table_logs_the_bloom_flag() {
         vec![true, false]
     );
 }
-
 /// A DDL frame names the target **the statement created**, not whatever else
 /// the batch holds. The batch carries the whole C++ layout (the DDL mirrors it
 /// inside `Catalog::capture`), so "the last table/index record" stops being the
 /// new one as soon as the catalog has more than one - which is how a second
 /// `CREATE INDEX` used to be logged as a copy of the first.
-#[test]
-fn a_ddl_frame_names_the_target_the_statement_created() {
+#[tokio::test]
+async fn a_ddl_frame_names_the_target_the_statement_created() {
     use storage::wal::index_def::IndexDef;
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t1 (a INT, b VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
         .unwrap();
-    e.execute_blocking("CREATE TABLE t2 (id INT);").unwrap();
-    e.execute_blocking("CREATE INDEX i1 ON t1 (a);").unwrap();
-    e.execute_blocking("CREATE INDEX i2 ON t2 (id);").unwrap();
-
+    e.execute("CREATE TABLE t1 (a INT, b VARCHAR);")
+        .await
+        .unwrap();
+    e.execute("CREATE TABLE t2 (id INT);").await.unwrap();
+    e.execute("CREATE INDEX i1 ON t1 (a);").await.unwrap();
+    e.execute("CREATE INDEX i2 ON t2 (id);").await.unwrap();
     let mut tables: Vec<(String, Vec<String>)> = Vec::new();
     let mut indexes: Vec<(String, String)> = Vec::new();
-    for entry in wal_entries(dir.path()) {
+    for entry in wal_entries(dir.path()).await {
         for cmd in &entry.cmds {
             match cmd {
                 WalCmd::CreateTable { table_def, .. } => tables.push((

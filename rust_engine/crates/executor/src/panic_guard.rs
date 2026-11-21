@@ -155,26 +155,21 @@ mod tests {
         assert!(guard(|| 7u8).is_ok());
     }
 
-    #[test]
-    fn a_panicking_future_returns_the_payload() {
-        let out = executor_runtime().block_on(guard_async::<(), _>(async {
+    #[tokio::test]
+    async fn a_panicking_future_returns_the_payload() {
+        let out = guard_async::<(), _>(async {
             if std::hint::black_box(true) {
                 panic!("boom in future");
             }
-        }));
+        })
+        .await;
         let payload = out.expect_err("a panicking future must come back as a payload");
         assert!(message(payload.as_ref()).contains("boom in future"));
     }
 
-    #[test]
-    fn a_healthy_future_passes_through() {
-        let out = executor_runtime().block_on(guard_async(async { 5 }));
+    #[tokio::test]
+    async fn a_healthy_future_passes_through() {
+        let out = guard_async(async { 5 }).await;
         assert_eq!(out.unwrap(), 5);
-    }
-
-    fn executor_runtime() -> tokio::runtime::Runtime {
-        tokio::runtime::Builder::new_current_thread()
-            .build()
-            .expect("runtime")
     }
 }

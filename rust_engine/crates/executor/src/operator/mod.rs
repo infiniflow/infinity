@@ -270,8 +270,18 @@ pub trait PhysicalOperator: Send {
     ) -> Result<bool>;
 }
 
+/// A source's next step: a boxed, `Send` future that may borrow the source.
+type SourceFuture<'a, T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>>;
+
 /// Pulls the next batch from the relation below the operator chain.
-pub trait ChunkSource {
+///
+/// The pull is asynchronous because the two real sources wait: a table scan
+/// waits on the scan gate and its block fan-out, and a tasklet's exchange waits
+/// on the queue the merge task drains. Waiting here rather than in a
+/// `block_in_place` is what removes the last thread parked by the SELECT path -
+/// a merge task that parked a worker could only be fed by that same worker.
+pub trait ChunkSource: Send {
     /// Width of the rows the source emits, before any projection.
     fn width(&self) -> usize {
         0
@@ -280,20 +290,22 @@ pub trait ChunkSource {
     /// Fills `state.data_blocks` with the next batch. Once the relation is
     /// exhausted the call sets `state.complete` (the batch handed out together
     /// with `complete` is still consumed by the chain).
-    fn next(&mut self, state: &mut SourceState) -> Result<()>;
+    fn next<'a>(&'a mut self, state: &'a mut SourceState) -> SourceFuture<'a, ()>;
 
     /// Reads the whole relation. Used when the plan has no operator above the
     /// scan, where the source *is* the result.
-    fn collect(&mut self) -> Result<Vec<Vec<Value>>> {
-        let mut state = SourceState::default();
-        let mut rows = Vec::new();
-        while !state.complete {
-            self.next(&mut state)?;
-            for block in std::mem::take(&mut state.data_blocks) {
-                rows.extend(block.into_rows());
+    fn collect<'a>(&'a mut self) -> SourceFuture<'a, Vec<Vec<Value>>> {
+        Box::pin(async move {
+            let mut state = SourceState::default();
+            let mut rows = Vec::new();
+            while !state.complete {
+                self.next(&mut state).await?;
+                for block in std::mem::take(&mut state.data_blocks) {
+                    rows.extend(block.into_rows());
+                }
             }
-        }
-        Ok(rows)
+            Ok(rows)
+        })
     }
 }
 
@@ -331,26 +343,30 @@ impl ChunkSource for RowsSource {
         self.width
     }
 
-    fn next(&mut self, state: &mut SourceState) -> Result<()> {
-        state.data_blocks = Vec::new();
-        let mut chunk = DataChunk::with_capacity(self.width, self.batch);
-        for row in self.rows.by_ref().take(self.batch) {
-            let mut row = row;
-            row.resize(self.width, Value::Null);
-            chunk.push_row(&row)?;
-        }
-        let exhausted = self.rows.len() == 0;
-        if chunk.row_count() > 0 {
-            chunk.finalize();
-            state.data_blocks.push(chunk);
-        } else if !self.started {
-            // The relation is empty: every operator downstream still has to run
-            // once so that a projection can publish its column names.
-            state.empty_source = true;
-        }
-        self.started = true;
-        state.complete = exhausted;
-        Ok(())
+    fn next<'a>(&'a mut self, state: &'a mut SourceState) -> SourceFuture<'a, ()> {
+        // Already-materialised rows: nothing to wait for, so the body is the
+        // synchronous one and the future is ready on the first poll.
+        Box::pin(async move {
+            state.data_blocks = Vec::new();
+            let mut chunk = DataChunk::with_capacity(self.width, self.batch);
+            for row in self.rows.by_ref().take(self.batch) {
+                let mut row = row;
+                row.resize(self.width, Value::Null);
+                chunk.push_row(&row)?;
+            }
+            let exhausted = self.rows.len() == 0;
+            if chunk.row_count() > 0 {
+                chunk.finalize();
+                state.data_blocks.push(chunk);
+            } else if !self.started {
+                // The relation is empty: every operator downstream still has to run
+                // once so that a projection can publish its column names.
+                state.empty_source = true;
+            }
+            self.started = true;
+            state.complete = exhausted;
+            Ok(())
+        })
     }
 }
 
@@ -418,14 +434,18 @@ fn cpu_count() -> usize {
 }
 
 /// Runs a fragment until its head completes (`FragmentTask` driven to the end).
-pub fn run_fragment(
-    operators: &[Box<dyn PhysicalOperator>],
+pub async fn run_fragment(
+    operators: &mut Vec<Box<dyn PhysicalOperator>>,
     ctx: &mut OperatorContext,
     states: &mut OperatorStates,
     source: &mut dyn ChunkSource,
 ) -> Result<()> {
+    // `&mut Vec<_>` rather than `&[_]`: the chain is held across the source's
+    // `await`, and a shared slice would demand `PhysicalOperator: Sync` - which
+    // an aggregate (a `RefCell` group table) and a limit (a `Cell` counter) are
+    // not. A `&mut` reference needs only `Send`, which every operator already is.
     while !states.is_complete() {
-        source.next(&mut states.source)?;
+        source.next(&mut states.source).await?;
         let progressed = execute_task(operators, ctx, states)?;
         if states.source.complete && !progressed && !states.is_complete() {
             // The relation is exhausted and no operator did any work, so no
@@ -439,7 +459,7 @@ pub fn run_fragment(
 }
 
 /// Runs the chain once over `source` and returns the head's output.
-fn run_serial(
+async fn run_serial(
     mut operators: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
     source: &mut dyn ChunkSource,
@@ -449,7 +469,7 @@ fn run_serial(
     }
     let mut ctx = OperatorContext::default();
     let mut states = OperatorStates::new(&operators);
-    run_fragment(&operators, &mut ctx, &mut states, source)?;
+    run_fragment(&mut operators, &mut ctx, &mut states, source).await?;
     // Nothing consumes the head's output, so it is still in its own state.
     let head = operators.len() - 1;
     let rows = std::mem::take(&mut states.state_mut(head).data_blocks)
@@ -495,67 +515,45 @@ impl ExchangeSource {
     }
 }
 
-/// Awaits the next chunk of one tasklet's queue from **synchronous** code.
-///
-/// `Receiver::blocking_recv` panics when the calling thread is driving the
-/// runtime: tokio refuses to park a worker. The sink is synchronous by design
-/// (it drains the queues in tasklet order), and it is reached from a worker
-/// whenever a statement runs a SELECT inline - `INSERT … SELECT` does exactly
-/// that - so the wait is handed to `block_in_place`, which lets the runtime
-/// replace this worker and keep polling the tasklets being waited for. Outside
-/// a runtime this is just `blocking_recv`.
-fn next_chunk_blocking(receiver: &mut ExchangeReceiver) -> Option<ExchangeItem> {
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(|| receiver.blocking_recv())
-        }
-        _ => receiver.blocking_recv(),
-    }
-}
-
 impl ChunkSource for ExchangeSource {
     fn width(&self) -> usize {
         self.width
     }
 
-    fn next(&mut self, state: &mut SourceState) -> Result<()> {
-        state.data_blocks = Vec::new();
-        loop {
-            if self.current.is_none() {
-                self.current = self.receivers.next();
-            }
-            let Some(receiver) = self.current.as_mut() else {
-                // Every tasklet is done. A fragment that never produced a chunk
-                // still has to run once, as an empty source does.
-                if !self.started {
-                    state.empty_source = true;
-                    self.started = true;
+    fn next<'a>(&'a mut self, state: &'a mut SourceState) -> SourceFuture<'a, ()> {
+        Box::pin(async move {
+            state.data_blocks = Vec::new();
+            loop {
+                if self.current.is_none() {
+                    self.current = self.receivers.next();
                 }
-                state.complete = true;
-                return Ok(());
-            };
-            // The sink is the fragment's synchronous merge task: it drains the
-            // tasklets' queues in order and does nothing else, so blocking here
-            // is what it is for.
-            //
-            // `blocking_recv` panics ("Cannot block the current thread from
-            // within a runtime") when the sink runs on a runtime **worker**,
-            // which is where it lands for any SELECT a statement calls
-            // synchronously - `INSERT … SELECT` is the plain case. There the
-            // wait goes through `block_in_place`, which hands the worker's core
-            // to a replacement so the tasklets this sink is waiting for keep
-            // being polled; off a worker it is a plain call.
-            match next_chunk_blocking(receiver) {
-                Some(Ok(chunk)) => {
-                    self.started = true;
-                    state.data_blocks.push(chunk);
+                let Some(receiver) = self.current.as_mut() else {
+                    // Every tasklet is done. A fragment that never produced a chunk
+                    // still has to run once, as an empty source does.
+                    if !self.started {
+                        state.empty_source = true;
+                        self.started = true;
+                    }
+                    state.complete = true;
                     return Ok(());
+                };
+                // The sink is the fragment's merge task: it drains the tasklets'
+                // queues in order and does nothing else. The wait is an `await`,
+                // so a merge task that is behind costs a future rather than a
+                // parked worker - which matters because the tasklets it is
+                // waiting for are polled by those same workers.
+                match receiver.recv().await {
+                    Some(Ok(chunk)) => {
+                        self.started = true;
+                        state.data_blocks.push(chunk);
+                        return Ok(());
+                    }
+                    Some(Err(message)) => return Err(Error::Invalid(message)),
+                    // This tasklet is finished; continue with the next one.
+                    None => self.current = None,
                 }
-                Some(Err(message)) => return Err(Error::Invalid(message)),
-                // This tasklet is finished; continue with the next one.
-                None => self.current = None,
             }
-        }
+        })
     }
 }
 
@@ -586,7 +584,7 @@ where
     let mut states = OperatorStates::new(&operators);
     let head = operators.len() - 1;
     while !states.is_complete() {
-        source.next(&mut states.source)?;
+        source.next(&mut states.source).await?;
         let progressed = execute_task(&operators, &mut ctx, &mut states)?;
         for chunk in std::mem::take(&mut states.state_mut(head).data_blocks) {
             // A closed queue means the fragment above has what it needs
@@ -614,8 +612,8 @@ where
 /// its own copy of the chain, and feeds their output through the exchange to
 /// `merge` — which runs as one task, in tasklet order, so the rows come out
 /// exactly as the serial run returns them.
-fn run_tasklets(
-    operators: &[Box<dyn PhysicalOperator>],
+async fn run_tasklets(
+    operators: Vec<Box<dyn PhysicalOperator>>,
     merge: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
     rows: Vec<Vec<Value>>,
@@ -673,14 +671,14 @@ fn run_tasklets(
         });
     }
     // The sink is the fragment's last task (`FragmentContext::Tasks`): it
-    // drains the tasklets' queues in order. It runs **here**, on the caller's
-    // thread - the caller is the statement task, which already handed the whole
-    // SELECT to the CPU pool, so dispatching again would only add a hop.
+    // drains the tasklets' queues in order. It runs **here**, as part of the
+    // statement's own future - the tasklets it waits for are tasks on the same
+    // runtime, so the wait has to be an `await`, not a parked thread.
     let mut source = ExchangeSource::new(receivers, prefix_width);
     if merge.is_empty() {
-        return Ok((names, source.collect()?));
+        return Ok((names, source.collect().await?));
     }
-    run_serial(merge, names, &mut source)
+    run_serial(merge, names, &mut source).await
 }
 
 /// Runs a lowered chain over a fragment source and returns the result in the
@@ -693,7 +691,7 @@ fn run_tasklets(
 /// tasklets and the merge part serially over the concatenated output, which is
 /// the fragment-with-exchange split of `FragmentBuilder` with a single merge
 /// task.
-pub fn run_operators(
+pub async fn run_operators(
     mut operators: Vec<Box<dyn PhysicalOperator>>,
     names: Vec<String>,
     source: &mut dyn ChunkSource,
@@ -707,7 +705,7 @@ pub fn run_operators(
     }
     if operators.is_empty() {
         // A plan with no operator above the scan: the source is the result.
-        return Ok((names, source.collect()?));
+        return Ok((names, source.collect().await?));
     }
     // `PhysicalOperatorType` has no exchange operator: the first operator that
     // needs the whole relation is where the parallel fragment ends.
@@ -723,7 +721,7 @@ pub fn run_operators(
     if split == 0 {
         // The merge point sits right on the scan (LIMIT pushed below the
         // projection, ORDER BY without a filter): nothing to split.
-        return run_serial(operators, names, source);
+        return run_serial(operators, names, source).await;
     }
     let source_width = source.width();
     let prefix_width = operators[..split]
@@ -731,32 +729,35 @@ pub fn run_operators(
         .fold(source_width, |width, operator| operator.output_width(width));
     // No operator in the prefix can finish early, so reading the relation up
     // front is what the serial run would do anyway.
-    let rows = source.collect()?;
+    let rows = source.collect().await?;
     let tasks = tasklet_count(&operators, block_tasklets(rows.len())).min(cpu_count());
     let merge = operators.split_off(split);
     let mut prefix = operators;
     if tasks > 1 {
         return run_tasklets(
-            &prefix,
+            prefix,
             merge,
             names,
             rows,
             source_width,
             prefix_width,
             tasks,
-        );
+        )
+        .await;
     }
     // One tasklet: the prefix still runs, just serially.
     let rows = {
         let mut source = RowsSource::new(rows, source_width, crate::chunk::DEFAULT_VECTOR_SIZE);
-        run_serial(std::mem::take(&mut prefix), Vec::new(), &mut source)?.1
+        run_serial(std::mem::take(&mut prefix), Vec::new(), &mut source)
+            .await?
+            .1
     };
     if merge.is_empty() {
         return Ok((names, rows));
     }
     // The merge fragment: one task over the tasklets' output.
     let mut source = RowsSource::new(rows, prefix_width, crate::chunk::DEFAULT_VECTOR_SIZE);
-    run_serial(merge, names, &mut source)
+    run_serial(merge, names, &mut source).await
 }
 
 #[cfg(test)]
@@ -799,11 +800,17 @@ mod tests {
         (0..n).map(|i| vec![Value::Int(i as i64)]).collect()
     }
 
-    fn run(operators: Vec<Box<dyn PhysicalOperator>>, rows: Vec<Vec<Value>>) -> Vec<Vec<Value>> {
+    async fn run(
+        operators: Vec<Box<dyn PhysicalOperator>>,
+        rows: Vec<Vec<Value>>,
+    ) -> Vec<Vec<Value>> {
         let mut ctx = OperatorContext { block_capacity: 4 };
         let mut states = OperatorStates::new(&operators);
         let mut source = RowsSource::new(rows, 1, 4);
-        run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        let mut operators = operators;
+        { run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         let head = states.len() - 1;
         // Nothing consumes the head's output, so it is still in its own state.
         std::mem::take(&mut states.state_mut(head).data_blocks)
@@ -838,8 +845,8 @@ mod tests {
     /// Tasklets read disjoint contiguous ranges and their output is joined in
     /// tasklet order, so the rows come back exactly as the serial run returns
     /// them.
-    #[test]
-    fn tasklets_join_their_output_in_tasklet_order() {
+    #[tokio::test]
+    async fn tasklets_join_their_output_in_tasklet_order() {
         use super::filter::Filter;
         use super::project::Projection;
 
@@ -858,23 +865,23 @@ mod tests {
         let mut serial_source = RowsSource::new(input.clone(), 1, 4);
         let chains: Vec<Box<dyn PhysicalOperator>> =
             operators.iter().map(|op| op.fork().unwrap()).collect();
-        let expected = run_serial(chains, Vec::new(), &mut serial_source)
+        let expected = { run_serial(chains, Vec::new(), &mut serial_source) }
+            .await
             .unwrap()
             .1;
         assert_eq!(expected.len(), 30);
         // Tasklet counts that divide the rows evenly and ones that do not, down
         // to one row per tasklet.
         for tasks in [2, 3, 5, 41] {
-            let (_, out) = run_tasklets(
-                &operators,
-                Vec::new(),
-                Vec::new(),
-                input.clone(),
-                1,
-                1,
-                tasks,
-            )
-            .unwrap();
+            // A fresh chain per iteration: `run_tasklets` takes ownership of it
+            // (the tasklets need `'static` copies), and an operator cannot be
+            // cloned - `fork` is how the fragment itself makes the copies.
+            let chains: Vec<Box<dyn PhysicalOperator>> =
+                operators.iter().map(|op| op.fork().unwrap()).collect();
+            let (_, out) =
+                { run_tasklets(chains, Vec::new(), Vec::new(), input.clone(), 1, 1, tasks) }
+                    .await
+                    .unwrap();
             assert_eq!(out, expected, "tasks = {tasks}");
         }
     }
@@ -882,8 +889,8 @@ mod tests {
     /// The merge task pulls through the exchange queue, tasklet by tasklet, and
     /// stops the tasklets once it has what it needs: a `LIMIT` above the split
     /// returns at once instead of waiting for every tasklet to finish.
-    #[test]
-    fn the_merge_task_reads_the_tasklets_through_the_exchange_queue() {
+    #[tokio::test]
+    async fn the_merge_task_reads_the_tasklets_through_the_exchange_queue() {
         use super::filter::Filter;
         use super::limit::Limit;
         use super::project::Projection;
@@ -900,8 +907,9 @@ mod tests {
             )),
         ];
         let merge: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Limit::new(0, 10))];
-        let (_, out) =
-            run_tasklets(&operators, merge, vec!["a".into()], rows(20_000), 1, 1, 4).unwrap();
+        let (_, out) = { run_tasklets(operators, merge, vec!["a".into()], rows(20_000), 1, 1, 4) }
+            .await
+            .unwrap();
         assert_eq!(out.len(), 10);
         assert_eq!(out[0], vec![Value::Int(101)]);
         assert_eq!(out[9], vec![Value::Int(110)]);
@@ -909,8 +917,8 @@ mod tests {
 
     /// A tasklet's failure travels through the exchange instead of ending the
     /// statement with a short result.
-    #[test]
-    fn a_tasklet_error_fails_the_statement() {
+    #[tokio::test]
+    async fn a_tasklet_error_fails_the_statement() {
         /// Forwarding operator that fails on its first pass.
         struct Boom;
 
@@ -938,15 +946,15 @@ mod tests {
         }
 
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Boom)];
-        let result = run_tasklets(&operators, Vec::new(), Vec::new(), rows(8), 1, 1, 2);
+        let result = { run_tasklets(operators, Vec::new(), Vec::new(), rows(8), 1, 1, 2) }.await;
         assert!(result.is_err(), "{result:?}");
     }
 
     /// The entry point takes the same split: a row-wise chain over more than one
     /// block runs in tasklets, and a LIMIT above it still sees the rows in
     /// order.
-    #[test]
-    fn run_operators_splits_a_row_wise_chain_and_limits_after_the_merge() {
+    #[tokio::test]
+    async fn run_operators_splits_a_row_wise_chain_and_limits_after_the_merge() {
         use super::filter::Filter;
         use super::limit::Limit;
         use super::project::Projection;
@@ -968,7 +976,9 @@ mod tests {
         // runs two tasklets.
         let input = rows(20_000);
         let mut source = RowsSource::new(input.clone(), 1, crate::chunk::DEFAULT_VECTOR_SIZE);
-        let (names, out) = run_operators(chain(), vec!["a".into()], &mut source).unwrap();
+        let (names, out) = { run_operators(chain(), vec!["a".into()], &mut source) }
+            .await
+            .unwrap();
         assert_eq!(names, vec!["a".to_string()]);
         assert_eq!(out.len(), 20_000 - 101);
         assert_eq!(out[0], vec![Value::Int(101)]);
@@ -979,14 +989,16 @@ mod tests {
         let mut operators = chain();
         operators.push(Box::new(Limit::new(0, 10)));
         let mut source = RowsSource::new(input, 1, crate::chunk::DEFAULT_VECTOR_SIZE);
-        let (_, out) = run_operators(operators, vec!["a".into()], &mut source).unwrap();
+        let (_, out) = { run_operators(operators, vec!["a".into()], &mut source) }
+            .await
+            .unwrap();
         assert_eq!(out.len(), 10);
         assert_eq!(out[0], vec![Value::Int(101)]);
         assert_eq!(out[9], vec![Value::Int(110)]);
     }
 
-    #[test]
-    fn a_chain_forwards_every_row_in_chunks() {
+    #[tokio::test]
+    async fn a_chain_forwards_every_row_in_chunks() {
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![
             Box::new(Forward {
                 kind: PhysicalOperatorType::Filter,
@@ -995,12 +1007,12 @@ mod tests {
                 kind: PhysicalOperatorType::Projection,
             }),
         ];
-        let out = run(operators, rows(10));
+        let out = run(operators, rows(10)).await;
         assert_eq!(out, rows(10));
     }
 
-    #[test]
-    fn take_prev_clears_the_predecessor() {
+    #[tokio::test]
+    async fn take_prev_clears_the_predecessor() {
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Forward {
             kind: PhysicalOperatorType::Filter,
         })];
@@ -1014,8 +1026,8 @@ mod tests {
     /// LIMIT 10 over 100k rows must not evaluate the projection 100k times:
     /// the reference stops as soon as the limit budget is spent
     /// (`physical_limit_impl.cpp:209`).
-    #[test]
-    fn a_limit_stops_the_projection_after_one_chunk() {
+    #[tokio::test]
+    async fn a_limit_stops_the_projection_after_one_chunk() {
         use super::limit::Limit;
         use super::project::Projection;
 
@@ -1037,7 +1049,10 @@ mod tests {
         let mut ctx = OperatorContext::default();
         let mut states = OperatorStates::new(&operators);
         let mut source = RowsSource::new(rows, 1, crate::chunk::DEFAULT_VECTOR_SIZE);
-        run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        let mut operators = operators;
+        { run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
 
         let head = operators.len() - 1;
         let out: Vec<Vec<Value>> = std::mem::take(&mut states.state_mut(head).data_blocks)
@@ -1054,12 +1069,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn an_empty_source_still_runs_one_pass() {
+    #[tokio::test]
+    async fn an_empty_source_still_runs_one_pass() {
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Forward {
             kind: PhysicalOperatorType::Projection,
         })];
-        let out = run(operators, Vec::new());
+        let out = run(operators, Vec::new()).await;
         assert!(out.is_empty());
     }
 }

@@ -35,30 +35,19 @@ impl Engine {
     /// segments become garbage that `Cleanup` reclaims. Mirroring that here
     /// keeps the segment ids the reference's fixtures assert (`{2}` after two
     /// imports are compacted, `{3}` after compacting `{2}`, and so on).
-    pub fn compact_table(&self, table: &str) -> Result<()> {
-        // `ManualCompactTask` hands `PhysicalCompact` the candidates
-        // `NewCompactionAlg` picked (`physical_compact_impl.cpp:36`). When it
-        // picks nothing the reference opens **no** transaction and leaves the
-        // directory untouched; merging anyway would move every row and spend a
-        // timestamp it never spends.
+    /// `ManualCompactTask` hands `PhysicalCompact` the candidates
+    /// `NewCompactionAlg` picked (`physical_compact_impl.cpp:36`). When it
+    /// picks nothing the reference opens **no** transaction and leaves the
+    /// directory untouched; merging anyway would move every row and spend a
+    /// timestamp it never spends.
+    pub async fn compact_table(&self, table: &str) -> Result<()> {
         let candidates = self.compaction_candidates(table);
         if candidates.is_empty() {
             return Ok(());
         }
-        crate::scheduler::block_on(self.compact_segments(table, &candidates))
-    }
-
-    /// [`Self::compact_table`] for an async caller (an RPC handler).
-    ///
-    /// The synchronous form bridges `compact_segments` with `block_on`, which
-    /// parks the calling thread for the whole merge - on a runtime worker that
-    /// is the worker every `.await` inside the merge needs to make progress.
-    pub async fn compact_table_async(&self, table: &str) -> Result<()> {
-        let candidates = self.compaction_candidates(table);
-        if candidates.is_empty() {
-            return Ok(());
-        }
-        self.compact_segments(table, &candidates).await
+        let built: std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> =
+            Box::pin(self.compact_segments(table, &candidates));
+        built.await
     }
 
     /// `NewTxn::Compact`: merge every segment of `table` into one new segment.
@@ -67,9 +56,9 @@ impl Engine {
     /// (`TestTxnCompact` calls `NewTxn::Compact` with explicit segment ids), so
     /// it merges unconditionally — even a single segment, which the manual and
     /// periodic tasks would never choose.
-    pub fn compact_all_segments(&self, table: &str) -> Result<()> {
-        let all = self.segment_ids(table);
-        crate::scheduler::block_on(self.compact_segments(table, &all))
+    pub async fn compact_all_segments(&self, table: &str) -> Result<()> {
+        let all = self.segment_ids(table).await;
+        self.compact_segments(table, &all).await
     }
 
     /// `NewTxn::OptimizeIndex` for the full-text indexes of `table`
@@ -153,17 +142,11 @@ impl Engine {
             match shared {
                 Some(index) => {
                     // The merge rewrites whole chunks and fsyncs every file it
-                    // writes: it is a blocking leaf, so it runs on the blocking
-                    // pool. Running it here would hold a runtime worker for the
-                    // duration of the rewrite, stalling every other task
-                    // scheduled on it.
-                    let done = crate::scheduler::scheduler()
-                        .spawn_blocking({
-                            let deleted = deleted.clone();
-                            move || {
-                                crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
-                            }
-                        })
+                    // writes, which `optimize_text_index_unlocked` already
+                    // moves to the blocking pool (`TextIndex::merge_runs`) on
+                    // its own - wrapping it again would hand a blocking thread
+                    // to a function whose job is to wait for one.
+                    let done = crate::engine::state::optimize_text_index_unlocked(&index, &deleted)
                         .await?;
                     if done == 0 {
                         continue;
@@ -178,7 +161,7 @@ impl Engine {
                     // a reader maps, so it has to name the merged chunk and stop
                     // naming the sources the merge deleted (`OptimizeFtIndex` ->
                     // `RemoveChunkIDs`).
-                    self.republish_text_chunks(table, index_id, &column);
+                    self.republish_text_chunks(table, index_id, &column).await;
                 }
                 None => {
                     // No cache entry: map the chunk list from the catalog, merge
@@ -193,17 +176,15 @@ impl Engine {
                         continue;
                     }
                     let dir = root.to_string_lossy().into_owned();
+                    // The merge itself is the blocking part, and it is moved
+                    // to the pool inside `merge_text_index_from_catalog` (the
+                    // `TextIndex::merge_runs` call); wrapping it again would
+                    // hand a blocking thread to a function that waits on one.
                     let (done, held): (usize, Vec<crate::engine::text_index::HeldTextChunk>) =
-                        crate::scheduler::scheduler()
-                            .spawn_blocking({
-                                let deleted = deleted.clone();
-                                move || {
-                                    crate::engine::state::merge_text_index_from_catalog(
-                                        &dir, &chunks, &deleted,
-                                    )
-                                }
-                            })
-                            .await?;
+                        crate::engine::state::merge_text_index_from_catalog(
+                            &dir, &chunks, &deleted,
+                        )
+                        .await?;
                     if done == 0 || held.is_empty() {
                         continue;
                     }
@@ -231,7 +212,7 @@ impl Engine {
     /// chunk no record names yet (the merged one) takes the id
     /// `GetAndSetNextChunkID` hands out. Counting files instead would name the
     /// merged chunk after the first source's id and hand that id out twice.
-    pub(crate) fn republish_text_chunks(&self, table: &str, index_id: u64, column: &str) {
+    pub(crate) async fn republish_text_chunks(&self, table: &str, index_id: u64, column: &str) {
         let qualified = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
             return;
@@ -243,30 +224,34 @@ impl Engine {
             );
         }
         let key = self.table_key(&qualified);
-        let held: Vec<(u32, String, u64, u64, u64)> = {
+        // The handle is cloned out of `tables` and the guard dropped before the
+        // index is awaited: a `std::sync::MutexGuard` may not cross an await.
+        let shared = {
             let tables = self.tables.lock().unwrap();
             tables
                 .get(&key)
                 .and_then(|entry| entry.text.get(&index_id).cloned())
-                .map(|shared| {
-                    let index = shared.read().unwrap_or_else(|e| e.into_inner());
-                    index
-                        .reader
-                        .segments
-                        .iter()
-                        .map(|s: &crate::engine::text_index::SealedSegment| {
-                            let base_row_id = s.reader.base_row_id();
-                            (
-                                (base_row_id >> 32) as u32,
-                                s.reader.base_name().to_string(),
-                                base_row_id,
-                                u64::from(s.docs),
-                                s.total_len,
-                            )
-                        })
-                        .collect()
-                })
-                .unwrap_or_default()
+        };
+        let held: Vec<(u32, String, u64, u64, u64)> = match shared {
+            Some(shared) => {
+                let index = shared.read().await;
+                index
+                    .reader
+                    .segments
+                    .iter()
+                    .map(|s: &crate::engine::text_index::SealedSegment| {
+                        let base_row_id = s.reader.base_row_id();
+                        (
+                            (base_row_id >> 32) as u32,
+                            s.reader.base_name().to_string(),
+                            base_row_id,
+                            u64::from(s.docs),
+                            s.total_len,
+                        )
+                    })
+                    .collect()
+            }
+            None => Vec::new(),
         };
         self.republish_text_chunks_of(&qualified, index_id, column, &held);
     }
@@ -376,7 +361,7 @@ impl Engine {
     /// with rows the fetch cannot resolve. This is the reference's
     /// `CompactTxnStore::deprecate_ids_in_segments_` (`base_txn_store_impl.cpp`
     /// `ToWalEntry`, `kCompact`).
-    fn populate_compacted_indexes(
+    async fn populate_compacted_indexes(
         &self,
         table: &str,
         merged_segment: u32,
@@ -388,7 +373,10 @@ impl Engine {
         // Every record this pass writes carries the compaction's ts
         // (`PopulateIndex(…, kCompact)` runs inside the transaction, so
         // `current_ts()` - still the previous commit here - is not it).
-        crate::engine::with_chunk_ts(compact_ts, || self.populate_secondary_indexes(table));
+        crate::engine::with_chunk_ts(compact_ts, async {
+            self.populate_secondary_indexes(table);
+        })
+        .await;
         let qualified = self.qualified_table(table);
         let Ok(indexes) = self.storage.catalog.indexes_of_table(&qualified) else {
             return;
@@ -400,12 +388,14 @@ impl Engine {
         {
             // Build the merged segment's chunk from its rows, then drop every
             // other segment's chunks.
-            let shared = self
-                .tables
-                .lock()
-                .unwrap()
-                .get(&key)
-                .and_then(|e| e.text.get(&im.id).cloned());
+            // A block, not a temporary chain: the `std::sync::MutexGuard` from
+            // `tables.lock()` lives until the end of the enclosing statement,
+            // and this statement is inside an `async fn` that awaits below - a
+            // guard alive at any await point makes the future non-`Send`.
+            let shared = {
+                let tables = self.tables.lock().unwrap();
+                tables.get(&key).and_then(|e| e.text.get(&im.id).cloned())
+            };
             let Some(shared) = shared else {
                 continue;
             };
@@ -413,16 +403,19 @@ impl Engine {
             // records of the segments this compaction retired - under one gate:
             // a build that loaded the chunk list in between would map a layout
             // that is torn in two (`Engine::with_text_dir_gate`).
-            Self::with_text_dir_gate(&shared, || {
-                crate::engine::state::seal_text_index_gated(&shared);
-                self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, sources);
-            });
+            let sources_owned: Vec<u32> = sources.to_vec();
+            Self::with_text_dir_gate(&shared, async {
+                crate::engine::state::seal_text_index_gated(&shared).await;
+                self.rewrite_text_chunk_segments(&qualified, im.id, merged_segment, &sources_owned);
+            })
+            .await;
             // The record is written **separately** and with the compaction's
             // ts: `record_sealed_text_chunks_of_at` takes an explicit value
             // because `current_ts()` is still the previous commit while the
             // compaction transaction is open (`AddChunkIndexID1` under
             // `kStarted` stores what the commit resolves).
-            self.record_sealed_text_chunks_at(&qualified, &im.column, Some(compact_ts));
+            self.record_sealed_text_chunks_at(&qualified, &im.column, Some(compact_ts))
+                .await;
             // `reindex_compacted_text` already sealed and recorded the merged
             // chunk, under `current_ts()`; a record that exists keeps the ts it
             // was written with, so the merged segment's id is restamped here.
@@ -436,7 +429,8 @@ impl Engine {
         // (`new_txn_data_impl.cpp:808`). Without them a query over the merged
         // segment fell back to the exact scan for every kind but full-text and
         // secondary - and the segment's directory had no chunk to publish.
-        self.populate_merged_segment_indexes(&qualified, merged_segment, &indexes, compact_ts);
+        self.populate_merged_segment_indexes(&qualified, merged_segment, &indexes, compact_ts)
+            .await;
     }
 
     /// `PopulateIndex` for the kinds that rebuild a whole segment from its
@@ -448,14 +442,16 @@ impl Engine {
     /// so the memory forms of these indexes were dropped with the old layout
     /// (`entry.hnsw_mem.clear()` and friends) - the merged chunk can only come
     /// from a rebuild, which is what each builder does.
-    fn populate_merged_segment_indexes(
+    async fn populate_merged_segment_indexes(
         &self,
         table: &str,
         merged_segment: u32,
         indexes: &[catalog::IndexMeta],
         compact_ts: u64,
     ) {
-        crate::engine::with_chunk_ts(compact_ts, || {
+        // `with_chunk_ts` is a **task**-local scope, so the HNSW rebuild below
+        // may await inside it: every task the build spawns inherits `ts`.
+        crate::engine::with_chunk_ts(compact_ts, async {
             for im in indexes {
                 if crate::is_secondary_kind(&im.index_type)
                     || im.index_type.eq_ignore_ascii_case("FULLTEXT")
@@ -477,13 +473,17 @@ impl Engine {
                     if let Some(width) = width {
                         let _ = self.sparse_index_by_id(table, &im.column, im.id, width);
                     }
-                    self.seal_sparse_index(table, im.id);
+                    self.seal_sparse_index(table, im.id).await;
                 } else if im.index_type.eq_ignore_ascii_case("HNSW") {
-                    let _ = self.build_hnsw_index_of(table, &im.column, Some(im.id));
-                    let _ = self.dump_hnsw_index(table, &im.name);
+                    // `PopulateIndex(…, kCompact)` rebuilds the merged segment
+                    // and dumps its chunk, all inside the transaction.
+                    let _ = self
+                        .build_hnsw_index_of(table, &im.column, Some(im.id))
+                        .await;
+                    let _ = self.dump_hnsw_index(table, &im.name).await;
                     self.release_hnsw_memory(table, im.id);
                 } else if im.index_type.eq_ignore_ascii_case("IVF") {
-                    let _ = self.write_ivf_index(table, &im.name);
+                    let _ = self.write_ivf_index(table, &im.name).await;
                     let key = self.table_key(table);
                     let mut tables = self.tables.lock().unwrap();
                     if let Some(rows) = tables.get_mut(&key).and_then(|e| e.ivf_mem.get_mut(&im.id))
@@ -494,9 +494,9 @@ impl Engine {
                     || im.index_type.eq_ignore_ascii_case("SMVE")
                     || im.index_type.eq_ignore_ascii_case("EMVB")
                 {
-                    self.seal_multivector_index(table, im.id);
+                    self.seal_multivector_index(table, im.id).await;
                     if im.index_type.eq_ignore_ascii_case("PLAID") {
-                        let _ = self.write_plaid_index(table, &im.name);
+                        let _ = self.write_plaid_index(table, &im.name).await;
                     }
                 }
             }
@@ -512,14 +512,13 @@ impl Engine {
                     {
                         continue;
                     }
-                    let _ = self.publish_index_chunks(
-                        table,
-                        meta.id,
-                        Some((im.name.as_str(), compact_ts)),
-                    );
+                    let _ = self
+                        .publish_index_chunks(table, meta.id, Some((im.name.as_str(), compact_ts)))
+                        .await;
                 }
             }
-        });
+        })
+        .await;
         let _ = merged_segment;
         // The chunk files are new: reload the readers so the merged segment is
         // served from them instead of the exact scan.
@@ -539,7 +538,7 @@ impl Engine {
     /// The handle is reloaded right away: `spann_lazy_load` is the same path a
     /// restart takes, and a failure there is not fatal - the query falls back
     /// to the exact scan.
-    fn rebuild_compacted_spann(&self, table: &str, ts: u64) {
+    async fn rebuild_compacted_spann(&self, table: &str, ts: u64) {
         let qualified = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&qualified) else {
             return;
@@ -551,8 +550,9 @@ impl Engine {
             .iter()
             .filter(|im| im.index_type.eq_ignore_ascii_case("SPANN"))
         {
-            if let Err(e) =
-                self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)))
+            if let Err(e) = self
+                .publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)))
+                .await
             {
                 eprintln!("[SPANN] rebuild {} after compaction: {e}", im.name);
                 continue;
@@ -724,7 +724,10 @@ impl Engine {
         // `DumpIndexV2` per index (`:502`; `CompactTxnStore` leaves the
         // `table_key` empty, so the port does too).
         let mut cmds = vec![self.compact_command(table, next_seg, rows.len(), &source_ids)?];
-        cmds.extend(self.dump_index_commands(table, next_seg, rows.len(), "")?);
+        cmds.extend(
+            self.dump_index_commands(table, next_seg, rows.len(), "")
+                .await?,
+        );
         t.set_typed_commands(cmds);
         // `NewTxnManager::CommitTxn`: conflict check -> `PrepareCommitCompact`
         // -> WAL append+fsync. The reference writes the merged rows into the
@@ -743,7 +746,7 @@ impl Engine {
         // `FnOnce` on a runtime worker that already holds the commit turn and
         // `commit_lock`, so it can neither `.await` nor take the gate.
         self.txn
-            .commit_at_deferred_with(t, compact_ts, |_txn| {
+            .commit_at_deferred_with(t, compact_ts, async |_txn| {
                 // Drop every source position that no compacted row reuses. The
                 // destination positions are exactly `[base, base + rows.len())`; every
                 // other key inside a merged segment is an old copy (including rows
@@ -915,7 +918,10 @@ impl Engine {
                 // The moved rows are published under their new ids now: add them
                 // to the full-text caches the merge kept (see the note where the
                 // caches are no longer dropped).
-                self.reindex_compacted_text(table, &rows, base, compact_ts);
+                // Inside the commit callback: no `.await` is allowed here, so
+                // the thread-local form is the one that applies.
+                self.reindex_compacted_text(table, &rows, base, compact_ts)
+                    .await;
                 // `PrepareCommitCompact`: the merged segment's blocks and
                 // records belong to the compaction transaction; writing them here
                 // (before the frame) is what makes a kill harmless - the
@@ -971,12 +977,13 @@ impl Engine {
         // The port reloads only the chunks the catalog lists, so the merged
         // segment's rows would otherwise stay in a memory tail and the old
         // chunks (whose row ids the merge retired) would keep answering.
-        self.populate_compacted_indexes(table, next_seg, &source_ids, compact_ts);
+        self.populate_compacted_indexes(table, next_seg, &source_ids, compact_ts)
+            .await;
         // The trees of the merged segments were dropped with the commit (their
         // row ids are gone, §9.8). Rebuild them here instead of waiting for the
         // next checkpoint: the segment is fresh, so its chunk no longer matches
         // its live rows and `publish_index_chunks_of` dumps exactly that one.
-        self.rebuild_compacted_spann(table, compact_ts);
+        self.rebuild_compacted_spann(table, compact_ts).await;
         // The spann handles and their mem index were just dropped: the byte
         // ledger the watermarks read has to follow, or the table stays charged
         // for a tree nobody holds.
@@ -1072,7 +1079,7 @@ impl Engine {
     /// knowing which rows changed. A failure is not fatal to the checkpoint —
     /// the index then answers from its previous chunk, and a query whose rows it
     /// does not cover falls back to the exact scan.
-    pub(crate) fn publish_spann_chunks(&self, ts: u64) {
+    pub(crate) async fn publish_spann_chunks(&self, ts: u64) {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
@@ -1083,7 +1090,9 @@ impl Engine {
             let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&im.table) else {
                 continue;
             };
-            let _ = self.publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)));
+            let _ = self
+                .publish_index_chunks(&im.table, meta.id, Some((im.name.as_str(), ts)))
+                .await;
         }
     }
 
@@ -1104,7 +1113,7 @@ impl Engine {
     /// transaction: a spann dump publishes its chunk records through the catalog
     /// itself, and folding it into the same `DumpIndex` command would write the
     /// record twice.
-    pub(crate) fn optimize_spann_indexes(&self, ts: u64) -> Result<()> {
+    pub(crate) async fn optimize_spann_indexes(&self, ts: u64) -> Result<()> {
         let max_open = self.max_open_chunks_per_index();
         for im in self.storage.catalog.list_indexes()? {
             if !im.index_type.eq_ignore_ascii_case("SPANN") {
@@ -1179,11 +1188,9 @@ impl Engine {
                 // Failure is not fatal to the pass: the index keeps answering
                 // from its previous chunk and the uncovered rows are scored
                 // exactly (§9.7).
-                let _ = self.publish_index_chunks_forced(
-                    &im.table,
-                    meta.id,
-                    Some((im.name.as_str(), ts)),
-                );
+                let _ = self
+                    .publish_index_chunks_forced(&im.table, meta.id, Some((im.name.as_str(), ts)))
+                    .await;
             }
             // The counts as they are **after** the publication above: the chunk
             // it wrote is in the catalog now, and the snapshot test below has to
@@ -1330,6 +1337,10 @@ impl Engine {
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {
+            // `PersistenceManager` holds a `MetaStore` trait object that is not
+            // `Send`, so it cannot cross to the blocking pool. It runs inline;
+            // a checkpoint is already the one call that owns `flush_lock`, and
+            // its cost is the file sweep `flush_blocks` above.
             if let Err(e) = pm.persist_directory() {
                 eprintln!("object dir: persisting failed: {e}");
             }
@@ -1339,7 +1350,7 @@ impl Engine {
         // blocks are final — is the natural place to refresh it. There is no
         // memory tail to seal, which is why it does not wait for a
         // `DumpMemIndex`.
-        self.publish_spann_chunks(bound_ts);
+        self.publish_spann_chunks(bound_ts).await;
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         // Bound the page cache the way the reference's buffer manager does:
@@ -1349,9 +1360,21 @@ impl Engine {
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the catalog and the row store follow at the end of
         // the checkpoint, once they are flushed.
-        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
+        // Cloned out in a block: the `std::sync::MutexGuard` from `lock()` lives
+        // to the end of its statement, and this statement spans an await.
+        let client = {
+            let guard = self.context.object_store.lock().unwrap();
+            guard.clone()
+        };
+        if let Some(client) = client {
             let root = self.dir.join("data");
-            let _ = storage::s3::sync_tree(&client, &root, "data");
+            // An S3 client is synchronous (plain TCP, optional rustls): the
+            // upload is blocking I/O, so it goes to the blocking pool.
+            crate::scheduler::scheduler()
+                .spawn_blocking(move || {
+                    let _ = storage::s3::sync_tree(&client, &root, "data");
+                })
+                .await;
         } // Mirror the catalog into the C++ key space / value encoding, in the
           // catalog store at `<dir>/catalog` (the path the C++ engine uses). A
           // C++-only catalog already rewrites on every DDL, so nothing is left to
@@ -1378,8 +1401,16 @@ impl Engine {
         // store holds their rows, so a directory restored from `data/` alone
         // has block files that belong to no table (measured: the table was
         // simply absent after the local files were wiped).
-        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
-            storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
+        // Same block: the guard may not cross the upload's await.
+        let client = {
+            let guard = self.context.object_store.lock().unwrap();
+            guard.clone()
+        };
+        if let Some(client) = client {
+            let root = self.dir.join("catalog");
+            crate::scheduler::scheduler()
+                .spawn_blocking(move || storage::s3::sync_tree(&client, &root, "catalog"))
+                .await?;
         }
         // The frame goes last, once every file it claims is on disk: the block
         // mirror, the index chunks and the store are all written and flushed
@@ -1409,8 +1440,16 @@ impl Engine {
     /// [`Self::flush`] already uploads. No-op upload when no store is bound.
     pub async fn checkpoint_to_object_store(&self) -> Result<()> {
         self.flush().await?;
-        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
-            storage::s3::sync_tree(&client, &self.dir.join("catalog"), "catalog")?;
+        // Same block: the guard may not cross the upload's await.
+        let client = {
+            let guard = self.context.object_store.lock().unwrap();
+            guard.clone()
+        };
+        if let Some(client) = client {
+            let root = self.dir.join("catalog");
+            crate::scheduler::scheduler()
+                .spawn_blocking(move || storage::s3::sync_tree(&client, &root, "catalog"))
+                .await?;
         }
         Ok(())
     }
@@ -1530,14 +1569,17 @@ impl Engine {
     /// Rotates and prunes the WAL without touching the KV store. Called by the
     /// periodic checkpoint loop so a slow `flush` cannot let the log grow
     /// unbounded; only fsynced records are dropped.
-    pub fn checkpoint_wal(&self) {
-        crate::scheduler::block_on(self.checkpoint_wal_async())
+    ///
+    /// In production the periodic trigger awaits this directly
+    /// (`engine::tasks`); the `#[cfg(test)]` name below is only the spelling the
+    /// tests use for one tick by hand. Both are async - a synchronous adapter
+    /// could only be a `block_on`, and there is nothing left to bridge.
+    #[cfg(test)]
+    pub async fn checkpoint_wal(&self) {
+        self.checkpoint_wal_async().await;
     }
 
-    /// The async body of [`Self::checkpoint_wal`].
-    ///
-    /// The trigger loop awaits this directly; the synchronous wrapper above is
-    /// what tests and the CLI call.
+    /// Rotates and prunes the WAL without touching the KV store.
     pub(crate) async fn checkpoint_wal_async(&self) {
         // The reference's checkpoint appends a `kNewCheckpoint` entry and then
         // drops everything up to it. The entry is what makes the directory
@@ -1565,10 +1607,11 @@ impl Engine {
     /// Runs the reference's optimize pass over the index mirrors: a mirror
     /// whose newest chunk does not cover every live row gets a merged chunk.
     ///
-    /// The synchronous form; the background task awaits
-    /// [`Self::optimize_indexes_async`] directly.
-    pub fn optimize_indexes(&self) -> Result<()> {
-        crate::scheduler::block_on(self.optimize_indexes_async())
+    /// Test-only name for [`Self::optimize_indexes_async`]: production submits
+    /// the work to the background processor, which awaits that one.
+    #[cfg(test)]
+    pub async fn optimize_indexes(&self) -> Result<()> {
+        self.optimize_indexes_async().await
     }
 
     /// The async body of [`Self::optimize_indexes`].
@@ -1585,6 +1628,6 @@ impl Engine {
         // this call it had no branch at all - the doc's "OPTIMIZE INDEX does
         // nothing for spann" was literally true.
         let ts = self.checkpoint_ts();
-        self.optimize_spann_indexes(ts)
+        self.optimize_spann_indexes(ts).await
     }
 }

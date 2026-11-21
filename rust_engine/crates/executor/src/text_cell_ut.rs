@@ -26,8 +26,8 @@
 use crate::{Engine, QueryResult};
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -39,11 +39,13 @@ fn texts(rows: Vec<Vec<String>>) -> Vec<String> {
     rows.into_iter().map(|r| r.join(" ")).collect()
 }
 
-#[test]
-fn varchar_cell_is_not_retyped_on_the_way_back() {
+#[tokio::test]
+async fn varchar_cell_is_not_retyped_on_the_way_back() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    rows(&engine, "CREATE TABLE t (c1 VARCHAR, c2 INT);");
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    rows(&engine, "CREATE TABLE t (c1 VARCHAR, c2 INT);").await;
     for (i, cell) in ["iNF", "007", "1.50", "infinity", "nan", "true", "null"]
         .iter()
         .enumerate()
@@ -51,39 +53,42 @@ fn varchar_cell_is_not_retyped_on_the_way_back() {
         rows(
             &engine,
             &format!("INSERT INTO t VALUES ('{cell}', {});", i + 1),
-        );
+        )
+        .await;
     }
 
     // `null` is the spelling the stored form writes for a NULL cell, so that one
     // cell reads back as NULL (rendered `null`); the other six keep their bytes.
     assert_eq!(
-        texts(rows(&engine, "SELECT c1 FROM t ORDER BY c2;")),
+        texts(rows(&engine, "SELECT c1 FROM t ORDER BY c2;").await),
         vec!["iNF", "007", "1.50", "infinity", "nan", "true", "null"]
     );
     assert_eq!(
-        texts(rows(&engine, "SELECT count(*) FROM t WHERE c1 IS NULL;")),
+        texts(rows(&engine, "SELECT count(*) FROM t WHERE c1 IS NULL;").await),
         vec!["1"]
     );
     assert_eq!(
-        texts(rows(&engine, "SELECT c2 FROM t WHERE c1 = 'iNF';")),
+        texts(rows(&engine, "SELECT c2 FROM t WHERE c1 = 'iNF';").await),
         vec!["1"]
     );
 }
 
 /// The read has to survive a block round trip, not just the in-memory append
 /// buffer: `flush` seals the blocks and the second read comes off the files.
-#[test]
-fn varchar_cell_survives_a_flush() {
+#[tokio::test]
+async fn varchar_cell_survives_a_flush() {
     let dir = tempdir().unwrap();
-    let engine = Engine::open(dir.path()).unwrap();
-    rows(&engine, "CREATE TABLE t (c1 VARCHAR, c2 INT);");
-    rows(&engine, "INSERT INTO t VALUES ('iNF', 1);");
-    rows(&engine, "INSERT INTO t VALUES ('inf', 2);");
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    rows(&engine, "CREATE TABLE t (c1 VARCHAR, c2 INT);").await;
+    rows(&engine, "INSERT INTO t VALUES ('iNF', 1);").await;
+    rows(&engine, "INSERT INTO t VALUES ('inf', 2);").await;
 
     crate::block_on(engine.flush()).unwrap();
 
     assert_eq!(
-        texts(rows(&engine, "SELECT c1, c2 FROM t ORDER BY c2;")),
+        texts(rows(&engine, "SELECT c1, c2 FROM t ORDER BY c2;").await),
         vec!["iNF 1", "inf 2"]
     );
 }

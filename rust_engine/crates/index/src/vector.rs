@@ -333,9 +333,16 @@ impl PlainVecs {
     }
 
     /// `GetVec`: the `dims` floats of vertex `i`, or `None` past the end.
+    ///
+    /// Two multiply/range checks per call, and this sits on the build's
+    /// innermost path (`distance_nodes` calls it twice), so `end` is computed
+    /// with its own `checked_add` rather than as `start + dims` inside the
+    /// range - the latter is a second overflow check LLVM cannot fold away.
+    #[inline]
     fn get(&self, i: usize) -> Option<&[f32]> {
         let start = i.checked_mul(self.dims)?;
-        self.data.get(start..start + self.dims)
+        let end = start.checked_add(self.dims)?;
+        self.data.get(start..end)
     }
 }
 
@@ -432,8 +439,31 @@ impl Store {
     ///
     /// True for the plain store, where `GetVecToQuery` copies `dims` floats
     /// that a caller can read in place instead.
-    pub(crate) fn queries_are_stored_vectors(&self) -> bool {
-        matches!(self, Store::Plain { .. })
+    /// The stored bytes of `node`, when they are themselves the vector.
+    ///
+    /// The plain store keeps every vector back to back, so a node's row is a
+    /// slice of one buffer. Returning it once lets a caller that scores the
+    /// same query against many nodes pay the offset arithmetic and the bounds
+    /// check a single time instead of once per comparison - which is what
+    /// `QueryRef::Row` does. No allocation, no copy.
+    pub(crate) fn plain_row(&self, node: usize) -> Option<&[f32]> {
+        match self {
+            Store::Plain { data, .. } => data.get(node),
+            _ => None,
+        }
+    }
+
+    /// The metric of a plain store (`None` for the quantized ones).
+    pub(crate) fn plain_metric(&self) -> Option<Metric> {
+        match self {
+            Store::Plain { metric, .. } => Some(*metric),
+            _ => None,
+        }
+    }
+
+    /// `plain_distance` between two already-resolved rows.
+    pub(crate) fn distance_rows(a: &[f32], b: &[f32], metric: Metric) -> f32 {
+        plain_distance(a, b, metric)
     }
 
     /// The query for the vector stored at `node` (the reference's `GetVecToQuery`).
@@ -495,11 +525,14 @@ impl Store {
     /// reverse-link pruning).
     pub(crate) fn distance_nodes(&self, a: usize, b: usize) -> f32 {
         match self {
-            Store::Plain { metric, data } => data
-                .get(a)
-                .zip(data.get(b))
-                .map(|(x, y)| plain_distance(x, y, *metric))
-                .unwrap_or(f32::MAX),
+            // Two `get`s and a `zip` around the kernel: the heuristic calls
+            // this once per (candidate, kept) pair, which is the build's
+            // innermost loop. Matching the variant first lets the compiler
+            // hoist `metric` and skip the enum dispatch per call.
+            Store::Plain { metric, data } => match (data.get(a), data.get(b)) {
+                (Some(x), Some(y)) => plain_distance(x, y, *metric),
+                _ => f32::MAX,
+            },
             Store::Lvq(store) => match (store.record(a), store.record(b)) {
                 // Borrow both records: `query_at` clones the whole i8 code, and
                 // this runs once per candidate comparison.
@@ -596,7 +629,14 @@ pub struct HnswIndex {
     lsg: Option<crate::lsg::LsgIndex>,
     levels: Vec<usize>,
     /// `links[layer][node]` = neighbor node ids.
-    links: Vec<Vec<Vec<usize>>>,
+    ///
+    /// Stored **already locked**, which is the shape a parallel build needs
+    /// (`LockedLinks`). Keeping the unlocked form meant `add_batch` wrapped
+    /// every existing cell in a fresh `RwLock` and unwrapped it again, once per
+    /// call - free when an index was built in one batch, and O(rows x layers)
+    /// per call once a caller feeds the rows a block at a time (123 calls on
+    /// SIFT 1M).
+    links: Vec<Vec<std::sync::RwLock<Vec<usize>>>>,
     entry: Option<usize>,
     max_level: usize,
     rng: Rng,
@@ -700,16 +740,30 @@ impl HnswIndex {
     /// scaling applied against 0.998 without — the port's answers diverged from
     /// the reference's and from what `metric='l2'` promises.
     ///
-    /// [`crate::lsg::LsgIndex`] is kept: it is the port of `HnswLSGBuilder` +
+    /// [`crate::lsg::LsgIndex`] is **not trained here**, so `build_type='lsg'`
+    /// currently builds an unscaled graph. That matches the reference: its
+    /// `HnswLSGBuilder` is not wired into `CREATE INDEX` either, which is why a
+    /// build-time comparison between the two is like for like without
+    /// disabling anything. `LsgIndex` itself is the port of that builder plus
     /// `LSGDistWrapper`, exercised by its own tests against
-    /// `test_lsg_build_ut.cpp`, and [`HnswIndex::adjust`] honours it when a
-    /// graph carries one (a graph loaded with scaling, or a future build that
-    /// trains it).
+    /// `test_lsg_build_ut.cpp`, and [`Self::adjust`] honours it for a graph
+    /// that does carry one.
+    ///
+    /// The parameter is kept, and named, so the missing step is visible at the
+    /// call site rather than looking like a config this function reads.
     pub fn train_store<V: AsRef<[f32]> + Sync>(
         &mut self,
         vectors: &[V],
-        _lsg: Option<crate::lsg::LsgConfig>,
+        lsg: Option<crate::lsg::LsgConfig>,
     ) {
+        if lsg.is_some() {
+            // Loud, not silent: a caller that asked for scaling and got an
+            // unscaled graph must not have to read the source to find out.
+            eprintln!(
+                "[HNSW] build_type='lsg' is not implemented on this port; \
+                 building an unscaled graph (the reference does the same)"
+            );
+        }
         self.store.train(vectors);
     }
 
@@ -759,12 +813,32 @@ impl HnswIndex {
     }
 
     /// Neighbours of `node` on `layer` (empty when absent).
-    pub fn neighbors(&self, layer: usize, node: usize) -> &[usize] {
-        self.links
-            .get(layer)
-            .and_then(|l| l.get(node))
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+    ///
+    /// Copied out from under the cell's lock: a reader may hold the result
+    /// while another thread links the vertex, so a borrowed slice cannot be
+    /// handed out. The hot paths inside this type use [`Self::with_neighbors`]
+    /// instead, which reads the list under the lock and allocates nothing.
+    pub fn neighbors(&self, layer: usize, node: usize) -> Vec<usize> {
+        self.with_neighbors(layer, node, |list| list.to_vec())
+    }
+
+    /// `GetNeighbors` with the read lock held for the span of `f`.
+    ///
+    /// The same contract the parallel builder uses: `f` only reads and computes
+    /// distances, so a writer waiting for this vertex cannot be blocked by it.
+    pub(crate) fn with_neighbors<R>(
+        &self,
+        layer: usize,
+        node: usize,
+        f: impl FnOnce(&[usize]) -> R,
+    ) -> R {
+        match self.links.get(layer).and_then(|l| l.get(node)) {
+            Some(cell) => {
+                let list = cell.read().unwrap_or_else(|e| e.into_inner());
+                f(&list)
+            }
+            None => f(&[]),
+        }
     }
 
     /// The stored (decompressed) vector of `node`.
@@ -790,7 +864,9 @@ impl HnswIndex {
             }
         }
         for (layer, nodes) in self.links.iter().enumerate() {
-            for (node, neighbors) in nodes.iter().enumerate() {
+            for (node, cell) in nodes.iter().enumerate() {
+                let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
+                let neighbors = &*neighbors;
                 let mut seen = HashSet::with_capacity(neighbors.len());
                 for &neighbor in neighbors {
                     if neighbor >= n {
@@ -818,7 +894,7 @@ impl HnswIndex {
     pub fn dump(&self, out: &mut impl Write) -> std::io::Result<()> {
         for node in 0..self.store.len() {
             write!(out, "{node} {}", self.level_of(node))?;
-            for &neighbor in self.neighbors(0, node) {
+            for neighbor in self.neighbors(0, node) {
                 write!(out, " {neighbor}")?;
             }
             writeln!(out)?;
@@ -859,9 +935,10 @@ impl HnswIndex {
         put_u64(&mut out, self.links.len() as u64);
         for layer in &self.links {
             put_u64(&mut out, layer.len() as u64);
-            for neighbors in layer {
+            for cell in layer {
+                let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
                 put_u64(&mut out, neighbors.len() as u64);
-                for &neighbor in neighbors {
+                for &neighbor in neighbors.iter() {
                     out.extend_from_slice(&(neighbor as u32).to_le_bytes());
                 }
             }
@@ -999,17 +1076,21 @@ impl HnswIndex {
         store: Store,
         lsg: Option<crate::lsg::LsgIndex>,
         levels: Vec<usize>,
-        mut links: Vec<Vec<Vec<usize>>>,
+        links: Vec<Vec<Vec<usize>>>,
         entry: Option<usize>,
         max_level: usize,
     ) -> Self {
+        let mut links: Vec<Vec<std::sync::RwLock<Vec<usize>>>> = links
+            .into_iter()
+            .map(|layer| layer.into_iter().map(std::sync::RwLock::new).collect())
+            .collect();
         for (node, level) in levels.iter().enumerate() {
             for layer in 0..=*level {
                 while links.len() <= layer {
                     links.push(Vec::new());
                 }
                 while links[layer].len() <= node {
-                    links[layer].push(Vec::new());
+                    links[layer].push(std::sync::RwLock::new(Vec::new()));
                 }
             }
         }
@@ -1139,7 +1220,8 @@ impl HnswIndex {
             .map(|layer| {
                 layer
                     .iter()
-                    .map(|neighbors| {
+                    .map(|cell| {
+                        let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
                         std::mem::size_of::<u32>() + neighbors.len() * std::mem::size_of::<u32>()
                     })
                     .sum::<usize>()
@@ -1227,7 +1309,7 @@ impl HnswIndex {
         // the bottom layer is where every insert does up to `2M` reverse links.
         let cap = if layer == 0 { self.m * 2 } else { self.m };
         while self.links[layer].len() <= node {
-            self.links[layer].push(Vec::with_capacity(cap));
+            self.links[layer].push(std::sync::RwLock::new(Vec::with_capacity(cap)));
         }
     }
 
@@ -1265,20 +1347,24 @@ impl HnswIndex {
     fn connect_neighbors(&mut self, target: usize, node: usize, layer: usize) {
         self.ensure(layer, target);
         let max_m = if layer == 0 { self.m * 2 } else { self.m };
-        if self.links[layer][target].len() < max_m {
-            self.links[layer][target].push(node);
+        // One write lock for the whole update: the list is read to build the
+        // candidate set and rewritten in place below.
+        let mut list = self.links[layer][target]
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+        if list.len() < max_m {
+            list.push(node);
             return;
         }
-        let mut cands: Vec<(f32, usize)> = Vec::with_capacity(self.links[layer][target].len() + 1);
+        let mut cands: Vec<(f32, usize)> = Vec::with_capacity(list.len() + 1);
         cands.push((self.distance_nodes(target, node), node));
-        for &nb in &self.links[layer][target] {
+        for &nb in list.iter() {
             cands.push((self.distance_nodes(target, nb), nb));
         }
         let kept = self.select_neighbors_heuristic(&cands, max_m);
         // Rewrite in place: `ensure` reserved `2M`/`M` slots, so replacing the
         // vector (as the reference's in-slab write does not) would throw that
         // capacity away and reallocate on the next prune.
-        let list = &mut self.links[layer][target];
         list.clear();
         list.extend(kept.into_iter().map(|(_, n)| n));
     }
@@ -1299,7 +1385,18 @@ impl HnswIndex {
     /// generator, so its levels are a scheduling outcome. Sampling in insertion
     /// order keeps them a property of the input, which is strictly easier to
     /// reproduce.
-    pub fn add_batch<V: AsRef<[f32]>>(&mut self, vectors: &[V], threads: usize) -> usize {
+    /// Bucket-parallel build of one batch.
+    ///
+    /// Async: the buckets are `spawn_blocking` jobs, so the fan-out is awaited
+    /// on the caller's runtime rather than entered through a nested
+    /// `block_on`. A synchronous caller with a `std::sync::MutexGuard` on the
+    /// graph cannot reach this; it takes the lock itself (see
+    /// `HnswIndexInMem::insert_batch`).
+    pub async fn add_batch<V: AsRef<[f32]> + Sync>(
+        &mut self,
+        vectors: &[V],
+        threads: usize,
+    ) -> usize {
         if vectors.is_empty() {
             return 0;
         }
@@ -1336,19 +1433,27 @@ impl HnswIndex {
             }
         }
 
-        // 2. A locked graph covering the whole batch.
-        let mut links: Vec<Vec<std::sync::RwLock<Vec<usize>>>> = std::mem::take(&mut self.links)
-            .into_iter()
-            .map(|layer| layer.into_iter().map(std::sync::RwLock::new).collect())
-            .collect();
+        // 2. The graph, already locked: `self.links` is stored in the build's
+        // own shape, so a batch neither wraps the existing cells in fresh
+        // `RwLock`s nor unwraps them again afterwards. That conversion was free
+        // when an index was built in one call and O(rows x layers) per call
+        // once a caller fed the rows a block at a time.
+        let mut links = std::mem::take(&mut self.links);
         while links.len() <= max_level {
             links.push(Vec::new());
         }
         let n = levels.len();
-        for (layer, slots) in links.iter_mut().enumerate() {
-            let cap = if layer == 0 { self.m * 2 } else { self.m };
+        // Empty vectors, no reserved capacity. `Vec::with_capacity(cap)` here
+        // heap-allocated `cap` slots for **every** vertex on **every** layer up
+        // to `max_level`, while a vertex only ever fills the layers up to its
+        // own level (`levels[i]`) and most hold far fewer than `M` neighbours
+        // (the heuristic prunes on distance). On SIFT 1M that was 5M
+        // allocations of 128/64 bytes - tens of millions of `malloc`s before
+        // the first edge was written. `connect_neighbors` grows the list as it
+        // fills; the per-vertex lock already serialises those pushes.
+        for slots in links.iter_mut() {
             if slots.len() < n {
-                slots.resize_with(n, || std::sync::RwLock::new(Vec::with_capacity(cap)));
+                slots.resize_with(n, || std::sync::RwLock::new(Vec::new()));
             }
         }
 
@@ -1396,8 +1501,8 @@ impl HnswIndex {
         // A bucket is pure graph construction over memory, so it is the
         // **blocking unit**: one tokio task per bucket, `threads` permits on a
         // semaphore, and the build itself on the blocking pool. The caller is
-        // free to run this from a runtime worker - `for_each_blocking` parks it
-        // while the tasks run - and nothing else is moved across a thread.
+        // free to run this from a runtime worker - the fan-out awaits the tasks
+        // rather than parking it - and nothing else is moved across a thread.
         //
         // The index's own fields are moved into the shared state (the store and
         // the LSG index are read by every bucket; the graph is written under
@@ -1440,11 +1545,20 @@ impl HnswIndex {
         let buckets = crate::parallel_build::build_buckets(base, n, prebuilt, threads);
         {
             let shared = std::sync::Arc::clone(&shared);
-            crate::parallel::for_each_blocking(buckets, threads, move |(start, end, skip)| {
+            // A bucket is pure CPU: graph construction over memory, taking
+            // seconds per bucket on a large build. It goes to the blocking
+            // pool, not to a runtime worker - a worker that ran it would stop
+            // polling every other task on the runtime.
+            // `add_batch` is async and its caller holds a `tokio::sync::Mutex`
+            // guard on the graph, so the fan-out may await the blocking pool -
+            // a bucket is a pure-CPU leaf that would otherwise occupy a
+            // runtime worker for seconds.
+            crate::parallel::for_each_cpu_bound(buckets, threads, move |(start, end, skip)| {
                 let builder = shared.builder();
                 crate::parallel_build::build_serial(&builder, start, end, skip);
                 Ok(())
             })
+            .await
             .expect("building a bucket cannot fail");
         }
         let shared = std::sync::Arc::try_unwrap(shared)
@@ -1456,15 +1570,7 @@ impl HnswIndex {
                 .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"))
         });
         self.links = std::sync::Arc::try_unwrap(shared.links)
-            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"))
-            .into_iter()
-            .map(|layer| {
-                layer
-                    .into_iter()
-                    .map(|cell| cell.into_inner().unwrap_or_else(|e| e.into_inner()))
-                    .collect()
-            })
-            .collect();
+            .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"));
         self.levels = std::sync::Arc::try_unwrap(shared.levels)
             .unwrap_or_else(|_| panic!("the bucket tasks outlived the build"));
         self.max_level = max_level;
@@ -1531,7 +1637,9 @@ impl HnswIndex {
                 continue;
             }
             ep = neighbors[0].1;
-            self.links[l as usize][node] = neighbors.iter().map(|(_, n)| *n).collect();
+            *self.links[l as usize][node]
+                .write()
+                .unwrap_or_else(|e| e.into_inner()) = neighbors.iter().map(|(_, n)| *n).collect();
             for (_, nb) in &neighbors {
                 self.connect_neighbors(*nb, node, l as usize);
             }
@@ -1551,7 +1659,8 @@ impl HnswIndex {
         let mut cur_d = self.distance_query(q, self_id, cur);
         loop {
             let mut changed = false;
-            if let Some(list) = self.links.get(layer).and_then(|l| l.get(cur)) {
+            if let Some(cell) = self.links.get(layer).and_then(|l| l.get(cur)) {
+                let list = cell.read().unwrap_or_else(|e| e.into_inner());
                 for &nb in list.iter().rev() {
                     let d = self.distance_query(q, self_id, nb);
                     if d < cur_d {
@@ -1656,10 +1765,11 @@ impl HnswIndex {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            let Some(list) = self.links.get(layer).and_then(|l| l.get(c)) else {
+            let Some(cell) = self.links.get(layer).and_then(|l| l.get(c)) else {
                 continue;
             };
-            for &nb in list {
+            let list = cell.read().unwrap_or_else(|e| e.into_inner());
+            for &nb in list.iter() {
                 if nb >= nodes || !visited.visit(nb) {
                     continue;
                 }
@@ -1695,8 +1805,11 @@ impl HnswIndex {
             .links
             .iter()
             .map(|layer| {
-                layer.capacity() * std::mem::size_of::<Vec<usize>>()
-                    + layer.iter().map(|l| l.capacity() * 8).sum::<usize>()
+                layer.capacity() * std::mem::size_of::<std::sync::RwLock<Vec<usize>>>()
+                    + layer
+                        .iter()
+                        .map(|l| l.read().unwrap_or_else(|e| e.into_inner()).capacity() * 8)
+                        .sum::<usize>()
             })
             .sum();
         data + levels + links
@@ -1867,8 +1980,8 @@ pub(crate) mod chunk_file {
             for node in 0..n {
                 let neighbors = index.neighbors(layer, node);
                 put_u64(&mut out, neighbors.len() as u64);
-                for &neighbor in neighbors {
-                    put_u64(&mut out, neighbor as u64);
+                for neighbor in &neighbors {
+                    put_u64(&mut out, *neighbor as u64);
                 }
             }
         }
@@ -1959,20 +2072,6 @@ mod tests {
             .collect()
     }
 
-    /// The runtime a bucket-parallel build spawns its tasks on.
-    ///
-    /// The index crate builds no runtime of its own, so a test that means to
-    /// exercise the parallel path has to bring one - otherwise `add_batch`
-    /// finds no runtime and builds bucket by bucket on this thread, which still
-    /// answers the same queries and would let a broken bucket path pass.
-    fn build_runtime() -> tokio::runtime::Runtime {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(4)
-            .enable_all()
-            .build()
-            .expect("build the test runtime")
-    }
-
     #[test]
     fn flat_exact_top1() {
         let data = dataset(50, 4);
@@ -2000,17 +2099,16 @@ mod tests {
     /// variants: the parallel path samples the levels up front and builds the
     /// top vertex first, so a mistake there shows up as a wrong answer rather
     /// than a crash.
-    #[test]
-    fn batch_build_matches_serial_answers() {
+    #[tokio::test]
+    async fn batch_build_matches_serial_answers() {
         let data = dataset(1200, 8);
         let mut serial = HnswIndex::new(8, 16, 100, 64);
         let mut parallel = HnswIndex::new(8, 16, 100, 64);
         for v in &data {
             serial.add(v);
         }
-        // Inside a runtime, so the batch really takes the bucket-parallel path.
-        let rt = build_runtime();
-        let built = rt.block_on(async { parallel.add_batch(&data, 4) });
+        // The batch takes the bucket-parallel path, on the blocking pool.
+        let built = parallel.add_batch(&data, 4).await;
         assert_eq!(built, data.len());
         assert_eq!(parallel.len(), serial.len());
         let mut rng = Rng::new(11);
@@ -2042,10 +2140,9 @@ mod tests {
     /// the serial path made an LVQ index build on one core, so this pins both
     /// the parallelism (the batch path is entered, the graph is well formed)
     /// and the answers (they match a serial build of the same data).
-    #[test]
-    fn quantized_batch_build_matches_serial_answers() {
+    #[tokio::test]
+    async fn quantized_batch_build_matches_serial_answers() {
         let data = dataset(1200, 8);
-        let rt = build_runtime();
         for encoding in [HnswEncoding::Lvq, HnswEncoding::Rabitq] {
             let mut serial = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
             serial.train_store(&data, None);
@@ -2054,7 +2151,7 @@ mod tests {
             }
             let mut parallel = HnswIndex::with_encoding(8, 16, 100, 64, Metric::L2, encoding);
             parallel.train_store(&data, None);
-            let built = rt.block_on(async { parallel.add_batch(&data, 4) });
+            let built = parallel.add_batch(&data, 4).await;
             assert_eq!(built, data.len());
             assert_eq!(parallel.len(), serial.len());
             // A serial build must not have been taken: with 1200 vertices and 4

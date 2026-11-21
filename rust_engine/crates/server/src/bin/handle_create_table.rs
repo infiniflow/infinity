@@ -21,9 +21,15 @@ use executor::Engine;
 use server::{read_create_table_call, run_create_table, write_reply_common};
 
 fn main() {
+    executor::scheduler().block_on_runtime(run());
+}
+
+async fn run() {
     let dir = std::env::temp_dir().join(format!("infinity-thrift-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let engine = Engine::open(&dir).expect("open engine");
+    let engine = Engine::open_async(&dir, Default::default())
+        .await
+        .expect("open engine");
 
     let mut stdin = std::io::stdin();
     let (seq, req) = read_create_table_call(&mut stdin).expect("decode CreateTable call");
@@ -31,8 +37,8 @@ fn main() {
     // The same primitive the Thrift `CreateTable` handler uses, so the fixture
     // builds `Statement::CreateTable` from the request rather than rendering
     // the column names into a statement string.
-    let resp = executor::block_on(run_create_table(Some(&engine), &req));
-    let _ = executor::block_on(engine.flush());
+    let resp = (run_create_table(Some(&engine), &req)).await;
+    let _ = (engine.flush()).await;
 
     let mut out = std::io::stdout().lock();
     write_reply_common(&mut out, "CreateTable", seq, &resp).expect("write reply");

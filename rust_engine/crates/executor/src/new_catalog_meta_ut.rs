@@ -30,8 +30,8 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -39,8 +39,9 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     Vec::new()
 }
 
-fn columns(engine: &Engine, table: &str) -> Vec<String> {
+async fn columns(engine: &Engine, table: &str) -> Vec<String> {
     rows(engine, &format!("SHOW TABLE {table} COLUMNS;"))
+        .await
         .into_iter()
         .map(|row| row[0].clone())
         .collect()
@@ -86,12 +87,15 @@ impl Engine {
 /// C++ `table_meta_ut.cpp:49` (`table_meta`): one appended block is exposed by
 /// the segment/block metadata; adding empty blocks and segments updates the
 /// block/segment id lists without changing the row count.
-#[test]
-fn table_meta() {
+#[tokio::test]
+async fn table_meta() {
     let dir = tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE DATABASE db1;").unwrap();
-    e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE DATABASE db1;").await.unwrap();
+    e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
 
     let batch: Vec<Vec<Literal>> = (0..8192)
@@ -102,16 +106,13 @@ fn table_meta() {
             ]
         })
         .collect();
-    e.insert_literals("db1.tb1", None, batch).unwrap();
+    e.insert_literals("db1.tb1", None, batch).await.unwrap();
 
     // Materialise the C++ block layout (the reference's flushed block 0).
-    assert_eq!(
-        crate::scheduler::block_on(e.write_blocks("db1.tb1")).unwrap(),
-        8192
-    );
+    assert_eq!(e.write_blocks("db1.tb1").await.unwrap(), 8192);
 
     // `GetSegmentIDs1` / `GetBlockIDs1` / `GetRowCnt1`.
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
     assert_eq!(e.block_ids("db1.tb1", 0), vec![0]);
     assert_eq!(e.block_row_count("db1.tb1", 0, 0), Some(8192));
     assert_eq!(e.segment_rows("db1.tb1", 0), 8192);
@@ -128,7 +129,7 @@ fn table_meta() {
     // `AddSegmentWithID` twice: ids 1 and 2 with no rows.
     e.add_segment_meta("db1.tb1", 1);
     e.add_segment_meta("db1.tb1", 2);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0, 1, 2]);
+    assert_eq!(e.segment_ids("db1.tb1").await, vec![0, 1, 2]);
     assert_eq!(e.segments("db1.tb1"), vec![(0, 8192), (1, 0), (2, 0)]);
 
     // `GetTableDir`: the table's directory is its table id under the database.
@@ -151,10 +152,10 @@ fn table_meta() {
     );
 
     // `GetColumnDefs` / `GetColumnIDByColumnName`: two columns, in order.
-    assert_eq!(columns(&e, "db1.tb1"), vec!["col1", "col2"]);
+    assert_eq!(columns(&e, "db1.tb1").await, vec!["col1", "col2"]);
 
-    e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
-    e.execute_blocking("DROP DATABASE db1;").unwrap();
+    e.execute("DROP TABLE db1.tb1;").await.unwrap();
+    e.execute("DROP DATABASE db1;").await.unwrap();
 }
 
 // ---------------------------------------------------------------------------

@@ -26,12 +26,15 @@ fn rows(rs: &[QueryResult]) -> Vec<Vec<String>> {
     }
 }
 
-#[test]
-fn every_statement_in_one_call_uses_its_own_result() {
+#[tokio::test]
+async fn every_statement_in_one_call_uses_its_own_result() {
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
     let rs = e
-        .execute_blocking("SELECT 1 AS a; SELECT 2 AS b; SELECT 3 AS c;")
+        .execute("SELECT 1 AS a; SELECT 2 AS b; SELECT 3 AS c;")
+        .await
         .unwrap();
     assert_eq!(rs.len(), 3);
     for (i, r) in rs.iter().enumerate() {
@@ -39,16 +42,20 @@ fn every_statement_in_one_call_uses_its_own_result() {
     }
 }
 
-#[test]
-fn the_row_id_system_column_is_selectable() {
+#[tokio::test]
+async fn the_row_id_system_column_is_selectable() {
     let dir = tempfile::tempdir().unwrap();
-    let e = Engine::open(dir.path()).unwrap();
-    e.execute_blocking("CREATE TABLE t (c1 INTEGER);").unwrap();
-    e.execute_blocking("INSERT INTO t VALUES (10), (20), (30);")
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    e.execute("CREATE TABLE t (c1 INTEGER);").await.unwrap();
+    e.execute("INSERT INTO t VALUES (10), (20), (30);")
+        .await
         .unwrap();
 
     let rs = e
-        .execute_blocking("SELECT c1, _row_id FROM t ORDER BY c1;")
+        .execute("SELECT c1, _row_id FROM t ORDER BY c1;")
+        .await
         .unwrap();
     let cols = match &rs[0] {
         QueryResult::Rows { columns, .. } => columns,

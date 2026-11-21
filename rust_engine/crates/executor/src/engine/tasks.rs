@@ -126,12 +126,10 @@ pub(crate) async fn trigger_loop(
             if !compact_interval.is_zero() && last_compact.elapsed() >= compact_interval {
                 last_compact = std::time::Instant::now();
                 // `CompactionProcessor::NewNotifyCompact`: every table, the
-                // segments `NewCompactionAlg` picks. `notify_compact` is still a
-                // synchronous walk (it takes each table's compaction lock), so
-                // it runs with the worker's core handed off rather than parking
-                // the tick.
-                let engine = engine.clone();
-                let _ = tokio::task::block_in_place(move || engine.notify_compact());
+                // segments `NewCompactionAlg` picks. Awaited like the
+                // checkpoint above - bridging it with `block_in_place` parked
+                // the tick's worker for the whole merge.
+                let _ = engine.notify_compact().await;
             }
             if !cleanup_interval.is_zero()
                 && last_cleanup.elapsed() >= cleanup_interval
@@ -144,13 +142,16 @@ pub(crate) async fn trigger_loop(
             // leaves the rest of a bulk load's backlog behind it; this is the
             // pass that catches up. It is bounded, and a tail with nothing
             // queued costs one short read, so an idle engine does no work here.
-            // `block_in_place`: the drain takes the tail's write lock, and a
-            // tokio worker must not park on it while other tasks are ready.
+            // Rebalancing a tail is pure CPU (it holds the tail's lock and
+            // splits/merges its nodes), so it goes to the blocking pool rather
+            // than parking a worker in place: `AGENTS.md` §7.8, and it keeps
+            // the per-tick wait an `.await` like every other step here.
             if engine.has_spann_fixups() {
                 let engine = engine.clone();
-                let _ = tokio::task::block_in_place(move || {
+                let _ = tokio::task::spawn_blocking(move || {
                     engine.spann_drain_fixups(crate::spann_mem::BACKGROUND_FIXUP_BUDGET)
-                });
+                })
+                .await;
             }
         }
         tokio::time::sleep(TICK).await;

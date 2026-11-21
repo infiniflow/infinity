@@ -37,7 +37,7 @@ impl Engine {
     ///   in whatever database the parser left, not the session's;
     /// * the result cache and the conflict retry loop - skipped: a read cannot
     ///   conflict, and a cache miss runs the same `run_select`.
-    pub(crate) fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+    pub(crate) async fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         let Some(stmt) = parse(sql)?.into_iter().next() else {
             return Ok((Vec::new(), Vec::new()));
         };
@@ -47,7 +47,7 @@ impl Engine {
             return Err(Error::Invalid("a derived table must be a SELECT".into()));
         }
         let qualified = self.qualify_tables(&stmt);
-        let (columns, rows) = self.run_select(&qualified)?;
+        let (columns, rows) = self.run_select(&qualified).await?;
         Ok((columns, rows.rows()))
     }
 
@@ -56,7 +56,7 @@ impl Engine {
     /// [`Self::run_select`] path is used so values are not round-tripped
     /// through their `.slt` text. `ctes` are the bindings already visible in
     /// the enclosing query.
-    pub(crate) fn run_subquery(
+    pub(crate) async fn run_subquery(
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
@@ -80,7 +80,7 @@ impl Engine {
         }
         let visible: Vec<String> = ctes.keys().cloned().collect();
         let stmt = self.qualify_tables_in(&stmt, &visible);
-        let (columns, rows) = self.run_select_with_ctes(&stmt, ctes)?;
+        let (columns, rows) = self.run_select_with_ctes(&stmt, ctes).await?;
         Ok((columns, rows.rows()))
     }
 
@@ -156,13 +156,13 @@ impl Engine {
         ))
     }
 
-    pub(crate) fn scalar_subquery_value(
+    pub(crate) async fn scalar_subquery_value(
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
         outer: &[String],
     ) -> Result<Value> {
-        let (columns, rows) = self.run_subquery(sql, ctes, outer)?;
+        let (columns, rows) = self.run_subquery(sql, ctes, outer).await?;
         if columns.len() > 1 {
             return Err(Error::Invalid(format!(
                 "scalar subquery must return only one column, got {}",
@@ -189,124 +189,142 @@ impl Engine {
     }
 
     /// `EXISTS (SELECT …)`: true when the subquery produces at least one row.
-    pub(crate) fn subquery_exists(
+    pub(crate) async fn subquery_exists(
         &self,
         sql: &str,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
         outer: &[String],
     ) -> Result<bool> {
-        Ok(!self.run_subquery(sql, ctes, outer)?.1.is_empty())
+        Ok(!self.run_subquery(sql, ctes, outer).await?.1.is_empty())
     }
 
     /// Rewrites the parser's `SUBQUERY`/`EXISTS` pseudo-functions into
     /// constants that the planner can evaluate. A scalar subquery becomes a
     /// literal (NULL when empty); `EXISTS` becomes a boolean comparison, which
     /// keeps `NOT EXISTS` working through `Predicate::Not`.
-    pub(crate) fn resolve_subquery_expr(
-        &self,
-        e: &ExprAst,
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-        outer: &[String],
-    ) -> Result<ExprAst> {
-        Ok(match e {
-            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
-                let sql = subquery_sql_arg(args)?;
-                ExprAst::Literal(value_to_literal(
-                    self.scalar_subquery_value(sql, ctes, outer)?,
-                ))
-            }
-            ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
-                let sql = exists_subquery_sql(args)?;
-                boolean_expr(self.subquery_exists(sql, ctes, outer)?)
-            }
-            ExprAst::Func { name, args } => ExprAst::Func {
-                name: name.clone(),
-                args: args
-                    .iter()
-                    .map(|a| self.resolve_subquery_expr(a, ctes, outer))
-                    .collect::<Result<Vec<_>>>()?,
-            },
-            ExprAst::Binary(a, op, b) => ExprAst::Binary(
-                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
-                *op,
-                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
-            ),
-            ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
-                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
-                *op,
-                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
-            ),
-            ExprAst::Not(a) => ExprAst::Not(Box::new(self.resolve_subquery_expr(a, ctes, outer)?)),
-            ExprAst::And(a, b) => ExprAst::And(
-                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
-                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
-            ),
-            ExprAst::Or(a, b) => ExprAst::Or(
-                Box::new(self.resolve_subquery_expr(a, ctes, outer)?),
-                Box::new(self.resolve_subquery_expr(b, ctes, outer)?),
-            ),
-            other => other.clone(),
+    pub(crate) fn resolve_subquery_expr<'a>(
+        &'a self,
+        e: &'a ExprAst,
+        ctes: &'a HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &'a [String],
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ExprAst>> + Send + 'a>> {
+        // Boxing the recursion: the rewrite walks an expression tree, so the
+        // future's type would otherwise contain itself.
+        Box::pin(async move {
+            Ok(match e {
+                ExprAst::Func { name, args } if name.eq_ignore_ascii_case("SUBQUERY") => {
+                    let sql = subquery_sql_arg(args)?;
+                    ExprAst::Literal(value_to_literal(
+                        self.scalar_subquery_value(sql, ctes, outer).await?,
+                    ))
+                }
+                ExprAst::Func { name, args } if name.eq_ignore_ascii_case("EXISTS") => {
+                    let sql = exists_subquery_sql(args)?;
+                    boolean_expr(self.subquery_exists(sql, ctes, outer).await?)
+                }
+                ExprAst::Func { name, args } => {
+                    let mut resolved = Vec::with_capacity(args.len());
+                    for a in args {
+                        resolved.push(self.resolve_subquery_expr(a, ctes, outer).await?);
+                    }
+                    ExprAst::Func {
+                        name: name.clone(),
+                        args: resolved,
+                    }
+                }
+                ExprAst::Binary(a, op, b) => ExprAst::Binary(
+                    Box::new(self.resolve_subquery_expr(a, ctes, outer).await?),
+                    *op,
+                    Box::new(self.resolve_subquery_expr(b, ctes, outer).await?),
+                ),
+                ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
+                    Box::new(self.resolve_subquery_expr(a, ctes, outer).await?),
+                    *op,
+                    Box::new(self.resolve_subquery_expr(b, ctes, outer).await?),
+                ),
+                ExprAst::Not(a) => {
+                    ExprAst::Not(Box::new(self.resolve_subquery_expr(a, ctes, outer).await?))
+                }
+                ExprAst::And(a, b) => ExprAst::And(
+                    Box::new(self.resolve_subquery_expr(a, ctes, outer).await?),
+                    Box::new(self.resolve_subquery_expr(b, ctes, outer).await?),
+                ),
+                ExprAst::Or(a, b) => ExprAst::Or(
+                    Box::new(self.resolve_subquery_expr(a, ctes, outer).await?),
+                    Box::new(self.resolve_subquery_expr(b, ctes, outer).await?),
+                ),
+                other => other.clone(),
+            })
         })
     }
 
-    pub(crate) fn resolve_subquery_pred(
-        &self,
-        p: &Predicate,
-        ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
-        outer: &[String],
-    ) -> Result<Predicate> {
-        Ok(match p {
-            // The parser wraps `EXISTS` as `IsTrue(EXISTS(SUBQUERY))`. Rewrite
-            // the whole predicate (not the inner expression) so the result is
-            // a comparison, which `validate_where_predicate` accepts.
-            Predicate::IsTrue(ExprAst::Func { name, args })
-                if name.eq_ignore_ascii_case("EXISTS") =>
-            {
-                let sql = exists_subquery_sql(args)?;
-                Predicate::Cmp(
-                    ExprAst::Literal(Literal::Int(1)),
-                    CmpOp::Eq,
-                    ExprAst::Literal(Literal::Int(i64::from(
-                        self.subquery_exists(sql, ctes, outer)?,
-                    ))),
-                )
-            }
-            Predicate::Cmp(a, op, b) => Predicate::Cmp(
-                self.resolve_subquery_expr(a, ctes, outer)?,
-                *op,
-                self.resolve_subquery_expr(b, ctes, outer)?,
-            ),
-            Predicate::IsTrue(e) => Predicate::IsTrue(self.resolve_subquery_expr(e, ctes, outer)?),
-            Predicate::IsNull(e, neg) => {
-                Predicate::IsNull(self.resolve_subquery_expr(e, ctes, outer)?, *neg)
-            }
-            Predicate::Like(a, pat, esc, neg) => Predicate::Like(
-                self.resolve_subquery_expr(a, ctes, outer)?,
-                self.resolve_subquery_expr(pat, ctes, outer)?,
-                *esc,
-                *neg,
-            ),
-            Predicate::In(a, vals, neg) => Predicate::In(
-                self.resolve_subquery_expr(a, ctes, outer)?,
-                vals.iter()
-                    .map(|v| self.resolve_subquery_expr(v, ctes, outer))
-                    .collect::<Result<Vec<_>>>()?,
-                *neg,
-            ),
-            Predicate::Bool(a, op, b) => Predicate::Bool(
-                Box::new(self.resolve_subquery_pred(a, ctes, outer)?),
-                *op,
-                Box::new(self.resolve_subquery_pred(b, ctes, outer)?),
-            ),
-            Predicate::Not(a) => {
-                Predicate::Not(Box::new(self.resolve_subquery_pred(a, ctes, outer)?))
-            }
+    pub(crate) fn resolve_subquery_pred<'a>(
+        &'a self,
+        p: &'a Predicate,
+        ctes: &'a HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
+        outer: &'a [String],
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Predicate>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(match p {
+                // The parser wraps `EXISTS` as `IsTrue(EXISTS(SUBQUERY))`.
+                // Rewrite the whole predicate (not the inner expression) so the
+                // result is a comparison, which `validate_where_predicate`
+                // accepts.
+                Predicate::IsTrue(ExprAst::Func { name, args })
+                    if name.eq_ignore_ascii_case("EXISTS") =>
+                {
+                    let sql = exists_subquery_sql(args)?;
+                    Predicate::Cmp(
+                        ExprAst::Literal(Literal::Int(1)),
+                        CmpOp::Eq,
+                        ExprAst::Literal(Literal::Int(i64::from(
+                            self.subquery_exists(sql, ctes, outer).await?,
+                        ))),
+                    )
+                }
+                Predicate::Cmp(a, op, b) => Predicate::Cmp(
+                    self.resolve_subquery_expr(a, ctes, outer).await?,
+                    *op,
+                    self.resolve_subquery_expr(b, ctes, outer).await?,
+                ),
+                Predicate::IsTrue(e) => {
+                    Predicate::IsTrue(self.resolve_subquery_expr(e, ctes, outer).await?)
+                }
+                Predicate::IsNull(e, neg) => {
+                    Predicate::IsNull(self.resolve_subquery_expr(e, ctes, outer).await?, *neg)
+                }
+                Predicate::Like(a, pat, esc, neg) => Predicate::Like(
+                    self.resolve_subquery_expr(a, ctes, outer).await?,
+                    self.resolve_subquery_expr(pat, ctes, outer).await?,
+                    *esc,
+                    *neg,
+                ),
+                Predicate::In(a, vals, neg) => {
+                    let mut resolved = Vec::with_capacity(vals.len());
+                    for v in vals {
+                        resolved.push(self.resolve_subquery_expr(v, ctes, outer).await?);
+                    }
+                    Predicate::In(
+                        self.resolve_subquery_expr(a, ctes, outer).await?,
+                        resolved,
+                        *neg,
+                    )
+                }
+                Predicate::Bool(a, op, b) => Predicate::Bool(
+                    Box::new(self.resolve_subquery_pred(a, ctes, outer).await?),
+                    *op,
+                    Box::new(self.resolve_subquery_pred(b, ctes, outer).await?),
+                ),
+                Predicate::Not(a) => {
+                    Predicate::Not(Box::new(self.resolve_subquery_pred(a, ctes, outer).await?))
+                }
+            })
         })
     }
 
     /// Resolves every subquery in a `SELECT`'s expressions. Returns `None`
     /// (without cloning the statement) when there is nothing to do.
-    pub(crate) fn resolve_stmt_subqueries(
+    pub(crate) async fn resolve_stmt_subqueries(
         &self,
         stmt: &Statement,
         ctes: &HashMap<String, (Vec<String>, Vec<Vec<Value>>)>,
@@ -354,30 +372,30 @@ impl Engine {
             match it {
                 SelectItem::Func { args, .. } => {
                     for a in args.iter_mut() {
-                        *a = self.resolve_subquery_expr(a, ctes, outer)?;
+                        *a = self.resolve_subquery_expr(a, ctes, outer).await?;
                     }
                 }
-                SelectItem::Expr(e) => *e = self.resolve_subquery_expr(e, ctes, outer)?,
+                SelectItem::Expr(e) => *e = self.resolve_subquery_expr(e, ctes, outer).await?,
                 SelectItem::Aggregate(a) => {
                     for e in a.arg_exprs.iter_mut().flatten() {
-                        *e = self.resolve_subquery_expr(e, ctes, outer)?;
+                        *e = self.resolve_subquery_expr(e, ctes, outer).await?;
                     }
                 }
                 _ => {}
             }
         }
         if let Some(p) = where_pred {
-            *p = self.resolve_subquery_pred(p, ctes, outer)?;
+            *p = self.resolve_subquery_pred(p, ctes, outer).await?;
         }
         for g in group_by.iter_mut() {
-            *g = self.resolve_subquery_expr(g, ctes, outer)?;
+            *g = self.resolve_subquery_expr(g, ctes, outer).await?;
         }
         if let Some(h) = having.as_mut() {
-            **h = self.resolve_subquery_pred(h, ctes, outer)?;
+            **h = self.resolve_subquery_pred(h, ctes, outer).await?;
         }
         for k in order_by.iter_mut() {
             if let Some(e) = k.expr.as_mut() {
-                *e = self.resolve_subquery_expr(e, ctes, outer)?;
+                *e = self.resolve_subquery_expr(e, ctes, outer).await?;
             }
         }
         // `SEARCH MATCH (…) WHERE <filter>` is compiled directly by the search
@@ -386,10 +404,10 @@ impl Engine {
         if let Some(search) = search.as_mut() {
             for m in search.matches.iter_mut() {
                 for a in m.args.iter_mut() {
-                    *a = self.resolve_subquery_expr(a, ctes, outer)?;
+                    *a = self.resolve_subquery_expr(a, ctes, outer).await?;
                 }
                 if let Some(f) = m.filter.as_mut() {
-                    *f = self.resolve_subquery_pred(f, ctes, outer)?;
+                    *f = self.resolve_subquery_pred(f, ctes, outer).await?;
                 }
             }
         }
@@ -413,34 +431,6 @@ impl Engine {
         }
     }
 
-    /// `block_on` adapter over [`Self::execute`] for callers that are not
-    /// async: the `cli`, the helper binaries and the ~1500 test call sites.
-    ///
-    /// This is a caller convenience, not a second code path - it polls exactly
-    /// the same future the wire handlers await.
-    ///
-    /// **It must not run on a runtime task.** The adapter parks the calling
-    /// thread, and a statement's completion can need the very worker it is
-    /// parked on (a bottom half, or the fan-out it dispatched): the statement
-    /// then waits for itself and the process hangs instead of failing. That is
-    /// not hypothetical - a background optimize that awaited a gate this way
-    /// stalled every client of the table for the whole Go suite's timeout. The
-    /// assertion turns the next such misuse into an immediate, named failure
-    /// in debug builds; the async entry ([`Self::execute`]) is what a task
-    /// must call.
-    pub fn execute_blocking(&self, sql: &str) -> Result<Vec<QueryResult>> {
-        // A plain `assert!`, not `debug_assert!`: this fired in a release build
-        // (the Thrift `run_common` helper called it from a handler task) and
-        // cost an afternoon - the server slept at 8% CPU with every worker
-        // parked. The check is one thread-local read per statement.
-        assert!(
-            tokio::task::try_id().is_none(),
-            "execute_blocking parks the calling thread; from inside a runtime \
-             task it deadlocks the worker. Await `execute` instead.\nSQL: {sql}"
-        );
-        crate::scheduler::block_on(self.execute(sql))
-    }
-
     /// Runs `sql` on the caller's task.
     ///
     /// Every wait in the chain is an `.await` (WAL writer, row allocator,
@@ -450,8 +440,9 @@ impl Engine {
     /// statement therefore holds a future, not a thread, which is what lets the
     /// server keep 100k connections open while their requests run.
     ///
-    /// Synchronous callers (`cli`, the helper binaries, the tests) go through
-    /// [`Self::execute_blocking`].
+    /// A caller without a runtime of its own enters one with `.await` (a
+    /// `#[tokio::test]`) or, if it is a process entry point, drives it once
+    /// through [`crate::scheduler::TaskScheduler::block_on_runtime`].
     /// `DROP TABLE` without the SQL round trip.
     ///
     /// The thrift `DropTable` RPC used to format `DROP TABLE <name>` and hand
@@ -493,7 +484,11 @@ impl Engine {
         // with an error too, not unwind the caller's task.
         let parsed = crate::panic_guard::guard(|| parse(sql))
             .unwrap_or_else(|payload| Err(crate::panic_guard::to_error(payload)))?;
-        self.execute_parsed(parsed, sql).await
+        // Boxed: the statement chain is by far the largest future in the
+        // engine, and every entry point that awaits it (a test on a 2 MiB test
+        // thread, a protocol handler in a generated dispatch) would otherwise
+        // have to hold it inline.
+        Box::pin(self.execute_parsed(parsed, sql)).await
     }
 
     /// Runs statements the caller has **already parsed**.
@@ -515,7 +510,10 @@ impl Engine {
         // AST): a panic in the statement chain becomes this request's error
         // here, so a front end only ever sees `Err`. Whether the instance should
         // be restarted afterwards is the deployment's call, not the engine's.
-        crate::panic_guard::guard_async(self.execute_statements(stmts, text))
+        // Boxed for the same reason as [`Self::execute`]: the chain is the
+        // biggest state machine in the engine, so it lives behind one pointer
+        // rather than inside every caller's frame.
+        crate::panic_guard::guard_async(Box::pin(self.execute_statements(stmts, text)))
             .await
             .unwrap_or_else(|payload| Err(crate::panic_guard::to_error(payload)))
     }
@@ -1148,8 +1146,15 @@ impl Engine {
         // runtime worker is free, so a thread-local set here would not be the
         // value the rest of the statement reads.
         let read_ts = self.txn.current_ts() + 1;
-        let mut res =
-            crate::engine::state::with_read_ts(read_ts, self.execute_stmt_inner(stmt)).await?;
+        // Boxed: `execute_stmt_inner` is the huge match, and inlining it here
+        // leaves its whole state machine in the frame of every caller up the
+        // chain - `execute` already boxes the two choke points above, and a
+        // deep-JSON statement that recurses (the JSON depth test) then runs out
+        // of a 2 MiB test thread's stack (AGENTS.md §7.7).
+        let inner: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<QueryResult>> + Send + '_>,
+        > = Box::pin(self.execute_stmt_inner(stmt));
+        let mut res = crate::engine::state::with_read_ts(read_ts, inner).await?;
         if let Statement::Select {
             highlight,
             search,
@@ -1207,7 +1212,9 @@ impl Engine {
                             // The reference rejects a zero bound at DDL time, but
                             // the SDK's `sparse,0,…` column type (physical type
                             // dimension 0) is accepted.
-                            let allow_zero = ALLOW_ZERO_SPARSE.with(|c| c.get())
+                            let allow_zero = ALLOW_ZERO_SPARSE
+                                .try_with(|allowed| *allowed)
+                                .unwrap_or(false)
                                 // the REST physical-type spelling declares an
                                 // unknown bound as 0
                                 || parts.len() >= 3;
@@ -2051,7 +2058,7 @@ impl Engine {
                     }
                     r
                 } else {
-                    self.copy_to(table, path, opts)
+                    self.copy_to(table, path, opts).await
                 }
             }
             Statement::CreateIndex {
@@ -2230,7 +2237,8 @@ impl Engine {
                 if has_rows && index_type.eq_ignore_ascii_case("FULLTEXT") {
                     let tokenizer = self.index_tokenizer(table, column);
                     if let Some(index_id) = created_index_id {
-                        self.text_index_for_id(table, index_id, column, tokenizer)?;
+                        self.text_index_for_id(table, index_id, column, tokenizer)
+                            .await?;
                     }
                 }
                 if index_type.eq_ignore_ascii_case("HNSW") {
@@ -2248,7 +2256,7 @@ impl Engine {
                         let entry = tables.entry(key).or_default();
                         entry.hnsw_topup = true;
                         if let Some(index_id) = created_index_id {
-                            entry.hnsw_mem.remove(&index_id);
+                            entry.hnsw_mem.retain(|(id, _), _| *id != index_id);
                         }
                     }
                     if has_rows {
@@ -2256,8 +2264,8 @@ impl Engine {
                         // on the column (the reference keeps one `MemIndex`
                         // per index id).
                         match created_index_id {
-                            Some(id) => self.build_hnsw_index_of(table, column, Some(id))?,
-                            None => self.build_hnsw_index(table, column)?,
+                            Some(id) => self.build_hnsw_index_of(table, column, Some(id)).await?,
+                            None => self.build_hnsw_index(table, column).await?,
                         }
                     }
                 }
@@ -2312,7 +2320,9 @@ impl Engine {
                         // `USING PLAID`) is a second `MemIndex` in the
                         // reference, so it is built under its own id and the
                         // first one keeps its tail and chunks.
-                        let _ = self.multivector_index_by_id(table, column, index_id, dims);
+                        let _ = self
+                            .multivector_index_by_id(table, column, index_id, dims)
+                            .await;
                     }
                 }
                 // The sparse BMP index is materialised the same way.
@@ -2366,7 +2376,8 @@ impl Engine {
                                 table,
                                 meta.id,
                                 Some((name.as_str(), create_ts)),
-                            )?;
+                            )
+                            .await?;
                         }
                     }
                 }
@@ -2609,7 +2620,7 @@ impl Engine {
                 }
                 // A subquery in the filter is evaluated once, before the scan.
                 let where_pred = match where_pred {
-                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[]).await?),
                     None => None,
                 };
                 let schema = self.table_schema(table)?;
@@ -2618,7 +2629,7 @@ impl Engine {
                     None => None,
                 };
                 let mut to_del = Vec::new();
-                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref())? {
+                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref()).await? {
                     let matches = match &pred {
                         Some(e) => e.eval_predicate(&row),
                         None => true,
@@ -2651,7 +2662,7 @@ impl Engine {
                     self.validate_where_predicate(table, p)?;
                 }
                 let where_pred = match where_pred {
-                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[])?),
+                    Some(p) => Some(self.resolve_subquery_pred(p, &HashMap::new(), &[]).await?),
                     None => None,
                 };
                 let schema = self.table_schema(table)?;
@@ -2719,7 +2730,7 @@ impl Engine {
                 };
                 let mut to_del = Vec::new();
                 let mut new_rows = Vec::new();
-                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref())? {
+                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref()).await? {
                     let matches = match &pred {
                         Some(e) => e.eval_predicate(&row),
                         None => true,
@@ -2815,7 +2826,7 @@ impl Engine {
                             self.update_text_indexes_batch_async(table, &batch, &schema, None)
                                 .await;
                             for (seq, texts) in &row_texts {
-                                self.update_vector_caches(table, *seq, texts);
+                                self.update_vector_caches(table, *seq, texts).await;
                             }
                         }
                     }
@@ -2829,21 +2840,24 @@ impl Engine {
                 // for the protocol layer to parse it back was ~40% of a scan's
                 // server time (`docs/SELECT_CHAIN.md`).
                 //
-                // A SELECT is one **CPU unit**: planning, the fragment's
-                // tasklets and the merge are all pure computation over data
-                // that is already in memory (the block decode reads mapped
-                // pages). It is dispatched as a whole to the CPU pool, so the
-                // statement task yields its worker for the entire query instead
-                // of parking it for the scan's duration - which is what the
-                // server needs to keep 100k connections in flight.
-                let Some(engine) = self.engine_handle() else {
-                    let (columns, rows) = self.run_select(stmt)?;
-                    return Ok(QueryResult::Rows { columns, rows });
-                };
-                let stmt = stmt.clone();
-                let (columns, rows) = crate::scheduler::scheduler()
-                    .spawn_blocking(move || engine.run_select(&stmt))
-                    .await?;
+                // The scan itself is a blocking unit (it waits on the scan
+                // gate and drives the block fan-out), so the statement task
+                // hands it to the blocking pool rather than occupying a runtime
+                // worker - a worker that ran it would stop polling every other
+                // task, including this scan's own fan-out, for the whole query.
+                //
+                // `run_select` waits for the gate with an `await` before it
+                // reaches that point, so the pool thread only ever carries the
+                // actual scan.
+                //
+                // **Boxed**: the SELECT chain is the largest future in the
+                // engine (a 600-line recursive plan walk plus the operator
+                // chain). Inlined into `execute`, it becomes part of the
+                // generated front end's dispatch state machine - a ~1500-line
+                // match that already earns the 8 MiB worker stack - and the
+                // combination overflowed it. A box keeps the dispatch frame at
+                // one pointer.
+                let (columns, rows) = Box::pin(self.run_select(stmt)).await?;
                 Ok(QueryResult::Rows { columns, rows })
             }
         }
@@ -2856,7 +2870,7 @@ impl Engine {
     /// pruned list); `candidate` is the index scan the planner selected for this
     /// scan, which the scan operator applies before handing rows to the chain.
     #[allow(clippy::too_many_arguments)] // one argument per planner hint the plan carries
-    pub(crate) fn run_plan(
+    pub(crate) async fn run_plan(
         &self,
         plan: LogicalPlan,
         mut override_rows: Option<Vec<Vec<Value>>>,
@@ -2867,6 +2881,7 @@ impl Engine {
         fulltext_substring: bool,
         catalog: Option<planner::index_scan::IndexCatalog>,
         rough_filter_done: bool,
+        search: Option<(parser::SearchClause, Option<expression::Expr>)>,
     ) -> Result<(Vec<String>, Batch)> {
         // The index filter was built over the scan layout that still contains
         // the pushed-down columns; remember how those map onto the row before
@@ -2898,12 +2913,18 @@ impl Engine {
         // already re-stacked by the binder (`optimize::normalize`).
         // The first two rules ran before the index-scan range lookup (the
         // candidate has to exist there), so this pass starts at the pruner.
-        let optimizer = match (catalog, rough_filter_done) {
-            (_, true) => planner::optimize::Optimizer::after_rough_filter(),
-            (Some(catalog), false) => planner::optimize::Optimizer::with_catalog(catalog, None),
-            (None, false) => planner::optimize::Optimizer::with_default_rules(),
+        // The optimizer is dropped before the first `await` below: its rule list
+        // is `Vec<Box<dyn OptimizerRule>>`, and that trait is not `Send`, so
+        // keeping it alive across a suspension point would make this whole
+        // future non-`Send` (and a SELECT no longer runnable on a worker).
+        let plan = {
+            let optimizer = match (catalog, rough_filter_done) {
+                (_, true) => planner::optimize::Optimizer::after_rough_filter(),
+                (Some(catalog), false) => planner::optimize::Optimizer::with_catalog(catalog, None),
+                (None, false) => planner::optimize::Optimizer::with_default_rules(),
+            };
+            optimizer.optimize(plan)?
         };
-        let plan = optimizer.optimize(plan)?;
         // `ResultCacheGetter` is registered last in the reference's optimizer
         // list, so it keys the *rewritten* nodes the scan actually produces.
         let begin_ts = self.current_ts();
@@ -2919,6 +2940,22 @@ impl Engine {
         };
         #[cfg(test)]
         LAST_PLAN_DEBUG.with(|slot| *slot.borrow_mut() = Some(format!("{plan:?}")));
+        // The optimizer has pruned the scan's column list. For a `SEARCH`, that
+        // list is the shape the search must produce: the table columns the
+        // projection kept, followed by the hidden ones. Running it here - after
+        // the pruner, before the operators - means the search reads exactly the
+        // rows the plan will use, and `SELECT ROW_ID()` keeps no table column
+        // and never touches the blocks that hold them.
+        if let Some((clause, pred)) = search {
+            let (table, columns) = plan_scan_of(&plan)
+                .ok_or_else(|| common::Error::Invalid("SEARCH without a scan".into()))?;
+            // The scan's list is the row's layout: the table columns the
+            // projection kept, then the hidden columns it reads.
+            let (rows, _hidden) = self
+                .run_search(&table, &clause, pred.as_ref(), &columns)
+                .await?;
+            override_rows = Some(rows);
+        }
         // A projection over a plain scan is a column selection (plus, at most, a
         // row predicate): answer it here, where every row costs one `Value`
         // clone instead of a trip through the `DataChunk` machinery.
@@ -2928,8 +2965,9 @@ impl Engine {
         if !cacheable && candidate.is_none() && !unmatchable && !fulltext_substring {
             let mut rows = override_rows.take();
             let mut block = override_block;
-            if let Some(out) =
-                self.direct_projection(&plan, &mut rows, &mut block, source_columns.as_ref())
+            if let Some(out) = self
+                .direct_projection(&plan, &mut rows, &mut block, source_columns.as_ref())
+                .await
             {
                 return Ok(out);
             }
@@ -3003,7 +3041,7 @@ impl Engine {
         // The operators exchange chunks and merge them into rows; the block the
         // result carries is built from those rows once, at the fragment's
         // boundary (an expression, a sort or an aggregate works on rows).
-        let (names, rows) = crate::operator::run_operators(operators, names, &mut source)?;
+        let (names, rows) = crate::operator::run_operators(operators, names, &mut source).await?;
         let mut block = Batch::from_rows(rows);
         block.columns = names.clone();
         Ok((names, block))

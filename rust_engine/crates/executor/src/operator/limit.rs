@@ -210,7 +210,7 @@ mod tests {
         range.map(|i| vec![Value::Int(i)]).collect()
     }
 
-    fn run(limit: Limit, input: Vec<Vec<Value>>, batch: usize) -> (Vec<Vec<Value>>, usize) {
+    async fn run(limit: Limit, input: Vec<Vec<Value>>, batch: usize) -> (Vec<Vec<Value>>, usize) {
         let total = input.len();
         let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(limit)];
         let mut ctx = OperatorContext {
@@ -218,7 +218,10 @@ mod tests {
         };
         let mut states = OperatorStates::new(&operators);
         let mut source = super::super::RowsSource::new(input, 1, batch);
-        super::super::run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        let mut operators = operators;
+        { super::super::run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         let pulled = total - source.remaining();
         let out = std::mem::take(&mut states.state_mut(0).data_blocks)
             .into_iter()
@@ -227,41 +230,44 @@ mod tests {
         (out, pulled)
     }
 
-    #[test]
-    fn limit_stops_pulling_the_source_once_it_is_done() {
-        let (out, pulled) = run(Limit::new(0, 10), rows(0..100), 8);
+    #[tokio::test]
+    async fn limit_stops_pulling_the_source_once_it_is_done() {
+        let (out, pulled) = run(Limit::new(0, 10), rows(0..100), 8).await;
         assert_eq!(out, rows(0..10));
         // Two batches of 8 rows answer LIMIT 10; the remaining 84 rows are
         // never converted into chunks.
         assert_eq!(pulled, 16);
     }
 
-    #[test]
-    fn offset_skips_whole_blocks_and_then_limits() {
-        let (out, _) = run(Limit::new(10, 5), rows(0..100), 8);
+    #[tokio::test]
+    async fn offset_skips_whole_blocks_and_then_limits() {
+        let (out, _) = run(Limit::new(10, 5), rows(0..100), 8).await;
         assert_eq!(out, rows(10..15));
     }
 
-    #[test]
-    fn offset_only_keeps_the_tail() {
-        let (out, _) = run(Limit::new(95, u64::MAX), rows(0..100), 8);
+    #[tokio::test]
+    async fn offset_only_keeps_the_tail() {
+        let (out, _) = run(Limit::new(95, u64::MAX), rows(0..100), 8).await;
         assert_eq!(out, rows(95..100));
     }
 
-    #[test]
-    fn a_limit_past_the_end_emits_everything() {
-        let (out, pulled) = run(Limit::new(0, 1000), rows(0..13), 8);
+    #[tokio::test]
+    async fn a_limit_past_the_end_emits_everything() {
+        let (out, pulled) = run(Limit::new(0, 1000), rows(0..13), 8).await;
         assert_eq!(out, rows(0..13));
         assert_eq!(pulled, 13);
     }
 
-    #[test]
-    fn counting_hits_does_not_stop_early() {
-        let operators: Vec<Box<dyn PhysicalOperator>> = vec![Box::new(Limit::counting_hits(0, 10))];
+    #[tokio::test]
+    async fn counting_hits_does_not_stop_early() {
+        let mut operators: Vec<Box<dyn PhysicalOperator>> =
+            vec![Box::new(Limit::counting_hits(0, 10))];
         let mut ctx = OperatorContext { block_capacity: 8 };
         let mut states = OperatorStates::new(&operators);
         let mut source = super::super::RowsSource::new(rows(0..100), 1, 8);
-        super::super::run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        { super::super::run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         let out: Vec<Vec<Value>> = std::mem::take(&mut states.state_mut(0).data_blocks)
             .into_iter()
             .flat_map(DataChunk::into_rows)

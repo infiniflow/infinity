@@ -439,7 +439,7 @@ mod tests {
         (func, columns, false, func.as_str().to_string())
     }
 
-    fn run(
+    async fn run(
         aggregate: Aggregate,
         rows: Vec<Vec<Value>>,
         width: usize,
@@ -454,7 +454,9 @@ mod tests {
         };
         let mut states = OperatorStates::new(&operators);
         let mut source = RowsSource::new(rows, width, batch);
-        crate::operator::run_fragment(&operators, &mut ctx, &mut states, &mut source).unwrap();
+        { crate::operator::run_fragment(&mut operators, &mut ctx, &mut states, &mut source) }
+            .await
+            .unwrap();
         std::mem::take(&mut states.state_mut(0).data_blocks)
             .into_iter()
             .flat_map(DataChunk::into_rows)
@@ -469,8 +471,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn groups_in_first_seen_order_across_chunk_boundaries() {
+    #[tokio::test]
+    async fn groups_in_first_seen_order_across_chunk_boundaries() {
         // "b" first appears in chunk 0, "a" in chunk 1, "b" again in chunk 2:
         // the output order is b, a and "b" is one group.
         let rows = vec![
@@ -481,7 +483,7 @@ mod tests {
             vec![Value::Str("a".into()), Value::Int(5)],
         ];
         let aggregate = referenced(AggFunc::Sum, vec![1]);
-        let out = run(aggregate, rows, 2, 2);
+        let out = run(aggregate, rows, 2, 2).await;
         assert_eq!(
             out,
             vec![
@@ -491,81 +493,81 @@ mod tests {
         );
     }
 
-    #[test]
-    fn count_star_counts_rows_and_count_of_a_column_skips_nulls() {
+    #[tokio::test]
+    async fn count_star_counts_rows_and_count_of_a_column_skips_nulls() {
         let rows = vec![
             vec![Value::Str("g".into()), Value::Int(1)],
             vec![Value::Str("g".into()), Value::Null],
             vec![Value::Str("g".into()), Value::Int(3)],
         ];
-        let out = run(referenced(AggFunc::Count, vec![]), rows.clone(), 2, 2);
+        let out = run(referenced(AggFunc::Count, vec![]), rows.clone(), 2, 2).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(3)]]);
-        let out = run(referenced(AggFunc::Count, vec![1]), rows, 2, 2);
+        let out = run(referenced(AggFunc::Count, vec![1]), rows, 2, 2).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(2)]]);
     }
 
-    #[test]
-    fn a_global_aggregate_over_an_empty_relation_is_one_row() {
+    #[tokio::test]
+    async fn a_global_aggregate_over_an_empty_relation_is_one_row() {
         let aggregate = Aggregate::new(
             Vec::new(),
             Vec::new(),
             vec![spec(AggFunc::Count, vec![]), spec(AggFunc::Sum, vec![0])],
         );
-        let out = run(aggregate, Vec::new(), 1, 4);
+        let out = run(aggregate, Vec::new(), 1, 4).await;
         assert_eq!(out, vec![vec![Value::Int(0), Value::Null]]);
     }
 
-    #[test]
-    fn a_global_aggregate_folds_every_chunk() {
+    #[tokio::test]
+    async fn a_global_aggregate_folds_every_chunk() {
         let aggregate = Aggregate::new(
             Vec::new(),
             Vec::new(),
             vec![spec(AggFunc::Sum, vec![0]), spec(AggFunc::Avg, vec![0])],
         );
         let rows: Vec<Vec<Value>> = (1..=6).map(|i| vec![Value::Int(i)]).collect();
-        let out = run(aggregate, rows, 1, 2);
+        let out = run(aggregate, rows, 1, 2).await;
         assert_eq!(out, vec![vec![Value::Int(21), Value::Float(3.5)]]);
     }
 
-    #[test]
-    fn sum_of_floats_stays_a_float_and_avg_divides_by_the_value_count() {
+    #[tokio::test]
+    async fn sum_of_floats_stays_a_float_and_avg_divides_by_the_value_count() {
         let rows = vec![
             vec![Value::Str("g".into()), Value::Float(1.5)],
             vec![Value::Str("g".into()), Value::Int(2)],
         ];
-        let out = run(referenced(AggFunc::Sum, vec![1]), rows.clone(), 2, 4);
+        let out = run(referenced(AggFunc::Sum, vec![1]), rows.clone(), 2, 4).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Float(3.5)]]);
-        let out = run(referenced(AggFunc::Avg, vec![1]), rows, 2, 4);
+        let out = run(referenced(AggFunc::Avg, vec![1]), rows, 2, 4).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Float(1.75)]]);
     }
 
-    #[test]
-    fn min_and_max_keep_the_first_winner() {
+    #[tokio::test]
+    async fn min_and_max_keep_the_first_winner() {
         let rows = vec![
             vec![Value::Str("g".into()), Value::Int(5)],
             vec![Value::Str("g".into()), Value::Int(1)],
             vec![Value::Str("g".into()), Value::Int(9)],
         ];
-        let out = run(referenced(AggFunc::Min, vec![1]), rows.clone(), 2, 2);
+        let out = run(referenced(AggFunc::Min, vec![1]), rows.clone(), 2, 2).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(1)]]);
-        let out = run(referenced(AggFunc::Max, vec![1]), rows, 2, 2);
+        let out = run(referenced(AggFunc::Max, vec![1]), rows, 2, 2).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(9)]]);
     }
 
-    #[test]
-    fn first_and_last_follow_the_input_order() {
+    #[tokio::test]
+    async fn first_and_last_follow_the_input_order() {
         let rows = vec![
             vec![Value::Str("g".into()), Value::Int(7)],
             vec![Value::Str("g".into()), Value::Int(8)],
         ];
-        let out = run(referenced(AggFunc::First, vec![1]), rows.clone(), 2, 1);
+        let out = run(referenced(AggFunc::First, vec![1]), rows.clone(), 2, 1).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(7)]]);
-        let out = run(referenced(AggFunc::Last, vec![1]), rows, 2, 1);
+        let out = run(referenced(AggFunc::Last, vec![1]), rows, 2, 1).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(8)]]);
     }
 
-    #[test]
-    fn distinct_dedupes_on_the_rendered_tuple() {
+    #[tokio::test]
+    async fn distinct_dedupes_on_the_rendered_tuple() {
         let rows = vec![
             vec![Value::Str("g".into()), Value::Int(1)],
             vec![Value::Str("g".into()), Value::Int(1)],
@@ -576,12 +578,12 @@ mod tests {
             vec!["g".into()],
             vec![(AggFunc::Count, vec![1], true, "c".into())],
         );
-        let out = run(aggregate, rows, 2, 2);
+        let out = run(aggregate, rows, 2, 2).await;
         assert_eq!(out, vec![vec![Value::Str("g".into()), Value::Int(2)]]);
     }
 
-    #[test]
-    fn the_accumulator_matches_the_reference_aggregate() {
+    #[tokio::test]
+    async fn the_accumulator_matches_the_reference_aggregate() {
         // Same rows, same answer as `expression::aggregate`, which is
         // what the stage pipeline used.
         let rows: Vec<Vec<Value>> = vec![
@@ -607,7 +609,7 @@ mod tests {
                         vec!["g".into()],
                         vec![(func, columns.clone(), distinct, "a".into())],
                     );
-                    let out = run(aggregate, rows.clone(), 2, 3);
+                    let out = run(aggregate, rows.clone(), 2, 3).await;
                     assert_eq!(
                         out,
                         vec![vec![Value::Str("g".into()), reference.clone()]],
@@ -620,8 +622,8 @@ mod tests {
 
     /// The reason this operator exists: a GROUP BY over 100k rows must hold one
     /// entry per group, not one cloned row per input row.
-    #[test]
-    fn a_group_by_holds_one_entry_per_group_not_per_row() {
+    #[tokio::test]
+    async fn a_group_by_holds_one_entry_per_group_not_per_row() {
         let total = 100_000usize;
         let groups = 1_000usize;
         let mut aggregate = Aggregate::new(
@@ -639,7 +641,7 @@ mod tests {
         let mut states = OperatorStates::new(&operators);
         let mut source = RowsSource::new(rows, 2, crate::chunk::DEFAULT_VECTOR_SIZE);
         while !states.is_complete() {
-            source.next(&mut states.source).unwrap();
+            { source.next(&mut states.source) }.await.unwrap();
             crate::operator::execute_task(&operators, &mut ctx, &mut states).unwrap();
             // The operator keeps only its group table; every consumed chunk is
             // dropped before the next pass.
@@ -675,8 +677,8 @@ mod tests {
         assert_eq!(operator.table.borrow().keys.len(), 7);
     }
 
-    #[test]
-    fn groups_split_across_chunks_do_not_duplicate() {
+    #[tokio::test]
+    async fn groups_split_across_chunks_do_not_duplicate() {
         // Two groups alternating over three chunks.
         let rows: Vec<Vec<Value>> = (0..9)
             .map(|i| {
@@ -686,7 +688,7 @@ mod tests {
                 ]
             })
             .collect();
-        let out = run(referenced(AggFunc::Sum, vec![1]), rows, 2, 2);
+        let out = run(referenced(AggFunc::Sum, vec![1]), rows, 2, 2).await;
         assert_eq!(
             out,
             vec![

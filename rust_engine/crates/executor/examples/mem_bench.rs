@@ -24,6 +24,7 @@
 //! `buffer_manager_size = budget_mb`, so the only thing that differs between
 //! runs is the budget.
 
+use common::Result;
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -51,10 +52,28 @@ fn rss_kb() -> u64 {
         .unwrap_or(0)
 }
 
+/// The runtime this example drives the engine on.
+///
+/// The engine's API is async; an example is a synchronous `main`, so it owns a
+/// runtime of its own and `block_on`s - the shape a binary entry point uses
+/// (a runtime created here is not a pool worker anyone else waits on).
+fn rt() -> &'static tokio::runtime::Runtime {
+    static RT: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
+    RT.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("build the example runtime")
+    })
+}
+
+/// Runs one statement to completion.
+fn run(e: &Engine, sql: &str) -> Result<Vec<executor::QueryResult>> {
+    rt().block_on(e.execute(sql))
+}
+
 fn rows_of(e: &Engine, sql: &str) -> usize {
-    let out = e
-        .execute_blocking(sql)
-        .unwrap_or_else(|err| panic!("{sql}: {err:?}"));
+    let out = run(e, sql).unwrap_or_else(|err| panic!("{sql}: {err:?}"));
     out.iter()
         .filter_map(|r| match r {
             executor::QueryResult::Rows { rows, .. } => Some(rows.len()),
@@ -81,9 +100,10 @@ fn timed(label: &str, f: impl FnOnce()) {
 }
 
 fn build(e: &Engine, dir: &Path, rows: usize, dim: usize) {
-    e.execute_blocking(&format!(
-        "CREATE TABLE bench (id INT, v EMBEDDING(FLOAT, {dim}), body VARCHAR);"
-    ))
+    run(
+        e,
+        &format!("CREATE TABLE bench (id INT, v EMBEDDING(FLOAT, {dim}), body VARCHAR);"),
+    )
     .ok();
     let path = dir.join("bench.csv");
     {
@@ -100,33 +120,38 @@ fn build(e: &Engine, dir: &Path, rows: usize, dim: usize) {
         w.flush().unwrap();
     }
     timed("copy", || {
-        e.execute_blocking(&format!(
-            "COPY bench FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-            path.display()
-        ))
+        run(
+            e,
+            &format!(
+                "COPY bench FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                path.display()
+            ),
+        )
         .expect("COPY");
     });
     timed("flush", || {
-        e.execute_blocking("FLUSH;").expect("FLUSH");
+        run(e, "FLUSH;").expect("FLUSH");
     });
     timed("hnsw", || {
-        e.execute_blocking(
+        run(
+            e,
             "CREATE INDEX bench_hnsw ON bench (v) USING HNSW \
              WITH (metric='l2', encode='plain', m=16, ef_construction=200);",
         )
         .expect("CREATE INDEX hnsw");
     });
     timed("fulltext", || {
-        e.execute_blocking("CREATE INDEX bench_ft ON bench (body) USING FULLTEXT;")
+        run(e, "CREATE INDEX bench_ft ON bench (body) USING FULLTEXT;")
             .expect("CREATE INDEX fulltext");
     });
 
     // The same vectors in their own table: one vector index per column, and the
     // SPANN tree is built by reading them through the block cache (`VectorColumn`),
     // which is the other half of this change.
-    e.execute_blocking(&format!(
-        "CREATE TABLE bench_sp (id INT, v EMBEDDING(FLOAT, {dim}));"
-    ))
+    run(
+        e,
+        &format!("CREATE TABLE bench_sp (id INT, v EMBEDDING(FLOAT, {dim}));"),
+    )
     .ok();
     let sp_path = dir.join("spann.csv");
     {
@@ -137,17 +162,21 @@ fn build(e: &Engine, dir: &Path, rows: usize, dim: usize) {
         w.flush().unwrap();
     }
     timed("sp copy", || {
-        e.execute_blocking(&format!(
-            "COPY bench_sp FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
-            sp_path.display()
-        ))
+        run(
+            e,
+            &format!(
+                "COPY bench_sp FROM '{}' WITH (DELIMITER ',', FORMAT CSV);",
+                sp_path.display()
+            ),
+        )
         .expect("COPY bench_sp");
     });
     timed("sp flush", || {
-        e.execute_blocking("FLUSH;").expect("FLUSH");
+        run(e, "FLUSH;").expect("FLUSH");
     });
     timed("spann", || {
-        e.execute_blocking(
+        run(
+            e,
             "CREATE INDEX bench_sp_i ON bench_sp (v) USING SPANN \
              WITH (min_rows=1, metric='l2', max_partition_size=256, num_centroids=64);",
         )
@@ -246,7 +275,10 @@ fn main() {
     let iters: usize = args[5].parse().unwrap();
     let mode = args.get(6).map(String::as_str).unwrap_or("measure");
 
-    let e = Arc::new(Engine::open(&dir).expect("open"));
+    let e = Arc::new(
+        rt().block_on(Engine::open_async(&dir, Default::default()))
+            .expect("open"),
+    );
     e.set_buffer_budget(budget_mb * 1024 * 1024);
     if mode == "build" {
         build(&e, &dir, rows, dim);

@@ -42,8 +42,8 @@ const PLANS: [&str; 12] = [
 
 const TEXT: &str = "abcdefghijklmnopqrstuvwxyz";
 
-fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
-    for result in engine.execute_blocking(sql).unwrap() {
+async fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
+    for result in engine.execute(sql).await.unwrap() {
         if let QueryResult::Rows { .. } = result {
             return result.rows_text();
         }
@@ -51,118 +51,135 @@ fn rows(engine: &Engine, sql: &str) -> Vec<Vec<String>> {
     Vec::new()
 }
 
-fn count(engine: &Engine, table: &str) -> usize {
-    rows(engine, &format!("SELECT count(*) FROM {table};"))[0][0]
+async fn count(engine: &Engine, table: &str) -> usize {
+    rows(engine, &format!("SELECT count(*) FROM {table};")).await[0][0]
         .parse()
         .unwrap()
 }
 
-fn columns(engine: &Engine, table: &str) -> Vec<String> {
+async fn columns(engine: &Engine, table: &str) -> Vec<String> {
     rows(engine, &format!("SHOW TABLE {table} COLUMNS;"))
+        .await
         .into_iter()
         .map(|row| row[0].clone())
         .collect()
 }
 
-fn insert_one(engine: &Engine, table: &str, value: i64) {
+async fn insert_one(engine: &Engine, table: &str, value: i64) {
     engine
         .insert_literals(
             table,
             None,
             vec![vec![Literal::Int(value), Literal::Str(TEXT.into())]],
         )
+        .await
         .unwrap();
 }
 
 /// `TestTxnCleanup::PreTest`: db1/tb1, a secondary index, two one-row imports,
 /// a merge and a checkpoint/cleanup.
-fn pre_test(engine: &Engine) {
-    engine.execute_blocking("CREATE DATABASE db1;").unwrap();
+async fn pre_test(engine: &Engine) {
+    engine.execute("CREATE DATABASE db1;").await.unwrap();
     engine
-        .execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        .await
         .unwrap();
     engine
-        .execute_blocking("CREATE INDEX index1 ON db1.tb1(col1);")
+        .execute("CREATE INDEX index1 ON db1.tb1(col1);")
+        .await
         .unwrap();
-    insert_one(engine, "db1.tb1", 1);
-    insert_one(engine, "db1.tb1", 1);
-    engine.compact_all_segments("db1.tb1").unwrap();
-    crate::scheduler::block_on(engine.cleanup()).unwrap();
+    insert_one(engine, "db1.tb1", 1).await;
+    insert_one(engine, "db1.tb1", 1).await;
+    engine.compact_all_segments("db1.tb1").await.unwrap();
+    engine.cleanup().await.unwrap();
 }
 
 /// Runs every plan: `cleanup()` at `a`/`b`/`c`, `op` at `B`, then the check
 /// and the reference's `PostTest`.
-fn run_plans(pre: impl Fn(&Engine), op: impl Fn(&Engine), check: impl Fn(&Engine)) {
+async fn run_plans<P, O, C>(pre: P, op: O, check: C)
+where
+    P: AsyncFn(&Engine),
+    O: AsyncFn(&Engine),
+    C: AsyncFn(&Engine),
+{
     for plan in PLANS {
         let dir = tempdir().unwrap();
-        let e = Engine::open(dir.path()).unwrap();
-        pre(&e);
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        pre(&e).await;
         let mut ran = false;
         for c in plan.chars() {
             match c {
                 'B' => {
-                    op(&e);
+                    op(&e).await;
                     ran = true;
                 }
-                'a'..='c' => crate::scheduler::block_on(e.cleanup()).unwrap(),
+                'a'..='c' => e.cleanup().await.unwrap(),
                 // `A` (begin) and `C` (commit) have no visible state.
                 _ => {}
             }
         }
         if !ran {
-            op(&e);
+            op(&e).await;
         }
-        crate::scheduler::block_on(e.cleanup()).unwrap();
-        check(&e);
+        e.cleanup().await.unwrap();
+        check(&e).await;
 
         // `TestTxnCleanup::PostTest`.
-        e.execute_blocking("DROP DATABASE IF EXISTS db1;").unwrap();
-        crate::scheduler::block_on(e.cleanup()).unwrap();
+        e.execute("DROP DATABASE IF EXISTS db1;").await.unwrap();
+        e.cleanup().await.unwrap();
         assert!(!e.table_exists("db1.tb1"));
     }
 }
 
 /// C++ `cleanup_ut.cpp:289` (`cleanup_with_drop_db`).
-#[test]
-fn cleanup_with_drop_db() {
+#[tokio::test]
+async fn cleanup_with_drop_db() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("DROP DATABASE db1;").unwrap();
+        async |e| {
+            e.execute("DROP DATABASE db1;").await.unwrap();
         },
-        |e| {
+        async |e| {
             assert!(!e.table_exists("db1.tb1"));
-            assert!(!rows(e, "SHOW DATABASES;").iter().any(|r| r[0] == "db1"));
+            assert!(!rows(e, "SHOW DATABASES;")
+                .await
+                .iter()
+                .any(|r| r[0] == "db1"));
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:318` (`cleanup_and_drop_table`).
-#[test]
-fn cleanup_and_drop_table() {
+#[tokio::test]
+async fn cleanup_and_drop_table() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("DROP TABLE db1.tb1;").unwrap();
+        async |e| {
+            e.execute("DROP TABLE db1.tb1;").await.unwrap();
         },
-        |e| {
+        async |e| {
             assert!(!e.table_exists("db1.tb1"));
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:348` (`cleanup_and_add_columns`).
-#[test]
-fn cleanup_and_add_columns() {
+#[tokio::test]
+async fn cleanup_and_add_columns() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+        async |e| {
+            e.execute("ALTER TABLE db1.tb1 ADD COLUMN (col3 VARCHAR DEFAULT '');")
+                .await
                 .unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-            let cols = columns(e, "db1.tb1");
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
+            let cols = columns(e, "db1.tb1").await;
             assert_eq!(cols, vec!["col1", "col2", "col3"]);
             let meta = e
                 .catalog()
@@ -171,84 +188,89 @@ fn cleanup_and_add_columns() {
                 .expect("tb1");
             assert_eq!(meta.ids, vec![0, 1, 2]);
             // Old rows read back the empty-string default.
-            for row in rows(e, "SELECT col3 FROM db1.tb1;") {
+            for row in rows(e, "SELECT col3 FROM db1.tb1;").await {
                 assert_eq!(row, vec![String::new()]);
             }
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:401` (`cleanup_and_drop_columns`).
-#[test]
-fn cleanup_and_drop_columns() {
+#[tokio::test]
+async fn cleanup_and_drop_columns() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+        async |e| {
+            e.execute("ALTER TABLE db1.tb1 DROP COLUMN (col2);")
+                .await
                 .unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-            assert_eq!(columns(e, "db1.tb1"), vec!["col1"]);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
+            assert_eq!(columns(e, "db1.tb1").await, vec!["col1"]);
             let meta = e
                 .catalog()
                 .get_table_by_name("db1.tb1")
                 .unwrap()
                 .expect("tb1");
             assert!(!meta.ids.contains(&1));
-            assert_eq!(count(e, "db1.tb1"), 2);
+            assert_eq!(count(e, "db1.tb1").await, 2);
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:446` (`cleanup_and_rename_table`).
-#[test]
-fn cleanup_and_rename_table() {
+#[tokio::test]
+async fn cleanup_and_rename_table() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+        async |e| {
+            e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
+                .await
                 .unwrap();
         },
-        |e| {
+        async |e| {
             assert!(!e.table_exists("db1.tb1"));
-            assert_eq!(e.segment_ids("db1.tb2"), vec![1]);
-            assert_eq!(count(e, "db1.tb2"), 2);
+            assert_eq!(e.segment_ids("db1.tb2").await, vec![1]);
+            assert_eq!(count(e, "db1.tb2").await, 2);
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:484` (`cleanup_and_compact`).
-#[test]
-fn cleanup_and_compact() {
+#[tokio::test]
+async fn cleanup_and_compact() {
     run_plans(
         pre_test,
-        |e| {
-            e.compact_all_segments("db1.tb1").unwrap();
+        async |e| {
+            e.compact_all_segments("db1.tb1").await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![2]);
-            assert_eq!(count(e, "db1.tb1"), 2);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![2]);
+            assert_eq!(count(e, "db1.tb1").await, 2);
             assert_eq!(e.segments("db1.tb1"), vec![(2, 2)]);
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:521` (`cleanup_and_drop_index`).
-#[test]
-fn cleanup_and_drop_index() {
+#[tokio::test]
+async fn cleanup_and_drop_index() {
     run_plans(
         pre_test,
-        |e| {
-            e.execute_blocking("DROP INDEX index1 ON db1.tb1;").unwrap();
+        async |e| {
+            e.execute("DROP INDEX index1 ON db1.tb1;").await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-            assert!(e
-                .execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
-                .is_err());
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
+            assert!(e.execute("SHOW TABLE db1.tb1 INDEX index1;").await.is_err());
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:563` (`cleanup_and_optimize_index`).
@@ -257,83 +279,87 @@ fn cleanup_and_drop_index() {
 /// optimizes. The secondary index has no Rust chunk bookkeeping (`GetChunkIDs1`
 /// / `ChunkIndexMetaInfo`), so the port asserts the optimized table's segment,
 /// row count and index visibility instead.
-#[test]
-fn cleanup_and_optimize_index() {
+#[tokio::test]
+async fn cleanup_and_optimize_index() {
     run_plans(
-        |e| {
-            e.execute_blocking("CREATE DATABASE db1;").unwrap();
-            e.execute_blocking("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+        async |e| {
+            e.execute("CREATE DATABASE db1;").await.unwrap();
+            e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
+                .await
                 .unwrap();
-            e.execute_blocking("CREATE INDEX index1 ON db1.tb1(col1);")
+            e.execute("CREATE INDEX index1 ON db1.tb1(col1);")
+                .await
                 .unwrap();
             for _ in 0..2 {
-                insert_one(e, "db1.tb1", 1);
+                insert_one(e, "db1.tb1", 1).await;
                 // `DumpMemIndex`.
-                crate::scheduler::block_on(e.flush()).unwrap();
+                e.flush().await.unwrap();
             }
         },
-        |e| {
-            e.optimize_indexes().unwrap();
+        async |e| {
+            e.optimize_indexes_async().await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
-            assert_eq!(count(e, "db1.tb1"), 2);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![0]);
+            assert_eq!(count(e, "db1.tb1").await, 2);
             // Both rows still match the indexed predicate.
             assert_eq!(
-                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
                 vec![vec!["2".to_string()]]
             );
-            e.execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
-                .unwrap();
+            e.execute("SHOW TABLE db1.tb1 INDEX index1;").await.unwrap();
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:654` (`cleanup_and_append`).
-#[test]
-fn cleanup_and_append() {
+#[tokio::test]
+async fn cleanup_and_append() {
     run_plans(
         pre_test,
-        |e| {
-            insert_one(e, "db1.tb1", 1);
+        async |e| {
+            insert_one(e, "db1.tb1", 1).await;
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![1, 2]);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![1, 2]);
             assert_eq!(e.segments("db1.tb1"), vec![(1, 2), (2, 1)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 3);
             // The block mirror writes each segment into its own directory, so
             // after a checkpoint the three live rows sit in the two segments
             // that hold them.
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             assert_eq!(e.block_ids("db1.tb1", 1), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 1, 0), Some(2));
             assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 2, 0), Some(1));
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:716` (`cleanup_and_delete`).
-#[test]
-fn cleanup_and_delete() {
+#[tokio::test]
+async fn cleanup_and_delete() {
     run_plans(
         pre_test,
-        |e| {
+        async |e| {
             // `Delete(RowID(2, 0))`: the first row of the merged segment.
             let mut t = e.begin_txn();
             assert_eq!(t.delete_row_ids("db1.tb1", &[(1, 0)]).unwrap(), 1);
-            t.commit().unwrap();
-            e.compact_all_segments("db1.tb1").unwrap();
+            t.commit().await.unwrap();
+            e.compact_all_segments("db1.tb1").await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![2]);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![2]);
             assert_eq!(e.segments("db1.tb1"), vec![(2, 1)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 1);
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             assert_eq!(e.block_ids("db1.tb1", 2), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 2, 0), Some(1));
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:772` (`cleanup_and_update`).
@@ -341,34 +367,35 @@ fn cleanup_and_delete() {
 /// `Update(RowID(2, 0))` rewrites one row; the port models it as a row-id
 /// delete followed by an append of the new value, which is exactly what the
 /// reference's update does internally (the new row lands in a new segment).
-#[test]
-fn cleanup_and_update() {
+#[tokio::test]
+async fn cleanup_and_update() {
     run_plans(
         pre_test,
-        |e| {
+        async |e| {
             let mut t = e.begin_txn();
             assert_eq!(t.delete_row_ids("db1.tb1", &[(1, 0)]).unwrap(), 1);
-            t.commit().unwrap();
-            insert_one(e, "db1.tb1", 2);
-            e.compact_all_segments("db1.tb1").unwrap();
+            t.commit().await.unwrap();
+            insert_one(e, "db1.tb1", 2).await;
+            e.compact_all_segments("db1.tb1").await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![3]);
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![3]);
             assert_eq!(e.segments("db1.tb1"), vec![(3, 2)]);
             assert_eq!(e.row_count("db1.tb1").unwrap(), 2);
             assert_eq!(
-                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
                 vec![vec!["1".to_string()]]
             );
             assert_eq!(
-                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;"),
+                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 2;").await,
                 vec![vec!["1".to_string()]]
             );
-            crate::scheduler::block_on(e.flush()).unwrap();
+            e.flush().await.unwrap();
             assert_eq!(e.block_ids("db1.tb1", 3), vec![0]);
             assert_eq!(e.block_row_count("db1.tb1", 3, 0), Some(2));
         },
-    );
+    )
+    .await;
 }
 
 /// C++ `cleanup_ut.cpp:849` (`cleanup_and_dump_index`).
@@ -377,23 +404,23 @@ fn cleanup_and_update() {
 /// chunk metadata. The Rust engine has no per-segment mem-index for a
 /// secondary index; `flush()` performs the dump and the visible segment/row
 /// and index state is asserted exactly.
-#[test]
-fn cleanup_and_dump_index() {
+#[tokio::test]
+async fn cleanup_and_dump_index() {
     run_plans(
         pre_test,
-        |e| {
-            crate::scheduler::block_on(e.flush()).unwrap();
+        async |e| {
+            e.flush().await.unwrap();
         },
-        |e| {
-            assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
-            assert_eq!(count(e, "db1.tb1"), 2);
-            e.execute_blocking("SHOW TABLE db1.tb1 INDEX index1;")
-                .unwrap();
+        async |e| {
+            assert_eq!(e.segment_ids("db1.tb1").await, vec![1]);
+            assert_eq!(count(e, "db1.tb1").await, 2);
+            e.execute("SHOW TABLE db1.tb1 INDEX index1;").await.unwrap();
             // The dump keeps every indexed row queryable.
             assert_eq!(
-                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;"),
+                rows(e, "SELECT count(*) FROM db1.tb1 WHERE col1 = 1;").await,
                 vec![vec!["2".to_string()]]
             );
         },
-    );
+    )
+    .await;
 }

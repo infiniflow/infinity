@@ -347,26 +347,30 @@ mod tests {
 
     /// A sealed `FLOAT` column: the source borrows each vector out of the block
     /// that holds it, which is what makes the scratch file unnecessary.
-    #[test]
-    fn a_sealed_column_is_read_in_place() {
+    #[tokio::test]
+    async fn a_sealed_column_is_read_in_place() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         engine
-            .execute_blocking("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         for row in 0..8 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO t VALUES ({row}, [{row}, {}, {}, {}]);",
                     row + 1,
                     row + 2,
                     row + 3
                 ))
+                .await
                 .unwrap();
         }
         // The checkpoint writes the append buffer out as a block; a source that
         // still saw buffered rows would stand down (they have no block body).
-        crate::scheduler::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
         let source = engine
             .vector_column("t", 1, None, Rows::Sealed)
             .expect("a sealed FLOAT column borrows");
@@ -391,31 +395,39 @@ mod tests {
     /// A table with rows still in the append buffer answers `None` when only
     /// sealed rows were asked for: those rows have no block body, and a caller
     /// that must cover every row has to ask for them.
-    #[test]
-    fn buffered_rows_stand_the_source_down() {
+    #[tokio::test]
+    async fn buffered_rows_stand_the_source_down() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
-        engine
-            .execute_blocking("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
             .unwrap();
         engine
-            .execute_blocking("INSERT INTO t VALUES (1, [1, 2, 3, 4]);")
+            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        engine
+            .execute("INSERT INTO t VALUES (1, [1, 2, 3, 4]);")
+            .await
             .unwrap();
         assert!(engine.vector_column("t", 1, None, Rows::Sealed).is_none());
     }
 
     /// ... and the same rows are served when the buffer is part of the row set:
     /// that is the case the scratch file existed for, and it needs no file.
-    #[test]
-    fn buffered_rows_are_served_in_place() {
+    #[tokio::test]
+    async fn buffered_rows_are_served_in_place() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         engine
-            .execute_blocking("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,4));")
+            .await
             .unwrap();
         for row in 0..5 {
             engine
-                .execute_blocking(&format!("INSERT INTO t VALUES ({row}, [{row}, 0, 0, 0]);"))
+                .execute(&format!("INSERT INTO t VALUES ({row}, [{row}, 0, 0, 0]);"))
+                .await
                 .unwrap();
         }
         let source = engine
@@ -441,21 +453,25 @@ mod tests {
 
     /// A `FLOAT16` body is widened one block at a time rather than copied to a
     /// scratch file; the values are the ones the writer encoded.
-    #[test]
-    fn a_widened_element_is_read_without_a_scratch_file() {
+    #[tokio::test]
+    async fn a_widened_element_is_read_without_a_scratch_file() {
         let dir = tempfile::tempdir().unwrap();
-        let engine = Engine::open(dir.path()).unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
         engine
-            .execute_blocking("CREATE TABLE t (id INT, v EMBEDDING(FLOAT16,4));")
+            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT16,4));")
+            .await
             .unwrap();
         for row in 0..6 {
             engine
-                .execute_blocking(&format!(
+                .execute(&format!(
                     "INSERT INTO t VALUES ({row}, [{row}.5, 0, 0, 0]);"
                 ))
+                .await
                 .unwrap();
         }
-        crate::scheduler::block_on(engine.flush()).unwrap();
+        engine.flush().await.unwrap();
         let source = engine
             .vector_column("t", 1, None, Rows::Sealed)
             .expect("a FLOAT16 column is widened");

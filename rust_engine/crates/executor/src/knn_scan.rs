@@ -90,7 +90,7 @@ use std::collections::{HashMap, HashSet};
 
 use expression::Value;
 
-use crate::{Engine, SharedVectorCache};
+use crate::Engine;
 
 /// The candidate phase of a KNN scan: probe the IVF/HNSW indexes and return
 /// the row ids to score exactly.
@@ -109,10 +109,8 @@ pub(crate) struct KnnCandidateScan<'a> {
     pub live_rows: Option<&'a [usize]>,
     /// How many live rows the table has, when that is known without counting
     /// them. The query path passes the published counter, so an indexed query
-    /// can prove the graph covers the table without a warm vector cache - the
-    /// cache is only built for the exact scan now.
+    /// can prove the graph covers the table without decoding it.
     pub live_count: Option<usize>,
-    pub cache: Option<&'a SharedVectorCache>,
     pub topn: usize,
     pub metric: &'a str,
     pub options: &'a KnnScanOptions,
@@ -169,9 +167,6 @@ fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
     if let Some(count) = q.live_count {
         return labelled == count;
     }
-    if let Some(c) = &q.cache {
-        return c.read().map(|g| labelled == g.live.len()).unwrap_or(false);
-    }
     labelled == q.rows.len()
 }
 
@@ -179,12 +174,6 @@ fn all_covered(q: &KnnCandidateScan<'_>, labelled: usize) -> bool {
 fn covers_set(q: &KnnCandidateScan<'_>, covered: &HashSet<usize>) -> bool {
     if let Some(live) = q.live_rows {
         return live.iter().all(|seq| covered.contains(seq));
-    }
-    if let Some(c) = &q.cache {
-        return c
-            .read()
-            .map(|g| g.live.iter().all(|s| covered.contains(s)))
-            .unwrap_or(false);
     }
     // Counting only: the caller's `rows` are still empty at this point (an
     // indexed query decodes its candidates afterwards), so comparing against
@@ -228,14 +217,6 @@ impl Engine {
                 .filter(|seq| !covered.contains(seq))
                 .collect();
         }
-        if let Some(guard) = q.cache.and_then(|c| c.read().ok()) {
-            return guard
-                .live
-                .iter()
-                .copied()
-                .filter(|seq| !covered.contains(seq))
-                .collect();
-        }
         let mut out: Vec<usize> = self
             .live_row_ids(q.table)
             .into_iter()
@@ -274,7 +255,7 @@ impl Engine {
         widened.min(cap).max(base)
     }
 
-    pub(crate) fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<KnnProbe> {
+    pub(crate) async fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<KnnProbe> {
         let tkey = self.table_key(q.table);
         // IVF: probe `nprobe` centroids of every sealed chunk (C++
         // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
@@ -359,8 +340,12 @@ impl Engine {
                 _ => (width, budget),
             };
             let hits = match q.allowed {
-                Some(allowed) => index.search_filtered(q.query, budget, Some(width), allowed),
-                None => index.search(q.query, budget, Some(width)),
+                Some(allowed) => {
+                    index
+                        .search_filtered(q.query, budget, Some(width), allowed)
+                        .await
+                }
+                None => index.search(q.query, budget, Some(width)).await,
             };
             // §16.4 telemetry: what this query actually cost. `hits.len() <
             // budget` means the beam ran out of partitions before the pool
@@ -485,18 +470,28 @@ impl Engine {
         // labels must cover the live q.rows, else the exact scan runs.
         // The in-memory segment: rows written after the last dump. The
         // reference searches every segment and merges the results.
-        let mem = self
+        // Every **segment's** memory graph, not one per index: the reference
+        // keys `MemIndex` by `(index_id, segment)`, and a query merges what
+        // every segment answers (`MergeKnn`).
+        let mems: Vec<std::sync::Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
-            .and_then(|e| e.hnsw_mem.get(&index_id).cloned());
+            .map(|e| {
+                e.hnsw_mem
+                    .iter()
+                    .filter(|((id, _), _)| *id == index_id)
+                    .map(|(_, m)| std::sync::Arc::clone(m))
+                    .collect()
+            })
+            .unwrap_or_default();
         // No graph at all: this column is answered by the exact scan. Returning
         // `Some(empty)` here would be read as "the index covers nothing", and
         // the caller (which defers decoding the rows) would then score none of
         // them - that is what made every KNN query on a non-float embedding
         // column return no rows.
-        if segments.is_empty() && mem.is_none() {
+        if segments.is_empty() && mems.is_empty() {
             return None;
         }
         let mut labelled = 0usize;
@@ -532,8 +527,13 @@ impl Engine {
                 .collect();
             merge.search(0, &hits);
         }
-        if let Some(mem) = &mem {
-            if let Ok(mem) = mem.lock() {
+        for mem in &mems {
+            // `try_lock`: the query path is synchronous. A graph the build is
+            // filling is skipped, which is what an empty one would report.
+            if let Ok(mem) = mem.try_lock() {
+                if mem.dims != q.query.len() {
+                    return None;
+                }
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
@@ -572,8 +572,8 @@ impl Engine {
         for seg in &segments {
             covered.extend(seg.labels.iter().map(|label| *label as usize));
         }
-        if let Some(mem) = &mem {
-            if let Ok(mem) = mem.lock() {
+        for mem in &mems {
+            if let Ok(mem) = mem.try_lock() {
                 covered.extend(mem.rows().iter().map(|row| *row as usize));
             }
         }
@@ -614,8 +614,6 @@ pub(crate) struct PhysicalKnnScan<'a> {
     pub threshold: Option<f64>,
     /// The decoded rows (`KnnScanSharedData`'s blocks).
     pub rows: &'a [(usize, Vec<Value>)],
-    /// Pre-decoded rows used instead of `rows` on the cache path.
-    pub cache: Option<&'a SharedVectorCache>,
     /// `PlanWithIndex()` result: rows the sealed index says can win.
     pub vector_candidates: Option<HashSet<usize>>,
 }
@@ -640,9 +638,11 @@ impl PhysicalKnnScan<'_> {
 
     /// C++ `Execute()`: score every scanned row (or cache entry) and return
     /// the operator state, before sorting/thresholding.
-    pub(crate) fn execute(
+    pub(crate) async fn execute(
         &self,
-        keep: &dyn Fn(&[Value]) -> bool,
+        // `+ Sync`: the execute future is awaited on a runtime worker and
+        // boxed as `Send`, so every borrow it captures has to be `Sync`.
+        keep: &(dyn Fn(&[Value]) -> bool + Sync),
         bmp_scores: &HashMap<usize, f64>,
         mv_scores: &HashMap<usize, f64>,
     ) -> crate::Result<KnnScanOperatorState> {
@@ -818,92 +818,120 @@ impl PhysicalKnnScan<'_> {
                 scored.push((*seq, sim, dist));
             }
         }
-        self.score_cache(&mut scored);
+
         Ok(KnnScanOperatorState {
             scored,
             use_sim: self.use_sim(),
         })
     }
 
-    /// The rows decoded once into the scalar row cache (the reference's
-    /// in-memory `DataBlock`s): score them without re-reading the store.
-    fn score_cache(&self, scored: &mut Vec<(usize, f64, f64)>) {
-        let Some(shared) = self.cache else {
-            return;
-        };
-        let qv: Vec<f64> = self
-            .query_items
-            .iter()
-            .filter_map(|x| x.parse::<f64>().ok())
-            .collect();
-        let guard = shared.read().unwrap();
-        if qv.is_empty() || qv.len() != guard.dims {
-            return;
+    /// C++ `MergeKnn`/result-handler finish: rank in the scan's direction,
+    /// apply `threshold`, keep `topn`.
+    ///
+    /// `select_nth_unstable_by` rather than a full sort: the exact scan scores
+    /// every live row, so `scored` holds a million entries for a top-100 answer
+    /// and sorting all of them was most of a brute-force query's time (SIFT 1M:
+    /// 947 ms per query, `sort_by` at the top of the profile). Partitioning at
+    /// `topn` is O(n), and only the kept prefix is sorted.
+    ///
+    /// The comparator is the one this function always used - `(score, row id)`
+    /// with the score direction taken from the metric - so the answer is
+    /// identical to the full-sort version, including the order of ties.
+    /// [`Self::finish`] without the final sort: the top-n, unordered.
+    ///
+    /// A block-at-a-time scan reduces its running set once per block, and only
+    /// the last reduction has to be ordered - the caller's final `finish` does
+    /// that. Sorting every block's set (123 blocks on SIFT 1M) was wasted work
+    /// on a monotone key.
+    ///
+    /// The exact scan now feeds [`Self::topn_collector`] instead, which drops
+    /// the per-block selection entirely. This stays as the reference the
+    /// collector is tested against.
+    #[cfg(test)]
+    pub(crate) fn keep_topn(&self, mut scored: Vec<(usize, f64, f64)>) -> Vec<(usize, f64, f64)> {
+        if self.threshold.is_some() {
+            let is_dist =
+                !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
+            let use_sim = self.is_sparse || self.is_tensor || self.is_knn_min_heap();
+            scored.retain(|e| match self.threshold {
+                Some(th) if is_dist => e.2 <= th,
+                Some(th) if use_sim => e.1 >= th,
+                Some(th) => e.2 >= th,
+                None => true,
+            });
         }
-        // An index already said which rows can win: walk the candidates, not the
-        // cache. Iterating the table and testing membership is the same answer
-        // for O(n) hash lookups instead of O(k), and on a 20k-row table that was
-        // most of the query's time.
-        if let Some(cands) = &self.vector_candidates {
-            // One sorted walk, not a lookup per candidate: the cache is built in
-            // id order (and the update path only replaces values in place), so
-            // both sides can be swept together. 64 binary searches over 20k rows
-            // was costing 1.27 ms of the query - more than the HNSW search.
-            let mut wanted: Vec<usize> = cands.iter().copied().collect();
-            wanted.sort_unstable();
-            let mut at = 0usize;
-            for seq in wanted {
-                while at < guard.rows.len() && guard.rows[at].0 < seq {
-                    at += 1;
-                }
-                if at == guard.rows.len() {
-                    break;
-                }
-                if guard.rows[at].0 != seq {
-                    continue;
-                }
-                let v = &guard.rows[at].1;
-                let (sim, dist) = crate::vector_score(&qv, v, self.metric);
-                scored.push((seq, sim, dist));
-            }
-            return;
+        if scored.len() > self.topn {
+            let use_sim = self.is_sparse || self.is_tensor || self.is_knn_min_heap();
+            let better = |a: &(usize, f64, f64), b: &(usize, f64, f64)| -> std::cmp::Ordering {
+                let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
+                x.partial_cmp(&y)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.0.cmp(&b.0))
+            };
+            scored.select_nth_unstable_by(self.topn - 1, better);
+            scored.truncate(self.topn);
         }
-        for (seq, v) in &guard.rows {
-            if !guard.live.contains(seq) {
-                continue;
-            }
-            let (sim, dist) = crate::vector_score(&qv, v, self.metric);
-            scored.push((*seq, sim, dist));
-        }
+        scored
     }
 
-    /// C++ `MergeKnn`/result-handler finish: sort in the scan's direction,
-    /// apply `threshold`, keep `topn`.
-    pub(crate) fn finish(&self, mut state: KnnScanOperatorState) -> KnnScanOperatorState {
+    /// A running top-n across every block of a scan.
+    ///
+    /// The block-at-a-time exact scan used to call [`Self::keep_topn`] once per
+    /// block, which ran a full `select_nth_unstable_by` over that block's 8192
+    /// candidates - 123 of those on SIFT 1M, and `perf` put 16% of the query
+    /// there. A scan visits each row exactly once, so the running set only has
+    /// to answer "is this row better than the current n-th?", which one
+    /// comparison against a cached cutoff does.
+    ///
+    /// `cutoff` is `None` until the set holds `topn` rows; after that it is the
+    /// score of the current n-th best, and a row that cannot beat it is dropped
+    /// without touching the set. Ties keep the smaller row id, the same rule
+    /// [`Self::keep_topn`] uses, so the answer is unchanged.
+    pub(crate) fn topn_collector(&self) -> TopN {
+        TopN::new(
+            self.topn,
+            self.use_sim(),
+            self.threshold,
+            self.metric.to_string(),
+        )
+    }
+
+    pub(crate) fn finish(&self, state: KnnScanOperatorState) -> KnnScanOperatorState {
         let use_sim = state.use_sim;
-        state.scored.sort_by(|a, b| {
+        // For a distance metric the threshold is an upper bound; for a
+        // similarity metric it is a lower bound.
+        let is_dist = !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
+        let passes = |sim: f64, dist: f64| -> bool {
+            match self.threshold {
+                None => true,
+                Some(th) if is_dist => dist <= th,
+                Some(th) if use_sim => sim >= th,
+                Some(th) => dist >= th,
+            }
+        };
+        // `a` sorts before `b` when `a` is the better answer.
+        let better = |a: &(usize, f64, f64), b: &(usize, f64, f64)| -> std::cmp::Ordering {
             let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
             x.partial_cmp(&y)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
-        });
-        if let Some(th) = self.threshold {
-            // For a distance metric the threshold is an upper bound; for a
-            // similarity metric it is a lower bound.
-            let is_dist =
-                !self.is_sparse && !self.is_tensor && matches!(self.metric, "l2" | "hamming");
-            state.scored.retain(|(_, sim, dist)| {
-                if is_dist {
-                    *dist <= th
-                } else if use_sim {
-                    *sim >= th
-                } else {
-                    *dist >= th
-                }
-            });
+        };
+        let mut scored: Vec<(usize, f64, f64)> = if self.threshold.is_some() {
+            state
+                .scored
+                .into_iter()
+                .filter(|e| passes(e.1, e.2))
+                .collect()
+        } else {
+            state.scored
+        };
+        if scored.len() > self.topn {
+            // Partition so the first `topn` are the best ones (unordered).
+            scored.select_nth_unstable_by(self.topn - 1, better);
+            scored.truncate(self.topn);
         }
-        state.scored.truncate(self.topn);
-        state
+        scored.sort_by(better);
+        KnnScanOperatorState { scored, use_sim }
     }
 }
 
@@ -936,7 +964,6 @@ mod tests {
             metric,
             threshold,
             rows: &[],
-            cache: None,
             vector_candidates: None,
         }
     }
@@ -975,6 +1002,43 @@ mod tests {
         assert_eq!(merged.scored, all.scored);
     }
 
+    /// The running collector and the per-block `keep_topn` must agree: it
+    /// replaced the latter on the exact scan's hot path, and a difference would
+    /// silently change which rows a query returns.
+    #[test]
+    fn the_running_collector_matches_keep_topn() {
+        for (metric, threshold) in [
+            ("l2", None),
+            ("ip", None),
+            ("cosine", None),
+            ("l2", Some(2.0)),
+            ("ip", Some(0.5)),
+        ] {
+            let scan = scan(metric, threshold);
+            // Ties on both the score and the id, so the tie-break rule is
+            // exercised too.
+            let scored: Vec<(usize, f64, f64)> = (0..50)
+                .map(|i| {
+                    let sim = (i % 5) as f64 / 5.0;
+                    (i, sim, 1.0 - sim)
+                })
+                .collect();
+
+            let mut expected = scan.keep_topn(scored.clone());
+            let mut got = {
+                let mut top = scan.topn_collector();
+                for row in scored.iter().copied() {
+                    top.push(row);
+                }
+                top.into_rows()
+            };
+            // Both are unordered; the caller's `finish` is what orders them.
+            expected.sort_unstable_by_key(|r| r.0);
+            got.sort_unstable_by_key(|r| r.0);
+            assert_eq!(got, expected, "metric={metric} threshold={threshold:?}");
+        }
+    }
+
     #[test]
     fn finish_ranks_by_metric_and_applies_threshold_and_topn() {
         let state = KnnScanOperatorState {
@@ -1010,5 +1074,138 @@ mod beam_tests {
         // A statement's own beam always wins, and never becomes zero.
         assert_eq!(Engine::search_width(Some(8), 4_000_000), 8);
         assert_eq!(Engine::search_width(Some(0), 100), 1);
+    }
+}
+
+/// A bounded top-n set, fed one scored row at a time.
+///
+/// See [`PhysicalKnnScan::topn_collector`]: the scan compares each row against
+/// the set's current cutoff instead of re-selecting per block.
+pub(crate) struct TopN {
+    topn: usize,
+    /// Higher is better: the score is a similarity, so the worst kept row has
+    /// the smallest score. Otherwise the score is a distance.
+    use_sim: bool,
+    threshold: Option<f64>,
+    metric: String,
+    rows: Vec<(usize, f64, f64)>,
+    /// The score a row has to beat to enter the full set, cached so the common
+    /// reject costs one comparison.
+    cutoff: Option<f64>,
+    /// Index of the row that currently holds `cutoff`.
+    worst: usize,
+}
+
+impl TopN {
+    fn new(topn: usize, use_sim: bool, threshold: Option<f64>, metric: String) -> Self {
+        Self {
+            topn: topn.max(1),
+            use_sim,
+            threshold,
+            metric,
+            rows: Vec::new(),
+            cutoff: None,
+            worst: 0,
+        }
+    }
+
+    /// Whether `row` would enter a full set: `true` while the set still has
+    /// room, then a comparison against the cached cutoff.
+    #[inline]
+    fn admits(&self, row: &(usize, f64, f64)) -> bool {
+        if self.rows.len() < self.topn {
+            return true;
+        }
+        let Some(cutoff) = self.cutoff else {
+            return true;
+        };
+        // Compare exactly as `keep_topn` orders rows: score first, then the
+        // row id, so a tie on the score keeps the smaller id. A similarity
+        // improves upward, a distance downward.
+        let mine = if self.use_sim { row.1 } else { row.2 };
+        let better = if self.use_sim {
+            mine.partial_cmp(&cutoff)
+        } else {
+            cutoff.partial_cmp(&mine)
+        };
+        match better {
+            Some(std::cmp::Ordering::Greater) => true,
+            Some(std::cmp::Ordering::Equal) => row.0 < self.rows[self.worst].0,
+            _ => false,
+        }
+    }
+
+    /// Offers one scored row. Cheap when the set is full and the row loses.
+    pub(crate) fn push(&mut self, row: (usize, f64, f64)) {
+        if self.threshold.is_some() && !self.passes_threshold(&row) {
+            return;
+        }
+        if !self.admits(&row) {
+            return;
+        }
+        if self.rows.len() < self.topn {
+            self.rows.push(row);
+            if self.rows.len() == self.topn {
+                self.refresh();
+            }
+            return;
+        }
+        self.rows[self.worst] = row;
+        self.refresh();
+    }
+
+    fn passes_threshold(&self, row: &(usize, f64, f64)) -> bool {
+        let Some(th) = self.threshold else {
+            return true;
+        };
+        let is_dist = !matches!(self.metric.as_str(), "cosine" | "ip");
+        if is_dist && !self.use_sim {
+            row.2 <= th
+        } else if self.use_sim {
+            row.1 >= th
+        } else {
+            row.2 >= th
+        }
+    }
+
+    /// Finds the worst kept row and caches its score as the cutoff. Only the
+    /// set (`topn` rows) is scanned, never a whole block.
+    fn refresh(&mut self) {
+        let mut worst = 0;
+        for i in 1..self.rows.len() {
+            if self.is_worse(&self.rows[i], &self.rows[worst]) {
+                worst = i;
+            }
+        }
+        self.worst = worst;
+        self.cutoff = Some(if self.use_sim {
+            self.rows[worst].1
+        } else {
+            self.rows[worst].2
+        });
+    }
+
+    /// `a` is worse than `b` for this scan's direction: a similarity improves
+    /// upward, a distance downward. Equal scores are broken by the row id, the
+    /// larger id being worse.
+    fn is_worse(&self, a: &(usize, f64, f64), b: &(usize, f64, f64)) -> bool {
+        // "a loses to b" is the same comparison `admits` makes against the
+        // cutoff, so both use one ordering rule.
+        let (a_score, b_score) = if self.use_sim { (a.1, b.1) } else { (a.2, b.2) };
+        let a_better = if self.use_sim {
+            a_score.partial_cmp(&b_score)
+        } else {
+            b_score.partial_cmp(&a_score)
+        };
+        match a_better {
+            Some(std::cmp::Ordering::Less) => true,
+            Some(std::cmp::Ordering::Equal) => a.0 > b.0,
+            _ => false,
+        }
+    }
+
+    /// The kept rows, unordered. The caller's `finish` sorts them.
+    pub(crate) fn into_rows(self) -> Vec<(usize, f64, f64)> {
+        self.rows
     }
 }
