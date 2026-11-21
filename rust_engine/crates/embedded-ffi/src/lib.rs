@@ -154,8 +154,27 @@ pub unsafe extern "C" fn inf_embedded_start(
                     // seals (`flush_storage`), which is what keeps the log at
                     // the size of one checkpoint.
                     if engine.has_work_since_checkpoint().await {
+                        // A checkpoint alone leaves every memory index in RAM,
+                        // and the next open rebuilds those tails from the rows
+                        // (`NewTxn::RecoverMemIndex`) - measured at 10.3 s of a
+                        // 10.3 s open for 4.6 k rows, because a multi-vector
+                        // row is ~96 KB. The operator's `FLUSH DATA` does not
+                        // dump either (the reference's flush leaves the tails
+                        // alone), but this host has no background trigger to
+                        // dump later, so the dump belongs here: pay it once on
+                        // the way down instead of on every open.
+                        engine.set_flush_dumps_mem_index(true);
                         if let Err(e) = engine.flush().await {
                             eprintln!("embedded engine: final checkpoint failed: {e}");
+                        }
+                        // `WalManager::Cleanup` is the only path that removes a
+                        // sealed segment, and it is the background trigger that
+                        // normally runs it. This host has none, so the stop does
+                        // it: without that step the log keeps every segment it
+                        // ever wrote, which is the disk half of the same
+                        // problem the replay half had.
+                        if let Err(e) = engine.cleanup().await {
+                            eprintln!("embedded engine: final cleanup failed: {e}");
                         }
                     }
                 });

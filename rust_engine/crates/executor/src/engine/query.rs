@@ -2098,14 +2098,31 @@ impl Engine {
                     None => (column.clone(), index_type.as_str(), None),
                 };
                 self.validate_index(table, &validate_column, effective_type, opts)?;
-                let duplicate = self
+                let existing = self
                     .storage
                     .catalog
                     .list_indexes()?
-                    .iter()
-                    .any(|im| im.name == *name && im.table == *table);
-                if duplicate && !*if_not_exists {
-                    return Err(Error::Invalid(format!("index '{name}' already exists")));
+                    .into_iter()
+                    .find(|im| im.name == *name && im.table == *table)
+                    .map(|im| im.column);
+                if let Some(existing_column) = existing {
+                    if !*if_not_exists {
+                        return Err(Error::Invalid(format!("index '{name}' already exists")));
+                    }
+                    // `IF NOT EXISTS` on an index that is already there is a
+                    // no-op: the record stands and nothing is materialised again.
+                    // Falling through re-created the record (a second
+                    // `idx_vec` under the same name answered every later
+                    // `SHOW INDEX` with an arbitrary one of them) and rebuilt
+                    // the index over every row, so a client that sets its
+                    // schema up on each connection - rgrep's `ensureSchema` -
+                    // paid a full build per open, and the duplicate records
+                    // multiplied it on the next one.
+                    return Ok(QueryResult::CreatedIndex {
+                        name: name.clone(),
+                        table: table.clone(),
+                        column: existing_column,
+                    });
                 }
                 // The command carries the bare table name; `table` is
                 // qualified (`default_db.wdldl`).

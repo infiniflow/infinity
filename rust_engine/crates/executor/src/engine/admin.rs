@@ -1331,9 +1331,22 @@ impl Engine {
         // The memory indexes still need a bound on a long import; that is the
         // quota (`enforce_memindex_quota`) and the per-batch capacity dumps, not
         // this function.
+        // `INFINITY_PROFILE_OPEN=1` also times the checkpoint's phases: a
+        // checkpoint that crosses a client's RPC timeout is invisible otherwise,
+        // and it is the write path's one long step.
+        let profile = std::env::var_os("INFINITY_PROFILE_OPEN").is_some();
+        let mut phase = std::time::Instant::now();
+        let ckpt_start = phase;
+        let mut mark = |name: &str| {
+            if profile {
+                eprintln!("checkpoint {name}: {:?}", phase.elapsed());
+            }
+            phase = std::time::Instant::now();
+        };
         // The C++ block mirror is the storage of record; a table it cannot
         // write (a column with no block layout) keeps its rows buffered only.
         let mirror = self.flush_blocks(bound_ts).await;
+        mark("flush_blocks");
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {
@@ -1351,8 +1364,10 @@ impl Engine {
         // memory tail to seal, which is why it does not wait for a
         // `DumpMemIndex`.
         self.publish_spann_chunks(bound_ts).await;
+        mark("spann+persist");
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
+        mark("reload_vector_indexes");
         // Bound the page cache the way the reference's buffer manager does:
         // segment files are written back and their clean pages dropped, so RSS
         // tracks live structures rather than file cache.
@@ -1388,6 +1403,7 @@ impl Engine {
                 .rewrite_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
+        mark("catalog_rewrite");
         // The checkpoint's one store flush, at the end as in
         // `NewTxn::Checkpoint` (`kv_store()->Flush()`, `new_txn_impl.cpp:1814`).
         // It covers everything the mirror published - `catalog|seg|…`,
@@ -1396,6 +1412,7 @@ impl Engine {
         // those records stay in the memtable and a `kill -9` discards them: the
         // reference then sees block files whose segment records do not exist.
         self.txn.flush()?;
+        mark("store_flush");
         // The checkpoint's other two trees. `data/` alone is not enough for a
         // restart out of the bucket: the catalog holds the tables and the row
         // store holds their rows, so a directory restored from `data/` alone
@@ -1432,6 +1449,9 @@ impl Engine {
         // a full scan (plan 4.2): it also absorbs any path that changed a tail
         // without refreshing.
         self.recompute_memindex_total();
+        if profile {
+            eprintln!("checkpoint total: {:?}", ckpt_start.elapsed());
+        }
         Ok(())
     }
 

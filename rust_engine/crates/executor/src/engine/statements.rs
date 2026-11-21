@@ -604,7 +604,20 @@ impl Engine {
         // the log put those DDLs and rows back would contradict the mode (the
         // reference replays only records up to its last checkpoint ts).
         let wal_enabled = options.wal_enabled;
+        // `INFINITY_PROFILE_OPEN=1`: the phases of an open, which is the cost a
+        // host pays per process (the embedded engine opens on every command).
+        // The same shape as `INFINITY_PROFILE_IMPORT` in the CLI.
+        let profile = std::env::var_os("INFINITY_PROFILE_OPEN").is_some();
+        let open_start = std::time::Instant::now();
+        let mut phase = std::time::Instant::now();
+        let mut mark = |name: &str| {
+            if profile {
+                eprintln!("open {name}: {:?}", phase.elapsed());
+            }
+            phase = std::time::Instant::now();
+        };
         let applied = engine.txn.applied_ts().await?;
+        mark("applied_ts");
         if wal_enabled {
             // The async replay: a replayed restore awaits the DDL turn and an
             // index publish awaits its chunk write, so the loop is a future.
@@ -618,10 +631,12 @@ impl Engine {
                 })
                 .await?;
         }
+        mark("replay_commands");
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
         // hold (the reference's checkpoint record gives it the same floor).
         let hydrated = engine.recover_blocks()?;
+        mark("recover_blocks");
         // Two floors, because the two halves of a commit reach the disk in
         // sequence: the KV batch is written first, the block in `CommitBottom`
         // after. A record above `applied` (the newest checkpoint frame) still
@@ -641,7 +656,9 @@ impl Engine {
                 .await?;
             engine.apply_replayed_rows(replayed_appends, replayed_deletes)?;
         }
+        mark("recover_into");
         engine.rebuild_indexes()?;
+        mark("rebuild_indexes");
         // `MetaTableObject::RestoreTableCache`: the allocator has no memory of
         // its own across a restart. The segment map, and the row id to continue
         // from, come from the catalog's segment/block layer and the blocks'
@@ -667,6 +684,7 @@ impl Engine {
             }
             entry.write_batches = entry.segments.len();
         }
+        mark("segment_map");
         // `Storage::Init` finishes with two write transactions: the startup
         // checkpoint and (on a directory that has no system timestamp yet) the
         // creation of `default_db`. Both spend a timestamp, and a directory the
@@ -689,6 +707,7 @@ impl Engine {
         // reopen at an older position - or not at all once that segment is
         // pruned - after a power loss.
         engine.txn.sync_wal().await?;
+        mark("startup_checkpoint");
         if !engine.storage.catalog.has_database_record("default_db")? {
             engine
                 .ddl_commit_typed(
@@ -713,6 +732,10 @@ impl Engine {
         engine.recover_mem_index().await?;
         // The in-memory indexes were just rebuilt; the quota reads this total.
         engine.recompute_memindex_total();
+        mark("recover_mem_index");
+        if profile {
+            eprintln!("open total: {:?}", open_start.elapsed());
+        }
         // The engine is complete: its `Drop` releases the registration, and the
         // guard must not undo it under a live engine.
         if let Some(registration) = registration.as_mut() {
@@ -11587,6 +11610,19 @@ impl Engine {
         self.flush_storage().await
     }
 
+    /// True when the log holds commits the newest checkpoint frame does not
+    /// cover.
+    ///
+    /// A host that checkpoints on the way down (`inf_embedded_stop`) asks this
+    /// first, so a read-only session does not pay a block-mirror rewrite just
+    /// to say goodbye.
+    pub async fn has_work_since_checkpoint(&self) -> bool {
+        match self.txn.applied_ts().await {
+            Ok(applied) => self.txn.current_ts() > applied,
+            Err(_) => true,
+        }
+    }
+
     /// Attaches a `BGTaskProcessor` (`Storage::dump_index_processor`). While
     /// attached, exceeding the memindex quota queues a real
     /// [`DumpMemIndexTask`] instead of dumping synchronously.
@@ -12241,7 +12277,7 @@ impl Engine {
         // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
         // records the KV store holds are reclaimed here, not at a checkpoint.
         if let Ok(applied) = self.txn.applied_ts().await {
-            let _ = self.txn.drop_sealed_wal_up_to(applied);
+            let _ = self.txn.drop_sealed_wal_up_to(applied).await;
         }
         self.reclaim_deprecated_segments()?;
         // The column files an `ALTER TABLE … DROP COLUMN` left behind: the

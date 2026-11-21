@@ -1299,7 +1299,23 @@ impl TxnManager {
         deletes: &mut Vec<ReplayedDelete>,
     ) -> Result<usize> {
         let mut applied = 0;
+        // A sealed segment's name carries the timestamp it was sealed at, and
+        // every record inside it is at or below that. One the checkpoint already
+        // covers is therefore skipped **without being read**: the loop below
+        // floors each record out anyway, but only after the whole file - and
+        // `WalEntryIterator::make` reads a segment whole - so a directory with a
+        // long history paid for it on every open (measured: 227 MB of segments,
+        // 33 s to open 4.6 k rows).
+        let covered: std::collections::HashSet<std::path::PathBuf> =
+            sealed_segments(&self.wal_path)?
+                .into_iter()
+                .filter(|(_, seal_ts)| *seal_ts <= checkpoint_ts)
+                .map(|(path, _)| path)
+                .collect();
         for path in segment_paths(&self.wal_path)? {
+            if covered.contains(&path) {
+                continue;
+            }
             let mut iter = WalEntryIterator::make(&path, false).await?;
             while iter.has_next() {
                 let Some(entry) = iter.next() else {
@@ -1596,23 +1612,62 @@ impl TxnManager {
         Ok(())
     }
 
+    /// Every segment that holds a `Checkpoint` frame at or above `applied`.
+    ///
+    /// The frame *is* the replay floor: every record at or below it is skipped
+    /// on the next open because the checkpoint's files hold it. It therefore has
+    /// to survive the truncation that follows it
+    /// ([`Self::append_checkpoint_flushed`]) — with the frame gone
+    /// [`Self::applied_ts`] answers 0, and an open whose log has since been
+    /// emptied replays from the beginning and loses the state the checkpoint
+    /// already covered.
+    ///
+    /// A frame can be in more than one segment: `rotate_wal_if_large` runs after
+    /// the frame is appended, so the active log is sealed *with* the frame in it
+    /// and a copy can also sit in the log that follows. Every such segment is
+    /// kept, not just the first found — dropping the sealed copy is what left a
+    /// restart with a single 41-byte log as its only floor.
+    async fn checkpoint_frame_segments(
+        &self,
+        applied: TxnTimeStamp,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        let mut out = Vec::new();
+        for path in segment_paths(&self.wal_path)? {
+            for entry in WalManager::read_all(&path).await? {
+                for cmd in &entry.cmds {
+                    if let WalCmd::Checkpoint { max_commit_ts } = cmd {
+                        if *max_commit_ts >= applied {
+                            out.push(path.clone());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// Drops the sealed segments whose records the KV store already holds.
     ///
     /// C++ `WalManager::Cleanup` (`wal_manager_impl.cpp`): a checkpoint keeps
     /// its sealed file — the reference deletes `wal.log.<ts>` only at a
     /// cleanup — so the deletion lives here rather than in the checkpoint path.
     /// The caller must pass a timestamp whose records have been fsynced.
-    pub fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
+    ///
+    /// The segment that holds the newest checkpoint frame is never dropped, even
+    /// when its records are covered: see [`Self::checkpoint_frame_segments`].
+    pub async fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
         let applied = applied.min(self.synced.load(Ordering::SeqCst));
         if applied == 0 {
             return Ok(false);
         }
+        let floors = self.checkpoint_frame_segments(applied).await?;
         let mut dropped = false;
         for (path, seal_ts) in sealed_segments(&self.wal_path)? {
-            if seal_ts <= applied {
-                std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
-                dropped = true;
+            if seal_ts > applied || floors.contains(&path) {
+                continue;
             }
+            std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
+            dropped = true;
         }
         Ok(dropped)
     }
