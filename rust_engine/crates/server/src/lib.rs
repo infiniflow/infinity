@@ -335,9 +335,18 @@ pub(crate) fn reject_taken_loopback(addr: &str) -> Result<()> {
     }
 }
 
+/// Where the thrift front end accepts connections.
+enum Listen {
+    Tcp(TcpListener),
+    /// A socket file: the embedded mode. It is unlinked on shutdown, so a
+    /// crashed run leaves one stale path that `bind_unix` clears.
+    #[cfg(unix)]
+    Unix(std::os::unix::net::UnixListener, std::path::PathBuf),
+}
+
 /// A minimal TCP server that handles one `Connect` per connection.
 pub struct Server {
-    listener: TcpListener,
+    listen: Listen,
     sessions: Arc<RwLock<HashMap<i64, i64>>>,
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
@@ -352,7 +361,7 @@ impl Server {
         let listener = TcpListener::bind(addr).map_err(|e| Error::io(addr, e))?;
         let bound = listener.local_addr().map_err(|e| Error::io(addr, e))?;
         Ok(Self {
-            listener,
+            listen: Listen::Tcp(listener),
             sessions: Arc::new(RwLock::new(HashMap::new())),
             next_session: Arc::new(AtomicI64::new(1)),
             engine: None,
@@ -380,6 +389,38 @@ impl Server {
         Ok(s)
     }
 
+    /// [`Self::bind_with_engine`] on a unix socket: the engine runs inside the
+    /// caller's process and no port is taken, which is what the embedded mode
+    /// of a local client wants. The path is removed on shutdown.
+    #[cfg(unix)]
+    pub fn bind_unix_with_engine(
+        path: impl AsRef<std::path::Path>,
+        engine: Arc<Engine>,
+    ) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        // A previous run that was killed leaves the socket file behind, and a
+        // bind on it fails with EADDRINUSE.
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::io(path.display().to_string(), e)),
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| Error::io(parent.display().to_string(), e))?;
+        }
+        let listener = std::os::unix::net::UnixListener::bind(&path)
+            .map_err(|e| Error::io(path.display().to_string(), e))?;
+        engine.install_engine_handle();
+        Ok(Self {
+            listen: Listen::Unix(listener, path.clone()),
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+            next_session: Arc::new(AtomicI64::new(1)),
+            engine: Some(engine),
+            peer: Arc::new(PeerManager::new("leader", path.display().to_string(), 0)),
+        })
+    }
+
     /// The peer/cluster manager shared with every connection. Mutating node
     /// state through it (`register_peer`, `heartbeat_peer`, `change_role`) is
     /// reflected by `SHOW CURRENT NODE`.
@@ -388,11 +429,14 @@ impl Server {
     }
 
     pub fn local_addr(&self) -> Result<String> {
-        Ok(self
-            .listener
-            .local_addr()
-            .map_err(|e| Error::io("<addr>", e))?
-            .to_string())
+        match &self.listen {
+            Listen::Tcp(listener) => Ok(listener
+                .local_addr()
+                .map_err(|e| Error::io("<addr>", e))?
+                .to_string()),
+            #[cfg(unix)]
+            Listen::Unix(_, path) => Ok(path.display().to_string()),
+        }
     }
 
     /// Serves Thrift on the **caller's** runtime, until it is shut down.
@@ -408,18 +452,37 @@ impl Server {
         use volo_thrift::codec::default::thrift::MakeThriftCodec;
         use volo_thrift::codec::default::DefaultMakeCodec;
 
-        self.listener
-            .set_nonblocking(true)
-            .expect("set the thrift listener non-blocking");
-        let listener =
-            tokio::net::TcpListener::from_std(self.listener).expect("adopt the thrift listener");
         let service =
             service::Service::new(self.engine, self.sessions, self.next_session, self.peer);
         // Unframed `TBinaryProtocol`, which is what the python/go SDKs speak.
         let server = volo_gen::infinity::InfinityServiceServer::new(service)
             .make_codec(DefaultMakeCodec::new(MakeThriftCodec::new()));
-        if let Err(e) = server.run(DefaultIncoming::from(listener)).await {
-            eprintln!("[THRIFT] server stopped: {e}");
+        match self.listen {
+            Listen::Tcp(listener) => {
+                listener
+                    .set_nonblocking(true)
+                    .expect("set the thrift listener non-blocking");
+                let listener =
+                    tokio::net::TcpListener::from_std(listener).expect("adopt the thrift listener");
+                if let Err(e) = server.run(DefaultIncoming::from(listener)).await {
+                    eprintln!("[THRIFT] server stopped: {e}");
+                }
+            }
+            #[cfg(unix)]
+            Listen::Unix(listener, path) => {
+                listener
+                    .set_nonblocking(true)
+                    .expect("set the unix listener non-blocking");
+                let listener =
+                    tokio::net::UnixListener::from_std(listener).expect("adopt the unix listener");
+                let out = server.run(DefaultIncoming::from(listener)).await;
+                // The socket file is ours: leaving it behind would make the next
+                // `bind_unix` look like a live server.
+                let _ = std::fs::remove_file(&path);
+                if let Err(e) = out {
+                    eprintln!("[THRIFT] server stopped: {e}");
+                }
+            }
         }
     }
 }

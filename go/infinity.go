@@ -17,6 +17,8 @@ package infinity
 import (
 	"context"
 	"fmt"
+	"net"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
@@ -41,6 +43,8 @@ func Connect(uri URI) (*InfinityConnection, error) {
 	switch u := uri.(type) {
 	case NetworkAddress:
 		return NewInfinityConnectionWithConfig(u, &thrift.TConfiguration{})
+	case UnixAddress:
+		return NewInfinityConnectionUnix(string(u), &thrift.TConfiguration{})
 	default:
 		return nil, NewInfinityException(
 			int(ErrorCodeInvalidServerAddress),
@@ -77,13 +81,6 @@ func NewInfinityConnectionWithConfig(address NetworkAddress, conf *thrift.TConfi
 	// Use buffered transport
 	bufferedTransport := thrift.NewTBufferedTransport(transport, 8192)
 
-	// Create binary protocol (matching Python's TBinaryProtocol)
-	protocolFactory := thrift.NewTBinaryProtocolFactoryConf(conf)
-	protocol := protocolFactory.GetProtocol(bufferedTransport)
-
-	// Create client
-	client := thriftapi.NewInfinityServiceClientProtocol(bufferedTransport, protocol, protocol)
-
 	// Open transport
 	if err := bufferedTransport.Open(); err != nil {
 		return nil, NewInfinityException(
@@ -91,10 +88,57 @@ func NewInfinityConnectionWithConfig(address NetworkAddress, conf *thrift.TConfi
 			fmt.Sprintf("Failed to connect to server at %s:%d: %v", address.IP, address.Port, err),
 		)
 	}
+	return newConnection(address, bufferedTransport, conf)
+}
+
+// NewInfinityConnectionUnix connects over a unix domain socket.
+//
+// The wire is the same thrift protocol as the TCP path; only the dialer differs,
+// so every `Database`/`Table` call works unchanged. This is how a host process
+// reaches an embedded engine: the engine serves its own socket inside the
+// host's data directory and dies with the host.
+func NewInfinityConnectionUnix(path string, conf *thrift.TConfiguration) (*InfinityConnection, error) {
+	if conf == nil {
+		conf = &thrift.TConfiguration{}
+	}
+	if path == "" {
+		return nil, NewInfinityException(
+			int(ErrorCodeInvalidServerAddress),
+			"unix socket path is empty",
+		)
+	}
+	timeout := conf.SocketTimeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	raw, err := net.DialTimeout("unix", path, timeout)
+	if err != nil {
+		return nil, NewInfinityException(
+			transportErrorCode(err),
+			fmt.Sprintf("Failed to connect to unix socket %s: %v", path, err),
+		)
+	}
+	// The connection is already dialled, so the transport is not opened again:
+	// `TSocket.Open` on a socket built from a `net.Conn` reports "already
+	// connected", and the buffered layer needs no opening of its own.
+	bufferedTransport := thrift.NewTBufferedTransport(
+		thrift.NewTSocketFromConnConf(raw, conf), 8192)
+	return newConnection(UnixAddress(path), bufferedTransport, conf)
+}
+
+// newConnection finishes a connection over an open transport: protocol, client
+// and the `Connect` handshake that yields the session id.
+func newConnection(uri URI, bufferedTransport thrift.TTransport, conf *thrift.TConfiguration) (*InfinityConnection, error) {
+	// Create binary protocol (matching Python's TBinaryProtocol)
+	protocolFactory := thrift.NewTBinaryProtocolFactoryConf(conf)
+	protocol := protocolFactory.GetProtocol(bufferedTransport)
+
+	// Create client
+	client := thriftapi.NewInfinityServiceClientProtocol(bufferedTransport, protocol, protocol)
 
 	// Create connection object
 	conn := &InfinityConnection{
-		uri:         address,
+		uri:         uri,
 		transport:   bufferedTransport,
 		client:      client,
 		isConnected: true,

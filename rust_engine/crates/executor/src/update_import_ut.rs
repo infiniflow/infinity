@@ -897,3 +897,54 @@ async fn import_then_optimize_index() {
     );
     h::ok(&e, "SHOW TABLE db1.tb1 INDEX index1;").await;
 }
+
+/// A VARCHAR cell may hold a TAB — indented source code, or a JSON blob copied
+/// out of a CSV. The stored row text joins cells with TABs, so such a value
+/// used to be split into extra cells and every following column of the row read
+/// a neighbour's value. The row must come back byte for byte, before and after
+/// the block is persisted.
+#[tokio::test]
+async fn a_varchar_with_a_tab_keeps_its_columns() {
+    let dir = tempdir().unwrap();
+    let code =
+        "func splitArgs(args []string) {\n\tfor i := 0; i < len(args); i++ {\n\t\t_ = i\n\t}\n}";
+    let tricky = r"a\tb \ end";
+    {
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        h::ok(&e, "CREATE DATABASE db1;").await;
+        h::ok(
+            &e,
+            "CREATE TABLE db1.tabs (code VARCHAR, name VARCHAR, n INT);",
+        )
+        .await;
+        e.insert_literals(
+            "db1.tabs",
+            None,
+            vec![vec![
+                Literal::Str(code.to_string()),
+                Literal::Str(tricky.to_string()),
+                Literal::Int(7),
+            ]],
+        )
+        .await
+        .unwrap();
+        let got = h::rows(&e, "SELECT code, name, n FROM db1.tabs;").await;
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0][0], code, "the tab-bearing cell shifted the row");
+        assert_eq!(got[0][1], tricky);
+        assert_eq!(got[0][2], "7");
+    }
+
+    // Reopening reads the row back through the block (and, for a table whose
+    // frame is typed, through replay): both must agree with the insert.
+    let e = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    let got = h::rows(&e, "SELECT code, name, n FROM db1.tabs;").await;
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0][0], code);
+    assert_eq!(got[0][1], tricky);
+    assert_eq!(got[0][2], "7");
+}

@@ -3454,7 +3454,7 @@ impl Engine {
                 if on_disk.contains(&(*seq as usize)) {
                     continue;
                 }
-                let cells: Vec<&str> = text.split('\t').collect();
+                let cells = common::row_text::split(text);
                 let mut placed: std::collections::BTreeMap<u64, Value> = Default::default();
                 for (at, id) in frame_ids.iter().enumerate() {
                     let Some(cell) = cells.get(at) else { break };
@@ -3466,7 +3466,7 @@ impl Engine {
                         .cloned()
                         .or_else(|| live_types.get(id).cloned());
                     let declared = frame_type.unwrap_or_default();
-                    if let Ok(value) = self.decode_cell(&table, &[declared], 0, cell) {
+                    if let Ok(value) = self.decode_cell(&table, &[declared], 0, cell.as_ref()) {
                         placed.insert(*id, value);
                     }
                 }

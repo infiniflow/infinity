@@ -2501,8 +2501,10 @@ impl Engine {
                 // cells are simply that text, which is what the writer stores.
                 Err(_) => {
                     let raw = String::from_utf8_lossy(text.as_ref()).into_owned();
-                    let cells: Vec<Value> =
-                        raw.split('\t').map(|c| Value::Str(c.to_string())).collect();
+                    let cells: Vec<Value> = common::row_text::split(&raw)
+                        .into_iter()
+                        .map(|c| Value::Str(c.into_owned()))
+                        .collect();
                     published.push((*seq, cells));
                 }
             }
@@ -2554,9 +2556,9 @@ impl Engine {
                     // Never drop a row because its text form would not parse:
                     // the cells are simply that text, which is what the writer
                     // stores.
-                    Err(_) => text
-                        .split('\t')
-                        .map(|c| Value::Str(c.to_string()))
+                    Err(_) => common::row_text::split(text)
+                        .into_iter()
+                        .map(|c| Value::Str(c.into_owned()))
                         .collect(),
                 };
                 published.borrow_mut().push((seq, values));
@@ -5277,12 +5279,14 @@ impl Engine {
                     .map(|(i, (_, bytes))| {
                         let text = std::str::from_utf8(bytes)
                             .ok()
-                            .and_then(|row| row.split('\t').nth(col))
-                            .map(|cell| match self.decode_cell(table, &types, col, cell) {
-                                Ok(Value::Str(text)) => text,
-                                Ok(other) => other.to_slt_string(),
-                                Err(_) => String::new(),
-                            })
+                            .and_then(|row| common::row_text::split(row).into_iter().nth(col))
+                            .map(
+                                |cell| match self.decode_cell(table, &types, col, cell.as_ref()) {
+                                    Ok(Value::Str(text)) => text,
+                                    Ok(other) => other.to_slt_string(),
+                                    Err(_) => String::new(),
+                                },
+                            )
                             .unwrap_or_default();
                         crate::engine::text_index::prepare_doc((base + i) as u64, &text, &tokenizer)
                     })
@@ -6455,8 +6459,16 @@ impl Engine {
             Err(_) => return self.parse_stored_row_lossy(table, defaults, types, v),
         };
         let mut cells: Vec<Value> = Vec::new();
-        for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
+        if types.len() == 1 {
+            // A one-column row cannot hold a separator: its whole text is the
+            // cell, escapes included.
+            let cell = common::row_text::decode_single(text);
+            cells.push(self.decode_cell(table, types, 0, cell.as_ref())?);
+        } else {
+            for cell in common::row_text::split(text) {
+                let at = cells.len();
+                cells.push(self.decode_cell(table, types, at, cell.as_ref())?);
+            }
         }
         while cells.len() < defaults.len() {
             let i = cells.len();
@@ -6479,8 +6491,9 @@ impl Engine {
     ) -> Result<Vec<Value>> {
         let text = String::from_utf8_lossy(v);
         let mut cells: Vec<Value> = Vec::new();
-        for cell in text.split('\t') {
-            cells.push(self.decode_cell(table, types, cells.len(), cell)?);
+        for cell in common::row_text::split(&text) {
+            let at = cells.len();
+            cells.push(self.decode_cell(table, types, at, cell.as_ref())?);
         }
         while cells.len() < defaults.len() {
             let i = cells.len();

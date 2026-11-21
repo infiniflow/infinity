@@ -2049,6 +2049,15 @@ fn row_text(block: &DataBlock, row: usize) -> Option<String> {
         return None;
     }
     let mut cells = Vec::with_capacity(block.column_count());
+    // A one-column block already *is* the row text (the port stores the joined
+    // row in a single varchar column), so it is returned verbatim: escaping a
+    // cell that carries the separators would escape the row, not a value.
+    if block.column_count() == 1 && block.row_count() > 0 {
+        return Some(match block.get_value(0, row) {
+            Some(value) => cell_text(&value),
+            None => "null".to_string(),
+        });
+    }
     for column in 0..block.column_count() {
         // Inside the block a missing value is a NULL slot (`BlockValue::Null`
         // is the encoder's own marker, the decoder reports the slot as absent),
@@ -2058,7 +2067,9 @@ fn row_text(block: &DataBlock, row: usize) -> Option<String> {
             None => "null".to_string(),
         });
     }
-    Some(cells.join("\t"))
+    // A cell may carry a TAB of its own (a VARCHAR holding source code), which
+    // a plain join would turn into a column separator.
+    Some(common::row_text::encode(&cells))
 }
 
 /// `.slt`/storage text of one typed value (`Literal::to_slt_string`).
