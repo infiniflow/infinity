@@ -696,7 +696,7 @@ unsealed_max_tables_per_round = 100
 
 ## 9. 未决
 
-- **`unsealed_reclaim_interval` 的实测标定**：默认 30 秒是照 `unsealed_idle_age / 20` 推的 **[推算]**。扫描是 O(表数 + 索引数) 次短 `tables` 锁加一次 `list_indexes()`；要在 10000 表 × 3 索引上量一次合计耗时，并确认压力路径每 tick 做一次可以接受。若偏重，就把 `list_indexes()` 的结果缓存到下一轮（索引 DDL 会 bump 一个 epoch，缓存按 epoch 失效）。
+- **`unsealed_reclaim_interval` 的实测标定**：默认 30 秒是照 `unsealed_idle_age / 20` 推的 **[推算]**。扫描是 O(表数) 次原子读（一次 `tables` 锁内，§4.0）加一次 `list_indexes()`；要在 10000 表 × 3 索引上量一次合计耗时，并确认压力路径每 tick 做一次可以接受。若偏重，就把 `list_indexes()` 的结果缓存到下一轮（索引 DDL 会 bump 一个 epoch，缓存按 epoch 失效）。
 - **`unsealed_max_tables_per_round = 100` 的实测标定**：100 是 **[推算]**，依据是"一次后台推进不该长时间占用 `flush` 串行化"。实际取值取决于单表 dump 的典型耗时；100 张表的单轮耗时若超过 `unsealed_reclaim_interval`，就调小。
 - **`K = 3` 的实测复核**：`K` 越小年龄越占优（§4.1）。3 是按"年龄优先于尺寸"定的，具体取值需要在一组真实表分布上看融合后的顺序是否符合预期；若发现尺寸完全不起作用（排序等价于纯按年龄），就把 `K` 调大。
 - **排水与 `checkpoint` 的协调**：两者都取 `flush_lock`。撞在一起时串行跑通，会重复写同一张表——这是可接受的（§4.7），不做合并。
