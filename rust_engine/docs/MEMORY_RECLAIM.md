@@ -98,7 +98,7 @@ reclaim_unsealed(now_ms, target) -> ():
 
 | 触发 | 调用 | `target_met` |
 |---|---|---|
-| 压力（每 tick） | `reclaim_unsealed(now, Bytes(soft))` | 重读引擎总量，`<= soft` |
+| 压力（每 `unsealed_reclaim_interval`，且水位非 `Normal`） | `reclaim_unsealed(now, Bytes(soft))` | 重读引擎总量，`<= soft` |
 | 陈旧（每 `unsealed_reclaim_interval`） | `reclaim_unsealed(now, Stale(idle_age))` | 剩余候选的 `age` 都 `<= idle_age` |
 
 ### 4.0 表级足迹：数据从哪来
@@ -238,14 +238,14 @@ order    = score 降序
 
   次数是 **`1 + dumped`**（`dumped` 是本轮实际 dump 的张数），**上界是 `1 + unsealed_max_tables_per_round`**。一旦达标立即返回，所以常见的"压力解除"场景只有 1～2 次。按上界估算：10000 表 × `cap = 100` 是每轮 101 次求和与 101 次短锁。这是有意的（总量必须新鲜），但成本要按上界算，不能按"一次求和"。
 
-  **`Bytes` 的终止性靠"每轮至少一张表被清空 + 轮数封顶"，不靠总量单调下降。** 总量可能被并发写入推高到 `soft` 以上，所以"降到 soft 以下"这个条件不保证可达；如果只用它作退出条件，一个持续写入的引擎会让循环一直转到轮数上限。这是有意的：压力路径每次 tick 只做有限的工作，剩下的留给下一次 tick，而不是在一次调用里等到总量回落。因此 `Bytes` 的退出是 `target_met() || dumped >= cap`，两者任一成立就返回。
+  **`Bytes` 的终止性靠"每轮至少一张表被清空 + 轮数封顶"，不靠总量单调下降。** 总量可能被并发写入推高到 `soft` 以上，所以"降到 soft 以下"这个条件不保证可达；如果只用它作退出条件，一个持续写入的引擎会让循环一直转到轮数上限。这是有意的：压力路径每次到点只做有限的工作，剩下的留给下一轮，而不是在一次调用里等到总量回落。因此 `Bytes` 的退出是 `target_met() || dumped >= cap`，两者任一成立就返回。
 - **`MAX_TABLES_PER_ROUND` 是必须的护栏。** 没有它，一次压力触发可能在持有 `flush` 串行化的情况下连续写 1000 张表。默认 100（`unsealed_max_tables_per_round`，见 §5），超出的交给下一轮——总量回落渐进，符合后台任务的定位。陈旧路径同样需要它：1000 张表同时超龄时，一次扫描排空全部会在 `flush` 串行化上停留很久。
 
 - **`target_met` 用与 `seal_pressure()` 相同的口径。** `Bytes(soft)` 的判据不是"候选集的 `footprint` 之和"，而是 `budget_bytes()`——`memindex_total + Σ 所有表的 unsealed_bytes()`（`index_build.rs:2448`）。压力本身就是按这个数判出来的，如果退出条件改用另一个口径，两边会对不上：`budget_bytes` 里 `memindex_total` 是全局原子，不等于 `Σ memindex_bytes`（后者是缓存，可能滞后一个批次）。
 
   `unsealed_footprint()` 只用于**排序**，不用于判断是否已达标。两者故意分开：排序容忍近似，退出条件不能。
 
-- **tick 上的压力判定不能调 `seal_pressure()`，因为它会改 `soft`。** `seal_pressure()` 在算 `level` 之前调 `marks.retune(pending)`（`index_build.rs:4577-4581`），而 `retune` 在超过 80% 预算时把 `soft` 减半（`maintain.rs:121-134`）。今天它只在写路径上被调用（频率 = 写入频率）；一旦提到每 tick，引擎持续超 80% 而**没有写入**时，`soft` 会每秒减半：64 MiB → 32 → 16 → … → 1 字节，约 6 秒触底。之后 `Bytes(1)` 的 `target_met` 要求总量降到 1 字节以下，等于把整池排空。
+- **定时器上的压力判定不能调 `seal_pressure()`，因为它会改 `soft`。** `seal_pressure()` 在算 `level` 之前调 `marks.retune(pending)`（`index_build.rs:4577-4581`），而 `retune` 在超过 80% 预算时把 `soft` 减半（`maintain.rs:121-134`）。今天它只在写路径上被调用（频率 = 写入频率）；一旦提到定时器上（每 30 秒一次），引擎持续超 80% 而**没有写入**时，`soft` 会每轮减半：64 MiB → 32 → 16 → … → 1 字节，约 6 分钟触底——仍然是把整池排空，只是慢一些。之后 `Bytes(1)` 的 `target_met` 要求总量降到 1 字节以下，等于把整池排空。
 
   所以新增一个**纯读**的 `Watermarks::pressure(pending)`（只 `level`，不 `retune`），tick 上用它；`retune` 仍只由 `seal_pressure()` 的写路径调用驱动。§6 的"水线推导不变"因此要补一句"更新频率也不变"。
 
@@ -269,7 +269,7 @@ order    = score 降序
 
 **两条路径共用一个原子。** 它们的"无进展"含义相同：候选非空、但每张 `dump_table` 都返回 `false`（I/O 失败，或只含释放不掉的 `Memory` 形态 spann 句柄）。"全部超龄表都在 import"不会造成无进展——那些表已被排除在候选集外，`candidates.is_empty()` 先 `break`。所以是 `Context::unsealed_backoff_until` 一个原子。
 
-不这么做的话：每 tick 都会跑满一整轮，每轮最多 `max_tables_per_round` 次 `dump_every_table_index`（每次扫一遍 `catalog.list_indexes()`），即每秒上百次前缀扫描。
+不这么做的话：每个间隔都会跑满一整轮，每轮最多 `max_tables_per_round` 次 `dump_every_table_index`（每次扫一遍 `catalog.list_indexes()`），且失败表会一直占着队头。
 
 **`Stale` 的循环必然终止，靠三条合起来：**
 
@@ -573,26 +573,37 @@ dump 3  version = [(10, 100), (14, 200), (20, 300)]
 
 对排水循环的要求：不复用自己实现的追加（用 `write_blocks_mode_with` / `dump_every_table_index`，它们已处理块号计算、`version` 重算、未触碰块的短路）；成本按块大小估；一次只动一张表。
 
-### 4.7 两个触发点的节拍
+### 4.7 单一节拍：一个间隔，两种目标
 
-每 tick（1 秒）：
+**只有一条定时器：`unsealed_reclaim_interval`（默认 30 秒）。** 到点时先读水位，再决定这一轮做什么：
 
 1. `Watermarks::pressure(budget_bytes())` 判定（**纯读，不 retune**；见 §4.2）
-2. 非 `Normal` → `reclaim_unsealed(now, Bytes(soft))`（`import_in_flight` 的表被排除在候选集之外，不影响其他表）
+2. 非 `Normal` → `reclaim_unsealed(now, Bytes(soft))`
+3. `Normal` → `reclaim_unsealed(now, Stale(unsealed_idle_age))`
 
-每 `unsealed_reclaim_interval`（默认 30 秒，是 tick 的整数倍）：
+```rust
+pub(crate) fn reclaim_tick(due, pressure, soft, idle_age) -> ReclaimTick {
+    if !due { return Skip }
+    match pressure {
+        Normal => Stale(idle_age),
+        _      => Pressure(soft),
+    }
+}
+```
 
-3. `reclaim_unsealed(now, Stale(unsealed_idle_age))`
+**为什么不再每 tick 查一次压力。** 写路径**每条语句**都会查配额（`enforce_memindex_quota` / `enforce_quota_after_append` / `seal_pending_over_budget`），所以 tick 从来只负责写路径看不见的那一件事：**没人再写、内存却还占着**。那正是陈旧度扫描。把压力检查留在 tick 上，除了每秒付一次 `budget_bytes()` 的全表求和，唯一收益是把"引擎已超水位"的发现从 30 秒缩到 1 秒；而超水位的直接原因是写入，写入自己已经查过了。合并之后：
 
-**压力优先，且共享同一次 `Watermarks::pressure()` 读。** 两者节拍不同（1 秒 vs 30 秒），一个 30 秒点撞上压力时会连续做两件事。正确做法不是跳过，而是共享判定：扫描先看压力（纯读），超限时只做压力那一轮并把这次扫描记作"本周期已处理"，否则再做陈旧度。这样一次 30 秒点最多产生一轮排水。
+- **一次扫描，一个间隔。** `trigger_loop` 里不再有 `else if due_stale`，没有"两条路径共享判定"的协调问题——只剩下优先级。
+- **`unsealed_reclaim_interval` 成为超水位的上界。** 若一个引擎在两次写入之间被推过水位（WAL 回放、刚结束的 import、别的表把总量顶高），最坏要等一个间隔才被发现。这是有意的权衡：间隔是 30 秒，而水位本身已经是软线（`soft`），不是 OOM 线。
+- **成本是每条间隔一次 O(表数) 原子读**（§4.0），不再是每 tick 一次。
 
-实现即 `tasks.rs` 的 `if pressure.0 != Pressure::Normal { … } else if due_stale { … }`：压力那支无论 `due_stale` 是否成立都先把 `last_reclaim` 推到 `now`，所以陈旧路径不会在同一个 tick 里紧接着再跑一轮。`reclaim_interval` 作为参数传入而**不是**从 `Context` 读，是为了让传四个 `Duration::ZERO` 的单测（`bg_task_ut.rs:148`）保持惰性：`0` 直接关掉陈旧路径。
+**压力优先。** 同一时刻既超水位又有超龄表时，先排字节：那是运维能感知的那个数。反之若先做陈旧度，一轮可能把间隔用超龄表占满，水位却还在线上。
 
-**同一张表在一轮里被重复处理是可接受的。** 压力路径与陈旧路径可能选中同一张表；`write_blocks_mode_with` 的 `!dirty && block_index 非空` 短路（`blocks/engine.rs:737-745`）与 `dump_index_transaction` 的"无 tail 就跳过"（`index_build.rs:1254`）都会让第二次调用空转。不为此加锁或去重。
+`reclaim_interval` 作为 `trigger_loop` 的参数传入而**不是**从 `Context` 读，是为了让传 `Duration::ZERO` 的单测（`bg_task_ut.rs:148`）保持惰性：`0` 直接关掉整条路径。
 
-**两个 `reclaim_unsealed` 并发调用会串行，不会重入。** `run_commit_bottom` 的 `HeldBottom` 标记是 **task-local**（`statements.rs:1304`），只对"同一条 task 上的嵌套调用"短路。压力路径与陈旧路径若真的并发跑（不同 task），同一张表的 gate 仍会串行：无 bottom pool 时走 `gate.lock().await`（`statements.rs:1310-1312`），有 pool 时由 `BottomWork::gates` 在 worker 上加锁（`state.rs:6584`、`:6634-6635`）。于是两次 `dump_table` 串行执行、第二次空转。这也是为什么本方案不需要一把引擎级的回收锁。
+**同一张表在一轮里被重复处理是可接受的。** 一轮只做一种目标，所以同一轮内不会重复；跨轮重复由 `write_blocks_mode_with` 的 `!dirty && block_index 非空` 短路（`blocks/engine.rs:737-745`）与 `dump_index_transaction` 的"无 tail 就跳过"（`index_build.rs:1254`）吸收，两次调用第二次空转。不为此加锁或去重。
 
-但要注意：**同一个 tick 内两条路径是顺序执行的，不会并发**（§4.7 的"共享同一次 `pressure()` 读"）。真正的并发只可能来自另一个进程或未来的第二个触发源。
+**两个 `reclaim_unsealed` 并发调用会串行，不会重入。** `run_commit_bottom` 的 `HeldBottom` 标记是 **task-local**（`statements.rs:1304`），只对"同一条 task 上的嵌套调用"短路。若真有第二个触发源（另一个进程、将来新增的路径），同一张表的 gate 仍会串行：无 bottom pool 时走 `gate.lock().await`（`statements.rs:1310-1312`），有 pool 时由 `BottomWork::gates` 在 worker 上加锁（`state.rs:6584`、`:6634-6635`）。于是两次 `dump_table` 串行、第二次空转。这也是为什么本方案不需要一把引擎级的回收锁。
 
 **tick 本身不动。** `trigger_loop` 的 1 秒节拍（`engine/tasks.rs:95` 的 `TICK`）与参考的 `periodic_trigger_thread_impl.cpp:50`（`milliseconds(1000)`）一致，它承载的四个步骤都很轻：
 
@@ -604,7 +615,7 @@ dump 3  version = [(10, 100), (14, 200), (20, 300)]
 
 四者间隔都 ≥ 10 秒（`optimize=10s` / `cleanup=60s` / `compact=120s` / `checkpoint=86400s`），1 秒只是判定粒度。改 tick 会改变它们的触发精度（tick=N 秒 → 最坏延迟 N 秒），收益只是省掉每秒一次的空转。
 
-新扫描本身是 **O(表数) 的内存加法 + 一次 `list_indexes()`**（§4.0）。`list_indexes()` 是 RocksDB 前缀扫描，代价随索引总数增长而与表数无关；压力路径每 tick 跑一次仍可接受 **[推算]**，但它是这条路径上唯一的 I/O，若实测偏重就改为按 `unsealed_reclaim_interval` 节流。陈旧路径无论如何都需要自己的间隔，因为它会真的产生 dump。
+新扫描本身是 **O(表数) 的内存加法 + 一次 `list_indexes()`**（§4.0）。`list_indexes()` 是 RocksDB 前缀扫描，代价随索引总数增长而与表数无关。它现在每个 `unsealed_reclaim_interval` 跑一次（§4.7 的单一节拍），不再是每 tick 一次，所以这条路径的 I/O 频率由配置直接约束。
 
 ## 5. 配置
 
@@ -612,9 +623,9 @@ dump 3  version = [(10, 100), (14, 200), (20, 300)]
 
 ```toml
 [buffer]
-# 陈旧度扫描的周期（唯一的定时器）。0 关闭这条路径。
+# 回收循环唯一的周期：每次到点读一次水位，决定排字节还是排超龄表。0 关闭整条路径。
 unsealed_reclaim_interval = "30s"
-# 陈旧路径的年龄阈值；也是压力路径失败退避的基数（与 interval 取 max）。
+# 陈旧目标的年龄阈值；也是压力目标失败退避的基数（与 interval 取 max）。
 unsealed_idle_age         = "600s"
 # 一轮排水最多动几张表。0 = 不限。
 unsealed_max_tables_per_round = 100
@@ -623,11 +634,11 @@ unsealed_max_tables_per_round = 100
 | 项 | 默认 | `0` 的含义 |
 |---|---|---|
 | `memindex_memory_quota` | 1GB（`conf/infinity_conf.toml:54`；代码默认 4 GiB，`config.rs:157`） | 关闭配额机制（压力路径随之失效） |
-| `unsealed_reclaim_interval` | `30s`（新增） | 关闭陈旧路径（压力路径仍由 `memindex_memory_quota` 控制） |
-| `unsealed_idle_age` | `600s`（新增） | 陈旧路径：**任何有 unsealed 数据的表都算超龄**，即尽快全量回收（最激进）。它同时是压力路径失败退避的基数，但与 `unsealed_reclaim_interval` 取 `max`，所以 `0` 不会关掉退避 |
+| `unsealed_reclaim_interval` | `30s`（新增） | 关闭**整条**回收路径（压力与陈旧都不再跑；写路径的配额检查不受影响） |
+| `unsealed_idle_age` | `600s`（新增） | 陈旧目标：**任何有 unsealed 数据的表都算超龄**，即尽快全量回收（最激进）。它同时是压力路径失败退避的基数，但与 `unsealed_reclaim_interval` 取 `max`，所以 `0` 不会关掉退避 |
 | `unsealed_max_tables_per_round` | `100`（新增） | 不限，一轮排到目标为止 |
 
-两条路径各由自己的既有配置控制，互不牵连。`unsealed_idle_age = 0` 的含义是"不设年龄门槛"（全部算超龄），要关闭陈旧路径应设 `unsealed_reclaim_interval = 0`。
+**只有一个开关：`unsealed_reclaim_interval`。** 它与 `unsealed_idle_age` 是两个不同的量（周期 vs 阈值），不能互相替代：`unsealed_idle_age = 0` 的含义是"不设年龄门槛"（全部算超龄，最激进），关掉整条路径要设 `unsealed_reclaim_interval = 0`。`memindex_memory_quota = 0` 只关写路径的配额判定，回收循环仍会按自己的节拍跑。
 
 默认值的依据：`unsealed_idle_age / unsealed_reclaim_interval = 600 / 30 = 20`，即最坏延迟是回收目标的 5% **[推算]**，见 §9。
 
@@ -641,7 +652,7 @@ unsealed_max_tables_per_round = 100
 |---|---|
 | **写路径的触发间隔一个都不动** | `the_memindex_quota_seals_one_hnsw_chunk_per_batch` 断言 `2..=3` 个 chunk（`tests_ut.rs:10455-10458`），依赖"一次 breach 排一个索引"；§4.4 只改"排哪一个"，候选集不变，区间不变 |
 | **`budget_bytes()` 的记账不变** | 新增的 `unsealed_footprint()` 只用于选表排序，不并入 `budget_bytes`，否则与 `memindex_total` 重复计数 |
-| **`soft` / `hard` 的推导与更新频率都不变** | 公式仍是 `max(1, min(64MiB, budget/4))` / `max(soft, max(1, min(256MiB, budget/2)))`，`budget == 0` 时都置 0（`maintain.rs:74-87`）；`retune` 仍只由写路径的 `seal_pressure()` 驱动，tick 上的判定改用纯读的 `Watermarks::pressure()`（§4.2） |
+| **`soft` / `hard` 的推导与更新频率都不变** | 公式仍是 `max(1, min(64MiB, budget/4))` / `max(soft, max(1, min(256MiB, budget/2)))`，`budget == 0` 时都置 0（`maintain.rs:74-87`）；`retune` 仍只由写路径的 `seal_pressure()` 驱动，定时器上的判定改用纯读的 `Watermarks::pressure()`（§4.2） |
 | **`FLUSH DATA` 语义不变** | `flush_dumps_mem_index` 仍只控制 `Engine::flush`；周期路径不读这个标志 |
 | **IMPORT 中的表单表不排水** | 逐表判断（`statements.rs:886-892` 的 `import_in_flight(table)`），只把那张表移出候选集；其他表照常回收。`dump_index_transaction` 自身的检查（`index_build.rs:1244`）仍保留作二次防护 |
 | **单元测试不受影响** | 唯一调用 `start_background_tasks` 的单测（`bg_task_ut.rs:148-154`）传的是四个 `Duration::ZERO`，因此新增步骤也不会触发 |
@@ -655,8 +666,8 @@ unsealed_max_tables_per_round = 100
 | 1 | `TableEntry::last_write_ms`（表级 `unsealed_footprint` 见 §4.0）+ 前者与 `mirror_epoch += 1` 同处更新（7 处），重启时置为启动时刻 | 一次 INSERT 后前进；7 个点都更新（含 `blocks/engine.rs:1804`、`:3528`）；重启后不是 0 |
 | 2 | `rrf_order(candidates)`：两路名次 + `K = 3` + 确定的平局规则 | 单测：构造"大而新"与"小而老"两组，断言年龄维度不被尺寸抹平；平局时按字节再按表名 |
 | 3 | `Engine::reclaim_unsealed(now_ms, target)`：候选集（逐表排除 import）、`has_unsealed` 判据、融合排序（`sort_base` 按 target 分叉）、逐个 dump（**两段式**：块写在 `run_commit_bottom` 内、索引 dump 在其外）、两个 target、`unsealed_max_tables_per_round`（0 = 不限）、退避原子 | 单测：`Bytes` 目标按 `budget_bytes()` 退出；`Stale` 排空不超过上限的超龄表（0 时全排）；`cap = 0` 不限；无进展时退避 |
-| 4 | 压力路径接入：tick 上 `Watermarks::pressure() != Normal` → `reclaim_unsealed(now, Bytes(soft))` | 单测：只写 A 表把总量顶过 `soft`，B 表（更老）被一起回收；**A 表自己也必须在候选集里** |
-| 5 | 陈旧路径接入：`unsealed_reclaim_interval` 到点 → `reclaim_unsealed(now, Stale(idle_age))` | 单测：配额设大、`idle_age` 设小，tail 与 append buffer 都被落盘 |
+| 4 | 压力目标接入：`unsealed_reclaim_interval` 到点且 `Watermarks::pressure() != Normal` → `reclaim_unsealed(now, Bytes(soft))` | 单测：只写 A 表把总量顶过 `soft`，B 表（更老）被一起回收；**A 表自己也必须在候选集里**；`reclaim_tick` 的优先级判定（压力胜、未到点跳过） |
+| 5 | 陈旧目标接入：同一个间隔到点且水位 `Normal` → `reclaim_unsealed(now, Stale(idle_age))` | 单测：配额设大、`idle_age` 设小，tail 与 append buffer 都被落盘 |
 | 6 | 配置接线（`config.rs` / `main.rs` / `conf/infinity_conf.toml`），三项 | 配置文件里能读到；`interval = 0` 关陈旧路径、`max_tables_per_round = 0` 表示不限、`idle_age = 0` 表示不设年龄门槛 |
 | 7 | `index_memory_bytes` 补 SPANN 分支（`index_has_memory_tail` 的 SPANN 兜底 `true` **保留**，见 §4.0）；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`Watermarks::soft()` / `hard()` 去掉 `#[cfg(test)]` + 新增纯读 `pressure()`；`elapsed_millis` 提升为 `pub(crate)` | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
 | 8 | `TableEntry::last_attempt_ms` + `dump_failures`；压力路径的 `sort_base = max(...)`，候选集门槛 `max(idle_age, interval) * 2^min(failures,6)`（`failures == 0` 时不设门槛）；`Context` 退避原子 | 单测：连续失败 3 次的表本轮不进候选集、但它被写入后立刻回到队列；成功一次清零 |
@@ -717,7 +728,7 @@ unsealed_max_tables_per_round = 100
 
 ## 9. 未决
 
-- **`unsealed_reclaim_interval` 的实测标定**：默认 30 秒是照 `unsealed_idle_age / 20` 推的 **[推算]**。扫描是 O(表数) 次原子读（一次 `tables` 锁内，§4.0）加一次 `list_indexes()`；要在 10000 表 × 3 索引上量一次合计耗时，并确认压力路径每 tick 做一次可以接受。若偏重，就把 `list_indexes()` 的结果缓存到下一轮（索引 DDL 会 bump 一个 epoch，缓存按 epoch 失效）。
+- **`unsealed_reclaim_interval` 的实测标定**：默认 30 秒是照 `unsealed_idle_age / 20` 推的 **[推算]**。扫描是 O(表数) 次原子读（一次 `tables` 锁内，§4.0）加一次 `list_indexes()`；要在 10000 表 × 3 索引上量一次合计耗时，并确认每 30 秒做一次可以接受。若偏重，就把 `list_indexes()` 的结果缓存到下一轮（索引 DDL 会 bump 一个 epoch，缓存按 epoch 失效）。
 - **`unsealed_max_tables_per_round = 100` 的实测标定**：100 是 **[推算]**，依据是"一次后台推进不该长时间占用 `flush` 串行化"。实际取值取决于单表 dump 的典型耗时；100 张表的单轮耗时若超过 `unsealed_reclaim_interval`，就调小。
 - **`K = 3` 的实测复核**：`K` 越小年龄越占优（§4.1）。3 是按"年龄优先于尺寸"定的，具体取值需要在一组真实表分布上看融合后的顺序是否符合预期；若发现尺寸完全不起作用（排序等价于纯按年龄），就把 `K` 调大。
 - **排水与 `checkpoint` 的协调**：两者都取 `flush_lock`。撞在一起时串行跑通，会重复写同一张表——这是可接受的（§4.7），不做合并。

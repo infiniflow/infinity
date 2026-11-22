@@ -25,7 +25,8 @@
 //! (size and idleness), fuses the ranks ([`rrf_order`]), and dumps tables in
 //! that order until the round's target is met.
 //!
-//! Two targets, one loop:
+//! Two targets, one loop, **one cadence** (`unsealed_reclaim_interval`): every
+//! slot reads the ledger once and picks one of these, pressure first.
 //!
 //! * `Target::Bytes(soft)`: the engine is over a waterline, so drain until
 //!   `budget_bytes()` is below the soft line again.

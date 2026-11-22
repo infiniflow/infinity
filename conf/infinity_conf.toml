@@ -54,7 +54,10 @@ result_cache             = "off"
 memindex_memory_quota    = "1GB"
 # Periodic reclaim of memory that is not on disk yet (buffer + index tails):
 # tables nobody writes any more would otherwise hold it until the process ends.
-# unsealed_reclaim_interval: how often the staleness sweep runs; "0s" disables it.
+# One cadence serves both goals: every interval the loop reads the byte ledger
+# once and either drains down to the soft waterline or sweeps tables idle past
+# `unsealed_idle_age`.
+# unsealed_reclaim_interval: the loop's period; "0s" disables the whole path.
 # unsealed_idle_age:        how long a table must be idle to count as stale;
 #                           "0s" means "no age threshold" (everything is stale).
 #                           Also the base of the failure backoff.
