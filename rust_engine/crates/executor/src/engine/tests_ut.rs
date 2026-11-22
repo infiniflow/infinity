@@ -7449,6 +7449,181 @@ mod tests {
         assert!(b.iter().all(|p| p.to_string_lossy().contains("idx_2")));
     }
 
+    /// An uncached index is built **per record** on the write path.
+    ///
+    /// When the cache has no entry for a column, the publish loop used to build
+    /// the column's index once and pair that single handle with every index id
+    /// on the column. Two `FULLTEXT` records then received the same documents
+    /// twice - the second pass deleted rows the first had just written - and the
+    /// absent record never got a handle of its own. Dropping the cache and
+    /// writing again must leave one document per record, not two and not zero.
+    #[tokio::test]
+    async fn an_uncached_column_publishes_once_per_fulltext_record() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tf2 (c1 INT, c2 VARCHAR);")
+            .await
+            .unwrap();
+        for name in ["ft2a", "ft2b"] {
+            e.execute(&format!("CREATE INDEX {name} ON tf2 (c2) USING FULLTEXT;"))
+                .await
+                .unwrap();
+        }
+        // Drop every cached text index: the next write must rebuild them.
+        e.tables
+            .lock()
+            .unwrap()
+            .get_mut(&e.table_key("tf2"))
+            .unwrap()
+            .text
+            .clear();
+        e.execute("INSERT INTO tf2 VALUES (1, 'alpha beta'), (2, 'alpha gamma');")
+            .await
+            .unwrap();
+
+        let ids = e.index_ids_on_column_of_kind("tf2", "c2", &["FULLTEXT"]);
+        assert_eq!(ids.len(), 2);
+        let key = e.table_key("tf2");
+        for id in &ids {
+            let (total, overridden, pending) = {
+                let shared = e
+                    .tables
+                    .lock()
+                    .unwrap()
+                    .get(&key)
+                    .and_then(|entry| entry.text.get(id).cloned())
+                    .unwrap_or_else(|| panic!("index {id} was never built by the write"));
+                let index = shared.read().await;
+                (
+                    index.total_docs(),
+                    index.overridden.len(),
+                    index.pending_publish.clone(),
+                )
+            };
+            assert!(
+                total >= 2,
+                "index {id} must hold both documents, holds {total}"
+            );
+            assert_eq!(
+                overridden, 0,
+                "index {id} must not have rows the duplicate publish deleted"
+            );
+            assert!(
+                pending.is_empty(),
+                "index {id} still has unpublished rows: {pending:?}"
+            );
+        }
+    }
+
+    /// A graph a query holds must not read as "nothing to dump".
+    ///
+    /// The probe cannot look inside a locked graph, and treating contention as
+    /// an empty tail cleared the index's unsealed mark. An index-only table then
+    /// dropped out of the reclaim candidate set until its next write, so the
+    /// rows stayed in memory for as long as the table was idle.
+    #[tokio::test]
+    async fn a_locked_hnsw_graph_keeps_its_unsealed_mark() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE lk (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO lk VALUES (1, [0.1,0.2,0.3,0.4]);")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX lk_v ON lk (v) USING HNSW WITH (metric = l2);")
+            .await
+            .unwrap();
+        let id = e.test_index_id("lk", "v", "HNSW");
+        let meta = e
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap()
+            .into_iter()
+            .find(|im| im.id == id)
+            .unwrap();
+        let graphs: Vec<_> = {
+            let tables = e.tables.lock().unwrap();
+            tables[&e.table_key("lk")]
+                .hnsw_mem
+                .iter()
+                .filter(|((gid, _), _)| *gid == id)
+                .map(|(_, graph)| std::sync::Arc::clone(graph))
+                .collect()
+        };
+        assert!(!graphs.is_empty(), "the graph was never materialised");
+
+        // A reader holds the graph; the probe cannot inspect it.
+        let held = graphs[0].lock().await;
+        assert_eq!(
+            e.index_has_memory_tail("lk", &meta),
+            crate::engine::index_build::TailState::Unknown,
+            "a contended graph is unknown, not empty"
+        );
+        e.tables
+            .lock()
+            .unwrap()
+            .get_mut(&e.table_key("lk"))
+            .unwrap()
+            .bump_unsealed(id, 1);
+        e.sync_unsealed_mark("lk", &meta);
+        let mark = {
+            let tables = e.tables.lock().unwrap();
+            tables[&e.table_key("lk")]
+                .unsealed_marks
+                .get(&id)
+                .map(|m| m.load(std::sync::atomic::Ordering::Relaxed))
+                .unwrap_or(0)
+        };
+        assert!(
+            mark > 0,
+            "the mark must survive a probe that could not look"
+        );
+        drop(held);
+    }
+
+    /// A secondary dump retires its frozen tail only when every segment's chunk
+    /// was written **and readable**.
+    ///
+    /// A failed segment has no reader, so retiring the tail would make its rows
+    /// invisible to an indexed lookup and unretryable (the entries are gone).
+    #[tokio::test]
+    async fn a_failed_secondary_chunk_keeps_the_frozen_tail() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE fs (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX fs_v ON fs (v);").await.unwrap();
+        for i in 0..5 {
+            e.execute(&format!("INSERT INTO fs VALUES ({i}, {i});"))
+                .await
+                .unwrap();
+        }
+        e.dump_index_transaction("fs", "fs_v").await.unwrap();
+        // The chunk is published; the frozen tail must be gone.
+        let sealing = {
+            let tables = e.tables.lock().unwrap();
+            tables[&e.table_key("fs")]
+                .secondary
+                .sealing
+                .values()
+                .map(|list| list.len())
+                .sum::<usize>()
+        };
+        assert_eq!(sealing, 0, "a complete dump retires its frozen tail");
+        assert_eq!(
+            rows(&e, "SELECT id FROM fs WHERE v = 3;").await,
+            vec![vec!["3".to_string()]],
+            "the published chunk answers the lookup"
+        );
+    }
+
     /// Two `CREATE INDEX … USING FULLTEXT` on one column are two indexes.
     ///
     /// Each record owns its tail, its chunk list and its `idx_{id}/` directory
@@ -15346,6 +15521,57 @@ mod tests {
         assert_eq!(got, vec![vec!["3".to_string()]]);
     }
 
+    /// A selective `WHERE` must not leave a SPANN query short of `k`.
+    ///
+    /// The leaf beam was charged per probed leaf, so a filter that rejects most
+    /// leaves spent the whole budget on partitions that contributed nothing and
+    /// the answer came back with fewer than `k` rows although admitted rows
+    /// existed. Only a leaf that admits at least one row may spend budget, and a
+    /// beam that still comes up short falls back to probing every leaf.
+    ///
+    /// 2000 rows in 8 tags: `tag = 7` admits 250, far more than `k`, so the
+    /// answer must be full and must equal the exact scan.
+    #[tokio::test]
+    async fn a_selective_filter_does_not_short_change_a_spann_query() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sf (id INT, tag INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        let mut sql = String::from("INSERT INTO sf VALUES ");
+        for i in 0..2000 {
+            // Tags interleave with the geometry, so each tag's rows are spread
+            // across the tree instead of forming one cluster.
+            let (x, y) = ((i % 47) as f32, ((i / 47) % 43) as f32);
+            sql.push_str(&format!("({i},{},[{x},{y},1.0,0.0])", i % 8));
+            if i + 1 < 2000 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).await.unwrap();
+        e.execute("CREATE INDEX sf_v ON sf (v) USING SPANN WITH (metric = l2);")
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
+        e.execute("DELETE FROM sf WHERE tag <> 7;").await.unwrap();
+
+        let query =
+            "SELECT id FROM sf SEARCH MATCH VECTOR (v, [3.0,5.0,1.0,0.0], 'float', 'l2', 10) \
+                     WHERE tag = 7;";
+        let got = rows(&e, query).await;
+        assert_eq!(
+            got.len(),
+            10,
+            "a selective filter must not short-change the top-k"
+        );
+        e.execute("DROP INDEX sf_v;").await.unwrap();
+        let exact = rows(&e, query).await;
+        assert_eq!(got, exact, "SPANN disagrees with the exact scan");
+    }
+
     /// A table whose index is mostly tombstones still answers a full top-k.
     ///
     /// The tombstones ride the same filter the probe takes
@@ -18054,6 +18280,62 @@ mod tests {
         assert_eq!(pending(), 0);
     }
 
+    /// The cap bounds **attempts**, not successes.
+    ///
+    /// A stale unsealed mark (a dump that released nothing and left the mark
+    /// behind) is the shape a widespread storage failure takes: the round keeps
+    /// walking tables and each visit pays block I/O plus an index catalog scan.
+    /// With `cap = 1` only one table may be touched even when a visit makes no
+    /// progress - counting successes let the round visit every eligible table.
+    #[tokio::test]
+    async fn the_round_cap_counts_attempts_not_only_successes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        // One real buffer, so the ledger is over the (tiny) target and the round
+        // does not stop before it starts.
+        e.execute("CREATE TABLE ca_real (id INT);").await.unwrap();
+        e.execute("INSERT INTO ca_real VALUES (1);").await.unwrap();
+        // Two tables whose only "unsealed data" is a mark for an index id that
+        // has no catalog record. They have no append ts, so the ranking puts
+        // them ahead of the table that was just written; their dumps release
+        // nothing.
+        for i in 0..2 {
+            e.execute(&format!("CREATE TABLE ca{i} (id INT);"))
+                .await
+                .unwrap();
+            let key = e.table_key(&format!("default_db.ca{i}"));
+            e.tables
+                .lock()
+                .unwrap()
+                .entry(key)
+                .or_default()
+                .bump_unsealed(9_000 + i, 1);
+        }
+        e.set_memindex_quota(1);
+        e.set_unsealed_max_tables_per_round(1);
+
+        let dumped = e.reclaim_unsealed().await;
+        assert_eq!(
+            dumped, 0,
+            "the one attempt went to a stale mark and released nothing"
+        );
+        let attempted: Vec<String> = {
+            let tables = e.tables.lock().unwrap();
+            tables
+                .iter()
+                .filter(|(_, entry)| entry.last_attempt_ts != 0)
+                .map(|(key, _)| key.clone())
+                .collect()
+        };
+        assert_eq!(
+            attempted.len(),
+            1,
+            "the cap counts the attempt, so only one table was visited: {attempted:?}"
+        );
+    }
+
     /// A table an `IMPORT` is staging into is not a candidate: its rows are not
     /// committed, so a dump would publish a chunk over rows the table may never
     /// have.
@@ -18086,6 +18368,10 @@ mod tests {
 
     /// A round that releases nothing defers the next one: without the backoff
     /// every tick would walk the same candidates and pay a `list_indexes()` each.
+    ///
+    /// The deadline is **monotonic time**, not a commit ts: a failed round may not
+    /// commit anything, so a commit-ts deadline would only come due when some
+    /// unrelated statement advanced the clock.
     #[tokio::test]
     async fn a_round_that_releases_nothing_defers_the_next() {
         let dir = tempdir().unwrap();
@@ -18101,15 +18387,19 @@ mod tests {
         // before doing any work.
         e.set_memindex_quota(1);
         e.execute("INSERT INTO rd VALUES (1);").await.unwrap();
-        let now_ts = e.current_ts();
         e.context
             .unsealed_backoff_until
-            .store(now_ts + 1_000_000, std::sync::atomic::Ordering::Relaxed);
+            .store(u64::MAX / 2, std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
             e.reclaim_unsealed().await,
             0,
             "the backoff gate stops the round before it starts"
         );
+        // The gate is a deadline, not a floor: an expired one lets the round run.
+        e.context
+            .unsealed_backoff_until
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(e.reclaim_unsealed().await, 1);
     }
 
     /// The target is a pure function of the quota: ten rounds do not move it, and
@@ -18429,30 +18719,27 @@ mod tests {
     /// A table that has been failing is pushed out of the candidate set, and a
     /// write puts it straight back.
     ///
-    /// The delay itself is `base * 2^failures`, which a unit test cannot reach
-    /// by moving the clock: `current_ts()` only advances when a commit
-    /// **finishes**, and `reserve_commit_ts` moves the prepare watermark
-    /// instead. What is asserted here is the observable half - exclusion while
-    /// failing, re-inclusion on a write - plus the delay's shape, checked
-    /// against the entry's own numbers.
+    /// The delay itself is `interval * 2^failures`, measured on the monotonic
+    /// clock, so the test can age the stamp directly instead of committing rows
+    /// to move `current_ts()`: nothing about a retry gate depends on commits.
     #[tokio::test]
     async fn a_failing_table_is_excluded_and_a_write_brings_it_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_unsealed_reclaim_interval(1); // < 1 min -> base = 1 commit
+        e.set_unsealed_reclaim_interval(1);
         e.set_memindex_quota(1);
         e.execute("CREATE TABLE rx (id INT);").await.unwrap();
         e.execute("INSERT INTO rx VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rx");
 
-        // Pretend three dumps in a row failed a moment ago.
+        // Three failures a moment ago: the wait is `1s * 2^3`.
         {
             let mut tables = e.tables.lock().unwrap();
             let entry = tables.get_mut(&key).unwrap();
             entry.dump_failures = 3;
-            entry.last_attempt_ts = e.current_ts();
+            entry.last_attempt_ts = crate::engine::reclaim::monotonic_now_ms();
         }
         e.context
             .unsealed_backoff_until
@@ -18463,7 +18750,33 @@ mod tests {
             "a table that keeps failing waits out its exponential delay"
         );
 
-        // A write is new data, so the backoff no longer applies.
+        // The same failure count, but the attempt is old enough that the wait
+        // is over: the table is a candidate again. This is what a commit-ts
+        // stamp could not express on an idle, failing server.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            // The stamp cannot go below zero, so "long ago" is `0` when the
+            // process is younger than the wait.
+            entry.last_attempt_ts =
+                crate::engine::reclaim::monotonic_now_ms().saturating_sub(10_000);
+        }
+        e.context
+            .unsealed_backoff_until
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            e.reclaim_unsealed().await,
+            1,
+            "an expired per-table wait lets the table retry"
+        );
+
+        // A write is new data, so the backoff no longer applies at all.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            entry.dump_failures = 5;
+            entry.last_attempt_ts = crate::engine::reclaim::monotonic_now_ms();
+        }
         e.execute("INSERT INTO rx VALUES (2);").await.unwrap();
         assert_eq!(
             e.tables

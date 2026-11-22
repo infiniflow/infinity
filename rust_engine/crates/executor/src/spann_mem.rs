@@ -537,7 +537,7 @@ impl SpannHandle {
         // clone shares nothing but costs a container copy, not a row copy.
         let ids: Arc<common::RowMask> = Arc::new(allowed.clone());
         let mut width = beam.unwrap_or(DEFAULT_SEARCH_BEAM).max(1);
-        for attempt in 0..3 {
+        for _attempt in 0..3 {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
                 SpannHandle::File(chains) => {
@@ -575,13 +575,33 @@ impl SpannHandle {
                     merged
                 }
             };
-            if hits.len() >= k || attempt == 2 {
+            if hits.len() >= k {
                 hits.truncate(k);
                 return hits;
             }
+            // A short answer means the beam did not reach enough leaves that
+            // hold admitted rows. Widen it, then **fall back to the whole
+            // tree**: the beam is a work bound, not a correctness one, so a
+            // selective filter must not answer fewer than `k` rows while
+            // admitted rows remain. The exhaustive attempt walks every leaf
+            // that holds an admitted row and is still cheaper than letting the
+            // caller's exact scan re-read the table.
             width = (width * 2).min(MAX_RERANK_CANDIDATES);
         }
-        Vec::new()
+        let mut hits = match self {
+            SpannHandle::Memory(index) => index.search_admitted_exact(q, k, &ids),
+            SpannHandle::File(chains) => {
+                let mut merged: Vec<(u64, f32)> = chains
+                    .iter()
+                    .flat_map(|c| c.search_admitted_exact(q, k, &ids))
+                    .collect();
+                merge_chunks(&mut merged);
+                merged.truncate(k);
+                merged
+            }
+        };
+        hits.truncate(k);
+        hits
     }
 
     /// `(partitions, height)`, reported by `SHOW INDEX` (§16.4).

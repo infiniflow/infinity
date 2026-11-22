@@ -42,6 +42,34 @@ use std::sync::atomic::Ordering;
 use super::maintain::{rrf_order, ReclaimCandidate};
 use crate::engine::state::Engine;
 
+/// Milliseconds on a clock that never goes backwards, for retry deadlines.
+///
+/// The ranking's age is in commit ts on purpose (it has to survive a restart),
+/// but a *retry gate* must not be: a failed round may not commit anything, so a
+/// deadline expressed in commit ts is only reached when an unrelated statement
+/// happens to advance the clock. An `Instant`-based deadline fires on time even
+/// on an idle, failing server.
+pub(crate) fn monotonic_now_ms() -> u64 {
+    use std::sync::OnceLock;
+    static START: OnceLock<std::time::Instant> = OnceLock::new();
+    // Never 0: the value doubles as "an attempt was recorded", so a stamp taken
+    // in the first millisecond of the process must not read as "never tried".
+    (START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis() as u64)
+        .max(1)
+}
+
+/// The monotonic deadline `wait` from now.
+fn monotonic_deadline(wait: std::time::Duration) -> u64 {
+    monotonic_now_ms().saturating_add(wait.as_millis() as u64)
+}
+
+/// The trigger loop's tick, in milliseconds. A drain only runs on a tick, so a
+/// retry deadline shorter than one could not be observed.
+const TICK_MS: u64 = 1000;
+
 /// A table as the round's first pass sees it.
 struct TableStat {
     key: String,
@@ -50,9 +78,9 @@ struct TableStat {
     footprint: u64,
     /// Commit ts of the table's last append, or 0 when it has none this process.
     last_ts: u64,
-    /// When the loop last tried and failed, in commit ts. The age the ranking
-    /// uses is measured from `max(last_ts, last_attempt_ts)`, so a table that
-    /// keeps failing drifts to the back instead of sitting at the front for ever.
+    /// When the loop last tried and failed, in **monotonic milliseconds**. The
+    /// per-table retry gate compares it against the same clock, so a failed dump
+    /// becomes due on time even when nothing commits in between.
     last_attempt_ts: u64,
     dump_failures: u32,
 }
@@ -60,10 +88,11 @@ struct TableStat {
 impl Engine {
     /// One reclaim round. Returns how many tables it dumped.
     ///
-    /// The clock is the engine's own commit timestamp: there is no `now` to pass
-    /// in and no wall clock to read. `current_ts()` is the order appends and
-    /// dumps already use, and a test drives ageing by committing rows rather
-    /// than by sleeping.
+    /// Two clocks, each where it belongs. **Age** is the engine's commit
+    /// timestamp - it orders appends and dumps already, survives a restart, and
+    /// a test drives ageing by committing rows instead of sleeping. **Retry
+    /// gates** are monotonic elapsed time, because a failed round may not commit
+    /// anything at all and a commit-ts deadline would then never come due.
     ///
     /// The round runs only while the ledger is over **half the quota** and stops
     /// the moment it is back under. `budget_bytes()` is re-read before every
@@ -77,14 +106,16 @@ impl Engine {
             return 0;
         }
         let now_ts = self.current_ts();
-        if self.context.unsealed_backoff_until.load(Ordering::Relaxed) > now_ts {
+        // The retry gate is a monotonic deadline, not a commit ts: ageing the
+        // ranking on commit ts is right, but no commit has to happen for a
+        // backed-off round to become due again.
+        if monotonic_now_ms() < self.context.unsealed_backoff_until.load(Ordering::Relaxed) {
             return 0;
         }
         let cap = self
             .context
             .unsealed_max_tables_per_round
             .load(Ordering::Relaxed);
-        let base = self.backoff_base_ts();
 
         let target = self.reclaim_target();
         if self.reclaim_target_met(target) {
@@ -97,14 +128,15 @@ impl Engine {
         }
         let candidates: Vec<ReclaimCandidate> = stats
             .iter()
-            .filter(|stat| self.reclaim_candidate_eligible(stat, now_ts, base))
+            .filter(|stat| self.reclaim_candidate_eligible(stat))
             .map(|stat| ReclaimCandidate {
                 key: stat.key.clone(),
                 bytes: stat.footprint,
-                // Age counts from the last append *or* the last attempt, so a
-                // table that keeps failing recedes instead of camping at the
-                // head of the order.
-                age_ms: now_ts.saturating_sub(stat.last_ts.max(stat.last_attempt_ts)),
+                // Pure commit-ts age: how long since the table last changed.
+                // A failing table recedes through its own backoff (which keeps
+                // it out of the candidate set), not by pretending it is young -
+                // mixing a monotonic stamp in here would compare two clocks.
+                age_ms: now_ts.saturating_sub(stat.last_ts),
             })
             .collect();
         if candidates.is_empty() {
@@ -114,17 +146,21 @@ impl Engine {
 
         let mut dumped = 0usize;
         let mut progressed = false;
-        for at in order {
+        // `attempted` counts visits, `dumped` counts successes: the cap is on
+        // the former, because a table whose dump releases nothing still spent
+        // block I/O and an index catalog scan. Counting only successes let a
+        // widespread storage failure walk every eligible table in one tick.
+        for (attempted, at) in order.into_iter().enumerate() {
             let key = candidates[at].key.clone();
             if self.reclaim_target_met(target) {
+                break;
+            }
+            if cap != 0 && attempted >= cap {
                 break;
             }
             if self.dump_table(&key).await {
                 progressed = true;
                 dumped += 1;
-                if cap != 0 && dumped >= cap {
-                    break;
-                }
             }
         }
         // A round that released nothing must not be repeated on the next slot: it
@@ -135,27 +171,44 @@ impl Engine {
                 .unsealed_backoff_until
                 .store(0, Ordering::Relaxed);
         } else {
+            // A **monotonic deadline**, not a commit ts. A failed round may not
+            // advance `current_ts()` at all (a block write that errors before
+            // its commit), and a deadline expressed in commit ts would then
+            // never be reached: once storage recovered, every later tick still
+            // failed the gate until an unrelated commit moved the clock.
+            //
+            // The floor is the tick: a drain only runs on one, so a shorter
+            // deadline could not be observed anyway. It also keeps an interval
+            // of `0` (sweep off, write-triggered drains only) from retrying a
+            // failure every tick.
+            let interval = self
+                .context
+                .unsealed_reclaim_interval
+                .load(Ordering::Relaxed);
+            let wait = std::time::Duration::from_millis(interval.max(TICK_MS));
             self.context
                 .unsealed_backoff_until
-                .store(now_ts.saturating_add(base), Ordering::Relaxed);
+                .store(monotonic_deadline(wait), Ordering::Relaxed);
         }
         dumped
     }
 
-    /// How many commit ts a failed round waits before trying again.
+    /// How long a failed table waits before it is a candidate again.
     ///
-    /// `unsealed_reclaim_interval` is a duration and the age is in commit ts, so
-    /// the two cannot be compared directly. The conversion here is one commit per
-    /// interval minute, which makes the base a **commit count** - the unit the
-    /// ranking actually uses. An interval of `0` (sweep off) falls back to 1 so a
-    /// failed write-triggered round still backs off instead of spinning.
-    fn backoff_base_ts(&self) -> u64 {
-        let minutes = self
+    /// Duration, not commit ts: the per-table backoff has the same problem the
+    /// round's gate has - a table whose dump keeps failing may never see a
+    /// commit, so a commit-ts deadline would only expire when some unrelated
+    /// statement advanced the clock, instead of on time.
+    fn table_backoff(&self, failures: u32) -> std::time::Duration {
+        // The interval is the base; `2^failures` stretches it. The cap at 2^6
+        // keeps the wait finite, while the tick floor keeps an interval of `0`
+        // (sweep off) from turning into a per-tick retry.
+        let base = self
             .context
             .unsealed_reclaim_interval
             .load(Ordering::Relaxed)
-            / 60_000;
-        minutes.max(1)
+            .max(TICK_MS);
+        std::time::Duration::from_millis(base.saturating_mul(1u64 << failures.min(6)))
     }
 
     /// The ledger level this round drains to: **half the quota**.
@@ -173,7 +226,7 @@ impl Engine {
     }
 
     /// Whether a table should enter this round's candidate set.
-    fn reclaim_candidate_eligible(&self, stat: &TableStat, now_ts: u64, base: u64) -> bool {
+    fn reclaim_candidate_eligible(&self, stat: &TableStat) -> bool {
         // A table an `IMPORT` is still staging into is not reclaimable: its rows
         // are not committed, so a dump would publish a chunk over rows the table
         // may never have.
@@ -186,12 +239,19 @@ impl Engine {
         if stat.dump_failures == 0 {
             return true;
         }
-        // Exponential backoff from the same base the ranking uses: a table that
-        // keeps failing must not hold a slot in every round. The cap at 2^6 keeps
-        // the wait finite instead of overflowing.
-        let wait = base.saturating_mul(1u64 << stat.dump_failures.min(6));
-        let since = now_ts.saturating_sub(stat.last_ts.max(stat.last_attempt_ts));
-        since >= wait
+        // No stamp means no attempt was recorded, so there is nothing to wait
+        // for. Only reachable when the counter outlives its stamp (a table entry
+        // rebuilt from the catalog); waiting from process start would keep the
+        // table in memory for a failure this process never had.
+        if stat.last_attempt_ts == 0 {
+            return true;
+        }
+        // The table's own backoff. `last_attempt_ts` is a monotonic millisecond
+        // stamp, so this fires on time on a failing server; the commit ts stays
+        // in `age_ms`, where its meaning is "how long since the table last
+        // changed" and a restart cannot reset it.
+        let wait = self.table_backoff(stat.dump_failures).as_millis() as u64;
+        monotonic_now_ms().saturating_sub(stat.last_attempt_ts) >= wait
     }
 
     /// One table's unsealed footprint snapshot, for every table.
@@ -288,12 +348,16 @@ impl Engine {
             .await;
         // Phase 2: seal every index tail, with no gate held.
         self.dump_every_table_index(Some(key)).await;
-        self.recompute_memindex_total();
+        // Only this table's charge, not a full reconciliation: the round's stop
+        // check re-reads the ledger before every dump, and a round of 100 dumps
+        // would otherwise walk every key (and read every index's state) 100
+        // times. The checkpoint's `recompute_memindex_total` stays the safety
+        // net for drift.
+        self.refresh_memindex_charge(key);
 
         let after = self.unsealed_live_of(key);
         let released = after < before;
         let still_unsealed = self.table_has_unsealed(key);
-        let now_ts = self.current_ts();
         if let Some(entry) = self.tables.lock().unwrap().get_mut(key) {
             if released {
                 // Partial success must not be recorded as a failure: the next
@@ -301,7 +365,10 @@ impl Engine {
                 entry.last_attempt_ts = 0;
                 entry.dump_failures = 0;
             } else {
-                entry.last_attempt_ts = now_ts;
+                // A monotonic stamp: the per-table gate compares it against a
+                // monotonic clock, so a failed dump retries when its wait is
+                // over even if nothing commits in between.
+                entry.last_attempt_ts = monotonic_now_ms();
                 entry.dump_failures = entry.dump_failures.saturating_add(1);
             }
             let _ = still_unsealed;

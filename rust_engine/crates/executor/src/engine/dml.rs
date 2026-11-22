@@ -876,7 +876,7 @@ impl Engine {
         // before these rows join it.
         let gate = self.batch_gate(table);
         let phase = std::time::Instant::now();
-        self.note_index_insert(table, rows.len()).await;
+        self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
         // row cache; the batch is appended after the commit.
         {
@@ -2365,17 +2365,29 @@ impl Engine {
         // column, and only while the cache has no entry for it.
         if indexes.len() < by_id.len() {
             for column in self.fulltext_columns(table) {
-                if schema.iter().all(|c| c != &column)
-                    || indexes.iter().any(|(_, cached, _)| cached == &column)
-                {
+                if schema.iter().all(|c| c != &column) {
                     continue;
                 }
                 let tokenizer = self.index_tokenizer(table, &column);
-                let ids = self.index_ids_on_column_of_kind(table, &column, &["FULLTEXT"]);
-                if let Ok(shared) = self.text_index_for(table, &column, tokenizer).await {
-                    for id in ids {
-                        indexes.push((id, column.clone(), shared.clone()));
-                    }
+                // One handle **per index id**, not one shared by every id on
+                // the column: each record owns its own `SharedTextIndex`
+                // (`text_index_build` keys the cache by id), so pairing one
+                // handle with two ids made the publish loop run the same
+                // documents into the same index twice - and the second pass
+                // deleted rows the first had just written.
+                let pending: Vec<u64> = self
+                    .index_ids_on_column_of_kind(table, &column, &["FULLTEXT"])
+                    .into_iter()
+                    .filter(|id| !indexes.iter().any(|(has, _, _)| has == id))
+                    .collect();
+                for id in pending {
+                    let Ok((shared, _)) = self
+                        .text_index_with_tokenizer_of_id(table, id, &column, tokenizer.clone())
+                        .await
+                    else {
+                        continue;
+                    };
+                    indexes.push((id, column.clone(), shared));
                 }
             }
         }
@@ -3229,11 +3241,22 @@ impl Engine {
     }
 
     /// Accounts `count` rows about to be inserted into `table` against each
-    /// HNSW memory index. The reference dumps an index when it reaches
-    /// `mem_index_capacity` rows (or, in this port, the buffered-size quota)
-    /// **before** taking the new rows, which is what this reproduces (one
-    /// `chunk_{n}.idx` per dump).
-    pub(crate) async fn note_index_insert(&self, table: &str, count: usize) {
+    /// HNSW memory index, and raises the reclaim flag when that crosses the
+    /// budget.
+    ///
+    /// The reference dumps an index when its tracer reports the memory limit
+    /// (`MemIndexTracer::IncreaseMemoryUsage`), and this port used to do the
+    /// same inline. It no longer does: a dump here is a chunk write plus an
+    /// index catalog scan **on the statement's latency**, and it can take
+    /// another table's bottom gate while this one holds its own. The decided
+    /// shape is one drain, on the trigger loop's tick (`reclaim_unsealed`), so
+    /// the write path only keeps the charge current and raises
+    /// [`Context::unsealed_reclaim_requested`].
+    ///
+    /// The separate **row-capacity** bound (`dump_hnsw_over_capacity`) is
+    /// untouched: it is a different question - how many rows one in-memory
+    /// graph may hold - and it is what keeps a long import's footprint flat.
+    pub(crate) fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
             .context
             .memindex_quota
@@ -3273,39 +3296,19 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
-            let dump = {
-                let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(tkey.clone()).or_default();
-                let cur = entry.index_pending_bytes.entry(im.id).or_insert(0);
-                *cur += bytes;
-                // The reference dumps when the memory passes the quota and
-                // subtracts only what the dump released, so the rows above
-                // the limit stay accounted and the *next* batch is what
-                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
-                if quota > 0 && *cur > quota {
-                    *cur -= quota;
-                    true
-                } else {
-                    false
-                }
-            };
-            if dump && self.dump_hnsw_index(&im.table, &im.name).await.is_ok() {
-                // The dumped segment leaves memory. The bytes above the
-                // quota were already left in the counter, so nothing else to
-                // do here but drop the graph the dump just sealed.
-                //
-                // **Before** the rows of this batch are written: a dump seals
-                // what the graph holds now, so each batch lands in its own
-                // chunk. Proposing it from the post-write quota check instead
-                // merged every batch into one chunk (`test_mem_bmp`,
-                // `test_optimize_from_different_database`).
-                let mut tables = self.tables.lock().unwrap();
-                if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.retain(|(id, _), _| *id != im.id);
-                    e.index_pending_bytes.insert(im.id, 0);
-                    e.hnsw_topup = true;
-                }
+            // Only the charge moves. The reference subtracts what a dump
+            // released and leaves the rest accounted, so the counter is a
+            // running total; the scan recomputes it when it drains.
+            if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
+                *entry.index_pending_bytes.entry(im.id).or_insert(0) += bytes;
             }
+        }
+        // One atomic read after the charge update, not per index: the scan's
+        // own check is authoritative, this only has to wake it up.
+        if (self.budget_bytes() as u64) > self.reclaim_target() {
+            self.context
+                .unsealed_reclaim_requested
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }

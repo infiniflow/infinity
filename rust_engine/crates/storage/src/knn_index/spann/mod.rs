@@ -903,13 +903,18 @@ impl FileIndex {
 
     /// Scores one leaf's page into `set`, the single-chunk scan the chain reuses
     /// (`ChunkChain::search` walks the chain but scans through the owner layer).
+    /// Reads one leaf's slots into `set`, returning how many the mask admitted.
+    ///
+    /// The count is what a filtered walk charges against its beam: a leaf whose
+    /// rows are all rejected costs nothing, so a selective filter cannot spend
+    /// the budget on partitions that cannot contribute.
     pub(crate) fn scan_leaf_into(
         &self,
         key: PartitionKey,
         q: &[f32],
         allowed: Option<&RowMask>,
         set: &mut SearchSet,
-    ) {
+    ) -> usize {
         let chunk = self.chunk();
         self.scan_leaf(
             &chunk,
@@ -919,7 +924,7 @@ impl FileIndex {
             self.dims(),
             allowed,
             set,
-        );
+        )
     }
 
     pub fn dims(&self) -> usize {
@@ -1025,11 +1030,16 @@ impl FileIndex {
                 continue;
             };
             if meta.level <= 1 {
-                if scanned >= budget {
-                    break;
+                // Only a leaf that admits at least one row spends beam budget:
+                // a leaf the filter rejects entirely cannot contribute, and
+                // charging it made a selective filter come back short.
+                let admitted = self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
+                if admitted > 0 || allowed.is_none() {
+                    if scanned >= budget {
+                        break;
+                    }
+                    scanned += 1;
                 }
-                scanned += 1;
-                self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
                 continue;
             }
             for child in chunk.children(key) {
@@ -1048,6 +1058,16 @@ impl FileIndex {
         set.into_sorted()
     }
 
+    /// The admitted rows this chunk holds, scored exactly.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short: the beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to the whole tree rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
+    }
+
     /// Scores every slot of one leaf into `set`.
     #[allow(clippy::too_many_arguments)]
     fn scan_leaf(
@@ -1059,12 +1079,13 @@ impl FileIndex {
         dims: usize,
         allowed: Option<&RowMask>,
         set: &mut SearchSet,
-    ) {
+    ) -> usize {
         let (Some(slots), Some(centroid)) = (chunk.slots(key), chunk.centroid(key)) else {
-            return;
+            return 0;
         };
         let rot_centroid = self.rotation.apply(&centroid);
         let query = quantize::make_query(&self.rotation, &rot_centroid, q);
+        let mut admitted = 0usize;
         for i in 0..slots.len() {
             let (Some(row), Some((norm, raw_norm, sum, error, bits))) =
                 (slots.row_id(i), slots.parts(i))
@@ -1076,6 +1097,7 @@ impl FileIndex {
                     continue;
                 }
             }
+            admitted += 1;
             // Scored from the raw columns: no per-member allocation, which is
             // what made the first mapped version 3.4× slower than heap.
             let squared = quantize::distance_estimate_parts(&query, norm, sum, error, bits, dims);
@@ -1083,6 +1105,7 @@ impl FileIndex {
             let (score, bound) = metric_score(metric, squared, err, query.raw_norm, raw_norm);
             set.add(score, bound, row);
         }
+        admitted
     }
 }
 
@@ -1166,6 +1189,69 @@ mod tests {
             max_partition_size: 32,
             min_partition_size: 8,
             ..Options::default()
+        }
+    }
+
+    /// A filtered probe may not spend its beam on leaves the mask rejects.
+    ///
+    /// 400 rows in ~13 leaves, `beam = 2`: with a mask that admits only the
+    /// rows of the **last** few leaves, charging every probed leaf to the beam
+    /// spent the budget on the first two rejected partitions and answered
+    /// nothing. Only a leaf that admits a row may count, so the probe keeps
+    /// walking until it has found `k` admitted rows.
+    #[test]
+    fn a_filtered_beam_skips_leaves_the_mask_rejects() {
+        let data = rows(400, 8);
+        let index = SpannIndex::build(data.clone(), opts()).unwrap();
+        let bytes = write(&index, 0).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_0.idx");
+        std::fs::write(&path, &bytes).unwrap();
+        let file = FileIndex::open(&path, &opts()).unwrap();
+
+        // The rows of the tail partitions: whatever the tree put last is what a
+        // `beam = 2` best-first walk reaches last.
+        let admitted: RowMask = RowMask::from_rows((360..400u64).collect());
+        assert!(
+            index
+                .search(&data[380].1, 5, Some(2))
+                .iter()
+                .all(|(id, _)| *id < 400),
+            "sanity: the unfiltered probe answers"
+        );
+        for query in data.iter().skip(360).take(5) {
+            let filtered: Vec<u64> = index
+                .search_filtered(&query.1, 5, Some(2), &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert!(
+                filtered.len() >= 5,
+                "a rejected leaf must not consume the beam (row {}): {filtered:?}",
+                query.0
+            );
+            assert!(
+                filtered.iter().all(|id| admitted.contains(*id)),
+                "row {}: the probe returned a filtered-out row",
+                query.0
+            );
+            // `beam = 2` is approximate, so the ids need not equal the
+            // exhaustive answer - but the exhaustive fallback the handle uses
+            // must.
+            let exact: Vec<u64> = index
+                .search_admitted_exact(&query.1, 5, &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(exact.len(), 5, "row {}: the fallback is short", query.0);
+
+            // The mapped form walks the same code.
+            let mapped: Vec<u64> = file
+                .search_filtered(&query.1, 5, Some(2), &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(mapped, filtered, "row {}: chunk file disagrees", query.0);
         }
     }
 

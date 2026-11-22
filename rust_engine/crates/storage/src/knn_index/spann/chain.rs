@@ -463,6 +463,16 @@ impl ChunkChain {
         self.search_masked(q, k, beam, Some(allowed))
     }
 
+    /// The admitted rows this chain holds, scored exactly.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short: the beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to walking every leaf rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
+    }
+
     fn search_masked(
         &self,
         q: &[f32],
@@ -498,12 +508,21 @@ impl ChunkChain {
                 continue;
             };
             if meta.level <= 1 {
-                if scanned >= budget {
-                    break;
-                }
-                scanned += 1;
-                if let Some(layer) = self.owner(key) {
-                    self.layers[layer].scan_leaf_into(key, q, allowed, &mut set);
+                // A leaf whose every row the mask rejects must not spend beam
+                // budget: with a selective filter the budget would be gone
+                // after the first few leaves and the answer would come back
+                // short although admitted rows exist elsewhere. Admitting at
+                // least one row is what makes a probe count; the walk is still
+                // bounded, by the tree's own leaf count.
+                let admitted = match self.owner(key) {
+                    Some(layer) => self.layers[layer].scan_leaf_into(key, q, allowed, &mut set),
+                    None => 0,
+                };
+                if admitted > 0 || allowed.is_none() {
+                    if scanned >= budget {
+                        break;
+                    }
+                    scanned += 1;
                 }
                 continue;
             }

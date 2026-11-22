@@ -63,8 +63,9 @@ trigger loop 的 tick 上，以**表**为单位把 append buffer 与索引 tail 
 可能与参考不同**——跨引擎字节门禁里凡是比较「chunk 数 / chunk 边界」的用例，若把配额设得很小并让服务端跑过 30 秒，
 就会看到差异。行数据本身不受影响（内存里的行本就在块文件和 WAL 里）。
 
-配置：`[buffer] unsealed_reclaim_interval`（`0` 停止调度）、`unsealed_max_tables_per_round`（`0` = 不限）；
-`unsealed_memory_quota = 0` 关掉整个机制，因为目标由它派生。
+配置：`[buffer] unsealed_reclaim_interval`（`0` 只停周期扫描，写路径置的标志仍会触发一次排水）、
+`unsealed_max_tables_per_round`（`0` = 不限，按**尝试**计数而非成功数）；`unsealed_memory_quota = 0`
+才是整个机制的开关，因为目标由它派生。配置值非法（`"512MiB"`、`"250ms"`、`-1`）在启动时报错并指明字段，不再静默变成 0。
 
 ## 2 未实现 / 未接线
 

@@ -4468,13 +4468,38 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<(SharedTextIndex, TextTokenizer)> {
-        let (index_id, index_name) = self.fulltext_record(table, column).ok_or_else(|| {
+        let (index_id, _) = self.fulltext_record(table, column).ok_or_else(|| {
             Error::Invalid(format!(
                 "fulltext index does not exist for column '{column}'"
             ))
         })?;
-        let tokenizer = self
-            .index_tokenizer_of(table, &index_name)
+        self.text_index_with_tokenizer_of_id(table, index_id, column, tokenizer)
+            .await
+    }
+
+    /// [`Self::text_index_with_tokenizer`] for **one** catalog record.
+    ///
+    /// The write path needs this form: a column may carry two `FULLTEXT`
+    /// indexes (with different analyzers), and each owns its own cached index.
+    /// Resolving by column returned the first record's handle for both, so the
+    /// same documents were published into one index twice.
+    pub(crate) async fn text_index_with_tokenizer_of_id(
+        &self,
+        table: &str,
+        index_id: u64,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<(SharedTextIndex, TextTokenizer)> {
+        let index_name = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()
+            .and_then(|list| list.into_iter().find(|im| im.id == index_id))
+            .map(|im| im.name);
+        let tokenizer = index_name
+            .as_deref()
+            .and_then(|name| self.index_tokenizer_of(table, name))
             .unwrap_or(tokenizer);
         let index = self
             .text_index_for_id(table, index_id, column, tokenizer.clone())

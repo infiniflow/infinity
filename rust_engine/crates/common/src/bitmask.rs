@@ -143,7 +143,16 @@ impl Bitmask {
     }
 
     /// C++ `RoaringBitmap::MergeAnd(other)` — the reference's `&=`.
+    ///
+    /// Two bitmaps over different universes cannot be merged: the reference
+    /// treats it as unrecoverable, and silently merging would leave `count`
+    /// naming one universe while `values` holds bits from another -
+    /// `count_true` and `count_false` then disagree with `iter`. A release
+    /// build keeps the receiver unchanged instead of aborting the process.
     pub fn merge_and(&mut self, other: &Bitmask) {
+        if !self.same_universe(other) {
+            return;
+        }
         if other.all_true {
             return;
         }
@@ -155,7 +164,14 @@ impl Bitmask {
     }
 
     /// C++ `RoaringBitmap::MergeOr(other)` — the reference's `|=`.
+    ///
+    /// The universe check runs **before** the all-true shortcuts: `merge_and`
+    /// replaces the receiver through `other.clone()`, and a shortcut taken
+    /// first would import the other bitmap's `count`.
     pub fn merge_or(&mut self, other: &Bitmask) {
+        if !self.same_universe(other) {
+            return;
+        }
         if other.all_true {
             self.set_all_true();
             return;
@@ -168,6 +184,17 @@ impl Bitmask {
             self.all_true = true;
             self.values.clear();
         }
+    }
+
+    /// Whether `other` names the same universe.
+    ///
+    /// The reference treats a mismatch as unrecoverable
+    /// (`RoaringBitmap::MergeAnd: bitmaps have different sizes`). This port
+    /// cannot abort a serving process over one bad filter, so the merge is
+    /// dropped instead - and the caller can see it from [`Self::count`], which
+    /// still names the receiver's universe.
+    fn same_universe(&self, other: &Bitmask) -> bool {
+        self.count == other.count
     }
 
     /// C++ `RoaringBitmap::SetAllTrue()`.
@@ -270,11 +297,27 @@ impl RowBitmap {
     }
 
     /// The rows in `[start, end)`, ascending.
+    ///
+    /// `advance_to` is a container-level seek (a `BTreeMap` descent plus one
+    /// container lookup), so a caller that asks for a window pays the seek, not
+    /// a walk over the rows below `start`. `skip_while` here scanned from the
+    /// first row on every call, which is what made a cursor that seeks per
+    /// document quadratic in the table.
     pub fn range(&self, start: u64, end: u64) -> impl Iterator<Item = u64> + '_ {
-        self.rows
-            .iter()
-            .skip_while(move |row| *row < start)
-            .take_while(move |row| *row < end)
+        let mut iter = self.rows.iter();
+        if start != 0 {
+            iter.advance_to(start);
+        }
+        iter.take_while(move |row| *row < end)
+    }
+
+    /// The first row `>= row`: the reference's `RoaringBitmap::NextSetBit`.
+    pub fn next_ge(&self, row: u64) -> Option<u64> {
+        let mut iter = self.rows.iter();
+        if row != 0 {
+            iter.advance_to(row);
+        }
+        iter.next()
     }
 
     /// How many rows the two sets share (`RoaringBitmap::intersection_len`).
@@ -406,22 +449,55 @@ impl RowMask {
     /// The first admitted row `>= row`.
     ///
     /// This is the seek the full-text cursors use (`DocFilter::next_ge`), and
-    /// the reference gets it from `RoaringBitmap::NextSetBit`. An excluded row
-    /// has to be hopped over, so the walk retries past it - a tombstone is
-    /// bounded work, and the alternative (a materialised complement) needs the
-    /// universe this type deliberately does not carry.
+    /// the reference gets it from `RoaringBitmap::NextSetBit`. Both halves are
+    /// walked by an **advancing** iterator rooted at `row`: an excluded row
+    /// costs the next step of the exclusion walk, not a new seek. Restarting
+    /// the scan per excluded row made a cursor over a mostly-deleted index
+    /// quadratic - with `0..100000` admitted and `0..98000` excluded, one call
+    /// walked every skipped row again from the start.
     pub fn next_ge(&self, row: u64) -> Option<u64> {
-        let mut at = match &self.admit {
-            Some(admit) => admit.range(row, u64::MAX).next()?,
-            None => row,
-        };
-        while self.exclude.as_ref().is_some_and(|set| set.contains(at)) {
-            at = match &self.admit {
-                Some(admit) => admit.range(at + 1, u64::MAX).next()?,
-                None => at.checked_add(1)?,
-            };
+        fn seek(set: &RowBitmap, row: u64) -> roaring::treemap::Iter<'_> {
+            let mut iter = set.iter();
+            if row != 0 {
+                iter.advance_to(row);
+            }
+            iter
         }
-        Some(at)
+        match (&self.admit, &self.exclude) {
+            (Some(admit), Some(exclude)) => {
+                let mut admit = seek(admit, row);
+                let mut excluded = seek(exclude, row).peekable();
+                loop {
+                    let at = admit.next()?;
+                    // Both walks ascend, so the exclusion cursor only moves
+                    // forward: no candidate is compared twice.
+                    while excluded.peek().is_some_and(|e| *e < at) {
+                        excluded.next();
+                    }
+                    if excluded.peek() != Some(&at) {
+                        return Some(at);
+                    }
+                }
+            }
+            (Some(admit), None) => seek(admit, row).next(),
+            // The predicate admits everything: step past the tombstones.
+            (None, Some(exclude)) => {
+                let mut at = row;
+                let mut excluded = seek(exclude, row);
+                let mut next = excluded.next();
+                loop {
+                    match next {
+                        Some(e) if e < at => next = excluded.next(),
+                        Some(e) if e == at => {
+                            at = at.checked_add(1)?;
+                            next = excluded.next();
+                        }
+                        _ => return Some(at),
+                    }
+                }
+            }
+            (None, None) => Some(row),
+        }
     }
 
     /// How many rows are admitted, when that is known without a universe.
@@ -535,6 +611,31 @@ mod row_mask_tests {
         assert_eq!(mask.next_ge(5), Some(7));
         assert_eq!(mask.len(), None);
     }
+
+    #[test]
+    fn a_seek_past_a_long_run_of_tombstones_does_not_restart_the_walk() {
+        // The case the quadratic seek was reported on: 100k admitted rows, all
+        // but the last 2k excluded. Every excluded row must cost one step of
+        // the exclusion cursor, not a fresh scan from row 0.
+        let mask = RowMask::from_rows((0..100_000u64).collect())
+            .with_excluded(Some((0..98_000u64).collect()));
+        assert_eq!(mask.next_ge(0), Some(98_000));
+        assert_eq!(mask.next_ge(97_999), Some(98_000));
+        assert_eq!(mask.next_ge(98_000), Some(98_000));
+        assert_eq!(mask.next_ge(99_999), Some(99_999));
+        assert_eq!(mask.next_ge(100_000), None);
+    }
+
+    #[test]
+    fn a_seek_over_an_exclusion_only_mask_steps_past_the_tombstones() {
+        // `all_true` plus deletes: the predicate half admits everything, so the
+        // seek walks the exclusion cursor rather than an admit cursor.
+        let excluded: RowBitmap = (0..98_000u64).collect();
+        let mask = RowMask::all_true().with_excluded(Some(excluded));
+        assert_eq!(mask.next_ge(0), Some(98_000));
+        assert_eq!(mask.next_ge(97_000), Some(98_000));
+        assert_eq!(mask.next_ge(110_000), Some(110_000));
+    }
 }
 
 #[cfg(test)]
@@ -591,6 +692,32 @@ mod tests {
         let mut or_true = a.clone();
         or_true.merge_or(&Bitmask::all_true(8));
         assert!(or_true.is_all_true());
+    }
+
+    #[test]
+    fn a_merge_across_universes_leaves_the_receiver_untouched() {
+        // The reference aborts here (`RoaringBitmap::MergeAnd: ... different
+        // sizes`). A release build must not import the other bitmap's universe:
+        // that made `count` name 1 while `values` held rows 1 and 2, so
+        // `count_false` underflowed and `iter` emitted rows outside the range.
+        let mut a = Bitmask::all_false(1);
+        let mut wider = Bitmask::all_false(3);
+        wider.set_true(1);
+        wider.set_true(2);
+
+        let before = a.clone();
+        a.merge_or(&wider);
+        assert_eq!(a, before);
+        assert_eq!(a.count(), 1);
+        assert_eq!(a.count_true(), 0);
+        assert_eq!(a.count_false(), 1);
+        assert_eq!(a.iter().collect::<Vec<_>>(), Vec::<u32>::new());
+
+        // The same for `&`, including the all-true shortcut in the receiver -
+        // it clones `other` and would carry its count along.
+        let mut all_true = Bitmask::all_true(1);
+        all_true.merge_and(&wider);
+        assert_eq!(all_true, Bitmask::all_true(1));
     }
 
     #[test]

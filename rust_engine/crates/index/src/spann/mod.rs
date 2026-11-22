@@ -425,6 +425,17 @@ impl SpannIndex {
         self.search_masked(q, k, beam, Some(allowed))
     }
 
+    /// [`Self::search_filtered`] with the beam disabled: every leaf that holds
+    /// an admitted row is probed.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short. The beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to the whole tree rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
+    }
+
     fn search_masked(
         &self,
         q: &[f32],
@@ -470,12 +481,19 @@ impl SpannIndex {
                 continue;
             };
             if part.is_leaf() {
-                if scanned >= budget {
-                    break;
-                }
+                // Only a leaf that admits at least one row spends beam budget.
+                // A leaf the filter rejects entirely cannot contribute, so
+                // charging it made a selective filter stop early and come back
+                // short although admitted rows exist elsewhere.
+                let before = set.len();
                 let query = part.make_query(&self.rotation, q);
                 part.search_into(&query, q, self.opts.metric, &mut set, allowed);
-                scanned += 1;
+                if set.len() > before || allowed.is_none() {
+                    if scanned >= budget {
+                        break;
+                    }
+                    scanned += 1;
+                }
             } else {
                 for child in &part.children {
                     if let Some(c) = self.store.partition(*child) {
